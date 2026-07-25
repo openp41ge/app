@@ -4,8 +4,13 @@
   "targets": {
     "build": {
       "executor": "nx:run-commands",
-      "outputs": ["{projectRoot}/dist", "{projectRoot}/dist-electron"],
-      "dependsOn": ["^build"],
+      "outputs": [
+        "{projectRoot}/dist",
+        "{projectRoot}/dist-electron"
+      ],
+      "dependsOn": [
+        "^build"
+      ],
       "options": {
         "commands": [
           "vite build",
@@ -18,7 +23,9 @@
     },
     "build:renderer": {
       "executor": "nx:run-commands",
-      "outputs": ["{projectRoot}/dist"],
+      "outputs": [
+        "{projectRoot}/dist"
+      ],
       "options": {
         "command": "vite build",
         "cwd": "{projectRoot}"
@@ -26,7 +33,9 @@
     },
     "build:electron": {
       "executor": "nx:run-commands",
-      "outputs": ["{projectRoot}/dist-electron"],
+      "outputs": [
+        "{projectRoot}/dist-electron"
+      ],
       "options": {
         "command": "tsc -p tsconfig.node.json && cp electron/preload.cjs dist-electron/electron/preload.cjs",
         "cwd": "{projectRoot}"
@@ -43,13 +52,6 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "rm -rf dist dist-electron",
-        "cwd": "{projectRoot}"
-      }
-    },
-    "test": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "vitest run",
         "cwd": "{projectRoot}"
       }
     },
@@ -76,23 +78,33 @@
     },
     "dev:vite": {
       "executor": "@nx/vite:dev-server",
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "options": {
         "buildTarget": "openp41ge:build"
       }
     },
     "dev:electron": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build:electron"],
+      "dependsOn": [
+        "build:electron"
+      ],
       "options": {
-        "commands": ["node scripts/wait-for-vite.mjs", "electron ."],
+        "commands": [
+          "node scripts/wait-for-vite.mjs",
+          "electron ."
+        ],
         "parallel": false,
         "cwd": "{projectRoot}"
       }
     },
     "dev": {
       "executor": "nx:run-commands",
-      "dependsOn": ["^build", "build:electron"],
+      "dependsOn": [
+        "^build",
+        "build:electron"
+      ],
       "options": {
         "command": "concurrently --kill-others \"vite\" \"node scripts/wait-for-vite.mjs && electron .\"",
         "cwd": "{projectRoot}"

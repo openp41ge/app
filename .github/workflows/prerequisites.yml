@@ -44,7 +44,7 @@ jobs:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: nx-${{ runner.os }}-
-      - run: pnpm nx run-many -t test
+      - run: pnpm nx run-many -t test:unit test:integration
 
   contract:
     runs-on: ubuntu-latest
