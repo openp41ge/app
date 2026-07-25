@@ -49,14 +49,28 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "vitest run --exclude test/contract",
+        "command": "vitest run",
         "cwd": "{projectRoot}"
       }
     },
-    "contract": {
+    "test:unit": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "vitest run test/contract",
+        "command": "vitest run --config vitest.unit.config.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "test:integration": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vitest.integration.config.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "test:contract": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vitest.contract.config.ts",
         "cwd": "{projectRoot}"
       }
     },

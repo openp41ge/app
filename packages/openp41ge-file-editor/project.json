@@ -36,6 +36,13 @@
         "command": "npx playwright test --config test/e2e/playwright.config.mjs",
         "cwd": "{projectRoot}"
       }
+    },
+    "test:unit": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vitest.unit.config.ts",
+        "cwd": "{projectRoot}"
+      }
     }
   }
 }
