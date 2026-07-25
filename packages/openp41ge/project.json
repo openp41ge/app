@@ -63,7 +63,7 @@
     "test:contract": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "RUST_LOG=error vitest run --config vitest.contract.config.ts",
+        "command": "vitest run --config vitest.contract.config.ts",
         "cwd": "{projectRoot}"
       }
     },
