@@ -53,7 +53,7 @@
         "cwd": "{projectRoot}"
       }
     },
-    "test:contract": {
+    "contract": {
       "executor": "nx:run-commands",
       "options": {
         "command": "vitest run test/contract",

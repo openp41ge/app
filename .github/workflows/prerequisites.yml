@@ -62,7 +62,7 @@ jobs:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: nx-${{ runner.os }}-
-      - run: pnpm nx run openp41ge:test:contract
+      - run: pnpm nx run openp41ge:contract
 
   e2e:
     runs-on: ubuntu-latest
