@@ -133,11 +133,14 @@ export class FileEditorController extends BaseController implements FileViewerCo
   private async _awaitEditorReady(): Promise<void> {
     const editor = this._editor;
     if (!editor) return;
+    // _viewportEl is private on FileEditorElement; access via bracket cast
+    type _EditorWithPrivates = { _viewportEl?: HTMLElement; updateComplete: Promise<void> };
+    const e = editor as unknown as _EditorWithPrivates;
     // If _viewportEl is already set by firstUpdated(), no need to wait
-    if ((editor as any)._viewportEl) return;
+    if (e._viewportEl) return;
     // Wait for Lit's updateComplete which resolves after firstUpdated()
-    if (typeof (editor as any).updateComplete?.then === "function") {
-      await (editor as any).updateComplete;
+    if (typeof e.updateComplete?.then === "function") {
+      await e.updateComplete;
     }
   }
 

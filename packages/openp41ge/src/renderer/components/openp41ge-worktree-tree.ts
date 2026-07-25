@@ -105,9 +105,7 @@ function _clearGridCellFocus(): void {
 function _restoreGridFocus(): void {
   const grid = document.querySelector("tab-grid") as HTMLElement | null;
   if (grid) {
-    const col = _savedFocusedCol >= 0 ? _savedFocusedCol : 0;
     _savedFocusedCol = -1;
-    // Focus the cell
     const cell = grid.querySelector(".grid-cell");
     if (cell) {
       (cell as HTMLElement).focus();
