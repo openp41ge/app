@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Openp41ge Tabs — Advanced Multi-Grid Demo</title>
+    <link rel="stylesheet" href="./src/index.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Openp41ge <span>Tabs</span> — Advanced Multi-Grid Demo</h1>
+      <p>
+        VS Code-style editor groups using <strong>&lt;tab-grid&gt;</strong> components. Drag tabs to
+        column edges to split, between columns to rearrange, or across grids to move between groups.
+      </p>
+    </header>
+
+    <!-- ─── Main Editor Grid ─────────────────────────────── -->
+    <div class="editor-grid-wrapper">
+      <div style="display: flex; flex-direction: column; height: 100%">
+        <tab-grid id="editor-grid"></tab-grid>
+        <button
+          class="demo-add-tab-btn"
+          data-win-id="editor"
+          data-col="0"
+          style="
+            background: rgba(74, 158, 255, 0.15);
+            color: rgb(74, 158, 255);
+            border: 1px solid rgba(74, 158, 255, 0.3);
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin: 4px;
+          "
+        >
+          +
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── Side Grids ───────────────────────────────────── -->
+    <section class="demo-section">
+      <h2>Side Grids <small>drag tabs between the main editor and these side panels</small></h2>
+      <div class="multi-grid-row">
+        <div class="mini-grid" style="display: flex; flex-direction: column">
+          <tab-grid id="side-grid-a" class="side-grid"></tab-grid>
+          <button
+            class="demo-add-tab-btn"
+            data-win-id="side-a"
+            data-col="0"
+            style="
+              background: rgba(74, 158, 255, 0.15);
+              color: rgb(74, 158, 255);
+              border: 1px solid rgba(74, 158, 255, 0.3);
+              border-radius: 4px;
+              width: 24px;
+              height: 24px;
+              font-size: 14px;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+              margin: 4px;
+            "
+          >
+            +
+          </button>
+        </div>
+        <div class="mini-grid" style="display: flex; flex-direction: column">
+          <tab-grid id="side-grid-b" class="side-grid"></tab-grid>
+          <button
+            class="demo-add-tab-btn"
+            data-win-id="side-b"
+            data-col="0"
+            style="
+              background: rgba(74, 158, 255, 0.15);
+              color: rgb(74, 158, 255);
+              border: 1px solid rgba(74, 158, 255, 0.3);
+              border-radius: 4px;
+              width: 24px;
+              height: 24px;
+              font-size: 14px;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+              margin: 4px;
+            "
+          >
+            +
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── File Explorer ──────────────────────────────── -->
+    <section class="demo-section">
+      <h2>
+        File Explorer <small>drag files onto the editor grid or click to open (unpinned)</small>
+      </h2>
+      <div class="file-explorer">
+        <div class="file-card" draggable="true" data-filepath="src/app.ts">
+          <span class="file-icon">📄</span>
+          <span class="file-name">app.ts</span>
+        </div>
+        <div class="file-card" draggable="true" data-filepath="src/utils.ts">
+          <span class="file-icon">📄</span>
+          <span class="file-name">utils.ts</span>
+        </div>
+        <div class="file-card" draggable="true" data-filepath="src/components/header.tsx">
+          <span class="file-icon">📄</span>
+          <span class="file-name">header.tsx</span>
+        </div>
+        <div class="file-card" draggable="true" data-filepath="README.md">
+          <span class="file-icon">📄</span>
+          <span class="file-name">README.md</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Event Log ───────────────────────────────────── -->
+    <section class="demo-section" id="event-log">
+      <h2>Event Log</h2>
+      <div class="log-controls">
+        <button id="btn-clear-log">Clear</button>
+        <button id="btn-reset">Reset Demo</button>
+      </div>
+      <pre id="log">Waiting for events…</pre>
+    </section>
+
+    <script type="module">
+      // ── Imports ─────────────────────────────────────────────────
+      import "openp41ge-tabs";
+
+      import { DragOrchestrator, TabDragSource, GhostManager } from "openp41ge-tabs";
+
+      // ── Tab ID counter ───────────────────────────────────────────
+      let nextTabId = 200;
+
+      function createTab(title, content, pinned = true) {
+        const id = "tab-" + nextTabId++;
+        return { id, title, content, pinned };
+      }
+
+      // ── Grid state (same as index.html) ──────────────────────────
+      class GridState {
+        constructor(winId, initialTabs) {
+          this.lastFocusedCol = 0;
+          this.winId = winId;
+          this.cols = 1;
+          this.tabs = {};
+          this.activeTabIds = {};
+          this.placements = [];
+
+          const tabIds = [];
+          for (const tab of initialTabs) {
+            this.tabs[tab.id] = {
+              title: tab.title,
+              content: tab.content,
+              pinned: tab.pinned ?? true,
+            };
+            tabIds.push(tab.id);
+          }
+          this.placements.push({ position: { row: 0, col: 0 }, tabIds });
+          if (tabIds.length > 0) this.activeTabIds["0"] = tabIds[0];
+        }
+
+        applyTo(gridEl) {
+          gridEl.winId = this.winId;
+          gridEl.cols = this.cols;
+          gridEl.tabData = { ...this.tabs };
+          gridEl.activeTabIds = { ...this.activeTabIds };
+          gridEl.placements = this.placements.map((p) => ({
+            position: { ...p.position },
+            tabIds: [...p.tabIds],
+          }));
+        }
+
+        getActive(col) {
+          return this.activeTabIds[String(col)] || null;
+        }
+
+        setActive(col, tabId) {
+          this.activeTabIds[String(col)] = tabId;
+        }
+
+        getTabIds(col) {
+          const p = this.placements.find((p) => p.position.col === col);
+          return p ? p.tabIds : [];
+        }
+
+        removeTab(tabId) {
+          for (let ci = 0; ci < this.placements.length; ci++) {
+            const p = this.placements[ci];
+            const idx = p.tabIds.indexOf(tabId);
+            if (idx >= 0) {
+              const tab = this.tabs[tabId];
+              p.tabIds.splice(idx, 1);
+              if (this.activeTabIds[String(ci)] === tabId) {
+                const next = p.tabIds[Math.min(idx, p.tabIds.length - 1)] || null;
+                if (next) this.activeTabIds[String(ci)] = next;
+                else delete this.activeTabIds[String(ci)];
+              }
+              if (p.tabIds.length === 0 && this.placements.length > 1) {
+                this.placements.splice(ci, 1);
+                this.cols = this.placements.length;
+                this.placements.forEach((pp, i) => {
+                  pp.position.col = i;
+                });
+                const newActive = {};
+                for (const [k, v] of Object.entries(this.activeTabIds)) {
+                  const ki = parseInt(k, 10);
+                  if (ki < ci) newActive[k] = v;
+                  else if (ki > ci) newActive[String(ki - 1)] = v;
+                }
+                this.activeTabIds = newActive;
+              }
+              return tab || null;
+            }
+          }
+          return null;
+        }
+
+        insertTab(tabData, col, index) {
+          this.tabs[tabData.id] = {
+            title: tabData.title,
+            content: tabData.content,
+            pinned: tabData.pinned ?? true,
+          };
+          let p = this.placements.find((p) => p.position.col === col);
+          if (!p) {
+            p = { position: { row: 0, col }, tabIds: [] };
+            this.placements.push(p);
+            this.placements.sort((a, b) => a.position.col - b.position.col);
+            this.cols = this.placements.length;
+          }
+          const insertAt = index >= 0 ? Math.min(index, p.tabIds.length) : p.tabIds.length;
+          p.tabIds.splice(insertAt, 0, tabData.id);
+          this.activeTabIds[String(col)] = tabData.id;
+        }
+
+        insertTabInSplit(tabData, splitCol, splitLeft) {
+          this.tabs[tabData.id] = {
+            title: tabData.title,
+            content: tabData.content,
+            pinned: tabData.pinned ?? true,
+          };
+          const splitIdx = this.placements.findIndex((p) => p.position.col === splitCol);
+          if (splitIdx < 0) return;
+          const newCol = splitLeft ? splitCol : splitCol + 1;
+          const newPlacement = { position: { row: 0, col: newCol }, tabIds: [tabData.id] };
+          if (splitLeft) {
+            this.placements.splice(splitIdx, 0, newPlacement);
+          } else {
+            this.placements.splice(splitIdx + 1, 0, newPlacement);
+          }
+          this.placements.forEach((p, i) => {
+            p.position.col = i;
+          });
+          this.cols = this.placements.length;
+          this.activeTabIds = {};
+          this.placements.forEach((p, i) => {
+            if (p.tabIds.length > 0) this.activeTabIds[String(i)] = p.tabIds[0];
+          });
+        }
+
+        reorder(col, fromIndex, toIndex) {
+          const p = this.placements.find((p) => p.position.col === col);
+          if (!p) return;
+          const [moved] = p.tabIds.splice(fromIndex, 1);
+          p.tabIds.splice(toIndex, 0, moved);
+        }
+
+        addTab(col, title, content) {
+          const tab = createTab(title || "New Tab", content || "<p>New tab content.</p>");
+          this.insertTab(tab, col >= 0 ? col : 0, -1);
+          return tab;
+        }
+      }
+
+      // ── Initial tab data ────────────────────────────────────────
+      const editorTabs = [
+        createTab(
+          "README.md",
+          '<div class="content-placeholder"><h3>README.md</h3><p>Welcome to the advanced demo! This editor has multiple columns. Drag tabs to the edges to create new columns, or drag them to the side panels.</p><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;margin-top:8px;"># Openp41ge Tabs\n\nA Lit-based drag-and-drop tab system.</pre></div>',
+        ),
+        createTab(
+          "index.js",
+          '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">import { TabGrid } from "openp41ge-tabs";\n\nconst grid = document.querySelector("tab-grid");\ngrid.cols = 2;</pre></div>',
+        ),
+        createTab(
+          "styles.css",
+          '<div class="content-placeholder"><h3>styles.css</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">.editor {\n  display: flex;\n  flex-direction: row;\n  height: 100%;\n  background: #1e1e1e;\n}</pre></div>',
+        ),
+        createTab(
+          "output.log",
+          '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">[12:00:00] Build started...\n[12:00:02] Build successful ✓\n[12:00:03] Server running on port 3000</p></div>',
+          false,
+        ),
+      ];
+
+      const sideTabsA = [
+        createTab(
+          "Terminal",
+          '<div class="content-placeholder"><h3>Terminal</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">$ git status\nOn branch main\nnothing to commit</pre></div>',
+        ),
+        createTab(
+          "Problems",
+          '<div class="content-placeholder"><h3>Problems</h3><p style="color:#888;">No problems detected.</p></div>',
+        ),
+      ];
+
+      const sideTabsB = [
+        createTab(
+          "Git Log",
+          '<div class="content-placeholder"><h3>Git Log</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">* abc1234 feat: add drag-and-drop\n* def5678 fix: tab reordering\n* fed4321 chore: initial setup</pre></div>',
+        ),
+      ];
+
+      // ── State instances ─────────────────────────────────────────
+      const editorState = new GridState("editor", editorTabs);
+      const sideStateA = new GridState("side-a", sideTabsA);
+      const sideStateB = new GridState("side-b", sideTabsB);
+
+      const allStates = {
+        editor: editorState,
+        "side-a": sideStateA,
+        "side-b": sideStateB,
+      };
+
+      // Start with 2 columns in the editor
+      (function initEditorSplit() {
+        const secondTab = editorTabs[1];
+        editorState.placements[0].tabIds.splice(1, 1);
+        editorState.placements.push({
+          position: { row: 0, col: 1 },
+          tabIds: [secondTab.id],
+        });
+        editorState.cols = 2;
+        editorState.activeTabIds = { 0: editorTabs[0].id, 1: secondTab.id };
+      })();
+
+      // ── DOM references ───────────────────────────────────────────
+      const editorGrid = document.getElementById("editor-grid");
+      const sideGridA = document.getElementById("side-grid-a");
+      const sideGridB = document.getElementById("side-grid-b");
+      const logEl = document.getElementById("log");
+      const clearBtn = document.getElementById("btn-clear-log");
+      const resetBtn = document.getElementById("btn-reset");
+
+      const allGrids = [editorGrid, sideGridA, sideGridB];
+
+      // ── Drag state ───────────────────────────────────────────────
+      let currentDragSource = null;
+      let ghostShownGrid = null;
+      const ghostManager = new GhostManager();
+
+      // ── Target resolver ──────────────────────────────────────────
+      function targetResolver(clientX, clientY) {
+        const el = document.elementFromPoint(clientX, clientY);
+        if (!el || !(el instanceof HTMLElement)) return null;
+
+        const tabBar = el.closest("tab-bar");
+        if (tabBar && tabBar.dropTarget) return tabBar.dropTarget;
+
+        const grid = el.closest("tab-grid");
+        if (grid && grid.dropTarget) return grid.dropTarget;
+
+        return null;
+      }
+
+      // ── Orchestrator ──────────────────────────────────────────────
+      const orchestrator = new DragOrchestrator(targetResolver);
+
+      // ── Grid ghost overlay ────────────────────────────────────────
+      function updateGridGhost(clientX, clientY) {
+        if (ghostShownGrid) {
+          ghostManager.hideGhost(ghostShownGrid);
+          ghostShownGrid = null;
+        }
+
+        const target = targetResolver(clientX, clientY);
+        if (!target || target.type !== "grid" || !currentDragSource) return;
+
+        const feedback = target.onHover(currentDragSource, clientX, clientY);
+        if (!feedback || !feedback.showGhost || !feedback.ghostConfig) return;
+
+        const cfg = feedback.ghostConfig;
+        ghostManager.showGhost(target.element, {
+          cols: cfg.cols,
+          boundaryIndex: cfg.boundaryIndex,
+          splitCol: cfg.splitCol,
+          splitLeft: cfg.splitLeft,
+          activeCol: cfg.mouseCol ?? cfg.col,
+        });
+        ghostShownGrid = target.element;
+      }
+
+      function clearGridGhost() {
+        if (ghostShownGrid) {
+          ghostManager.hideGhost(ghostShownGrid);
+          ghostShownGrid = null;
+        }
+      }
+
+      document.addEventListener("mousemove", (e) => {
+        if (!orchestrator.isDragging) return;
+        updateGridGhost(e.clientX, e.clientY);
+      });
+
+      document.addEventListener("mouseup", () => {
+        clearGridGhost();
+      });
+
+      // ── Render ───────────────────────────────────────────────────
+      async function renderAll() {
+        editorState.applyTo(editorGrid);
+        sideStateA.applyTo(sideGridA);
+        sideStateB.applyTo(sideGridB);
+        await Promise.all(allGrids.map((g) => g.updateComplete));
+      }
+
+      // ── Reset demo ───────────────────────────────────────────────
+      function resetDemo() {
+        // Re-create the initial state
+        nextTabId = 200;
+        const newEditorTabs = [
+          createTab(
+            "README.md",
+            '<div class="content-placeholder"><h3>README.md</h3><p>Welcome to the advanced demo!</p></div>',
+          ),
+          createTab(
+            "index.js",
+            '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">console.log("hello");</pre></div>',
+          ),
+          createTab(
+            "styles.css",
+            '<div class="content-placeholder"><h3>styles.css</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">.editor { }</pre></div>',
+          ),
+          createTab(
+            "output.log",
+            '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output</p></div>',
+            false,
+          ),
+        ];
+        const newSideA = [
+          createTab(
+            "Terminal",
+            '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>',
+          ),
+          createTab(
+            "Problems",
+            '<div class="content-placeholder"><h3>Problems</h3><p>No problems.</p></div>',
+          ),
+        ];
+        const newSideB = [
+          createTab(
+            "Git Log",
+            '<div class="content-placeholder"><h3>Git Log</h3><p>Commit history</p></div>',
+          ),
+        ];
+
+        editorState.winId = "editor";
+        editorState.cols = 2;
+        editorState.tabs = {};
+        editorState.activeTabIds = {};
+        editorState.placements = [];
+        newEditorTabs.forEach((t, i) => {
+          editorState.tabs[t.id] = { title: t.title, content: t.content };
+        });
+        editorState.placements.push({
+          position: { row: 0, col: 0 },
+          tabIds: [newEditorTabs[0].id, newEditorTabs[2].id, newEditorTabs[3].id],
+        });
+        editorState.placements.push({
+          position: { row: 0, col: 1 },
+          tabIds: [newEditorTabs[1].id],
+        });
+        editorState.activeTabIds = { 0: newEditorTabs[0].id, 1: newEditorTabs[1].id };
+
+        sideStateA.winId = "side-a";
+        sideStateA.cols = 1;
+        sideStateA.tabs = {};
+        sideStateA.activeTabIds = {};
+        sideStateA.placements = [];
+        newSideA.forEach((t) => {
+          sideStateA.tabs[t.id] = { title: t.title, content: t.content };
+        });
+        sideStateA.placements.push({
+          position: { row: 0, col: 0 },
+          tabIds: newSideA.map((t) => t.id),
+        });
+        sideStateA.activeTabIds = { 0: newSideA[0].id };
+
+        sideStateB.winId = "side-b";
+        sideStateB.cols = 1;
+        sideStateB.tabs = {};
+        sideStateB.activeTabIds = {};
+        sideStateB.placements = [];
+        newSideB.forEach((t) => {
+          sideStateB.tabs[t.id] = { title: t.title, content: t.content };
+        });
+        sideStateB.placements.push({
+          position: { row: 0, col: 0 },
+          tabIds: newSideB.map((t) => t.id),
+        });
+        sideStateB.activeTabIds = { 0: newSideB[0].id };
+
+        renderAll().then(() => {
+          logEl.innerHTML = "";
+          logMessage("system", "Demo reset to initial state");
+        });
+      }
+
+      // ── Mousedown: start drag ───────────────────────────────────
+      document.addEventListener("mousedown", (e) => {
+        const tabBtn = e.target.closest("[role='tab']");
+        if (!tabBtn) return;
+        if (e.target.closest(".tab-close")) return;
+
+        const tabBar = tabBtn.closest("tab-bar");
+        if (!tabBar) return;
+        const tabId = tabBtn.getAttribute("data-tab-id");
+        if (!tabId) return;
+
+        e.preventDefault();
+        currentDragSource = new TabDragSource(tabBtn, tabId, tabBar.winId, "workset-1");
+        orchestrator.startDrag(currentDragSource, e.clientX, e.clientY);
+      });
+
+      // ── Click handlers ───────────────────────────────────────────
+      document.addEventListener("click", (e) => {
+        // Close button
+        const closeBtn = e.target.closest(".tab-close");
+        if (closeBtn) {
+          const tabBar = closeBtn.closest("tab-bar");
+          if (!tabBar) return;
+          const tabId = closeBtn.getAttribute("data-close-tab-id");
+          if (!tabId) return;
+          const state = allStates[tabBar.winId];
+          if (!state) return;
+          state.removeTab(tabId);
+          renderAll();
+          logMessage("grid-remove", JSON.stringify({ winId: tabBar.winId, tabId }));
+          return;
+        }
+
+        // Add button (external, injected by demo)
+        const addBtn = e.target.closest(".demo-add-tab-btn");
+        if (addBtn) {
+          const winId = addBtn.getAttribute("data-win-id") || "editor";
+          const col = parseInt(addBtn.getAttribute("data-col") || "0", 10);
+          const state = allStates[winId];
+          if (!state) return;
+          const tab = state.addTab(
+            col,
+            "New Tab",
+            '<div class="content-placeholder"><h3>New Tab</h3><p>Added from + button.</p></div>',
+          );
+          renderAll();
+          logMessage("system", `Added tab "${tab.id}" to ${winId}`);
+          return;
+        }
+
+        // Tab activation
+        const tabBtn = e.target.closest("[role='tab']");
+        if (tabBtn) {
+          const tabBar = tabBtn.closest("tab-bar");
+          if (!tabBar) return;
+          const tabId = tabBtn.getAttribute("data-tab-id");
+          if (!tabId) return;
+          const state = allStates[tabBar.winId];
+          if (!state) return;
+          state.setActive(tabBar.col, tabId);
+          renderAll();
+          logMessage("grid-activate", JSON.stringify({ winId: tabBar.winId, tabId }));
+        }
+      });
+
+      // ── Event logging ─────────────────────────────────────────────
+      function logMessage(type, text) {
+        const time = new Date().toISOString().substring(11, 23);
+        let line = `<span class="timestamp">[${time}]</span>`;
+        if (type === "system") {
+          line += ` <span class="event-name">⏺ ${text}</span>`;
+        } else {
+          line += ` <span class="event-name">${type}</span>`;
+          try {
+            const pretty = JSON.stringify(JSON.parse(text), null, 2);
+            line += `\n<span class="event-detail">${pretty}</span>`;
+          } catch {
+            line += ` <span class="event-detail">${text}</span>`;
+          }
+        }
+        logEl.innerHTML += "\n" + line;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function logEvent(name, detail) {
+        logMessage(name, JSON.stringify(detail));
+      }
+
+      clearBtn.addEventListener("click", () => {
+        logEl.innerHTML = "";
+      });
+      resetBtn.addEventListener("click", resetDemo);
+
+      // ── Last focused column tracking (for file card clicks) ──────
+      function updateLastFocusedCol(winId, col) {
+        if (winId && col !== undefined) {
+          const state = allStates[winId];
+          if (state) state.lastFocusedCol = col;
+        }
+      }
+
+      document.addEventListener("grid-activate", (e) => {
+        logEvent("grid-activate", e.detail);
+        updateLastFocusedCol(e.detail.winId, e.detail.col);
+      });
+
+      document.addEventListener("grid-focus-col", (e) => {
+        logEvent("grid-focus-col", e.detail);
+        updateLastFocusedCol(e.detail.winId, e.detail.col);
+      });
+
+      document.addEventListener("grid-pin", (e) => {
+        const { winId, tabId, pinned } = e.detail;
+        logEvent("grid-pin", e.detail);
+        const state = allStates[winId];
+        if (!state) return;
+        if (state.tabs[tabId]) {
+          state.tabs[tabId] = { ...state.tabs[tabId], pinned };
+        }
+      });
+
+      // ── File card native drag: set dataTransfer ─────────────────
+      document.addEventListener("dragstart", (e) => {
+        const card = e.target.closest(".file-card");
+        if (!card) return;
+        const filePath = card.getAttribute("data-filepath");
+        if (filePath) {
+          e.dataTransfer?.setData("text/plain", filePath);
+          e.dataTransfer.effectAllowed = "copy";
+        }
+      });
+
+      // ── File card click: open unpinned in last focused column ────
+      document.addEventListener("click", (e) => {
+        const card = e.target.closest(".file-card");
+        if (!card) return;
+        const filePath = card.getAttribute("data-filepath");
+        if (!filePath) return;
+        const editorState = allStates["editor"];
+        if (!editorState) return;
+        const lastCol = editorState.lastFocusedCol ?? 0;
+        document.querySelector("#editor-grid")?.dispatchEvent(
+          new CustomEvent("grid-open-tab", {
+            bubbles: true,
+            detail: {
+              winId: "editor",
+              tabType: "file-viewer",
+              tabConfig: { filePath },
+              targetCol: lastCol,
+              pinned: false,
+            },
+          }),
+        );
+      });
+
+      // ── Event handlers ───────────────────────────────────────────
+
+      document.addEventListener("tab-bar-reorder", (e) => {
+        const { winId, col, fromIndex, toIndex } = e.detail;
+        logEvent("tab-bar-reorder", e.detail);
+        const state = allStates[winId];
+        if (!state) return;
+        state.reorder(col, fromIndex, toIndex);
+        renderAll();
+      });
+
+      document.addEventListener("tab-bar-move-cell", (e) => {
+        const { sourceWinId, tabId, targetWinId, targetCol, dropIndex } = e.detail;
+        logEvent("tab-bar-move-cell", e.detail);
+        const source = allStates[sourceWinId];
+        const target = allStates[targetWinId];
+        if (!source || !target) return;
+        const removed = source.removeTab(tabId);
+        if (!removed) return;
+        target.insertTab(
+          { id: tabId, title: removed.title, content: removed.content },
+          targetCol,
+          dropIndex,
+        );
+        renderAll();
+      });
+
+      document.addEventListener("grid-split", (e) => {
+        const { sourceWinId, winId, tabId, splitCol, splitLeft } = e.detail;
+        logEvent("grid-split", e.detail);
+        const source = allStates[sourceWinId];
+        const target = allStates[winId];
+        if (!source || !target) return;
+        const removed = source.removeTab(tabId);
+        if (!removed) return;
+        target.insertTabInSplit(
+          { id: tabId, title: removed.title, content: removed.content },
+          splitCol,
+          splitLeft,
+        );
+        renderAll();
+      });
+
+      document.addEventListener("grid-move", (e) => {
+        const { sourceWinId, tabId, targetWinId, targetCol } = e.detail;
+        logEvent("grid-move", e.detail);
+        const source = allStates[sourceWinId];
+        const target = allStates[targetWinId];
+        if (!source || !target) return;
+        const removed = source.removeTab(tabId);
+        if (!removed) return;
+        target.insertTab(
+          { id: tabId, title: removed.title, content: removed.content },
+          targetCol,
+          -1,
+        );
+        renderAll();
+      });
+
+      document.addEventListener("grid-open-tab", (e) => {
+        const { winId, tabType, tabConfig, targetCol, pinned, isBoundary, splitCol, splitLeft } =
+          e.detail;
+        logEvent("grid-open-tab", e.detail);
+        const state = allStates[winId];
+        if (!state) return;
+        const filePath = tabConfig.filePath;
+
+        if (!pinned) {
+          // Find existing unpinned tab in the target cell
+          const existingUnpinned = findUnpinnedInCell(state, targetCol);
+          if (existingUnpinned) {
+            // Replace it
+            state.tabs[existingUnpinned] = {
+              title: filePath,
+              content: `<div class="content-placeholder"><h3>${filePath}</h3></div>`,
+              pinned: false,
+            };
+            state.setActive(targetCol, existingUnpinned);
+            renderAll();
+            return;
+          }
+        }
+
+        const tab = createTab(
+          filePath,
+          `<div class="content-placeholder"><h3>${filePath}</h3></div>`,
+          pinned ?? true,
+        );
+        if (isBoundary) {
+          state.insertTabInSplit(tab, splitCol, splitLeft);
+        } else {
+          state.insertTab(tab, targetCol, -1);
+        }
+        renderAll();
+      });
+
+      function findUnpinnedInCell(state, col) {
+        const p = state.placements.find((p) => p.position.col === col);
+        if (!p) return null;
+        for (const tabId of p.tabIds) {
+          if ((state.tabs[tabId]?.pinned ?? true) === false) {
+            return tabId;
+          }
+        }
+        return null;
+      }
+
+      // ── Init ─────────────────────────────────────────────────────
+      async function init() {
+        await renderAll();
+        logMessage(
+          "system",
+          "Advanced demo initialized — drag tabs to split, rearrange, or move between grids",
+        );
+      }
+
+      init().catch((err) => {
+        logEl.textContent += "\n[ERROR] " + err.message;
+        console.error("Demo init error:", err);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+allowBuilds:
+  "@google/genai": true
+  "@scarf/scarf": true
+  electron: true
+  esbuild: true
+  nx: true
+  protobufjs: true
+  unrs-resolver: true

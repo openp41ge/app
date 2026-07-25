@@ -1,0 +1,12 @@
+{
+  "name": "openp41ge-agent-chat-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "openp41ge-agent-chat": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

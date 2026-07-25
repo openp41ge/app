@@ -1,0 +1,89 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "tags": ["+@public"],
+  "ignoreIssues": {
+    "package.json": ["unresolved"]
+  },
+  "workspaces": {
+    ".": {
+      "project": ["!packages/**"],
+      "ignoreDependencies": [
+        "@earendil-works/pi-coding-agent",
+        "@eslint/js",
+        "typescript-eslint",
+        "@xterm/addon-fit",
+        "concurrently",
+        "lit",
+        "zod",
+        "@playwright/test"
+      ]
+    },
+    "packages/openp41ge": {
+      "entry": ["src/main/index.ts", "electron/main.ts", "electron/preload.cjs"],
+      "project": ["src/**/*.ts", "electron/**/*.{ts,cjs}"],
+      "ignoreDependencies": ["ts-node"],
+      "ignore": [
+        "src/renderer/components/openp41ge-bottom-bar.ts",
+        "src/renderer/components/openp41ge-grid.ts",
+        "src/renderer/components/sidebar-views/index.ts",
+        "src/renderer/drag-overlay.ts",
+        "src/renderer/interfaces/grid-drag-handler.ts",
+        "src/renderer/interfaces/index.ts",
+        "src/renderer/models/index.ts",
+        "src/renderer/models/text-content-model.ts",
+        "src/renderer/models/test-text-content-model.ts",
+        "src/renderer/models/text-decoration-provider.ts",
+        "src/renderer/models/text-edit.ts",
+        "src/renderer/models/text-model-events.ts",
+        "src/renderer/models/text-model.ts",
+        "src/renderer/services/drag/index.ts",
+        "src/renderer/services/index.ts",
+        "src/layout/index.ts",
+        "src/index.ts"
+      ],
+      "ignoreExportsUsedInFile": {
+        "interface": true,
+        "type": true
+      }
+    },
+    "packages/openp41ge-file-editor": {
+      "project": ["src/**/*.ts"],
+      "entry": ["src/file-editor.ts"],
+      "ignoreExportsUsedInFile": {
+        "interface": true,
+        "type": true
+      },
+      "ignoreDependencies": ["electron"]
+    },
+    "packages/openp41ge-syntax-highlighting": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/services/index.ts"]
+    },
+    "packages/openp41ge-tabs": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/openp41ge-terminal": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/openp41ge-agent-chat": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/openp41ge-git-repository": {
+      "project": ["src/**/*.ts"],
+      "ignoreExportsUsedInFile": {
+        "interface": true,
+        "type": true
+      }
+    },
+    "packages/openp41ge-logger": {
+      "project": ["src/**/*.ts"],
+      "ignoreExportsUsedInFile": {
+        "interface": true,
+        "type": true
+      }
+    },
+    "packages/openp41ge-tabs-demo": {
+      "ignoreDependencies": ["openp41ge-tabs"]
+    }
+  }
+}

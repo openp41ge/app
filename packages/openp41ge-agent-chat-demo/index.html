@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Openp41ge — Agent Chat Demo</title>
+    <link rel="stylesheet" href="./src/demo-styles.css" />
+  </head>
+  <body>
+    <div class="demo-root">
+      <!-- Main panel area -->
+      <div class="demo-main">
+        <!-- Chat header -->
+        <div class="chat-header">
+          <span class="chat-icon">&#x1F916;</span>
+          <span>openp41ge</span>
+          <span style="color: #555; font-weight: 400">— Agent Chat</span>
+        </div>
+
+        <!-- Chat panel -->
+        <div class="demo-chat-panel" id="chat-panel"></div>
+
+        <!-- Console output -->
+        <div class="demo-console">
+          <div class="demo-console-header">
+            <span>Console Log</span>
+            <span style="margin-left: auto; color: #555; font-weight: 400; font-size: 10px">
+              (chat-message events)
+            </span>
+          </div>
+          <div class="demo-console-body" id="console-body">
+            <div class="log-entry">
+              <span class="timestamp">[--:--:--]</span>Waiting for demo to initialize...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar controls -->
+      <div class="demo-sidebar">
+        <h3>State Controls</h3>
+
+        <div class="demo-control-group">
+          <button class="demo-btn demo-btn--primary" id="btn-send-user">
+            &#x1F4AC; Send user message
+          </button>
+          <button class="demo-btn demo-btn--primary" id="btn-simulate-response">
+            &#x1F916; Simulate response
+          </button>
+        </div>
+
+        <div class="demo-control-group">
+          <button class="demo-btn demo-btn--warning" id="btn-loading">
+            &#x21bb; Simulate typing
+          </button>
+        </div>
+
+        <div class="demo-control-group">
+          <button class="demo-btn demo-btn--danger" id="btn-clear">&#x2716; Clear messages</button>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #2a2a2a; margin: 4px 0" />
+
+        <div class="demo-control-group">
+          <button class="demo-btn demo-btn--success" id="btn-reset">&#x21A9; Reset all</button>
+        </div>
+
+        <div style="margin-top: auto; padding-top: 12px; font-size: 10px; color: #444">
+          Agent Chat Demo v0.1
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./src/demo-app.ts"></script>
+  </body>
+</html>

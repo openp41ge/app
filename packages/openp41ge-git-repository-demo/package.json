@@ -1,0 +1,12 @@
+{
+  "name": "openp41ge-git-repository-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "openp41ge-git-repository": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

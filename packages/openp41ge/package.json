@@ -1,0 +1,39 @@
+{
+  "name": "openp41ge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "dev:tools": "OPENP41GE_DEVTOOLS=1 bash scripts/dev.sh",
+    "dev:renderer": "bash scripts/dev-renderer.sh",
+    "dev:electron": "bash scripts/dev-electron.sh",
+    "build": "vite build && bash scripts/build-electron.sh",
+    "build:electron": "bash scripts/build-electron.sh",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test": "vitest run",
+    "clean": "bash scripts/clean.sh",
+    "notarize": "bash scripts/notarize.sh",
+    "start": "electron .",
+    "start:devtools": "OPENP41GE_DEVTOOLS=1 electron ."
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "lit": "^3.3.3",
+    "zod": "^3.24.0",
+    "openp41ge-file-editor": "workspace:*",
+    "openp41ge-git-repository": "workspace:*",
+    "openp41ge-logger": "workspace:*",
+    "openp41ge-tabs": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.0.0",
+    "electron": "^43.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}

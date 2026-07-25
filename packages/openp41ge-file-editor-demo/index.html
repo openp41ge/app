@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>File Editor Demo</title>
+    <link rel="stylesheet" href="./src/demo-styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>File <span>Editor</span> Demo</h1>
+      <p>
+        Self-contained code editor component with syntax highlighting. Click into an editor to start
+        typing — <kbd>Cmd+S</kbd> saves, <kbd>Cmd+Z</kbd> undoes. Switch files with the dropdown.
+      </p>
+    </header>
+
+    <main class="editors-grid">
+      <!-- Editor 1 (left, larger) -->
+      <section class="editor-panel" data-panel="0">
+        <div class="editor-toolbar">
+          <span class="editor-label">Editor 1</span>
+          <select class="file-select" data-panel="0">
+            <option value="typescript" selected>sample.ts</option>
+            <option value="long">long-line.txt</option>
+            <option value="javascript">sample.js</option>
+            <option value="json">sample.json</option>
+            <option value="markdown">sample.md</option>
+            <option value="css">sample.css</option>
+            <option value="html">sample.html</option>
+            <option value="python">sample.py</option>
+          </select>
+          <span class="dirty-indicator dirty-hidden" data-panel="0" title="Unsaved changes"
+            >&#9679;</span
+          >
+          <span class="language-badge" data-panel="0">-</span>
+          <div class="editor-actions">
+            <button class="theme-toggle" data-panel="0" title="Toggle theme">&#127779;</button>
+            <button class="save-btn" data-panel="0" title="Save (Cmd+S)">&#128190; Save</button>
+          </div>
+        </div>
+        <div class="editor-container">
+          <file-editor
+            data-editor-id="0"
+            style="width: 100%; height: 100%; display: block"
+          ></file-editor>
+        </div>
+      </section>
+
+      <!-- Editor 2 (right, smaller) -->
+      <section class="editor-panel" data-panel="1">
+        <div class="editor-toolbar">
+          <span class="editor-label">Editor 2</span>
+          <select class="file-select" data-panel="1">
+            <option value="typescript" selected>sample.ts</option>
+            <option value="long">long-line.txt</option>
+            <option value="javascript">sample.js</option>
+            <option value="json">sample.json</option>
+            <option value="markdown">sample.md</option>
+            <option value="css">sample.css</option>
+            <option value="html">sample.html</option>
+            <option value="python">sample.py</option>
+          </select>
+          <span class="dirty-indicator dirty-hidden" data-panel="1" title="Unsaved changes"
+            >&#9679;</span
+          >
+          <span class="language-badge" data-panel="1">-</span>
+          <div class="editor-actions">
+            <button class="theme-toggle" data-panel="1" title="Toggle theme">&#127779;</button>
+            <button class="save-btn" data-panel="1" title="Save (Cmd+S)">&#128190; Save</button>
+          </div>
+        </div>
+        <div class="editor-container">
+          <file-editor
+            data-editor-id="1"
+            style="width: 100%; height: 100%; display: block"
+          ></file-editor>
+        </div>
+      </section>
+    </main>
+
+    <footer id="status-bar">
+      <span id="active-editor-label">Active: Editor 1</span>
+      <span class="separator">|</span>
+      <span id="focus-debug">Focus: —</span>
+    </footer>
+
+    <script type="module" src="./src/demo-app.ts"></script>
+  </body>
+</html>

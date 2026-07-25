@@ -1,0 +1,105 @@
+/**
+ * <openp41ge-titlebar> — minimal title bar (Lit).
+ *
+ * Worksets have been removed. This component provides:
+ *   - macOS traffic-light spacer / non-Mac window controls
+ *   - Window title
+ */
+
+import { LitElement, html, nothing, type TemplateResult } from "lit";
+import { property, state } from "lit/decorators.js";
+import type { Window } from "../../layout/types";
+
+const isMac = (() => {
+  try {
+    return window.openp41ge?.platform === "darwin" || navigator.platform.startsWith("Mac");
+  } catch {
+    return false;
+  }
+})();
+
+const HEIGHT = 35;
+
+class Openp41geTitleBar extends LitElement {
+  protected createRenderRoot(): HTMLElement | DocumentFragment {
+    return this;
+  }
+
+  @property({ attribute: false })
+  windowData: Window | null = null;
+
+  @state()
+  private _projectName: string | null = null;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this._loadProjectName();
+  }
+
+  private async _loadProjectName(): Promise<void> {
+    try {
+      const name = await window.openp41ge.project.current();
+      this._projectName = name;
+    } catch {
+      // preload might not be ready yet — ignore
+    }
+  }
+
+  render(): TemplateResult | typeof nothing {
+    const win = this.windowData;
+    if (!win) return nothing;
+
+    const title = this._projectName ? `Openp41ge — ${this._projectName}` : "Openp41ge";
+
+    return html`
+      <div
+        style="display:flex;align-items:center;height:${HEIGHT}px;background:var(--bg-gutter);border-bottom:1px solid var(--border-divider);flex-shrink:0;user-select:none;-webkit-app-region:drag;position:relative;"
+      >
+        <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
+        <div style="width:${isMac ? 85 : 12}px;flex-shrink:0;"></div>
+
+        <!-- Title -->
+        <div
+          style="flex:1;min-width:0;padding:0 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+        >
+          ${title}
+        </div>
+
+        ${
+          isMac
+            ? ""
+            : html`
+                <div style="display:flex;height:100%;flex-shrink:0;">
+                  ${this._winBtn("\u2500", false, () => window.openp41ge?.window.minimize())}
+                  ${this._winBtn("\u25a1", false, () => window.openp41ge?.window.maximize())}
+                  ${this._winBtn("\u2715", true, () => window.openp41ge?.window.close())}
+                </div>
+              `
+        }
+      </div>
+    `;
+  }
+
+  private _winBtn(label: string, isClose: boolean, onClick: () => void): TemplateResult {
+    return html`
+      <div
+        style="width:46px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;color:var(--text-secondary);transition:background 0.1s;-webkit-app-region:no-drag;"
+        @mouseenter=${(e: MouseEvent) => {
+          const el = e.currentTarget as HTMLElement;
+          el.style.background = isClose ? "#e81123" : "#333";
+          if (isClose) el.style.color = "#fff";
+        }}
+        @mouseleave=${(e: MouseEvent) => {
+          const el = e.currentTarget as HTMLElement;
+          el.style.background = "transparent";
+          if (isClose) el.style.color = "#999";
+        }}
+        @click=${onClick}
+      >
+        ${label}
+      </div>
+    `;
+  }
+}
+
+customElements.define("openp41ge-titlebar", Openp41geTitleBar);

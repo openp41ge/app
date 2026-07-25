@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Openp41ge — Themes Demo</title>
+    <link rel="stylesheet" href="./src/demo-styles.css" />
+  </head>
+  <body>
+    <div class="demo-root">
+      <div class="demo-main">
+        <!-- Header -->
+        <div class="demo-header">
+          <span class="demo-icon">&#x25D0;</span>
+          <span>openp41ge</span>
+          <span class="demo-header-sub">— Themes</span>
+        </div>
+
+        <!-- Theme display -->
+        <div class="demo-content">
+          <div class="theme-section" id="theme-section">
+            <div class="theme-preview" id="theme-preview"></div>
+            <div class="theme-colors" id="theme-colors"></div>
+          </div>
+        </div>
+
+        <!-- Console -->
+        <div class="demo-console">
+          <div class="demo-console-header">
+            <span>Console Log</span>
+          </div>
+          <div class="demo-console-body" id="console-body">
+            <div class="log-entry"><span class="timestamp">[--:--:--]</span>Waiting...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="demo-sidebar">
+        <h3>Themes</h3>
+        <div class="demo-control-group" id="theme-buttons">
+          <button class="demo-btn demo-btn--active" data-theme="openp41ge-dark">
+            Openp41ge Dark
+          </button>
+          <button class="demo-btn" data-theme="openp41ge-light">Openp41ge Light</button>
+        </div>
+        <hr style="border: none; border-top: 1px solid #2a2a2a; margin: 4px 0" />
+        <div style="font-size: 10px; color: #555; line-height: 1.6">
+          Syntax scope colors used by the syntax highlighting engine. Each color maps to a CSS scope
+          class.
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./src/demo-app.ts"></script>
+  </body>
+</html>

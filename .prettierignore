@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+**/*.d.ts
+
+/.nx/cache
+/.nx/workspace-data
+.nx/self-healing
