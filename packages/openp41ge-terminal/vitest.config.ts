@@ -16,6 +16,7 @@ export default defineConfig({
     alias: {
       "@openp41ge-terminal": path.resolve(__dirname, "./src"),
       "@openp41ge": path.resolve(__dirname, "../openp41ge/src"),
+      "openp41ge-logger": path.resolve(__dirname, "../openp41ge-logger/src"),
     },
   },
 });
