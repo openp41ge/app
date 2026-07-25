@@ -10,49 +10,75 @@ env:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    timeout-minutes: 5
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Cache Nx
-        uses: actions/cache@v4
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
         with:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            nx-${{ runner.os }}-
+          restore-keys: nx-${{ runner.os }}-
+      - run: pnpm nx lint
+      - run: pnpm nx knip
+      - run: pnpm nx format:check
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install chromium
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: nx-${{ runner.os }}-
+      - run: pnpm nx test
 
-      - name: Lint
-        run: pnpm nx lint
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: nx-${{ runner.os }}-
+      - run: pnpm exec playwright install chromium
+      - run: pnpm nx e2e
 
-      - name: Knip
-        run: pnpm nx knip
-
-      - name: Format check
-        run: pnpm nx format:check
-
-      - name: Test
-        run: pnpm nx test
-
-      - name: E2E
-        run: pnpm nx e2e
-
-      - name: Build
-        run: pnpm nx build
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: nx-${{ runner.os }}-
+      - run: pnpm nx build
