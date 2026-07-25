@@ -92,6 +92,33 @@ process.on("unhandledRejection", (err) => {
   console.error("Unhandled Rejection:", err);
 });
 
+// ── Suppress known console noise ──────────────────────────────────────────
+//
+// Intercept console.warn/error to suppress patterns that are expected in tests
+// (Lit dev-mode message, jsdom limitations, intentional test errors).
+
+const _origConsoleWarn = console.warn.bind(console);
+const _origConsoleError = console.error.bind(console);
+const _noisePatterns = [
+  "Lit is in dev mode",
+  "HTMLCanvasElement",
+  "ChildPart has no parentNode",
+  "Error unmounting controller",
+  "ConfigService.*init error",
+];
+
+console.warn = (...args: any[]) => {
+  const msg = args.join(" ");
+  if (_noisePatterns.some((p) => msg.includes(p) || new RegExp(p).test(msg))) return;
+  _origConsoleWarn(...args);
+};
+
+console.error = (...args: any[]) => {
+  const msg = args.join(" ");
+  if (_noisePatterns.some((p) => msg.includes(p) || new RegExp(p).test(msg))) return;
+  _origConsoleError(...args);
+};
+
 // ── Suppress Pact Rust-level warnings ────────────────────────────────────
 //
 // Pact's Rust crate writes log messages directly to process.stderr,
