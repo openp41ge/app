@@ -97,6 +97,7 @@ process.on("unhandledRejection", (err) => {
 // Intercept console.warn/error to suppress patterns that are expected in tests
 // (Lit dev-mode message, jsdom limitations, intentional test errors).
 
+const _origConsoleInfo = console.info.bind(console);
 const _origConsoleWarn = console.warn.bind(console);
 const _origConsoleError = console.error.bind(console);
 const _noisePatterns = [
@@ -105,7 +106,14 @@ const _noisePatterns = [
   "ChildPart has no parentNode",
   "Error unmounting controller",
   "ConfigService.*init error",
+  "[config-service]",
 ];
+
+console.info = (...args: any[]) => {
+  const msg = args.join(" ");
+  if (_noisePatterns.some((p) => msg.includes(p) || new RegExp(p).test(msg))) return;
+  _origConsoleInfo(...args);
+};
 
 console.warn = (...args: any[]) => {
   const msg = args.join(" ");
