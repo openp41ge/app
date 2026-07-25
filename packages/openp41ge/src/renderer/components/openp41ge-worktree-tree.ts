@@ -1672,9 +1672,7 @@ class Openp41geWorktreeTree extends LitElement {
         if (tries >= 200 || !_isOpen || !this.isConnected) return;
         tries++;
         if (document.activeElement !== this && !this.contains(document.activeElement)) {
-          const activeParent = document.activeElement?.closest(
-            ".grid-cell, tab-content",
-          );
+          const activeParent = document.activeElement?.closest(".grid-cell, tab-content");
           if (!activeParent) {
             this.focus();
           }

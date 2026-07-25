@@ -105,9 +105,10 @@ class Openp41geWindowView extends LitElement {
 
     // Ensure at least 1 column for an empty grid so the tab-grid renders
     const effectiveCols = Math.max(1, win.grid.cols);
-    const placements = win.grid.placements.length > 0
-      ? win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))
-      : [{ position: { row: 0, col: 0 }, tabIds: [] as string[] }];
+    const placements =
+      win.grid.placements.length > 0
+        ? win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))
+        : [{ position: { row: 0, col: 0 }, tabIds: [] as string[] }];
 
     return html`
       <div

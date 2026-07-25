@@ -7,11 +7,7 @@
       "description": "a dispatch of activateTabInCell",
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "ws-1",
-            "tab-1"
-          ],
+          "args": ["win-1", "ws-1", "tab-1"],
           "fn": "activateTabInCell"
         },
         "headers": {
@@ -66,9 +62,7 @@
       "description": "a dispatch of addColumnTab",
       "request": {
         "body": {
-          "args": [
-            "win-1"
-          ],
+          "args": ["win-1"],
           "fn": "addColumnTab"
         },
         "headers": {
@@ -192,9 +186,7 @@
       "description": "a dispatch of closeWindow",
       "request": {
         "body": {
-          "args": [
-            "win-1"
-          ],
+          "args": ["win-1"],
           "fn": "closeWindow"
         },
         "headers": {
@@ -313,13 +305,7 @@
       "description": "a dispatch of moveTabBetweenCells",
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "tab-1",
-            "win-1",
-            0,
-            1
-          ],
+          "args": ["win-1", "tab-1", "win-1", 0, 1],
           "fn": "moveTabBetweenCells"
         },
         "headers": {
@@ -374,12 +360,7 @@
       "description": "a dispatch of moveTabToWindow",
       "request": {
         "body": {
-          "args": [
-            "tab-1",
-            "win-2",
-            0,
-            0
-          ],
+          "args": ["tab-1", "win-2", 0, 0],
           "fn": "moveTabToWindow"
         },
         "headers": {
@@ -439,10 +420,7 @@
       ],
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "tab-1"
-          ],
+          "args": ["win-1", "tab-1"],
           "fn": "removeTabFromCell"
         },
         "headers": {
@@ -497,13 +475,7 @@
       "description": "a dispatch of reorderTabsInCell",
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            0,
-            0,
-            1,
-            0
-          ],
+          "args": ["win-1", 0, 0, 1, 0],
           "fn": "reorderTabsInCell"
         },
         "headers": {
@@ -558,11 +530,7 @@
       "description": "a dispatch of resizeGrid",
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            2,
-            3
-          ],
+          "args": ["win-1", 2, 3],
           "fn": "resizeGrid"
         },
         "headers": {
@@ -617,9 +585,7 @@
       "description": "a dispatch of splitColumn",
       "request": {
         "body": {
-          "args": [
-            "win-1"
-          ],
+          "args": ["win-1"],
           "fn": "splitColumn"
         },
         "headers": {
@@ -674,13 +640,7 @@
       "description": "a dispatch of splitTabFromCell",
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "ws-1",
-            "tab-1",
-            0,
-            true
-          ],
+          "args": ["win-1", "ws-1", "tab-1", 0, true],
           "fn": "splitTabFromCell"
         },
         "headers": {
@@ -735,14 +695,7 @@
       "description": "a dispatch of splitTabFromCell with focusTabId",
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "ws-1",
-            "tab-2",
-            0,
-            false,
-            "tab-1"
-          ],
+          "args": ["win-1", "ws-1", "tab-2", 0, false, "tab-1"],
           "fn": "splitTabFromCell"
         },
         "headers": {
@@ -797,12 +750,7 @@
       "description": "a dispatch of switchTabInCell",
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "tab-2",
-            0,
-            0
-          ],
+          "args": ["win-1", "tab-2", 0, 0],
           "fn": "switchTabInCell"
         },
         "headers": {
@@ -857,11 +805,7 @@
       "description": "a dispatch of updateTabConfig",
       "request": {
         "body": {
-          "args": [
-            "tab-1",
-            "filePath",
-            "/repos/openp41ge/src/index.ts"
-          ],
+          "args": ["tab-1", "filePath", "/repos/openp41ge/src/index.ts"],
           "fn": "updateTabConfig"
         },
         "headers": {
@@ -916,10 +860,7 @@
       "description": "a dispatch of updateTabTitle",
       "request": {
         "body": {
-          "args": [
-            "tab-1",
-            "New Title"
-          ],
+          "args": ["tab-1", "New Title"],
           "fn": "updateTabTitle"
         },
         "headers": {

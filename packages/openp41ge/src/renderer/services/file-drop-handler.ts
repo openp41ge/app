@@ -98,13 +98,13 @@ export class FileDropHandler implements IFileDropHandler {
   }
 
   private _resolveWinId(gridEl: HTMLElement): string {
-    const tabGrid = gridEl.closest("tab-grid") as HTMLElement & { winId?: string } | null;
+    const tabGrid = gridEl.closest("tab-grid") as (HTMLElement & { winId?: string }) | null;
     return tabGrid?.winId || "";
   }
 
   /** Determine the target column based on cursor position or last focused. */
   private _resolveTargetCol(gridEl: HTMLElement, _e: DragEvent): number {
-    const tabGrid = gridEl.closest("tab-grid") as HTMLElement & { winId?: string } | null;
+    const tabGrid = gridEl.closest("tab-grid") as (HTMLElement & { winId?: string }) | null;
     if (tabGrid?.winId) {
       return Openp41geTabsEventHandler.getLastFocusedCol(tabGrid.winId);
     }
