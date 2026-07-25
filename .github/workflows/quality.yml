@@ -25,10 +25,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: nx lint
+        run: pnpm nx lint
 
       - name: Knip
-        run: nx knip
+        run: pnpm nx knip
 
       - name: Format check
-        run: nx format:check
+        run: pnpm nx format:check
