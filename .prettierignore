@@ -3,6 +3,9 @@ dist
 coverage
 **/*.d.ts
 
+# Pact contract tests — auto-generated JSON files
+packages/openp41ge/test/contract/pacts
+
 /.nx/cache
 /.nx/workspace-data
 .nx/self-healing
