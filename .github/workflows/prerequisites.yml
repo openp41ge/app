@@ -26,6 +26,8 @@ jobs:
           restore-keys: nx-${{ runner.os }}-
       - run: pnpm nx lint
       - run: pnpm nx knip
+      - name: Create main branch ref for prettier
+        run: git branch main HEAD || true
       - run: pnpm nx format:check
 
   test:
