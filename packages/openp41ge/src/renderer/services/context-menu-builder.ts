@@ -1,8 +1,8 @@
 import type { IContextMenuBuilder } from "../interfaces/context-menu-builder";
 import type { ICommandBus } from "../interfaces/command-bus";
-import { isOpenp41geGrid, createOpenp41geContextMenu } from "../interfaces/element-guards";
+import { isTabGrid, createOpenp41geContextMenu } from "../interfaces/element-guards";
 import { toggleWorktree } from "../components/openp41ge-worktree-controller";
-import { setContextMenuActive } from "./tab-drag-handler";
+import { setContextMenuActive } from "./drag-context";
 
 export class ContextMenuBuilder implements IContextMenuBuilder {
   private _commandBus: ICommandBus | null = null;
@@ -18,7 +18,7 @@ export class ContextMenuBuilder implements IContextMenuBuilder {
     _col: number,
     gridEl: HTMLElement,
   ): Promise<void> {
-    if (!isOpenp41geGrid(gridEl)) return;
+    if (!isTabGrid(gridEl)) return;
     const winId = gridEl.winId;
     const dispatch = this._commandBus!.dispatch.bind(this._commandBus);
 
@@ -68,9 +68,8 @@ export class ContextMenuBuilder implements IContextMenuBuilder {
         window.openp41ge.workspace.cmdNewColumn();
         break;
       case "equalize": {
-        const grid = gridEl.pageData?.grid;
-        if (grid) {
-          const cols = grid.cols;
+        const cols = gridEl.cols;
+        if (cols > 0) {
           dispatch("resizeGrid", winId, winId, 1, cols);
         }
         break;

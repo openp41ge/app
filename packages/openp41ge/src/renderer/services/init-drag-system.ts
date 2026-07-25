@@ -7,14 +7,17 @@
  *   2. A mousedown handler on document that starts drag sessions
  *      when the user grabs a tab button
  *   3. The DragOrchestrator that coordinates the drag lifecycle
+ *   4. Cross-window drag bridge — main-process ghost overlay, cross-window
+ *      hit-testing, and detach-to-new-window handling.
  *
- * Called during bootstrap (RegisterEventListenersStep).
+ * Called during bootstrap via StartupContext.wireServices().
  */
 
 import {
   DragOrchestrator,
   TabDragSource,
   GhostManager,
+  DRAG_EVENTS,
   type IDragSource,
   type IDropTarget,
 } from "../openp41ge-tabs-adapter";
@@ -30,14 +33,14 @@ let _ghostManager = new GhostManager();
 export function initDragSystem(): () => void {
   const cleanups: (() => void)[] = [];
 
-  // Create the orchestrator
+  // ── Create the orchestrator ──────────────────────────────────────────
   _orchestrator = new DragOrchestrator(openp41geTargetResolver);
   cleanups.push(() => {
     _orchestrator?.dispose();
     _orchestrator = null;
   });
 
-  // Listen for mousedown on document to initiate tab drags
+  // ── Mousedown: initiate tab drags ────────────────────────────────────
   const onMouseDown = (e: MouseEvent) => {
     const tabBtn = (e.target as HTMLElement).closest?.("[data-tab-id]");
     if (!tabBtn || !(tabBtn instanceof HTMLElement)) return;
@@ -49,37 +52,37 @@ export function initDragSystem(): () => void {
 
     const tabId = tabBtn.getAttribute("data-tab-id") || "";
     const tabBarEl = tabBtn.closest?.("tab-bar");
-
-    // Only proceed if we can find the tab bar
     if (!tabBarEl) return;
 
     const tabBar = tabBarEl as HTMLElement & { winId?: string; col?: number };
     const winId = tabBar.winId || "";
     const col = tabBar.col ?? 0;
-    const dragSource = new TabDragSource(tabBtn, tabId, winId, col.toString());
+    const label = tabBtn.textContent?.trim() || "Tab";
+
+    const dragSource = new TabDragSource(tabBtn, tabId, winId, col.toString(), label);
     _currentSource = dragSource;
     _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
+
+    // Show main-process ghost overlay (visible outside the window)
+    window.openp41ge.drag.start(label, e.screenX, e.screenY);
   };
 
   document.addEventListener("mousedown", onMouseDown);
   cleanups.push(() => document.removeEventListener("mousedown", onMouseDown));
 
-  // Listen for click on tab buttons to activate tabs
+  // ── Click: activate tab (short clicks that don't become drags) ────────
   const onClick = (e: MouseEvent) => {
     const tabBtn = (e.target as HTMLElement).closest?.("[data-tab-id]");
     if (!tabBtn || !(tabBtn instanceof HTMLElement)) return;
 
-    // Ignore close button clicks
     if ((e.target as HTMLElement).closest?.(".tab-close")) return;
 
     const tabId = tabBtn.getAttribute("data-tab-id") || "";
     const tabBarEl = tabBtn.closest?.("tab-bar");
     if (!tabBarEl) return;
 
-    const tabBarEl2 = tabBarEl as HTMLElement & { winId?: string };
-    const winId = tabBarEl2.winId || "";
+    const winId = (tabBarEl as HTMLElement & { winId?: string }).winId || "";
 
-    // Fire grid-activate so the Openp41geTabsEventHandler picks it up
     tabBtn.dispatchEvent(
       new CustomEvent("grid-activate", {
         bubbles: true,
@@ -91,15 +94,24 @@ export function initDragSystem(): () => void {
   document.addEventListener("click", onClick);
   cleanups.push(() => document.removeEventListener("click", onClick));
 
-  // Track mousemove to update grid ghost overlays
+  // ── Mousemove: update grid ghost + cross-window detection ────────────
   const onMouseMove = (e: MouseEvent) => {
     if (!_orchestrator?.isDragging) return;
+
+    // Update the in-window grid ghost overlay
     updateGridGhost(e.clientX, e.clientY);
+
+    // Cross-window detection: if elementFromPoint returns null, the cursor
+    // has left the Electron window. The main-process ghost overlay (started
+    // in mousedown) keeps the drag visual visible. The orchestrator fires
+    // openp41ge-drag-detach when no target is found on mouseup, which opens
+    // the tab in a new window.
   };
 
   document.addEventListener("mousemove", onMouseMove);
   cleanups.push(() => document.removeEventListener("mousemove", onMouseMove));
 
+  // ── Mouseup: clear grid ghost ────────────────────────────────────────
   const onMouseUp = () => {
     clearGridGhost();
     _currentSource = null;
@@ -108,11 +120,49 @@ export function initDragSystem(): () => void {
   document.addEventListener("mouseup", onMouseUp);
   cleanups.push(() => document.removeEventListener("mouseup", onMouseUp));
 
+  // ── Orchestrator position events → move main-process ghost ───────────
+  const onPosition = (e: Event) => {
+    const detail = (e as CustomEvent).detail as { screenX: number; screenY: number };
+    if (detail) {
+      window.openp41ge.drag.move(detail.screenX, detail.screenY);
+    }
+  };
+
+  document.addEventListener(DRAG_EVENTS.POSITION, onPosition);
+  cleanups.push(() => document.removeEventListener(DRAG_EVENTS.POSITION, onPosition));
+
+  // ── Orchestrator end event → hide main-process ghost ─────────────────
+  const onDragEnd = () => {
+    window.openp41ge.drag.end();
+    clearGridGhost();
+    _currentSource = null;
+  };
+
+  document.addEventListener(DRAG_EVENTS.END, onDragEnd);
+  cleanups.push(() => document.removeEventListener(DRAG_EVENTS.END, onDragEnd));
+
+  // ── Orchestrator detach event → create new window ────────────────────
+  const onDetach = (e: Event) => {
+    const detail = (e as CustomEvent).detail as {
+      winId: string;
+      tabId: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    };
+    if (detail) {
+      window.openp41ge.workspace.detachTab(detail.winId, detail.tabId, detail.bounds);
+    }
+  };
+
+  document.addEventListener(DRAG_EVENTS.DETACH, onDetach);
+  cleanups.push(() => document.removeEventListener(DRAG_EVENTS.DETACH, onDetach));
+
   return () => {
     _ghostManager.dispose();
     for (const fn of cleanups) fn();
   };
 }
+
+// ── Target resolver ───────────────────────────────────────────────────────
 
 /**
  * Target resolver for openp41ge-tabs DragOrchestrator.
@@ -142,12 +192,13 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
   return null;
 }
 
+// ── Ghost overlay management ──────────────────────────────────────────────
+
 /** Track the grid element that currently has a ghost overlay. */
 let _ghostShownGrid: HTMLElement | null = null;
 
 /**
  * Update the grid ghost overlay based on the current cursor position.
- * Mirrors the demo's updateGridGhost logic.
  */
 function updateGridGhost(clientX: number, clientY: number): void {
   clearGridGhost();
@@ -168,11 +219,11 @@ function updateGridGhost(clientX: number, clientY: number): void {
     mouseCol?: number;
   };
   _ghostManager.showGhost(target.element, {
-    cols: cfg.cols,
+    cols: cfg.cols ?? 1,
     boundaryIndex: cfg.boundaryIndex,
     splitCol: cfg.splitCol,
     splitLeft: cfg.splitLeft,
-    activeCol: cfg.mouseCol ?? cfg.col,
+    activeCol: cfg.mouseCol ?? 0,
   });
   _ghostShownGrid = target.element;
 }

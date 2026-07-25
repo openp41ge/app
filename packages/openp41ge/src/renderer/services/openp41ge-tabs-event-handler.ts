@@ -223,7 +223,7 @@ export class Openp41geTabsEventHandler {
     this._onClick(".tab-close", (el) => {
       const tabId = el.getAttribute("data-close-tab-id");
       if (!tabId) return;
-      const tabBar = el.closest("tab-bar");
+      const tabBar = el.closest("tab-bar") as HTMLElement & { winId?: string } | null;
       if (!tabBar) return;
       const winId = tabBar.winId;
       if (!winId) return;

@@ -103,14 +103,9 @@ export const appServices = {
   zoomService: context.zoomService,
   configService: context.configService,
   fileOpenHandler: context.fileOpenHandler,
-  tabDragHandler: context.tabDragHandler,
-  gridDragHandler: context.gridDragHandler,
-  ghostRenderer: context.ghostRenderer,
-  cellTargetRenderer: context.cellTargetRenderer,
   contextMenuBuilder: context.contextMenuBuilder,
   quoteController: context.quoteController,
   fileDropHandler: context.fileDropHandler,
-  dragHandler: context.dragHandler,
   modelRegistry: context.modelRegistry,
 };
 
@@ -119,8 +114,7 @@ export const appServices = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { unmountAllControllers } from "./controllers/registry";
-import { resetTabDragState } from "./services/tab-drag-handler";
-import { resetGridDragState } from "./services/grid-drag-handler";
+import { resetTabDragState } from "./services/drag-context";
 
 /**
  * Renderer-side teardown for app state reset.
@@ -139,14 +133,8 @@ import { resetGridDragState } from "./services/grid-drag-handler";
 export function resetApp(): void {
   // ── Phase A: Teardown ─────────────────────────────────────────────────
 
-  // 1. Cancel any active drag sessions
-  context.dragHandler.cancelDrag();
-
-  // 2. Clear tab drag state (module-level)
+  // 1. Clear tab drag state (module-level)
   resetTabDragState();
-
-  // 3. Clear grid drag state (module-level)
-  resetGridDragState();
 
   // 4. Unmount all pane controllers and clear registry
   unmountAllControllers();

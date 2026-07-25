@@ -12,14 +12,9 @@ import { createLogger } from "openp41ge-logger";
 const log = createLogger("bootstrap:expose-test-models");
 
 // ── Test models (tree-shaken from production) ──────────────────────────
-import { TestDragHandler } from "../../models/test-drag-handler";
-import { TabDragSource, Openp41geTabDragSource } from "../../services/drag-sources/tab-drag-source";
 import { FileDragSource } from "../../services/drag-sources/file-drag-source";
 import { RepoDragSource } from "../../services/drag-sources/repo-drag-source";
-import { GridDropTarget } from "../../services/drop-targets/grid-drop-target";
-import { TabBarDropTarget } from "../../services/drop-targets/tab-bar-drop-target";
 import { TopBarDropTarget } from "../../services/drop-targets/topbar-drop-target";
-import { dragOrchestrator } from "../../services/drag/orchestrator";
 import {
   TestRepoService,
   TestRepositoryModel,
@@ -43,15 +38,9 @@ export class ExposeTestModelsStep implements IStartupStep {
       TestRepositoryModel,
       TestWorktreeModel,
       TestFileContent,
-      TestDragHandler,
-      TabDragSource,
-      Openp41geTabDragSource,
       FileDragSource,
       RepoDragSource,
-      GridDropTarget,
-      TabBarDropTarget,
       TopBarDropTarget,
-      dragOrchestrator,
       // Scope expansion utilities
       resolveFileReferences,
       getUncoveredPaths,

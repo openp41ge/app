@@ -7,11 +7,10 @@
  */
 
 import type { ICommandBus } from "./command-bus";
-import type { IGhostRenderer } from "./ghost-renderer";
 
 export interface IFileDropHandler {
   /** Initialize with required dependencies. */
-  init(commandBus: ICommandBus, ghostRenderer: IGhostRenderer): void;
+  init(commandBus: ICommandBus): void;
 
   /** Handle dragover event on the grid. */
   handleDragOver(e: DragEvent, gridEl: HTMLElement): void;

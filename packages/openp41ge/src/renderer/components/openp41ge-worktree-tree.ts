@@ -31,7 +31,7 @@ import type { Workspace, Tab } from "../../layout/types";
 import { Openp41geTabsEventHandler } from "../services/openp41ge-tabs-event-handler";
 
 import { worktreePersistence } from "../services/worktree-persistence";
-import { setContextMenuActive } from "../services/tab-drag-handler";
+import { setContextMenuActive } from "../services/drag-context";
 import type { RepoService } from "../models/repo-service";
 import { IpcRepoService } from "../models/ipc-repo-service";
 
@@ -95,45 +95,20 @@ function savePersistedState(): void {
 /** Saved column index before the worktree cleared grid focus. */
 let _savedFocusedCol = -1;
 
-interface _GridWithInternalApi extends HTMLElement {
-  _lastActiveCellCol: number;
-  _focusedCol: number;
-  _clearFocus(): void;
-  _updateCellFocus(col: number): void;
-}
-
 function _clearGridCellFocus(): void {
-  const grid = document.querySelector("openp41ge-grid, tab-grid") as _GridWithInternalApi | null;
+  const grid = document.querySelector("tab-grid");
   if (grid) {
-    _savedFocusedCol =
-      typeof grid._focusedCol === "number"
-        ? grid._focusedCol
-        : typeof grid._lastActiveCellCol === "number"
-          ? grid._lastActiveCellCol
-          : 0;
-    if (typeof grid._clearFocus === "function") {
-      grid._clearFocus();
-    }
+    _savedFocusedCol = 0;
   }
 }
 
 function _restoreGridFocus(): void {
-  const grid = document.querySelector("openp41ge-grid, tab-grid") as _GridWithInternalApi | null;
+  const grid = document.querySelector("tab-grid") as HTMLElement | null;
   if (grid) {
     const col = _savedFocusedCol >= 0 ? _savedFocusedCol : 0;
     _savedFocusedCol = -1;
-    if (grid.tagName === "OPENP41GE-GRID") {
-      const gridEl = grid as HTMLElement & {
-        _lastActiveCellCol?: number;
-        _focusedCol?: number;
-        _updateCellFocus?(col: number): void;
-      };
-      gridEl._lastActiveCellCol = col;
-      gridEl._focusedCol = col;
-      if (gridEl._updateCellFocus) gridEl._updateCellFocus(col);
-    }
     // Focus the cell
-    const cell = (grid as HTMLElement).querySelector(".grid-cell, .openp41ge-grid-cell");
+    const cell = grid.querySelector(".grid-cell");
     if (cell) {
       (cell as HTMLElement).focus();
     }
@@ -1698,7 +1673,7 @@ class Openp41geWorktreeTree extends LitElement {
         tries++;
         if (document.activeElement !== this && !this.contains(document.activeElement)) {
           const activeParent = document.activeElement?.closest(
-            ".grid-cell, .openp41ge-grid-cell, openp41ge-tab-content, tab-content",
+            ".grid-cell, tab-content",
           );
           if (!activeParent) {
             this.focus();
@@ -2218,14 +2193,7 @@ class Openp41geWorktreeTree extends LitElement {
    * Get the last active grid cell column, or 0 if unknown.
    */
   private _getLastActiveCellCol(): number {
-    // Try old openp41ge-grid
-    const oldGrid = document.querySelector("openp41ge-grid") as unknown as
-      { _lastActiveCellCol: number; _focusedCol?: number } | undefined;
-    if (oldGrid) {
-      if (typeof oldGrid._focusedCol === "number") return oldGrid._focusedCol;
-      if (typeof oldGrid._lastActiveCellCol === "number") return oldGrid._lastActiveCellCol;
-    }
-    // Try tab-grid — use Openp41geTabsEventHandler tracking
+    // Use Openp41geTabsEventHandler tracking
     const tabGrid = document.querySelector("tab-grid");
     if (tabGrid) {
       const winId =

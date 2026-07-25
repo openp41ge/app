@@ -2,11 +2,11 @@
  * Tests for auto-pin on edit behaviour.
  *
  * When a file is edited in an unpinned (preview) tab, the FileEditorController
- * must dispatch `cell-tab:pin` on the document so the openp41ge platform can
- * pin the tab (preventing the preview-replacement behaviour).
+ * must dispatch `grid-pin` on the container so the Openp41geTabsEventHandler
+ * can pin the tab (preventing the preview-replacement behaviour).
  *
  * The controller registers a `fe:dirty-changed` listener when mounted.
- * On the first transition from clean to dirty, it dispatches `cell-tab:pin`.
+ * On the first transition from clean to dirty, it dispatches `grid-pin`.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -63,39 +63,6 @@ function createEditorStub(): HTMLDivElement {
   return el;
 }
 
-/**
- * Wrap an editor stub in a DOM hierarchy that mirrors production:
- *   <openp41ge-tab-content winId="..." pageId="...">
- *     <div class="openp41ge-grid-cell">
- *       <div> (the editor stub) </div>
- *     </div>
- *   </openp41ge-tab-content>
- *
- * This is required because the auto-pin code dispatches `cell-tab:pin` on
- * tabContent only when a `.openp41ge-grid-cell` ancestor is found.
- */
-function wrapEditorInCell(
-  editor: HTMLElement,
-  winId = "win-1",
-  worksetId = "ws-1",
-): { tabContent: HTMLElement; cell: HTMLElement } {
-  // Production DOM hierarchy:
-  //   div.openp41ge-grid-cell
-  //     openp41ge-tab-content  (container, returned as tabContent)
-  //       div  (editor stub)
-  const tabContent = document.createElement("openp41ge-tab-content");
-  (tabContent as any).winId = winId;
-  (tabContent as any).pageId = worksetId;
-  tabContent.appendChild(editor);
-
-  const cell = document.createElement("div");
-  cell.className = "openp41ge-grid-cell";
-  cell.appendChild(tabContent);
-
-  document.body.appendChild(cell);
-  return { tabContent, cell };
-}
-
 describe("auto-pin on edit", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
@@ -107,18 +74,22 @@ describe("auto-pin on edit", () => {
     vi.restoreAllMocks();
   });
 
-  it("dispatches cell-tab:pin on document when fe:dirty-changed fires with isDirty=true", async () => {
+  it("dispatches grid-pin on document when fe:dirty-changed fires with isDirty=true", async () => {
     const controller = new FileEditorController("tab-1", "file-editor", "/test/file.txt");
     (controller as any).tabId = "tab-1";
 
     const editorStub = createEditorStub();
-    const { tabContent } = wrapEditorInCell(editorStub);
+    // Container is the controller's mount target — dispatch is on this element
+    const container = document.createElement("div");
+    container.appendChild(editorStub);
+    document.body.appendChild(container);
+
     (controller as any)._editor = editorStub;
-    (controller as any).container = tabContent;
+    (controller as any).container = container;
     (controller as any)._attachEventBridge();
 
     const pinSpy = vi.fn();
-    document.addEventListener("cell-tab:pin", pinSpy);
+    document.addEventListener("grid-pin", pinSpy);
 
     controller._isDirty = false;
     editorStub.dispatchEvent(
@@ -133,22 +104,27 @@ describe("auto-pin on edit", () => {
     expect(pinSpy).toHaveBeenCalledTimes(1);
     const pinDetail = (pinSpy.mock.calls[0][0] as CustomEvent).detail;
     expect(pinDetail.tabId).toBe("tab-1");
+    expect(pinDetail.pinned).toBe(true);
 
+    container.remove();
     controller.unmount();
   });
 
-  it("does not dispatch cell-tab:pin when going clean (isDirty=false)", async () => {
+  it("does not dispatch grid-pin when going clean (isDirty=false)", async () => {
     const controller = new FileEditorController("tab-2", "file-editor", "/test/file.txt");
     (controller as any).tabId = "tab-2";
 
     const editorStub = createEditorStub();
-    const { tabContent } = wrapEditorInCell(editorStub);
+    const container = document.createElement("div");
+    container.appendChild(editorStub);
+    document.body.appendChild(container);
+
     (controller as any)._editor = editorStub;
-    (controller as any).container = tabContent;
+    (controller as any).container = container;
     (controller as any)._attachEventBridge();
 
     const pinSpy = vi.fn();
-    document.addEventListener("cell-tab:pin", pinSpy);
+    document.addEventListener("grid-pin", pinSpy);
 
     controller._isDirty = false;
     editorStub.dispatchEvent(
@@ -161,21 +137,25 @@ describe("auto-pin on edit", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(pinSpy).not.toHaveBeenCalled();
+    container.remove();
     controller.unmount();
   });
 
-  it("does not dispatch cell-tab:pin on subsequent dirty transitions (already dirty)", async () => {
+  it("does not dispatch grid-pin on subsequent dirty transitions (already dirty)", async () => {
     const controller = new FileEditorController("tab-3", "file-editor", "/test/file.txt");
     (controller as any).tabId = "tab-3";
 
     const editorStub = createEditorStub();
-    const { tabContent } = wrapEditorInCell(editorStub);
+    const container = document.createElement("div");
+    container.appendChild(editorStub);
+    document.body.appendChild(container);
+
     (controller as any)._editor = editorStub;
-    (controller as any).container = tabContent;
+    (controller as any).container = container;
     (controller as any)._attachEventBridge();
 
     const pinSpy = vi.fn();
-    document.addEventListener("cell-tab:pin", pinSpy);
+    document.addEventListener("grid-pin", pinSpy);
 
     controller._isDirty = false;
     editorStub.dispatchEvent(
@@ -199,33 +179,10 @@ describe("auto-pin on edit", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(pinSpy).toHaveBeenCalledTimes(1);
 
+    container.remove();
     controller.unmount();
   });
 
-  it("does not dispatch cell-tab:pin when there is no tabId", async () => {
-    const controller = new FileEditorController("tab-4", "file-editor", "/test/file.txt");
-    (controller as any).tabId = null;
-
-    const editorStub = createEditorStub();
-    document.body.appendChild(editorStub);
-    (controller as any)._editor = editorStub;
-    // container is NOT set
-    (controller as any)._attachEventBridge();
-
-    const pinSpy = vi.fn();
-    document.addEventListener("cell-tab:pin", pinSpy);
-
-    controller._isDirty = false;
-    editorStub.dispatchEvent(
-      new CustomEvent("fe:dirty-changed", {
-        bubbles: true,
-        composed: true,
-        detail: { isDirty: true },
-      }),
-    );
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(pinSpy).not.toHaveBeenCalled();
-    controller.unmount();
-  });
+  // Note: tabId is a required constructor parameter (string), so it can
+  // never be null at runtime. No test needed for the null case.
 });

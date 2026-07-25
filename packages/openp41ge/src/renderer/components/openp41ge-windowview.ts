@@ -25,7 +25,7 @@ const SYNTAX_THEME_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "github-light", label: "GitHub Light" },
 ];
 
-import { setContextMenuActive } from "../services/tab-drag-handler";
+import { setContextMenuActive } from "../services/drag-context";
 import "./openp41ge-bottom-button";
 import "./openp41ge-activity-bar";
 import "./openp41ge-sidebar";
@@ -103,6 +103,12 @@ class Openp41geWindowView extends LitElement {
       }
     }
 
+    // Ensure at least 1 column for an empty grid so the tab-grid renders
+    const effectiveCols = Math.max(1, win.grid.cols);
+    const placements = win.grid.placements.length > 0
+      ? win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))
+      : [{ position: { row: 0, col: 0 }, tabIds: [] as string[] }];
+
     return html`
       <div
         style="display:flex;flex-direction:column;width:100%;height:100%;background:var(--bg-surface);position:relative"
@@ -115,8 +121,8 @@ class Openp41geWindowView extends LitElement {
           <div class="openp41ge-grid-area" style="flex:1;position:relative;overflow:hidden">
             <tab-grid
               winId=${win.id}
-              .cols=${win.grid.cols}
-              .placements=${win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))}
+              .cols=${effectiveCols}
+              .placements=${placements}
               .tabData=${tabData}
               .activeTabIds=${activeTabIds}
             ></tab-grid>

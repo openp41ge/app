@@ -36,7 +36,7 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
   }
 
   /** Render the current workspace state into the DOM. */
-  private _render(context: StartupContext): void {
+  private async _render(context: StartupContext): Promise<void> {
     const root = document.getElementById("root");
     const ws = context.workspaceState.getWorkspace();
     if (!root || !ws) return;
@@ -77,5 +77,11 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
     (el as Openp41geWindowviewElement).windowData = myWindow;
     (el as Openp41geWindowviewElement).workspaceData = ws;
     (el as Openp41geWindowviewElement).layouts = context.workspaceState.getLayouts();
+
+    // Sync controller mounts after the grid has rendered its DOM
+    // (await Lit's updateComplete to ensure [data-tab-id] elements exist).
+    if (windowId) {
+      await context.tabMountManager.sync(ws, windowId);
+    }
   }
 }

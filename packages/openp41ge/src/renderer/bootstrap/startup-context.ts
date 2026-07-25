@@ -16,10 +16,6 @@ import type { IKeyboardManager } from "../interfaces/keyboard-manager";
 import type { IZoomService } from "../interfaces/zoom-service";
 import type { IQuoteController } from "../interfaces/quote-controller";
 import type { IFileOpenHandler } from "../interfaces/file-open-handler";
-import type { IGhostRenderer } from "../interfaces/ghost-renderer";
-import type { ICellTargetRenderer } from "../interfaces/cell-target-renderer";
-import type { ITabDragHandler } from "../interfaces/tab-drag-handler";
-
 import type { IFileDropHandler } from "../interfaces/file-drop-handler";
 import type { IContextMenuBuilder } from "../interfaces/context-menu-builder";
 
@@ -29,16 +25,9 @@ import { KeyboardManager } from "../services/keyboard-manager";
 import { ZoomService } from "../services/zoom-service";
 import { ConfigService } from "../services/config-service";
 import { FileOpenHandler } from "../services/file-open-handler";
-import { TabDragHandler } from "../services/tab-drag-handler";
-import { GridDragHandler } from "../services/grid-drag-handler";
-// IGridDragHandler interface exists but GridDragHandler uses
-// handlePaneMouseDown (not handleMouseDown) — we use the concrete type.
-import { GhostRenderer } from "../services/ghost-renderer";
-import { CellTargetRenderer } from "../services/cell-target-renderer";
 import { ContextMenuBuilder } from "../services/context-menu-builder";
 import { QuoteController } from "../services/quote-controller";
 import { FileDropHandler } from "../services/file-drop-handler";
-import { RealDragHandler } from "../services/real-drag-handler";
 import { Openp41geTabsEventHandler } from "../services/openp41ge-tabs-event-handler";
 import { TabMountManager } from "../services/tab-mount-manager";
 import { ModelRegistry } from "../models/model-registry";
@@ -55,14 +44,9 @@ export class StartupContext {
   readonly zoomService: IZoomService;
   readonly configService: ConfigService;
   readonly fileOpenHandler: IFileOpenHandler;
-  readonly tabDragHandler: ITabDragHandler;
-  readonly gridDragHandler: GridDragHandler;
-  readonly ghostRenderer: IGhostRenderer;
-  readonly cellTargetRenderer: ICellTargetRenderer;
   readonly contextMenuBuilder: IContextMenuBuilder;
   readonly quoteController: IQuoteController;
   readonly fileDropHandler: IFileDropHandler;
-  readonly dragHandler: RealDragHandler;
   readonly openp41geTabsEventHandler: Openp41geTabsEventHandler;
   readonly tabMountManager: TabMountManager;
   readonly modelRegistry: ModelRegistry;
@@ -91,14 +75,9 @@ export class StartupContext {
     this.zoomService = new ZoomService();
     this.configService = new ConfigService();
     this.fileOpenHandler = new FileOpenHandler();
-    this.tabDragHandler = new TabDragHandler();
-    this.gridDragHandler = new GridDragHandler();
-    this.ghostRenderer = new GhostRenderer();
-    this.cellTargetRenderer = new CellTargetRenderer();
     this.contextMenuBuilder = new ContextMenuBuilder();
     this.quoteController = new QuoteController();
     this.fileDropHandler = new FileDropHandler();
-    this.dragHandler = new RealDragHandler();
     this.openp41geTabsEventHandler = new Openp41geTabsEventHandler();
     this.tabMountManager = new TabMountManager();
     this.modelRegistry = new ModelRegistry();
@@ -110,12 +89,9 @@ export class StartupContext {
    * Called as part of the init-services step.
    */
   wireServices(): void {
-    this.tabDragHandler.init(this.commandBus, this.ghostRenderer, this.cellTargetRenderer);
-    this.gridDragHandler.init(this.commandBus, this.ghostRenderer);
     this.contextMenuBuilder.init(this.commandBus);
     this.fileOpenHandler.init(this.commandBus, this.workspaceState);
-    this.fileDropHandler.init(this.commandBus, this.ghostRenderer);
-    this.dragHandler.init(this.commandBus, this.ghostRenderer, this.cellTargetRenderer);
+    this.fileDropHandler.init(this.commandBus);
 
     // Initialize Openp41geTabsEventHandler to handle tab-grid custom events
     this.openp41geTabsEventHandler.init(this.commandBus, this.tabMountManager, {

@@ -1,26 +1,15 @@
-import type { TabController } from "../controllers/types";
 import type { Window, Workspace } from "../../layout/types";
 
 /**
- * Type guard: checks if an element is a <openp41ge-grid> custom element.
+ * Type guard: checks if an element is a <tab-grid> custom element.
  */
-export interface Openp41geGridElement extends HTMLElement {
+export interface TabGridElement extends HTMLElement {
   winId: string;
-  pageData: Window | null;
-  _lastActiveCellCol: number;
-  _clearFocus: () => void;
-  _updateCellFocus: (col: number) => void;
-  _focusedCol: number;
-  setLastActiveCellCol?(col: number): void;
-  _getNextTabForCell?(col: number, closedTabId: string): string | null;
-  _trackTabFocus?(col: number, tabId: string): void;
-  /** @internal DI injection point for unified drag system */
-  dragHandler?: unknown;
-  _setFocusedCol?(col: number): void;
+  cols: number;
 }
 
-export function isOpenp41geGrid(el: unknown): el is Openp41geGridElement {
-  return el instanceof HTMLElement && el.tagName === "OPENP41GE-GRID";
+export function isTabGrid(el: unknown): el is TabGridElement {
+  return el instanceof HTMLElement && el.tagName === "TAB-GRID";
 }
 
 /**
@@ -49,23 +38,6 @@ export interface Openp41geWindowviewElement extends HTMLElement {
 
 export function isOpenp41geWindowview(el: unknown): el is Openp41geWindowviewElement {
   return el instanceof HTMLElement && el.tagName === "OPENP41GE-WINDOWVIEW";
-}
-
-/**
- * Type guard: checks if an element is a <openp41ge-tab-content> custom element.
- */
-export interface Openp41geTabContentElement extends HTMLElement {
-  _winId: string;
-  _pageId: string;
-  _tabData: { id: string; appType: string } | null;
-  controller: TabController | null;
-  _controller: TabController | null;
-  tabData: { id: string; appType: string; content?: string } | null;
-  _onTabMouseDown: ((e: MouseEvent, pid: string) => void) | null;
-}
-
-export function isOpenp41geTabContent(el: unknown): el is Openp41geTabContentElement {
-  return el instanceof HTMLElement && el.tagName === "OPENP41GE-TAB-CONTENT";
 }
 
 /**

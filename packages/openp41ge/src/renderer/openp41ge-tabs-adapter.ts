@@ -31,7 +31,11 @@ export {
   splitCellForBoundary,
   classifyGridPosition,
   INSERT_BOUNDARY_THRESHOLD,
+  DRAG_EVENTS,
 } from "openp41ge-tabs";
+
+// ─── Drag orchestrator events (for cross-window bridge) ───────────────────
+export { DRAG_EVENTS };
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export type {
@@ -75,7 +79,8 @@ export function windowToTabGridState(win: Window, workspace?: Workspace) {
     activeTabIds[colStr] = (pl.activeTabId ?? pl.tabIds[0] ?? "") as string;
 
     for (const tabId of pl.tabIds) {
-      const tab = workspace?.tabs?.[tabId as string] as Tab | undefined;
+      const tabsRecord = workspace?.tabs as Record<string, Tab | undefined> | undefined;
+      const tab = tabsRecord?.[tabId as string];
       tabs[tabId as string] = {
         title: tab?.title ?? "Untitled",
         content: "",

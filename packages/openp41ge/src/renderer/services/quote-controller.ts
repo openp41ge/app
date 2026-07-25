@@ -75,7 +75,7 @@ export class QuoteController implements IQuoteController {
       if (!this._started) return;
       this._offset++;
       // Update all visible quotes
-      document.querySelectorAll("openp41ge-grid .openp41ge-empty-quote").forEach((el) => {
+      document.querySelectorAll("tab-grid .openp41ge-empty-quote").forEach((el) => {
         if (!(el instanceof HTMLElement)) return;
         const col = parseInt(el.dataset.col ?? "0", 10);
         const quote = this.getQuote(col);
