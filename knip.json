@@ -24,10 +24,7 @@
       "ignoreDependencies": ["ts-node"],
       "ignore": [
         "src/renderer/components/openp41ge-bottom-bar.ts",
-        "src/renderer/components/openp41ge-grid.ts",
         "src/renderer/components/sidebar-views/index.ts",
-        "src/renderer/drag-overlay.ts",
-        "src/renderer/interfaces/grid-drag-handler.ts",
         "src/renderer/interfaces/index.ts",
         "src/renderer/models/index.ts",
         "src/renderer/models/text-content-model.ts",
@@ -36,7 +33,7 @@
         "src/renderer/models/text-edit.ts",
         "src/renderer/models/text-model-events.ts",
         "src/renderer/models/text-model.ts",
-        "src/renderer/services/drag/index.ts",
+
         "src/renderer/services/index.ts",
         "src/layout/index.ts",
         "src/index.ts"
