@@ -44,7 +44,7 @@ jobs:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: nx-${{ runner.os }}-
-      - run: pnpm nx test
+      - run: pnpm nx run-many -t test
 
   e2e:
     runs-on: ubuntu-latest
@@ -63,7 +63,7 @@ jobs:
           key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: nx-${{ runner.os }}-
       - run: pnpm exec playwright install chromium
-      - run: pnpm nx e2e
+      - run: pnpm nx run-many -t e2e
 
   build:
     runs-on: ubuntu-latest
@@ -81,4 +81,4 @@ jobs:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: nx-${{ runner.os }}-
-      - run: pnpm nx build
+      - run: pnpm nx run-many -t build
