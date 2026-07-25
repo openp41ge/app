@@ -408,7 +408,9 @@
         "path": "/workspaceController.listBranches"
       },
       "response": {
-        "body": ["main"],
+        "body": [
+          "main"
+        ],
         "headers": {
           "Content-Type": "application/json"
         },
