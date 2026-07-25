@@ -7,7 +7,12 @@
  * no MutationObserver or manual injection is needed.
  *
  * Lifecycle per tab:
- *   createController → grid.mountController(tabId, container) → sync shows/hides
+ *   createController → mount container into grid DOM → mount controller
+ *
+ * IMPORTANT: The container MUST be connected to the document DOM before
+ * calling controller.mount(), because Lit custom elements (like <file-editor>)
+ * require DOM connection for firstUpdated() to fire. Without it, internal
+ * elements like _viewportEl are never created.
  */
 
 import { getAppTypeRegistration } from "../apps/app-registry";
@@ -30,17 +35,22 @@ export class TabMountManager {
   /**
    * Sync controller containers with the current workspace state.
    * Call after every grid render (from SubscribeStateUpdatesStep).
+   *
+   * Waits for the grid's Lit updateComplete to ensure
+   * [data-tab-id] elements exist before mounting controllers.
    */
-  sync(workspace: Workspace, windowId: string): void {
+  async sync(workspace: Workspace, windowId: string): Promise<void> {
     const win = workspace.windows.find((w) => w.id === windowId);
     if (!win) return;
 
     const grid = this._findGrid();
 
-    const allCurrentTabIds = new Set<string>();
+    // Wait for the grid to finish rendering so [data-tab-id] elements exist
+    if (grid && "updateComplete" in grid) {
+      await (grid as unknown as { updateComplete: Promise<void> }).updateComplete;
+    }
 
-    // Track which columns have active controllers (for legacy tab-view hiding)
-    const controlledCols = new Set<number>();
+    const allCurrentTabIds = new Set<string>();
 
     for (const placement of win.grid.placements) {
       const col = placement.position.col;
@@ -51,14 +61,11 @@ export class TabMountManager {
         const tab = workspace.tabs[tabId as keyof typeof workspace.tabs] as Tab | undefined;
         if (!tab) continue;
 
-        const entry = this._getOrCreateEntry(tab, workspace);
+        const entry = this._getOrCreateEntry(tab, workspace, grid, tabId);
         if (!entry) continue;
 
-        // Mount the controller container
-        if (grid) {
-          grid.mountController(tabId, entry.container);
-        } else {
-          // Legacy: inject into grid cell directly
+        if (!grid) {
+          // Legacy fallback: inject into grid cell directly
           this._injectIntoCell(entry.container, col);
         }
 
@@ -67,21 +74,8 @@ export class TabMountManager {
         entry.container.style.display = isActive ? "" : "none";
         if (isActive) {
           entry.controller.setVisible(true);
-          controlledCols.add(col);
         } else {
           entry.controller.setVisible(false);
-        }
-      }
-    }
-
-    // Legacy: hide tab-view for columns with controllers
-    if (!grid) {
-      for (const col of controlledCols) {
-        const cell = this._findGridCell(col);
-        if (!cell) continue;
-        const tabView = cell.querySelector(":scope > tab-view");
-        if (tabView instanceof HTMLElement) {
-          tabView.style.display = "none";
         }
       }
     }
@@ -100,8 +94,6 @@ export class TabMountManager {
   /**
    * Show the container for a specific tab (called on grid-activate).
    * Hides siblings in the same parent, shows the target tab.
-   * The <tab-content> handles this via activeTabId when available,
-   * but this method provides immediate feedback before the next sync.
    */
   activateTab(tabId: string): void {
     const entry = this._mounts.get(tabId);
@@ -145,9 +137,7 @@ export class TabMountManager {
 
   /** Legacy: find a grid cell element. */
   private _findGridCell(col: number): HTMLElement | null {
-    const gridArea = document.querySelector(".openp41ge-grid-area");
-    if (!gridArea) return null;
-    const grid = gridArea.querySelector("tab-grid");
+    const grid = document.querySelector("tab-grid");
     if (!grid) return null;
     return grid.querySelector(`.grid-cell[data-cell-col="${col}"]`);
   }
@@ -155,13 +145,24 @@ export class TabMountManager {
   private _findGrid(): TabGrid | null {
     const grid = document.querySelector("tab-grid");
     if (!grid) return null;
-    // Verify the grid supports controller mounting
     const tg = grid as unknown as TabGrid;
     if (typeof tg.mountController !== "function") return null;
     return tg;
   }
 
-  private _getOrCreateEntry(tab: Tab, _workspace: Workspace): MountEntry | undefined {
+  /**
+   * Get or create a mount entry for a tab.
+   *
+   * The container + controller are created here but controller.mount()
+   * is NOT called until the container is connected to the DOM (in sync()).
+   * This ensures Lit custom elements get their connectedCallback.
+   */
+  private _getOrCreateEntry(
+    tab: Tab,
+    _workspace: Workspace,
+    grid: TabGrid | null,
+    tabId: string,
+  ): MountEntry | undefined {
     const existing = this._mounts.get(tab.id);
     if (existing) return existing;
 
@@ -185,6 +186,25 @@ export class TabMountManager {
       "position:relative",
     ].join(";");
 
+    // Attach container to grid DOM BEFORE controller.mount() so Lit
+    // lifecycle (connectedCallback / firstUpdated) fires for custom elements
+    // like <file-editor> that the controller creates during mount().
+    let mounted = false;
+    if (grid) {
+      mounted = grid.mountController(tabId, container);
+    }
+    if (!mounted) {
+      // mountController failed — fall back to appending container to grid
+      const gridEl = document.querySelector("tab-grid");
+      const controllerDiv = gridEl?.querySelector(".tab-content-controller");
+      if (controllerDiv) {
+        controllerDiv.appendChild(container);
+        mounted = true;
+      }
+    }
+
+    // NOW mount the controller — Lit lifecycle will fire for any elements
+    // created inside mount() since the container is in the DOM.
     controller.mount(container);
 
     const entry: MountEntry = { controller, container };

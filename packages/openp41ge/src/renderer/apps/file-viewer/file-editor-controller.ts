@@ -127,12 +127,31 @@ export class FileEditorController extends BaseController implements FileViewerCo
   }
 
   /**
+   * Wait for the editor's Lit lifecycle to complete (firstUpdated)._viewportEl
+   * must be created before loadFile can render lines.
+   */
+  private async _awaitEditorReady(): Promise<void> {
+    const editor = this._editor;
+    if (!editor) return;
+    // If _viewportEl is already set by firstUpdated(), no need to wait
+    if ((editor as any)._viewportEl) return;
+    // Wait for Lit's updateComplete which resolves after firstUpdated()
+    if (typeof (editor as any).updateComplete?.then === "function") {
+      await (editor as any).updateComplete;
+    }
+  }
+
+  /**
    * Async file loading using the shared model from the registry.
    * Called from mount() to keep the mount() signature synchronous.
    */
   private async _loadFileAsync(path: string, fileName: string): Promise<void> {
     if (!this._editor) return;
     try {
+      // Ensure the editor's Lit lifecycle has completed (firstUpdated)
+      // so _viewportEl is available before loadFile() is called.
+      await this._awaitEditorReady();
+
       const model = await appServices.modelRegistry.getOrCreate(path);
       if (!this._editor) return; // Already unmounted
       this._editor.textContentModel = model;
@@ -281,27 +300,16 @@ export class FileEditorController extends BaseController implements FileViewerCo
         // Auto-pin the tab when it becomes dirty for the first time.
         // An unpinned (preview) tab becomes pinned once modified, since
         // pinned tabs cannot be unpinned — they can only be closed.
-        // Dispatch on tabContent which bubbles to .openp41ge-grid-cell where
-        // the @cell-tab:pin handler is registered.
-        const cell = this.container.closest(".openp41ge-grid-cell");
-        if (cell) {
-          const col = Array.from(cell.parentElement?.children ?? []).indexOf(cell as HTMLElement);
-          const tabContent = this.container.closest("openp41ge-tab-content");
-          const winId = (tabContent as HTMLElement & { winId?: string })?.winId ?? "";
-          const worksetId = (tabContent as HTMLElement & { pageId?: string })?.pageId ?? "";
-          tabContent?.dispatchEvent(
-            new CustomEvent("cell-tab:pin", {
-              bubbles: true,
-              composed: true,
-              detail: {
-                winId,
-                worksetId,
-                tabId: this.tabId,
-                col: Math.max(0, col),
-              },
-            }),
-          );
-        }
+        this.container.dispatchEvent(
+          new CustomEvent("grid-pin", {
+            bubbles: true,
+            composed: true,
+            detail: {
+              tabId: this.tabId,
+              pinned: true,
+            },
+          }),
+        );
       }
     };
 
