@@ -5,16 +5,23 @@
   "interactions": [
     {
       "description": "a request to mount a controller",
+      "pending": false,
       "request": {
         "body": {
-          "appType": "file-viewer",
-          "config": {
-            "filePath": "/repos/openp41ge/README.md"
+          "content": {
+            "appType": "file-viewer",
+            "config": {
+              "filePath": "/repos/openp41ge/README.md"
+            },
+            "tabId": "tab-1"
           },
-          "tabId": "tab-1"
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -49,11 +56,17 @@
       },
       "response": {
         "body": {
-          "success": true,
-          "tabId": "tab-1"
+          "content": {
+            "success": true,
+            "tabId": "tab-1"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -76,18 +89,26 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a request to mount a terminal controller",
+      "pending": false,
       "request": {
         "body": {
-          "appType": "terminal",
-          "config": {},
-          "tabId": "tab-2"
+          "content": {
+            "appType": "terminal",
+            "config": {},
+            "tabId": "tab-2"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -122,11 +143,17 @@
       },
       "response": {
         "body": {
-          "success": true,
-          "tabId": "tab-2"
+          "content": {
+            "success": true,
+            "tabId": "tab-2"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -149,21 +176,29 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a request to restore a controller's state",
+      "pending": false,
       "request": {
         "body": {
-          "state": {
-            "cursorPosition": 42,
-            "filePath": "/repos/openp41ge/README.md",
-            "isDirty": false
+          "content": {
+            "state": {
+              "cursorPosition": 42,
+              "filePath": "/repos/openp41ge/README.md",
+              "isDirty": false
+            },
+            "tabId": "tab-1"
           },
-          "tabId": "tab-1"
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -190,10 +225,16 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -208,17 +249,25 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a request to set controller visibility",
+      "pending": false,
       "request": {
         "body": {
-          "tabId": "tab-1",
-          "visible": true
+          "content": {
+            "tabId": "tab-1",
+            "visible": true
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -245,10 +294,16 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -263,16 +318,24 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a request to snapshot a controller's state",
+      "pending": false,
       "request": {
         "body": {
-          "tabId": "tab-1"
+          "content": {
+            "tabId": "tab-1"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -291,12 +354,18 @@
       },
       "response": {
         "body": {
-          "cursorPosition": 42,
-          "filePath": "/repos/openp41ge/README.md",
-          "isDirty": false
+          "content": {
+            "cursorPosition": 42,
+            "filePath": "/repos/openp41ge/README.md",
+            "isDirty": false
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -311,16 +380,24 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a request to unmount a controller",
+      "pending": false,
       "request": {
         "body": {
-          "tabId": "tab-1"
+          "content": {
+            "tabId": "tab-1"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -339,10 +416,16 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -357,18 +440,26 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "mount request in full lifecycle",
+      "pending": false,
       "request": {
         "body": {
-          "appType": "file-viewer",
-          "config": {},
-          "tabId": "lifecycle-tab"
+          "content": {
+            "appType": "file-viewer",
+            "config": {},
+            "tabId": "lifecycle-tab"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -403,11 +494,17 @@
       },
       "response": {
         "body": {
-          "success": true,
-          "tabId": "lifecycle-tab"
+          "content": {
+            "success": true,
+            "tabId": "lifecycle-tab"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -430,69 +527,29 @@
           }
         },
         "status": 200
-      }
-    },
-    {
-      "description": "snapshot request in full lifecycle",
-      "request": {
-        "body": {
-          "tabId": "lifecycle-tab"
-        },
-        "headers": {
-          "Content-Type": "application/json"
-        },
-        "matchingRules": {
-          "body": {
-            "$.tabId": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
-                }
-              ]
-            }
-          }
-        },
-        "method": "POST",
-        "path": "/controller.snapshot"
       },
-      "response": {
-        "body": {
-          "cursorPosition": 0,
-          "filePath": "/repos/openp41ge/src/index.ts",
-          "isDirty": false
-        },
-        "headers": {
-          "Content-Type": "application/json"
-        },
-        "matchingRules": {
-          "body": {
-            "$": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
-                }
-              ]
-            }
-          }
-        },
-        "status": 200
-      }
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "restore request in full lifecycle",
+      "pending": false,
       "request": {
         "body": {
-          "state": {
-            "cursorPosition": 0,
-            "filePath": "/repos/openp41ge/src/index.ts",
-            "isDirty": false
+          "content": {
+            "state": {
+              "cursorPosition": 0,
+              "filePath": "/repos/openp41ge/src/index.ts",
+              "isDirty": false
+            },
+            "tabId": "lifecycle-tab"
           },
-          "tabId": "lifecycle-tab"
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -519,10 +576,16 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -537,7 +600,70 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "snapshot request in full lifecycle",
+      "pending": false,
+      "request": {
+        "body": {
+          "content": {
+            "tabId": "lifecycle-tab"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.tabId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/controller.snapshot"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "cursorPosition": 0,
+            "filePath": "/repos/openp41ge/src/index.ts",
+            "isDirty": false
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     }
   ],
   "metadata": {
@@ -549,7 +675,7 @@
       "models": "1.3.11"
     },
     "pactSpecification": {
-      "version": "3.0.0"
+      "version": "4.0"
     }
   },
   "provider": {

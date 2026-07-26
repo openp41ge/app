@@ -5,17 +5,24 @@
   "interactions": [
     {
       "description": "a dispatch of activateTabInCell",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "ws-1",
-            "tab-1"
-          ],
-          "fn": "activateTabInCell"
+          "content": {
+            "args": [
+              "win-1",
+              "ws-1",
+              "tab-1"
+            ],
+            "fn": "activateTabInCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -42,10 +49,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -60,19 +71,105 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of activateTabInCell",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1",
+              "ws-1",
+              "tab-1"
+            ],
+            "fn": "activateTabInCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of addColumnTab",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1"
-          ],
-          "fn": "addColumnTab"
+          "content": {
+            "args": [
+              "win-1"
+            ],
+            "fn": "addColumnTab"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -99,10 +196,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -117,10 +218,88 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of addColumnTab",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1"
+            ],
+            "fn": "addColumnTab"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of addTabToCell",
+      "pending": false,
       "providerStates": [
         {
           "name": "grid is empty"
@@ -128,20 +307,26 @@
       ],
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            {
-              "appType": "terminal",
-              "id": "tab-1",
-              "title": "Terminal"
-            },
-            0,
-            0
-          ],
-          "fn": "addTabToCell"
+          "content": {
+            "args": [
+              "win-1",
+              {
+                "appType": "terminal",
+                "id": "tab-1",
+                "title": "Terminal"
+              },
+              0,
+              0
+            ],
+            "fn": "addTabToCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -168,10 +353,16 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -186,19 +377,27 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of closeWindow",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1"
-          ],
-          "fn": "closeWindow"
+          "content": {
+            "args": [
+              "win-1"
+            ],
+            "fn": "closeWindow"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -225,10 +424,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -243,26 +446,110 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of closeWindow",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1"
+            ],
+            "fn": "closeWindow"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of detachTabToWindow",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "tab-1",
-            {
-              "height": 600,
-              "width": 800,
-              "x": 100,
-              "y": 100
-            }
-          ],
-          "fn": "detachTabToWindow"
+          "content": {
+            "args": [
+              "win-1",
+              "tab-1",
+              {
+                "height": 600,
+                "width": 800,
+                "x": 100,
+                "y": 100
+              }
+            ],
+            "fn": "detachTabToWindow"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -289,10 +576,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -307,23 +598,114 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of detachTabToWindow",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1",
+              "tab-1",
+              {
+                "height": 600,
+                "width": 800,
+                "x": 100,
+                "y": 100
+              }
+            ],
+            "fn": "detachTabToWindow"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of moveTabBetweenCells",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "tab-1",
-            "win-1",
-            0,
-            1
-          ],
-          "fn": "moveTabBetweenCells"
+          "content": {
+            "args": [
+              "win-1",
+              "tab-1",
+              "win-1",
+              0,
+              1
+            ],
+            "fn": "moveTabBetweenCells"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -350,10 +732,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -368,22 +754,110 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of moveTabBetweenCells",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1",
+              "tab-1",
+              "win-1",
+              0,
+              1
+            ],
+            "fn": "moveTabBetweenCells"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of moveTabToWindow",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "tab-1",
-            "win-2",
-            0,
-            0
-          ],
-          "fn": "moveTabToWindow"
+          "content": {
+            "args": [
+              "tab-1",
+              "win-2",
+              0,
+              0
+            ],
+            "fn": "moveTabToWindow"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -410,10 +884,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -428,10 +906,91 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of moveTabToWindow",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "tab-1",
+              "win-2",
+              0,
+              0
+            ],
+            "fn": "moveTabToWindow"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of removeTabFromCell",
+      "pending": false,
       "providerStates": [
         {
           "name": "grid has tabs"
@@ -439,14 +998,20 @@
       ],
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "tab-1"
-          ],
-          "fn": "removeTabFromCell"
+          "content": {
+            "args": [
+              "win-1",
+              "tab-1"
+            ],
+            "fn": "removeTabFromCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -473,10 +1038,16 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -491,23 +1062,31 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of reorderTabsInCell",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            0,
-            0,
-            1,
-            0
-          ],
-          "fn": "reorderTabsInCell"
+          "content": {
+            "args": [
+              "win-1",
+              0,
+              0,
+              1,
+              0
+            ],
+            "fn": "reorderTabsInCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -534,10 +1113,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -552,21 +1135,109 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of reorderTabsInCell",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1",
+              0,
+              0,
+              1,
+              0
+            ],
+            "fn": "reorderTabsInCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of resizeGrid",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            2,
-            3
-          ],
-          "fn": "resizeGrid"
+          "content": {
+            "args": [
+              "win-1",
+              2,
+              3
+            ],
+            "fn": "resizeGrid"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -593,10 +1264,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -611,19 +1286,105 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of resizeGrid",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1",
+              2,
+              3
+            ],
+            "fn": "resizeGrid"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of splitColumn",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1"
-          ],
-          "fn": "splitColumn"
+          "content": {
+            "args": [
+              "win-1"
+            ],
+            "fn": "splitColumn"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -650,10 +1411,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -668,23 +1433,107 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of splitColumn",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1"
+            ],
+            "fn": "splitColumn"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of splitTabFromCell",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "ws-1",
-            "tab-1",
-            0,
-            true
-          ],
-          "fn": "splitTabFromCell"
+          "content": {
+            "args": [
+              "win-1",
+              "ws-1",
+              "tab-1",
+              0,
+              true
+            ],
+            "fn": "splitTabFromCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -711,10 +1560,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -729,24 +1582,112 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of splitTabFromCell",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1",
+              "ws-1",
+              "tab-1",
+              0,
+              true
+            ],
+            "fn": "splitTabFromCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of splitTabFromCell with focusTabId",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "ws-1",
-            "tab-2",
-            0,
-            false,
-            "tab-1"
-          ],
-          "fn": "splitTabFromCell"
+          "content": {
+            "args": [
+              "win-1",
+              "ws-1",
+              "tab-2",
+              0,
+              false,
+              "tab-1"
+            ],
+            "fn": "splitTabFromCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -773,10 +1714,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -791,22 +1736,111 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of splitTabFromCell with focusTabId",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1",
+              "ws-1",
+              "tab-2",
+              0,
+              false,
+              "tab-1"
+            ],
+            "fn": "splitTabFromCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of switchTabInCell",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "win-1",
-            "tab-2",
-            0,
-            0
-          ],
-          "fn": "switchTabInCell"
+          "content": {
+            "args": [
+              "win-1",
+              "tab-2",
+              0,
+              0
+            ],
+            "fn": "switchTabInCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -833,10 +1867,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -851,21 +1889,108 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of switchTabInCell",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "win-1",
+              "tab-2",
+              0,
+              0
+            ],
+            "fn": "switchTabInCell"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of updateTabConfig",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "tab-1",
-            "filePath",
-            "/repos/openp41ge/src/index.ts"
-          ],
-          "fn": "updateTabConfig"
+          "content": {
+            "args": [
+              "tab-1",
+              "filePath",
+              "/repos/openp41ge/src/index.ts"
+            ],
+            "fn": "updateTabConfig"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -892,10 +2017,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -910,20 +2039,106 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of updateTabConfig",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "tab-1",
+              "filePath",
+              "/repos/openp41ge/src/index.ts"
+            ],
+            "fn": "updateTabConfig"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     },
     {
       "description": "a dispatch of updateTabTitle",
+      "pending": false,
       "request": {
         "body": {
-          "args": [
-            "tab-1",
-            "New Title"
-          ],
-          "fn": "updateTabTitle"
+          "content": {
+            "args": [
+              "tab-1",
+              "New Title"
+            ],
+            "fn": "updateTabTitle"
+          },
+          "contentType": "application/json",
+          "encoded": false
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -950,10 +2165,14 @@
       },
       "response": {
         "body": {
-          "success": true
+          "content": "eyJzdWNjZXNzIjp0cnVlfQ==",
+          "contentType": "*/*",
+          "encoded": "base64"
         },
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": [
+            "application/json"
+          ]
         },
         "matchingRules": {
           "body": {
@@ -968,7 +2187,85 @@
           }
         },
         "status": 200
-      }
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a dispatch of updateTabTitle",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": ""
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "args": [
+              "tab-1",
+              "New Title"
+            ],
+            "fn": "updateTabTitle"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.args": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.fn": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/dispatch"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "success": true
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
     }
   ],
   "metadata": {
@@ -980,7 +2277,7 @@
       "models": "1.3.11"
     },
     "pactSpecification": {
-      "version": "3.0.0"
+      "version": "4.0"
     }
   },
   "provider": {

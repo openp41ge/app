@@ -9,309 +9,291 @@
  * system) correctly handles the lifecycle state machine.
  */
 
-import { PactV3 } from "@pact-foundation/pact";
+import { PactV4 } from "@pact-foundation/pact";
 import { MatchersV3 } from "@pact-foundation/pact/src/v3";
 import { describe, it, expect } from "vitest";
 import { pactOptions } from "../helpers/pact-setup";
 
 const { like, string, boolean } = MatchersV3;
 
-const provider = new PactV3(pactOptions("pane-controller", "controller-registry"));
+const provider = new PactV4(pactOptions("pane-controller", "controller-registry"));
 
 // ─── Controller Lifecycle Contract ────────────────────────────────────
 
 describe("PaneController lifecycle contract", () => {
   it("mount initialises the controller and attaches to the DOM", async () => {
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("a request to mount a controller")
-      .withRequest({
-        method: "POST",
-        path: "/controller.mount",
-        body: {
+      .withRequest("POST", "/controller.mount", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({
           tabId: string("tab-1"),
           appType: string("file-viewer"),
           config: like({ filePath: "/repos/openp41ge/README.md" }),
-        },
+        });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: {
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody({
           success: boolean(true),
           tabId: string("tab-1"),
-        },
+        });
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.mount`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tabId: "tab-1",
+            appType: "file-viewer",
+            config: { filePath: "/repos/openp41ge/README.md" },
+          }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.success).toBe(true);
+        expect(body.tabId).toBe("tab-1");
       });
-
-    await provider.executeTest(async (mockServer) => {
-      const res = await fetch(`${mockServer.url}/controller.mount`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tabId: "tab-1",
-          appType: "file-viewer",
-          config: { filePath: "/repos/openp41ge/README.md" },
-        }),
-      });
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.success).toBe(true);
-      expect(body.tabId).toBe("tab-1");
-    });
   });
 
   it("unmount detaches the controller and releases resources", async () => {
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("a request to unmount a controller")
-      .withRequest({
-        method: "POST",
-        path: "/controller.unmount",
-        body: { tabId: string("tab-1") },
+      .withRequest("POST", "/controller.unmount", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({ tabId: string("tab-1") });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: {
-          success: boolean(true),
-        },
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody({ success: boolean(true) });
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.unmount`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tabId: "tab-1" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.success).toBe(true);
       });
-
-    await provider.executeTest(async (mockServer) => {
-      const res = await fetch(`${mockServer.url}/controller.unmount`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabId: "tab-1" }),
-      });
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.success).toBe(true);
-    });
   });
 
   it("snapshot returns serializable state", async () => {
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("a request to snapshot a controller's state")
-      .withRequest({
-        method: "POST",
-        path: "/controller.snapshot",
-        body: { tabId: string("tab-1") },
+      .withRequest("POST", "/controller.snapshot", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({ tabId: string("tab-1") });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: like({
-          filePath: "/repos/openp41ge/README.md",
-          cursorPosition: 42,
-          isDirty: false,
-        }),
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody(
+          like({
+            filePath: "/repos/openp41ge/README.md",
+            cursorPosition: 42,
+            isDirty: false,
+          }),
+        );
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.snapshot`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tabId: "tab-1" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body).toHaveProperty("filePath");
+        expect(body).toHaveProperty("cursorPosition");
+        expect(body).toHaveProperty("isDirty");
       });
-
-    await provider.executeTest(async (mockServer) => {
-      const res = await fetch(`${mockServer.url}/controller.snapshot`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabId: "tab-1" }),
-      });
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body).toHaveProperty("filePath");
-      expect(body).toHaveProperty("cursorPosition");
-      expect(body).toHaveProperty("isDirty");
-    });
   });
 
   it("restore applies saved state to the controller", async () => {
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("a request to restore a controller's state")
-      .withRequest({
-        method: "POST",
-        path: "/controller.restore",
-        body: {
+      .withRequest("POST", "/controller.restore", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({
           tabId: string("tab-1"),
           state: like({
             filePath: "/repos/openp41ge/README.md",
             cursorPosition: 42,
             isDirty: false,
           }),
-        },
+        });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: {
-          success: boolean(true),
-        },
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody({ success: boolean(true) });
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.restore`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tabId: "tab-1",
+            state: { filePath: "/repos/openp41ge/README.md", cursorPosition: 42, isDirty: false },
+          }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.success).toBe(true);
       });
-
-    await provider.executeTest(async (mockServer) => {
-      const res = await fetch(`${mockServer.url}/controller.restore`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tabId: "tab-1",
-          state: { filePath: "/repos/openp41ge/README.md", cursorPosition: 42, isDirty: false },
-        }),
-      });
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.success).toBe(true);
-    });
   });
 
   it("setVisible toggles visibility without throwing", async () => {
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("a request to set controller visibility")
-      .withRequest({
-        method: "POST",
-        path: "/controller.setVisible",
-        body: {
+      .withRequest("POST", "/controller.setVisible", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({
           tabId: string("tab-1"),
           visible: boolean(true),
-        },
+        });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: {
-          success: boolean(true),
-        },
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody({ success: boolean(true) });
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.setVisible`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tabId: "tab-1", visible: true }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.success).toBe(true);
       });
-
-    await provider.executeTest(async (mockServer) => {
-      const res = await fetch(`${mockServer.url}/controller.setVisible`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabId: "tab-1", visible: true }),
-      });
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.success).toBe(true);
-    });
   });
 
   it("mount with terminal appType creates a terminal controller", async () => {
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("a request to mount a terminal controller")
-      .withRequest({
-        method: "POST",
-        path: "/controller.mount",
-        body: {
+      .withRequest("POST", "/controller.mount", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({
           tabId: string("tab-2"),
           appType: string("terminal"),
           config: like({}),
-        },
+        });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: {
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody({
           success: boolean(true),
           tabId: string("tab-2"),
-        },
+        });
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.mount`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tabId: "tab-2",
+            appType: "terminal",
+            config: {},
+          }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.success).toBe(true);
+        expect(body.tabId).toBe("tab-2");
       });
-
-    await provider.executeTest(async (mockServer) => {
-      const res = await fetch(`${mockServer.url}/controller.mount`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tabId: "tab-2",
-          appType: "terminal",
-          config: {},
-        }),
-      });
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.success).toBe(true);
-      expect(body.tabId).toBe("tab-2");
-    });
   });
 
   it("full lifecycle: mount → setVisible(false) → snapshot → unmount → restore → mount → setVisible(true)", async () => {
     // Interaction 1: mount
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("mount request in full lifecycle")
-      .withRequest({
-        method: "POST",
-        path: "/controller.mount",
-        body: {
+      .withRequest("POST", "/controller.mount", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({
           tabId: string("lifecycle-tab"),
           appType: string("file-viewer"),
           config: like({}),
-        },
+        });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: { success: boolean(true), tabId: string("lifecycle-tab") },
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody({ success: boolean(true), tabId: string("lifecycle-tab") });
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.mount`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tabId: "lifecycle-tab", appType: "file-viewer", config: {} }),
+        });
+        expect(res.status).toBe(200);
       });
 
     // Interaction 2: snapshot
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("snapshot request in full lifecycle")
-      .withRequest({
-        method: "POST",
-        path: "/controller.snapshot",
-        body: { tabId: string("lifecycle-tab") },
+      .withRequest("POST", "/controller.snapshot", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({ tabId: string("lifecycle-tab") });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: like({
-          filePath: "/repos/openp41ge/src/index.ts",
-          cursorPosition: 0,
-          isDirty: false,
-        }),
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody(
+          like({
+            filePath: "/repos/openp41ge/src/index.ts",
+            cursorPosition: 0,
+            isDirty: false,
+          }),
+        );
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.snapshot`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tabId: "lifecycle-tab" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.filePath).toBe("/repos/openp41ge/src/index.ts");
       });
 
     // Interaction 3: restore
-    provider
+    await provider
+      .addInteraction()
       .uponReceiving("restore request in full lifecycle")
-      .withRequest({
-        method: "POST",
-        path: "/controller.restore",
-        body: {
+      .withRequest("POST", "/controller.restore", (req) => {
+        req.headers({ "Content-Type": "application/json" });
+        req.jsonBody({
           tabId: string("lifecycle-tab"),
           state: like({
             filePath: "/repos/openp41ge/src/index.ts",
             cursorPosition: 0,
             isDirty: false,
           }),
-        },
+        });
       })
-      .willRespondWith({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: { success: boolean(true) },
+      .willRespondWith(200, (res) => {
+        res.headers({ "Content-Type": "application/json" });
+        res.jsonBody({ success: boolean(true) });
+      })
+      .executeTest(async (mockServer) => {
+        const res = await fetch(`${mockServer.url}/controller.restore`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tabId: "lifecycle-tab",
+            state: { filePath: "/repos/openp41ge/src/index.ts", cursorPosition: 0, isDirty: false },
+          }),
+        });
+        expect(res.status).toBe(200);
       });
-
-    await provider.executeTest(async (mockServer) => {
-      const baseUrl = mockServer.url;
-
-      // mount
-      const mountRes = await fetch(`${baseUrl}/controller.mount`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabId: "lifecycle-tab", appType: "file-viewer", config: {} }),
-      });
-      expect(mountRes.status).toBe(200);
-
-      // snapshot
-      const snapRes = await fetch(`${baseUrl}/controller.snapshot`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabId: "lifecycle-tab" }),
-      });
-      expect(snapRes.status).toBe(200);
-      const snapBody = await snapRes.json();
-      expect(snapBody.filePath).toBe("/repos/openp41ge/src/index.ts");
-
-      // restore
-      const restoreRes = await fetch(`${baseUrl}/controller.restore`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabId: "lifecycle-tab", state: snapBody }),
-      });
-      expect(restoreRes.status).toBe(200);
-    });
   });
 });
