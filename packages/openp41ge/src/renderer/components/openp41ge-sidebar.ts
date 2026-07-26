@@ -180,7 +180,7 @@ class Openp41geSidebar extends LitElement {
 
     return html`
       <div
-        style="display:flex;flex-direction:column;width:${this.width}px;height:100%;background:var(--bg-gutter);border-left:1px solid var(--border-divider);flex-shrink:0;overflow:hidden;position:relative;"
+        style="display:flex;flex-direction:column;width:${this.width}px;min-width:${MIN_SIDEBAR_WIDTH}px;height:100%;background:var(--bg-gutter);border-left:1px solid var(--border-divider);overflow:hidden;position:relative;"
       >
         <!-- Resize notch on the left edge -->
         <div
