@@ -29,6 +29,16 @@ let _remoteDragActive = false;
 /** Whether our window has an active local drag. */
 let _localDragActive = false;
 
+/** Deferred drag:start params, captured on mousedown, fired on first POSITION event. */
+let _pendingDragStart: {
+  label: string;
+  screenX: number;
+  screenY: number;
+  tabId: string;
+  winId: string;
+  worksetId: string;
+} | null = null;
+
 /**
  * The window ID of this renderer, resolved lazily.
  * Cannot be cached at init time because openp41ge:init (which sets
@@ -92,15 +102,16 @@ export function initDragSystem(): () => void {
     _currentSource = dragSource;
     _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
 
-    window.openp41ge.drag.start(
+    // Defer drag:start until the POSITION event fires (after threshold met).
+    // Store params for the deferred call.
+    _pendingDragStart = {
       label,
-      e.screenX,
-      e.screenY,
-      undefined,
+      screenX: e.screenX,
+      screenY: e.screenY,
       tabId,
       winId,
-      col.toString(),
-    );
+      worksetId: col.toString(),
+    };
   };
 
   document.addEventListener("mousedown", onMouseDown);
@@ -151,6 +162,7 @@ export function initDragSystem(): () => void {
 
   // ── Mouseup: handle cross-window drops ───────────────────────────────
   const onMouseUp = async (e: MouseEvent) => {
+    _pendingDragStart = null;
     if (_localDragActive) {
       clearGridGhost();
       _localDragActive = false;
@@ -176,6 +188,23 @@ export function initDragSystem(): () => void {
       if (!_dragActivated) {
         _dragActivated = true;
         _localDragActive = true;
+
+        // First POSITION event fires after the drag threshold is met — now
+        // it's safe to show the main-process BrowserWindow ghost and broadcast
+        // drag-active to other windows.
+        if (_pendingDragStart) {
+          const p = _pendingDragStart;
+          window.openp41ge.drag.start(
+            p.label,
+            p.screenX,
+            p.screenY,
+            undefined,
+            p.tabId,
+            p.winId,
+            p.worksetId,
+          );
+          _pendingDragStart = null;
+        }
         window.openp41ge.drag.activate();
       }
     }
