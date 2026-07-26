@@ -109,12 +109,11 @@ function _restoreGridFocus(): void {
 }
 
 function updateDrawerVisibility(): void {
-  const explorerWidth = _isOpen ? "280px" : "0px";
   const el = document.querySelector("openp41ge-worktree-tree") as Openp41geWorktreeTree | null;
   if (el) {
     el.style.position = "relative";
     el.style.inset = "auto";
-    el.style.width = explorerWidth;
+    el.style.width = _isOpen ? "" : "0";
     el.style.zIndex = "";
     el.style.borderLeft = _isOpen ? "1px solid #2a2a2a" : "none";
     el.style.height = "";
