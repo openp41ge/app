@@ -33,7 +33,7 @@ export class TabContent extends LitElement {
           class="tab-content-empty"
           style="display:flex;align-items:center;justify-content:center;height:100%;color:#666;font-style:italic;"
         >
-          No tabs
+          ${['🪟', '🔲', '🫙', '🌌', '◻️', '📑'][Math.floor(Math.random() * 6)]}
         </div>
       `;
     }
