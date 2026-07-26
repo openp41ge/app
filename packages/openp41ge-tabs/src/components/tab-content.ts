@@ -32,22 +32,21 @@ const _emojiPool = [
   '🚀','🎉','🎊','🎈','🎁','🎀','🪅','🎃','🎄','🎆','🎇','✨','🎶','🎵','🎸','🎺','🎻','🥁','🪘','🎮','🕹️','🎲','♟️','🧩','🧸','🪀','🪁','📚','📖','🔮','💎','🕶️','👑','🎒','🧳','🌍','🌎','🌏','🗺️','🧭','⏰','⌚','📱','💻','⌨️','🖥️','🖨️','🖱️','🖲️','💾','💿','📀','📸','📹','🎥','📽️','🎞️','📞','☎️','📟','📠','🔊','🔔','🎵','🎶',
 ];
 
-function _randomChain(): string {
-  const len = 5 + Math.floor(Math.random() * 11); // 5–15
-  let chain = '';
-  for (let i = 0; i < len; i++) {
-    chain += _emojiPool[Math.floor(Math.random() * _emojiPool.length)];
+function _randomGrid(): string[] {
+  const grid: string[] = [];
+  for (let i = 0; i < 9; i++) {
+    grid.push(_emojiPool[Math.floor(Math.random() * _emojiPool.length)]);
   }
-  return chain;
+  return grid;
 }
 
-function _mutateChain(chain: string): string {
-  const chars = [...chain];
-  const count = 1 + Math.floor(Math.random() * Math.min(4, chars.length));
+function _mutateGrid(grid: string[]): string[] {
+  const next = [...grid];
+  const count = 1 + Math.floor(Math.random() * 3); // 1–3 positions change
   for (let i = 0; i < count; i++) {
-    chars[Math.floor(Math.random() * chars.length)] = _emojiPool[Math.floor(Math.random() * _emojiPool.length)];
+    next[Math.floor(Math.random() * 9)] = _emojiPool[Math.floor(Math.random() * _emojiPool.length)];
   }
-  return chars.join('');
+  return next;
 }
 
 export class TabContent extends LitElement {
@@ -55,7 +54,7 @@ export class TabContent extends LitElement {
   @property({ type: String }) activeTabId: string = "";
   @property({ type: Object }) tabs: Record<string, { content: string }> = {};
 
-  @state() private _emojiChain: string = _randomChain();
+  @state() private _emojiGrid: string[] = _randomGrid();
   private _timer: ReturnType<typeof setTimeout> | null = null;
 
   connectedCallback(): void {
@@ -74,7 +73,7 @@ export class TabContent extends LitElement {
   private _scheduleTick(): void {
     this._timer = setTimeout(() => {
       if (!this.isConnected) return;
-      this._emojiChain = _mutateChain(this._emojiChain);
+      this._emojiGrid = _mutateGrid(this._emojiGrid);
       this._scheduleTick();
     }, 5000 + Math.random() * 10000); // 5–15 seconds
   }
@@ -88,9 +87,10 @@ export class TabContent extends LitElement {
       return html`
         <div
           class="tab-content-empty"
-          style="display:flex;align-items:center;justify-content:center;height:100%;color:#666;font-size:2rem;letter-spacing:2px;"
+          style="display:grid;grid-template-columns:repeat(3,auto);place-content:center;place-items:center;gap:12px;height:100%;color:#666;font-size:2.5rem;"
         >
-          ${this._emojiChain}
+          ${this._emojiGrid.map((e) => html`<span>${e}</span>`)}
+
         </div>
       `;
     }
