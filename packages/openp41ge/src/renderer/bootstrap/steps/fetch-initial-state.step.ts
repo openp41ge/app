@@ -41,10 +41,7 @@ export class FetchInitialStateStep implements IStartupStep {
     // Fire state fetch AND waitForInit in parallel — the state fetch
     // might already have the data (via cached initial state) while
     // waitForInit ensures windowId is ready.
-    const [json] = await Promise.all([
-      statePromise,
-      window.openp41ge.workspace.waitForInit(),
-    ]);
+    const [json] = await Promise.all([statePromise, window.openp41ge.workspace.waitForInit()]);
     const ws: Workspace = JSON.parse(json);
 
     // Resolve window ID — waitForInit ensures getWindowId() is ready.

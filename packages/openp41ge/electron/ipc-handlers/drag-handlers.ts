@@ -43,7 +43,10 @@ function _startCursorPoll(): void {
   // events only to the capturing window, and the target window only gets
   // the entry event.
   _cursorPollInterval = setInterval(() => {
-    if (!_activeSession) { _stopCursorPoll(); return; }
+    if (!_activeSession) {
+      _stopCursorPoll();
+      return;
+    }
     const pos = screen.getCursorScreenPoint();
     const data = JSON.stringify({ screenX: pos.x, screenY: pos.y });
     for (const [, bw] of openp41geWindows) {
@@ -256,18 +259,54 @@ async function _resolveDropInWindow(
         const gridRect = grid.getBoundingClientRect();
         const relX = ${clientX} - gridRect.left;
         const cols = grid.cols || 1;
-        const cellWidth = gridRect.width / cols;
-        const mouseCol = Math.min(Math.floor(relX / cellWidth), cols - 1);
 
-        const colFraction = (relX % cellWidth) / cellWidth;
-        const isLeftBoundary = mouseCol > 0 && colFraction < 0.15;
-        const isRightBoundary = mouseCol < cols - 1 && colFraction > 0.85;
+        // Use same boundary detection as computeDropTarget to keep ghost
+        // preview and actual drop target in sync.
+        var gridWidth = gridRect.width;
+        var fraction = relX / gridWidth;
 
-        if (isLeftBoundary) {
-          return { type: 'grid-split', winId: grid.winId, splitCol: mouseCol, splitLeft: false };
+        if (cols <= 0) {
+          return { type: 'grid-move', winId: grid.winId, col: 0 };
         }
-        if (isRightBoundary) {
+
+        if (cols === 1) {
+          var edgeThreshold = Math.min(0.15, 1 / 3);
+          if (fraction <= edgeThreshold) {
+            return { type: 'grid-split', winId: grid.winId, splitCol: 0, splitLeft: true };
+          }
+          if (fraction >= 1 - edgeThreshold) {
+            return { type: 'grid-split', winId: grid.winId, splitCol: 0, splitLeft: false };
+          }
+          return { type: 'grid-move', winId: grid.winId, col: 0 };
+        }
+
+        // For cols > 1, compute dividers and classify
+        var cellWidth = gridWidth / cols;
+        var mouseCol = Math.min(Math.floor(relX / cellWidth), cols - 1);
+
+        // Check left edge of grid (boundaryIndex = 0)
+        if (fraction < 0.15) {
+          return { type: 'grid-split', winId: grid.winId, splitCol: 0, splitLeft: true };
+        }
+
+        // Check right edge of grid (boundaryIndex = cols)
+        if (fraction > 1 - 0.15) {
+          return { type: 'grid-split', winId: grid.winId, splitCol: cols - 1, splitLeft: false };
+        }
+
+        // Check internal boundaries
+        // Left edge of cell N → boundary between N-1 and N.
+        // splitLeft=true  → new column at same position N (before existing N).
+        // Right edge of cell N → boundary between N and N+1.
+        // splitLeft=false → new column at N+1 (after existing N).
+        var colFraction = (relX % cellWidth) / cellWidth;
+        if (colFraction < 0.15) {
+          // Near left edge of mouseCol → split col to the left
           return { type: 'grid-split', winId: grid.winId, splitCol: mouseCol, splitLeft: true };
+        }
+        if (colFraction > 0.85) {
+          // Near right edge of mouseCol → split col to the right
+          return { type: 'grid-split', winId: grid.winId, splitCol: mouseCol, splitLeft: false };
         }
 
         return { type: 'grid-move', winId: grid.winId, col: mouseCol };

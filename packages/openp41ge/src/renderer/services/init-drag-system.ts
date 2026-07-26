@@ -45,7 +45,6 @@ function _resolveMyWinId(): string {
 
 // ─── Dummy drag source for cross-window ghost preview ────────────────────
 
-
 /**
  * Initialize the drag system. Call once during startup.
  * Returns a cleanup function.
@@ -86,14 +85,23 @@ export function initDragSystem(): () => void {
     // main-process BrowserWindow ghost (DragGhostManager), not the in-DOM floating ghost.
     const dragSource = new TabDragSource(tabBtn, tabId, winId, col.toString(), label, () => {
       const ghost = document.createElement("div");
-      ghost.style.cssText = "position:fixed;pointer-events:none;opacity:0;width:1px;height:1px;z-index:-1;";
+      ghost.style.cssText =
+        "position:fixed;pointer-events:none;opacity:0;width:1px;height:1px;z-index:-1;";
       return ghost;
     });
     _currentSource = dragSource;
     _localDragActive = true;
     _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
 
-    window.openp41ge.drag.start(label, e.screenX, e.screenY, undefined, tabId, winId, col.toString());
+    window.openp41ge.drag.start(
+      label,
+      e.screenX,
+      e.screenY,
+      undefined,
+      tabId,
+      winId,
+      col.toString(),
+    );
   };
 
   document.addEventListener("mousedown", onMouseDown);
@@ -162,19 +170,16 @@ export function initDragSystem(): () => void {
   // Also broadcasts drag-active to other windows on the FIRST position event
   // (which fires after the drag threshold is met), not on mousedown.
   let _dragActivated = false;
-  document.addEventListener(
-    DRAG_EVENTS.POSITION,
-    (e: Event) => {
-      const detail = (e as CustomEvent).detail as { screenX: number; screenY: number };
-      if (detail) {
-        window.openp41ge.drag.move(detail.screenX, detail.screenY);
-        if (!_dragActivated) {
-          _dragActivated = true;
-          window.openp41ge.drag.activate();
-        }
+  document.addEventListener(DRAG_EVENTS.POSITION, (e: Event) => {
+    const detail = (e as CustomEvent).detail as { screenX: number; screenY: number };
+    if (detail) {
+      window.openp41ge.drag.move(detail.screenX, detail.screenY);
+      if (!_dragActivated) {
+        _dragActivated = true;
+        window.openp41ge.drag.activate();
       }
-    },
-  );
+    }
+  });
 
   // ── Orchestrator end event → hide main-process ghost ─────────────────
   const onDragEnd = () => {
@@ -323,7 +328,7 @@ async function _handleCrossWindowDrop(
 
       // Check if cursor is near a grid boundary — even when over the tab bar,
       // the drop should create a new column if at the grid edge.
-      const gridEl = tabBarTarget.element.closest("tab-grid");
+      const gridEl = tabBarTarget.element.closest("tab-grid") as HTMLElement | null;
       if (gridEl) {
         const gridRect = gridEl.getBoundingClientRect();
         const gridRelX = clientX - gridRect.left;
@@ -331,17 +336,19 @@ async function _handleCrossWindowDrop(
         const gridPos = computeDropTarget(gridEl, gridRelX, gridRect.width, cols);
 
         if (gridPos.isBoundary) {
-          const splitLeft = gridPos.boundaryIndex === 0
-            ? true
-            : gridPos.boundaryIndex >= cols
-              ? false
-              : gridPos.col >= gridPos.boundaryIndex;
-          const splitCol = gridPos.boundaryIndex === 0
-            ? 0
-            : gridPos.boundaryIndex >= cols
-              ? cols - 1
-              : gridPos.col;
-          _dispatchCrossWindowSplit(data.tabId, splitCol, splitLeft);
+          const splitLeft =
+            gridPos.boundaryIndex === 0
+              ? true
+              : gridPos.boundaryIndex >= cols
+                ? false
+                : gridPos.col >= gridPos.boundaryIndex;
+          const splitCol =
+            gridPos.boundaryIndex === 0
+              ? 0
+              : gridPos.boundaryIndex >= cols
+                ? cols - 1
+                : gridPos.col;
+          _dispatchCrossWindowSplit(sourceWinId, data.tabId, targetWinId, splitCol, splitLeft);
           window.openp41ge.drag.endSession();
           return;
         }
@@ -350,12 +357,15 @@ async function _handleCrossWindowDrop(
       const barEl = tabBarTarget.element;
       const barRect = barEl.getBoundingClientRect();
       const barRelX = clientX - barRect.left;
-      const tabButtons = barEl.querySelectorAll('[data-tab-id]');
+      const tabButtons = barEl.querySelectorAll("[data-tab-id]");
       let dropIndex = tabButtons.length;
       for (let i = 0; i < tabButtons.length; i++) {
         const btnRect = tabButtons[i].getBoundingClientRect();
         const btnMid = btnRect.left - barRect.left + btnRect.width / 2;
-        if (barRelX < btnMid) { dropIndex = i; break; }
+        if (barRelX < btnMid) {
+          dropIndex = i;
+          break;
+        }
       }
 
       const colStr = tabBarTarget.element.closest(".grid-cell")?.getAttribute("data-cell-col");
@@ -380,17 +390,15 @@ async function _handleCrossWindowDrop(
       const mouseCol = pos.col;
 
       if (pos.isBoundary) {
-        const splitLeft = pos.boundaryIndex === 0
-          ? true
-          : pos.boundaryIndex >= cols
-            ? false
-            : mouseCol >= pos.boundaryIndex;
-        const splitCol = pos.boundaryIndex === 0
-          ? 0
-          : pos.boundaryIndex >= cols
-            ? cols - 1
-            : mouseCol;
-        _dispatchCrossWindowSplit(data.tabId, splitCol, splitLeft);
+        const splitLeft =
+          pos.boundaryIndex === 0
+            ? true
+            : pos.boundaryIndex >= cols
+              ? false
+              : mouseCol >= pos.boundaryIndex;
+        const splitCol =
+          pos.boundaryIndex === 0 ? 0 : pos.boundaryIndex >= cols ? cols - 1 : mouseCol;
+        _dispatchCrossWindowSplit(sourceWinId, data.tabId, targetWinId, splitCol, splitLeft);
       } else {
         _dispatchCrossWindowMove(sourceWinId, data.tabId, targetWinId, mouseCol, -1);
       }
@@ -438,7 +446,7 @@ async function _tryCrossWindowDrop(
     if (type === "grid-split") {
       const splitCol = typeof target.splitCol === "number" ? target.splitCol : 0;
       const splitLeft = typeof target.splitLeft === "boolean" ? target.splitLeft : true;
-      _dispatchCrossWindowSplit(tabId, splitCol, splitLeft);
+      _dispatchCrossWindowSplit(sourceWinId, tabId, targetWinId, splitCol, splitLeft);
       return true;
     }
 
@@ -469,11 +477,18 @@ function _dispatchCrossWindowMove(
   );
 }
 
-function _dispatchCrossWindowSplit(tabId: string, splitCol: number, splitLeft: boolean): void {
+function _dispatchCrossWindowSplit(
+  sourceWinId: string,
+  tabId: string,
+  targetWinId: string,
+  splitCol: number,
+  splitLeft: boolean,
+): void {
   window.openp41ge.workspace.dispatch(
-    "splitTabFromCell",
-    _resolveMyWinId(),
+    "splitCrossWindowTab",
+    sourceWinId,
     tabId,
+    targetWinId,
     splitCol,
     splitLeft,
   );
@@ -484,14 +499,21 @@ function _dispatchCrossWindowSplit(tabId: string, splitCol: number, splitLeft: b
 // ═══════════════════════════════════════════════════════════════════════════
 
 if (typeof window !== "undefined") {
-  (window as Record<string, unknown>)["__openp41geTestHooks"] = {
-    setRemoteDragActive: (active: boolean) => { _remoteDragActive = active; if (!active) _hideCrossWindowGhost(); },
+  (window as unknown as Record<string, unknown>)["__openp41geTestHooks"] = {
+    setRemoteDragActive: (active: boolean) => {
+      _remoteDragActive = active;
+      if (!active) _hideCrossWindowGhost();
+    },
     isRemoteDragActive: () => _remoteDragActive,
     isLocalDragActive: () => _localDragActive,
-    getGridGhostOverlay: () => _crossGhostGrid ? _crossGhostGrid.querySelector(".openp41ge-ghost-overlay") : null,
-    getLocalGhostOverlay: () => _ghostShownGrid ? _ghostShownGrid.querySelector(".openp41ge-ghost-overlay") : null,
+    getGridGhostOverlay: () =>
+      _crossGhostGrid ? _crossGhostGrid.querySelector(".openp41ge-ghost-overlay") : null,
+    getLocalGhostOverlay: () =>
+      _ghostShownGrid ? _ghostShownGrid.querySelector(".openp41ge-ghost-overlay") : null,
     getOrchestrator: () => _orchestrator,
-    setGridCols: (gridEl: HTMLElement, cols: number) => { (gridEl as any).cols = cols; },
+    setGridCols: (gridEl: HTMLElement, cols: number) => {
+      (gridEl as any).cols = cols;
+    },
     callUpdateCrossWindowGhost: (cx: number, cy: number) => _updateCrossWindowGhost(cx, cy),
     callHandleCrossWindowDrop: async (cx: number, cy: number, sx: number, sy: number) => {
       await _handleCrossWindowDrop(cx, cy, sx, sy);
@@ -537,8 +559,7 @@ function _updateCrossWindowGhost(clientX: number, clientY: number): void {
   const rect = _crossWindowGrid.getBoundingClientRect();
 
   // Hide ghost if cursor leaves the grid bounds
-  if (clientX < rect.left || clientX > rect.right ||
-      clientY < rect.top || clientY > rect.bottom) {
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
     _hideCrossWindowGhost();
     return;
   }
@@ -548,16 +569,18 @@ function _updateCrossWindowGhost(clientX: number, clientY: number): void {
   const mouseCol = pos.col;
 
   if (pos.isBoundary) {
-    const splitLeft = pos.boundaryIndex === 0
-      ? true
-      : pos.boundaryIndex >= _crossWindowGridCols
-        ? false
-        : mouseCol >= pos.boundaryIndex;
-    const splitCol = pos.boundaryIndex === 0
-      ? 0
-      : pos.boundaryIndex >= _crossWindowGridCols
-        ? _crossWindowGridCols - 1
-        : mouseCol;
+    const splitLeft =
+      pos.boundaryIndex === 0
+        ? true
+        : pos.boundaryIndex >= _crossWindowGridCols
+          ? false
+          : mouseCol >= pos.boundaryIndex;
+    const splitCol =
+      pos.boundaryIndex === 0
+        ? 0
+        : pos.boundaryIndex >= _crossWindowGridCols
+          ? _crossWindowGridCols - 1
+          : mouseCol;
     _ghostManager.showGhost(_crossWindowGrid, {
       cols: _crossWindowGridCols,
       boundaryIndex: pos.boundaryIndex,

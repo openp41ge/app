@@ -199,9 +199,10 @@ export class DragOrchestrator implements IDragHandler {
             detail: {
               screenX: ev.screenX,
               screenY: ev.screenY,
-              tabId: data.type === 'tab' || data.type === 'openp41ge-tab' ? data.tabId : undefined,
-              winId: data.type === 'tab' || data.type === 'openp41ge-tab' ? data.winId : undefined,
-              label: data.type === 'tab' || data.type === 'openp41ge-tab' ? data.title || 'Tab' : 'Drag',
+              tabId: data.type === "tab" || data.type === "openp41ge-tab" ? data.tabId : undefined,
+              winId: data.type === "tab" || data.type === "openp41ge-tab" ? data.winId : undefined,
+              label:
+                data.type === "tab" || data.type === "openp41ge-tab" ? data.title || "Tab" : "Drag",
             },
           }),
         );

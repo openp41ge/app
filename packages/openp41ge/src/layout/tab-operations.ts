@@ -515,3 +515,31 @@ export function addColumnTabAt(
 export function removeColumnTab(workspace: Workspace, windowId: string, tabId: string): Workspace {
   return removeTabFromCell(workspace, windowId, tabId);
 }
+
+/**
+ * Split a tab from its source window into a new column in the target window.
+ *
+ * Handles cross-window drag-to-split: splitsTabFromCell alone cannot be used
+ * because the tab doesn't exist in the target window's grid. This operation:
+ *   1. Moves the tab from source to target window via moveTabBetweenCells
+ *   2. Splits the tab into a new column via splitTabFromCell
+ */
+export function splitCrossWindowTab(
+  workspace: Workspace,
+  sourceWindowId: string,
+  tabId: string,
+  targetWindowId: string,
+  targetCol: number,
+  splitLeft: boolean,
+): Workspace {
+  const moved = moveTabBetweenCells(
+    workspace,
+    sourceWindowId,
+    tabId,
+    targetWindowId,
+    0,
+    targetCol,
+    -1,
+  );
+  return splitTabFromCell(moved, targetWindowId, tabId, targetCol, splitLeft);
+}
