@@ -21,6 +21,9 @@ import { ExplorerSidebarView } from "./sidebar-views/explorer-view";
 
 const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 600;
+const GRID_MIN_WIDTH = 200;
+const ACTIVITY_BAR_WIDTH = 48;
+const BORDER_WIDTH = 3;
 
 class Openp41geSidebar extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -45,10 +48,27 @@ class Openp41geSidebar extends LitElement {
   private _isResizing = false;
   private _resizeStartX = 0;
   private _resizeStartWidth = 0;
+  private _resizeObserver: ResizeObserver | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
     document.addEventListener("openp41ge:activity-click", this._onActivityClick as EventListener);
+
+    // Observe actual rendered width so flex-shrink updates this.width
+    // and content reflows correctly when the window is narrow.
+    this._resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const actualWidth = Math.round(entry.contentRect.width);
+        if (
+          !this._isResizing &&
+          actualWidth >= MIN_SIDEBAR_WIDTH &&
+          Math.abs(actualWidth - this.width) > 1
+        ) {
+          this.width = Math.min(actualWidth, MAX_SIDEBAR_WIDTH);
+        }
+      }
+    });
+    this._resizeObserver.observe(this);
   }
 
   disconnectedCallback(): void {
@@ -59,6 +79,8 @@ class Openp41geSidebar extends LitElement {
     );
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
     this._unmountView();
   }
 
@@ -145,6 +167,11 @@ class Openp41geSidebar extends LitElement {
     if (notch) notch.classList.add("dragging");
   }
 
+  private _getMaxSidebarWidth(): number {
+    const available = window.innerWidth - GRID_MIN_WIDTH - ACTIVITY_BAR_WIDTH - BORDER_WIDTH;
+    return Math.min(MAX_SIDEBAR_WIDTH, available);
+  }
+
   private _onResizeMove = (e: MouseEvent): void => {
     if (!this._isResizing) return;
     // The grid is to the left, sidebar to the right.
@@ -152,7 +179,7 @@ class Openp41geSidebar extends LitElement {
     const dx = this._resizeStartX - e.clientX;
     const newWidth = Math.max(
       MIN_SIDEBAR_WIDTH,
-      Math.min(MAX_SIDEBAR_WIDTH, this._resizeStartWidth + dx),
+      Math.min(this._getMaxSidebarWidth(), this._resizeStartWidth + dx),
     );
     this.width = newWidth;
     this.style.width = `${newWidth}px`;
