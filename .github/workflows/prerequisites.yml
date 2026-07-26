@@ -88,7 +88,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: playwright-${{ runner.os }}-
-      - run: pnpm exec playwright install --with-deps chromium chromium-headless-shell
+      # Install browsers for each package's Playwright version
+      - run: cd packages/openp41ge-tabs && npx playwright install --with-deps chromium chromium-headless-shell
+      - run: cd packages/openp41ge-file-editor && npx playwright install --with-deps chromium chromium-headless-shell
+      - run: cd packages/openp41ge-git-repository && npx playwright install --with-deps chromium chromium-headless-shell
       - run: pnpm nx run-many -t e2e
 
   build:
