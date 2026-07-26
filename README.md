@@ -30,17 +30,17 @@ nx run openp41ge:dev:renderer
 
 ## Useful Commands
 
-| Command | Description |
-|---|---|
-| `nx build` | Build all 17 packages |
-| `nx dev` | Start Electron app in dev mode |
-| `nx test` | Run all unit/integration tests |
-| `nx e2e` | Run all Playwright E2E tests |
-| `nx lint` | ESLint across all packages |
-| `nx typecheck` | TypeScript type-checking |
-| `nx knip` | Dead code detection |
-| `nx quality` | typecheck + lint + knip |
-| `nx format` | Prettier formatting |
+| Command        | Description                    |
+| -------------- | ------------------------------ |
+| `nx build`     | Build all 17 packages          |
+| `nx dev`       | Start Electron app in dev mode |
+| `nx test`      | Run all unit/integration tests |
+| `nx e2e`       | Run all Playwright E2E tests   |
+| `nx lint`      | ESLint across all packages     |
+| `nx typecheck` | TypeScript type-checking       |
+| `nx knip`      | Dead code detection            |
+| `nx quality`   | typecheck + lint + knip        |
+| `nx format`    | Prettier formatting            |
 
 ## Project Structure
 
