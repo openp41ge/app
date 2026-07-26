@@ -148,50 +148,50 @@ class Openp41geWindowView extends LitElement {
             </svg>
           </openp41ge-bottom-button>
           ${
-              window.openp41ge.isDev()
-                ? html`<openp41ge-bottom-button
-                      title="Toggle DevTools"
-                      @click=${(e: MouseEvent) => {
+            window.openp41ge.isDev()
+              ? html`<openp41ge-bottom-button
+                    title="Toggle DevTools"
+                    @click=${(e: MouseEvent) => {
                       e.stopPropagation();
                       window.openp41ge.window.openDevTools();
                     }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="16px"
+                      viewBox="0 -960 960 960"
+                      width="16px"
+                      fill="currentColor"
+                      style="margin-top:-1px"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        height="16px"
-                        viewBox="0 -960 960 960"
-                        width="16px"
-                        fill="currentColor"
-                        style="margin-top:-1px"
-                      >
-                        <path
-                          d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"
-                        />
-                      </svg>
-                    </openp41ge-bottom-button>
-                    <openp41ge-bottom-button
-                      flat
-                      title="Reset app state"
-                      @click=${(e: MouseEvent) => {
+                      <path
+                        d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"
+                      />
+                    </svg>
+                  </openp41ge-bottom-button>
+                  <openp41ge-bottom-button
+                    flat
+                    title="Reset app state"
+                    @click=${(e: MouseEvent) => {
                       e.stopPropagation();
                       window.openp41ge.workspace.reset();
                     }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="16px"
+                      viewBox="0 -960 960 960"
+                      width="16px"
+                      fill="currentColor"
+                      style="margin-top:-1px"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        height="16px"
-                        viewBox="0 -960 960 960"
-                        width="16px"
-                        fill="currentColor"
-                        style="margin-top:-1px"
-                      >
-                        <path
-                          d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-155.5t86-127Q252-817 325-848.5T480-880q83 0 155.5 31.5t127 86.5q54.5 55 86 127T880-480h-80q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q97 0 183-57t115-143h82q-31 114-123 187T480-80Zm238-240-56-58 102-102H520v-80h244L662-662l56-58 162 162-162 238Z"
-                        />
-                      </svg>
-                    </openp41ge-bottom-button>`
-                : nothing
-            }
+                      <path
+                        d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-155.5t86-127Q252-817 325-848.5T480-880q83 0 155.5 31.5t127 86.5q54.5 55 86 127T880-480h-80q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q97 0 183-57t115-143h82q-31 114-123 187T480-80Zm238-240-56-58 102-102H520v-80h244L662-662l56-58 162 162-162 238Z"
+                      />
+                    </svg>
+                  </openp41ge-bottom-button>`
+              : nothing
+          }
         </div>
         <div
           class="prompt-overlay"
