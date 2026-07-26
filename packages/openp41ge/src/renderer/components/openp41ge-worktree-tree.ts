@@ -58,12 +58,7 @@ let _isOpen = false;
 
 let _showingAddRepo = false;
 
-/** When window width is at or below this, the explorer becomes a full-screen overlay. */
-const OVERLAY_BREAKPOINT = 680;
 
-function isOverlayMode(): boolean {
-  return window.innerWidth <= OVERLAY_BREAKPOINT;
-}
 
 // ─── Workspace state ───────────────────────────────────────────────────
 
@@ -114,54 +109,26 @@ function _restoreGridFocus(): void {
 }
 
 function updateDrawerVisibility(): void {
-  const overlay = _isOpen && isOverlayMode();
-  const clampedWidth = _isOpen && !overlay ? Math.min(280, window.innerWidth) : 0;
-  const explorerWidth = clampedWidth > 0 ? clampedWidth + "px" : "0px";
+  const explorerWidth = _isOpen ? "280px" : "0px";
   const el = document.querySelector("openp41ge-worktree-tree") as Openp41geWorktreeTree | null;
   if (el) {
-    if (overlay) {
-      el.style.position = "fixed";
-      el.style.inset = "0";
-      el.style.width = "100%";
-      el.style.height = "100%";
-      el.style.zIndex = "100";
-      el.style.borderLeft = "none";
-    } else if (_isOpen) {
-      el.style.position = "relative";
-      el.style.inset = "auto";
-      el.style.width = explorerWidth;
-      el.style.height = "";
-      el.style.zIndex = "";
-      // Remove left border when at full width to avoid a 1px jump
-      // when transitioning to overlay mode
-      const isFullWidth = clampedWidth >= window.innerWidth;
-      el.style.borderLeft = isFullWidth ? "none" : "1px solid #2a2a2a";
-    } else {
-      el.style.position = "relative";
-      el.style.inset = "auto";
-      el.style.width = "0";
-      el.style.zIndex = "";
-      el.style.borderLeft = "none";
-    }
-    // Make inner drawer width responsive
+    el.style.position = "relative";
+    el.style.inset = "auto";
+    el.style.width = explorerWidth;
+    el.style.zIndex = "";
+    el.style.borderLeft = _isOpen ? "1px solid #2a2a2a" : "none";
+    el.style.height = "";
+
     const drawer = el.querySelector(".wt-drawer") as HTMLElement | null;
     if (drawer) {
-      drawer.style.width = overlay ? "100%" : explorerWidth;
+      drawer.style.width = "";
     }
-    // Resize notch: hidden in overlay; floating grip at full width
     const notch = el.querySelector(".wt-resize-notch") as HTMLElement | null;
     if (notch) {
-      if (overlay) {
-        notch.style.display = "none";
-        notch.classList.toggle("fullwidth", false);
-      } else {
-        notch.style.display = "";
-        const isFullWidth = clampedWidth >= window.innerWidth;
-        notch.classList.toggle("fullwidth", isFullWidth);
-      }
+      notch.style.display = _isOpen ? "" : "none";
+      notch.classList.toggle("fullwidth", false);
     }
   }
-  // Remove legacy --explorer-width CSS var — no longer needed with flex layout
   document.dispatchEvent(
     new CustomEvent("openp41ge:explorer-state-changed", { detail: { open: _isOpen } }),
   );

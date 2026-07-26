@@ -561,7 +561,7 @@ export class TabGrid extends LitElement {
 
   render() {
     const gridStyle =
-      "display:flex;flex-direction:row;height:100%;background:#1e1e1e;overflow:hidden;";
+      "display:flex;flex-direction:row;height:100%;background:#1e1e1e;overflow-x:auto;overflow-y:hidden;";
 
     return html`
       <div class="grid-container" style=${gridStyle}>
@@ -571,7 +571,7 @@ export class TabGrid extends LitElement {
   }
 
   private _renderColumn(colIndex: number) {
-    const colStyle = `display:flex;flex-direction:column;flex:1;min-width:100px;border-right:${colIndex < this.cols - 1 ? "1px solid #333" : "none"};overflow:hidden;`;
+    const colStyle = `display:flex;flex-direction:column;flex:1;min-width:200px;border-right:${colIndex < this.cols - 1 ? "1px solid #333" : "none"};overflow:hidden;`;
     const placement = this.placements.find((p) => p.position.col === colIndex);
     const tabIds = placement ? placement.tabIds : [];
     const activeTabId = this.activeTabIds[String(colIndex)] || tabIds[0] || "";
