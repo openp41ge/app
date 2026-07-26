@@ -32,9 +32,9 @@ interface DebugEvent {
 class DebugEventBus {
   private _listeners: Set<(event: DebugEvent) => void> = new Set();
   private _enabled: boolean;
-  
+
   constructor() { this._enabled = !!process.env.OPENP41GE_DEBUG || false; }
-  
+
   emit(source: string, label: string, data: Record<string, unknown>): void { ... }
   on(listener: (event: DebugEvent) => void): () => void { ... }
   setEnabled(v: boolean): void { ... }
@@ -69,17 +69,17 @@ Replace inline DOM creation in `init-drag-system.ts` with debug events:
 
 # Files Changed
 
-| File | Change |
-|------|--------|
-| `packages/openp41ge-logger/src/debug-event-bus.ts` | New: typed `DebugEventBus` class with `emit`/`on` |
-| `packages/openp41ge-logger/src/index.ts` | Export `DebugEventBus` and types |
-| `packages/openp41ge/src/renderer/components/debug-overlay.ts` | New: `<debug-overlay>` Lit component |
-| `packages/openp41ge/src/renderer/app.ts` | Register debug-overlay component, gate on env var |
-| `packages/openp41ge/src/renderer/services/init-drag-system.ts` | Remove inline DOM diagnostics, emit debug events instead |
-| `packages/openp41ge/src/renderer/bootstrap/steps/init-services.step.ts` | Pass `DebugEventBus` instance to drag system |
-| `packages/openp41ge/vite.config.ts` | Define `__OPENP41GE_DEBUG__` global from env |
-| `packages/openp41ge/README.md` | Document `OPENP41GE_DEBUG=1` usage |
-| `.pi/skills/test-cross-window-drag/SKILL.md` | Update to mention debug overlay |
+| File                                                                    | Change                                                   |
+| ----------------------------------------------------------------------- | -------------------------------------------------------- |
+| `packages/openp41ge-logger/src/debug-event-bus.ts`                      | New: typed `DebugEventBus` class with `emit`/`on`        |
+| `packages/openp41ge-logger/src/index.ts`                                | Export `DebugEventBus` and types                         |
+| `packages/openp41ge/src/renderer/components/debug-overlay.ts`           | New: `<debug-overlay>` Lit component                     |
+| `packages/openp41ge/src/renderer/app.ts`                                | Register debug-overlay component, gate on env var        |
+| `packages/openp41ge/src/renderer/services/init-drag-system.ts`          | Remove inline DOM diagnostics, emit debug events instead |
+| `packages/openp41ge/src/renderer/bootstrap/steps/init-services.step.ts` | Pass `DebugEventBus` instance to drag system             |
+| `packages/openp41ge/vite.config.ts`                                     | Define `__OPENP41GE_DEBUG__` global from env             |
+| `packages/openp41ge/README.md`                                          | Document `OPENP41GE_DEBUG=1` usage                       |
+| `.pi/skills/test-cross-window-drag/SKILL.md`                            | Update to mention debug overlay                          |
 
 # UX Considerations
 

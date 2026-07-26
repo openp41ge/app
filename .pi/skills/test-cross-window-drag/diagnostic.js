@@ -30,7 +30,9 @@ async function testCrossWindowGhost() {
 
   console.log(`\n═══ Grid Diagnostic ═══`);
   console.log(`Grid cols:        ${cols}`);
-  console.log(`Grid rect:        left=${Math.round(rect.left)} right=${Math.round(rect.right)} width=${Math.round(rect.width)}`);
+  console.log(
+    `Grid rect:        left=${Math.round(rect.left)} right=${Math.round(rect.right)} width=${Math.round(rect.width)}`,
+  );
   console.log(`Cell width:       ${Math.round(cellW)}px`);
   console.log(`Grid element:     ${grid.tagName}`);
   console.log(`Drop target type: ${grid.dropTarget?.type || "none"}`);
@@ -43,11 +45,11 @@ async function testCrossWindowGhost() {
   // ── Test 1: elementFromPoint sanity check ─────────────────────────────
   console.log(`\n─── Test 1: elementFromPoint ───`);
   const points = [
-    { label: "grid left edge",  x: rect.left + 2,        y: gridMidY },
-    { label: "grid center",     x: rect.left + rect.width/2, y: gridMidY },
-    { label: "grid right edge", x: rect.right - 2,       y: gridMidY },
-    { label: "tab-bar left",    x: rect.left + 2,        y: rect.top + 10 },
-    { label: "tab-bar right",   x: rect.right - 2,       y: rect.top + 10 },
+    { label: "grid left edge", x: rect.left + 2, y: gridMidY },
+    { label: "grid center", x: rect.left + rect.width / 2, y: gridMidY },
+    { label: "grid right edge", x: rect.right - 2, y: gridMidY },
+    { label: "tab-bar left", x: rect.left + 2, y: rect.top + 10 },
+    { label: "tab-bar right", x: rect.right - 2, y: rect.top + 10 },
   ];
   for (const p of points) {
     const el = document.elementFromPoint(p.x, p.y);
@@ -106,7 +108,9 @@ async function testCrossWindowGhost() {
     const shadow0 = ov?.children[0]?.style.boxShadow || "?";
     const flex1 = ov?.children[1]?.style.flex || "?";
     const shadow1 = ov?.children[1]?.style.boxShadow || "?";
-    console.log(`  ${p.label}: ${n} cols, col0 flex=${flex0} shadow=${shadow0}, col1 flex=${flex1} shadow=${shadow1}`);
+    console.log(
+      `  ${p.label}: ${n} cols, col0 flex=${flex0} shadow=${shadow0}, col1 flex=${flex1} shadow=${shadow1}`,
+    );
     if (p.label.startsWith("2") || p.label.startsWith("4")) {
       // Center → should be 1 column (cell-center)
       if (n !== 1) console.log(`  ⚠ Expected 1 column at center, got ${n}`);
@@ -132,7 +136,9 @@ async function testCrossWindowGhost() {
     for (const p of positions) {
       const relX = p.x - rect.left;
       const result = computeDropTarget(grid, relX, rect.width, cols);
-      console.log(`  ${p.label}: col=${result.col} isBoundary=${result.isBoundary} boundaryIndex=${result.boundaryIndex}`);
+      console.log(
+        `  ${p.label}: col=${result.col} isBoundary=${result.isBoundary} boundaryIndex=${result.boundaryIndex}`,
+      );
     }
   } catch (e) {
     console.log(`  computeDropTarget import failed: ${e.message}`);
@@ -143,9 +149,16 @@ async function testCrossWindowGhost() {
       const edgeThreshold = Math.min(0.15, 1 / 3);
       let isBoundary = false;
       let boundaryIndex = 0;
-      if (fraction <= edgeThreshold) { isBoundary = true; boundaryIndex = 0; }
-      else if (fraction >= 1 - edgeThreshold) { isBoundary = true; boundaryIndex = 1; }
-      console.log(`  ${p.label}: fraction=${fraction.toFixed(3)} isBoundary=${isBoundary} boundaryIndex=${boundaryIndex}`);
+      if (fraction <= edgeThreshold) {
+        isBoundary = true;
+        boundaryIndex = 0;
+      } else if (fraction >= 1 - edgeThreshold) {
+        isBoundary = true;
+        boundaryIndex = 1;
+      }
+      console.log(
+        `  ${p.label}: fraction=${fraction.toFixed(3)} isBoundary=${isBoundary} boundaryIndex=${boundaryIndex}`,
+      );
     }
   }
 

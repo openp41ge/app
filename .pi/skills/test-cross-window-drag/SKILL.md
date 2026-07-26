@@ -23,8 +23,8 @@ Paste this in the **target window's** DevTools console while dragging a tab:
 ```javascript
 // Load and run the diagnostic script
 fetch("/.pi/skills/test-cross-window-drag/diagnostic.js")
-  .then(r => r.text())
-  .then(code => eval(code))
+  .then((r) => r.text())
+  .then((code) => eval(code))
   .catch(() => {
     // Fallback: paste the file content manually
     console.error("Could not load diagnostic.js — paste its contents directly");
@@ -57,6 +57,7 @@ Cross-window drag flow (target window perspective):
 ```
 
 Two target types:
+
 - **tab-bar**: cursor over a `<tab-bar>` element (inside a `.grid-cell`)
 - **grid**: cursor over the grid surface (content area below the tab bar)
 
@@ -77,18 +78,18 @@ console.log("Remote active:", H.isRemoteDragActive());
 
 ## Test Hooks API
 
-| Hook | Signature | Description |
-|------|-----------|-------------|
-| `setRemoteDragActive` | `(active: boolean) => void` | Simulate drag-state broadcast from main process |
-| `isRemoteDragActive` | `() => boolean` | Check `_remoteDragActive` flag |
-| `isLocalDragActive` | `() => boolean` | Check `_localDragActive` flag |
-| `getGridGhostOverlay` | `() => HTMLElement \| null` | Get the cross-window ghost overlay element in the DOM |
-| `getLocalGhostOverlay` | `() => HTMLElement \| null` | Get the same-window ghost overlay element |
-| `callUpdateCrossWindowGhost` | `(cx, cy) => void` | Directly invoke the ghost computation for given viewport coordinates |
-| `callHandleCrossWindowDrop` | `(cx, cy, sx, sy) => Promise<void>` | Directly invoke the drop handler (needs IPC mock — see below) |
-| `forceCrossWindowGhostCleanup` | `() => void` | Force-hide the cross-window ghost overlay |
-| `gridEl` | `() => HTMLElement \| null` | Get the `<tab-grid>` element |
-| `setGridCols` | `(gridEl, cols) => void` | Override the number of columns (for testing multi-column scenarios) |
+| Hook                           | Signature                           | Description                                                          |
+| ------------------------------ | ----------------------------------- | -------------------------------------------------------------------- |
+| `setRemoteDragActive`          | `(active: boolean) => void`         | Simulate drag-state broadcast from main process                      |
+| `isRemoteDragActive`           | `() => boolean`                     | Check `_remoteDragActive` flag                                       |
+| `isLocalDragActive`            | `() => boolean`                     | Check `_localDragActive` flag                                        |
+| `getGridGhostOverlay`          | `() => HTMLElement \| null`         | Get the cross-window ghost overlay element in the DOM                |
+| `getLocalGhostOverlay`         | `() => HTMLElement \| null`         | Get the same-window ghost overlay element                            |
+| `callUpdateCrossWindowGhost`   | `(cx, cy) => void`                  | Directly invoke the ghost computation for given viewport coordinates |
+| `callHandleCrossWindowDrop`    | `(cx, cy, sx, sy) => Promise<void>` | Directly invoke the drop handler (needs IPC mock — see below)        |
+| `forceCrossWindowGhostCleanup` | `() => void`                        | Force-hide the cross-window ghost overlay                            |
+| `gridEl`                       | `() => HTMLElement \| null`         | Get the `<tab-grid>` element                                         |
+| `setGridCols`                  | `(gridEl, cols) => void`            | Override the number of columns (for testing multi-column scenarios)  |
 
 ## Ghost Overlay DOM Structure
 
@@ -109,12 +110,12 @@ When the ghost is shown, a div with class `openp41ge-ghost-overlay` is appended 
 
 Columns can have these visual states (visible via `background`/`boxShadow` styles):
 
-| State        | Visual                                  |
-| ------------ | --------------------------------------- |
-| `active`     | `rgba(74,158,255,0.06)` + 1px blue border |
-| `highlighted`| `rgba(74,158,255,0.12)` + 2px blue border |
-| `splitPair`  | `rgba(74,158,255,0.06)` (no border)     |
-| Default      | `rgba(74,158,255,0.04)` (very subtle)   |
+| State         | Visual                                    |
+| ------------- | ----------------------------------------- |
+| `active`      | `rgba(74,158,255,0.06)` + 1px blue border |
+| `highlighted` | `rgba(74,158,255,0.12)` + 2px blue border |
+| `splitPair`   | `rgba(74,158,255,0.06)` (no border)       |
+| Default       | `rgba(74,158,255,0.04)` (very subtle)     |
 
 ### Classification Logic
 
@@ -130,10 +131,13 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
 **Objective**: Verify ghost overlay appears and shows correct variation when remote drag is active.
 
 ```javascript
-(async function() {
+(async function () {
   const H = window.__openp41geTestHooks;
   const grid = H.gridEl();
-  if (!grid) { console.error("No grid found"); return; }
+  if (!grid) {
+    console.error("No grid found");
+    return;
+  }
   const rect = grid.getBoundingClientRect();
 
   // Activate remote drag mode
@@ -150,8 +154,8 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
     console.log("1b) Children count:", overlay.children.length); // should be 1
     const col0 = overlay.children[0];
     console.log("1c) Col 0 flex:", col0.style.flex);
-    console.log("1d) Col 0 background:", col0.style.background);  // rgba(74,158,255,0.06)
-    console.log("1e) Col 0 boxShadow:", col0.style.boxShadow);    // inset 0 0 0 1px ...
+    console.log("1d) Col 0 background:", col0.style.background); // rgba(74,158,255,0.06)
+    console.log("1e) Col 0 boxShadow:", col0.style.boxShadow); // inset 0 0 0 1px ...
   }
 
   // Test boundary (left edge): far left of grid
@@ -163,9 +167,9 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
     // split-left boundary → first child highlighted, second splitPair
     const c0 = overlay2.children[0];
     const c1 = overlay2.children[1];
-    console.log("2b) Col 0 background:", c0.style.background);  // rgba(74,158,255,0.12)
-    console.log("2c) Col 0 boxShadow:", c0.style.boxShadow);    // inset 0 0 0 2px ...
-    console.log("2d) Col 1 background:", c1.style.background);  // rgba(74,158,255,0.06) (splitPair)
+    console.log("2b) Col 0 background:", c0.style.background); // rgba(74,158,255,0.12)
+    console.log("2c) Col 0 boxShadow:", c0.style.boxShadow); // inset 0 0 0 2px ...
+    console.log("2d) Col 1 background:", c1.style.background); // rgba(74,158,255,0.06) (splitPair)
   }
 
   // Test boundary (right edge): far right of grid
@@ -187,6 +191,7 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
 ```
 
 **Verify**:
+
 - [ ] Ghost exists in DOM when remote drag is active
 - [ ] Center of column → 1 child, `active` style (subtle blue border)
 - [ ] Near left edge → 2 children, left is `highlighted` (2px blue border)
@@ -198,10 +203,13 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
 **Objective**: Verify ghost classification works correctly in a multi-column grid.
 
 ```javascript
-(async function() {
+(async function () {
   const H = window.__openp41geTestHooks;
   const grid = H.gridEl();
-  if (!grid) { console.error("No grid found"); return; }
+  if (!grid) {
+    console.error("No grid found");
+    return;
+  }
 
   // Temporarily set grid to 2 columns for testing
   const origCols = grid.cols;
@@ -219,34 +227,34 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
   const col0MidX = rect.left + cellW / 2;
   H.callUpdateCrossWindowGhost(col0MidX, midY);
   let ov = H.getGridGhostOverlay();
-  console.log("Col 0 center — children:", ov?.children.length);        // 2
+  console.log("Col 0 center — children:", ov?.children.length); // 2
   console.log("Col 0 center — col 0 active?", ov?.children[0]?.style.boxShadow); // inset 0 0 0 1px ...
 
   // Column 1 center
   const col1MidX = rect.left + cellW + cellW / 2;
   H.callUpdateCrossWindowGhost(col1MidX, midY);
   ov = H.getGridGhostOverlay();
-  console.log("Col 1 center — children:", ov?.children.length);        // 2
+  console.log("Col 1 center — children:", ov?.children.length); // 2
   console.log("Col 1 center — col 1 active?", ov?.children[1]?.style.boxShadow); // inset 0 0 0 1px ...
 
   // Left edge of grid (boundary index 0)
   H.callUpdateCrossWindowGhost(rect.left + 2, midY);
   ov = H.getGridGhostOverlay();
-  console.log("Left edge — children:", ov?.children.length);           // 3 (2 → 3 due to split)
+  console.log("Left edge — children:", ov?.children.length); // 3 (2 → 3 due to split)
   // First child should be highlighted (new column on left)
   if (ov) console.log("Left edge — col 0 highlighted:", ov.children[0]?.style.boxShadow);
 
   // Right edge of grid (boundary index 2 — past the last column)
   H.callUpdateCrossWindowGhost(rect.right - 2, midY);
   ov = H.getGridGhostOverlay();
-  console.log("Right edge — children:", ov?.children.length);          // 3 (2 → 3 due to split)
+  console.log("Right edge — children:", ov?.children.length); // 3 (2 → 3 due to split)
   if (ov) console.log("Right edge — last col highlighted:", ov.children[2]?.style.boxShadow);
 
   // Interior divider between col 0 and col 1
   const dividerX = rect.left + cellW;
   H.callUpdateCrossWindowGhost(dividerX, midY);
   ov = H.getGridGhostOverlay();
-  console.log("Interior divider — children:", ov?.children.length);    // 3
+  console.log("Interior divider — children:", ov?.children.length); // 3
 
   H.setRemoteDragActive(false);
   H.setGridCols(grid, origCols);
@@ -255,6 +263,7 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
 ```
 
 **Verify**:
+
 - [ ] Center of column 0 → 2 children, col 0 has `active` style
 - [ ] Center of column 1 → 2 children, col 1 has `active` style
 - [ ] Left edge → 3 children, first is `highlighted`
@@ -266,29 +275,38 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
 **Objective**: Verify `openp41geTargetResolver` returns the correct target type.
 
 ```javascript
-(async function() {
+(async function () {
   const grid = document.querySelector("tab-grid");
-  if (!grid) { console.error("No grid found"); return; }
+  if (!grid) {
+    console.error("No grid found");
+    return;
+  }
   const rect = grid.getBoundingClientRect();
   const midX = rect.left + rect.width / 2;
   const midY = rect.top + rect.height / 2;
-  const topY = rect.top + 10;        // tab-bar area
-  const contentY = rect.top + 80;    // content area (below tab-bar)
+  const topY = rect.top + 10; // tab-bar area
+  const contentY = rect.top + 80; // content area (below tab-bar)
 
   // Get the target resolver function (it's exported)
   // We can test it by elementFromPoint → checking what's returned
   const elAtMid = document.elementFromPoint(midX, contentY);
   const elAtTop = document.elementFromPoint(midX, topY);
 
-  console.log("Element at grid center (content area):", elAtMid?.tagName,
-              elAtMid?.closest?.("tab-grid") ? "(in grid)" : "(not in grid)");
-  console.log("Element at grid top (tab-bar area):", elAtTop?.tagName,
-              elAtTop?.closest?.("tab-bar") ? "(in tab-bar)" : "");
+  console.log(
+    "Element at grid center (content area):",
+    elAtMid?.tagName,
+    elAtMid?.closest?.("tab-grid") ? "(in grid)" : "(not in grid)",
+  );
+  console.log(
+    "Element at grid top (tab-bar area):",
+    elAtTop?.tagName,
+    elAtTop?.closest?.("tab-bar") ? "(in tab-bar)" : "",
+  );
 
   // Check if tab-bar has dropTarget
   const tabBar = elAtTop?.closest?.("tab-bar");
   if (tabBar) {
-    console.log("TabBar dropTarget:", (tabBar).dropTarget?.type);
+    console.log("TabBar dropTarget:", tabBar.dropTarget?.type);
   }
 
   // Check grid dropTarget
@@ -297,7 +315,7 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
   // Simulate cross-window drop dispatch interception
   const originalDispatch = window.openp41ge.workspace.dispatch;
   let lastDispatch = null;
-  window.openp41ge.workspace.dispatch = function(...args) {
+  window.openp41ge.workspace.dispatch = function (...args) {
     lastDispatch = args;
     console.log("INTERCEPTED dispatch:", args);
   };
@@ -324,16 +342,19 @@ Columns can have these visual states (visible via `background`/`boxShadow` style
 This test requires mocking `window.openp41ge.drag.getActive()` to return fake session data. Since the real implementation goes through IPC, we need to override it:
 
 ```javascript
-(async function() {
+(async function () {
   const H = window.__openp41geTestHooks;
   const grid = H.gridEl();
-  if (!grid) { console.error("No grid found"); return; }
+  if (!grid) {
+    console.error("No grid found");
+    return;
+  }
   const rect = grid.getBoundingClientRect();
 
   // Step 1: Intercept dispatch calls
   const dispatched = [];
   const originalDispatch = window.openp41ge.workspace.dispatch;
-  window.openp41ge.workspace.dispatch = function(...args) {
+  window.openp41ge.workspace.dispatch = function (...args) {
     dispatched.push(args);
     console.log("DISPATCH:", ...args);
   };
@@ -392,6 +413,7 @@ This test requires mocking `window.openp41ge.drag.getActive()` to return fake se
 ```
 
 **Verify**:
+
 - [ ] Cell-center drop → `moveTabBetweenCells` with correct sourceWinId, tabId, targetWinId, row=0, col, dropIndex=-1
 - [ ] Left boundary → `splitTabFromCell` with tabId, splitCol=0, splitLeft=true
 - [ ] Right boundary → `splitTabFromCell` with tabId, splitCol=0, splitLeft=false
@@ -401,10 +423,13 @@ This test requires mocking `window.openp41ge.drag.getActive()` to return fake se
 **Objective**: Test the scenario where a grid is modified to have different column counts and verify ghost + drop handle it correctly.
 
 ```javascript
-(async function() {
+(async function () {
   const H = window.__openp41geTestHooks;
   const grid = H.gridEl();
-  if (!grid) { console.error("No grid found"); return; }
+  if (!grid) {
+    console.error("No grid found");
+    return;
+  }
 
   // Simulate different grid column counts
   const configs = [1, 2, 3];
@@ -423,7 +448,7 @@ This test requires mocking `window.openp41ge.drag.getActive()` to return fake se
     const expectedSplitCols = cols + 1;
     console.log(`  Left edge → children: ${ov?.children.length} (expected ${expectedSplitCols})`);
     if (ov && ov.children.length === expectedSplitCols) {
-      console.log(`    Col 0 highlighted: ${ov.children[0]?.style.boxShadow?.includes('2px')}`);
+      console.log(`    Col 0 highlighted: ${ov.children[0]?.style.boxShadow?.includes("2px")}`);
     }
 
     // Right edge
@@ -431,7 +456,9 @@ This test requires mocking `window.openp41ge.drag.getActive()` to return fake se
     ov = H.getGridGhostOverlay();
     console.log(`  Right edge → children: ${ov?.children.length} (expected ${expectedSplitCols})`);
     if (ov && ov.children.length === expectedSplitCols) {
-      console.log(`    Col ${expectedSplitCols - 1} highlighted: ${ov.children[expectedSplitCols - 1]?.style.boxShadow?.includes('2px')}`);
+      console.log(
+        `    Col ${expectedSplitCols - 1} highlighted: ${ov.children[expectedSplitCols - 1]?.style.boxShadow?.includes("2px")}`,
+      );
     }
 
     // Center (cell-center)
@@ -447,6 +474,7 @@ This test requires mocking `window.openp41ge.drag.getActive()` to return fake se
 ```
 
 **Verify**:
+
 - [ ] For cols=1: left-edge → 2 children (split), right-edge → 2 children, center → 1 child
 - [ ] For cols=2: left-edge → 3 children, right-edge → 3 children, center → 2 children
 - [ ] For cols=3: left-edge → 4 children, right-edge → 4 children, center → 3 children
@@ -459,17 +487,20 @@ This test requires mocking `window.openp41ge.drag.getActive()` to return fake se
 This is the specific scenario that was previously broken — the tab-bar branch in `_handleCrossWindowDrop` always dispatched `moveTabBetweenCells`, never `splitTabFromCell`.
 
 ```javascript
-(async function() {
+(async function () {
   const H = window.__openp41geTestHooks;
   const grid = H.gridEl();
-  if (!grid) { console.error("No grid found"); return; }
+  if (!grid) {
+    console.error("No grid found");
+    return;
+  }
   const rect = grid.getBoundingClientRect();
   const tabBarY = rect.top + 10; // tab-bar area (top of grid)
 
   // Mock IPC
   const dispatched = [];
   const origD = window.openp41ge.workspace.dispatch;
-  window.openp41ge.workspace.dispatch = function(...args) {
+  window.openp41ge.workspace.dispatch = function (...args) {
     dispatched.push(args);
     console.log("DISPATCH:", ...args);
   };
@@ -477,7 +508,13 @@ This is the specific scenario that was previously broken — the tab-bar branch 
   window.openp41ge.drag.getActive = async () => ({
     sourceWinId: "test-source-win",
     label: "Test Tab",
-    dragData: { tabId: "test-tab-id", winId: "test-source-win", worksetId: "test-source-win", type: "tab", title: "Test Tab" },
+    dragData: {
+      tabId: "test-tab-id",
+      winId: "test-source-win",
+      worksetId: "test-source-win",
+      type: "tab",
+      title: "Test Tab",
+    },
   });
   window.openp41ge.drag.endSession = () => {};
 
@@ -513,6 +550,7 @@ This is the specific scenario that was previously broken — the tab-bar branch 
 ```
 
 **Verify**:
+
 - [ ] Tab-bar left edge → `splitTabFromCell` dispatched (creates new cell)
 - [ ] Tab-bar right edge → `splitTabFromCell` dispatched (creates new cell)
 - [ ] Tab-bar center → `moveTabBetweenCells` dispatched (inserts into existing cell)
@@ -522,25 +560,39 @@ This is the specific scenario that was previously broken — the tab-bar branch 
 **Objective**: Trigger an actual drag via synthetic mouse events and verify ghost overlay appears and evolves as the mouse moves.
 
 ```javascript
-(async function() {
+(async function () {
   const H = window.__openp41geTestHooks;
 
   // Find a tab button to start the drag
-  const tabBtn = document.querySelector('[data-tab-id]');
-  if (!tabBtn) { console.error("No tab button found"); return; }
+  const tabBtn = document.querySelector("[data-tab-id]");
+  if (!tabBtn) {
+    console.error("No tab button found");
+    return;
+  }
   const btnRect = tabBtn.getBoundingClientRect();
 
   // Step 1: Mousedown on the tab (starts same-window drag)
-  tabBtn.dispatchEvent(new MouseEvent("mousedown", {
-    bubbles: true, clientX: btnRect.left + 10, clientY: btnRect.top + 10, screenX: 100, screenY: 100, buttons: 1
-  }));
+  tabBtn.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      clientX: btnRect.left + 10,
+      clientY: btnRect.top + 10,
+      screenX: 100,
+      screenY: 100,
+      buttons: 1,
+    }),
+  );
   console.log("Local drag active:", H.isLocalDragActive());
 
   // Step 2: Move mouse — ghost should appear
-  document.dispatchEvent(new MouseEvent("mousemove", {
-    clientX: btnRect.left + 20, clientY: btnRect.top + 30, buttons: 1
-  }));
-  await new Promise(r => setTimeout(r, 50));
+  document.dispatchEvent(
+    new MouseEvent("mousemove", {
+      clientX: btnRect.left + 20,
+      clientY: btnRect.top + 30,
+      buttons: 1,
+    }),
+  );
+  await new Promise((r) => setTimeout(r, 50));
   console.log("Same-window ghost overlay:", !!H.getLocalGhostOverlay());
 
   // Step 3: Move to grid boundary to test split preview
@@ -548,25 +600,33 @@ This is the specific scenario that was previously broken — the tab-bar branch 
   if (grid) {
     const gridRect = grid.getBoundingClientRect();
     const leftEdgeX = gridRect.left + 2;
-    document.dispatchEvent(new MouseEvent("mousemove", {
-      clientX: leftEdgeX, clientY: gridRect.top + 50, buttons: 1
-    }));
-    await new Promise(r => setTimeout(r, 50));
+    document.dispatchEvent(
+      new MouseEvent("mousemove", {
+        clientX: leftEdgeX,
+        clientY: gridRect.top + 50,
+        buttons: 1,
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 50));
     const ov = H.getLocalGhostOverlay();
     console.log("Left-edge ghost children:", ov?.children.length);
 
     const rightEdgeX = gridRect.right - 2;
-    document.dispatchEvent(new MouseEvent("mousemove", {
-      clientX: rightEdgeX, clientY: gridRect.top + 50, buttons: 1
-    }));
-    await new Promise(r => setTimeout(r, 50));
+    document.dispatchEvent(
+      new MouseEvent("mousemove", {
+        clientX: rightEdgeX,
+        clientY: gridRect.top + 50,
+        buttons: 1,
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 50));
     const ov2 = H.getLocalGhostOverlay();
     console.log("Right-edge ghost children:", ov2?.children.length);
   }
 
   // Step 4: Release mouse (ends drag)
   document.dispatchEvent(new MouseEvent("mouseup", { clientX: 0, clientY: 0, buttons: 0 }));
-  await new Promise(r => setTimeout(r, 50));
+  await new Promise((r) => setTimeout(r, 50));
   console.log("Local drag active after mouseup:", H.isLocalDragActive());
   console.log("Ghost after cleanup:", !!H.getLocalGhostOverlay());
 
@@ -575,6 +635,7 @@ This is the specific scenario that was previously broken — the tab-bar branch 
 ```
 
 **Verify**:
+
 - [ ] Mousedown starts local drag (`isLocalDragActive()` = true)
 - [ ] Mousemove shows same-window ghost overlay
 - [ ] Ghost overlay changes children count when moving to boundary
@@ -588,7 +649,10 @@ Paste this to run all diagnostic checks consecutively:
 (async function runAll() {
   const results = [];
   const H = window.__openp41geTestHooks;
-  if (!H) { console.error("Test hooks not available!"); return; }
+  if (!H) {
+    console.error("Test hooks not available!");
+    return;
+  }
 
   // 1. Sanity checks
   results.push({ check: "Hooks exist", pass: !!H });
@@ -597,23 +661,29 @@ Paste this to run all diagnostic checks consecutively:
 
   // 2. Remote drag toggle
   H.setRemoteDragActive(true);
-  results.push({ check: "Remote active after setRemoteDragActive(true)", pass: H.isRemoteDragActive() });
+  results.push({
+    check: "Remote active after setRemoteDragActive(true)",
+    pass: H.isRemoteDragActive(),
+  });
   H.setRemoteDragActive(false);
-  results.push({ check: "Remote inactive after setRemoteDragActive(false)", pass: !H.isRemoteDragActive() });
+  results.push({
+    check: "Remote inactive after setRemoteDragActive(false)",
+    pass: !H.isRemoteDragActive(),
+  });
 
   // 3. Ghost overlay rendering (single column, center)
   H.setRemoteDragActive(true);
   const grid = H.gridEl();
   if (grid) {
     const rect = grid.getBoundingClientRect();
-    H.callUpdateCrossWindowGhost(rect.left + rect.width/2, rect.top + rect.height/2);
+    H.callUpdateCrossWindowGhost(rect.left + rect.width / 2, rect.top + rect.height / 2);
     const ov = H.getGridGhostOverlay();
     results.push({ check: "Ghost overlay exists after updateCrossWindowGhost", pass: !!ov });
     if (ov) {
       results.push({ check: "Cell-center shows 1 column", pass: ov.children.length === 1 });
     }
     // Boundary
-    H.callUpdateCrossWindowGhost(rect.left + 2, rect.top + rect.height/2);
+    H.callUpdateCrossWindowGhost(rect.left + 2, rect.top + rect.height / 2);
     const ov2 = H.getGridGhostOverlay();
     if (ov2) {
       results.push({ check: "Left edge shows 2 columns", pass: ov2.children.length === 2 });
@@ -622,7 +692,7 @@ Paste this to run all diagnostic checks consecutively:
   H.setRemoteDragActive(false);
 
   console.table(results);
-  console.log(`Passed: ${results.filter(r => r.pass).length}/${results.length}`);
+  console.log(`Passed: ${results.filter((r) => r.pass).length}/${results.length}`);
   return results;
 })();
 ```
@@ -632,28 +702,37 @@ Paste this to run all diagnostic checks consecutively:
 If a specific scenario fails, check in order:
 
 1. **Is `_remoteDragActive` actually true?**
+
    ```javascript
    H.setRemoteDragActive(true);
    H.isRemoteDragActive(); // must be true
    ```
 
 2. **Does `elementFromPoint` return the right element?**
+
    ```javascript
    document.elementFromPoint(cx, cy)?.closest?.("tab-grid"); // must be the grid
    ```
 
 3. **Is the ghost overlay in the DOM?**
+
    ```javascript
    document.querySelector(".openp41ge-ghost-overlay"); // must exist
    ```
 
 4. **Are the overlay's children correct?**
+
    ```javascript
    const ov = document.querySelector(".openp41ge-ghost-overlay");
-   Array.from(ov.children).map(c => ({ flex: c.style.flex, bg: c.style.background, shadow: c.style.boxShadow }));
+   Array.from(ov.children).map((c) => ({
+     flex: c.style.flex,
+     bg: c.style.background,
+     shadow: c.style.boxShadow,
+   }));
    ```
 
 5. **What does `computeDropTarget` return for this position?**
+
    ```javascript
    const { computeDropTarget } = await import("../openp41ge-tabs-adapter");
    const grid = document.querySelector("tab-grid");

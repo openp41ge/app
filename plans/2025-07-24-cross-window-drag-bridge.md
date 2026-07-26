@@ -13,6 +13,7 @@ Openp41ge supports multiple Electron windows, and tabs can be dragged between th
 ## 1. Current state
 
 The cross-window drag system already has some infrastructure:
+
 - `DragGhostManager` — main-process `BrowserWindow` ghost overlay (visible outside the app window)
 - `drag-handlers.ts` — IPC handlers: `openp41ge:drag-start`, `openp41ge:drag-move`, `openp41ge:drag-end`, `openp41ge:drag-ghost-show`, `openp41ge:drag-ghost-hide`, `openp41ge:drag-check`
 - `init-drag-system.ts` — wires `TabDragSource`, `DragOrchestrator`, target resolver, main-process ghost lifecycle events
@@ -48,6 +49,7 @@ Since mousemove events stop firing in the source window when the cursor enters a
 5. **Orchestrator DETACH as fallback**: If cross-window drop fails (e.g., cursor wasn't over any valid target), falls through to the existing DETACH → new-window flow.
 
 Key design decisions:
+
 - **No `executeJavaScript`**: Target window resolves locally — avoids IPC roundtrip for drop resolution.
 - **No `DRAG_EVENTS.CROSS`**: Each window independently tracks `_remoteDragActive` and shows ghost on local mousemove.
 - **Drag activation deferred**: `drag:activate` fires only after drag threshold met (first `DRAG_EVENTS.POSITION`), preventing stale `_remoteDragActive` from click-without-drag.
@@ -72,12 +74,12 @@ The drop handler uses `computeDropTarget` to correctly decide move vs. split at 
 
 # Files Changed
 
-| File | Change |
-| ---- | ------ |
-| `electron/ipc-handlers/drag-handlers.ts` | Update `openp41ge:drag-check` handler: replace `_dropTargetType`/`_dropPayload` with openp41ge-tabs `GridDropTarget`/`TabBarDropTarget` target resolution via `executeJavaScript`. Add `openp41ge:drag-cross-drop` handler for executing drops in target windows. |
-| `electron/preload.cjs` | Expand `drag.check` to accept drag data for cross-window drop execution. |
-| `src/renderer/services/init-drag-system.ts` | Wire cross-window drop flow: after orchestrator finds no local target, check cross-window via IPC before falling through to DETACH. Listen for cross-window ghost events forwarded via IPC. |
-| `packages/openp41ge-tabs/src/orchestrator.ts` | Fire `DRAG_EVENTS.CROSS` when mousemove detects cursor has left the window (elementFromPoint returns null outside the grid).
+| File                                          | Change                                                                                                                                                                                                                                                            |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `electron/ipc-handlers/drag-handlers.ts`      | Update `openp41ge:drag-check` handler: replace `_dropTargetType`/`_dropPayload` with openp41ge-tabs `GridDropTarget`/`TabBarDropTarget` target resolution via `executeJavaScript`. Add `openp41ge:drag-cross-drop` handler for executing drops in target windows. |
+| `electron/preload.cjs`                        | Expand `drag.check` to accept drag data for cross-window drop execution.                                                                                                                                                                                          |
+| `src/renderer/services/init-drag-system.ts`   | Wire cross-window drop flow: after orchestrator finds no local target, check cross-window via IPC before falling through to DETACH. Listen for cross-window ghost events forwarded via IPC.                                                                       |
+| `packages/openp41ge-tabs/src/orchestrator.ts` | Fire `DRAG_EVENTS.CROSS` when mousemove detects cursor has left the window (elementFromPoint returns null outside the grid).                                                                                                                                      |
 
 # Testing Strategy
 
