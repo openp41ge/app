@@ -58,8 +58,6 @@ let _isOpen = false;
 
 let _showingAddRepo = false;
 
-
-
 // ─── Workspace state ───────────────────────────────────────────────────
 
 // ─── Clone session state ────────────────────────────────────────────────

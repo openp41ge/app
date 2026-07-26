@@ -78,7 +78,19 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
 
   ipcMain.on("openp41ge:drag-start", (_event, data: string) => {
     const parsed = JSON.parse(data);
-    const { label, screenX, screenY, emoji, tabId, winId, worksetId, tabWidth, tabHeight, offsetX, offsetY } = parsed;
+    const {
+      label,
+      screenX,
+      screenY,
+      emoji,
+      tabId,
+      winId,
+      worksetId,
+      tabWidth,
+      tabHeight,
+      offsetX,
+      offsetY,
+    } = parsed;
     dragGhost.show(label, screenX, screenY, emoji, tabWidth, tabHeight, offsetX, offsetY);
 
     // Track the active drag session for cross-window drops
