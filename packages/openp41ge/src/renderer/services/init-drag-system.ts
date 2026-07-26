@@ -90,7 +90,6 @@ export function initDragSystem(): () => void {
       return ghost;
     });
     _currentSource = dragSource;
-    _localDragActive = true;
     _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
 
     window.openp41ge.drag.start(
@@ -176,6 +175,7 @@ export function initDragSystem(): () => void {
       window.openp41ge.drag.move(detail.screenX, detail.screenY);
       if (!_dragActivated) {
         _dragActivated = true;
+        _localDragActive = true;
         window.openp41ge.drag.activate();
       }
     }
