@@ -127,32 +127,3 @@ console.error = (...args: any[]) => {
   _origConsoleError(...args);
 };
 
-// ── Suppress Pact Rust-level warnings ────────────────────────────────────
-//
-// Pact's Rust crate writes log messages directly to process.stderr,
-// bypassing console.log/warn/error. These are not useful in test output.
-// We intercept stderr writes to filter known Pact noise patterns.
-
-const _origStderrWrite = process.stderr.write.bind(process.stderr);
-(process.stderr as any).write = function (data: string | Uint8Array, ...args: any[]): boolean {
-  const str = typeof data === "string" ? data : String(data);
-  if (str.includes("pact_models::pact") || str.includes("pact_matching::metrics")) {
-    return true; // suppress
-  }
-  return _origStderrWrite(data, ...(args as [any]));
-};
-
-// ── Suppress Node.js process warnings ────────────────────────────────────
-//
-// DeprecationWarnings from dependencies (e.g., Pact's `util._extend` usage)
-// go through process.emitWarning(), not console.log, so onConsoleLog doesn't
-// catch them. We suppress known-deprecation patterns here.
-
-process.on("warning", (warning) => {
-  if (warning.name === "DeprecationWarning" && warning.message?.includes("util._extend")) {
-    // Suppress Pact's util._extend deprecation warning
-    return;
-  }
-  // Let all other warnings through
-  process.emitWarning(warning);
-});
