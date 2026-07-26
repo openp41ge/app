@@ -92,7 +92,7 @@ export function createOpenp41geWindow(
   const win = new BrowserWindow({
     width,
     height,
-    minWidth: 540,
+    minWidth: 480,
     minHeight: 200,
     title: "Openp41ge",
     titleBarStyle: "hiddenInset",
