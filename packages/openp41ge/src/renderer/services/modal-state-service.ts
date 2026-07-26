@@ -1,14 +1,13 @@
 /**
  * ModalStateService — application-wide modal state machine.
  *
- * Manages application states: default, confirmation, settings, projects.
+ * Manages application states: default, confirmation, projects.
  * Each modal state scopes keyboard and pointer controls to the active modal,
  * preventing them from reaching default application handlers.
  *
  * States:
  *   default       — normal app operation, no modal visible
  *   confirmation  — confirm/cancel dialog (existing <openp41ge-confirm-modal>)
- *   settings      — settings panel (existing inline modal in openp41ge-windowview)
  *   projects      — project picker/creator (new <openp41ge-project-picker>)
  *
  * The service provides:
@@ -22,7 +21,7 @@ import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("modal-state-service");
 
-export type ModalState = "default" | "confirmation" | "settings" | "projects";
+export type ModalState = "default" | "confirmation" | "projects";
 
 export interface ModalStateChangeListener {
   (state: ModalState, previous: ModalState): void;
@@ -84,11 +83,6 @@ export class ModalStateService {
   /** Show a confirmation modal. */
   showConfirmation(): void {
     this._enter("confirmation");
-  }
-
-  /** Show the settings modal. */
-  showSettings(): void {
-    this._enter("settings");
   }
 
   /** Show the project picker/creator modal. */

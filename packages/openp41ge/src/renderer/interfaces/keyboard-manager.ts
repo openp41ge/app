@@ -10,9 +10,9 @@ export interface IKeyboardBinding {
   code: string;
   /** Handler to execute when the binding is triggered. */
   handler: () => void;
-  /** Human-readable description (for settings UI). */
+  /** Human-readable description for display purposes. */
   description: string;
-  /** Category for grouping in settings. */
+  /** Category for grouping related shortcuts. */
   category: string;
 }
 
@@ -39,7 +39,7 @@ export interface IKeyboardManager {
   /** Handle a keydown event. Returns true if the event was consumed. */
   handleKeyDown(e: KeyboardEvent): boolean;
 
-  /** Get all registered bindings (for settings UI). */
+  /** Get all registered bindings for inspection. */
   getBindings(): IKeyboardBinding[];
 
   /** Push a modal onto the stack (all shortcuts blocked while count > 0). */

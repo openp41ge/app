@@ -27,7 +27,6 @@ export class ContextMenuBuilder implements IContextMenuBuilder {
       { label: "Equalize column widths", id: "equalize" },
       { label: "---", id: "sep1" },
       { label: "Open explorer", id: "explorer" },
-      { label: "Open settings", id: "settings" },
       { label: "Add workset", id: "add-workset" },
       { label: "---", id: "sep2" },
       { label: "Quit", id: "quit" },
@@ -76,9 +75,6 @@ export class ContextMenuBuilder implements IContextMenuBuilder {
       }
       case "explorer":
         toggleWorktree();
-        break;
-      case "settings":
-        document.dispatchEvent(new CustomEvent("openp41ge:toggle-settings"));
         break;
       // add-workset removed — no more worksets
       case "quit":
