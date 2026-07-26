@@ -11,6 +11,7 @@ logic against in-memory test services.
 ## What Changed
 
 ### New files
+
 - `packages/openp41ge/src/trpc/types.ts` — shared type definitions for all RPC
   procedures (workspace, file, config domains)
 - `packages/openp41ge/electron/trpc/index.ts` — main-process IPC handler registry
@@ -29,12 +30,14 @@ logic against in-memory test services.
   for config handlers
 
 ### Deleted files
+
 - `packages/openp41ge/test/contract/` (entire directory — 3 consumer tests,
   1 provider verification, helpers, pact files)
 - `packages/openp41ge/vitest.contract.config.ts`
 - `packages/openp41ge/src/trpc/router.ts` (superseded by types.ts)
 
 ### Modified files
+
 - `packages/openp41ge/project.json` — removed `test:contract` target
 - `packages/openp41ge/vitest.integration.config.ts` — updated with proper aliases
 - `packages/openp41ge/test/unit/pre-setup.ts` — removed pact Rust stderr filter
@@ -43,6 +46,7 @@ logic against in-memory test services.
 - `pnpm-lock.yaml` — lockfile update
 
 ### Test Results
+
 - **Unit tests**: 562 passed (unchanged)
 - **Integration tests (new)**: 20 passed (replaces 45 Pact contract tests)
 - **Build**: 17/17 packages
@@ -61,6 +65,7 @@ Renderer (Web Components)
 ```
 
 Key design decisions:
+
 - **Not using actual tRPC framework** — the @trpc/server/client packages are
   designed for HTTP transports and bring observable-based link infrastructure
   that adds complexity in Electron IPC context. Instead we use shared TypeScript

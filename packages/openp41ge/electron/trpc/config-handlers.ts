@@ -10,7 +10,7 @@ export interface ConfigService {
 }
 
 class ProductionConfigService implements ConfigService {
-  async get(key: string): Promise<ConfigValue> {
+  async get(_key: string): Promise<ConfigValue> {
     throw new Error("Not yet implemented");
   }
 

@@ -25,43 +25,38 @@ export interface ReposService {
 
 class ProductionReposService implements ReposService {
   async listRepos(): Promise<RepoInfo[]> {
-    const { ipcMain } = await import("electron");
-    // In production, this is called from the main process directly,
-    // so we delegate to the actual workspace service.
-    // This is a placeholder — actual implementation delegates to
-    // GitRepositoryService which is already wired.
     throw new Error("Not yet implemented — delegates to GitRepositoryService");
   }
 
-  async getRepo(name: string): Promise<RepoInfo | null> {
+  async getRepo(_name: string): Promise<RepoInfo | null> {
     throw new Error("Not yet implemented");
   }
 
-  async listWorktrees(repoName: string): Promise<WorktreeInfo[]> {
+  async listWorktrees(_repoName: string): Promise<WorktreeInfo[]> {
     throw new Error("Not yet implemented");
   }
 
-  async checkoutWorktree(repoName: string, branch: string): Promise<WorktreeInfo> {
+  async checkoutWorktree(_repoName: string, _branch: string): Promise<WorktreeInfo> {
     throw new Error("Not yet implemented");
   }
 
-  async deleteWorktree(repoName: string, branch: string): Promise<void> {
+  async deleteWorktree(_repoName: string, _branch: string): Promise<void> {
     throw new Error("Not yet implemented");
   }
 
-  async pullBranch(repoName: string, branch: string): Promise<void> {
+  async pullBranch(_repoName: string, _branch: string): Promise<void> {
     throw new Error("Not yet implemented");
   }
 
-  async fetch(repoName: string): Promise<void> {
+  async fetch(_repoName: string): Promise<void> {
     throw new Error("Not yet implemented");
   }
 
-  async listBranches(repoName: string): Promise<string[]> {
+  async listBranches(_repoName: string): Promise<string[]> {
     throw new Error("Not yet implemented");
   }
 
-  async getDefaultBranch(name: string): Promise<string | null> {
+  async getDefaultBranch(_name: string): Promise<string | null> {
     throw new Error("Not yet implemented");
   }
 }

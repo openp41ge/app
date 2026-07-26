@@ -12,19 +12,19 @@ export interface FileService {
 }
 
 class ProductionFileService implements FileService {
-  async readdir(dirPath: string): Promise<FileEntry[]> {
+  async readdir(_dirPath: string): Promise<FileEntry[]> {
     throw new Error("Not yet implemented");
   }
 
-  async readRange(filePath: string, offset: number, length: number): Promise<ReadRangeResult> {
+  async readRange(_filePath: string, _offset: number, _length: number): Promise<ReadRangeResult> {
     throw new Error("Not yet implemented");
   }
 
-  async writeFile(filePath: string, content: string): Promise<WriteFileResult> {
+  async writeFile(_filePath: string, _content: string): Promise<WriteFileResult> {
     throw new Error("Not yet implemented");
   }
 
-  async stat(filePath: string): Promise<FileEntry | null> {
+  async stat(_filePath: string): Promise<FileEntry | null> {
     throw new Error("Not yet implemented");
   }
 }

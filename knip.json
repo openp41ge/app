@@ -14,8 +14,7 @@
         "@xterm/addon-fit",
         "concurrently",
         "lit",
-        "zod",
-        "@playwright/test"
+        "zod"
       ]
     },
     "packages/openp41ge": {
@@ -36,7 +35,8 @@
 
         "src/renderer/services/index.ts",
         "src/layout/index.ts",
-        "src/index.ts"
+        "src/index.ts",
+        "electron/trpc/index.ts"
       ],
       "ignoreExportsUsedInFile": {
         "interface": true,
