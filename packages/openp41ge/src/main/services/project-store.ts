@@ -11,14 +11,23 @@
 
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("project-store");
+
+/** Regex matching draft project names: draft-<uuid>.draft */
+const DRAFT_NAME_RE = /^draft-[a-f0-9-]+\.draft$/;
+
+/** Default draft expiry: 7 days in milliseconds. */
+export const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface ProjectConfig {
   name: string;
   createdAt: string;
   updatedAt: string;
+  /** True for auto-created draft projects that haven't been saved yet. */
+  draft?: boolean;
 }
 
 export class ProjectStore {
@@ -58,6 +67,8 @@ export class ProjectStore {
       return fs.readdirSync(this._openp41geDir).filter((entry) => {
         // Skip dot-prefixed directories (.config, .pending, etc.)
         if (entry.startsWith(".")) return false;
+        // Skip draft projects — they're transparent to the picker
+        if (DRAFT_NAME_RE.test(entry)) return false;
         const fullPath = path.join(this._openp41geDir, entry);
         return fs.statSync(fullPath).isDirectory() && this.exists(entry);
       });
@@ -127,6 +138,93 @@ export class ProjectStore {
     } catch (err) {
       log.error(`Failed to touch project "${name}":`, err);
     }
+  }
+
+  // ── Draft project support ──────────────────────────────────────────
+
+  /** Create a draft project with a unique name. Returns the draft project name. */
+  createDraft(): string {
+    const uuid = crypto.randomUUID();
+    const name = `draft-${uuid}.draft`;
+    this.create(name);
+    // Re-write config with draft flag
+    const config = this.readConfig(name);
+    if (config) {
+      config.draft = true;
+      fs.writeFileSync(this.configPath(name), JSON.stringify(config, null, 2), "utf-8");
+    }
+    log.info(`Draft project "${name}" created`);
+    return name;
+  }
+
+  /** Check whether a project name matches the draft pattern. */
+  isDraft(name: string): boolean {
+    return DRAFT_NAME_RE.test(name);
+  }
+
+  /**
+   * Convert a draft project to a permanent named project.
+   * Renames the directory from draft-<uuid>.draft/ to <newName>/ and
+   * updates the config to remove the draft flag.
+   * Returns true on success, false if the draft doesn't exist or newName conflicts.
+   */
+  saveDraftAs(draftName: string, newName: string): boolean {
+    try {
+      if (!this.isDraft(draftName) || !this.exists(draftName)) {
+        log.warn(`Cannot save draft "${draftName}": not a draft or doesn't exist`);
+        return false;
+      }
+      if (this.exists(newName)) {
+        log.warn(`Cannot save draft as "${newName}": project already exists`);
+        return false;
+      }
+      const draftDir = this.projectDir(draftName);
+      const newDir = this.projectDir(newName);
+      fs.renameSync(draftDir, newDir);
+      // Update config: remove draft flag, set new name, update updatedAt
+      const config = this.readConfig(newName);
+      if (config) {
+        config.name = newName;
+        config.draft = false;
+        config.updatedAt = new Date().toISOString();
+        fs.writeFileSync(this.configPath(newName), JSON.stringify(config, null, 2), "utf-8");
+      }
+      log.info(`Draft "${draftName}" saved as project "${newName}"`);
+      return true;
+    } catch (err) {
+      log.error(`Failed to save draft "${draftName}" as "${newName}":`, err);
+      return false;
+    }
+  }
+
+  /**
+   * Garbage-collect draft projects older than the given max age.
+   * Returns the number of drafts deleted.
+   */
+  gcDrafts(maxAgeMs: number = DRAFT_MAX_AGE_MS): number {
+    let deleted = 0;
+    try {
+      if (!fs.existsSync(this._openp41geDir)) return 0;
+      const entries = fs.readdirSync(this._openp41geDir);
+      const now = Date.now();
+      for (const entry of entries) {
+        if (!DRAFT_NAME_RE.test(entry)) continue;
+        const config = this.readConfig(entry);
+        if (!config || !config.draft) continue;
+        const createdAt = new Date(config.createdAt).getTime();
+        if (now - createdAt > maxAgeMs) {
+          if (this.delete(entry)) {
+            deleted++;
+          }
+        }
+      }
+    } catch (err) {
+      log.error("Failed to garbage-collect drafts:", err);
+    }
+    if (deleted > 0) {
+      log.info(`Garbage-collected ${deleted} old draft(s)`);
+    }
+    return deleted;
   }
 
   /** Delete a project and all its contents. */

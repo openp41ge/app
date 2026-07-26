@@ -20,6 +20,7 @@ const log = createLogger("app");
 // ─── Component registration (side-effect imports — must be at module level) ──
 import "./components/openp41ge-windowview";
 import "./components/openp41ge-project-picker";
+import "./components/openp41ge-save-draft-dialog";
 import "./components/openp41ge-titlebar";
 import "./components/openp41ge-topbar";
 import "./components/openp41ge-contextmenu";
@@ -169,6 +170,52 @@ export function resetApp(): void {
 export function wireResetListener(): void {
   window.openp41ge.workspace.onReset(() => {
     resetApp();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Singleton renderer
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Draft save dialog wiring
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Show the save draft dialog by creating and appending the element.
+ */
+function _showSaveDraftDialog(draftName?: string): void {
+  // Don't stack multiple dialogs
+  if (document.querySelector("openp41ge-save-draft-dialog")) return;
+  const dialog = document.createElement("openp41ge-save-draft-dialog");
+  if (draftName) {
+    (dialog as any)._draftName = draftName;
+  }
+  document.body.appendChild(dialog);
+  // Focus the input after mount
+  requestAnimationFrame(() => {
+    const input = dialog.shadowRoot?.querySelector("input");
+    if (input) input.focus();
+  });
+}
+
+// Listen for the titlebar's "Save Project" button
+// We use a document-level listener since the titlebar may be recreated
+document.addEventListener("draft:save", ((e: CustomEvent) => {
+  const detail = e.detail;
+  _showSaveDraftDialog(detail?.draftName);
+}) as EventListener);
+
+// Listen for IPC from the main process File menu "Save Project As..."
+// Guarded because the preload mock in tests may not have this method.
+if (window.openp41ge?.project?.onShowSaveDraftDialog) {
+  window.openp41ge.project.onShowSaveDraftDialog(() => {
+    // Fetch current project name and show dialog
+    window.openp41ge.project.current().then((name) => {
+      if (name) {
+        _showSaveDraftDialog(name);
+      }
+    });
   });
 }
 

@@ -56,6 +56,18 @@ export function registerProjectHandlers(
     return currentProjectName();
   });
 
+  ipcMain.handle("project:saveDraftAs", async (_event, draftName: string, newName: string) => {
+    return projectStore.saveDraftAs(draftName, newName);
+  });
+
+  ipcMain.handle("project:isDraft", async (_event, name: string) => {
+    return projectStore.isDraft(name);
+  });
+
+  ipcMain.handle("project:gcDrafts", async () => {
+    return projectStore.gcDrafts();
+  });
+
   /**
    * Switch the current project — called from the renderer project picker.
    * Loads the project's workspace state into the dispatcher, updates the

@@ -1,14 +1,16 @@
 /**
- * CheckProjectStep — shows the project picker modal on startup if no project is active.
+ * CheckProjectStep — confirms a project is active; shows the project picker
+ * only as a fallback.
  *
- * This step runs after services are wired but before the initial render.
- * If the main process didn't receive a --project CLI arg, it shows the
- * project picker modal so the user can select or create a project.
+ * The main process now auto-creates a draft project on startup (when no
+ * --project CLI arg is given), so this step usually resolves immediately.
+ * The project picker is still available for switching projects, but it's
+ * triggered by the user via the "Open Project..." command, not on startup.
  *
- * When a project is selected, it calls project:switch on the main process
- * to load that project's workspace state and broadcast it.
+ * When a project is selected from the picker, it calls project:switch on
+ * the main process to load that project's workspace state.
  *
- * The subsequent FetchInitialStateStep picks up the broadcast and renders.
+ * The subsequent FetchInitialStateStep picks up the state and renders.
  */
 
 import type { IStartupStep } from "../startup-step";
@@ -27,6 +29,7 @@ export class CheckProjectStep implements IStartupStep {
 
       if (currentProject) {
         log.info(`Active project: ${currentProject}`);
+        window.__openp41geProjectName = currentProject;
         return; // Project already set — proceed normally
       }
 

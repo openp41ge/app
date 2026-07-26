@@ -154,6 +154,11 @@ declare global {
         reposDir: (name: string) => Promise<string>;
         current: () => Promise<string | null>;
         switchTo: (name: string) => Promise<{ success: boolean; error?: string }>;
+        saveDraftAs: (draftName: string, newName: string) => Promise<boolean>;
+        isDraft: (name: string) => Promise<boolean>;
+        gcDrafts: () => Promise<number>;
+        /** Register callback for File > Save Project As... menu item. Returns unsubscribe. */
+        onShowSaveDraftDialog: (callback: () => void) => () => void;
       };
     };
 

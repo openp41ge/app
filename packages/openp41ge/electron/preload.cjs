@@ -484,5 +484,14 @@ contextBridge.exposeInMainWorld("openp41ge", {
     reposDir: (name) => ipcRenderer.invoke("project:reposDir", name),
     current: () => ipcRenderer.invoke("project:current"),
     switchTo: (name) => ipcRenderer.invoke("project:switch", name),
+    saveDraftAs: (draftName, newName) => ipcRenderer.invoke("project:saveDraftAs", draftName, newName),
+    isDraft: (name) => ipcRenderer.invoke("project:isDraft", name),
+    gcDrafts: () => ipcRenderer.invoke("project:gcDrafts"),
+    /** Register callback for when the File > "Save Project As..." menu item is clicked. */
+    onShowSaveDraftDialog: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("menu:save-draft", handler);
+      return () => ipcRenderer.removeListener("menu:save-draft", handler);
+    },
   },
 });

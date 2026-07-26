@@ -188,12 +188,17 @@ export class Openp41geApplication {
   private _initServices(): void {
     this.projectStore = new ProjectStore(this.openp41geDir);
 
-    // When no project is specified on the CLI, use a pending directory so
-    // nothing writes to ~/.openp41ge/repositories or ~/.openp41ge/workspace-state.json.
-    // The project picker must be used before any state or repos are saved.
-    const reposDir = this.projectName
-      ? this.projectStore.reposDir(this.projectName)
-      : path.join(this.openp41geDir, ".pending", "repositories");
+    // Garbage-collect expired drafts on every startup
+    this.projectStore.gcDrafts();
+
+    // When no project is specified on the CLI, auto-create a draft project.
+    // This replaces the old flow where the project picker was required — now
+    // the app opens directly into a draft that can be saved later.
+    if (!this.projectName) {
+      this.projectName = this.projectStore.createDraft();
+    }
+
+    const reposDir = this.projectStore.reposDir(this.projectName);
 
     this.dispatcher = new OperationDispatcher();
     this.terminalManager = new TerminalManager();
@@ -236,17 +241,13 @@ export class Openp41geApplication {
   // ── Step 5b: Load saved state ───────────────────────────────────────
 
   /**
-   * If a project is specified (via --project CLI arg), ensure it exists and
-   * load its workspace state. If no project is specified, the dispatcher
-   * starts with an empty workspace — the project picker handles selection.
+   * Load saved workspace state for the current project.
+   * This is now called for both regular projects and drafts.
+   * Drafts that have never been saved simply get a fresh empty workspace.
    */
   private _maybeLoadState(): void {
     if (!this.projectName) return;
 
-    // Ensure the project exists
-    if (!this.projectStore.exists(this.projectName)) {
-      this.projectStore.create(this.projectName);
-    }
     const statePath = this.projectStore.workspaceStatePath(this.projectName);
     const saved = this.workspaceStateStore.load(statePath);
     if (saved) {
@@ -369,6 +370,16 @@ export class Openp41geApplication {
             },
           },
           { type: "separator" },
+          {
+            label: "Save Project As...",
+            accelerator: "CmdOrCtrl+Shift+S",
+            click: () => {
+              const focused = BrowserWindow.getFocusedWindow();
+              if (focused && !focused.isDestroyed()) {
+                focused.webContents.send("menu:save-draft");
+              }
+            },
+          },
           { type: "separator" },
           {
             label: "New Pane",
