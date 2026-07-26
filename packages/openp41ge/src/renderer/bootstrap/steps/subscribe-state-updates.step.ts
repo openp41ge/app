@@ -48,12 +48,18 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
     if (!windowId) {
       windowId = window.openp41ge.workspace.getWindowId();
     }
-    // Final fallback: first window in workspace (always correct for single window)
-    if (!windowId && ws.windows.length > 0) {
-      windowId = ws.windows[0].id;
+
+    // Defensive: if windowId is still not resolved, skip rendering.
+    // The FetchInitialStateStep awaits waitForInit() before setting
+    // context.windowId, so this only happens in edge cases (e.g., a
+    // stray broadcast before init finishes). Using ws.windows[0] as
+    // fallback would render the wrong window's data in multi-window apps.
+    if (!windowId) {
+      log.warn("window ID not resolved yet, skipping render");
+      return;
     }
 
-    const myWindow = windowId ? ws.windows.find((w) => w.id === windowId) : null;
+    const myWindow = ws.windows.find((w) => w.id === windowId);
 
     if (!myWindow) {
       log.warn("window not found for id:", windowId);

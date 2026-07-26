@@ -7,6 +7,15 @@
  *
  * If this fails, the UI stays in its empty state until a state update arrives
  * via the IPC subscription (step 6).
+ *
+ * Window ID resolution:
+ *   - The openp41ge:init IPC (which sets _windowId in the preload) fires on
+ *     did-finish-load, AFTER deferred module scripts execute.
+ *   - The state fetch (getState) works either way — it returns the cached
+ *     initial state if init arrived, or fires a fresh IPC call.
+ *   - But getWindowId() returns null until init arrives.
+ *   - We must await waitForInit() before resolving windowId, otherwise the
+ *     fallback uses ws.windows[0].id and the WRONG window's data is rendered.
  */
 
 import type { IStartupStep } from "../startup-step";
@@ -28,18 +37,25 @@ export class FetchInitialStateStep implements IStartupStep {
     const statePromise = projectSelected
       ? window.openp41ge.workspace.getState()
       : (context.initialStatePromise ?? window.openp41ge.workspace.getState());
-    const json = await statePromise;
+
+    // Fire state fetch AND waitForInit in parallel — the state fetch
+    // might already have the data (via cached initial state) while
+    // waitForInit ensures windowId is ready.
+    const [json] = await Promise.all([
+      statePromise,
+      window.openp41ge.workspace.waitForInit(),
+    ]);
     const ws: Workspace = JSON.parse(json);
 
-    // Resolve window ID
+    // Resolve window ID — waitForInit ensures getWindowId() is ready.
+    // Fall through to the first-window fallback only if getWindowId()
+    // somehow still returns null or the ID doesn't match (defensive).
     const rawId = window.openp41ge.workspace.getWindowId();
     let windowId: string | null = null;
 
     if (rawId && ws.windows.find((w) => w.id === rawId)) {
       windowId = rawId;
     } else {
-      // If window ID isn't ready yet, try to match on first window
-      // (single-window scenario during initial boot)
       log.warn("window ID not resolved yet, using first window");
       if (ws.windows.length > 0) {
         windowId = ws.windows[0].id;

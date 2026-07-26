@@ -82,6 +82,7 @@ export class DragOrchestrator implements IDragHandler {
   private _resolveTarget: TargetResolver;
   private _targetCache = new Map<HTMLElement, IDropTarget>();
   private _lastCrossCheck = 0;
+  private _crossEnabled = true;
 
   get isDragging(): boolean {
     return this._session !== null;
@@ -184,11 +185,28 @@ export class DragOrchestrator implements IDragHandler {
 
     if (s.currentTarget) {
       s.currentTarget.onHover(s.source, ev.clientX, ev.clientY);
+    } else if (s.thresholdMet && s.initiated) {
+      // Cursor is not over any valid drop target in this window.
+      // Fire CROSS event so the host can forward ghost position to
+      // other windows for cross-window drag preview.
+      // Throttled to ~100ms to avoid excessive IPC.
+      const now = Date.now();
+      if (now - this._lastCrossCheck > 100) {
+        this._lastCrossCheck = now;
+        const data = s.source.getDragData();
+        document.dispatchEvent(
+          new CustomEvent(DRAG_EVENTS.CROSS, {
+            detail: {
+              screenX: ev.screenX,
+              screenY: ev.screenY,
+              tabId: data.type === 'tab' || data.type === 'openp41ge-tab' ? data.tabId : undefined,
+              winId: data.type === 'tab' || data.type === 'openp41ge-tab' ? data.winId : undefined,
+              label: data.type === 'tab' || data.type === 'openp41ge-tab' ? data.title || 'Tab' : 'Drag',
+            },
+          }),
+        );
+      }
     }
-
-    // Cross-window check (throttled) — fire event for host to handle
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const now = Date.now(); // keep for potential future throttling
   };
 
   private _onMouseUp = (ev: MouseEvent): void => {
@@ -228,6 +246,8 @@ export class DragOrchestrator implements IDragHandler {
         });
     } else {
       // No target — fire detach event for host to handle
+      // Include screenX/screenY so the host can check for cross-window drops
+      // before falling back to creating a new window.
       const data = s.source.getDragData();
       if (data.type === "tab" || data.type === "openp41ge-tab") {
         document.dispatchEvent(
@@ -235,6 +255,9 @@ export class DragOrchestrator implements IDragHandler {
             detail: {
               winId: data.winId,
               tabId: data.tabId,
+              sourceWorksetId: data.worksetId,
+              screenX: ev.screenX,
+              screenY: ev.screenY,
               bounds: { x: ev.screenX - 50, y: ev.screenY - 50, width: 800, height: 600 },
             },
           }),

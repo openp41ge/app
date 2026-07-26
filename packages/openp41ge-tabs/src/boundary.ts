@@ -91,7 +91,7 @@ export function classifyGridPosition(
  */
 export function getDividerPositions(gridEl: HTMLElement, cols: number): number[] {
   if (cols <= 1) return [];
-  const cells = gridEl.querySelectorAll(".openp41ge-grid-cell");
+  const cells = gridEl.querySelectorAll(".grid-cell");
   if (cells.length === 0) return Array.from({ length: cols - 1 }, (_, i) => (i + 1) / cols);
 
   const flexValues = Array.from(cells).map((c) => {
