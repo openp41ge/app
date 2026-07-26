@@ -20,6 +20,7 @@ declare global {
         dispatch: (fn: string, ...args: unknown[]) => void;
         onStateUpdate: (callback: (stateJson: string) => void) => () => void;
         getWindowId: () => string | null;
+        waitForInit: () => Promise<void>;
         detachPane: (windowId: string, paneId: string, bounds?: { x: number; y: number; width: number; height: number }) => void;
         detachTab: (windowId: string, tabId: string, bounds?: { x: number; y: number; width: number; height: number }) => void;
         cmdNewWindow: () => void;
@@ -34,14 +35,20 @@ declare global {
         onReset: (callback: () => void) => () => void;
       };
       drag: {
-        start: (label: string, screenX: number, screenY: number, emoji?: string) => void;
+        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string) => void;
         move: (screenX: number, screenY: number) => void;
         end: () => void;
-        check: (screenX: number, screenY: number) => Promise<{ target: { type: string; payload: any } | null; windowId: string } | null>;
-        ghostShow: (targetWinId: string, paneId: string, screenX: number, screenY: number, label: string) => void;
+        activate: () => void;
+        ghostForward: (screenX: number, screenY: number) => void;
+        check: (screenX: number, screenY: number, dragData?: string) => Promise<{ target: Record<string, unknown> | null; windowId: string } | null>;
+        getActive: () => Promise<{ sourceWinId: string; label: string; dragData: { tabId: string; winId: string; worksetId: string; type: string; title?: string } } | null>;
+        endSession: () => void;
+        onEndSession: (callback: () => void) => () => void;
+        ghostShow: (targetWinId: string, screenX: number, screenY: number, label: string) => void;
         ghostHide: (targetWinId: string) => void;
-        onGhostShow: (callback: (data: { paneId: string; screenX: number; screenY: number; label: string }) => void) => void;
+        onGhostShow: (callback: (data: { screenX: number; screenY: number; label: string }) => void) => void;
         onGhostHide: (callback: () => void) => void;
+        onDragState: (callback: (active: boolean) => void) => void;
       };
 
       terminal: {

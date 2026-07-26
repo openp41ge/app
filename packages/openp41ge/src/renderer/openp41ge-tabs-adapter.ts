@@ -34,9 +34,6 @@ export {
   DRAG_EVENTS,
 } from "openp41ge-tabs";
 
-// ─── Drag orchestrator events (for cross-window bridge) ───────────────────
-export { DRAG_EVENTS };
-
 // ─── Types ────────────────────────────────────────────────────────────────
 export type {
   IDragSource,

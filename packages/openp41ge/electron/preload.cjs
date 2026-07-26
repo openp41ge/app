@@ -2,6 +2,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 let _windowId = null;
 let _isDev = false;
+let _initResolve = null;
+/** Promise that resolves once openp41ge:init IPC message is received. */
+const _initPromise = new Promise((resolve) => {
+  _initResolve = resolve;
+});
 
 // Listen for the init message from the main process
 ipcRenderer.on("openp41ge:init", (_event, data) => {
@@ -9,6 +14,10 @@ ipcRenderer.on("openp41ge:init", (_event, data) => {
   _isDev = !!data.isDev;
   // Store initial workspace state for the renderer to pick up
   _initialState = data.workspace;
+  if (_initResolve) {
+    _initResolve();
+    _initResolve = null;
+  }
 });
 
 let _initialState = null;
@@ -82,6 +91,17 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** Get this window's Openp41ge window ID. */
     getWindowId: () => _windowId,
 
+    /**
+     * Wait for the openp41ge:init IPC message (which sets windowId and initial state).
+     * Returns once the init message has been received.
+     *
+     * Needed because did-finish-load (where init is sent) fires AFTER deferred
+     * module scripts execute. The renderer bootstrap must await this before
+     * resolving its window ID, otherwise ws.windows[0].id is used as fallback
+     * and the wrong window data is rendered.
+     */
+    waitForInit: () => _initPromise,
+
     /** Request creation of a new child window with a detached pane. */
     detachPane: (windowId, paneId, bounds) => {
       ipcRenderer.send(
@@ -136,8 +156,11 @@ contextBridge.exposeInMainWorld("openp41ge", {
   },
 
   drag: {
-    start: (label, screenX, screenY, emoji) => {
-      ipcRenderer.send("openp41ge:drag-start", JSON.stringify({ label, screenX, screenY, emoji }));
+    start: (label, screenX, screenY, emoji, tabId, winId, worksetId) => {
+      ipcRenderer.send(
+        "openp41ge:drag-start",
+        JSON.stringify({ label, screenX, screenY, emoji, tabId, winId, worksetId }),
+      );
     },
     move: (screenX, screenY) => {
       ipcRenderer.send("openp41ge:drag-move", JSON.stringify({ screenX, screenY }));
@@ -145,15 +168,46 @@ contextBridge.exposeInMainWorld("openp41ge", {
     end: () => {
       ipcRenderer.send("openp41ge:drag-end");
     },
-    check: (screenX, screenY) => {
-      return ipcRenderer.invoke("openp41ge:drag-check", JSON.stringify({ screenX, screenY }));
+    /**
+     * Called when the drag threshold is met (actual drag starts, not just mousedown).
+     * Broadcasts drag-active state to other windows.
+     */
+    activate: () => {
+      ipcRenderer.send("openp41ge:drag-activate");
+    },
+    /** Forward cursor position from source window to all others for ghost preview. */
+    ghostForward: (screenX, screenY) => {
+      ipcRenderer.send("openp41ge:drag-ghost-forward", JSON.stringify({ screenX, screenY }));
+    },
+    check: (screenX, screenY, dragData) => {
+      return ipcRenderer.invoke(
+        "openp41ge:drag-check",
+        JSON.stringify({ screenX, screenY, dragData }),
+      );
+    },
+
+    /** Query the main process for the current active drag session (cross-window). */
+    getActive: () => {
+      return ipcRenderer.invoke("openp41ge:drag-get-active");
+    },
+
+    /** End the current drag session and clean up the source window (cross-window). */
+    endSession: () => {
+      ipcRenderer.send("openp41ge:drag-end-session");
+    },
+
+    /** Register callback for when source window tells us to end the drag session. */
+    onEndSession: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("openp41ge:drag-end-session", handler);
+      return () => ipcRenderer.removeListener("openp41ge:drag-end-session", handler);
     },
 
     /** Send ghost preview data to another window for rendering. */
-    ghostShow: (targetWinId, paneId, screenX, screenY, label) => {
+    ghostShow: (targetWinId, screenX, screenY, label) => {
       ipcRenderer.send(
         "openp41ge:drag-ghost-show",
-        JSON.stringify({ targetWinId, paneId, screenX, screenY, label }),
+        JSON.stringify({ targetWinId, screenX, screenY, label }),
       );
     },
     /** Hide ghost in another window. */
@@ -169,6 +223,15 @@ contextBridge.exposeInMainWorld("openp41ge", {
     onGhostHide: (callback) => {
       const handler = () => callback();
       ipcRenderer.on("openp41ge:drag-ghost-hide", handler);
+    },
+
+    /**
+     * Register callback for drag-state changes broadcast by the main process.
+     * Called with true when a drag starts in another window, false when it ends.
+     */
+    onDragState: (callback) => {
+      const handler = (_event, active) => callback(active);
+      ipcRenderer.on("openp41ge:drag-state", handler);
     },
   },
 
