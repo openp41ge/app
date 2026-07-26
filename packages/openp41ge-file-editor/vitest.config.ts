@@ -10,7 +10,10 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     watch: false,
-    setupFiles: [path.resolve(__dirname, "./test/unit/pre-setup.ts"), path.resolve(__dirname, "./test/unit/setup.ts")],
+    setupFiles: [
+      path.resolve(__dirname, "./test/unit/pre-setup.ts"),
+      path.resolve(__dirname, "./test/unit/setup.ts"),
+    ],
   },
   resolve: {
     alias: {

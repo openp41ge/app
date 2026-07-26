@@ -126,4 +126,3 @@ console.error = (...args: any[]) => {
   if (_noisePatterns.some((p) => msg.includes(p) || new RegExp(p).test(msg))) return;
   _origConsoleError(...args);
 };
-

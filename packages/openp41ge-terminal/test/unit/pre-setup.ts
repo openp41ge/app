@@ -15,7 +15,11 @@
 const _origStderrWrite = process.stderr.write.bind(process.stderr);
 (process.stderr as any).write = function (data: string | Uint8Array, ...args: any[]): boolean {
   const str = typeof data === "string" ? data : String(data);
-  if (str.includes("DEP0060") || str.includes("pact_models::pact") || str.includes("pact_matching::metrics")) {
+  if (
+    str.includes("DEP0060") ||
+    str.includes("pact_models::pact") ||
+    str.includes("pact_matching::metrics")
+  ) {
     return true; // suppress
   }
   return _origStderrWrite(data, ...(args as [any]));
