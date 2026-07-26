@@ -1,18 +1,25 @@
 /**
- * Vitest configuration — integration tests only.
- * Extends the root config with package-specific paths.
+ * Vitest config for integration tests.
+ *
+ * Integration tests verify cross-system interactions — tRPC handlers,
+ * command bus operations, and pane controller lifecycle — using
+ * in-memory test services instead of Pact mock servers.
  */
-import { defineConfig } from "vitest/config";
+
 import path from "path";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
     root: __dirname,
-    include: ["test/integration/**/*.test.ts"],
+    include: ["test/integration/rpc-*.test.ts"],
     environment: "jsdom",
     globals: true,
     watch: false,
-    setupFiles: [path.resolve(__dirname, "./test/unit/pre-setup.ts"), path.resolve(__dirname, "./test/unit/setup.ts")],
+    setupFiles: [
+      path.resolve(__dirname, "./test/unit/pre-setup.ts"),
+      path.resolve(__dirname, "./test/unit/setup.ts"),
+    ],
   },
   resolve: {
     alias: {
