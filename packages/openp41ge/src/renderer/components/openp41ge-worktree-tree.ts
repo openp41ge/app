@@ -610,8 +610,12 @@ class Openp41geWorktreeTree extends LitElement {
       updateDrawerVisibility();
     }
 
-    // Sync custom overlay scrollbar thumb position and bind scroll listener
-    this._syncScrollbar();
+    // Sync custom overlay scrollbar thumb position and bind scroll listener.
+    // Use requestAnimationFrame so the browser has performed layout after
+    // Lit's DOM update — otherwise scrollHeight may still reflect old
+    // content (e.g., expanded worktrees) and the scrollbar won't be hidden
+    // when content shrinks.
+    requestAnimationFrame(() => this._syncScrollbar());
     if (this._treeEl) {
       this._treeEl.removeEventListener("scroll", this._boundScroll);
       this._treeEl.addEventListener("scroll", this._boundScroll, { passive: true });
