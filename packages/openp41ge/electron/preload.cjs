@@ -156,10 +156,10 @@ contextBridge.exposeInMainWorld("openp41ge", {
   },
 
   drag: {
-    start: (label, screenX, screenY, emoji, tabId, winId, worksetId) => {
+    start: (label, screenX, screenY, emoji, tabId, winId, worksetId, tabWidth, tabHeight, offsetX, offsetY) => {
       ipcRenderer.send(
         "openp41ge:drag-start",
-        JSON.stringify({ label, screenX, screenY, emoji, tabId, winId, worksetId }),
+        JSON.stringify({ label, screenX, screenY, emoji, tabId, winId, worksetId, tabWidth, tabHeight, offsetX, offsetY }),
       );
     },
     move: (screenX, screenY) => {

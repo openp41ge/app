@@ -37,6 +37,10 @@ let _pendingDragStart: {
   tabId: string;
   winId: string;
   worksetId: string;
+  tabWidth: number;
+  tabHeight: number;
+  offsetX: number;
+  offsetY: number;
 } | null = null;
 
 /**
@@ -91,6 +95,15 @@ export function initDragSystem(): () => void {
     const col = tabBar.col ?? 0;
     const label = tabBtn.textContent?.trim() || "Tab";
 
+    // Calculate offset from cursor to tab's top-left (in screen coordinates)
+    const tabRect = tabBtn.getBoundingClientRect();
+    const tabScreenX = window.screenX + tabRect.left;
+    const tabScreenY = window.screenY + tabRect.top;
+    const tabWidth = tabBtn.offsetWidth;
+    const tabHeight = tabBtn.offsetHeight;
+    const offsetX = e.screenX - tabScreenX;
+    const offsetY = e.screenY - tabScreenY;
+
     // Use a ghostFactory that returns an invisible element — we only want the
     // main-process BrowserWindow ghost (DragGhostManager), not the in-DOM floating ghost.
     const dragSource = new TabDragSource(tabBtn, tabId, winId, col.toString(), label, () => {
@@ -111,6 +124,10 @@ export function initDragSystem(): () => void {
       tabId,
       winId,
       worksetId: col.toString(),
+      tabWidth,
+      tabHeight,
+      offsetX,
+      offsetY,
     };
   };
 
@@ -202,6 +219,10 @@ export function initDragSystem(): () => void {
             p.tabId,
             p.winId,
             p.worksetId,
+            p.tabWidth,
+            p.tabHeight,
+            p.offsetX,
+            p.offsetY,
           );
           _pendingDragStart = null;
         }

@@ -16,19 +16,38 @@ export class DragGhostManager implements IDragGhostManager {
   private readonly _BrowserWindow: typeof BrowserWindow;
   private _contentW = 0;
   private _contentH = 0;
+  private _offsetX = 0;
+  private _offsetY = 0;
 
   constructor(BrowserWindowCtor: typeof BrowserWindow) {
     this._BrowserWindow = BrowserWindowCtor;
   }
 
-  show(label: string, screenX: number, screenY: number, emoji?: string): void {
+  show(
+    label: string,
+    screenX: number,
+    screenY: number,
+    emoji?: string,
+    tabWidth?: number,
+    tabHeight?: number,
+    offsetX?: number,
+    offsetY?: number,
+  ): void {
     this.hide();
 
+    // Store offset for subsequent move() calls
+    this._offsetX = offsetX ?? Math.round((tabWidth ?? 110) / 2);
+    this._offsetY = offsetY ?? Math.round((tabHeight ?? 35) / 2);
+
+    // Use tab dimensions if provided, otherwise use defaults
+    const ghostW = tabWidth ?? 110;
+    const ghostH = tabHeight ?? 35;
+
     const ghost = new this._BrowserWindow({
-      width: 110,
-      height: 35,
-      x: screenX - 55,
-      y: screenY - 17,
+      width: ghostW,
+      height: ghostH,
+      x: screenX - this._offsetX,
+      y: screenY - this._offsetY,
       frame: false,
       transparent: true,
       roundedCorners: false,
@@ -63,7 +82,7 @@ export class DragGhostManager implements IDragGhostManager {
 <html><body style="margin:0;padding:0;background:transparent;cursor:grabbing;">
 <div style="
   display:flex;align-items:center;gap:6px;
-  width:110px;height:35px;
+  width:${ghostW}px;height:${ghostH}px;
   padding:0 14px;
   background:#1e1e1e;
   border:1px solid #2a2a2a;
@@ -91,8 +110,8 @@ export class DragGhostManager implements IDragGhostManager {
           this._contentW = cw;
           this._contentH = ch;
           ghost.setBounds({
-            x: screenX - Math.round(cw / 2),
-            y: screenY - Math.round(ch / 2),
+            x: screenX - this._offsetX,
+            y: screenY - this._offsetY,
             width: cw,
             height: ch,
           });
@@ -118,9 +137,7 @@ export class DragGhostManager implements IDragGhostManager {
 
   move(screenX: number, screenY: number): void {
     if (this._ghost && !this._ghost.isDestroyed()) {
-      const cw = this._contentW || 110;
-      const ch = this._contentH || 35;
-      this._ghost.setPosition(screenX - Math.round(cw / 2), screenY - Math.round(ch / 2));
+      this._ghost.setPosition(screenX - this._offsetX, screenY - this._offsetY);
     }
   }
 
@@ -131,6 +148,8 @@ export class DragGhostManager implements IDragGhostManager {
     this._ghost = null;
     this._contentW = 0;
     this._contentH = 0;
+    this._offsetX = 0;
+    this._offsetY = 0;
   }
 
   isActive(): boolean {
