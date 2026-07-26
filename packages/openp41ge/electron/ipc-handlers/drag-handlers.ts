@@ -168,7 +168,6 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
   // leaves valid drop targets. We forward screenX/screenY so every window
   // can show a ghost at the correct position.
   ipcMain.on("openp41ge:drag-ghost-forward", (_event, data: string) => {
-    const parsed = JSON.parse(data);
     const sender = _event.sender;
     for (const [, bw] of openp41geWindows) {
       if (bw.webContents !== sender && !bw.isDestroyed()) {

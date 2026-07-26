@@ -512,7 +512,7 @@ if (typeof window !== "undefined") {
       _ghostShownGrid ? _ghostShownGrid.querySelector(".openp41ge-ghost-overlay") : null,
     getOrchestrator: () => _orchestrator,
     setGridCols: (gridEl: HTMLElement, cols: number) => {
-      (gridEl as any).cols = cols;
+      (gridEl as HTMLElement & { cols: number }).cols = cols;
     },
     callUpdateCrossWindowGhost: (cx: number, cy: number) => _updateCrossWindowGhost(cx, cy),
     callHandleCrossWindowDrop: async (cx: number, cy: number, sx: number, sy: number) => {
