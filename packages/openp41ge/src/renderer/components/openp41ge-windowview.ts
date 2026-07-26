@@ -9,10 +9,8 @@
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
-import { createLogger } from "openp41ge-logger";
 import type { Window, Workspace, Rect } from "../../layout/types";
 import { dispatch } from "../app";
-const log = createLogger("openp41ge-windowview");
 
 import { setContextMenuActive } from "../services/drag-context";
 import "./openp41ge-bottom-button";
