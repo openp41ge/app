@@ -102,7 +102,7 @@ class Openp41geWindowView extends LitElement {
           class="openp41ge-main-area"
           style="display:flex;flex:1;overflow:hidden;min-height:0;position:relative;"
         >
-          <div class="openp41ge-grid-area" style="flex:1;min-width:200px;position:relative;overflow:hidden">
+          <div class="openp41ge-grid-area" style="flex:1 1 200px;min-width:200px;position:relative;overflow:hidden">
             <tab-grid
               winId=${win.id}
               .cols=${effectiveCols}
