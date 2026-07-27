@@ -38,14 +38,20 @@ class Openp41geTitleBar extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._loadProjectName();
-    // Refresh project name when draft is saved
+    // Refresh when project changes (switched or saved)
+    document.addEventListener("project:changed", this._onProjectChanged);
     this.addEventListener("draft:saved", this._onDraftSaved as EventListener);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    document.removeEventListener("project:changed", this._onProjectChanged);
     this.removeEventListener("draft:saved", this._onDraftSaved as EventListener);
   }
+
+  private _onProjectChanged = (): void => {
+    this._loadProjectName();
+  };
 
   private _onDraftSaved = (): void => {
     this._loadProjectName();
