@@ -239,7 +239,6 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .detail-card {
-      max-width: 400px;
       width: 100%;
     }
 
