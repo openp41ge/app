@@ -910,7 +910,7 @@ export class Openp41geProjectPicker extends LitElement {
 
                     <div class="add-repo-row">
                       <div class="add-repo-btn" @click=${() => this._addRepository()}>
-                        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin:0 6px 0 2px;position:relative;top:0;">
+                        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin:0 4px 0 4px;position:relative;top:0;">
                           <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
                         </svg>
                         add repository
