@@ -9,7 +9,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
-import { showProjectPicker } from "../services/project-switch-service";
+import { showProjectsSidebar } from "../services/project-switch-service";
 
 const isMac = (() => {
   try {
@@ -57,8 +57,8 @@ class Openp41geTitleBar extends LitElement {
     this._loadProjectName();
   };
 
-  private _openProjectPicker(): void {
-    showProjectPicker();
+  private _openProjects(): void {
+    showProjectsSidebar();
   }
 
   private async _loadProjectName(): Promise<void> {
@@ -109,7 +109,7 @@ class Openp41geTitleBar extends LitElement {
             el.style.color = "var(--text-muted, #888)";
             el.style.background = "transparent";
           }}
-          @click=${() => this._openProjectPicker()}
+          @click=${() => this._openProjects()}
         >
           ${title}
         </span>

@@ -1,15 +1,13 @@
 /**
  * ProjectSwitchService — handles project switching in the renderer.
  *
- * When the user selects a project from the picker (via titlebar click or
- * File > Open Project), this service:
+ * When the user selects a project from the sidebar (activity bar icon,
+ * titlebar click, or File > Open Project), this service:
  *   1. Calls project:switchTo on the main process
- *   2. The main process broadcasts the updated workspace state, which the
- *      existing onStateUpdate subscriber picks up automatically
+ *   2. The main process broadcasts the updated workspace state
  *   3. Dispatches a DOM event so the titlebar and other components refresh
  *
- * This logic was previously duplicated in CheckProjectStep; it's extracted
- * here so both the bootstrap step and the interactive picker reuse it.
+ * The old modal project picker is replaced by the Projects sidebar view.
  */
 
 import { createLogger } from "openp41ge-logger";
@@ -46,27 +44,15 @@ export async function switchToProject(name: string): Promise<boolean> {
 }
 
 /**
- * Show the project picker and wire up selection/dismissal handlers.
- * Handles the full lifecycle: mount, wait for selection, switch, cleanup.
+ * Open the Projects sidebar view via the activity bar.
+ * Dispatches an activity-click event that the sidebar picks up.
  */
-export function showProjectPicker(): void {
-  if (document.querySelector("openp41ge-project-picker")) return;
-
-  const picker = document.createElement("openp41ge-project-picker");
-  document.body.appendChild(picker);
-
-  const onSelected = async (e: Event) => {
-    const detail = (e as CustomEvent).detail;
-    if (detail?.name) {
-      picker.remove();
-      await switchToProject(detail.name);
-    }
-  };
-
-  const onDismissed = () => {
-    picker.remove();
-  };
-
-  picker.addEventListener("project:selected", onSelected as EventListener);
-  picker.addEventListener("project:dismissed", onDismissed as EventListener);
+export function showProjectsSidebar(): void {
+  document.dispatchEvent(
+    new CustomEvent("openp41ge:activity-click", {
+      bubbles: true,
+      composed: true,
+      detail: { viewId: "projects" },
+    }),
+  );
 }

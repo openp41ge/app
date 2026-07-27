@@ -19,8 +19,7 @@ const log = createLogger("app");
 
 // ─── Component registration (side-effect imports — must be at module level) ──
 import "./components/openp41ge-windowview";
-import "./components/openp41ge-project-picker";
-import "./components/openp41ge-save-draft-dialog";
+
 import "./components/openp41ge-titlebar";
 import "./components/openp41ge-topbar";
 import "./components/openp41ge-contextmenu";
@@ -60,7 +59,7 @@ import type { Workspace } from "../layout/types";
 // Bootstrap pipeline
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { showProjectPicker } from "./services/project-switch-service";
+import { showProjectsSidebar } from "./services/project-switch-service";
 
 const context = new StartupContext();
 
@@ -187,18 +186,19 @@ export function wireResetListener(): void {
  * Show the save draft dialog by creating and appending the element.
  */
 function _showSaveDraftDialog(draftName?: string): void {
-  // Don't stack multiple dialogs
-  if (document.querySelector("openp41ge-save-draft-dialog")) return;
-  const dialog = document.createElement("openp41ge-save-draft-dialog");
-  if (draftName) {
-    (dialog as any)._draftName = draftName;
+  // If we have a project-manager tab, activate it; otherwise open one
+  const winId = window.openp41ge?.workspace?.getWindowId?.();
+  if (!winId) return;
+
+  const name = draftName ?? window.__openp41geProjectName;
+  if (!name) return;
+
+  // Check for existing project-manager tab
+  try {
+    dispatch("addColumnTabAt", winId, "project-manager", name, name, 0);
+  } catch {
+    // Tab already open, just switch
   }
-  document.body.appendChild(dialog);
-  // Focus the input after mount
-  requestAnimationFrame(() => {
-    const input = dialog.shadowRoot?.querySelector("input");
-    if (input) input.focus();
-  });
 }
 
 // Listen for IPC from the main process File menu "Save Project As..."
@@ -217,7 +217,7 @@ if (window.openp41ge?.project?.onShowSaveDraftDialog) {
 // Listen for IPC from the main process File menu "Open Project..."
 if (window.openp41ge?.project?.onShowOpenProject) {
   window.openp41ge.project.onShowOpenProject(() => {
-    showProjectPicker();
+    showProjectsSidebar();
   });
 }
 

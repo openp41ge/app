@@ -216,6 +216,15 @@ export function gitInfoIcon(size?: number): string {
   );
 }
 
+/** Projects icon — stacked folders (activity bar) */
+export function projectsIcon(size?: number): string {
+  const s = size ?? 20;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z" fill="currentColor"/>
+    <path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="currentColor"/>
+  </svg>`;
+}
+
 /** Refresh icon — circular arrow with fill */
 export function refreshIcon(size?: number): string {
   const s = size ?? 16;

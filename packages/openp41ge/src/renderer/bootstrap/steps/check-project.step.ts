@@ -1,17 +1,16 @@
 /**
- * CheckProjectStep — confirms a project is active; shows the project picker
- * only as a fallback.
+ * CheckProjectStep — confirms a project is active.
  *
- * The main process now auto-creates a draft project on startup (when no
+ * The main process auto-creates a draft project on startup (when no
  * --project CLI arg is given), so this step usually resolves immediately.
- * The project picker is still available for switching projects, but it's
- * triggered by the user via the titlebar or "Open Project...", not on startup.
+ * If there's a draft, it auto-opens a project-manager tab for it.
  */
 
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 import { switchToProject } from "../../services/project-switch-service";
+import { dispatch } from "../../app";
 
 const log = createLogger("bootstrap:check-project");
 
@@ -25,62 +24,43 @@ export class CheckProjectStep implements IStartupStep {
       if (currentProject) {
         log.info(`Active project: ${currentProject}`);
         window.__openp41geProjectName = currentProject;
-        return; // Project already set — proceed normally
-      }
 
-      log.info("No active project — showing project picker");
-
-      // Mount the project picker and await selection
-      const pickerEl = document.createElement("openp41ge-project-picker");
-      document.body.appendChild(pickerEl);
-
-      context.modalState.showProjects();
-      context.modalState.setFocusTrap(pickerEl);
-
-      const selected = await new Promise<string>((resolve) => {
-        const timeout = setTimeout(() => {
-          cleanup();
-          resolve("");
-        }, 120_000);
-
-        const onSelected = (e: Event) => {
-          const detail = (e as CustomEvent).detail;
-          if (detail?.name) {
-            cleanup();
-            clearTimeout(timeout);
-            resolve(detail.name);
-          }
-        };
-
-        const onDismissed = () => {
-          cleanup();
-          clearTimeout(timeout);
-          resolve("");
-        };
-
-        const cleanup = () => {
-          pickerEl.removeEventListener("project:selected", onSelected as EventListener);
-          pickerEl.removeEventListener("project:dismissed", onDismissed as EventListener);
-        };
-
-        pickerEl.addEventListener("project:selected", onSelected as EventListener);
-        pickerEl.addEventListener("project:dismissed", onDismissed as EventListener);
-      });
-
-      pickerEl.remove();
-      context.modalState.dismiss();
-
-      if (selected) {
-        await switchToProject(selected);
-
-        // Fetch the updated workspace state explicitly — the broadcast
-        // may race with our re-render
-        const stateJson = await window.openp41ge.workspace.getState();
-        const ws = JSON.parse(stateJson);
-        if (ws?.windows?.length > 0) {
-          context.workspaceState.setState(ws);
+        // Check if it's a draft — if so, auto-open the project-manager tab
+        let isDraft = false;
+        try {
+          isDraft = await window.openp41ge.project.isDraft(currentProject);
+        } catch {
+          // not a draft
         }
+        if (isDraft) {
+          // Wait a tick for the workspace state to settle, then open the tab
+          setTimeout(() => {
+            const winId = window.openp41ge?.workspace?.getWindowId?.();
+            if (winId) {
+              try {
+                dispatch("addColumnTabAt", winId, "project-manager", currentProject, currentProject, 0);
+              } catch {
+                // Tab may already be open
+              }
+            }
+          }, 100);
+        }
+
+        return;
       }
+
+      log.info("No active project — showing projects sidebar");
+
+      // Open the projects sidebar so the user can pick or create a project
+      setTimeout(() => {
+        document.dispatchEvent(
+          new CustomEvent("openp41ge:activity-click", {
+            bubbles: true,
+            composed: true,
+            detail: { viewId: "projects" },
+          }),
+        );
+      }, 300);
     } catch (err) {
       log.error("Error in project check:", err);
     }
