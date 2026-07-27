@@ -624,6 +624,25 @@ export class Openp41geProjectPicker extends LitElement {
     );
   }
 
+  private async _activateProject(name: string): Promise<void> {
+    log.info(`Activating project: ${name}`);
+    const result = await window.openp41ge.project.switchTo(name);
+    if (result.success) {
+      window.__openp41geProjectName = name;
+      this._activeProjectName = name;
+      document.dispatchEvent(
+        new CustomEvent("project:changed", {
+          bubbles: true,
+          detail: { name },
+        }),
+      );
+      // Reload project list to reflect the new active state
+      this._loadProjects();
+    } else {
+      log.error(`Failed to activate project "${name}": ${result.error}`);
+    }
+  }
+
   private async _deleteProject(e: Event, name: string): Promise<void> {
     e.stopPropagation();
 
@@ -957,7 +976,7 @@ export class Openp41geProjectPicker extends LitElement {
                                   this._detailProject.name === this._activeProjectName
                                     ? html`<span class="active-badge">Active</span>`
                                     : html`
-                                        <button class="switch-btn" @click=${() => this._selectProject(this._detailProject!.name)}>
+                                        <button class="switch-btn" @click=${() => this._activateProject(this._detailProject!.name)}>
                                           Activate
                                           <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor" style="vertical-align:middle;margin-left:4px;"><path d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"/></svg>
                                         </button>
