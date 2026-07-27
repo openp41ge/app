@@ -99,6 +99,44 @@ export function setSidebarWidthOp(
   }));
 }
 
+// ─── Secondary sidebar operations ──────────────────────────────────────────────
+
+export function toggleSecondarySidebarViewOp(
+  workspace: Workspace,
+  windowId: string,
+  viewId: string,
+): Workspace {
+  return mapWindow(workspace, windowId, (win) => {
+    const current = win.secondarySidebar?.activeViewId;
+    if (current === viewId) {
+      return { ...win, secondarySidebar: { ...win.secondarySidebar, activeViewId: null } };
+    }
+    return { ...win, secondarySidebar: { ...win.secondarySidebar, activeViewId: viewId } };
+  });
+}
+
+export function setSecondarySidebarViewOp(
+  workspace: Workspace,
+  windowId: string,
+  activeViewId: string | null,
+): Workspace {
+  return mapWindow(workspace, windowId, (win) => ({
+    ...win,
+    secondarySidebar: { ...win.secondarySidebar, activeViewId },
+  }));
+}
+
+export function setSecondarySidebarWidthOp(
+  workspace: Workspace,
+  windowId: string,
+  width: number,
+): Workspace {
+  return mapWindow(workspace, windowId, (win) => ({
+    ...win,
+    secondarySidebar: { ...win.secondarySidebar, width: Math.max(180, Math.min(600, width)) },
+  }));
+}
+
 // ─── Overlay operations ───────────────────────────────────────────────────
 
 export function createOverlay(

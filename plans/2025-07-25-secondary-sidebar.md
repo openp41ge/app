@@ -112,13 +112,13 @@ Update `electron/ipc-handlers/dispatch-handler.ts` (or the operation dispatcher)
 
 ## Completion Criteria
 
-- [ ] Layout model supports secondary sidebar
-- [ ] Secondary sidebar renders on the left side, shrinks grid
-- [ ] Both sidebars can be open simultaneously
-- [ ] Activity bar shows only explorer (projects removed)
-- [ ] Titlebar button toggles secondary sidebar
-- [ ] Cmd+P toggles secondary sidebar
-- [ ] Projects view works in secondary sidebar
+- [x] Layout model supports secondary sidebar
+- [x] Secondary sidebar renders on the left side, shrinks grid
+- [x] Both sidebars can be open simultaneously
+- [x] Activity bar shows only explorer (projects removed)
+- [x] Titlebar button toggles secondary sidebar
+- [x] Cmd+P toggles secondary sidebar
+- [x] Projects view works in secondary sidebar
 - [ ] Minimum window size accounts for both sidebars
-- [ ] All existing tests pass
+- [x] All existing tests pass
 - [ ] `nx build` succeeds

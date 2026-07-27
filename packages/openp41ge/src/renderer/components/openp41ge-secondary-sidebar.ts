@@ -1,15 +1,13 @@
 /**
- * <openp41ge-sidebar> — sidebar panel between the grid and activity bar.
+ * <openp41ge-secondary-sidebar> — sidebar panel on the left side of the grid.
  *
- * Renders the currently active sidebar view panel. Contains a header
- * (view title + close button), a content area for the view, and a
- * left-edge drag handle for resizing.
+ * Mirrors the primary sidebar but lives on the opposite side. Currently
+ * hosts the projects view. Resize handle is on the right edge (drag right
+ * to widen, left to narrow).
  *
  * Architecture (SOLID):
- *   - Single Responsibility: manages the sidebar container, resize,
- *     and view lifecycle
- *   - Communication: listens for "openp41ge:activity-click" events and
- *     dispatches workspace operations to persist state
+ *   - Single Responsibility: manages the sidebar container, resize, and view lifecycle
+ *   - Communication: dispatches workspace operations to persist state
  *   - Width is stored in the layout data model (per-workset)
  */
 
@@ -17,7 +15,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { SidebarView } from "./sidebar-views/sidebar-view";
 import { dispatch } from "../app";
-import { ExplorerSidebarView } from "./sidebar-views/explorer-view";
+import { ProjectSidebarView } from "./sidebar-views/projects-view";
 
 const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 600;
@@ -25,7 +23,7 @@ const GRID_MIN_WIDTH = 200;
 const ACTIVITY_BAR_WIDTH = 48;
 const BORDER_WIDTH = 3;
 
-class Openp41geSidebar extends LitElement {
+class Openp41geSecondarySidebar extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
@@ -51,30 +49,13 @@ class Openp41geSidebar extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    document.addEventListener("openp41ge:activity-click", this._onActivityClick as EventListener);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener(
-      "openp41ge:activity-click",
-      this._onActivityClick as EventListener,
-    );
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
     this._unmountView();
-  }
-
-  willUpdate(changed: Map<string | number | symbol, unknown>): void {
-    if (changed.has("worksetId") && this.worksetId) {
-      // Recreate the view with the new worksetId
-      if (this._view) {
-        const view = this._view as HTMLElement & { setWorksetId?(id: string): void };
-        if (typeof view.setWorksetId === "function") {
-          view.setWorksetId(this.worksetId);
-        }
-      }
-    }
   }
 
   updated(changed: Map<string | number | symbol, unknown>): void {
@@ -93,30 +74,19 @@ class Openp41geSidebar extends LitElement {
     }
   }
 
-  // ═══ Activity click handler ───────────────────────────────────────
-
-  private _onActivityClick = (e: Event): void => {
-    const detail = (e as CustomEvent).detail;
-    if (!detail || !detail.viewId) return;
-    if (!this.windowId) return;
-
-    const viewId = detail.viewId;
-    dispatch("toggleSidebarViewOp", this.windowId, viewId);
-  };
-
   // ═══ View lifecycle ───────────────────────────────────────────────
 
   private _mountView(): void {
     if (!this.activeViewId) return;
     this._unmountView();
 
-    const container = this.querySelector(".sidebar-content") as HTMLElement;
+    const container = this.querySelector(".secondary-sidebar-content") as HTMLElement;
     if (!container) return;
 
     let view: SidebarView | null = null;
 
-    if (this.activeViewId === "explorer") {
-      view = new ExplorerSidebarView(this.worksetId);
+    if (this.activeViewId === "projects") {
+      view = new ProjectSidebarView();
     }
 
     if (view) {
@@ -144,7 +114,7 @@ class Openp41geSidebar extends LitElement {
     document.addEventListener("mouseup", this._onResizeEnd);
 
     // Add dragging class to the resize notch
-    const notch = this.querySelector(".sidebar-resize-notch") as HTMLElement;
+    const notch = this.querySelector(".secondary-sidebar-resize-notch") as HTMLElement;
     if (notch) notch.classList.add("dragging");
   }
 
@@ -155,9 +125,9 @@ class Openp41geSidebar extends LitElement {
 
   private _onResizeMove = (e: MouseEvent): void => {
     if (!this._isResizing) return;
-    // The grid is to the left, sidebar to the right.
-    // Resizing the sidebar left edge means: moving left = wider, moving right = narrower.
-    const dx = this._resizeStartX - e.clientX;
+    // Resize handle is on the right edge.
+    // Moving right = wider, moving left = narrower.
+    const dx = e.clientX - this._resizeStartX;
     const newWidth = Math.max(
       MIN_SIDEBAR_WIDTH,
       Math.min(this._getMaxSidebarWidth(), this._resizeStartWidth + dx),
@@ -172,12 +142,12 @@ class Openp41geSidebar extends LitElement {
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
 
-    const notch = this.querySelector(".sidebar-resize-notch") as HTMLElement;
+    const notch = this.querySelector(".secondary-sidebar-resize-notch") as HTMLElement;
     if (notch) notch.classList.remove("dragging");
 
     // Persist the new width
     if (this.windowId && this.worksetId) {
-      dispatch("setSidebarWidthOp", this.windowId, this.worksetId, this.width);
+      dispatch("setSecondarySidebarWidthOp", this.windowId, this.worksetId, this.width);
     }
   };
 
@@ -188,19 +158,19 @@ class Openp41geSidebar extends LitElement {
 
     return html`
       <div
-        style="display:flex;flex-direction:column;flex:0 1 ${this.width}px;min-width:${MIN_SIDEBAR_WIDTH}px;height:100%;background:var(--bg-gutter);border-left:1px solid var(--border-divider);overflow:hidden;position:relative;"
+        style="display:flex;flex-direction:column;flex:0 1 ${this.width}px;min-width:${MIN_SIDEBAR_WIDTH}px;height:100%;background:var(--bg-gutter);border-right:1px solid var(--border-divider);overflow:hidden;position:relative;"
       >
-        <!-- Resize notch on the left edge -->
+        <!-- Resize notch on the right edge -->
         <div
-          class="sidebar-resize-notch"
-          style="position:absolute;left:0;top:0;width:4px;height:100%;cursor:col-resize;z-index:10;pointer-events:auto;touch-action:none;background:transparent;"
+          class="secondary-sidebar-resize-notch"
+          style="position:absolute;right:0;top:0;width:4px;height:100%;cursor:col-resize;z-index:10;pointer-events:auto;touch-action:none;background:transparent;"
           @mousedown=${this._startResize}
         ></div>
         <style>
-          .sidebar-resize-notch::before {
+          .secondary-sidebar-resize-notch::before {
             content: "";
             position: absolute;
-            left: 0;
+            right: 0;
             top: 0;
             width: 3px;
             height: 100%;
@@ -209,15 +179,15 @@ class Openp41geSidebar extends LitElement {
             transition: opacity 0.12s ease;
             pointer-events: none;
           }
-          .sidebar-resize-notch:hover::before,
-          .sidebar-resize-notch.dragging::before {
+          .secondary-sidebar-resize-notch:hover::before,
+          .secondary-sidebar-resize-notch.dragging::before {
             opacity: 1;
           }
         </style>
 
         <!-- View content area -->
         <div
-          class="sidebar-content"
+          class="secondary-sidebar-content"
           style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;"
         ></div>
       </div>
@@ -225,6 +195,6 @@ class Openp41geSidebar extends LitElement {
   }
 }
 
-customElements.define("openp41ge-sidebar", Openp41geSidebar);
+customElements.define("openp41ge-secondary-sidebar", Openp41geSecondarySidebar);
 
-export { Openp41geSidebar };
+export { Openp41geSecondarySidebar, MIN_SIDEBAR_WIDTH as SECONDARY_SIDEBAR_MIN_WIDTH };

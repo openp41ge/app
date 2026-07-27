@@ -12,6 +12,7 @@
 
 import { createLogger } from "openp41ge-logger";
 import { clearCapturedErrors } from "./error-capture-service";
+import { dispatch } from "../app";
 
 const log = createLogger("project-switch-service");
 
@@ -44,15 +45,13 @@ export async function switchToProject(name: string): Promise<boolean> {
 }
 
 /**
- * Open the Projects sidebar view via the activity bar.
- * Dispatches an activity-click event that the sidebar picks up.
+ * Open the Projects sidebar view in the secondary sidebar.
+ * Dispatches a workspace operation to toggle the secondary sidebar view.
  */
 export function showProjectsSidebar(): void {
-  document.dispatchEvent(
-    new CustomEvent("openp41ge:activity-click", {
-      bubbles: true,
-      composed: true,
-      detail: { viewId: "projects" },
-    }),
-  );
+  dispatch("toggleSecondarySidebarViewOp", getWindowId(), "projects");
+}
+
+function getWindowId(): string {
+  return window.openp41ge?.workspace?.getWindowId?.() ?? "";
 }

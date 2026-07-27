@@ -9,6 +9,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
+import { dispatch } from "../app";
 
 
 const isMac = (() => {
@@ -37,6 +38,12 @@ class Openp41geTitleBar extends LitElement {
     super.disconnectedCallback();
   }
 
+  private _openProjects(): void {
+    const win = this.windowData;
+    if (!win) return;
+    dispatch("toggleSecondarySidebarViewOp", win.id, "projects");
+  }
+
   render(): TemplateResult | typeof nothing {
     const win = this.windowData;
     if (!win) return nothing;
@@ -50,6 +57,25 @@ class Openp41geTitleBar extends LitElement {
 
         <!-- Spacer to push content to the right -->
         <div style="flex:1;min-width:0;"></div>
+
+        <!-- Project name — opens secondary sidebar -->
+        <span
+          title="Projects"
+          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:48px;"
+          @mouseenter=${(e: MouseEvent) => {
+            const el = e.currentTarget as HTMLElement;
+            el.style.color = "var(--text-primary, #e0e0e0)";
+            el.style.background = "var(--hover-bg, #333)";
+          }}
+          @mouseleave=${(e: MouseEvent) => {
+            const el = e.currentTarget as HTMLElement;
+            el.style.color = "var(--text-muted, #888)";
+            el.style.background = "transparent";
+          }}
+          @click=${() => this._openProjects()}
+        >
+          Projects
+        </span>
 
         ${
           isMac

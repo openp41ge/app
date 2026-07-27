@@ -85,12 +85,12 @@ export class RegisterShortcutsStep implements IStartupStep {
           if (!myWindowId) return;
           const win = ws.windows.find((w) => w.id === myWindowId);
           if (!win) return;
-          context.commandBus.dispatch("toggleSidebarViewOp", myWindowId, "projects");
+          context.commandBus.dispatch("toggleSecondarySidebarViewOp", myWindowId, "projects");
         } catch (_err) {
           // ignore
         }
       },
-      description: "Toggle Projects Sidebar",
+      description: "Toggle Projects Secondary Sidebar",
       category: "View",
     });
 
