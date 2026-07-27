@@ -62,15 +62,37 @@ export function registerProjectHandlers(
     return projectStore.reposDir(name);
   });
 
-  /** List repo directories for a given project (top-level dirs under repos/). */
+  /**
+   * List repos for a given project.
+   * Walks the repos directory tree recursively and returns repo paths
+   * relative to the repos dir (e.g. "github.com/owner/repo").
+   */
   ipcMain.handle("project:listRepos", (_event, name: string) => {
     const reposDir = projectStore.reposDir(name);
     try {
       if (!fs.existsSync(reposDir)) return [];
-      return fs.readdirSync(reposDir).filter((entry) => {
-        const fullPath = path.join(reposDir, entry);
-        return fs.statSync(fullPath).isDirectory();
-      });
+
+      const repos: string[] = [];
+      const walk = (dir: string) => {
+        let entries: fs.Dirent[];
+        try {
+          entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+          return;
+        }
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const fullPath = path.join(dir, entry.name);
+          const gitDir = path.join(fullPath, ".git");
+          if (fs.existsSync(gitDir)) {
+            repos.push(path.relative(reposDir, fullPath));
+          }
+          walk(fullPath);
+        }
+      };
+
+      walk(reposDir);
+      return repos.sort();
     } catch {
       return [];
     }
