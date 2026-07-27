@@ -133,9 +133,9 @@ export class ProjectSidebarView implements SidebarView {
       </div>
 
       <!-- Search -->
-      <div style="padding:8px 12px;flex-shrink:0;">
+      <div style="flex-shrink:0;border-bottom:1px solid var(--border-divider);">
         <input id="pv-search" type="text" placeholder="Search projects..." value="${this._escapeHtml(this._searchQuery)}"
-          style="width:100%;box-sizing:border-box;padding:4px 8px;font-size:12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:4px;color:#ddd;outline:none;" />
+          style="width:100%;height:32px;box-sizing:border-box;padding:0 12px;font-size:13px;background:transparent;border:none;border-radius:0;color:#ddd;outline:none;" />
       </div>
 
       <!-- Project list -->
