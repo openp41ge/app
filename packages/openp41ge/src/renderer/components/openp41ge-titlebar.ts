@@ -83,7 +83,7 @@ class Openp41geTitleBar extends LitElement {
         : this._projectName
       : "Openp41ge";
 
-    const title = `Openp41ge — ${displayName}`;
+    const title = displayName;
 
     return html`
       <div
