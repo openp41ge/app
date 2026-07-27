@@ -315,6 +315,42 @@ export class Openp41geProjectPicker extends LitElement {
       font-size: 14px;
     }
 
+    .detail-card .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--openp41ge-muted-text, #888);
+      margin: 20px 0 8px 0;
+    }
+
+    .detail-card .repo-tree {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .detail-card .repo-tree li {
+      padding: 4px 0;
+      font-size: 13px;
+      color: var(--openp41ge-text-color, #e0e0e0);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .detail-card .repo-tree .repo-icon {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      color: var(--openp41ge-accent-color, #4a9eff);
+    }
+
+    .detail-card .repo-tree .loading-text {
+      color: var(--openp41ge-muted-text, #888);
+      font-size: 12px;
+    }
+
     /* ── Empty state ────────────────────────────── */
     .empty-state {
       text-align: center;
@@ -328,6 +364,8 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _filteredProjects: ProjectInfo[] = [];
   @state() private _selectedIndex = 0;
   @state() private _detailProject: ProjectInfo | null = null;
+  @state() private _detailRepos: string[] | null = null;
+  @state() private _loadingRepos = false;
   @state() private _searchText = "";
   @state() private _activeProjectName: string | null = null;
   @state() private _loading = true;
@@ -364,6 +402,13 @@ export class Openp41geProjectPicker extends LitElement {
       const currentProj = projects.find((p) => p.name === currentName);
       if (currentProj) {
         this._detailProject = currentProj;
+        this._loadingRepos = true;
+        window.openp41ge.project.listRepos(currentProj.name).then((repos) => {
+          if (!this._disconnected && this._detailProject?.name === currentProj.name) {
+            this._detailRepos = repos;
+            this._loadingRepos = false;
+          }
+        });
       }
     } catch (err) {
       log.error("Failed to load projects:", err);
@@ -418,8 +463,19 @@ export class Openp41geProjectPicker extends LitElement {
     }
   }
 
-  private _showDetails(project: ProjectInfo): void {
+  private async _showDetails(project: ProjectInfo): Promise<void> {
     this._detailProject = project;
+    this._detailRepos = null;
+    this._loadingRepos = true;
+    try {
+      const repos = await window.openp41ge.project.listRepos(project.name);
+      if (this._disconnected || this._detailProject?.name !== project.name) return;
+      this._detailRepos = repos;
+    } catch (err) {
+      log.error("Failed to load repos:", err);
+    }
+    if (this._disconnected || this._detailProject?.name !== project.name) return;
+    this._loadingRepos = false;
   }
 
   private _scrollToSelected(): void {
@@ -682,6 +738,28 @@ export class Openp41geProjectPicker extends LitElement {
                             </div>
                           `
                         : ""
+                    }
+
+                    <div class="section-title">Repositories</div>
+                    ${
+                      this._loadingRepos
+                        ? html`<div class="loading-text">Loading...</div>`
+                        : this._detailRepos && this._detailRepos.length > 0
+                          ? html`
+                              <ul class="repo-tree">
+                                ${this._detailRepos.map(
+                                  (repo) => html`
+                                    <li>
+                                      <svg class="repo-icon" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                                      </svg>
+                                      ${repo}
+                                    </li>
+                                  `,
+                                )}
+                              </ul>
+                            `
+                          : html`<div class="loading-text">No repositories</div>`
                     }
                   </div>
                 `

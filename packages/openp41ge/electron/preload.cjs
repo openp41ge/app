@@ -483,6 +483,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     delete: (name) => ipcRenderer.invoke("project:delete", name),
     workspaceStatePath: (name) => ipcRenderer.invoke("project:workspaceStatePath", name),
     reposDir: (name) => ipcRenderer.invoke("project:reposDir", name),
+    listRepos: (name) => ipcRenderer.invoke("project:listRepos", name),
     current: () => ipcRenderer.invoke("project:current"),
     switchTo: (name) => ipcRenderer.invoke("project:switch", name),
     saveDraftAs: (draftName, newName) => ipcRenderer.invoke("project:saveDraftAs", draftName, newName),

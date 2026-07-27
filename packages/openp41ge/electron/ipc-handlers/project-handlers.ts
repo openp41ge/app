@@ -11,6 +11,8 @@
  */
 
 import { ipcMain } from "electron";
+import fs from "fs";
+import path from "path";
 import type { WorkspaceStateStore } from "../../src/main/services/workspace-state-store";
 import type { ProjectStore } from "../../src/main/services/project-store";
 import type { OperationDispatcher } from "../../src/main/services/operation-dispatcher";
@@ -58,6 +60,20 @@ export function registerProjectHandlers(
 
   ipcMain.handle("project:reposDir", (_event, name: string) => {
     return projectStore.reposDir(name);
+  });
+
+  /** List repo directories for a given project (top-level dirs under repos/). */
+  ipcMain.handle("project:listRepos", (_event, name: string) => {
+    const reposDir = projectStore.reposDir(name);
+    try {
+      if (!fs.existsSync(reposDir)) return [];
+      return fs.readdirSync(reposDir).filter((entry) => {
+        const fullPath = path.join(reposDir, entry);
+        return fs.statSync(fullPath).isDirectory();
+      });
+    } catch {
+      return [];
+    }
   });
 
   ipcMain.handle("project:current", () => {
