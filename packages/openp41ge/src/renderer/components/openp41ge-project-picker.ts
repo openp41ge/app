@@ -508,6 +508,11 @@ export class Openp41geProjectPicker extends LitElement {
       padding: 40px 16px;
       font-size: 13px;
     }
+
+    @keyframes spinner-rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
   `;
 
   @state() private _projects: ProjectInfo[] = [];
@@ -522,6 +527,8 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _renameValue = "";
   @state() private _addingRepo = false;
   @state() private _repoUrl = "";
+  @state() private _cloning = false;
+  @state() private _clonePercent = 0;
   @state() private _loading = true;
   private _disconnected = false;
 
@@ -829,11 +836,16 @@ export class Openp41geProjectPicker extends LitElement {
       log.warn("Invalid URL format");
       return;
     }
-    this._addingRepo = false;
+    this._cloning = true;
+    this._clonePercent = 0;
     this._repoUrl = "";
     try {
       const session = window.openp41ge.workspaceController.clone(url);
+      session.onProgress((progress: { percent: number; message: string }) => {
+        this._clonePercent = progress.percent;
+      });
       const result = await session.promise;
+      this._cloning = false;
       if (result.success) {
         log.info(`Repository cloned from ${url}`);
         // Reload repos in the detail panel
@@ -852,7 +864,13 @@ export class Openp41geProjectPicker extends LitElement {
       }
     } catch (err) {
       log.error("Clone failed:", err);
+      this._cloning = false;
     }
+  }
+
+  private _cancelClone(): void {
+    this._cloning = false;
+    this._clonePercent = 0;
   }
 
   private _cancelAddRepo(): void {
@@ -1230,46 +1248,60 @@ export class Openp41geProjectPicker extends LitElement {
 
                     <div class="add-repo-row">
                       ${
-                        this._addingRepo
+                        this._cloning
                           ? html`
-                              <div style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);outline:2px solid var(--openp41ge-accent-color,#4a9eff);outline-offset:-2px;">
-                                <input
-                                  class="add-repo-input"
-                                  type="text"
-                                  placeholder="git clone URL"
-                                  .value=${this._repoUrl}
-                                  @input=${(e: Event) => { this._repoUrl = (e.target as HTMLInputElement).value; }}
-                                  @keydown=${this._onRepoUrlKeydown}
-                                  style="flex:1;min-width:0;height:24px;background:transparent;border:none;color:var(--openp41ge-text-color,#e0e0e0);font-size:12px;outline:none;font-family:inherit;"
-                                />
-                                <span
-                                  style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;margin-left:4px;color:var(--openp41ge-accent-color,#4a9eff);"
-                                  @click=${this._confirmAddRepo}
-                                  @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(74,158,255,0.12)"; }}
-                                  @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                                  title="Confirm"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,8 7,11 12,4"/></svg>
-                                </span>
+                              <div style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);font-size:12px;color:var(--openp41ge-muted-text,#888);gap:8px;">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="animation:spinner-rotate 0.8s linear infinite;">
+                                  <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/>
+                                </svg>
+                                <span style="flex:1;">Cloning... ${this._clonePercent > 0 ? html`${this._clonePercent}%` : ""}</span>
                                 <span
                                   style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--openp41ge-muted-text,#888);"
-                                  @click=${this._cancelAddRepo}
-                                  @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
-                                  @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                  @click=${this._cancelClone}
                                   title="Cancel"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
-                                </span>
+                                >✕</span>
                               </div>
                             `
-                          : html`
-                              <div class="add-repo-btn" tabindex="0" @click=${this._startAddRepo} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.stopPropagation(); this._startAddRepo(); } }}>
-                                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-left:4px;position:relative;top:0;">
-                                  <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
-                                </svg>
-                                add repository
-                              </div>
-                            `
+                          : this._addingRepo
+                            ? html`
+                                <div style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);outline:2px solid var(--openp41ge-accent-color,#4a9eff);outline-offset:-2px;">
+                                  <input
+                                    class="add-repo-input"
+                                    type="text"
+                                    placeholder="git clone URL"
+                                    .value=${this._repoUrl}
+                                    @input=${(e: Event) => { this._repoUrl = (e.target as HTMLInputElement).value; }}
+                                    @keydown=${this._onRepoUrlKeydown}
+                                    style="flex:1;min-width:0;height:24px;background:transparent;border:none;color:var(--openp41ge-text-color,#e0e0e0);font-size:12px;outline:none;font-family:inherit;"
+                                  />
+                                  <span
+                                    style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;margin-left:4px;color:var(--openp41ge-accent-color,#4a9eff);"
+                                    @click=${this._confirmAddRepo}
+                                    @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(74,158,255,0.12)"; }}
+                                    @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                    title="Confirm"
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,8 7,11 12,4"/></svg>
+                                  </span>
+                                  <span
+                                    style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--openp41ge-muted-text,#888);"
+                                    @click=${this._cancelAddRepo}
+                                    @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+                                    @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                    title="Cancel"
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+                                  </span>
+                                </div>
+                              `
+                            : html`
+                                <div class="add-repo-btn" tabindex="0" @click=${this._startAddRepo} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.stopPropagation(); this._startAddRepo(); } }}>
+                                  <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-left:4px;position:relative;top:0;">
+                                    <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+                                  </svg>
+                                  add repository
+                                </div>
+                              `
                       }
                     </div>
                   </div>
