@@ -31,7 +31,7 @@ export class ProjectSidebarView implements SidebarView {
   private _projects: ProjectEntry[] = [];
   private _filtered: ProjectEntry[] = [];
   private _searchQuery = "";
-  private _selectedIndex = 0;
+
   private _disconnected = false;
   private _projectChangedHandler: (() => void) | null = null;
 
@@ -111,9 +111,6 @@ export class ProjectSidebarView implements SidebarView {
     this._filtered = q
       ? this._projects.filter((p) => p.name.toLowerCase().includes(q))
       : [...this._projects];
-    if (this._selectedIndex >= this._filtered.length) {
-      this._selectedIndex = Math.max(0, this._filtered.length - 1);
-    }
     this._render();
   }
 
@@ -127,7 +124,6 @@ export class ProjectSidebarView implements SidebarView {
     el.innerHTML = `
       <style>
         .pv-item:hover { background: rgba(255,255,255,0.04); }
-        .pv-item.pv-selected:hover { background: rgba(74,158,255,0.12); }
       </style>
       <!-- Header -->
       <div style="display:flex;align-items:center;height:36px;padding:0 12px;border-bottom:1px solid var(--border-divider);flex-shrink:0;">
@@ -146,10 +142,8 @@ export class ProjectSidebarView implements SidebarView {
         ${this._filtered
           .map(
             (p, i) => `
-          <div class="pv-item ${i === this._selectedIndex ? "pv-selected" : ""}" data-index="${i}"
-            style="display:flex;align-items:center;height:32px;padding:0 12px;cursor:pointer;font-size:13px;gap:6px;
-              ${i === this._selectedIndex ? "background:rgba(74,158,255,0.12);" : ""}
-              ${p.name === currentName ? "color:#4a9eff;" : "color:#ccc;"}">
+          <div class="pv-item" data-index="${i}"
+            style="display:flex;align-items:center;height:32px;padding:0 12px;cursor:pointer;font-size:13px;gap:6px;${p.name === currentName ? "color:#4a9eff;" : "color:#ccc;"}">
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this._escapeHtml(p.name)}</span>
             ${p.name === currentName ? '<span style="font-size:10px;padding:1px 4px;border-radius:3px;background:rgba(74,158,255,0.15);color:#4a9eff;">active</span>' : ""}
             ${p.isDraft ? '<span style="font-size:10px;color:#888;">draft</span>' : ""}
@@ -179,7 +173,7 @@ export class ProjectSidebarView implements SidebarView {
       searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          const p = this._filtered[this._selectedIndex];
+          const p = this._filtered[0];
           if (p) this._openProject(p.name);
         }
       });
@@ -193,7 +187,6 @@ export class ProjectSidebarView implements SidebarView {
         if (item) {
           const idx = parseInt(item.dataset.index ?? "-1");
           if (idx >= 0 && idx < this._filtered.length) {
-            this._selectedIndex = idx;
             this._openProject(this._filtered[idx].name);
           }
         }
@@ -202,7 +195,7 @@ export class ProjectSidebarView implements SidebarView {
       list.addEventListener("keydown", (e: KeyboardEvent) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          const p = this._filtered[this._selectedIndex];
+          const p = this._filtered[0];
           if (p) this._openProject(p.name);
         }
       });
@@ -222,17 +215,6 @@ export class ProjectSidebarView implements SidebarView {
     const newBtn = el.querySelector("#pv-new-btn");
     if (newBtn) {
       newBtn.addEventListener("click", () => this._createNewProject());
-    }
-  }
-
-  private _scrollToSelected(): void {
-    const el = this._element;
-    if (!el) return;
-    const list = el.querySelector("#pv-list") as HTMLElement | null;
-    if (!list) return;
-    const item = list.querySelector(`[data-index="${this._selectedIndex}"]`) as HTMLElement | null;
-    if (item) {
-      item.scrollIntoView({ block: "nearest" });
     }
   }
 
