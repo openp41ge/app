@@ -1270,7 +1270,7 @@ export class Openp41geProjectPicker extends LitElement {
                                 ${this._detailRepos.map(
                                   (repo, idx) => html`
                                     ${this._detailReposDropIndex === idx
-                                      ? html`<li style="height:2px;background:#4a9eff;list-style:none;margin:0;padding:0;"></li>`
+                                      ? html`<li style="height:2px;background:#4a9eff;list-style:none;margin:3px 0;padding:0;"></li>`
                                       : nothing}
                                     <li class="repo-group">
                                       <div class="repo-header"
@@ -1310,7 +1310,7 @@ export class Openp41geProjectPicker extends LitElement {
                                   `,
                                 )}
                               ${this._detailReposDropIndex === (this._detailRepos?.length ?? 0)
-                                ? html`<li style="height:2px;background:#4a9eff;list-style:none;margin:0;padding:0;"></li>`
+                                ? html`<li style="height:2px;background:#4a9eff;list-style:none;margin:3px 0;padding:0;"></li>`
                                 : nothing}
                               </ul>
                             `
