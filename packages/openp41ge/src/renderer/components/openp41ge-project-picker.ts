@@ -559,9 +559,9 @@ export class Openp41geProjectPicker extends LitElement {
       this._projects = projects;
       this._activeProjectName = currentName;
       this._applyFilter();
-      // Highlight the currently active project, or first if none matches
+      // Highlight the currently active project, or none if no active project
       const currentIdx = projects.findIndex((p) => p.name === currentName);
-      this._selectedIndex = currentIdx >= 0 ? currentIdx : 0;
+      this._selectedIndex = currentIdx >= 0 ? currentIdx : -1;
       // Show current project details by default
       const currentProj = projects.find((p) => p.name === currentName);
       if (currentProj) {
@@ -716,7 +716,7 @@ export class Openp41geProjectPicker extends LitElement {
   private _clearSearch(): void {
     this._searchText = "";
     this._applyFilter();
-    this._selectedIndex = 0;
+    this._selectedIndex = this._activeProjectName ? 0 : -1;
   }
 
   private async _createAndSelect(name: string): Promise<void> {
@@ -797,6 +797,7 @@ export class Openp41geProjectPicker extends LitElement {
       // If the deleted project was active, switch back to a draft
       if (name === this._activeProjectName) {
         this._activeProjectName = null;
+        this._selectedIndex = -1;
         window.__openp41geProjectName = undefined;
         await window.openp41ge.project.createDraft();
         document.dispatchEvent(new CustomEvent("project:changed", { bubbles: true, detail: { name: null } }));
@@ -980,7 +981,7 @@ export class Openp41geProjectPicker extends LitElement {
     const input = e.target as HTMLInputElement;
     this._searchText = input.value;
     this._applyFilter();
-    this._selectedIndex = 0;
+    this._selectedIndex = this._activeProjectName ? 0 : -1;
   }
 
   private _formatDate(iso: string): string {
