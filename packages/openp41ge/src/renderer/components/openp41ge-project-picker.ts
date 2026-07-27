@@ -185,37 +185,25 @@ export class Openp41geProjectPicker extends LitElement {
       color: #e5c07b;
     }
 
-    .project-item .action-btn {
+    .project-item .delete-btn {
       visibility: hidden;
       background: none;
       border: none;
       color: var(--openp41ge-muted-text, #888);
-      font-size: 14px;
+      font-size: 16px;
       line-height: 1;
       cursor: pointer;
-      padding: 2px 5px;
+      padding: 2px 6px;
       border-radius: 3px;
       transition:
         color 0.1s,
         background 0.1s;
       user-select: none;
       flex-shrink: 0;
-      margin-left: 2px;
     }
 
-    .project-item:hover .action-btn {
+    .project-item:hover .delete-btn {
       visibility: visible;
-    }
-
-    .project-item .info-btn:hover {
-      color: var(--openp41ge-accent-color, #4a9eff);
-      background: rgba(74, 158, 255, 0.12);
-    }
-
-    .project-item .info-btn.active-info {
-      visibility: visible;
-      color: var(--openp41ge-accent-color, #4a9eff);
-      background: rgba(74, 158, 255, 0.12);
     }
 
     .project-item .delete-btn:hover {
@@ -354,6 +342,11 @@ export class Openp41geProjectPicker extends LitElement {
       // Highlight the currently active project, or first if none matches
       const currentIdx = projects.findIndex((p) => p.name === currentName);
       this._selectedIndex = currentIdx >= 0 ? currentIdx : 0;
+      // Show current project details by default
+      const currentProj = projects.find((p) => p.name === currentName);
+      if (currentProj) {
+        this._detailProject = currentProj;
+      }
     } catch (err) {
       log.error("Failed to load projects:", err);
     }
@@ -595,7 +588,7 @@ export class Openp41geProjectPicker extends LitElement {
                           return html`
                             <div
                               class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
-                              @click=${() => this._selectProject(project.name)}
+                              @click=${(e: Event) => { e.stopPropagation(); this._showDetails(project); }}
                             >
                               <span class="name">
                                 <svg
@@ -619,14 +612,7 @@ export class Openp41geProjectPicker extends LitElement {
                               </span>
                               ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
                               <button
-                                class="action-btn info-btn ${this._detailProject?.name === project.name ? "active-info" : ""}"
-                                title="Show project details"
-                                @click=${(e: Event) => { e.stopPropagation(); this._showDetails(project); }}
-                              >
-                                ℹ
-                              </button>
-                              <button
-                                class="action-btn delete-btn"
+                                class="delete-btn"
                                 title="Delete project"
                                 @click=${(e: Event) => this._deleteProject(e, project.name)}
                               >
@@ -675,7 +661,7 @@ export class Openp41geProjectPicker extends LitElement {
               : html`
                   <div class="empty-hint">
                     ${this._projects.length > 0
-                      ? "Click ℹ on a project to see details"
+                      ? "Click a project to see details"
                       : ""}
                   </div>
                 `
