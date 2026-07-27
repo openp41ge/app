@@ -926,7 +926,7 @@ export class Openp41geProjectPicker extends LitElement {
                                   .value=${this._renameValue}
                                   @input=${this._onRenameInput}
                                   @keydown=${this._onRenameKeyDown}
-                                  style="flex:1;border:none;outline:none;background:transparent;color:var(--openp41ge-text-color,#e0e0e0);font-size:20px;font-weight:600;font-family:inherit;padding:4px 0 4px 3px;margin:-3px 0;"
+                                  style="flex:1;border:none;outline:none;background:transparent;color:var(--openp41ge-text-color,#e0e0e0);font-size:20px;font-weight:600;font-family:inherit;line-height:1.2;padding:4px 0 4px 3px;margin:-3px 0;"
                                 />
                                 <button
                                   title="Confirm"
@@ -956,7 +956,7 @@ export class Openp41geProjectPicker extends LitElement {
                                 @click=${this._startRename}
                                 title="Rename project"
                               >
-                                <h2 style="margin:0;font-size:20px;font-weight:600;color:var(--openp41ge-text-color,#e0e0e0);">${this._detailProject.name}</h2>
+                                <h2 style="margin:0;font-size:20px;font-weight:600;line-height:1.2;color:var(--openp41ge-text-color,#e0e0e0);">${this._detailProject.name}</h2>
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--openp41ge-muted-text,#888)" style="flex-shrink:0;">
                                   <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25a1.75 1.75 0 0 1 .445-.758l8.61-8.61zm1.414 1.06a.25.25 0 0 0-.354 0L3.245 11.315a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l8.61-8.61a.25.25 0 0 0 0-.353l-1.086-1.086z"/>
                                 </svg>
