@@ -645,7 +645,7 @@ export class Openp41geProjectPicker extends LitElement {
                       <h2>${this._detailProject.name}</h2>
                       <button class="switch-btn" @click=${() => this._selectProject(this._detailProject!.name)}>
                         Switch to Project
-                        <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor" style="vertical-align:middle;margin-left:4px;"><path d="m320-160-56-57 103-103H80v-80h287L264-503l56-57 200 200-200 200Zm320-240L440-600l200-200 56 57-103 103h287v80H593l103 103-56 57Z"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor" style="vertical-align:middle;margin-left:4px;"><path d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"/></svg>
                       </button>
                     </div>
                     ${
