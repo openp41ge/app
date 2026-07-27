@@ -165,6 +165,9 @@ class Openp41geWorktreeTree extends LitElement {
   // ── Git panel state ───────────────────────────────────────────────────────
   private _gitDisconnected = false;
   private _repoDropHandler: ((e: Event) => void) | null = null;
+  private _onProjectChanged = (): void => {
+    this._loadRepos();
+  };
   private _loading = true;
   private _errorMessage = "";
   private _errorRetry: (() => void) | null = null;
@@ -281,6 +284,9 @@ class Openp41geWorktreeTree extends LitElement {
       },
     );
 
+    // Reload when the project is switched (e.g. via project picker)
+    document.addEventListener("project:changed", this._onProjectChanged);
+
     // Listen for repo drops from file-tree drag-and-drop
     this._repoDropHandler = (e: Event) => {
       if (e.target !== document) return; // Only handle events dispatched on document
@@ -310,6 +316,7 @@ class Openp41geWorktreeTree extends LitElement {
       this._openp41geRepoUnsub();
       this._openp41geRepoUnsub = null;
     }
+    document.removeEventListener("project:changed", this._onProjectChanged);
     if (this._repoDropHandler) {
       document.removeEventListener("repo-open-git", this._repoDropHandler);
       this._repoDropHandler = null;
