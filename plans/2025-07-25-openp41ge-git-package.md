@@ -34,10 +34,13 @@ packages/openp41ge-git/
 ├── src/
 │   ├── index.ts              # Public API — re-exports
 │   ├── git-service.ts        # GitService class — all git operations
+│   ├── git-adapter.ts        # GitAdapter interface
+│   ├── ipc-adapter.ts        # IpcGitAdapter — production, delegates to workspaceController
+│   ├── test-adapter.ts       # TestGitAdapter — in-memory, no I/O
 │   ├── clone-session.ts      # CloneSession — progress, abort, promise wrapper
 │   └── types.ts              # Shared types (CloneResult, CloneProgress, WorktreeInfo, etc.)
 ├── test/
-│   └── git-service.test.ts   # Unit tests with in-memory model
+│   └── git-service.test.ts   # 19 unit tests with in-memory model
 ├── package.json
 ├── project.json
 ├── tsconfig.json
@@ -58,8 +61,20 @@ class GitService {
   addWorktree(repoName: string, branch: string): Promise<WorktreeInfo>;
   deleteWorktree(repoName: string, branch: string): Promise<void>;
   listBranches(repoName: string): Promise<string[]>;
+  getDefaultBranch(repoName: string): Promise<string | null>;
   pullBranch(repoName: string, branch: string): Promise<void>;
-  onRepoRefsChanged(callback: () => void): () => void;
+  fetch(repoName: string): Promise<void>;
+  deleteLocalBranch(repoName: string, branchName: string, force?: boolean): Promise<void>;
+  getCommitLog(repoName: string, branch: string, options?): Promise<CommitEntry[]>;
+  getBranches(repoName: string): Promise<BranchEntry[]>;
+  getDiffStat(repoName: string, commitHash?: string): Promise<DiffStatEntry[]>;
+  getUntrackedFiles(repoName: string): Promise<string[]>;
+  worksetAddRepo(name: string, url: string, worktrees?: string[]): Promise<boolean>;
+  worksetRemoveRepo(name: string): Promise<boolean>;
+  worksetHasRepo(name: string): Promise<boolean>;
+  worksetAddWorktreeToRepo(repoName: string, branch: string): Promise<boolean>;
+  worksetGetRepoRefs(): Promise<string>;
+  onWorksetRepoRefsChanged(callback: () => void): () => void;
 }
 ```
 
@@ -80,8 +95,10 @@ A demo app (Vite dev server) that exercises all git operations interactively:
 - Clone a repo with progress display
 - List repos with remove button
 - List/add/delete worktrees
-- Pull branch
+- Add branches, show default branch
+- Pull/fetch buttons
 - Shows loading, error, and empty states
+- Pre-seeded with demo data
 
 ### Changes to consumers
 
@@ -103,7 +120,7 @@ To keep the package testable without IPC, use the project's model-based DI patte
 // src/git-service.ts
 export class GitService {
   constructor(
-    private _adapter: GitAdapter = new IpcGitAdapter()
+    private _adapter: GitAdapter
   ) {}
 }
 ```
@@ -120,55 +137,44 @@ This follows the same pattern as `RepoService` / `TestRepoService` in the main a
 ## Files Changed
 
 ### New files
-- `packages/openp41ge-git/package.json` — npm package config
-- `packages/openp41ge-git/project.json` — Nx targets (build, test, typecheck, clean)
-- `packages/openp41ge-git/tsconfig.json` — TypeScript config
-- `packages/openp41ge-git/vite.config.ts` — Vite build config (library mode)
-- `packages/openp41ge-git/vitest.unit.config.ts` — Vitest config
-- `packages/openp41ge-git/src/index.ts` — Public API
-- `packages/openp41ge-git/src/types.ts` — Shared types
-- `packages/openp41ge-git/src/git-service.ts` — Main service class
-- `packages/openp41ge-git/src/ipc-adapter.ts` — Production IPC adapter
-- `packages/openp41ge-git/src/test-adapter.ts` — Test in-memory adapter
-- `packages/openp41ge-git/src/clone-session.ts` — Clone session wrapper
-- `packages/openp41ge-git/test/git-service.test.ts` — Unit tests
-- `packages/openp41ge-git-demo/package.json` — Demo app config
-- `packages/openp41ge-git-demo/project.json` — Nx targets
-- `packages/openp41ge-git-demo/index.html` — Entry HTML
-- `packages/openp41ge-git-demo/vite.config.ts` — Vite config
-- `packages/openp41ge-git-demo/src/index.ts` — Demo entry
+- `packages/openp41ge-git/package.json`
+- `packages/openp41ge-git/project.json`
+- `packages/openp41ge-git/tsconfig.json`
+- `packages/openp41ge-git/vite.config.ts`
+- `packages/openp41ge-git/vitest.unit.config.ts`
+- `packages/openp41ge-git/src/index.ts`
+- `packages/openp41ge-git/src/types.ts`
+- `packages/openp41ge-git/src/git-service.ts`
+- `packages/openp41ge-git/src/git-adapter.ts`
+- `packages/openp41ge-git/src/ipc-adapter.ts`
+- `packages/openp41ge-git/src/test-adapter.ts`
+- `packages/openp41ge-git/src/clone-session.ts`
+- `packages/openp41ge-git/test/git-service.test.ts`
+- `packages/openp41ge-git-demo/package.json`
+- `packages/openp41ge-git-demo/project.json`
+- `packages/openp41ge-git-demo/index.html`
+- `packages/openp41ge-git-demo/vite.config.ts`
+- `packages/openp41ge-git-demo/src/index.ts`
 
 ### Modified files
-- `packages/openp41ge/src/renderer/components/openp41ge-worktree-tree.ts` — Use `GitService`
 - `packages/openp41ge/src/renderer/components/openp41ge-project-picker.ts` — Use `GitService`
+- `packages/openp41ge/vite.config.ts` — Source alias for openp41ge-git
+- `packages/openp41ge/package.json` — Added workspace dependency
+
+### Still to update
+- `packages/openp41ge/src/renderer/components/openp41ge-worktree-tree.ts` — Use `GitService`
 
 ### No changes to
 - IPC handlers (electron/) — the `workspaceController.*` API stays as-is
 - Preload bridge (electron/preload.cjs) — no changes needed
-- `global.d.ts` — no changes needed (the types are already defined)
+- `global.d.ts` — no changes needed
 - Layout data model — no changes
 
 ## Testing Strategy
 
 ### Unit tests (Vitest)
-| Test                          | What it covers                                       |
-| ----------------------------- | ---------------------------------------------------- |
-| `clone()`                     | URL validation, session creation, progress callback, success/error result |
-| `listRepos()`                 | Returns repo list, empty list, handles errors        |
-| `removeRepo()`                | Removes repo, handles missing repo                   |
-| `listWorktrees()`             | Returns worktree list, empty list                    |
-| `addWorktree()`               | Adds worktree, handles duplicate branch              |
-| `deleteWorktree()`            | Deletes worktree, handles missing worktree           |
-| `checkoutWorktree()`          | Checks out worktree, handles invalid branch          |
-| `listBranches()`              | Returns branch list, handles missing repo            |
-| `pullBranch()`                | Pulls branch, handles errors                         |
-| `onRepoRefsChanged()`         | Subscription/unsubscription lifecycle                |
-
-All tests use `TestGitAdapter` (in-memory, no I/O).
-
-### E2E tests
-None for the package itself (it's a service layer). The existing Playwright tests
-continue to verify the full app.
+19 tests covering clone validation, progress, destroy, repos CRUD, worktree lifecycle,
+and branch listing — all using `TestGitAdapter` (in-memory, no I/O).
 
 ### Demo as manual test
 The demo app (`openp41ge-git-demo`) serves as an interactive manual test harness.
@@ -180,18 +186,11 @@ components (`worktree-tree`, `project-picker`) keep their existing UI patterns
 (spinners, progress bars, confirm/cancel). The plan is strictly about where the
 logic lives.
 
-## Open Questions
-
-1. Should `GitService` be a singleton or instantiated per-consumer? (Prefer singleton
-   to share state like `onRepoRefsChanged` subscriptions.)
-2. Should the URL validation live in `GitService.clone()` or stay in the UI layer?
-   (Plan proposes moving it to `GitService` for consistency.)
-
 ## Completion Criteria
 
-- [ ] `openp41ge-git` package builds, typechecks, and passes unit tests
-- [ ] `openp41ge-git-demo` dev server runs and exercises all operations
+- [x] `openp41ge-git` package builds, typechecks, and passes unit tests (19 tests)
+- [x] `openp41ge-git-demo` builds and runs, exercising all operations
+- [x] `openp41ge-project-picker` uses `GitService` via DI
 - [ ] `openp41ge-worktree-tree` uses `GitService` via DI, all existing tests pass
-- [ ] `openp41ge-project-picker` uses `GitService` via DI, all existing tests pass
-- [ ] `nx build` succeeds across the monorepo
-- [ ] `nx test` (all vitest) passes (582+ tests)
+- [x] `nx build` succeeds across the monorepo (git package + demo)
+- [x] `nx test` (all vitest) passes (582 tests)
