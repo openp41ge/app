@@ -57,7 +57,7 @@ export class Openp41geProjectPicker extends LitElement {
     .topbar {
       display: flex;
       align-items: center;
-      height: 42px;
+      height: 35px;
       background: var(--bg-gutter, #252526);
       border-bottom: 1px solid var(--border-divider, #333);
       flex-shrink: 0;
