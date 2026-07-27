@@ -159,6 +159,7 @@ declare global {
         saveDraftAs: (draftName: string, newName: string) => Promise<boolean>;
         isDraft: (name: string) => Promise<boolean>;
         gcDrafts: () => Promise<number>;
+        rename: (oldName: string, newName: string) => Promise<boolean>;
         /** Register callback for File > Save Project As... menu item. Returns unsubscribe. */
         onShowSaveDraftDialog: (callback: () => void) => () => void;
         /** Register callback for File > Open Project... menu item. Returns unsubscribe. */

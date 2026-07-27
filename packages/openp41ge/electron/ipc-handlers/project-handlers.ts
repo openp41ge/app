@@ -157,6 +157,10 @@ export function registerProjectHandlers(
     return projectStore.gcDrafts();
   });
 
+  ipcMain.handle("project:rename", async (_event, oldName: string, newName: string) => {
+    return projectStore.rename(oldName, newName);
+  });
+
   /**
    * Switch the current project — called from the renderer project picker.
    * Loads the project's workspace state into the dispatcher, updates the

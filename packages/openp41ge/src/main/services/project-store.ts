@@ -140,6 +140,35 @@ export class ProjectStore {
     }
   }
 
+  /** Rename a project. Returns true on success, false if oldName doesn't exist or newName conflicts. */
+  rename(oldName: string, newName: string): boolean {
+    try {
+      if (!this.exists(oldName)) {
+        log.warn(`Cannot rename "${oldName}": doesn't exist`);
+        return false;
+      }
+      if (oldName === newName) return true;
+      if (this.exists(newName)) {
+        log.warn(`Cannot rename "${oldName}" to "${newName}": already exists`);
+        return false;
+      }
+      const oldDir = this.projectDir(oldName);
+      const newDir = this.projectDir(newName);
+      fs.renameSync(oldDir, newDir);
+      const config = this.readConfig(newName);
+      if (config) {
+        config.name = newName;
+        config.updatedAt = new Date().toISOString();
+        fs.writeFileSync(this.configPath(newName), JSON.stringify(config, null, 2), "utf-8");
+      }
+      log.info(`Project "${oldName}" renamed to "${newName}"`);
+      return true;
+    } catch (err) {
+      log.error(`Failed to rename "${oldName}" to "${newName}":`, err);
+      return false;
+    }
+  }
+
   // ── Draft project support ──────────────────────────────────────────
 
   /** Create a draft project with a unique name. Returns the draft project name. */
