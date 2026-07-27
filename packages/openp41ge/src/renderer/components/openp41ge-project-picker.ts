@@ -862,7 +862,9 @@ export class Openp41geProjectPicker extends LitElement {
                           ? html`
                               <div
                                 class="project-item create-item ${this._selectedIndex === 0 ? "selected" : ""}"
+                                tabindex="0"
                                 @click=${() => this._createAndSelect(this._searchText.trim())}
+                                @focus=${() => { this._selectedIndex = 0; this._scrollToSelected(); }}
 
                               >
                                 <span class="name">
@@ -894,7 +896,9 @@ export class Openp41geProjectPicker extends LitElement {
                           return html`
                             <div
                               class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
+                              tabindex="0"
                               @click=${(e: Event) => { e.stopPropagation(); this._showDetails(project); }}
+                              @focus=${() => { this._selectedIndex = idx; this._scrollToSelected(); }}
                             >
                               <span class="name">
                                 <svg
@@ -995,7 +999,7 @@ export class Openp41geProjectPicker extends LitElement {
                                 <button
                                   class="detail-delete-btn"
                                   title="Delete project"
-                                  @click=${(e: Event) => this._deleteProject(e, this._detailProject!.name)}
+                                @click=${(e: Event) => this._deleteProject(e, this._detailProject!.name)}
                                 >
                                   <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path d="M2 4a1 1 0 0 1 1-1h2.5a1 1 0 0 1 .8-.4h3.4a1 1 0 0 1 .8.4H13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1-1-1V4zm2 1v7a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V5H4zm-1-1h10V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/></svg>
                                 </button>
