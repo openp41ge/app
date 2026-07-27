@@ -6,7 +6,7 @@
  * Manages its own TabBarDropTarget internally.
  */
 
-import { LitElement, html } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { property } from "lit/decorators.js";
 import { TabBarDropTarget } from "../targets/tab-bar-drop-target";
 import { getDropIndexInBar } from "../boundary";
@@ -247,6 +247,7 @@ export class TabBar extends LitElement {
   // ── Render ────────────────────────────────────────────────────────────
 
   render() {
+    if (this.tabIds.length === 0) return nothing;
     return html`
       <style>
         .tab-close {
