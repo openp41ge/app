@@ -17,6 +17,7 @@ import { createLogger } from "openp41ge-logger";
 const log = createLogger("bootstrap:register-shortcuts");
 
 import { showCloneDialog } from "../../components/openp41ge-worktree-controller";
+import { showProjectPicker } from "../../services/project-switch-service";
 
 export class RegisterShortcutsStep implements IStartupStep {
   readonly name = "register-shortcuts";
@@ -61,15 +62,13 @@ export class RegisterShortcutsStep implements IStartupStep {
       code: "KeyP",
       handler: () => {
         try {
-          // handlePinTab — pin/unpin tab
-          // This is a placeholder for the pin tab feature
-          log.warn("Pin tab shortcut triggered but not yet implemented");
+          showProjectPicker();
         } catch (err) {
-          log.warn("Pin tab handler error:", err);
+          log.warn("Project picker handler error:", err);
         }
       },
-      description: "Pin / Unpin Tab",
-      category: "Tab",
+      description: "Open Project Switcher",
+      category: "Project",
     });
 
     // ── Pane ────────────────────────────────────────────────────────
