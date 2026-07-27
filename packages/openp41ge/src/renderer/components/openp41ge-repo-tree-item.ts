@@ -438,7 +438,7 @@ export class Openp41geRepoTreeItem extends LitElement {
           <!-- Inner wrapper: receives all pointer events, click/drag/contextmenu -->
           <div
             draggable="true"
-            style="pointer-events:auto;display:flex;align-items:center;height:30px;padding:0 8px 0 4px;cursor:pointer;font-size:12px;color:#ccc;gap:4px;"
+            style="pointer-events:auto;display:flex;align-items:center;height:30px;padding:0 8px 0 12px;cursor:pointer;font-size:12px;color:#ccc;gap:4px;"
             @mouseenter=${(e: MouseEvent) => {
               (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.08)";
             }}
@@ -466,15 +466,6 @@ export class Openp41geRepoTreeItem extends LitElement {
               );
             }}
           >
-            <!-- Drag grip -->
-            <span
-              style="width:16px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#555;cursor:grab;"
-              title="Drag to reorder"
-            >
-              <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor">
-                <path d="M360-160q-33 0-56.5-23.5T280-240q0-33 23.5-56.5T360-320q33 0 56.5 23.5T440-240q0 33-23.5 56.5T360-160Zm240 0q-33 0-56.5-23.5T520-240q0-33 23.5-56.5T600-320q33 0 56.5 23.5T680-240q0 33-23.5 56.5T600-160ZM360-400q-33 0-56.5-23.5T280-480q0-33 23.5-56.5T360-560q33 0 56.5 23.5T440-480q0 33-23.5 56.5T360-400Zm240 0q-33 0-56.5-23.5T520-480q0-33 23.5-56.5T600-560q33 0 56.5 23.5T680-480q0 33-23.5 56.5T600-400ZM360-640q-33 0-56.5-23.5T280-720q0-33 23.5-56.5T360-800q33 0 56.5 23.5T440-720q0 33-23.5 56.5T360-640Zm240 0q-33 0-56.5-23.5T520-720q0-33 23.5-56.5T600-800q33 0 56.5 23.5T680-720q0 33-23.5 56.5T600-640Z"/>
-              </svg>
-            </span>
             <span style="color:#8a8a8a;font-size:10px;width:10px;"
               >${this._expanded ? "\u25BC" : "\u25B6"}</span
             >

@@ -22,7 +22,7 @@
  *   CustomEvent('project:dismissed') — when Escape is pressed or close clicked
  */
 
-import { LitElement, html, css, type TemplateResult } from "lit";
+import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
 import { GitService, IpcGitAdapter } from "openp41ge-git";
@@ -522,6 +522,7 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _selectedIndex = 0;
   @state() private _detailProject: ProjectInfo | null = null;
   @state() private _detailRepos: Array<{ name: string; worktrees: string[] }> | null = null;
+  @state() private _detailReposDropIndex: number = -1;
   @state() private _loadingRepos = false;
   @state() private _searchText = "";
   @state() private _activeProjectName: string | null = null;
@@ -1220,11 +1221,64 @@ export class Openp41geProjectPicker extends LitElement {
                         ? html`<div class="loading-text">Loading...</div>`
                         : this._detailRepos && this._detailRepos.length > 0
                           ? html`
-                              <ul class="repo-tree">
+                              <ul class="repo-tree"
+                                @dragenter=${(e: DragEvent) => {
+                                  if (e.dataTransfer?.types.includes("application/x-openp41ge-project-repo")) e.preventDefault();
+                                }}
+                                @dragover=${(e: DragEvent) => {
+                                  if (!e.dataTransfer?.types.includes("application/x-openp41ge-project-repo")) return;
+                                  e.preventDefault();
+                                  e.dataTransfer.dropEffect = "move";
+                                  const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
+                                  let idx = this._detailRepos?.length ?? 0;
+                                  if (items) {
+                                    for (let i = 0; i < items.length; i++) {
+                                      const rect = items[i].getBoundingClientRect();
+                                      if (e.clientY < rect.top + rect.height / 2) { idx = i; break; }
+                                    }
+                                  }
+                                  this._detailReposDropIndex = idx;
+                                }}
+                                @dragleave=${(e: DragEvent) => {
+                                  const t = e.currentTarget as HTMLElement;
+                                  const r = e.relatedTarget as Node | null;
+                                  if (r && t.contains(r)) return;
+                                  this._detailReposDropIndex = -1;
+                                }}
+                                @drop=${(e: DragEvent) => {
+                                  this._detailReposDropIndex = -1;
+                                  const dragName = e.dataTransfer?.getData("application/x-openp41ge-project-repo");
+                                  if (!dragName || !this._detailRepos) return;
+                                  e.preventDefault();
+                                  const repos = [...this._detailRepos];
+                                  const fromIdx = repos.findIndex((r) => r.name === dragName);
+                                  if (fromIdx === -1) return;
+                                  const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
+                                  let dropIndex = repos.length;
+                                  if (items) {
+                                    for (let i = 0; i < items.length; i++) {
+                                      const rect = items[i].getBoundingClientRect();
+                                      if (e.clientY < rect.top + rect.height / 2) { dropIndex = i; break; }
+                                    }
+                                  }
+                                  if (fromIdx === dropIndex || dropIndex === fromIdx + 1) return;
+                                  const [moved] = repos.splice(fromIdx, 1);
+                                  repos.splice(dropIndex > fromIdx ? dropIndex - 1 : dropIndex, 0, moved);
+                                  this._detailRepos = repos;
+                                }}
+                              >
                                 ${this._detailRepos.map(
-                                  (repo) => html`
+                                  (repo, idx) => html`
+                                    ${this._detailReposDropIndex === idx
+                                      ? html`<li style="height:2px;background:#4a9eff;list-style:none;margin:0;padding:0;"></li>`
+                                      : nothing}
                                     <li class="repo-group">
-                                      <div class="repo-header">
+                                      <div class="repo-header"
+                                        draggable="true"
+                                        @dragstart=${(e: DragEvent) => {
+                                          e.dataTransfer!.setData("application/x-openp41ge-project-repo", repo.name);
+                                          e.dataTransfer!.effectAllowed = "move";
+                                        }}>
                                         <svg class="repo-icon" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;position:relative;top:-1px;">
                                           <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
                                         </svg>
@@ -1250,6 +1304,9 @@ export class Openp41geProjectPicker extends LitElement {
                                     </li>
                                   `,
                                 )}
+                              ${this._detailReposDropIndex === (this._detailRepos?.length ?? 0)
+                                ? html`<li style="height:2px;background:#4a9eff;list-style:none;margin:0;padding:0;"></li>`
+                                : nothing}
                               </ul>
                             `
                           : html`<div class="loading-text">No repositories</div>`
