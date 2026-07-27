@@ -29,55 +29,17 @@ class Openp41geTitleBar extends LitElement {
   @property({ attribute: false })
   windowData: Window | null = null;
 
-  @state()
-  private _projectName: string | null = null;
-
-  @state()
-  private _isDraft = false;
-
   connectedCallback(): void {
     super.connectedCallback();
-    this._loadProjectName();
-    // Refresh when project changes (switched or saved)
-    document.addEventListener("project:changed", this._onProjectChanged);
-    this.addEventListener("draft:saved", this._onDraftSaved as EventListener);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener("project:changed", this._onProjectChanged);
-    this.removeEventListener("draft:saved", this._onDraftSaved as EventListener);
-  }
-
-  private _onProjectChanged = (): void => {
-    this._loadProjectName();
-  };
-
-  private _onDraftSaved = (): void => {
-    this._loadProjectName();
-  };
-
-
-
-  private async _loadProjectName(): Promise<void> {
-    try {
-      const name = await window.openp41ge.project.current();
-      this._projectName = name;
-      if (name) {
-        this._isDraft = await window.openp41ge.project.isDraft(name);
-      }
-    } catch {
-      // preload might not be ready yet — ignore
-    }
   }
 
   render(): TemplateResult | typeof nothing {
     const win = this.windowData;
     if (!win) return nothing;
-
-    const displayName = this._projectName ?? "Openp41ge";
-
-    const title = displayName;
 
     return html`
       <div
@@ -88,13 +50,6 @@ class Openp41geTitleBar extends LitElement {
 
         <!-- Spacer to push content to the right -->
         <div style="flex:1;min-width:0;"></div>
-
-        <!-- Title -->
-        <span
-          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;border-radius:4px;-webkit-app-region:no-drag;margin-right:48px;"
-        >
-          ${title}
-        </span>
 
         ${
           isMac
