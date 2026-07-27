@@ -919,7 +919,7 @@ export class Openp41geProjectPicker extends LitElement {
                       ${
                         this._renaming
                           ? html`
-                              <div class="rename-container" style="display:flex;align-items:center;flex:1;gap:4px;padding:0 4px 0 8px;margin:-1px 0 0 -8px;border:1px solid var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);">
+                              <div class="rename-container" style="display:flex;align-items:center;flex:1;gap:4px;padding:0 4px 0 8px;margin:-1px 0 0 -8px;box-shadow:0 0 0 1px var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);">
                                 <input
                                   class="rename-input"
                                   type="text"
@@ -950,7 +950,7 @@ export class Openp41geProjectPicker extends LitElement {
                             `
                           : html`
                               <div
-                                style="display:flex;align-items:center;gap:4px;cursor:pointer;border-radius:4px;padding:2px 4px;transition:background 0.1s;"
+                                style="display:flex;align-items:center;gap:4px;cursor:pointer;border-radius:4px;padding:2px 4px 2px 8px;margin-left:-8px;transition:background 0.1s;"
                                 @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "var(--openp41ge-hover-bg,#333)"; }}
                                 @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                                 @click=${this._startRename}
