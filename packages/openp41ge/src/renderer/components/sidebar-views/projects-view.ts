@@ -121,6 +121,10 @@ export class ProjectSidebarView implements SidebarView {
     const currentName = window.__openp41geProjectName;
 
     el.innerHTML = `
+      <style>
+        .pv-item:hover { background: rgba(255,255,255,0.04); }
+        .pv-item.pv-selected:hover { background: rgba(74,158,255,0.12); }
+      </style>
       <!-- Header -->
       <div style="display:flex;align-items:center;height:36px;padding:0 12px;border-bottom:1px solid var(--border-divider);flex-shrink:0;">
         <span style="font-size:12px;font-weight:600;color:#ccc;text-transform:uppercase;letter-spacing:0.5px;">Projects</span>
@@ -138,20 +142,10 @@ export class ProjectSidebarView implements SidebarView {
         ${this._filtered
           .map(
             (p, i) => `
-          <div class="pv-item" data-index="${i}"
+          <div class="pv-item ${i === this._selectedIndex ? "pv-selected" : ""}" data-index="${i}"
             style="display:flex;align-items:center;height:32px;padding:0 12px;cursor:pointer;border-radius:4px;font-size:13px;gap:6px;
               ${i === this._selectedIndex ? "background:rgba(74,158,255,0.12);" : ""}
-              ${p.name === currentName ? "color:#4a9eff;" : "color:#ccc;"}"
-            @mouseenter=${(e: MouseEvent) => {
-              if (parseInt((e.currentTarget as HTMLElement).dataset.index ?? "-1") !== this._selectedIndex) {
-                (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
-              }
-            }}
-            @mouseleave=${(e: MouseEvent) => {
-              if (parseInt((e.currentTarget as HTMLElement).dataset.index ?? "-1") !== this._selectedIndex) {
-                (e.currentTarget as HTMLElement).style.background = "transparent";
-              }
-            }}>
+              ${p.name === currentName ? "color:#4a9eff;" : "color:#ccc;"}">
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this._escapeHtml(p.name)}</span>
             ${p.name === currentName ? '<span style="font-size:10px;padding:1px 4px;border-radius:3px;background:rgba(74,158,255,0.15);color:#4a9eff;">active</span>' : ""}
             ${p.isDraft ? '<span style="font-size:10px;color:#888;">draft</span>' : ""}
