@@ -94,6 +94,7 @@ export class Openp41geProjectPicker extends LitElement {
       flex: 1;
       display: flex;
       min-height: 0;
+      position: relative;
     }
 
     /* ── Left column: search + list ─────────────── */
@@ -896,7 +897,6 @@ export class Openp41geProjectPicker extends LitElement {
       <!-- Top bar -->
       <div class="topbar">
         <div style="flex:1;"></div>
-        <button class="close-btn" @click=${this._dismiss} title="Close (Esc)">✕</button>
       </div>
 
       <!-- Body -->
@@ -1151,6 +1151,7 @@ export class Openp41geProjectPicker extends LitElement {
                 `
           }
         </div>
+        <button class="close-btn" @click=${this._dismiss} title="Close (Esc)" style="position:absolute;top:12px;right:12px;width:28px;height:28px;font-size:16px;">✕</button>
       </div>
     `;
   }
