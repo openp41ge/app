@@ -477,6 +477,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
   project: {
     list: () => ipcRenderer.invoke("project:list"),
+    listWithInfo: () => ipcRenderer.invoke("project:listWithInfo"),
     exists: (name) => ipcRenderer.invoke("project:exists", name),
     create: (name) => ipcRenderer.invoke("project:create", name),
     delete: (name) => ipcRenderer.invoke("project:delete", name),

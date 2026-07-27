@@ -32,6 +32,14 @@ export function registerProjectHandlers(
     return projectStore.list();
   });
 
+  /** List all projects with their full config info (name, dates, draft status). */
+  ipcMain.handle("project:listWithInfo", () => {
+    return projectStore.list().map((name) => ({
+      name,
+      config: projectStore.readConfig(name),
+    }));
+  });
+
   ipcMain.handle("project:exists", (_event, name: string) => {
     return projectStore.exists(name);
   });

@@ -1,25 +1,37 @@
 /**
- * <openp41ge-project-picker> — modal overlay for selecting or creating a project.
+ * <openp41ge-project-picker> — full-size modal for selecting or creating a project.
  *
- * On startup (when no --project CLI arg is provided), this modal is shown.
- * The user can:
- *   - Click an existing project to load it
- *   - Type a name and press Enter (or click "Create") to create a new one
- *   - Press Escape to close (with no project selected — app does nothing)
- *   - Navigate the project list with arrow keys + Enter
+ * Layout:
+ *   ┌──────────────────────────────────────────────┐
+ *   │  Projects                          [✕]      │  ← top bar
+ *   ├──────────────────┬───────────────────────────┤
+ *   │  🔍 Search...    │                           │
+ *   │                   │   Project Details         │
+ *   │  ┌─────────────┐  │   ─────────────           │
+ *   │  │ Project A   │  │   Name: Project A        │
+ *   │  │ Project B   │  │   Created: Jan 1, 2025   │
+ *   │  │ Project C   │  │   Modified: Jan 15, 2025 │
+ *   │  └─────────────┘  │                           │
+ *   │                   │                           │
+ *   ├──────────────────┴───────────────────────────┤
+ *   │  [Create "xxx"]                      [Delete] │
+ *   └──────────────────────────────────────────────┘
  *
  * Dispatches:
  *   CustomEvent('project:selected', { detail: { name: string } }) — bubbles
- *   CustomEvent('project:dismissed') — when Escape is pressed
- *
- * The host app (openp41ge-windowview or bootstrap) listens for these events.
+ *   CustomEvent('project:dismissed') — when Escape is pressed or close clicked
  */
 
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("openp41ge-project-picker");
+
+interface ProjectInfo {
+  name: string;
+  config: { name: string; createdAt: string; updatedAt: string; draft?: boolean } | null;
+}
 
 export class Openp41geProjectPicker extends LitElement {
   static styles = css`
@@ -28,9 +40,8 @@ export class Openp41geProjectPicker extends LitElement {
       inset: 0;
       z-index: 10000;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.5);
+      flex-direction: column;
+      background: var(--openp41ge-bg-color, #1e1e1e);
       font-family: var(
         --openp41ge-font-family,
         -apple-system,
@@ -42,77 +53,105 @@ export class Openp41geProjectPicker extends LitElement {
       color: var(--openp41ge-text-color, #e0e0e0);
     }
 
-    .overlay {
-      background: var(--openp41ge-bg-color, #1e1e1e);
-      border: 1px solid var(--openp41ge-border-color, #444);
-      border-radius: 8px;
-      padding: 24px;
-      min-width: 400px;
-      max-width: 500px;
-      max-height: 80vh;
+    /* ── Top bar ────────────────────────────────── */
+    .topbar {
       display: flex;
-      flex-direction: column;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      align-items: center;
+      height: 42px;
+      background: var(--bg-gutter, #252526);
+      border-bottom: 1px solid var(--border-divider, #333);
+      flex-shrink: 0;
+      padding: 0 16px;
+      -webkit-app-region: drag;
     }
 
-    h2 {
-      margin: 0 0 16px 0;
-      font-size: 18px;
+    .topbar-title {
+      flex: 1;
+      font-size: 14px;
       font-weight: 600;
       color: var(--openp41ge-text-color, #e0e0e0);
     }
 
-    .search-row {
+    .close-btn {
+      width: 32px;
+      height: 32px;
       display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--openp41ge-muted-text, #888);
+      font-size: 18px;
+      cursor: pointer;
+      border-radius: 4px;
+      -webkit-app-region: no-drag;
+      transition:
+        background 0.1s,
+        color 0.1s;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--openp41ge-text-color, #e0e0e0);
+    }
+
+    /* ── Body: two columns ──────────────────────── */
+    .body {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    /* ── Left column: search + list ─────────────── */
+    .left-panel {
+      width: 340px;
+      min-width: 280px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border-divider, #333);
+      background: var(--openp41ge-bg-color, #1e1e1e);
+    }
+
+    .search-row {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-divider, #333);
     }
 
     .search-row input {
-      flex: 1;
+      width: 100%;
       padding: 8px 12px;
       border: 1px solid var(--openp41ge-border-color, #444);
       border-radius: 4px;
       background: var(--openp41ge-input-bg, #2a2a2a);
       color: var(--openp41ge-text-color, #e0e0e0);
-      font-size: 14px;
+      font-size: 13px;
       outline: none;
+      box-sizing: border-box;
     }
 
     .search-row input:focus {
       border-color: var(--openp41ge-accent-color, #4a9eff);
     }
 
-    .search-row button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      background: var(--openp41ge-accent-color, #4a9eff);
-      color: #fff;
-      font-size: 14px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .search-row button:hover {
-      opacity: 0.9;
-    }
-
     .project-list {
       flex: 1;
       overflow-y: auto;
-      margin: 0 -24px;
-      padding: 0 24px;
+      padding: 8px 12px;
     }
 
     .project-item {
       display: flex;
       align-items: center;
-      padding: 10px 12px;
-      border-radius: 4px;
+      padding: 12px 12px;
+      margin-bottom: 4px;
+      border-radius: 6px;
       cursor: pointer;
       transition: background 0.1s;
       user-select: none;
+    }
+
+    .project-item:last-child {
+      margin-bottom: 0;
     }
 
     .project-item:hover,
@@ -125,28 +164,22 @@ export class Openp41geProjectPicker extends LitElement {
       font-size: 14px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+      min-width: 0;
     }
 
     .project-item .icon {
       width: 16px;
       height: 16px;
       flex-shrink: 0;
-      color: var(--openp41ge-muted-text, #888);
     }
 
     .project-item .icon.folder {
       color: var(--openp41ge-accent-color, #4a9eff);
     }
 
-    .project-item .icon.create {
+    .project-item .icon.draft {
       color: #e5c07b;
-    }
-
-    .project-item .arrow {
-      color: var(--openp41ge-muted-text, #888);
-      font-size: 12px;
-      margin-left: 8px;
     }
 
     .project-item .delete-btn {
@@ -157,13 +190,13 @@ export class Openp41geProjectPicker extends LitElement {
       font-size: 16px;
       line-height: 1;
       cursor: pointer;
-      padding: 0 4px;
-      margin-left: 4px;
+      padding: 2px 6px;
       border-radius: 3px;
       transition:
         color 0.1s,
         background 0.1s;
       user-select: none;
+      flex-shrink: 0;
     }
 
     .project-item:hover .delete-btn {
@@ -175,26 +208,98 @@ export class Openp41geProjectPicker extends LitElement {
       background: rgba(224, 108, 117, 0.15);
     }
 
+    .project-item .draft-tag {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(229, 192, 123, 0.15);
+      color: #e5c07b;
+      flex-shrink: 0;
+    }
+
+    .create-item {
+      color: var(--openp41ge-accent-color, #4a9eff);
+    }
+
+    .create-item .icon.create {
+      color: #e5c07b;
+    }
+
+    /* ── Right column: details ──────────────────── */
+    .right-panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      background: var(--openp41ge-bg-color, #1e1e1e);
+    }
+
+    .detail-card {
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .detail-card h2 {
+      margin: 0 0 4px 0;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--openp41ge-text-color, #e0e0e0);
+    }
+
+    .detail-card .draft-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(229, 192, 123, 0.15);
+      color: #e5c07b;
+      margin-bottom: 16px;
+    }
+
+    .detail-card .detail-row {
+      display: flex;
+      align-items: baseline;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .detail-card .detail-label {
+      width: 90px;
+      color: var(--openp41ge-muted-text, #888);
+      flex-shrink: 0;
+    }
+
+    .detail-card .detail-value {
+      color: var(--openp41ge-text-color, #e0e0e0);
+    }
+
+    .detail-card .empty-hint {
+      color: var(--openp41ge-muted-text, #888);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    /* ── Empty state ────────────────────────────── */
     .empty-state {
       text-align: center;
       color: var(--openp41ge-muted-text, #888);
-      padding: 24px;
+      padding: 40px 16px;
       font-size: 13px;
     }
   `;
 
-  @state() private _projects: string[] = [];
+  @state() private _projects: ProjectInfo[] = [];
+  @state() private _filteredProjects: ProjectInfo[] = [];
   @state() private _selectedIndex = 0;
-  @state() private _newProjectName = "";
+  @state() private _hoveredProject: ProjectInfo | null = null;
+  @state() private _searchText = "";
   @state() private _loading = true;
   private _disconnected = false;
-
-  private _inputEl!: HTMLInputElement;
 
   connectedCallback(): void {
     super.connectedCallback();
     this._loadProjects();
-    // Capture keyboard for list navigation
     this.addEventListener("keydown", this._onKeyDown);
   }
 
@@ -206,15 +311,31 @@ export class Openp41geProjectPicker extends LitElement {
 
   private async _loadProjects(): Promise<void> {
     try {
-      const projects = await window.openp41ge.project.list();
+      const projects = await window.openp41ge.project.listWithInfo();
       if (this._disconnected) return;
-      this._projects = projects.sort();
+      this._projects = projects;
+      this._applyFilter();
       this._selectedIndex = 0;
     } catch (err) {
       log.error("Failed to load projects:", err);
     }
     if (this._disconnected) return;
     this._loading = false;
+  }
+
+  private _applyFilter(): void {
+    const q = this._searchText.toLowerCase().trim();
+    if (!q) {
+      this._filteredProjects = [...this._projects];
+    } else {
+      this._filteredProjects = this._projects.filter((p) =>
+        p.name.toLowerCase().includes(q),
+      );
+    }
+  }
+
+  private get _listLength(): number {
+    return this._searchText.trim() ? this._filteredProjects.length + 1 : this._filteredProjects.length;
   }
 
   private _onKeyDown(e: KeyboardEvent): void {
@@ -231,10 +352,14 @@ export class Openp41geProjectPicker extends LitElement {
         break;
       case "Enter":
         e.preventDefault();
-        if (this._newProjectName.trim()) {
-          this._createAndSelect(this._newProjectName.trim());
-        } else if (this._projects.length > 0) {
-          this._selectProject(this._projects[this._selectedIndex]);
+        if (this._searchText.trim() && this._selectedIndex === 0) {
+          this._createAndSelect(this._searchText.trim());
+        } else {
+          const idx = this._searchText.trim() ? this._selectedIndex - 1 : this._selectedIndex;
+          const project = this._filteredProjects[idx];
+          if (project) {
+            this._selectProject(project.name);
+          }
         }
         break;
       case "Escape":
@@ -244,12 +369,7 @@ export class Openp41geProjectPicker extends LitElement {
     }
   }
 
-  private get _listLength(): number {
-    return this._newProjectName.trim() ? this._projects.length + 1 : this._projects.length;
-  }
-
   private _scrollToSelected(): void {
-    // Wait for render, then scroll the selected item into view
     requestAnimationFrame(() => {
       const items = this.shadowRoot?.querySelectorAll(".project-item");
       if (items && items[this._selectedIndex]) {
@@ -262,13 +382,10 @@ export class Openp41geProjectPicker extends LitElement {
     if (e.key === "Enter") {
       e.preventDefault();
       e.stopPropagation();
-      if (this._newProjectName.trim()) {
-        this._createAndSelect(this._newProjectName.trim());
+      if (this._searchText.trim()) {
+        this._createAndSelect(this._searchText.trim());
       }
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      // Let the host handle navigation
-      this._onKeyDown(e);
-    } else if (e.key === "Escape") {
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Escape") {
       this._onKeyDown(e);
     }
   }
@@ -276,7 +393,6 @@ export class Openp41geProjectPicker extends LitElement {
   private async _createAndSelect(name: string): Promise<void> {
     const exists = await window.openp41ge.project.exists(name);
     if (exists) {
-      // Just select the existing project
       this._selectProject(name);
       return;
     }
@@ -301,15 +417,32 @@ export class Openp41geProjectPicker extends LitElement {
 
   private async _deleteProject(e: Event, name: string): Promise<void> {
     e.stopPropagation();
-    if (!confirm(`Delete project "${name}"? This cannot be undone.`)) {
-      return;
-    }
+
+    // Import and show the confirm modal
+    await import("./openp41ge-confirm-modal");
+    const modal = document.createElement("openp41ge-confirm-modal") as any;
+    modal.title = "Delete Project";
+    modal.message = `Delete "${name}"?`;
+    modal.detail = "All project data including repositories and workspace state will be permanently deleted. This cannot be undone.";
+    modal.confirmLabel = "Delete";
+    modal._confirmStyle =
+      "background:#e06c75;border:none;border-radius:4px;color:#fff;font-size:12px;padding:6px 16px;cursor:pointer;";
+    document.body.appendChild(modal);
+
+    const confirmed = await modal.waitForResult();
+    modal.remove();
+    if (!confirmed) return;
+
     const deleted = await window.openp41ge.project.delete(name);
     if (this._disconnected) return;
     if (deleted) {
-      this._projects = this._projects.filter((p) => p !== name);
-      if (this._selectedIndex >= this._projects.length) {
-        this._selectedIndex = Math.max(0, this._projects.length - 1);
+      this._projects = this._projects.filter((p) => p.name !== name);
+      this._applyFilter();
+      if (this._hoveredProject?.name === name) {
+        this._hoveredProject = null;
+      }
+      if (this._selectedIndex >= this._listLength) {
+        this._selectedIndex = Math.max(0, this._listLength - 1);
       }
     } else {
       log.error(`Failed to delete project "${name}"`);
@@ -325,56 +458,106 @@ export class Openp41geProjectPicker extends LitElement {
     );
   }
 
-  private _onInput(e: Event): void {
+  private _onSearchInput(e: Event): void {
     const input = e.target as HTMLInputElement;
-    this._newProjectName = input.value;
-    this._selectedIndex = 0; // Reset selection when typing
+    this._searchText = input.value;
+    this._applyFilter();
+    this._selectedIndex = 0;
   }
 
-  render() {
-    const showCreateOption = this._newProjectName.trim().length > 0;
-    const createLabel = showCreateOption ? `Create "${this._newProjectName.trim()}"` : "";
+  private _formatDate(iso: string): string {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
+  }
+
+  render(): TemplateResult | typeof nothing {
+    const showCreateOption = this._searchText.trim().length > 0;
+    const createLabel = showCreateOption ? `Create "${this._searchText.trim()}"` : "";
+    const listItems = this._filteredProjects;
 
     return html`
-      <div class="overlay" @click=${(e: Event) => e.stopPropagation()}>
-        <h2>Open Project</h2>
-        <div class="search-row">
-          <input
-            type="text"
-            placeholder="Search or create project..."
-            .value=${this._newProjectName}
-            @input=${this._onInput}
-            @keydown=${this._onInputKeyDown}
-            autofocus
-          />
-          ${
-            showCreateOption
-              ? html`<button @click=${() => this._createAndSelect(this._newProjectName.trim())}>
-                  Create
-                </button>`
-              : ""
-          }
-        </div>
+      <!-- Top bar -->
+      <div class="topbar">
+        <div class="topbar-title">Projects</div>
+        <button class="close-btn" @click=${this._dismiss} title="Close (Esc)">✕</button>
+      </div>
 
-        <div class="project-list">
-          ${
-            this._loading
-              ? html`<div class="empty-state">Loading...</div>`
-              : this._projects.length === 0 && !showCreateOption
-                ? html`<div class="empty-state">
-                    No projects yet. Type a name above to create one.
-                  </div>`
-                : html`
-                    ${
-                      showCreateOption
-                        ? html`
+      <!-- Body -->
+      <div class="body">
+        <!-- Left panel -->
+        <div class="left-panel">
+          <div class="search-row">
+            <input
+              type="text"
+              placeholder="Search or create project..."
+              .value=${this._searchText}
+              @input=${this._onSearchInput}
+              @keydown=${this._onInputKeyDown}
+              autofocus
+            />
+          </div>
+
+          <div class="project-list">
+            ${
+              this._loading
+                ? html`<div class="empty-state">Loading...</div>`
+                : listItems.length === 0 && !showCreateOption
+                  ? html`<div class="empty-state">
+                      No projects yet. Type a name above to create one.
+                    </div>`
+                  : html`
+                      ${
+                        showCreateOption
+                          ? html`
+                              <div
+                                class="project-item create-item ${this._selectedIndex === 0 ? "selected" : ""}"
+                                @click=${() => this._createAndSelect(this._searchText.trim())}
+                                @mouseenter=${() => (this._hoveredProject = null)}
+                              >
+                                <span class="name">
+                                  <svg
+                                    class="icon create"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 16 16"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                  >
+                                    <line x1="8" y1="2" x2="8" y2="14" />
+                                    <line x1="2" y1="8" x2="14" y2="8" />
+                                  </svg>
+                                  ${createLabel}
+                                </span>
+                              </div>
+                            `
+                          : ""
+                      }
+                      ${listItems.map(
+                        (project, i) => {
+                          const idx = showCreateOption ? i + 1 : i;
+                          const isDraft = project.config?.draft === true;
+                          return html`
                             <div
-                              class="project-item ${this._selectedIndex === 0 ? "selected" : ""}"
-                              @click=${() => this._createAndSelect(this._newProjectName.trim())}
+                              class="project-item ${this._selectedIndex === idx ? "selected" : ""}"
+                              @click=${() => this._selectProject(project.name)}
+                              @mouseenter=${() => (this._hoveredProject = project)}
                             >
                               <span class="name">
                                 <svg
-                                  class="icon create"
+                                  class="icon ${isDraft ? "draft" : "folder"}"
                                   width="16"
                                   height="16"
                                   viewBox="0 0 16 16"
@@ -384,52 +567,66 @@ export class Openp41geProjectPicker extends LitElement {
                                   stroke-linecap="round"
                                   stroke-linejoin="round"
                                 >
-                                  <line x1="8" y1="2" x2="8" y2="14" />
-                                  <line x1="2" y1="8" x2="14" y2="8" />
+                                  ${
+                                    isDraft
+                                      ? html`<path d="M8 2v12M2 8h12" stroke-linecap="round" />` /* plus icon for draft */
+                                      : html`<path d="M2 4.5C2 3.67 2.67 3 3.5 3h2.59c.4 0 .78.16 1.06.44l.91.91c.28.28.67.44 1.06.44H14a1 1 0 011 1v5.7a1 1 0 01-1 1H3.5A1.5 1.5 0 012 11V4.5z" />`
+                                  }
                                 </svg>
-                                ${createLabel}
+                                ${project.name}
                               </span>
-                              <span class="arrow">→</span>
+                              ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
+                              <button
+                                class="delete-btn"
+                                title="Delete project"
+                                @click=${(e: Event) => this._deleteProject(e, project.name)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          `;
+                        },
+                      )}
+                    `
+            }
+          </div>
+        </div>
+
+        <!-- Right panel: project details -->
+        <div class="right-panel">
+          ${
+            this._hoveredProject
+              ? html`
+                  <div class="detail-card">
+                    <h2>${this._hoveredProject.name}</h2>
+                    ${
+                      this._hoveredProject.config?.draft
+                        ? html`<div class="draft-badge">Draft</div>`
+                        : ""
+                    }
+                    ${
+                      this._hoveredProject.config
+                        ? html`
+                            <div class="detail-row">
+                              <span class="detail-label">Created</span>
+                              <span class="detail-value">${this._formatDate(this._hoveredProject.config.createdAt)}</span>
+                            </div>
+                            <div class="detail-row">
+                              <span class="detail-label">Modified</span>
+                              <span class="detail-value">${this._formatDate(this._hoveredProject.config.updatedAt)}</span>
                             </div>
                           `
                         : ""
                     }
-                    ${this._projects.map(
-                      (name, i) => html`
-                        <div
-                          class="project-item ${this._selectedIndex === (showCreateOption ? i + 1 : i) ? "selected" : ""}"
-                          @click=${() => this._selectProject(name)}
-                        >
-                          <span class="name">
-                            <svg
-                              class="icon folder"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 16 16"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="1.5"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                            >
-                              <path
-                                d="M2 4.5C2 3.67 2.67 3 3.5 3h2.59c.4 0 .78.16 1.06.44l.91.91c.28.28.67.44 1.06.44H14a1 1 0 011 1v5.7a1 1 0 01-1 1H3.5A1.5 1.5 0 012 11V4.5z"
-                              />
-                            </svg>
-                            ${name}
-                          </span>
-                          <button
-                            class="delete-btn"
-                            title="Delete project"
-                            @click=${(e: Event) => this._deleteProject(e, name)}
-                          >
-                            ×
-                          </button>
-                          <span class="arrow">→</span>
-                        </div>
-                      `,
-                    )}
-                  `
+                  </div>
+                `
+              : html`
+                  <div class="empty-hint">
+                    ${this._projects.length > 0
+                      ? "Hover over a project to see details"
+                      : ""}
+                  </div>
+                `
           }
         </div>
       </div>

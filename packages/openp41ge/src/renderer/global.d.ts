@@ -147,6 +147,7 @@ declare global {
 
       project: {
         list: () => Promise<string[]>;
+        listWithInfo: () => Promise<Array<{ name: string; config: { name: string; createdAt: string; updatedAt: string; draft?: boolean } | null }>>;
         exists: (name: string) => Promise<boolean>;
         create: (name: string) => Promise<boolean>;
         delete: (name: string) => Promise<boolean>;
