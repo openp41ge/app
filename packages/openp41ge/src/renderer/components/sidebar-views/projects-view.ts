@@ -111,7 +111,24 @@ export class ProjectSidebarView implements SidebarView {
     this._filtered = q
       ? this._projects.filter((p) => p.name.toLowerCase().includes(q))
       : [...this._projects];
+
+    // Save and restore focus on the search input — re-render replaces the DOM
+    const el = this._element;
+    const prevSearchEl = el?.querySelector("#pv-search") as HTMLInputElement | null;
+    const prevFocus = prevSearchEl === document.activeElement;
+    const prevCaret = prevFocus ? prevSearchEl!.selectionStart : null;
+
     this._render();
+
+    if (prevFocus) {
+      const newSearchEl = this._element?.querySelector("#pv-search") as HTMLInputElement | null;
+      if (newSearchEl) {
+        newSearchEl.focus();
+        if (prevCaret !== null) {
+          newSearchEl.setSelectionRange(prevCaret, prevCaret);
+        }
+      }
+    }
   }
 
   // ── Render ──
