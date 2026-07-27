@@ -13,7 +13,6 @@
 import { ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
-import { execSync } from "child_process";
 import type { WorkspaceStateStore } from "../../src/main/services/workspace-state-store";
 import type { ProjectStore } from "../../src/main/services/project-store";
 import type { OperationDispatcher } from "../../src/main/services/operation-dispatcher";
@@ -109,29 +108,29 @@ export function registerProjectHandlers(
   });
 
   /**
-   * Run git worktree list --porcelain and extract branch names.
-   * Returns an array of branch names (or "(detached HEAD)" for detached worktrees).
+   * Find worktree branches for a repo.
+   * Worktrees are subdirectories under the repo directory that contain
+   * a .git file (pointer file to the bare repo).
+   * The directory name is the branch name with '/' replaced by '--'.
+   * We reverse that to show the original branch name.
    */
   function _getWorktreeBranches(gitDir: string): string[] {
     try {
-      const output = execSync(`git --git-dir="${gitDir}" worktree list --porcelain`, {
-        encoding: "utf-8",
-        timeout: 5000,
-        stdio: ["pipe", "pipe", "ignore"],
-      });
+      const repoDir = path.dirname(gitDir);
+      const entries = fs.readdirSync(repoDir, { withFileTypes: true });
       const worktrees: string[] = [];
-      const lines = output.split("\n");
-      for (const line of lines) {
-        if (line.startsWith("branch ")) {
-          const ref = line.slice(7).trim(); // "refs/heads/branch-name"
-          const branch = ref.replace("refs/heads/", "");
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name === ".git") continue;
+        const fullPath = path.join(repoDir, entry.name);
+        const gitFile = path.join(fullPath, ".git");
+        if (fs.existsSync(gitFile)) {
+          // Convert directory name back to branch name: "feature--branch" → "feature/branch"
+          const branch = entry.name.replace(/--/g, "/");
           worktrees.push(branch);
         }
-        if (line.startsWith("HEAD ") && !lines.some((l) => l.startsWith("branch "))) {
-          worktrees.push("(detached HEAD)");
-        }
       }
-      return worktrees.filter((b, i, arr) => arr.indexOf(b) === i); // deduplicate
+      return worktrees.sort();
     } catch {
       return [];
     }
