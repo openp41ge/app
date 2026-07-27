@@ -1115,7 +1115,7 @@ export class Openp41geProjectPicker extends LitElement {
                                                 <li>${wt}</li>
                                               `,
                                             )}
-                                            <li class="add-wt-item" @click=${() => this._addWorktree(repo.name)}>
+                                            <li class="add-wt-item" tabindex="0" @click=${() => this._addWorktree(repo.name)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.stopPropagation(); this._addWorktree(repo.name); } }}>
                                               <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:2px;position:relative;top:-1px;">
                                                 <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
                                               </svg>
@@ -1133,7 +1133,7 @@ export class Openp41geProjectPicker extends LitElement {
                     }
 
                     <div class="add-repo-row">
-                      <div class="add-repo-btn" @click=${() => this._addRepository()}>
+                      <div class="add-repo-btn" tabindex="0" @click=${() => this._addRepository()} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.stopPropagation(); this._addRepository(); } }}>
                         <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-left:4px;position:relative;top:0;">
                           <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
                         </svg>
