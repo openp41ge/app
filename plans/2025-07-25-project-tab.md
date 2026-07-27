@@ -128,11 +128,11 @@ The titlebar already shows the active project name. When clicked, instead of ope
 
 ## Completion Criteria
 
-- [ ] Projects sidebar view shows project list with search, active indicator, context menu
-- [ ] Clicking a project opens a project-manager tab with repo/worktree management
-- [ ] `openp41ge-project-picker` removed
-- [ ] Activity bar has Projects icon
-- [ ] Titlebar click opens sidebar instead of modal
-- [ ] Draft auto-opens as tab on startup
-- [ ] All existing unit tests pass (582+)
-- [ ] `nx build` succeeds
+- [x] Projects sidebar view shows project list with search, active indicator, context menu
+- [x] Clicking a project opens a project-manager tab with repo/worktree management
+- [x] `openp41ge-project-picker` removed
+- [x] Activity bar has Projects icon
+- [x] Titlebar click opens sidebar instead of modal
+- [x] Draft auto-opens as tab on startup
+- [x] All existing unit tests pass (582+)
+- [x] `nx build` succeeds
