@@ -25,6 +25,7 @@
 import { LitElement, html, css, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
+import { appServices } from "../app";
 
 const log = createLogger("openp41ge-project-picker");
 
@@ -324,12 +325,14 @@ export class Openp41geProjectPicker extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    appServices.keyboardManager.pushModal();
     this._loadProjects();
     this.addEventListener("keydown", this._onKeyDown);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    appServices.keyboardManager.popModal();
     this._disconnected = true;
     this.removeEventListener("keydown", this._onKeyDown);
   }
