@@ -128,6 +128,10 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .project-list:focus {
+      outline: none;
+    }
+
+    .project-list:focus-visible {
       outline: 2px solid var(--openp41ge-accent-color, #4a9eff);
       outline-offset: -2px;
     }
