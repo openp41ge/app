@@ -77,17 +77,15 @@ class Openp41geActivityBar extends LitElement {
               <div
                 data-activity-id="${activity.id}"
                 title="${activity.label}"
-                style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;cursor:pointer;color:${this.activeViewId === activity.id ? "var(--accent-hover, #4a9eff)" : "var(--text-secondary, #888)"};background:${this.activeViewId === activity.id ? "rgba(74,158,255,0.12)" : "transparent"};transition:background 0.1s,color 0.1s;position:relative;"
+                style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;cursor:pointer;color:${this.activeViewId === activity.id ? "var(--accent-hover, #4a9eff)" : "var(--text-secondary, #888)"};background:${this.activeViewId === activity.id ? "rgba(74,158,255,0.12)" : "transparent"};transition:color 0.1s;position:relative;"
                 @click=${() => this._handleClick(activity.id)}
                 @mouseenter=${(e: MouseEvent) => {
                   if (this.activeViewId !== activity.id) {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)";
                     (e.currentTarget as HTMLElement).style.color = "#e0e0e0";
                   }
                 }}
                 @mouseleave=${(e: MouseEvent) => {
                   if (this.activeViewId !== activity.id) {
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
                     (e.currentTarget as HTMLElement).style.color = "#888";
                   }
                 }}
