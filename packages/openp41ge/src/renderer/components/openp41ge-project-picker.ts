@@ -487,6 +487,7 @@ export class Openp41geProjectPicker extends LitElement {
     appServices.keyboardManager.popModal();
     this._disconnected = true;
     this.removeEventListener("keydown", this._onKeyDown);
+    this._cleanupRename();
   }
 
   private async _loadProjects(): Promise<void> {
@@ -698,6 +699,19 @@ export class Openp41geProjectPicker extends LitElement {
         input.focus();
         input.select();
       }
+      // Listen for clicks outside the rename container
+      const container = this.shadowRoot?.querySelector(".rename-container") as HTMLElement | null;
+      if (container) {
+        const onOutsideClick = (e: MouseEvent) => {
+          if (!container.contains(e.target as Node)) {
+            document.removeEventListener("mousedown", onOutsideClick, true);
+            this._cancelRename();
+          }
+        };
+        document.addEventListener("mousedown", onOutsideClick, true);
+        // Store the cleanup function
+        (this as any).__renameCleanup = () => document.removeEventListener("mousedown", onOutsideClick, true);
+      }
     });
   }
 
@@ -706,6 +720,7 @@ export class Openp41geProjectPicker extends LitElement {
     const trimmed = this._renameValue.trim();
     if (!trimmed || trimmed === this._detailProject.name) {
       this._renaming = false;
+      this._cleanupRename();
       return;
     }
     const result = await window.openp41ge.project.rename(this._detailProject.name, trimmed);
@@ -726,6 +741,15 @@ export class Openp41geProjectPicker extends LitElement {
 
   private _cancelRename(): void {
     this._renaming = false;
+    this._cleanupRename();
+  }
+
+  private _cleanupRename(): void {
+    const fn = (this as any).__renameCleanup;
+    if (fn) {
+      fn();
+      (this as any).__renameCleanup = null;
+    }
   }
 
   private _onRenameInput(e: Event): void {
@@ -895,7 +919,7 @@ export class Openp41geProjectPicker extends LitElement {
                       ${
                         this._renaming
                           ? html`
-                              <div style="display:flex;align-items:center;flex:1;gap:4px;padding-right:4px;border:1px solid var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);">
+                              <div class="rename-container" style="display:flex;align-items:center;flex:1;gap:4px;padding-right:4px;border:1px solid var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);">
                                 <input
                                   class="rename-input"
                                   type="text"
