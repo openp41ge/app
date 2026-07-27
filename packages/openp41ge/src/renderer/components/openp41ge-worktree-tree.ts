@@ -353,7 +353,42 @@ class Openp41geWorktreeTree extends LitElement {
             class="wt-tree-scroll"
             style="position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;"
           >
-            <div class="wt-tree-scroll-content">
+            <div class="wt-tree-scroll-content"
+              @dragover=${(e: DragEvent) => {
+                if (e.dataTransfer?.types.includes("application/x-openp41ge-repo")) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }
+              }}
+              @drop=${(e: DragEvent) => {
+                const dragName = e.dataTransfer?.getData("application/x-openp41ge-repo");
+                if (!dragName) return;
+                e.preventDefault();
+
+                // Find drop index — which repo item is closest to the cursor?
+                const items = this.renderRoot?.querySelectorAll("openp41ge-repo-tree-item");
+                let dropIndex = this._repos.length;
+                if (items) {
+                  for (let i = 0; i < items.length; i++) {
+                    const rect = items[i].getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    if (e.clientY < midY) {
+                      dropIndex = i;
+                      break;
+                    }
+                  }
+                }
+
+                const fromIdx = this._repos.findIndex((r) => r.name === dragName);
+                if (fromIdx === -1 || fromIdx === dropIndex || (dropIndex === fromIdx + 1)) return;
+
+                const newRepos = [...this._repos];
+                const [moved] = newRepos.splice(fromIdx, 1);
+                const adjDrop = dropIndex > fromIdx ? dropIndex - 1 : dropIndex;
+                newRepos.splice(adjDrop, 0, moved);
+                this._repos = newRepos;
+              }}
+            >
               ${this._repos.map((repo) => {
                 const worktrees = this._worktreesByRepo.get(repo.name) ?? [];
                 return html`
