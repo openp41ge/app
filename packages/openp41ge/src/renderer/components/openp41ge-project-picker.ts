@@ -1221,7 +1221,7 @@ export class Openp41geProjectPicker extends LitElement {
                         ? html`<div class="loading-text">Loading...</div>`
                         : this._detailRepos && this._detailRepos.length > 0
                           ? html`
-                              <ul class="repo-tree"
+                              <ul class="repo-tree" style="position:relative;"
                                 @dragenter=${(e: DragEvent) => {
                                   if (e.dataTransfer?.types.includes("application/x-openp41ge-project-repo")) e.preventDefault();
                                 }}
@@ -1269,10 +1269,10 @@ export class Openp41geProjectPicker extends LitElement {
                               >
                                 ${this._detailRepos.map(
                                   (repo, idx) => html`
-                                    ${this._detailReposDropIndex === idx
-                                      ? html`<li style="height:2px;background:#4a9eff;list-style:none;margin:3px 0;padding:0;"></li>`
-                                      : nothing}
-                                    <li class="repo-group">
+                                    <li class="repo-group" style="position:relative;">
+                                      ${this._detailReposDropIndex === idx
+                                        ? html`<div style="position:absolute;top:-4px;left:0;right:0;height:2px;background:#4a9eff;pointer-events:none;z-index:1;"></div>`
+                                        : nothing}
                                       <div class="repo-header"
                                         draggable="true"
                                         @dragstart=${(e: DragEvent) => {
@@ -1310,7 +1310,7 @@ export class Openp41geProjectPicker extends LitElement {
                                   `,
                                 )}
                               ${this._detailReposDropIndex === (this._detailRepos?.length ?? 0)
-                                ? html`<li style="height:2px;background:#4a9eff;list-style:none;margin:3px 0;padding:0;"></li>`
+                                ? html`<li style="position:absolute;bottom:-4px;left:0;right:0;height:2px;background:#4a9eff;list-style:none;padding:0;margin:0;pointer-events:none;z-index:1;"></li>`
                                 : nothing}
                               </ul>
                             `
