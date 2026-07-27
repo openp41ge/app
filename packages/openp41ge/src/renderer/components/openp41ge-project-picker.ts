@@ -343,7 +343,7 @@ export class Openp41geProjectPicker extends LitElement {
 
     .detail-card .repo-group .repo-header {
       font-size: 13px;
-      color: var(--openp41ge-text-color, #e0e0e0);
+      color: var(--openp41ge-text-color, #f0f0f0);
       display: flex;
       align-items: center;
       gap: 6px;
@@ -366,7 +366,7 @@ export class Openp41geProjectPicker extends LitElement {
     .detail-card .repo-group .worktree-list li {
       position: relative;
       padding: 3px 0 3px 31px;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--openp41ge-muted-text, #888);
     }
 
@@ -415,6 +415,7 @@ export class Openp41geProjectPicker extends LitElement {
       display: inline-block;
       padding: 2px 4px;
       margin: 2px 0 2px 10px;
+      font-size: 13px;
     }
 
     .detail-card .repo-group .worktree-list .add-wt-item::before,
