@@ -605,6 +605,12 @@ export class Openp41geProjectPicker extends LitElement {
           }
         }
         break;
+      case "Tab":
+        if (this._shouldTrapFocus(e.shiftKey)) {
+          e.preventDefault();
+          this._trapFocus(e.shiftKey);
+        }
+        break;
       case "Escape":
         e.preventDefault();
         this._dismiss();
@@ -633,6 +639,34 @@ export class Openp41geProjectPicker extends LitElement {
     const project = this._filteredProjects[idx];
     if (project && project.name !== this._detailProject?.name) {
       this._showDetails(project);
+    }
+  }
+
+  private _getFocusable(): NodeListOf<HTMLElement> {
+    const root = this.shadowRoot;
+    if (!root) return document.createDocumentFragment().querySelectorAll('*') as any;
+    return root.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+  }
+
+  private _shouldTrapFocus(shiftKey: boolean): boolean {
+    const focusable = this._getFocusable();
+    if (focusable.length === 0) return false;
+    const active = this.shadowRoot?.activeElement;
+    if (shiftKey) {
+      return active === focusable[0];
+    }
+    return active === focusable[focusable.length - 1];
+  }
+
+  private _trapFocus(shiftKey: boolean): void {
+    const focusable = this._getFocusable();
+    if (focusable.length === 0) return;
+    if (shiftKey) {
+      focusable[focusable.length - 1].focus();
+    } else {
+      focusable[0].focus();
     }
   }
 
@@ -897,6 +931,7 @@ export class Openp41geProjectPicker extends LitElement {
       <!-- Top bar -->
       <div class="topbar">
         <div style="flex:1;"></div>
+        <button class="close-btn" @click=${this._dismiss} title="Close (Esc)">✕</button>
       </div>
 
       <!-- Body -->
@@ -1151,7 +1186,6 @@ export class Openp41geProjectPicker extends LitElement {
                 `
           }
         </div>
-        <button class="close-btn" @click=${this._dismiss} title="Close (Esc)" style="position:absolute;top:12px;right:12px;width:28px;height:28px;font-size:16px;">✕</button>
       </div>
     `;
   }
