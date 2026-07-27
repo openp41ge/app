@@ -9,7 +9,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
-import { showProjectsSidebar } from "../services/project-switch-service";
+
 
 const isMac = (() => {
   try {
@@ -57,9 +57,7 @@ class Openp41geTitleBar extends LitElement {
     this._loadProjectName();
   };
 
-  private _openProjects(): void {
-    showProjectsSidebar();
-  }
+
 
   private async _loadProjectName(): Promise<void> {
     try {
@@ -95,21 +93,9 @@ class Openp41geTitleBar extends LitElement {
         <!-- Spacer to push content to the right -->
         <div style="flex:1;min-width:0;"></div>
 
-        <!-- Title (clickable to open project) -->
+        <!-- Title -->
         <span
-          title="Switch project"
-          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:48px;"
-          @mouseenter=${(e: MouseEvent) => {
-            const el = e.currentTarget as HTMLElement;
-            el.style.color = "var(--text-primary, #e0e0e0)";
-            el.style.background = "var(--hover-bg, #333)";
-          }}
-          @mouseleave=${(e: MouseEvent) => {
-            const el = e.currentTarget as HTMLElement;
-            el.style.color = "var(--text-muted, #888)";
-            el.style.background = "transparent";
-          }}
-          @click=${() => this._openProjects()}
+          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;border-radius:4px;-webkit-app-region:no-drag;margin-right:48px;"
         >
           ${title}
         </span>
