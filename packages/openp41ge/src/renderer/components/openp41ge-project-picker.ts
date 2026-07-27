@@ -243,17 +243,22 @@ export class Openp41geProjectPicker extends LitElement {
       width: 100%;
     }
 
-    .detail-card h2 {
-      margin: 0 0 8px 0;
+    .detail-card .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .detail-card .title-row h2 {
+      margin: 0;
       font-size: 20px;
       font-weight: 600;
       color: var(--openp41ge-text-color, #e0e0e0);
     }
 
     .detail-card .switch-btn {
-      display: inline-block;
       padding: 6px 16px;
-      margin-bottom: 16px;
       border: none;
       border-radius: 4px;
       background: var(--openp41ge-accent-color, #4a9eff);
@@ -261,6 +266,7 @@ export class Openp41geProjectPicker extends LitElement {
       font-size: 13px;
       cursor: pointer;
       transition: opacity 0.1s;
+      white-space: nowrap;
     }
 
     .detail-card .switch-btn:hover {
@@ -633,10 +639,12 @@ export class Openp41geProjectPicker extends LitElement {
             this._detailProject
               ? html`
                   <div class="detail-card">
-                    <h2>${this._detailProject.name}</h2>
-                    <button class="switch-btn" @click=${() => this._selectProject(this._detailProject!.name)}>
-                      Switch to Project
-                    </button>
+                    <div class="title-row">
+                      <h2>${this._detailProject.name}</h2>
+                      <button class="switch-btn" @click=${() => this._selectProject(this._detailProject!.name)}>
+                        Switch to Project
+                      </button>
+                    </div>
                     ${
                       this._detailProject.config?.draft
                         ? html`<div class="draft-badge">Draft</div>`
