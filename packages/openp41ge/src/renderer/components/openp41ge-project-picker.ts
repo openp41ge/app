@@ -919,7 +919,7 @@ export class Openp41geProjectPicker extends LitElement {
                       ${
                         this._renaming
                           ? html`
-                              <div class="rename-container" style="display:flex;align-items:center;flex:1;gap:4px;padding:0 4px 0 8px;margin:-1px 0 0 -8px;box-shadow:0 0 0 1px var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);">
+                              <div class="rename-container" style="display:flex;align-items:center;flex:1;gap:4px;padding:1px 4px 1px 8px;margin:0 0 0 -8px;box-shadow:0 0 0 1px var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);">
                                 <input
                                   class="rename-input"
                                   type="text"
