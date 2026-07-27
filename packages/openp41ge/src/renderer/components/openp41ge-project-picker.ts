@@ -163,6 +163,11 @@ export class Openp41geProjectPicker extends LitElement {
       padding-left: 9px;
     }
 
+    .project-item:focus {
+      outline: 2px solid var(--openp41ge-accent-color, #4a9eff);
+      outline-offset: -2px;
+    }
+
     .project-item .name {
       flex: 1;
       font-size: 14px;
@@ -582,7 +587,9 @@ export class Openp41geProjectPicker extends LitElement {
     requestAnimationFrame(() => {
       const items = this.shadowRoot?.querySelectorAll(".project-item");
       if (items && items[this._selectedIndex]) {
-        items[this._selectedIndex].scrollIntoView({ block: "nearest" });
+        const el = items[this._selectedIndex] as HTMLElement;
+        el.scrollIntoView({ block: "nearest" });
+        el.focus({ preventScroll: true });
       }
     });
   }
