@@ -407,6 +407,17 @@ export class Openp41geProjectPicker extends LitElement {
       top: 0;
     }
 
+    .detail-card .repo-group .worktree-list .add-wt-item {
+      cursor: pointer;
+      color: var(--openp41ge-accent-color, #4a9eff);
+      transition: background 0.1s;
+      border-radius: 3px;
+    }
+
+    .detail-card .repo-group .worktree-list .add-wt-item:hover {
+      background: rgba(74, 158, 255, 0.12);
+    }
+
     .detail-card .repo-tree .loading-text {
       color: var(--openp41ge-muted-text, #888);
       font-size: 12px;
@@ -640,6 +651,18 @@ export class Openp41geProjectPicker extends LitElement {
     }
   }
 
+  private _addWorktree(repoName: string): void {
+    if (!this._detailProject) return;
+    log.info(`Add worktree to repo "${repoName}" in project "${this._detailProject.name}"`);
+    this.dispatchEvent(
+      new CustomEvent("project:add-worktree", {
+        bubbles: true,
+        composed: true,
+        detail: { projectName: this._detailProject.name, repoName },
+      }),
+    );
+  }
+
   private _addRepository(): void {
     if (!this._detailProject) return;
     log.info(`Add repository to project: ${this._detailProject.name}`);
@@ -852,17 +875,21 @@ export class Openp41geProjectPicker extends LitElement {
                                         ${repo.name}
                                       </div>
                                       ${
-                                        repo.worktrees && repo.worktrees.length > 0
-                                          ? html`
-                                              <ul class="worktree-list">
-                                                ${repo.worktrees.map(
-                                                  (wt) => html`
-                                                    <li>${wt}</li>
-                                                  `,
-                                                )}
-                                              </ul>
-                                            `
-                                          : ""
+                                        html`
+                                          <ul class="worktree-list">
+                                            ${repo.worktrees.map(
+                                              (wt) => html`
+                                                <li>${wt}</li>
+                                              `,
+                                            )}
+                                            <li class="add-wt-item" @click=${() => this._addWorktree(repo.name)}>
+                                              <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:2px;">
+                                                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+                                              </svg>
+                                              Add Worktree
+                                            </li>
+                                          </ul>
+                                        `
                                       }
                                     </li>
                                   `,
