@@ -222,9 +222,9 @@ export class Openp41geProjectPicker extends LitElement {
     .right-panel {
       flex: 1;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 40px;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 24px;
       background: var(--openp41ge-bg-color, #1e1e1e);
     }
 
@@ -270,7 +270,6 @@ export class Openp41geProjectPicker extends LitElement {
     .detail-card .empty-hint {
       color: var(--openp41ge-muted-text, #888);
       font-size: 14px;
-      text-align: center;
     }
 
     /* ── Empty state ────────────────────────────── */
