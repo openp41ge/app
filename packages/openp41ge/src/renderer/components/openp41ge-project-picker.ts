@@ -67,15 +67,15 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .close-btn {
-      width: 32px;
-      height: 32px;
+      width: 24px;
+      height: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
       background: none;
       border: none;
       color: var(--openp41ge-muted-text, #888);
-      font-size: 18px;
+      font-size: 14px;
       cursor: pointer;
       border-radius: 4px;
       -webkit-app-region: no-drag;
