@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GitService } from "../src/git-service";
 import { TestGitAdapter } from "../src/test-adapter";
 
@@ -36,19 +36,63 @@ describe("GitService", () => {
       expect(() => service.clone("ftp://bad")).toThrow("Invalid URL format");
     });
 
-    it("reports progress", async () => {
+    it("reports progress to single subscriber", async () => {
       const session = service.clone("https://github.com/example/repo.git");
       const progresses: number[] = [];
       session.onProgress((p) => progresses.push(p.percent));
       const result = await session.promise;
       expect(result.success).toBe(true);
-      expect(progresses.length).toBeGreaterThan(0);
+      expect(progresses).toContain(50);
+      expect(progresses).toContain(100);
     });
 
-    it("can be destroyed", async () => {
+    it("reports progress to multiple subscribers", async () => {
+      const session = service.clone("https://github.com/example/repo.git");
+      const p1: number[] = [];
+      const p2: number[] = [];
+      session.onProgress((p) => p1.push(p.percent));
+      session.onProgress((p) => p2.push(p.percent));
+      await session.promise;
+      expect(p1.length).toBeGreaterThan(0);
+      expect(p2).toEqual(p1);
+    });
+
+    it("unsubscribe stops progress notifications", async () => {
+      const session = service.clone("https://github.com/example/repo.git");
+      const progresses: number[] = [];
+      const unsub = session.onProgress((p) => progresses.push(p.percent));
+      unsub();
+      await session.promise;
+      expect(progresses).toHaveLength(0);
+    });
+
+    it("can be destroyed before completion", async () => {
       const session = service.clone("https://github.com/example/repo.git");
       session.destroy();
       await expect(session.promise).rejects.toThrow("Clone aborted");
+    });
+
+    it("double destroy is safe", async () => {
+      const session = service.clone("https://github.com/example/repo.git");
+      session.destroy();
+      // Suppress the expected rejection so it doesn't leak as unhandled
+      session.promise.catch(() => {});
+      session.destroy(); // should not throw
+      await expect(session.promise).rejects.toThrow("Clone aborted");
+    });
+
+    it("clone makes the repo visible via listRepos", async () => {
+      const session = service.clone("https://github.com/example/new-repo.git");
+      await session.promise;
+      const repos = await service.listRepos();
+      expect(repos.some((r) => r.name === "new-repo")).toBe(true);
+    });
+
+    it("handles URL with complex path", async () => {
+      const session = service.clone("https://github.com/org/sub-group/my-repo.git");
+      await session.promise;
+      const repos = await service.listRepos();
+      expect(repos.some((r) => r.name === "my-repo")).toBe(true);
     });
   });
 
@@ -77,6 +121,7 @@ describe("GitService", () => {
       const repo = await service.getRepo("my-repo");
       expect(repo).not.toBeNull();
       expect(repo!.name).toBe("my-repo");
+      expect(repo!.url).toBe("https://github.com/example/my-repo.git");
     });
 
     it("removeRepo deletes the repo", async () => {
@@ -84,6 +129,18 @@ describe("GitService", () => {
       await service.removeRepo("my-repo");
       const repos = await service.listRepos();
       expect(repos).toHaveLength(0);
+    });
+
+    it("removeRepo cleans up associated worktrees and branches", async () => {
+      adapter.addRepo("my-repo", "url");
+      adapter.addWorktreeData("my-repo", "main");
+      adapter.addBranch("my-repo", "main");
+      await service.removeRepo("my-repo");
+      // Removed from all maps
+      const wts = await service.listWorktrees("my-repo");
+      expect(wts).toHaveLength(0);
+      const branches = await service.listBranches("my-repo");
+      expect(branches).toHaveLength(0);
     });
   });
 
@@ -100,12 +157,14 @@ describe("GitService", () => {
       const wts = await service.listWorktrees("my-repo");
       expect(wts).toHaveLength(1);
       expect(wts[0].branch).toBe("main");
+      expect(wts[0].exists).toBe(true);
     });
 
     it("checkoutWorktree creates a worktree", async () => {
       const wt = await service.checkoutWorktree("my-repo", "feature-x");
       expect(wt.branch).toBe("feature-x");
       expect(wt.exists).toBe(true);
+      expect(wt.path).toContain("feature-x");
     });
 
     it("addWorktree creates a worktree", async () => {
@@ -119,6 +178,28 @@ describe("GitService", () => {
       const wts = await service.listWorktrees("my-repo");
       expect(wts).toHaveLength(0);
     });
+
+    it("allows multiple worktrees on the same repo", async () => {
+      await service.addWorktree("my-repo", "main");
+      await service.addWorktree("my-repo", "develop");
+      await service.addWorktree("my-repo", "feature-x");
+      const wts = await service.listWorktrees("my-repo");
+      expect(wts).toHaveLength(3);
+    });
+
+    it("replaces existing worktree on checkout with same branch", async () => {
+      adapter.addWorktreeData("my-repo", "main", "/old/path");
+      const wt = await service.checkoutWorktree("my-repo", "main");
+      expect(wt.path).not.toBe("/old/path");
+      const wts = await service.listWorktrees("my-repo");
+      expect(wts).toHaveLength(1);
+    });
+
+    it("deleteWorktree on non-existent branch does not throw", async () => {
+      await expect(
+        service.deleteWorktree("my-repo", "nonexistent"),
+      ).resolves.toBeUndefined();
+    });
   });
 
   // ── Branches ──
@@ -131,6 +212,11 @@ describe("GitService", () => {
       expect(branches).toEqual(["main", "develop"]);
     });
 
+    it("listBranches returns empty array for unknown repo", async () => {
+      const branches = await service.listBranches("nonexistent");
+      expect(branches).toEqual([]);
+    });
+
     it("getDefaultBranch returns first branch", async () => {
       adapter.addBranch("my-repo", "main");
       const def = await service.getDefaultBranch("my-repo");
@@ -140,6 +226,167 @@ describe("GitService", () => {
     it("getDefaultBranch returns null when no branches", async () => {
       const def = await service.getDefaultBranch("my-repo");
       expect(def).toBeNull();
+    });
+
+    it("deleteLocalBranch resolves", async () => {
+      await expect(
+        service.deleteLocalBranch("my-repo", "feature-x", false),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  // ── Pull / Fetch ──
+
+  describe("pull & fetch", () => {
+    it("pullBranch resolves", async () => {
+      await expect(
+        service.pullBranch("my-repo", "main"),
+      ).resolves.toBeUndefined();
+    });
+
+    it("fetch resolves", async () => {
+      await expect(
+        service.fetch("my-repo"),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  // ── Commit log & branch metadata ──
+
+  describe("commit log & branch metadata", () => {
+    it("getCommitLog returns empty array by default", async () => {
+      const log = await service.getCommitLog("my-repo", "main");
+      expect(log).toEqual([]);
+    });
+
+    it("getCommitLog accepts options hash", async () => {
+      const log = await service.getCommitLog("my-repo", "main", {
+        maxCount: 10,
+        after: "abc123",
+      });
+      expect(log).toEqual([]);
+    });
+
+    it("getBranches returns empty array", async () => {
+      const branches = await service.getBranches("my-repo");
+      expect(branches).toEqual([]);
+    });
+
+    it("getDiffStat returns empty array", async () => {
+      const stat = await service.getDiffStat("my-repo");
+      expect(stat).toEqual([]);
+    });
+
+    it("getDiffStat accepts commit hash", async () => {
+      const stat = await service.getDiffStat("my-repo", "abc123");
+      expect(stat).toEqual([]);
+    });
+
+    it("getUntrackedFiles returns empty array", async () => {
+      const files = await service.getUntrackedFiles("my-repo");
+      expect(files).toEqual([]);
+    });
+  });
+
+  // ── Workset API ──
+
+  describe("workset API", () => {
+    it("worksetAddRepo returns true", async () => {
+      const ok = await service.worksetAddRepo("my-repo", "url");
+      expect(ok).toBe(true);
+    });
+
+    it("worksetAddRepo accepts optional worktrees", async () => {
+      const ok = await service.worksetAddRepo("my-repo", "url", ["main", "develop"]);
+      expect(ok).toBe(true);
+    });
+
+    it("worksetRemoveRepo returns true", async () => {
+      const ok = await service.worksetRemoveRepo("my-repo");
+      expect(ok).toBe(true);
+    });
+
+    it("worksetHasRepo returns true", async () => {
+      const ok = await service.worksetHasRepo("my-repo");
+      expect(ok).toBe(true);
+    });
+
+    it("worksetAddWorktreeToRepo returns true", async () => {
+      const ok = await service.worksetAddWorktreeToRepo("my-repo", "main");
+      expect(ok).toBe(true);
+    });
+
+    it("worksetGetRepoRefs returns JSON string", async () => {
+      adapter.repoRefs = JSON.stringify([
+        { name: "repo1", url: "url1", worktrees: ["main"] },
+      ]);
+      const refs = await service.worksetGetRepoRefs();
+      expect(refs).toBe(
+        JSON.stringify([{ name: "repo1", url: "url1", worktrees: ["main"] }]),
+      );
+    });
+  });
+
+  // ── onWorksetRepoRefsChanged ──
+
+  describe("onWorksetRepoRefsChanged", () => {
+    it("calls callback when triggered via adapter", () => {
+      const cb = vi.fn();
+      const unsub = service.onWorksetRepoRefsChanged(cb);
+      // Trigger the adapter's refs changed callbacks
+      adapter._refsChanged.forEach((fn) => fn());
+      expect(cb).toHaveBeenCalledTimes(1);
+      unsub();
+    });
+
+    it("unsubscribe stops receiving callbacks", () => {
+      const cb = vi.fn();
+      const unsub = service.onWorksetRepoRefsChanged(cb);
+      unsub();
+      adapter._refsChanged.forEach((fn) => fn());
+      expect(cb).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Integration ──
+
+  describe("integration", () => {
+    it("clone -> listWorktrees -> addWorktree -> deleteWorktree flow", async () => {
+      const session = service.clone("https://github.com/example/integration-repo.git");
+      await session.promise;
+
+      // Repo is now visible
+      const repos = await service.listRepos();
+      const repo = repos.find((r) => r.name === "integration-repo");
+      expect(repo).toBeTruthy();
+
+      // No worktrees initially
+      let wts = await service.listWorktrees("integration-repo");
+      expect(wts).toHaveLength(0);
+
+      // Add worktree
+      await service.addWorktree("integration-repo", "feature-foo");
+      wts = await service.listWorktrees("integration-repo");
+      expect(wts).toHaveLength(1);
+
+      // Delete worktree
+      await service.deleteWorktree("integration-repo", "feature-foo");
+      wts = await service.listWorktrees("integration-repo");
+      expect(wts).toHaveLength(0);
+    });
+
+    it("operates on multiple repos independently", async () => {
+      adapter.addRepo("repo-a", "url-a");
+      adapter.addRepo("repo-b", "url-b");
+      adapter.addWorktreeData("repo-a", "main");
+      adapter.addWorktreeData("repo-b", "develop");
+
+      expect(await service.listWorktrees("repo-a")).toHaveLength(1);
+      expect(await service.listWorktrees("repo-b")).toHaveLength(1);
+
+      await service.deleteWorktree("repo-a", "main");
+      expect(await service.listWorktrees("repo-a")).toHaveLength(0);
+      expect(await service.listWorktrees("repo-b")).toHaveLength(1);
     });
   });
 });
