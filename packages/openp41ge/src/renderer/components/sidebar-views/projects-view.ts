@@ -144,11 +144,6 @@ export class ProjectSidebarView implements SidebarView {
         .pv-item:first-child { border-top: 1px solid var(--border-divider); }
         .pv-item:hover { background: rgba(255,255,255,0.04); }
       </style>
-      <!-- Header -->
-      <div style="display:flex;align-items:center;height:36px;padding:0 12px;border-bottom:1px solid var(--border-divider);flex-shrink:0;">
-        <span style="font-size:12px;font-weight:600;color:#ccc;text-transform:uppercase;letter-spacing:0.5px;">Projects</span>
-      </div>
-
       <!-- Search -->
       <div style="flex-shrink:0;">
         <input id="pv-search" type="text" placeholder="Search projects..." value="${this._escapeHtml(this._searchQuery)}"
