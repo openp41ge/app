@@ -552,8 +552,7 @@ export class Openp41geProjectPicker extends LitElement {
           const idx = this._searchText.trim() ? this._selectedIndex - 1 : this._selectedIndex;
           const project = this._filteredProjects[idx];
           if (project) {
-            this._activateProject(project.name);
-            this._clearSearch();
+            this._showDetails(project);
           }
         }
         break;
