@@ -690,7 +690,7 @@ export class Openp41geProjectPicker extends LitElement {
       // If the deleted project was active, switch back to a draft
       if (name === this._activeProjectName) {
         this._activeProjectName = null;
-        window.__openp41geProjectName = null;
+        window.__openp41geProjectName = undefined;
         await window.openp41ge.project.createDraft();
         document.dispatchEvent(new CustomEvent("project:changed", { bubbles: true, detail: { name: null } }));
       }
