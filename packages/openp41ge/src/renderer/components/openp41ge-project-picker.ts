@@ -876,7 +876,7 @@ export class Openp41geProjectPicker extends LitElement {
                           ? html`
                               <div
                                 class="project-item create-item ${this._selectedIndex === 0 ? "selected" : ""}"
-                                tabindex="0"
+                                tabindex="${0 === this._selectedIndex ? "0" : "-1"}"
                                 @click=${() => this._createAndSelect(this._searchText.trim())}
                                 @focus=${() => { this._selectedIndex = 0; this._scrollToSelected(); }}
 
@@ -910,7 +910,7 @@ export class Openp41geProjectPicker extends LitElement {
                           return html`
                             <div
                               class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
-                              tabindex="0"
+                              tabindex="${idx === this._selectedIndex ? "0" : "-1"}"
                               @click=${(e: Event) => { e.stopPropagation(); this._showDetails(project); }}
                               @focus=${() => { this._selectedIndex = idx; this._scrollToSelected(); }}
                             >
