@@ -157,6 +157,20 @@ export function registerProjectHandlers(
     return projectStore.gcDrafts();
   });
 
+  ipcMain.handle("project:createDraft", async () => {
+    const name = projectStore.createDraft();
+    setCurrentProjectName(name);
+    const projectReposDir = projectStore.reposDir(name);
+    gitService.setReposDir(projectReposDir);
+    workspaceService.setReposDir(projectReposDir);
+    const statePath = projectStore.workspaceStatePath(name);
+    const saved = workspaceStateStore.load(statePath);
+    if (saved) {
+      dispatcher.replaceState(saved);
+    }
+    return name;
+  });
+
   ipcMain.handle("project:rename", async (_event, oldName: string, newName: string) => {
     return projectStore.rename(oldName, newName);
   });

@@ -687,6 +687,13 @@ export class Openp41geProjectPicker extends LitElement {
       if (this._selectedIndex >= this._listLength) {
         this._selectedIndex = Math.max(0, this._listLength - 1);
       }
+      // If the deleted project was active, switch back to a draft
+      if (name === this._activeProjectName) {
+        this._activeProjectName = null;
+        window.__openp41geProjectName = null;
+        await window.openp41ge.project.createDraft();
+        document.dispatchEvent(new CustomEvent("project:changed", { bubbles: true, detail: { name: null } }));
+      }
     } else {
       log.error(`Failed to delete project "${name}"`);
     }
