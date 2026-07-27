@@ -413,8 +413,8 @@ export class Openp41geProjectPicker extends LitElement {
       transition: background 0.1s;
       border-radius: 3px;
       display: inline-block;
-      padding: 2px 8px 2px 0;
-      margin: 2px 0 2px 18px;
+      padding: 2px 8px;
+      margin: 2px 0 2px 10px;
     }
 
     .detail-card .repo-group .worktree-list .add-wt-item::before,
