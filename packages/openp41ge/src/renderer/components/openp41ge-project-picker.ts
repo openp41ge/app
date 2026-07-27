@@ -65,13 +65,6 @@ export class Openp41geProjectPicker extends LitElement {
       -webkit-app-region: drag;
     }
 
-    .topbar-title {
-      flex: 1;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--openp41ge-text-color, #e0e0e0);
-    }
-
     .close-btn {
       width: 32px;
       height: 32px;
@@ -488,7 +481,7 @@ export class Openp41geProjectPicker extends LitElement {
     return html`
       <!-- Top bar -->
       <div class="topbar">
-        <div class="topbar-title">Projects</div>
+        <div style="flex:1;"></div>
         <button class="close-btn" @click=${this._dismiss} title="Close (Esc)">✕</button>
       </div>
 
