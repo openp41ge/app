@@ -147,9 +147,19 @@ export class Openp41geProjectPicker extends LitElement {
       margin-bottom: 0;
     }
 
-    .project-item:hover,
+    .project-item:hover {
+      background: var(--openp41ge-hover-bg, #333);
+      outline: 1px solid var(--openp41ge-accent-color, #4a9eff);
+      outline-offset: -1px;
+    }
+
     .project-item.selected {
       background: var(--openp41ge-hover-bg, #333);
+    }
+
+    .project-item.active {
+      border-left: 3px solid var(--openp41ge-accent-color, #4a9eff);
+      padding-left: 9px;
     }
 
     .project-item .name {
@@ -286,6 +296,7 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _selectedIndex = 0;
   @state() private _hoveredProject: ProjectInfo | null = null;
   @state() private _searchText = "";
+  @state() private _activeProjectName: string | null = null;
   @state() private _loading = true;
   private _disconnected = false;
 
@@ -303,11 +314,17 @@ export class Openp41geProjectPicker extends LitElement {
 
   private async _loadProjects(): Promise<void> {
     try {
-      const projects = await window.openp41ge.project.listWithInfo();
+      const [projects, currentName] = await Promise.all([
+        window.openp41ge.project.listWithInfo(),
+        window.openp41ge.project.current(),
+      ]);
       if (this._disconnected) return;
       this._projects = projects;
+      this._activeProjectName = currentName;
       this._applyFilter();
-      this._selectedIndex = 0;
+      // Highlight the currently active project, or first if none matches
+      const currentIdx = projects.findIndex((p) => p.name === currentName);
+      this._selectedIndex = currentIdx >= 0 ? currentIdx : 0;
     } catch (err) {
       log.error("Failed to load projects:", err);
     }
@@ -541,9 +558,10 @@ export class Openp41geProjectPicker extends LitElement {
                         (project, i) => {
                           const idx = showCreateOption ? i + 1 : i;
                           const isDraft = project.config?.draft === true;
+                          const isActive = project.name === this._activeProjectName;
                           return html`
                             <div
-                              class="project-item ${this._selectedIndex === idx ? "selected" : ""}"
+                              class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
                               @click=${() => this._selectProject(project.name)}
                               @mouseenter=${() => (this._hoveredProject = project)}
                             >
