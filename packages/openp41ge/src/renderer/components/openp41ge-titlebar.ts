@@ -75,11 +75,7 @@ class Openp41geTitleBar extends LitElement {
     const win = this.windowData;
     if (!win) return nothing;
 
-    const displayName = this._projectName
-      ? this._isDraft
-        ? "Draft Project"
-        : this._projectName
-      : "Openp41ge";
+    const displayName = this._projectName ?? "Openp41ge";
 
     const title = displayName;
 
