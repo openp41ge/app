@@ -16,7 +16,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { property } from "lit/decorators.js";
-import { fileIcon, projectsIcon } from "../icons";
+import { fileIcon } from "../icons";
 
 export interface ActivityBarItem {
   id: string;
@@ -25,7 +25,6 @@ export interface ActivityBarItem {
 }
 
 const DEFAULT_ACTIVITIES: ActivityBarItem[] = [
-  { id: "projects", label: "Projects", icon: "projects" },
   { id: "explorer", label: "Explorer", icon: "file" },
 ];
 
@@ -55,9 +54,6 @@ class Openp41geActivityBar extends LitElement {
   private _renderIcon(activity: ActivityBarItem): TemplateResult {
     if (activity.id === "explorer") {
       return html`${unsafeHTML(fileIcon(20))}`;
-    }
-    if (activity.id === "projects") {
-      return html`${unsafeHTML(projectsIcon(20))}`;
     }
     // Fallback: use the icon string as raw HTML
     return html`<span style="font-size:20px;">${activity.icon}</span>`;
