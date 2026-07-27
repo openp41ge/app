@@ -91,9 +91,14 @@ export function registerProjectHandlers(
           const fullPath = path.join(dir, entry.name);
           const gitDir = path.join(fullPath, ".git");
           if (fs.existsSync(gitDir)) {
-            const repoName = path.relative(reposDir, fullPath);
-            const worktrees = _getWorktreeBranches(gitDir);
-            repos.push({ name: repoName, worktrees });
+            if (fs.statSync(gitDir).isDirectory()) {
+              // Bare repo — add it and look for worktrees
+              const repoName = path.relative(reposDir, fullPath);
+              const worktrees = _getWorktreeBranches(gitDir);
+              repos.push({ name: repoName, worktrees });
+            }
+            // Worktree subdirectory (.git is a file) — skip walking into it
+            continue;
           }
           walk(fullPath);
         }
