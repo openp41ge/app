@@ -541,6 +541,14 @@ export class Openp41geProjectPicker extends LitElement {
     this.addEventListener("keydown", this._onKeyDown);
   }
 
+  firstUpdated(): void {
+    // Focus the search input on open
+    requestAnimationFrame(() => {
+      const input = this.shadowRoot?.querySelector(".search-row input") as HTMLInputElement | null;
+      if (input) input.focus();
+    });
+  }
+
   disconnectedCallback(): void {
     super.disconnectedCallback();
     appServices.keyboardManager.popModal();
