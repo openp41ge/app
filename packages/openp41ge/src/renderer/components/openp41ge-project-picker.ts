@@ -218,6 +218,15 @@ export class Openp41geProjectPicker extends LitElement {
         background 0.1s;
     }
 
+    .detail-card .detail-delete-btn:focus {
+      outline: none;
+    }
+
+    .detail-card .detail-delete-btn:focus-visible {
+      outline: 2px solid var(--openp41ge-accent-color, #4a9eff);
+      outline-offset: 2px;
+    }
+
     .detail-card .detail-delete-btn:hover {
       color: #e06c75;
       background: rgba(224, 108, 117, 0.15);
