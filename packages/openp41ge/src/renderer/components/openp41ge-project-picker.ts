@@ -186,28 +186,23 @@ export class Openp41geProjectPicker extends LitElement {
       color: #e5c07b;
     }
 
-    .project-item .delete-btn {
-      visibility: hidden;
-      background: none;
+    .detail-card .detail-delete-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
       border: none;
+      border-radius: 4px;
+      background: transparent;
       color: var(--openp41ge-muted-text, #888);
-      font-size: 16px;
-      line-height: 1;
       cursor: pointer;
-      padding: 2px 6px;
-      border-radius: 3px;
       transition:
         color 0.1s,
         background 0.1s;
-      user-select: none;
-      flex-shrink: 0;
     }
 
-    .project-item:hover .delete-btn {
-      visibility: visible;
-    }
-
-    .project-item .delete-btn:hover {
+    .detail-card .detail-delete-btn:hover {
       color: #e06c75;
       background: rgba(224, 108, 117, 0.15);
     }
@@ -891,15 +886,6 @@ export class Openp41geProjectPicker extends LitElement {
                                   }
                                 </svg>
                                 ${project.name}
-                              </span>
-                              ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
-                              <button
-                                class="delete-btn"
-                                title="Delete project"
-                                @click=${(e: Event) => this._deleteProject(e, project.name)}
-                              >
-                                ×
-                              </button>
                             </div>
                           `;
                         },
@@ -964,14 +950,28 @@ export class Openp41geProjectPicker extends LitElement {
                             `
                       }
                       ${
-                        !this._renaming && this._detailProject.name === this._activeProjectName
-                          ? html`<span class="active-badge">Active</span>`
-                          : !this._renaming ? html`
-                              <button class="switch-btn" @click=${() => this._selectProject(this._detailProject!.name)}>
-                                Switch to Project
-                                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor" style="vertical-align:middle;margin-left:4px;"><path d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"/></svg>
-                              </button>
-                            ` : ""
+                        this._renaming ? ""
+                          : html`
+                              <div style="display:flex;align-items:center;gap:8px;">
+                                ${
+                                  this._detailProject.name === this._activeProjectName
+                                    ? html`<span class="active-badge">Active</span>`
+                                    : html`
+                                        <button class="switch-btn" @click=${() => this._selectProject(this._detailProject!.name)}>
+                                          Switch to Project
+                                          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor" style="vertical-align:middle;margin-left:4px;"><path d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"/></svg>
+                                        </button>
+                                      `
+                                }
+                                <button
+                                  class="detail-delete-btn"
+                                  title="Delete project"
+                                  @click=${(e: Event) => this._deleteProject(e, this._detailProject!.name)}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path d="M2 4a1 1 0 0 1 1-1h2.5a1 1 0 0 1 .8-.4h3.4a1 1 0 0 1 .8.4H13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1-1-1V4zm2 1v7a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V5H4zm-1-1h10V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/></svg>
+                                </button>
+                              </div>
+                            `
                       }
                     </div>
                     ${
