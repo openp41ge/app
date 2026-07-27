@@ -22,7 +22,7 @@
  *   CustomEvent('project:dismissed') — when Escape is pressed or close clicked
  */
 
-import { LitElement, html, css, nothing, type TemplateResult } from "lit";
+import { LitElement, html, css, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
 
@@ -185,25 +185,37 @@ export class Openp41geProjectPicker extends LitElement {
       color: #e5c07b;
     }
 
-    .project-item .delete-btn {
+    .project-item .action-btn {
       visibility: hidden;
       background: none;
       border: none;
       color: var(--openp41ge-muted-text, #888);
-      font-size: 16px;
+      font-size: 14px;
       line-height: 1;
       cursor: pointer;
-      padding: 2px 6px;
+      padding: 2px 5px;
       border-radius: 3px;
       transition:
         color 0.1s,
         background 0.1s;
       user-select: none;
       flex-shrink: 0;
+      margin-left: 2px;
     }
 
-    .project-item:hover .delete-btn {
+    .project-item:hover .action-btn {
       visibility: visible;
+    }
+
+    .project-item .info-btn:hover {
+      color: var(--openp41ge-accent-color, #4a9eff);
+      background: rgba(74, 158, 255, 0.12);
+    }
+
+    .project-item .info-btn.active-info {
+      visibility: visible;
+      color: var(--openp41ge-accent-color, #4a9eff);
+      background: rgba(74, 158, 255, 0.12);
     }
 
     .project-item .delete-btn:hover {
@@ -244,10 +256,27 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .detail-card h2 {
-      margin: 0 0 4px 0;
-      font-size: 22px;
+      margin: 0 0 8px 0;
+      font-size: 20px;
       font-weight: 600;
       color: var(--openp41ge-text-color, #e0e0e0);
+    }
+
+    .detail-card .switch-btn {
+      display: inline-block;
+      padding: 6px 16px;
+      margin-bottom: 16px;
+      border: none;
+      border-radius: 4px;
+      background: var(--openp41ge-accent-color, #4a9eff);
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.1s;
+    }
+
+    .detail-card .switch-btn:hover {
+      opacity: 0.9;
     }
 
     .detail-card .draft-badge {
@@ -263,7 +292,7 @@ export class Openp41geProjectPicker extends LitElement {
     .detail-card .detail-row {
       display: flex;
       align-items: baseline;
-      padding: 6px 0;
+      padding: 5px 0;
       font-size: 13px;
     }
 
@@ -294,7 +323,7 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _projects: ProjectInfo[] = [];
   @state() private _filteredProjects: ProjectInfo[] = [];
   @state() private _selectedIndex = 0;
-  @state() private _hoveredProject: ProjectInfo | null = null;
+  @state() private _detailProject: ProjectInfo | null = null;
   @state() private _searchText = "";
   @state() private _activeProjectName: string | null = null;
   @state() private _loading = true;
@@ -378,6 +407,10 @@ export class Openp41geProjectPicker extends LitElement {
     }
   }
 
+  private _showDetails(project: ProjectInfo): void {
+    this._detailProject = project;
+  }
+
   private _scrollToSelected(): void {
     requestAnimationFrame(() => {
       const items = this.shadowRoot?.querySelectorAll(".project-item");
@@ -447,8 +480,8 @@ export class Openp41geProjectPicker extends LitElement {
     if (deleted) {
       this._projects = this._projects.filter((p) => p.name !== name);
       this._applyFilter();
-      if (this._hoveredProject?.name === name) {
-        this._hoveredProject = null;
+      if (this._detailProject?.name === name) {
+        this._detailProject = null;
       }
       if (this._selectedIndex >= this._listLength) {
         this._selectedIndex = Math.max(0, this._listLength - 1);
@@ -489,7 +522,7 @@ export class Openp41geProjectPicker extends LitElement {
     }
   }
 
-  render(): TemplateResult | typeof nothing {
+  render(): TemplateResult {
     const showCreateOption = this._searchText.trim().length > 0;
     const createLabel = showCreateOption ? `Create "${this._searchText.trim()}"` : "";
     const listItems = this._filteredProjects;
@@ -531,7 +564,7 @@ export class Openp41geProjectPicker extends LitElement {
                               <div
                                 class="project-item create-item ${this._selectedIndex === 0 ? "selected" : ""}"
                                 @click=${() => this._createAndSelect(this._searchText.trim())}
-                                @mouseenter=${() => (this._hoveredProject = null)}
+
                               >
                                 <span class="name">
                                   <svg
@@ -563,7 +596,6 @@ export class Openp41geProjectPicker extends LitElement {
                             <div
                               class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
                               @click=${() => this._selectProject(project.name)}
-                              @mouseenter=${() => (this._hoveredProject = project)}
                             >
                               <span class="name">
                                 <svg
@@ -587,7 +619,14 @@ export class Openp41geProjectPicker extends LitElement {
                               </span>
                               ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
                               <button
-                                class="delete-btn"
+                                class="action-btn info-btn ${this._detailProject?.name === project.name ? "active-info" : ""}"
+                                title="Show project details"
+                                @click=${(e: Event) => { e.stopPropagation(); this._showDetails(project); }}
+                              >
+                                ℹ
+                              </button>
+                              <button
+                                class="action-btn delete-btn"
                                 title="Delete project"
                                 @click=${(e: Event) => this._deleteProject(e, project.name)}
                               >
@@ -605,25 +644,28 @@ export class Openp41geProjectPicker extends LitElement {
         <!-- Right panel: project details -->
         <div class="right-panel">
           ${
-            this._hoveredProject
+            this._detailProject
               ? html`
                   <div class="detail-card">
-                    <h2>${this._hoveredProject.name}</h2>
+                    <h2>${this._detailProject.name}</h2>
+                    <button class="switch-btn" @click=${() => this._selectProject(this._detailProject!.name)}>
+                      Switch to Project
+                    </button>
                     ${
-                      this._hoveredProject.config?.draft
+                      this._detailProject.config?.draft
                         ? html`<div class="draft-badge">Draft</div>`
                         : ""
                     }
                     ${
-                      this._hoveredProject.config
+                      this._detailProject.config
                         ? html`
                             <div class="detail-row">
                               <span class="detail-label">Created</span>
-                              <span class="detail-value">${this._formatDate(this._hoveredProject.config.createdAt)}</span>
+                              <span class="detail-value">${this._formatDate(this._detailProject.config.createdAt)}</span>
                             </div>
                             <div class="detail-row">
                               <span class="detail-label">Modified</span>
-                              <span class="detail-value">${this._formatDate(this._hoveredProject.config.updatedAt)}</span>
+                              <span class="detail-value">${this._formatDate(this._detailProject.config.updatedAt)}</span>
                             </div>
                           `
                         : ""
@@ -633,7 +675,7 @@ export class Openp41geProjectPicker extends LitElement {
               : html`
                   <div class="empty-hint">
                     ${this._projects.length > 0
-                      ? "Hover over a project to see details"
+                      ? "Click ℹ on a project to see details"
                       : ""}
                   </div>
                 `
