@@ -552,7 +552,7 @@ export class Openp41geProjectPicker extends LitElement {
           const idx = this._searchText.trim() ? this._selectedIndex - 1 : this._selectedIndex;
           const project = this._filteredProjects[idx];
           if (project) {
-            this._selectProject(project.name);
+            this._activateProject(project.name);
           }
         }
         break;
@@ -602,12 +602,12 @@ export class Openp41geProjectPicker extends LitElement {
   private async _createAndSelect(name: string): Promise<void> {
     const exists = await window.openp41ge.project.exists(name);
     if (exists) {
-      this._selectProject(name);
+      await this._activateProject(name);
       return;
     }
     const created = await window.openp41ge.project.create(name);
     if (created) {
-      this._selectProject(name);
+      await this._activateProject(name);
     } else {
       log.error(`Failed to create project "${name}"`);
     }
