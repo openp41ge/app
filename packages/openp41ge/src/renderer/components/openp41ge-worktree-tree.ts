@@ -34,6 +34,7 @@ import { worktreePersistence } from "../services/worktree-persistence";
 import { setContextMenuActive } from "../services/drag-context";
 import type { RepoService } from "../models/repo-service";
 import { IpcRepoService } from "../models/ipc-repo-service";
+import { GitService, IpcGitAdapter } from "openp41ge-git";
 
 // ─── Workspace record type ─────────────────────────────────────────────
 
@@ -161,6 +162,13 @@ class Openp41geWorktreeTree extends LitElement {
    * In tests: TestRepoService can be injected externally.
    */
   _repoService: RepoService = new IpcRepoService();
+
+  /**
+   * Git service — wraps workspaceController git operations with adapter-based DI.
+   * In production: IpcGitAdapter (delegates to workspaceController).
+   * In tests: TestGitAdapter can be injected.
+   */
+  _gitService: GitService = new GitService(new IpcGitAdapter());
 
   // ── Git panel state ───────────────────────────────────────────────────────
   private _gitDisconnected = false;
@@ -1517,8 +1525,8 @@ class Openp41geWorktreeTree extends LitElement {
     this._ensureOpen();
 
     try {
-      const session = window.openp41ge.workspaceController.clone(url);
-      _cloneDestroy = session.destroy;
+      const session = this._gitService.clone(url);
+      _cloneDestroy = () => session.destroy();
 
       session.onProgress((progress: { percent: number; message: string }) => {
         if (this._cloneProgressBar) {
@@ -2102,7 +2110,7 @@ class Openp41geWorktreeTree extends LitElement {
       close();
 
       try {
-        await window.openp41ge.workspaceController.checkoutWorktree(repoName, branch);
+        await this._gitService.addWorktree(repoName, branch);
         toastService.show(`Worktree "${branch}" created`, "success");
         await this._loadRepos();
       } catch (err: unknown) {

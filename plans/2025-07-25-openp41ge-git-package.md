@@ -191,6 +191,6 @@ logic lives.
 - [x] `openp41ge-git` package builds, typechecks, and passes unit tests (19 tests)
 - [x] `openp41ge-git-demo` builds and runs, exercising all operations
 - [x] `openp41ge-project-picker` uses `GitService` via DI
-- [ ] `openp41ge-worktree-tree` uses `GitService` via DI, all existing tests pass
+- [x] `openp41ge-worktree-tree` uses `GitService` via DI, all existing tests pass
 - [x] `nx build` succeeds across the monorepo (git package + demo)
 - [x] `nx test` (all vitest) passes (582 tests)
