@@ -117,6 +117,27 @@ export class RegisterShortcutsStep implements IStartupStep {
     });
 
     km.register({
+      modifiers: 10, // Meta + Alt (cmd+option)
+      key: "b",
+      code: "KeyB",
+      handler: () => {
+        try {
+          const ws = context.workspaceState.getWorkspace();
+          if (!ws) return;
+          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+          if (!myWindowId) return;
+          const win = ws.windows.find((w) => w.id === myWindowId);
+          if (!win) return;
+          context.commandBus.dispatch("toggleSecondarySidebarViewOp", myWindowId, "projects");
+        } catch (_err) {
+          // ignore
+        }
+      },
+      description: "Toggle Projects Secondary Sidebar",
+      category: "View",
+    });
+
+    km.register({
       modifiers: 12, // Meta + Shift
       key: "o",
       code: "KeyO",
