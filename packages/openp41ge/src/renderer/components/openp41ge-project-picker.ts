@@ -553,6 +553,7 @@ export class Openp41geProjectPicker extends LitElement {
           const project = this._filteredProjects[idx];
           if (project) {
             this._activateProject(project.name);
+            this._clearSearch();
           }
         }
         break;
@@ -599,15 +600,23 @@ export class Openp41geProjectPicker extends LitElement {
     }
   }
 
+  private _clearSearch(): void {
+    this._searchText = "";
+    this._applyFilter();
+    this._selectedIndex = 0;
+  }
+
   private async _createAndSelect(name: string): Promise<void> {
     const exists = await window.openp41ge.project.exists(name);
     if (exists) {
       await this._activateProject(name);
+      this._clearSearch();
       return;
     }
     const created = await window.openp41ge.project.create(name);
     if (created) {
       await this._activateProject(name);
+      this._clearSearch();
     } else {
       log.error(`Failed to create project "${name}"`);
     }
@@ -812,8 +821,10 @@ export class Openp41geProjectPicker extends LitElement {
   }
 
   render(): TemplateResult {
-    const showCreateOption = this._searchText.trim().length > 0;
-    const createLabel = showCreateOption ? `Create "${this._searchText.trim()}"` : "";
+    const trimmed = this._searchText.trim();
+    const exactMatch = trimmed.length > 0 && this._projects.some((p) => p.name === trimmed);
+    const showCreateOption = trimmed.length > 0 && !exactMatch;
+    const createLabel = showCreateOption ? `Create "${trimmed}"` : "";
     const listItems = this._filteredProjects;
 
     return html`
