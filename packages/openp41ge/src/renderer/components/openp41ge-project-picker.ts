@@ -280,6 +280,15 @@ export class Openp41geProjectPicker extends LitElement {
       transition: background 0.1s;
     }
 
+    .detail-card .switch-btn:focus {
+      outline: none;
+    }
+
+    .detail-card .switch-btn:focus-visible {
+      outline: 2px solid var(--openp41ge-accent-color, #4a9eff);
+      outline-offset: 2px;
+    }
+
     .detail-card .switch-btn:hover {
       background: rgba(74, 158, 255, 0.12);
     }
