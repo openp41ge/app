@@ -141,13 +141,13 @@ export class ProjectSidebarView implements SidebarView {
       </div>
 
       <!-- Project list -->
-      <div id="pv-list" style="flex:1;overflow-y:auto;padding:0 4px;" tabindex="0">
+      <div id="pv-list" style="flex:1;overflow-y:auto;">
         ${this._filtered.length === 0 ? '<div style="padding:16px 12px;font-size:12px;color:#666;">No projects found</div>' : ""}
         ${this._filtered
           .map(
             (p, i) => `
           <div class="pv-item ${i === this._selectedIndex ? "pv-selected" : ""}" data-index="${i}"
-            style="display:flex;align-items:center;height:32px;padding:0 12px;cursor:pointer;border-radius:4px;font-size:13px;gap:6px;
+            style="display:flex;align-items:center;height:32px;padding:0 12px;cursor:pointer;font-size:13px;gap:6px;
               ${i === this._selectedIndex ? "background:rgba(74,158,255,0.12);" : ""}
               ${p.name === currentName ? "color:#4a9eff;" : "color:#ccc;"}">
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this._escapeHtml(p.name)}</span>
