@@ -523,6 +523,7 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _detailProject: ProjectInfo | null = null;
   @state() private _detailRepos: Array<{ name: string; worktrees: string[] }> | null = null;
   @state() private _detailReposDropIndex: number = -1;
+  @state() private _detailReposDragIdx: number = -1;
   @state() private _loadingRepos = false;
   @state() private _searchText = "";
   @state() private _activeProjectName: string | null = null;
@@ -1247,6 +1248,7 @@ export class Openp41geProjectPicker extends LitElement {
                                 }}
                                 @drop=${(e: DragEvent) => {
                                   this._detailReposDropIndex = -1;
+                                  this._detailReposDragIdx = -1;
                                   const dragName = e.dataTransfer?.getData("application/x-openp41ge-project-repo");
                                   if (!dragName || !this._detailRepos) return;
                                   e.preventDefault();
@@ -1266,18 +1268,23 @@ export class Openp41geProjectPicker extends LitElement {
                                   repos.splice(dropIndex > fromIdx ? dropIndex - 1 : dropIndex, 0, moved);
                                   this._detailRepos = repos;
                                 }}
+                                @dragend=${() => {
+                                  this._detailReposDropIndex = -1;
+                                  this._detailReposDragIdx = -1;
+                                }}
                               >
                                 ${this._detailRepos.map(
                                   (repo, idx) => html`
                                     ${this._detailReposDropIndex === idx
                                       ? html`<li style="height:16px;list-style:none;margin:0;padding:0;"></li>`
                                       : nothing}
-                                    <li class="repo-group">
+                                    <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'opacity:0;' : ''}">
                                       <div class="repo-header"
                                         draggable="true"
                                         @dragstart=${(e: DragEvent) => {
                                           e.dataTransfer!.setData("application/x-openp41ge-project-repo", repo.name);
                                           e.dataTransfer!.effectAllowed = "move";
+                                          this._detailReposDragIdx = idx;
                                         }}>
                                         <span style="display:inline-flex;align-items:center;color:#555;cursor:grab;margin-right:4px;">
                                           <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
