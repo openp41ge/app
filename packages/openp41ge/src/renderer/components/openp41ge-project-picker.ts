@@ -562,9 +562,9 @@ export class Openp41geProjectPicker extends LitElement {
         this._showSelectedDetails();
         break;
       case "Enter":
-        // If focus is on a button or input, let the browser fire its click event
-        const target = e.target as HTMLElement;
-        if (target.tagName === "BUTTON" || target.tagName === "INPUT") return;
+        // If focus is inside a button or input, let the browser fire its click event
+        const target = e.composedPath()[0] as HTMLElement;
+        if (target?.closest?.("button, input")) return;
         e.preventDefault();
         if (this._searchText.trim() && this._selectedIndex === 0) {
           this._createAndSelect(this._searchText.trim());
