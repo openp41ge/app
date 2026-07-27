@@ -166,8 +166,13 @@ export function registerProjectHandlers(
     const statePath = projectStore.workspaceStatePath(name);
     const saved = workspaceStateStore.load(statePath);
     if (saved) {
-      dispatcher.replaceState(saved);
+      dispatcher.setWorkspace(saved);
+    } else {
+      const fresh = createWorkspace("ws1");
+      const withExplorer = setSidebarViewOp(fresh, fresh.windows[0].id, "explorer");
+      dispatcher.setWorkspace(withExplorer);
     }
+    dispatcher.broadcast();
     return name;
   });
 
