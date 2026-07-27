@@ -93,18 +93,24 @@ class Openp41geTitleBar extends LitElement {
         <div style="width:${isMac ? 85 : 12}px;flex-shrink:0;"></div>
 
         <!-- Title (clickable to open project) -->
-        <div
-          style="flex:1;min-width:0;padding:0 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;-webkit-app-region:no-drag;transition:color 0.1s;"
-          title="Switch project"
-          @mouseenter=${(e: MouseEvent) => {
-            (e.currentTarget as HTMLElement).style.color = "var(--text-primary, #e0e0e0)";
-          }}
-          @mouseleave=${(e: MouseEvent) => {
-            (e.currentTarget as HTMLElement).style.color = "var(--text-muted, #888)";
-          }}
-          @click=${() => this._openProjectPicker()}
-        >
-          ${title}
+        <div style="flex:1;display:flex;align-items:center;min-width:0;padding:0 12px;">
+          <span
+            title="Switch project"
+            style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;"
+            @mouseenter=${(e: MouseEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.color = "var(--text-primary, #e0e0e0)";
+              el.style.background = "var(--hover-bg, #333)";
+            }}
+            @mouseleave=${(e: MouseEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.color = "var(--text-muted, #888)";
+              el.style.background = "transparent";
+            }}
+            @click=${() => this._openProjectPicker()}
+          >
+            ${title}
+          </span>
         </div>
 
         ${
