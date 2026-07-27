@@ -520,6 +520,8 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _activeProjectName: string | null = null;
   @state() private _renaming = false;
   @state() private _renameValue = "";
+  @state() private _addingRepo = false;
+  @state() private _repoUrl = "";
   @state() private _loading = true;
   private _disconnected = false;
 
@@ -807,17 +809,53 @@ export class Openp41geProjectPicker extends LitElement {
     );
   }
 
-  private _addRepository(): void {
+  private _startAddRepo(): void {
     if (!this._detailProject) return;
-    log.info(`Add repository to project: ${this._detailProject.name}`);
-    // Close the picker first, then signal the parent to handle repo addition
+    this._repoUrl = "";
+    this._addingRepo = true;
+    requestAnimationFrame(() => {
+      const input = this.shadowRoot?.querySelector(".add-repo-input") as HTMLInputElement | null;
+      if (input) {
+        input.focus();
+      }
+    });
+  }
+
+  private async _confirmAddRepo(): Promise<void> {
+    if (!this._detailProject) return;
+    const url = this._repoUrl.trim();
+    if (!url) return;
+    if (!url.startsWith("http") && !url.startsWith("git@") && !url.startsWith("ssh://")) {
+      log.warn("Invalid URL format");
+      return;
+    }
+    this._addingRepo = false;
+    this._repoUrl = "";
+    // Dispatch event so the parent can handle the actual clone
     this.dispatchEvent(
       new CustomEvent("project:add-repo", {
         bubbles: true,
         composed: true,
-        detail: { name: this._detailProject.name },
+        detail: { name: this._detailProject.name, url },
       }),
     );
+  }
+
+  private _cancelAddRepo(): void {
+    this._addingRepo = false;
+    this._repoUrl = "";
+  }
+
+  private _onRepoUrlKeydown(e: KeyboardEvent): void {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      this._confirmAddRepo();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      this._cancelAddRepo();
+    }
   }
 
   private _startRename(): void {
@@ -1177,12 +1215,48 @@ export class Openp41geProjectPicker extends LitElement {
                     }
 
                     <div class="add-repo-row">
-                      <div class="add-repo-btn" tabindex="0" @click=${() => this._addRepository()} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.stopPropagation(); this._addRepository(); } }}>
-                        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-left:4px;position:relative;top:0;">
-                          <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
-                        </svg>
-                        add repository
-                      </div>
+                      ${
+                        this._addingRepo
+                          ? html`
+                              <div style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);outline:2px solid var(--openp41ge-accent-color,#4a9eff);outline-offset:-2px;">
+                                <input
+                                  class="add-repo-input"
+                                  type="text"
+                                  placeholder="git clone URL"
+                                  .value=${this._repoUrl}
+                                  @input=${(e: Event) => { this._repoUrl = (e.target as HTMLInputElement).value; }}
+                                  @keydown=${this._onRepoUrlKeydown}
+                                  style="flex:1;min-width:0;height:24px;background:transparent;border:none;color:var(--openp41ge-text-color,#e0e0e0);font-size:12px;outline:none;font-family:inherit;"
+                                />
+                                <span
+                                  style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;margin-left:4px;color:var(--openp41ge-accent-color,#4a9eff);"
+                                  @click=${this._confirmAddRepo}
+                                  @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(74,158,255,0.12)"; }}
+                                  @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                  title="Confirm"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,8 7,11 12,4"/></svg>
+                                </span>
+                                <span
+                                  style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--openp41ge-muted-text,#888);"
+                                  @click=${this._cancelAddRepo}
+                                  @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+                                  @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                  title="Cancel"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+                                </span>
+                              </div>
+                            `
+                          : html`
+                              <div class="add-repo-btn" tabindex="0" @click=${this._startAddRepo} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.stopPropagation(); this._startAddRepo(); } }}>
+                                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-left:4px;position:relative;top:0;">
+                                  <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+                                </svg>
+                                add repository
+                              </div>
+                            `
+                      }
                     </div>
                   </div>
                 `
