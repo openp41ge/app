@@ -16,7 +16,6 @@ import { setContextMenuActive } from "../services/drag-context";
 import "./openp41ge-bottom-button";
 import "./openp41ge-activity-bar";
 import "./openp41ge-sidebar";
-import "./openp41ge-secondary-sidebar";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -103,11 +102,6 @@ class Openp41geWindowView extends LitElement {
           class="openp41ge-main-area"
           style="display:flex;flex:1;overflow:hidden;min-height:0;position:relative;"
         >
-          <openp41ge-secondary-sidebar
-            .windowId=${win.id}
-            .activeViewId=${win.secondarySidebar?.activeViewId ?? null}
-            .width=${win.secondarySidebar?.width ?? 280}
-          ></openp41ge-secondary-sidebar>
           <div
             class="openp41ge-grid-area"
             style="flex:1 1 200px;min-width:200px;position:relative;overflow:hidden"

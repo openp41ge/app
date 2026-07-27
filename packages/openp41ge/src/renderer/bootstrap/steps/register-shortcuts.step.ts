@@ -79,19 +79,19 @@ export class RegisterShortcutsStep implements IStartupStep {
       code: "KeyP",
       handler: () => {
         try {
-          const ws = context.workspaceState.getWorkspace();
-          if (!ws) return;
-          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
-          if (!myWindowId) return;
-          const win = ws.windows.find((w) => w.id === myWindowId);
-          if (!win) return;
-          context.commandBus.dispatch("toggleSecondarySidebarViewOp", myWindowId, "projects");
-        } catch (_err) {
-          // ignore
+          // showPanePicker — opens the pane picker overlay
+          // Dispatches the pane-picker event for the grid to handle
+          const panePickerEvent = new CustomEvent("openp41ge:show-pane-picker", {
+            bubbles: true,
+            composed: true,
+          });
+          document.dispatchEvent(panePickerEvent);
+        } catch (err) {
+          log.warn("Pane picker handler error:", err);
         }
       },
-      description: "Toggle Projects Secondary Sidebar",
-      category: "View",
+      description: "Show Pane Picker",
+      category: "Pane",
     });
 
     // ── File ────────────────────────────────────────────────────────
@@ -108,27 +108,6 @@ export class RegisterShortcutsStep implements IStartupStep {
           const win = ws.windows.find((w) => w.id === myWindowId);
           if (!win) return;
           context.commandBus.dispatch("toggleSidebarViewOp", myWindowId, "explorer");
-        } catch (_err) {
-          // ignore
-        }
-      },
-      description: "Toggle Explorer Sidebar",
-      category: "View",
-    });
-
-    km.register({
-      modifiers: 10, // Meta + Alt (cmd+option)
-      key: "b",
-      code: "KeyB",
-      handler: () => {
-        try {
-          const ws = context.workspaceState.getWorkspace();
-          if (!ws) return;
-          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
-          if (!myWindowId) return;
-          const win = ws.windows.find((w) => w.id === myWindowId);
-          if (!win) return;
-          context.commandBus.dispatch("toggleSecondarySidebarViewOp", myWindowId, "projects");
         } catch (_err) {
           // ignore
         }

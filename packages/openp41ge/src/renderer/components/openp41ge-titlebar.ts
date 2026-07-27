@@ -9,7 +9,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
-import { dispatch } from "../app";
+import { showProjectPicker } from "../services/project-switch-service";
 
 
 const isMac = (() => {
@@ -30,18 +30,48 @@ class Openp41geTitleBar extends LitElement {
   @property({ attribute: false })
   windowData: Window | null = null;
 
+  @state()
+  private _projectName: string | null = null;
+
+  @state()
+  private _isDraft = false;
+
   connectedCallback(): void {
     super.connectedCallback();
+    this._loadProjectName();
+    // Refresh when project changes (switched or saved)
+    document.addEventListener("project:changed", this._onProjectChanged);
+    this.addEventListener("draft:saved", this._onDraftSaved as EventListener);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    document.removeEventListener("project:changed", this._onProjectChanged);
+    this.removeEventListener("draft:saved", this._onDraftSaved as EventListener);
   }
 
-  private _openProjects(): void {
-    const win = this.windowData;
-    if (!win) return;
-    dispatch("toggleSecondarySidebarViewOp", win.id, "projects");
+  private _onProjectChanged = (): void => {
+    this._loadProjectName();
+  };
+
+  private _onDraftSaved = (): void => {
+    this._loadProjectName();
+  };
+
+  private _openProjectPicker(): void {
+    showProjectPicker();
+  }
+
+  private async _loadProjectName(): Promise<void> {
+    try {
+      const name = await window.openp41ge.project.current();
+      this._projectName = name;
+      if (name) {
+        this._isDraft = await window.openp41ge.project.isDraft(name);
+      }
+    } catch {
+      // preload might not be ready yet — ignore
+    }
   }
 
   render(): TemplateResult | typeof nothing {
@@ -58,6 +88,25 @@ class Openp41geTitleBar extends LitElement {
         <!-- Spacer to push content to the right -->
         <div style="flex:1;min-width:0;"></div>
 
+        <!-- Title (clickable to open project picker) -->
+        <span
+          title="Switch project"
+          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:48px;"
+          @mouseenter=${(e: MouseEvent) => {
+            const el = e.currentTarget as HTMLElement;
+            el.style.color = "var(--text-primary, #e0e0e0)";
+            el.style.background = "var(--hover-bg, #333)";
+          }}
+          @mouseleave=${(e: MouseEvent) => {
+            const el = e.currentTarget as HTMLElement;
+            el.style.color = "var(--text-muted, #888)";
+            el.style.background = "transparent";
+          }}
+          @click=${() => this._openProjectPicker()}
+        >
+          ${this._projectName ? (this._isDraft ? "Draft" : this._projectName) : "Openp41ge"}
+        </span>
+
         ${
           isMac
             ? ""
@@ -69,25 +118,6 @@ class Openp41geTitleBar extends LitElement {
                 </div>
               `
         }
-
-        <!-- Project name — opens secondary sidebar -->
-        <span
-          title="Projects"
-          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:12px;"
-          @mouseenter=${(e: MouseEvent) => {
-            const el = e.currentTarget as HTMLElement;
-            el.style.color = "var(--text-primary, #e0e0e0)";
-            el.style.background = "var(--hover-bg, #333)";
-          }}
-          @mouseleave=${(e: MouseEvent) => {
-            const el = e.currentTarget as HTMLElement;
-            el.style.color = "var(--text-muted, #888)";
-            el.style.background = "transparent";
-          }}
-          @click=${() => this._openProjects()}
-        >
-          Projects
-        </span>
       </div>
     `;
   }

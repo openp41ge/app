@@ -19,7 +19,7 @@ const log = createLogger("app");
 
 // ─── Component registration (side-effect imports — must be at module level) ──
 import "./components/openp41ge-windowview";
-
+import "./components/openp41ge-project-picker";
 import "./components/openp41ge-titlebar";
 import "./components/openp41ge-topbar";
 import "./components/openp41ge-contextmenu";
@@ -59,7 +59,7 @@ import type { Workspace } from "../layout/types";
 // Bootstrap pipeline
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { showProjectsSidebar } from "./services/project-switch-service";
+import { showProjectPicker } from "./services/project-switch-service";
 
 const context = new StartupContext();
 
@@ -217,7 +217,7 @@ if (window.openp41ge?.project?.onShowSaveDraftDialog) {
 // Listen for IPC from the main process File menu "Open Project..."
 if (window.openp41ge?.project?.onShowOpenProject) {
   window.openp41ge.project.onShowOpenProject(() => {
-    showProjectsSidebar();
+    showProjectPicker();
   });
 }
 

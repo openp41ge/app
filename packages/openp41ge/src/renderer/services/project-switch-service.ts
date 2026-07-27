@@ -12,7 +12,6 @@
 
 import { createLogger } from "openp41ge-logger";
 import { clearCapturedErrors } from "./error-capture-service";
-import { dispatch } from "../app";
 
 const log = createLogger("project-switch-service");
 
@@ -45,13 +44,27 @@ export async function switchToProject(name: string): Promise<boolean> {
 }
 
 /**
- * Open the Projects sidebar view in the secondary sidebar.
- * Dispatches a workspace operation to toggle the secondary sidebar view.
+ * Show the project picker and wire up selection/dismissal handlers.
+ * Handles the full lifecycle: mount, wait for selection, switch, cleanup.
  */
-export function showProjectsSidebar(): void {
-  dispatch("toggleSecondarySidebarViewOp", getWindowId(), "projects");
-}
+export function showProjectPicker(): void {
+  if (document.querySelector("openp41ge-project-picker")) return;
 
-function getWindowId(): string {
-  return window.openp41ge?.workspace?.getWindowId?.() ?? "";
+  const picker = document.createElement("openp41ge-project-picker");
+  document.body.appendChild(picker);
+
+  const onSelected = async (e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    if (detail?.name) {
+      picker.remove();
+      await switchToProject(detail.name);
+    }
+  };
+
+  const onDismissed = () => {
+    picker.remove();
+  };
+
+  picker.addEventListener("project:selected", onSelected as EventListener);
+  picker.addEventListener("project:dismissed", onDismissed as EventListener);
 }

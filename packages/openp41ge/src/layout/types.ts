@@ -180,7 +180,6 @@ export const WindowSchema = z.object({
   grid: GridSchema,
   repoRefs: z.array(RepoRefSchema).default([]),
   sidebar: SidebarStateSchema.optional().default({ activeViewId: null, width: 280 }),
-  secondarySidebar: SidebarStateSchema.optional().default({ activeViewId: null, width: 280 }),
   overlays: z.array(OverlaySchema).default([]),
 });
 export type Window = z.infer<typeof WindowSchema>;
@@ -194,7 +193,6 @@ export function createWindow(id: string, bounds?: Bounds, monitor?: number): Win
     grid,
     repoRefs: [],
     sidebar: { activeViewId: null, width: 280 },
-    secondarySidebar: { activeViewId: null, width: 280 },
     overlays: [],
   });
 }
