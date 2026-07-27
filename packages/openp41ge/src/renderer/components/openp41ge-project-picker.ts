@@ -25,9 +25,11 @@
 import { LitElement, html, css, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
+import { GitService, IpcGitAdapter } from "openp41ge-git";
 import { appServices } from "../app";
 
 const log = createLogger("openp41ge-project-picker");
+const gitService = new GitService(new IpcGitAdapter());
 
 interface ProjectInfo {
   name: string;
@@ -832,16 +834,13 @@ export class Openp41geProjectPicker extends LitElement {
     if (!this._detailProject) return;
     const url = this._repoUrl.trim();
     if (!url) return;
-    if (!url.startsWith("http") && !url.startsWith("git@") && !url.startsWith("ssh://")) {
-      log.warn("Invalid URL format");
-      return;
-    }
+
     this._cloning = true;
     this._clonePercent = 0;
     this._repoUrl = "";
     try {
-      const session = window.openp41ge.workspaceController.clone(url);
-      session.onProgress((progress: { percent: number; message: string }) => {
+      const session = gitService.clone(url);
+      session.onProgress((progress) => {
         this._clonePercent = progress.percent;
       });
       const result = await session.promise;

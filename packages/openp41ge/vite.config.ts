@@ -16,6 +16,7 @@ export default defineConfig({
       // Source aliases for dev mode — vite serves directly from lib package source
       // so changes are picked up without rebuilds. Build output (dist/) is still
       // used by nx run-many -t build for production builds.
+      { find: "openp41ge-git", replacement: path.resolve(__dirname, "../openp41ge-git/src") },
       { find: "openp41ge-logger", replacement: path.resolve(__dirname, "../openp41ge-logger/src") },
       { find: "openp41ge-tabs", replacement: path.resolve(__dirname, "../openp41ge-tabs/src") },
       {
