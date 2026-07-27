@@ -79,20 +79,25 @@ export class ProjectSidebarView implements SidebarView {
       const currentName = window.__openp41geProjectName;
 
       this._projects = await Promise.all(
-        projects.map(async (p: { name: string; config: { name: string; createdAt: string; updatedAt: string; draft?: boolean } | null }) => {
-          let isDraft = false;
-          try {
-            isDraft = await window.openp41ge.project.isDraft(p.name);
-          } catch {
-            // not a draft
-          }
-          return {
-            name: p.name,
-            createdAt: p.config ? new Date(p.config.createdAt).getTime() : Date.now(),
-            modifiedAt: p.config ? new Date(p.config.updatedAt).getTime() : Date.now(),
-            isDraft,
-          };
-        }),
+        projects.map(
+          async (p: {
+            name: string;
+            config: { name: string; createdAt: string; updatedAt: string; draft?: boolean } | null;
+          }) => {
+            let isDraft = false;
+            try {
+              isDraft = await window.openp41ge.project.isDraft(p.name);
+            } catch {
+              // not a draft
+            }
+            return {
+              name: p.name,
+              createdAt: p.config ? new Date(p.config.createdAt).getTime() : Date.now(),
+              modifiedAt: p.config ? new Date(p.config.updatedAt).getTime() : Date.now(),
+              isDraft,
+            };
+          },
+        ),
       );
 
       this._filter();
@@ -172,17 +177,7 @@ export class ProjectSidebarView implements SidebarView {
         this._filter();
       });
       searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          this._selectedIndex = Math.min(this._selectedIndex + 1, this._filtered.length - 1);
-          this._render();
-          this._scrollToSelected();
-        } else if (e.key === "ArrowUp") {
-          e.preventDefault();
-          this._selectedIndex = Math.max(0, this._selectedIndex - 1);
-          this._render();
-          this._scrollToSelected();
-        } else if (e.key === "Enter") {
+        if (e.key === "Enter") {
           e.preventDefault();
           const p = this._filtered[this._selectedIndex];
           if (p) this._openProject(p.name);
@@ -205,24 +200,13 @@ export class ProjectSidebarView implements SidebarView {
       });
 
       list.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          this._selectedIndex = Math.min(this._selectedIndex + 1, this._filtered.length - 1);
-          this._render();
-          this._scrollToSelected();
-        } else if (e.key === "ArrowUp") {
-          e.preventDefault();
-          this._selectedIndex = Math.max(0, this._selectedIndex - 1);
-          this._render();
-          this._scrollToSelected();
-        } else if (e.key === "Enter") {
+        if (e.key === "Enter") {
           e.preventDefault();
           const p = this._filtered[this._selectedIndex];
           if (p) this._openProject(p.name);
         }
       });
 
-      // Context menu
       list.addEventListener("contextmenu", (e) => {
         const item = (e.target as HTMLElement).closest(".pv-item") as HTMLElement | null;
         if (!item) return;
@@ -270,10 +254,7 @@ export class ProjectSidebarView implements SidebarView {
       for (const placement of win.grid.placements) {
         for (const tabId of placement.tabIds) {
           const tab = tabs[tabId];
-          if (
-            tab?.appType === "project-manager" &&
-            tab?.config?.projectName === name
-          ) {
+          if (tab?.appType === "project-manager" && tab?.config?.projectName === name) {
             dispatch("activateTabInCell", winId, tabId);
             return;
           }
@@ -308,9 +289,7 @@ export class ProjectSidebarView implements SidebarView {
       if (window.__openp41geProjectName === name) {
         window.__openp41geProjectName = newName;
       }
-      document.dispatchEvent(
-        new CustomEvent("project:changed", { detail: { name: newName } }),
-      );
+      document.dispatchEvent(new CustomEvent("project:changed", { detail: { name: newName } }));
       await this._loadProjects();
     } catch (err) {
       log.error("Rename failed:", err);
@@ -326,9 +305,7 @@ export class ProjectSidebarView implements SidebarView {
         await window.openp41ge.project.createDraft();
         const draftName = await window.openp41ge.project.current();
         window.__openp41geProjectName = draftName ?? undefined;
-        document.dispatchEvent(
-          new CustomEvent("project:changed", { detail: { name: draftName } }),
-        );
+        document.dispatchEvent(new CustomEvent("project:changed", { detail: { name: draftName } }));
       }
       await this._loadProjects();
       this._render();
@@ -345,12 +322,13 @@ export class ProjectSidebarView implements SidebarView {
       if (window.__openp41geProjectName) {
         const isDraft = await window.openp41ge.project.isDraft(window.__openp41geProjectName);
         if (isDraft) {
-          const saved = await window.openp41ge.project.saveDraftAs(window.__openp41geProjectName, name);
+          const saved = await window.openp41ge.project.saveDraftAs(
+            window.__openp41geProjectName,
+            name,
+          );
           if (!saved) return;
           window.__openp41geProjectName = name;
-          document.dispatchEvent(
-            new CustomEvent("project:changed", { detail: { name } }),
-          );
+          document.dispatchEvent(new CustomEvent("project:changed", { detail: { name } }));
         }
       }
       await this._loadProjects();
