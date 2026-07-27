@@ -85,9 +85,6 @@ class Openp41geTitleBar extends LitElement {
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
         <div style="width:${isMac ? 85 : 12}px;flex-shrink:0;"></div>
 
-        <!-- Spacer to push content to the right -->
-        <div style="flex:1;min-width:0;"></div>
-
         <!-- Title (clickable to open project picker) -->
         <span
           title="Switch project"
@@ -106,6 +103,9 @@ class Openp41geTitleBar extends LitElement {
         >
           ${this._projectName ? (this._isDraft ? "Draft" : this._projectName) : "Openp41ge"}
         </span>
+
+        <!-- Spacer to push content to the right -->
+        <div style="flex:1;min-width:0;"></div>
 
         ${
           isMac
