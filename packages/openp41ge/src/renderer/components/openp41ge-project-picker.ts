@@ -167,9 +167,16 @@ export class Openp41geProjectPicker extends LitElement {
       background: var(--openp41ge-hover-bg, #333);
     }
 
-    .project-item.active {
-      border-left: 3px solid var(--openp41ge-accent-color, #4a9eff);
-      padding-left: 9px;
+    .project-item .active-tag {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: rgba(74, 158, 255, 0.2);
+      color: var(--openp41ge-accent-color, #4a9eff);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
     }
 
     .project-item .name {
@@ -275,16 +282,6 @@ export class Openp41geProjectPicker extends LitElement {
 
     .detail-card .switch-btn:hover {
       background: rgba(74, 158, 255, 0.12);
-    }
-
-    .detail-card .active-badge {
-      padding: 6px 12px;
-      border: 1px solid var(--openp41ge-accent-color, #4a9eff);
-      border-radius: 4px;
-      background: transparent;
-      color: var(--openp41ge-accent-color, #4a9eff);
-      font-size: 12px;
-      white-space: nowrap;
     }
 
     .detail-card .draft-badge {
@@ -944,6 +941,9 @@ export class Openp41geProjectPicker extends LitElement {
                                   }
                                 </svg>
                                 ${project.name}
+                              </span>
+                              ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
+                              ${isActive ? html`<span class="active-tag">Active</span>` : ""}
                             </div>
                           `;
                         },
@@ -1012,14 +1012,13 @@ export class Openp41geProjectPicker extends LitElement {
                           : html`
                               <div style="display:flex;align-items:center;gap:8px;">
                                 ${
-                                  this._detailProject.name === this._activeProjectName
-                                    ? html`<span class="active-badge">Active</span>`
-                                    : html`
+                                  this._detailProject.name !== this._activeProjectName
+                                    ? html`
                                         <button class="switch-btn" @click=${() => this._activateProject(this._detailProject!.name)}>
                                           Activate
                                           <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor" style="vertical-align:middle;margin-left:4px;"><path d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"/></svg>
                                         </button>
-                                      `
+                                      ` : ""
                                 }
                                 <button
                                   class="detail-delete-btn"
