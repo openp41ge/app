@@ -127,6 +127,11 @@ export class Openp41geProjectPicker extends LitElement {
       border-color: var(--openp41ge-accent-color, #4a9eff);
     }
 
+    .project-list:focus {
+      outline: 2px solid var(--openp41ge-accent-color, #4a9eff);
+      outline-offset: -2px;
+    }
+
     .project-list {
       flex: 1;
       overflow-y: auto;
@@ -161,11 +166,6 @@ export class Openp41geProjectPicker extends LitElement {
     .project-item.active {
       border-left: 3px solid var(--openp41ge-accent-color, #4a9eff);
       padding-left: 9px;
-    }
-
-    .project-item:focus {
-      outline: 2px solid var(--openp41ge-accent-color, #4a9eff);
-      outline-offset: -2px;
     }
 
     .project-item .name {
@@ -543,11 +543,13 @@ export class Openp41geProjectPicker extends LitElement {
         e.preventDefault();
         this._selectedIndex = Math.min(this._selectedIndex + 1, this._listLength - 1);
         this._scrollToSelected();
+        this._showSelectedDetails();
         break;
       case "ArrowUp":
         e.preventDefault();
         this._selectedIndex = Math.max(this._selectedIndex - 1, 0);
         this._scrollToSelected();
+        this._showSelectedDetails();
         break;
       case "Enter":
         e.preventDefault();
@@ -581,6 +583,15 @@ export class Openp41geProjectPicker extends LitElement {
     }
     if (this._disconnected || this._detailProject?.name !== project.name) return;
     this._loadingRepos = false;
+  }
+
+  private _showSelectedDetails(): void {
+    // Skip the create-item (index 0 when search is non-empty)
+    const idx = this._searchText.trim() ? this._selectedIndex - 1 : this._selectedIndex;
+    const project = this._filteredProjects[idx];
+    if (project && project.name !== this._detailProject?.name) {
+      this._showDetails(project);
+    }
   }
 
   private _scrollToSelected(): void {
@@ -862,7 +873,7 @@ export class Openp41geProjectPicker extends LitElement {
             />
           </div>
 
-          <div class="project-list">
+          <div class="project-list" tabindex="0">
             ${
               this._loading
                 ? html`<div class="empty-state">Loading...</div>`
@@ -876,10 +887,8 @@ export class Openp41geProjectPicker extends LitElement {
                           ? html`
                               <div
                                 class="project-item create-item ${this._selectedIndex === 0 ? "selected" : ""}"
-                                tabindex="${0 === this._selectedIndex ? "0" : "-1"}"
-                                @click=${() => this._createAndSelect(this._searchText.trim())}
-                                @focus=${() => { this._selectedIndex = 0; this._scrollToSelected(); }}
 
+                                @click=${() => this._createAndSelect(this._searchText.trim())}
                               >
                                 <span class="name">
                                   <svg
@@ -910,9 +919,7 @@ export class Openp41geProjectPicker extends LitElement {
                           return html`
                             <div
                               class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
-                              tabindex="${idx === this._selectedIndex ? "0" : "-1"}"
                               @click=${(e: Event) => { e.stopPropagation(); this._showDetails(project); }}
-                              @focus=${() => { this._selectedIndex = idx; this._scrollToSelected(); }}
                             >
                               <span class="name">
                                 <svg
