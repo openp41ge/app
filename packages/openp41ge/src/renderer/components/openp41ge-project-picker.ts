@@ -365,7 +365,7 @@ export class Openp41geProjectPicker extends LitElement {
 
     .detail-card .repo-group .worktree-list li {
       position: relative;
-      padding: 3px 0 3px 32px;
+      padding: 3px 0 3px 31px;
       font-size: 12px;
       color: var(--openp41ge-muted-text, #888);
     }
@@ -414,7 +414,7 @@ export class Openp41geProjectPicker extends LitElement {
       border-radius: 3px;
       display: inline-block;
       padding: 2px 8px 2px 0;
-      margin: 2px 0 2px 10px;
+      margin: 2px 0 2px 18px;
     }
 
     .detail-card .repo-group .worktree-list .add-wt-item::before,
