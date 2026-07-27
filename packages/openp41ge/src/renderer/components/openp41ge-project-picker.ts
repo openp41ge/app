@@ -412,6 +412,7 @@ export class Openp41geProjectPicker extends LitElement {
       color: var(--openp41ge-accent-color, #4a9eff);
       transition: background 0.1s;
       border-radius: 3px;
+      padding-right: 10px;
     }
 
     .detail-card .repo-group .worktree-list .add-wt-item:hover {
