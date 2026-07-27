@@ -98,7 +98,7 @@ class Openp41geTitleBar extends LitElement {
         <!-- Title (clickable to open project) -->
         <span
           title="Switch project"
-          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:6px;"
+          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:48px;"
           @mouseenter=${(e: MouseEvent) => {
             const el = e.currentTarget as HTMLElement;
             el.style.color = "var(--text-primary, #e0e0e0)";
