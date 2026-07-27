@@ -895,14 +895,14 @@ export class Openp41geProjectPicker extends LitElement {
                       ${
                         this._renaming
                           ? html`
-                              <div style="display:flex;align-items:center;gap:6px;flex:1;">
+                              <div style="display:flex;align-items:center;flex:1;gap:4px;padding-right:4px;border:1px solid var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);">
                                 <input
                                   class="rename-input"
                                   type="text"
                                   .value=${this._renameValue}
                                   @input=${this._onRenameInput}
                                   @keydown=${this._onRenameKeyDown}
-                                  style="flex:1;padding:4px 8px;border:1px solid var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);color:var(--openp41ge-text-color,#e0e0e0);font-size:16px;font-weight:600;outline:none;"
+                                  style="flex:1;border:none;outline:none;background:transparent;color:var(--openp41ge-text-color,#e0e0e0);font-size:20px;font-weight:600;padding:4px 0 4px 8px;"
                                 />
                                 <button
                                   title="Confirm"
