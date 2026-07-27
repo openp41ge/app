@@ -176,7 +176,7 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .project-item .delete-btn {
-      display: none;
+      visibility: hidden;
       background: none;
       border: none;
       color: var(--openp41ge-muted-text, #888);
@@ -193,7 +193,7 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .project-item:hover .delete-btn {
-      display: inline-block;
+      visibility: visible;
     }
 
     .project-item .delete-btn:hover {
