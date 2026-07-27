@@ -58,10 +58,22 @@ class Openp41geTitleBar extends LitElement {
         <!-- Spacer to push content to the right -->
         <div style="flex:1;min-width:0;"></div>
 
+        ${
+          isMac
+            ? ""
+            : html`
+                <div style="display:flex;height:100%;flex-shrink:0;">
+                  ${this._winBtn("\u2500", false, () => window.openp41ge?.window.minimize())}
+                  ${this._winBtn("\u25a1", false, () => window.openp41ge?.window.maximize())}
+                  ${this._winBtn("\u2715", true, () => window.openp41ge?.window.close())}
+                </div>
+              `
+        }
+
         <!-- Project name — opens secondary sidebar -->
         <span
           title="Projects"
-          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:48px;"
+          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:12px;"
           @mouseenter=${(e: MouseEvent) => {
             const el = e.currentTarget as HTMLElement;
             el.style.color = "var(--text-primary, #e0e0e0)";
@@ -76,18 +88,6 @@ class Openp41geTitleBar extends LitElement {
         >
           Projects
         </span>
-
-        ${
-          isMac
-            ? ""
-            : html`
-                <div style="display:flex;height:100%;flex-shrink:0;">
-                  ${this._winBtn("\u2500", false, () => window.openp41ge?.window.minimize())}
-                  ${this._winBtn("\u25a1", false, () => window.openp41ge?.window.maximize())}
-                  ${this._winBtn("\u2715", true, () => window.openp41ge?.window.close())}
-                </div>
-              `
-        }
       </div>
     `;
   }

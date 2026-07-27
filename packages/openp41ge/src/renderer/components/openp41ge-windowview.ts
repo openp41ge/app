@@ -16,6 +16,7 @@ import { setContextMenuActive } from "../services/drag-context";
 import "./openp41ge-bottom-button";
 import "./openp41ge-activity-bar";
 import "./openp41ge-sidebar";
+import "./openp41ge-secondary-sidebar";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
