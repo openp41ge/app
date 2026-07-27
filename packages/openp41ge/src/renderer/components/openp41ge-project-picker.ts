@@ -522,7 +522,7 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _selectedIndex = 0;
   @state() private _detailProject: ProjectInfo | null = null;
   @state() private _detailRepos: Array<{ name: string; worktrees: string[] }> | null = null;
-  @state() private _detailReposDropIndex: number = -1;
+  private _dragRepoName: string | null = null;
   @state() private _loadingRepos = false;
   @state() private _searchText = "";
   @state() private _activeProjectName: string | null = null;
@@ -1222,56 +1222,52 @@ export class Openp41geProjectPicker extends LitElement {
                         : this._detailRepos && this._detailRepos.length > 0
                           ? html`
                               <ul class="repo-tree"
+                                @dragstart=${(e: DragEvent) => {
+                                  const dt = e.dataTransfer;
+                                  if (dt && dt.types.includes("application/x-openp41ge-project-repo")) {
+                                    this._dragRepoName = dt.getData("application/x-openp41ge-project-repo");
+                                  }
+                                }}
                                 @dragenter=${(e: DragEvent) => {
-                                  if (e.dataTransfer?.types.includes("application/x-openp41ge-project-repo")) e.preventDefault();
+                                  if (e.dataTransfer?.types.includes("application/x-openp41ge-project-repo")) {
+                                    e.preventDefault();
+                                  }
                                 }}
                                 @dragover=${(e: DragEvent) => {
-                                  if (!e.dataTransfer?.types.includes("application/x-openp41ge-project-repo")) return;
+                                  if (!e.dataTransfer?.types.includes("application/x-openp41ge-project-repo") || !this._detailRepos || !this._dragRepoName) return;
                                   e.preventDefault();
                                   e.dataTransfer.dropEffect = "move";
+                                  // Live reorder: move the dragged item on every dragover
+                                  const fromIdx = this._detailRepos.findIndex((r) => r.name === this._dragRepoName);
+                                  if (fromIdx === -1) return;
                                   const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
-                                  let idx = this._detailRepos?.length ?? 0;
+                                  let toIdx = this._detailRepos.length - 1;
                                   if (items) {
                                     for (let i = 0; i < items.length; i++) {
                                       const rect = items[i].getBoundingClientRect();
-                                      if (e.clientY < rect.top + rect.height / 2) { idx = i; break; }
+                                      if (e.clientY < rect.top + rect.height / 2) { toIdx = i; break; }
                                     }
                                   }
-                                  this._detailReposDropIndex = idx;
+                                  // Adjust target index to account for the dragged item's absence
+                                  if (toIdx > fromIdx) toIdx--;
+                                  if (toIdx === fromIdx) return;
+                                  const repos = [...this._detailRepos];
+                                  const [moved] = repos.splice(fromIdx, 1);
+                                  repos.splice(toIdx, 0, moved);
+                                  this._detailRepos = repos;
                                 }}
                                 @dragleave=${(e: DragEvent) => {
                                   const t = e.currentTarget as HTMLElement;
                                   const r = e.relatedTarget as Node | null;
                                   if (r && t.contains(r)) return;
-                                  this._detailReposDropIndex = -1;
+                                  this._dragRepoName = null;
                                 }}
                                 @drop=${(e: DragEvent) => {
-                                  this._detailReposDropIndex = -1;
-                                  const dragName = e.dataTransfer?.getData("application/x-openp41ge-project-repo");
-                                  if (!dragName || !this._detailRepos) return;
-                                  e.preventDefault();
-                                  const repos = [...this._detailRepos];
-                                  const fromIdx = repos.findIndex((r) => r.name === dragName);
-                                  if (fromIdx === -1) return;
-                                  const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
-                                  let dropIndex = repos.length;
-                                  if (items) {
-                                    for (let i = 0; i < items.length; i++) {
-                                      const rect = items[i].getBoundingClientRect();
-                                      if (e.clientY < rect.top + rect.height / 2) { dropIndex = i; break; }
-                                    }
-                                  }
-                                  if (fromIdx === dropIndex || dropIndex === fromIdx + 1) return;
-                                  const [moved] = repos.splice(fromIdx, 1);
-                                  repos.splice(dropIndex > fromIdx ? dropIndex - 1 : dropIndex, 0, moved);
-                                  this._detailRepos = repos;
+                                  this._dragRepoName = null;
                                 }}
                               >
                                 ${this._detailRepos.map(
-                                  (repo, idx) => html`
-                                    ${this._detailReposDropIndex === idx
-                                      ? html`<li style="height:14px;list-style:none;margin:0;padding:0;"></li>`
-                                      : nothing}
+                                  (repo) => html`
                                     <li class="repo-group">
                                       <div class="repo-header"
                                         draggable="true"
@@ -1309,9 +1305,6 @@ export class Openp41geProjectPicker extends LitElement {
                                     </li>
                                   `,
                                 )}
-                              ${this._detailReposDropIndex === (this._detailRepos?.length ?? 0)
-                                ? html`<li style="height:14px;list-style:none;margin:0;padding:0;"></li>`
-                                : nothing}
                               </ul>
                             `
                           : html`<div class="loading-text">No repositories</div>`
