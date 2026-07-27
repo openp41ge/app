@@ -9,6 +9,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
+import { showProjectPicker } from "../services/project-switch-service";
 
 const isMac = (() => {
   try {
@@ -51,9 +52,7 @@ class Openp41geTitleBar extends LitElement {
   };
 
   private _openProjectPicker(): void {
-    if (document.querySelector("openp41ge-project-picker")) return;
-    const picker = document.createElement("openp41ge-project-picker");
-    document.body.appendChild(picker);
+    showProjectPicker();
   }
 
   private async _loadProjectName(): Promise<void> {

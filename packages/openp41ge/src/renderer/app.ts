@@ -60,6 +60,8 @@ import type { Workspace } from "../layout/types";
 // Bootstrap pipeline
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { showProjectPicker } from "./services/project-switch-service";
+
 const context = new StartupContext();
 
 const steps = [
@@ -215,10 +217,7 @@ if (window.openp41ge?.project?.onShowSaveDraftDialog) {
 // Listen for IPC from the main process File menu "Open Project..."
 if (window.openp41ge?.project?.onShowOpenProject) {
   window.openp41ge.project.onShowOpenProject(() => {
-    // Don't stack multiple pickers
-    if (document.querySelector("openp41ge-project-picker")) return;
-    const picker = document.createElement("openp41ge-project-picker");
-    document.body.appendChild(picker);
+    showProjectPicker();
   });
 }
 
