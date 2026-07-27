@@ -831,14 +831,28 @@ export class Openp41geProjectPicker extends LitElement {
     }
     this._addingRepo = false;
     this._repoUrl = "";
-    // Dispatch event so the parent can handle the actual clone
-    this.dispatchEvent(
-      new CustomEvent("project:add-repo", {
-        bubbles: true,
-        composed: true,
-        detail: { name: this._detailProject.name, url },
-      }),
-    );
+    try {
+      const session = window.openp41ge.workspaceController.clone(url);
+      const result = await session.promise;
+      if (result.success) {
+        log.info(`Repository cloned from ${url}`);
+        // Reload repos in the detail panel
+        if (this._detailProject) {
+          const projName = this._detailProject.name;
+          this._loadingRepos = true;
+          window.openp41ge.project.listRepos(projName).then((repos) => {
+            if (!this._disconnected && this._detailProject?.name === projName) {
+              this._detailRepos = repos;
+              this._loadingRepos = false;
+            }
+          });
+        }
+      } else {
+        log.error(`Failed to clone: ${result.error}`);
+      }
+    } catch (err) {
+      log.error("Clone failed:", err);
+    }
   }
 
   private _cancelAddRepo(): void {
