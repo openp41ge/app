@@ -12,7 +12,6 @@
 
 import type { SidebarView } from "./sidebar-view";
 import { createLogger } from "openp41ge-logger";
-import { switchToProject } from "../../services/project-switch-service";
 import { dispatch } from "../../app";
 
 const log = createLogger("projects-view");
@@ -254,11 +253,6 @@ export class ProjectSidebarView implements SidebarView {
   }
 
   private async _openProject(name: string): Promise<void> {
-    // 1. Switch the active project context
-    const switched = await switchToProject(name);
-    if (!switched) return;
-
-    // 2. Open a project-manager tab (or activate existing one)
     const winId = window.openp41ge.workspace.getWindowId();
     if (!winId) return;
 
@@ -287,9 +281,9 @@ export class ProjectSidebarView implements SidebarView {
       }
     }
 
-    // Use the last active column
+    // Open as unpinned (preview) tab in the last active column
     const targetCol = this._getLastActiveCellCol();
-    dispatch("addColumnTabAt", winId, "project-manager", name, name, targetCol);
+    dispatch("openTabInCell", winId, "project-manager", name, name, targetCol, false);
   }
 
   private _getLastActiveCellCol(): number {
@@ -351,14 +345,17 @@ export class ProjectSidebarView implements SidebarView {
       if (window.__openp41geProjectName) {
         const isDraft = await window.openp41ge.project.isDraft(window.__openp41geProjectName);
         if (isDraft) {
-          await window.openp41ge.project.saveDraftAs(window.__openp41geProjectName, name);
+          const saved = await window.openp41ge.project.saveDraftAs(window.__openp41geProjectName, name);
+          if (!saved) return;
+          window.__openp41geProjectName = name;
+          document.dispatchEvent(
+            new CustomEvent("project:changed", { detail: { name } }),
+          );
         }
       }
-      const switched = await switchToProject(name);
-      if (switched) {
-        await this._loadProjects();
-        this._render();
-      }
+      await this._loadProjects();
+      this._render();
+      this._openProject(name);
     } catch (err) {
       log.error("Create project failed:", err);
     }
