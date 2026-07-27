@@ -356,20 +356,17 @@ export class Openp41geApplication {
               }
             },
           },
+          { type: "separator" },
           {
-            label: "New Tab",
-            accelerator: "CmdOrCtrl+T",
+            label: "Open Project...",
+            accelerator: "CmdOrCtrl+O",
             click: () => {
               const focused = BrowserWindow.getFocusedWindow();
-              for (const [id, bw] of openp41geWindows) {
-                if (bw === focused) {
-                  handleNewTab(id);
-                  return;
-                }
+              if (focused && !focused.isDestroyed()) {
+                focused.webContents.send("menu:open-project");
               }
             },
           },
-          { type: "separator" },
           {
             label: "Save Project As...",
             accelerator: "CmdOrCtrl+Shift+S",
@@ -377,20 +374,6 @@ export class Openp41geApplication {
               const focused = BrowserWindow.getFocusedWindow();
               if (focused && !focused.isDestroyed()) {
                 focused.webContents.send("menu:save-draft");
-              }
-            },
-          },
-          { type: "separator" },
-          {
-            label: "New Pane",
-            accelerator: "CmdOrCtrl+P",
-            click: () => {
-              const focused = BrowserWindow.getFocusedWindow();
-              for (const [id, bw] of openp41geWindows) {
-                if (bw === focused) {
-                  handleNewColumn(id);
-                  return;
-                }
               }
             },
           },

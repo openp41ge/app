@@ -159,6 +159,8 @@ declare global {
         gcDrafts: () => Promise<number>;
         /** Register callback for File > Save Project As... menu item. Returns unsubscribe. */
         onShowSaveDraftDialog: (callback: () => void) => () => void;
+        /** Register callback for File > Open Project... menu item. Returns unsubscribe. */
+        onShowOpenProject: (callback: () => void) => () => void;
       };
     };
 

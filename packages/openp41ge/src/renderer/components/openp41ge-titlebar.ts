@@ -9,9 +9,6 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
-import { createLogger } from "openp41ge-logger";
-
-const log = createLogger("openp41ge-titlebar");
 
 const isMac = (() => {
   try {
@@ -65,18 +62,6 @@ class Openp41geTitleBar extends LitElement {
     }
   }
 
-  private _onSaveDraftClick(): void {
-    if (!this._projectName || !this._isDraft) return;
-    log.info("Save draft triggered from titlebar");
-    this.dispatchEvent(
-      new CustomEvent("draft:save", {
-        bubbles: true,
-        composed: true,
-        detail: { draftName: this._projectName },
-      }),
-    );
-  }
-
   render(): TemplateResult | typeof nothing {
     const win = this.windowData;
     if (!win) return nothing;
@@ -96,33 +81,11 @@ class Openp41geTitleBar extends LitElement {
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
         <div style="width:${isMac ? 85 : 12}px;flex-shrink:0;"></div>
 
-        <!-- Title with draft badge -->
+        <!-- Title -->
         <div
-          style="flex:1;min-width:0;padding:0 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px;"
+          style="flex:1;min-width:0;padding:0 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
         >
-          <span>${title}</span>
-          ${
-            this._isDraft
-              ? html`
-                  <button
-                    title="Save this draft as a permanent project"
-                    style="font-size:11px;padding:2px 8px;border:1px solid var(--accent, #4a9eff);border-radius:4px;background:transparent;color:var(--accent, #4a9eff);cursor:pointer;white-space:nowrap;-webkit-app-region:no-drag;transition:background 0.1s;"
-                    @mouseenter=${(e: MouseEvent) => {
-                      (e.currentTarget as HTMLElement).style.background = "rgba(74, 158, 255, 0.15)";
-                    }}
-                    @mouseleave=${(e: MouseEvent) => {
-                      (e.currentTarget as HTMLElement).style.background = "transparent";
-                    }}
-                    @click=${(e: MouseEvent) => {
-                      e.stopPropagation();
-                      this._onSaveDraftClick();
-                    }}
-                  >
-                    Save Project
-                  </button>
-                `
-              : ""
-          }
+          ${title}
         </div>
 
         ${

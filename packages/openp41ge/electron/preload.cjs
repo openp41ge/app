@@ -493,5 +493,11 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.on("menu:save-draft", handler);
       return () => ipcRenderer.removeListener("menu:save-draft", handler);
     },
+    /** Register callback for when the File > "Open Project..." menu item is clicked. */
+    onShowOpenProject: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("menu:open-project", handler);
+      return () => ipcRenderer.removeListener("menu:open-project", handler);
+    },
   },
 });

@@ -199,13 +199,6 @@ function _showSaveDraftDialog(draftName?: string): void {
   });
 }
 
-// Listen for the titlebar's "Save Project" button
-// We use a document-level listener since the titlebar may be recreated
-document.addEventListener("draft:save", ((e: CustomEvent) => {
-  const detail = e.detail;
-  _showSaveDraftDialog(detail?.draftName);
-}) as EventListener);
-
 // Listen for IPC from the main process File menu "Save Project As..."
 // Guarded because the preload mock in tests may not have this method.
 if (window.openp41ge?.project?.onShowSaveDraftDialog) {
@@ -216,6 +209,16 @@ if (window.openp41ge?.project?.onShowSaveDraftDialog) {
         _showSaveDraftDialog(name);
       }
     });
+  });
+}
+
+// Listen for IPC from the main process File menu "Open Project..."
+if (window.openp41ge?.project?.onShowOpenProject) {
+  window.openp41ge.project.onShowOpenProject(() => {
+    // Don't stack multiple pickers
+    if (document.querySelector("openp41ge-project-picker")) return;
+    const picker = document.createElement("openp41ge-project-picker");
+    document.body.appendChild(picker);
   });
 }
 
