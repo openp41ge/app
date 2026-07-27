@@ -258,19 +258,19 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .detail-card .switch-btn {
-      padding: 6px 16px;
+      padding: 6px 12px;
       border: none;
       border-radius: 4px;
-      background: var(--openp41ge-accent-color, #4a9eff);
-      color: #fff;
+      background: transparent;
+      color: var(--openp41ge-accent-color, #4a9eff);
       font-size: 13px;
       cursor: pointer;
-      transition: opacity 0.1s;
       white-space: nowrap;
+      transition: background 0.1s;
     }
 
     .detail-card .switch-btn:hover {
-      opacity: 0.9;
+      background: rgba(74, 158, 255, 0.12);
     }
 
     .detail-card .draft-badge {
