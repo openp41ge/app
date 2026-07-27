@@ -84,6 +84,15 @@ export class Openp41geProjectPicker extends LitElement {
         color 0.1s;
     }
 
+    .close-btn:focus {
+      outline: none;
+    }
+
+    .close-btn:focus-visible {
+      outline: 2px solid var(--openp41ge-accent-color, #4a9eff);
+      outline-offset: 2px;
+    }
+
     .close-btn:hover {
       background: rgba(255, 255, 255, 0.1);
       color: var(--openp41ge-text-color, #e0e0e0);
