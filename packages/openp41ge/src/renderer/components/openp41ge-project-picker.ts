@@ -972,6 +972,7 @@ export class Openp41geProjectPicker extends LitElement {
       this._confirmRename();
     } else if (e.key === "Escape") {
       e.preventDefault();
+      e.stopPropagation();
       this._cancelRename();
     }
   }
