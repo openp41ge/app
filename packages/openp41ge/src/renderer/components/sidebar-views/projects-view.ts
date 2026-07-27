@@ -123,6 +123,8 @@ export class ProjectSidebarView implements SidebarView {
 
     el.innerHTML = `
       <style>
+        .pv-item { border-bottom: 1px solid var(--border-divider); }
+        .pv-item:first-child { border-top: 1px solid var(--border-divider); }
         .pv-item:hover { background: rgba(255,255,255,0.04); }
       </style>
       <!-- Header -->
