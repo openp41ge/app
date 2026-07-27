@@ -50,6 +50,12 @@ class Openp41geTitleBar extends LitElement {
     this._loadProjectName();
   };
 
+  private _openProjectPicker(): void {
+    if (document.querySelector("openp41ge-project-picker")) return;
+    const picker = document.createElement("openp41ge-project-picker");
+    document.body.appendChild(picker);
+  }
+
   private async _loadProjectName(): Promise<void> {
     try {
       const name = await window.openp41ge.project.current();
@@ -81,9 +87,17 @@ class Openp41geTitleBar extends LitElement {
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
         <div style="width:${isMac ? 85 : 12}px;flex-shrink:0;"></div>
 
-        <!-- Title -->
+        <!-- Title (clickable to open project) -->
         <div
-          style="flex:1;min-width:0;padding:0 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+          style="flex:1;min-width:0;padding:0 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;-webkit-app-region:no-drag;transition:color 0.1s;"
+          title="Switch project"
+          @mouseenter=${(e: MouseEvent) => {
+            (e.currentTarget as HTMLElement).style.color = "var(--text-primary, #e0e0e0)";
+          }}
+          @mouseleave=${(e: MouseEvent) => {
+            (e.currentTarget as HTMLElement).style.color = "var(--text-muted, #888)";
+          }}
+          @click=${() => this._openProjectPicker()}
         >
           ${title}
         </div>
