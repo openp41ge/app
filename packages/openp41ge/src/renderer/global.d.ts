@@ -153,7 +153,7 @@ declare global {
         delete: (name: string) => Promise<boolean>;
         workspaceStatePath: (name: string) => Promise<string>;
         reposDir: (name: string) => Promise<string>;
-        listRepos: (name: string) => Promise<string[]>;
+        listRepos: (name: string) => Promise<Array<{ name: string; worktrees: string[] }>>;
         current: () => Promise<string | null>;
         switchTo: (name: string) => Promise<{ success: boolean; error?: string }>;
         saveDraftAs: (draftName: string, newName: string) => Promise<boolean>;

@@ -13,6 +13,7 @@
 import { ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
+import { execSync } from "child_process";
 import type { WorkspaceStateStore } from "../../src/main/services/workspace-state-store";
 import type { ProjectStore } from "../../src/main/services/project-store";
 import type { OperationDispatcher } from "../../src/main/services/operation-dispatcher";
@@ -63,16 +64,22 @@ export function registerProjectHandlers(
   });
 
   /**
-   * List repos for a given project.
+   * List repos for a given project, each with their worktrees.
    * Walks the repos directory tree recursively and returns repo paths
    * relative to the repos dir (e.g. "github.com/owner/repo").
+   * For each repo, runs git worktree list to find worktree branches.
    */
   ipcMain.handle("project:listRepos", (_event, name: string) => {
     const reposDir = projectStore.reposDir(name);
     try {
       if (!fs.existsSync(reposDir)) return [];
 
-      const repos: string[] = [];
+      interface RepoEntry {
+        name: string;
+        worktrees: string[];
+      }
+
+      const repos: RepoEntry[] = [];
       const walk = (dir: string) => {
         let entries: fs.Dirent[];
         try {
@@ -85,18 +92,50 @@ export function registerProjectHandlers(
           const fullPath = path.join(dir, entry.name);
           const gitDir = path.join(fullPath, ".git");
           if (fs.existsSync(gitDir)) {
-            repos.push(path.relative(reposDir, fullPath));
+            const repoName = path.relative(reposDir, fullPath);
+            const worktrees = _getWorktreeBranches(gitDir);
+            repos.push({ name: repoName, worktrees });
           }
           walk(fullPath);
         }
       };
 
       walk(reposDir);
-      return repos.sort();
+      repos.sort((a, b) => a.name.localeCompare(b.name));
+      return repos;
     } catch {
       return [];
     }
   });
+
+  /**
+   * Run git worktree list --porcelain and extract branch names.
+   * Returns an array of branch names (or "(detached HEAD)" for detached worktrees).
+   */
+  function _getWorktreeBranches(gitDir: string): string[] {
+    try {
+      const output = execSync(`git --git-dir="${gitDir}" worktree list --porcelain`, {
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "ignore"],
+      });
+      const worktrees: string[] = [];
+      const lines = output.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("branch ")) {
+          const ref = line.slice(7).trim(); // "refs/heads/branch-name"
+          const branch = ref.replace("refs/heads/", "");
+          worktrees.push(branch);
+        }
+        if (line.startsWith("HEAD ") && !lines.some((l) => l.startsWith("branch "))) {
+          worktrees.push("(detached HEAD)");
+        }
+      }
+      return worktrees.filter((b, i, arr) => arr.indexOf(b) === i); // deduplicate
+    } catch {
+      return [];
+    }
+  }
 
   ipcMain.handle("project:current", () => {
     return currentProjectName();
