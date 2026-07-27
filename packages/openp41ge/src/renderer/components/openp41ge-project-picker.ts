@@ -894,7 +894,7 @@ export class Openp41geProjectPicker extends LitElement {
                                               <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:2px;">
                                                 <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
                                               </svg>
-                                              Add Worktree
+                                              add worktree
                                             </li>
                                           </ul>
                                         `
@@ -912,7 +912,7 @@ export class Openp41geProjectPicker extends LitElement {
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:4px;">
                           <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
                         </svg>
-                        Add Repository
+                        add repository
                       </div>
                     </div>
                   </div>
