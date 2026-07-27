@@ -476,7 +476,7 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .detail-card .add-repo-btn {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 6px;
       padding: 6px 10px;
