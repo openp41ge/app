@@ -25,8 +25,8 @@ export interface ActivityBarItem {
 }
 
 const DEFAULT_ACTIVITIES: ActivityBarItem[] = [
-  { id: "explorer", label: "Explorer", icon: "file" },
   { id: "projects", label: "Projects", icon: "projects" },
+  { id: "explorer", label: "Explorer", icon: "file" },
 ];
 
 const ACTIVITY_BAR_WIDTH = 48;
