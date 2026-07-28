@@ -27,7 +27,7 @@ export function registerDispatchHandlers(dispatcher: OperationDispatcher): void 
       dispatcher.broadcast();
       closeOrphanedWindows();
 
-      if (fn === "detachTabToWindow") {
+      if (fn === "detachTabToWindow" || fn === "actionOpenFileInNewWindow") {
         const ws = dispatcher.getWorkspace();
         const existingIds = new Set<string>();
         for (const [id] of openp41geWindows) existingIds.add(id);

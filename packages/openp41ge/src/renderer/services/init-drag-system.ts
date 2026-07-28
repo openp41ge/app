@@ -257,15 +257,16 @@ export function initDragSystem(): () => void {
       if (_localFileDragActive && _pendingFileDetachPath) {
         const filePath = _pendingFileDetachPath;
         _pendingFileDetachPath = null;
-        // Use a short delay so cross-window IPC (endSession) has time to
-        // set _fileDropHandled before we decide to create a new window.
+        // Use setTimeout(0) to yield to the event loop, allowing any
+        // pending IPC messages (endSession from cross-window drops) to
+        // be delivered before we decide whether to create a new window.
         setTimeout(() => {
           if (!_fileDropHandled) {
             const fileName = filePath.split("/").filter(Boolean).pop() || "file";
             window.openp41ge.workspace.dispatch("actionOpenFileInNewWindow", filePath, fileName);
           }
           _fileDropHandled = false;
-        }, 200);
+        }, 0);
       }
       _localDragActive = false;
       _localFileDragActive = false;
