@@ -84,6 +84,14 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
     (el as Openp41geWindowviewElement).workspaceData = ws;
     (el as Openp41geWindowviewElement).layouts = context.workspaceState.getLayouts();
 
+    // Wait for the windowview's Lit update cycle to complete before syncing
+    // controller mounts. This ensures <tab-grid> has received its updated
+    // .placements property from the windowview's render before mountController()
+    // searches for tabs in the grid layout. Without this await, sync() runs
+    // synchronously after setting windowData but before Lit's async microtask
+    // processes the windowview update, leaving grid placements stale.
+    await (el as Openp41geWindowviewElement).updateComplete;
+
     // Sync controller mounts after the grid has rendered its DOM
     // (await Lit's updateComplete to ensure [data-tab-id] elements exist).
     if (windowId) {

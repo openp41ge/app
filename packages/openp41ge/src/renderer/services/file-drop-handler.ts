@@ -50,10 +50,6 @@ export class FileDropHandler implements IFileDropHandler {
     const winId = this._resolveWinId(gridEl);
     const targetCol = this._resolveTargetCol(gridEl, _e);
 
-    // Set pending path so FileEditorController picks it up on mount
-    window.__pendingFilePath = filePath;
-    window.__pendingFileName = filePath.split("/").pop() || filePath;
-
     // Dispatch the grid-open-tab event that Openp41geTabsEventHandler handles
     gridEl.dispatchEvent(
       new CustomEvent("grid-open-tab", {

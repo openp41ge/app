@@ -48,6 +48,19 @@ export class TabMountManager {
     // Wait for the grid to finish rendering so [data-tab-id] elements exist
     if (grid && "updateComplete" in grid) {
       await (grid as unknown as { updateComplete: Promise<void> }).updateComplete;
+      // Also wait for all <tab-content> children to finish their Lit updates.
+      // grid.updateComplete only waits for the grid element itself, but
+      // <tab-content> elements are queued for update during the grid's render
+      // and may still be pending. Without this await, mountController queries
+      // stale DOM with old data-tab-id placements and appends to controller
+      // divs that will be removed when tab-content finally re-renders.
+      const tabContents = document.querySelectorAll("tab-content");
+      await Promise.all(
+        Array.from(tabContents).map(
+          (tc) =>
+            (tc as unknown as { updateComplete: Promise<void> }).updateComplete,
+        ),
+      );
     }
 
     const allCurrentTabIds = new Set<string>();
@@ -64,7 +77,14 @@ export class TabMountManager {
         const entry = this._getOrCreateEntry(tab, workspace, grid, tabId);
         if (!entry) continue;
 
-        if (!grid) {
+        // Re-mount the controller container on every sync. This ensures
+        // that when the grid re-renders (e.g., tab moved to another column),
+        // the container is re-parented to the correct column's tab-content
+        // controller slot. mountController() is idempotent — it only appends
+        // if the container isn't already a child.
+        if (grid) {
+          grid.mountController(tabId, entry.container);
+        } else {
           // Legacy fallback: inject into grid cell directly
           this._injectIntoCell(entry.container, col);
         }

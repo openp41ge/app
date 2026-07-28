@@ -169,8 +169,10 @@ declare global {
       };
     };
 
-    // Inter-module state passing (set by file-open-handler, consumed by file-editor-controller)
+    // @deprecated — no longer consumed by FileEditorController. The file path is now
+    // passed through tab.config.filePath via restore() before mount().
     __pendingFilePath?: string | null;
+    // @deprecated — no longer consumed. Kept for migration compat.
     __pendingFileName?: string;
     __pendingGitRepo?: string | null;
 

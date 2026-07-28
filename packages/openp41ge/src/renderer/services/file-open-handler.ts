@@ -74,8 +74,6 @@ export class FileOpenHandler implements IFileOpenHandler {
       const existingPreviewTabId = this._findPreviewInCell(targetCol);
       if (existingPreviewTabId) {
         log.info("replace preview via actionOpenFile", existingPreviewTabId);
-        window.__pendingFilePath = filePath;
-        window.__pendingFileName = fileName;
         this._commandBus!.dispatch(
           "actionOpenFile",
           myWindowId,
@@ -100,8 +98,6 @@ export class FileOpenHandler implements IFileOpenHandler {
       targetCol,
       pinned,
     );
-    window.__pendingFilePath = filePath;
-    window.__pendingFileName = fileName;
   }
 
   openPreview(filePath: string, fileName: string): void {
@@ -130,8 +126,6 @@ export class FileOpenHandler implements IFileOpenHandler {
       targetCol,
       pinned,
     );
-    window.__pendingFilePath = filePath;
-    window.__pendingFileName = fileName;
   }
 
   private _getLastActiveCellCol(): number {

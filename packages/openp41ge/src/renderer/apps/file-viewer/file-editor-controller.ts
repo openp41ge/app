@@ -84,14 +84,9 @@ export class FileEditorController extends BaseController implements FileViewerCo
   mount(container: HTMLElement): void {
     this.container = container;
 
-    // Use the pending file path if set
-    const pendingPath = window.__pendingFilePath;
-    if (pendingPath) {
-      this.filePath = pendingPath;
-      this.state.filePath = pendingPath;
-      window.__pendingFilePath = null;
-    }
-
+    // File path is already set by restore() from tab.config.filePath
+    // before mount() is called. Do NOT use window.__pendingFilePath —
+    // it races with concurrent file opens and overrides the correct path.
     const fileName = this.filePath.split("/").filter(Boolean).pop() || "Untitled";
 
     // Layout
