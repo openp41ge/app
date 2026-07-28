@@ -1245,17 +1245,23 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._detailReposDragIdx = fromIdx;
                                           this._dragRepoName = repo.name;
                                           this._dragEl = e.currentTarget as HTMLElement;
-                                          // Clone the full repo row (.repo-group <li>) for exact visual match
+                                          // Clone the repo header for height accuracy, width from the full row
                                           const header = e.currentTarget as HTMLElement;
                                           const row = header.closest(".repo-group") as HTMLElement;
-                                          const rect = row.getBoundingClientRect();
-                                          this._dragOffsetX = e.clientX - rect.left;
-                                          this._dragOffsetY = e.clientY - rect.top;
+                                          const rowRect = row.getBoundingClientRect();
+                                          const headerRect = header.getBoundingClientRect();
+                                          this._dragOffsetX = e.clientX - rowRect.left;
+                                          this._dragOffsetY = e.clientY - headerRect.top;
+                                          // Clone the full row then strip the worktree list
                                           const clone = row.cloneNode(true) as HTMLElement;
-                                          // Remove worktree list from clone (only need the header row)
                                           const wtList = clone.querySelector(".worktree-list");
                                           if (wtList) wtList.remove();
-                                          // Copy computed styles recursively so the clone looks identical outside shadow DOM.
+                                          // Collapse vertical padding: the <li> has 6px top/bottom padding,
+                                          // but we only want the header height. Set padding to 0 and let
+                                          // the header's own padding provide vertical space.
+                                          clone.style.paddingTop = "0";
+                                          clone.style.paddingBottom = "0";
+                                          // Copy computed styles from row (minus dimensions)
                                           const copyStyles = (src: Element, dst: Element) => {
                                             const cs = getComputedStyle(src);
                                             for (let i = 0; i < cs.length; i++) {
@@ -1263,6 +1269,7 @@ export class Openp41geProjectPicker extends LitElement {
                                               if (prop.startsWith("--")) continue;
                                               if (prop === "cursor" || prop === "pointer-events") continue;
                                               if (prop === "width" || prop === "height" || prop === "min-width" || prop === "min-height" || prop === "max-width" || prop === "max-height") continue;
+                                              if (prop === "padding-top" || prop === "padding-bottom" || prop === "padding") continue;
                                               if (dst instanceof HTMLElement || dst instanceof SVGElement) {
                                                 dst.style.setProperty(prop, cs.getPropertyValue(prop));
                                               }
@@ -1276,13 +1283,13 @@ export class Openp41geProjectPicker extends LitElement {
                                             }
                                           };
                                           copyStyles(row, clone);
-                                          // Override positioning and visual extras
+                                          // Size to the header's dimensions (width comes from row for full span)
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
                                           clone.style.opacity = "1";
-                                          clone.style.width = Math.round(rect.width) + "px";
-                                          clone.style.height = Math.round(rect.height) + "px";
+                                          clone.style.width = Math.round(rowRect.width) + "px";
+                                          clone.style.height = Math.round(headerRect.height) + "px";
                                           clone.style.top = (e.clientY - this._dragOffsetY) + "px";
                                           clone.style.left = (e.clientX - this._dragOffsetX) + "px";
                                           clone.style.margin = "0";
