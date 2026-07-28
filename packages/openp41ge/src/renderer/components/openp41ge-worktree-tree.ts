@@ -211,13 +211,19 @@ class Openp41geWorktreeTree extends LitElement {
     this._boundExplorerPointerUp = (ev: PointerEvent) => {
       if (this._explorerDragIdx < 0) return;
       ev.preventDefault();
-      // Persist the new repo order synchronously using the global project name
-      const projectName = window.__openp41geProjectName;
-      if (projectName) {
-        const orderNames = this._repos.map((r) => r.name);
-        window.openp41ge.project.setRepoOrder(projectName, orderNames).then(() => {
+      // Persist the new repo order
+      const orderNames = this._repos.map((r) => r.name);
+      const saveOrder = (name: string) => {
+        window.openp41ge.project.setRepoOrder(name, orderNames).then(() => {
           document.dispatchEvent(new CustomEvent("project:changed"));
         });
+      };
+      const pn = window.__openp41geProjectName;
+      if (pn) {
+        saveOrder(pn);
+      } else {
+        // Fallback: get project name via IPC
+        window.openp41ge.project.current().then((n) => { if (n) saveOrder(n); });
       }
       // Clean up
       this._explorerDragIdx = -1;
@@ -469,7 +475,7 @@ class Openp41geWorktreeTree extends LitElement {
                   ${this._dropIndex === idx
                     ? html`<div style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"></div>`
                     : nothing}
-                  <div style="display:flex;align-items:stretch;flex:1;${this._explorerDragIdx === idx ? 'opacity:0.3;' : ''}">
+                  <div style="display:flex;align-items:stretch;width:100%;${this._explorerDragIdx === idx ? 'opacity:0.3;' : ''}">
                     <!-- Grip area for drag reorder -->
                     <span
                       style="display:flex;align-items:center;justify-content:center;width:16px;flex-shrink:0;cursor:grab;color:#444;"
