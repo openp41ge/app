@@ -1,11 +1,23 @@
 import type { GitAdapter } from "./git-adapter";
-import type { RepoInfo, WorktreeInfo, BranchEntry, CommitEntry, DiffStatEntry, CloneResult, CloneProgress } from "./types";
+import type {
+  RepoInfo,
+  WorktreeInfo,
+  BranchEntry,
+  CommitEntry,
+  DiffStatEntry,
+  CloneResult,
+  CloneProgress,
+} from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface Openp41geWindow extends Window {}
 
 interface WorkspaceController {
-  clone(url: string): { promise: Promise<CloneResult>; onProgress: (fn: (progress: CloneProgress) => void) => () => void; destroy: () => void };
+  clone(url: string): {
+    promise: Promise<CloneResult>;
+    onProgress: (fn: (progress: CloneProgress) => void) => () => void;
+    destroy: () => void;
+  };
   listRepos(): Promise<RepoInfo[]>;
   getRepo(name: string): Promise<RepoInfo | null>;
   removeRepo(repoName: string): Promise<void>;
@@ -16,7 +28,11 @@ interface WorkspaceController {
   getDefaultBranch(repoName: string): Promise<string | null>;
   pullBranch(repoName: string, branch: string): Promise<void>;
   fetch(repoName: string): Promise<void>;
-  getCommitLog(repoName: string, branch: string, options?: { maxCount?: number; after?: string }): Promise<CommitEntry[]>;
+  getCommitLog(
+    repoName: string,
+    branch: string,
+    options?: { maxCount?: number; after?: string },
+  ): Promise<CommitEntry[]>;
   getBranches(repoName: string): Promise<BranchEntry[]>;
   getDiffStat(repoName: string, commitHash?: string): Promise<DiffStatEntry[]>;
   deleteLocalBranch(repoName: string, branchName: string, force?: boolean): Promise<void>;
@@ -30,7 +46,11 @@ interface WorkspaceController {
 }
 
 function getWC(): WorkspaceController {
-  const wc = ((window as unknown) as Openp41geWindow & { openp41ge?: { workspaceController?: WorkspaceController } }).openp41ge?.workspaceController;
+  const wc = (
+    window as unknown as Openp41geWindow & {
+      openp41ge?: { workspaceController?: WorkspaceController };
+    }
+  ).openp41ge?.workspaceController;
   if (!wc) throw new Error("workspaceController not available");
   return wc;
 }

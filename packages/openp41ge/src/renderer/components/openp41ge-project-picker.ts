@@ -724,7 +724,10 @@ export class Openp41geProjectPicker extends LitElement {
 
   private _getFocusable(): NodeListOf<HTMLElement> {
     const root = this.shadowRoot;
-    if (!root) return document.createDocumentFragment().querySelectorAll("*") as unknown as NodeListOf<HTMLElement>;
+    if (!root)
+      return document
+        .createDocumentFragment()
+        .querySelectorAll("*") as unknown as NodeListOf<HTMLElement>;
     return root.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
     );
@@ -837,7 +840,14 @@ export class Openp41geProjectPicker extends LitElement {
 
     // Import and show the confirm modal
     await import("./openp41ge-confirm-modal");
-    const modal = document.createElement("openp41ge-confirm-modal") as unknown as HTMLElement & { title: string; message: string; detail: string; confirmLabel: string; _confirmStyle: string; waitForResult: () => Promise<boolean>; };
+    const modal = document.createElement("openp41ge-confirm-modal") as unknown as HTMLElement & {
+      title: string;
+      message: string;
+      detail: string;
+      confirmLabel: string;
+      _confirmStyle: string;
+      waitForResult: () => Promise<boolean>;
+    };
     modal.title = "Delete Project";
     modal.message = `Delete "${name}"?`;
     modal.detail =
@@ -982,8 +992,7 @@ export class Openp41geProjectPicker extends LitElement {
         };
         document.addEventListener("mousedown", onOutsideClick, true);
         // Store the cleanup function
-        this._renameCleanup = () =>
-          document.removeEventListener("mousedown", onOutsideClick, true);
+        this._renameCleanup = () => document.removeEventListener("mousedown", onOutsideClick, true);
       }
     });
   }
@@ -1153,9 +1162,9 @@ export class Openp41geProjectPicker extends LitElement {
                           <div
                             class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
                             @click=${(e: Event) => {
-                                e.stopPropagation();
-                                this._showDetails(project);
-                              }}
+                              e.stopPropagation();
+                              this._showDetails(project);
+                            }}
                           >
                             <span class="name">${project.name}</span>
                             ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
@@ -1715,11 +1724,11 @@ export class Openp41geProjectPicker extends LitElement {
                                   tabindex="0"
                                   @click=${this._startAddRepo}
                                   @keydown=${(e: KeyboardEvent) => {
-                                  if (e.key === "Enter") {
-                                    e.stopPropagation();
-                                    this._startAddRepo();
-                                  }
-                                }}
+                                    if (e.key === "Enter") {
+                                      e.stopPropagation();
+                                      this._startAddRepo();
+                                    }
+                                  }}
                                 >
                                   <svg
                                     width="10"
