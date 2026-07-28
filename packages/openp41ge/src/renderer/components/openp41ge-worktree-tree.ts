@@ -172,9 +172,80 @@ class Openp41geWorktreeTree extends LitElement {
   // ── Git panel state ───────────────────────────────────────────────────────
   private _gitDisconnected = false;
   private _repoDropHandler: ((e: Event) => void) | null = null;
+  /** Persist the current repo order and notify the project picker. */
+  private _persistExplorerRepoOrder(): void {
+    const order = this._repos.map((r) => r.name);
+    window.openp41ge.project.current().then((currentName) => {
+      if (currentName) {
+        window.openp41ge.project.setRepoOrder(currentName, order);
+        document.dispatchEvent(new CustomEvent("project:changed"));
+      }
+    });
+  }
+
   private _onProjectChanged = (): void => {
     this._loadRepos();
   };
+
+  /** Initiate a pointer-event drag to reorder a repo in the explorer tree. */
+  private _startExplorerDrag(e: PointerEvent, repoName: string, idx: number): void {
+    if (this._explorerDragIdx >= 0) return;
+    const repos = this._repos;
+    const fromIdx = repos.findIndex((r) => r.name === repoName);
+    if (fromIdx < 0) return;
+
+    this._explorerDragIdx = fromIdx;
+    this._explorerDragRepoName = repoName;
+
+    // Document-level listeners for live reorder
+    this._boundExplorerPointerMove = (ev: PointerEvent) => {
+      if (this._explorerDragIdx < 0) return;
+      ev.preventDefault();
+      // Move the clone
+      if (this._explorerDragClone) {
+        this._explorerDragClone.style.left = (ev.clientX - this._explorerDragOffsetX) + "px";
+        this._explorerDragClone.style.top = (ev.clientY - this._explorerDragOffsetY) + "px";
+      }
+      // Find drop index
+      const items = this.renderRoot?.querySelectorAll("openp41ge-repo-tree-item");
+      let toIdx = repos.length;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          const r = items[i].getBoundingClientRect();
+          if (ev.clientY < r.top + r.height / 2) { toIdx = i; break; }
+        }
+      }
+      const from = this._explorerDragIdx;
+      if (toIdx === from) return;
+      const adjustedTo = toIdx > from ? toIdx - 1 : toIdx;
+      const [moved] = repos.splice(from, 1);
+      repos.splice(adjustedTo, 0, moved);
+      this._repos = [...repos];
+      this._explorerDragIdx = adjustedTo;
+    };
+
+    this._boundExplorerPointerUp = (ev: PointerEvent) => {
+      if (this._explorerDragIdx < 0) return;
+      ev.preventDefault();
+      // Persist order
+      this._persistExplorerRepoOrder();
+      // Clean up
+      this._explorerDragIdx = -1;
+      this._explorerDragRepoName = null;
+      if (this._boundExplorerPointerMove) {
+        document.removeEventListener("pointermove", this._boundExplorerPointerMove);
+      }
+      if (this._boundExplorerPointerUp) {
+        document.removeEventListener("pointerup", this._boundExplorerPointerUp);
+      }
+      this._boundExplorerPointerMove = null;
+      this._boundExplorerPointerUp = null;
+    };
+
+    document.addEventListener("pointermove", this._boundExplorerPointerMove);
+    document.addEventListener("pointerup", this._boundExplorerPointerUp);
+  }
+
   private _loading = true;
   private _errorMessage = "";
   private _errorRetry: (() => void) | null = null;
@@ -182,6 +253,16 @@ class Openp41geWorktreeTree extends LitElement {
   private _pendingLoadAfterTreeReady = false;
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
   @state() private _dropIndex: number = -1;
+  @state() private _explorerDragIdx: number = -1;
+  @state() private _explorerDragCloneX = 0;
+  @state() private _explorerDragCloneY = 0;
+  private _explorerDragRepoName: string | null = null;
+  private _explorerDragClone: HTMLElement | null = null;
+  private _explorerDragWrapper: HTMLElement | null = null;
+  private _explorerDragOffsetX = 0;
+  private _explorerDragOffsetY = 0;
+  private _boundExplorerPointerMove: ((e: PointerEvent) => void) | null = null;
+  private _boundExplorerPointerUp: ((e: PointerEvent) => void) | null = null;
   private _addWsContainer: HTMLElement | null = null;
   constructor() {
     super();
@@ -404,58 +485,77 @@ class Openp41geWorktreeTree extends LitElement {
                   ${this._dropIndex === idx
                     ? html`<div style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"></div>`
                     : nothing}
-                  <openp41ge-repo-tree-item
-                    .repoName=${repo.name}
-                    .repoUrl=${repo.url}
-                    .worksetId=${this.worksetId}
-                    .worktrees=${worktrees}
-                    .editMode=${this._editMode}
-                    @repo-toggle-expand=${(e: CustomEvent) => {
-                      const { repoName: rn, expanded } = e.detail;
-                      if (expanded) _expandedRepos.add(rn); else _expandedRepos.delete(rn);
-                      savePersistedState();
-                    }}
-                    @repo-add-worktree=${(e: CustomEvent) => {
-                      this._doAddWorktree(e.detail.repoName, e.detail.branch);
-                    }}
-                    @repo-open-git=${(e: CustomEvent) => {
-                      this._openGitTab(e.detail.repoName);
-                    }}
-                    @worktree-files-toggle=${(e: CustomEvent) => {
-                      const { repoName: rn, branch, expanded } = e.detail;
-                      const key = rn + ":" + branch;
-                      if (expanded) _expandedWorktrees.add(key); else _expandedWorktrees.delete(key);
-                      savePersistedState();
-                    }}
-                    @dir-toggle-expand=${(e: CustomEvent) => {
-                      const { branch, path, expanded } = e.detail;
-                      const key = branch + ":" + path;
-                      if (expanded) _expandedDirs.add(key); else _expandedDirs.delete(key);
-                      savePersistedState();
-                    }}
-                    @worktree-delete=${async (e: CustomEvent) => {
-                      const { branch } = e.detail;
-                      const confirmed = await showConfirmModal({
-                        message: "Delete worktree",
-                        detail: 'Are you sure you want to delete worktree "' + branch + '"?',
-                        confirmLabel: "Delete", confirmStyle: "danger",
-                      });
-                      if (confirmed) {
-                        try {
-                          await window.openp41ge.workspaceController.deleteWorktree(repo.name, branch);
-                          await this._loadRepos();
-                        } catch { /* ignore */ }
-                      }
-                    }}
-                    @file-open=${(e: CustomEvent) => {
-                      const { path: fp } = e.detail;
-                      this._openFile(fp, fp.split("/").pop() ?? fp, true);
-                    }}
-                    @file-preview=${(e: CustomEvent) => {
-                      const { path: fp } = e.detail;
-                      this._openFile(fp, fp.split("/").pop() ?? fp, false);
-                    }}
-                  ></openp41ge-repo-tree-item>
+                  <div style="display:flex;align-items:stretch;${this._explorerDragIdx === idx ? 'opacity:0.3;' : ''}">
+                    <!-- Grip area for drag reorder -->
+                    <span
+                      style="display:flex;align-items:center;justify-content:center;width:16px;flex-shrink:0;cursor:grab;color:#444;"
+                      @pointerdown=${(e: PointerEvent) => {
+                        if (e.button !== 0 || this._explorerDragIdx >= 0) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this._startExplorerDrag(e, repo.name, idx);
+                      }}
+                      title="Drag to reorder"
+                    >
+                      <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                        <circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/>
+                        <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
+                        <circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/>
+                      </svg>
+                    </span>
+                    <openp41ge-repo-tree-item
+                      .repoName=${repo.name}
+                      .repoUrl=${repo.url}
+                      .worksetId=${this.worksetId}
+                      .worktrees=${worktrees}
+                      .editMode=${this._editMode}
+                      @repo-toggle-expand=${(e: CustomEvent) => {
+                        const { repoName: rn, expanded } = e.detail;
+                        if (expanded) _expandedRepos.add(rn); else _expandedRepos.delete(rn);
+                        savePersistedState();
+                      }}
+                      @repo-add-worktree=${(e: CustomEvent) => {
+                        this._doAddWorktree(e.detail.repoName, e.detail.branch);
+                      }}
+                      @repo-open-git=${(e: CustomEvent) => {
+                        this._openGitTab(e.detail.repoName);
+                      }}
+                      @worktree-files-toggle=${(e: CustomEvent) => {
+                        const { repoName: rn, branch, expanded } = e.detail;
+                        const key = rn + ":" + branch;
+                        if (expanded) _expandedWorktrees.add(key); else _expandedWorktrees.delete(key);
+                        savePersistedState();
+                      }}
+                      @dir-toggle-expand=${(e: CustomEvent) => {
+                        const { branch, path, expanded } = e.detail;
+                        const key = branch + ":" + path;
+                        if (expanded) _expandedDirs.add(key); else _expandedDirs.delete(key);
+                        savePersistedState();
+                      }}
+                      @worktree-delete=${async (e: CustomEvent) => {
+                        const { branch } = e.detail;
+                        const confirmed = await showConfirmModal({
+                          message: "Delete worktree",
+                          detail: 'Are you sure you want to delete worktree "' + branch + '"?',
+                          confirmLabel: "Delete", confirmStyle: "danger",
+                        });
+                        if (confirmed) {
+                          try {
+                            await window.openp41ge.workspaceController.deleteWorktree(repo.name, branch);
+                            await this._loadRepos();
+                          } catch { /* ignore */ }
+                        }
+                      }}
+                      @file-open=${(e: CustomEvent) => {
+                        const { path: fp } = e.detail;
+                        this._openFile(fp, fp.split("/").pop() ?? fp, true);
+                      }}
+                      @file-preview=${(e: CustomEvent) => {
+                        const { path: fp } = e.detail;
+                        this._openFile(fp, fp.split("/").pop() ?? fp, false);
+                      }}
+                    ></openp41ge-repo-tree-item>
+                  </div>
                 `;
               })}
               ${this._dropIndex === this._repos.length
