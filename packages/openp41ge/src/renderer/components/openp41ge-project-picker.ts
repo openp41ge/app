@@ -200,19 +200,10 @@ export class Openp41geProjectPicker extends LitElement {
       min-width: 0;
     }
 
-    .project-item .icon {
-      width: 16px;
-      height: 16px;
-      flex-shrink: 0;
-      margin-right: 4px;
-    }
-
-    .project-item .icon.folder {
-      color: var(--openp41ge-accent-color, #4a9eff);
-    }
-
-    .project-item .icon.draft {
-      color: #e5c07b;
+    .project-item .name {
+      flex: 1;
+      font-size: 14px;
+      min-width: 0;
     }
 
     .detail-card .detail-delete-btn {
@@ -1141,26 +1132,7 @@ export class Openp41geProjectPicker extends LitElement {
                               class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
                               @click=${(e: Event) => { e.stopPropagation(); this._showDetails(project); }}
                             >
-                              <span class="name">
-                                <svg
-                                  class="icon ${isDraft ? "draft" : "folder"}"
-                                  width="16"
-                                  height="16"
-                                  viewBox="0 0 16 16"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  stroke-width="1.5"
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                >
-                                  ${
-                                    isDraft
-                                      ? html`<path d="M8 2v12M2 8h12" stroke-linecap="round" />` /* plus icon for draft */
-                                      : html`<path d="M2 4.5C2 3.67 2.67 3 3.5 3h2.59c.4 0 .78.16 1.06.44l.91.91c.28.28.67.44 1.06.44H14a1 1 0 011 1v5.7a1 1 0 01-1 1H3.5A1.5 1.5 0 012 11V4.5z" />`
-                                  }
-                                </svg>
-                                ${project.name}
-                              </span>
+                              <span class="name">${project.name}</span>
                               ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
                               ${isActive ? html`<span class="active-tag">Active</span>` : ""}
                             </div>
