@@ -48,8 +48,8 @@ export function registerDispatchHandlers(dispatcher: OperationDispatcher): void 
             newWin.id,
             false,
             src ?? undefined,
-            isFinite(dropScreenX) ? dropScreenX : undefined,
-            isFinite(dropScreenY) ? dropScreenY : undefined,
+            dropScreenX !== undefined && isFinite(dropScreenX) ? dropScreenX : undefined,
+            dropScreenY !== undefined && isFinite(dropScreenY) ? dropScreenY : undefined,
           );
         }
       }
@@ -68,8 +68,8 @@ export function registerDispatchHandlers(dispatcher: OperationDispatcher): void 
       const src = BrowserWindow.fromWebContents(event.sender);
       // Use the true screen coordinates if provided, falling back to
       // bounds.x/y (which may have a -50px offset baked in).
-      const sx = isFinite(dropScreenX) ? dropScreenX : bounds?.x;
-      const sy = isFinite(dropScreenY) ? dropScreenY : bounds?.y;
+      const sx = dropScreenX !== undefined && isFinite(dropScreenX) ? dropScreenX : bounds?.x;
+      const sy = dropScreenY !== undefined && isFinite(dropScreenY) ? dropScreenY : bounds?.y;
       createOpenp41geWindow(newWin.id, false, src ?? undefined, sx, sy);
     }
   });
