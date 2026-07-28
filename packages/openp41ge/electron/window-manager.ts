@@ -71,22 +71,34 @@ export function createOpenp41geWindow(
 ): void {
   const isTest = !!process.env.OPENP41GE_E2E_TEST;
 
+  // Inherit size from the source window, falling back to defaults
   let width = 1280;
   let height = 860;
-  let x: number | undefined;
-  let y: number | undefined;
-
   if (sourceWindow && !sourceWindow.isDestroyed()) {
     const bounds = sourceWindow.getBounds();
     width = bounds.width;
     height = bounds.height;
-    x = bounds.x + 30;
-    y = bounds.y + 30;
-  } else if (dropScreenX !== undefined && dropScreenY !== undefined) {
+  }
+
+  let x: number | undefined;
+  let y: number | undefined;
+
+  if (dropScreenX !== undefined && dropScreenY !== undefined) {
+    // Position the window near the drop point, clamped to the work area
     const display = screen.getDisplayNearestPoint({ x: dropScreenX, y: dropScreenY });
     const workArea = display.workArea;
-    x = workArea.x + Math.round(workArea.width / 2) - 640;
-    y = workArea.y + Math.round(workArea.height / 2) - 430;
+
+    // Try to align the top-left of the window near the drop point.
+    // Clamp so the window doesn't overflow off the work area.
+    let candidateX = dropScreenX - Math.round(width / 4);
+    let candidateY = dropScreenY - Math.round(height / 4);
+
+    x = Math.max(workArea.x, Math.min(candidateX, workArea.x + workArea.width - width));
+    y = Math.max(workArea.y, Math.min(candidateY, workArea.y + workArea.height - height));
+  } else if (sourceWindow && !sourceWindow.isDestroyed()) {
+    const bounds = sourceWindow.getBounds();
+    x = bounds.x + 30;
+    y = bounds.y + 30;
   }
 
   const win = new BrowserWindow({

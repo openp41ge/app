@@ -22,7 +22,13 @@ declare global {
         getWindowId: () => string | null;
         waitForInit: () => Promise<void>;
         detachPane: (windowId: string, paneId: string, bounds?: { x: number; y: number; width: number; height: number }) => void;
-        detachTab: (windowId: string, tabId: string, bounds?: { x: number; y: number; width: number; height: number }) => void;
+        detachTab: (
+          windowId: string,
+          tabId: string,
+          bounds?: { x: number; y: number; width: number; height: number },
+          dropScreenX?: number,
+          dropScreenY?: number,
+        ) => void;
         cmdNewWindow: () => void;
         cmdNewPage: () => void;
         cmdNewTab: () => void;

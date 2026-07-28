@@ -115,7 +115,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
       );
     },
     /** Request creation of a new child window with a detached tab. */
-    detachTab: (windowId, tabId, bounds) => {
+    detachTab: (windowId, tabId, bounds, dropScreenX, dropScreenY) => {
       ipcRenderer.send(
         "openp41ge:create-window",
         JSON.stringify({
@@ -123,6 +123,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
           windowId,
           tabId,
           bounds,
+          dropScreenX,
+          dropScreenY,
         }),
       );
     },

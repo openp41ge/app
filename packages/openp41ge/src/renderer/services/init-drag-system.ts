@@ -38,6 +38,9 @@ let _pendingFileDetachPath: string | null = null;
 /** Set to true when a file is successfully dropped on a grid target (via grid-open-tab). */
 let _fileDropHandled = false;
 
+/** Last screen position from POSITION events — used for new-window positioning. */
+let _lastScreenPos = { screenX: 0, screenY: 0 };
+
 /** Deferred drag:start params for tab drags, captured on mousedown, fired on first POSITION event. */
 let _pendingDragStart: {
   label: string;
@@ -263,7 +266,13 @@ export function initDragSystem(): () => void {
         setTimeout(() => {
           if (!_fileDropHandled) {
             const fileName = filePath.split("/").filter(Boolean).pop() || "file";
-            window.openp41ge.workspace.dispatch("actionOpenFileInNewWindow", filePath, fileName);
+            window.openp41ge.workspace.dispatch(
+              "actionOpenFileInNewWindow",
+              filePath,
+              fileName,
+              _lastScreenPos.screenX,
+              _lastScreenPos.screenY,
+            );
           }
           _fileDropHandled = false;
         }, 0);
@@ -288,6 +297,7 @@ export function initDragSystem(): () => void {
   document.addEventListener(DRAG_EVENTS.POSITION, (e: Event) => {
     const detail = (e as CustomEvent).detail as { screenX: number; screenY: number };
     if (detail) {
+      _lastScreenPos = { screenX: detail.screenX, screenY: detail.screenY };
       window.openp41ge.drag.move(detail.screenX, detail.screenY);
       if (!_dragActivated) {
         _dragActivated = true;
@@ -344,6 +354,7 @@ export function initDragSystem(): () => void {
   const onDragEnd = () => {
     _dragActivated = false;
     _focusedOnEntry = false;
+    _lastScreenPos = { screenX: 0, screenY: 0 };
     window.openp41ge.drag.end();
     clearGridGhost();
     _localDragActive = false;
@@ -390,7 +401,13 @@ export function initDragSystem(): () => void {
       // fall through
     }
 
-    window.openp41ge.workspace.detachTab(detail.winId, detail.tabId, detail.bounds);
+    window.openp41ge.workspace.detachTab(
+      detail.winId,
+      detail.tabId,
+      detail.bounds,
+      screenX,
+      screenY,
+    );
   };
 
   document.addEventListener(DRAG_EVENTS.DETACH, onDetach);

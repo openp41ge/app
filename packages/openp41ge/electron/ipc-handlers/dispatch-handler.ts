@@ -34,14 +34,31 @@ export function registerDispatchHandlers(dispatcher: OperationDispatcher): void 
         const newWin = ws.windows.find((w) => !existingIds.has(w.id));
         if (newWin) {
           const src = BrowserWindow.fromWebContents(event.sender);
-          createOpenp41geWindow(newWin.id, false, src ?? undefined);
+          // actionOpenFileInNewWindow may carry dropScreenX/dropScreenY
+          // as the last two positional args after fileName.
+          const dropScreenX =
+            fn === "actionOpenFileInNewWindow" && args.length >= 4
+              ? Number(args[2])
+              : undefined;
+          const dropScreenY =
+            fn === "actionOpenFileInNewWindow" && args.length >= 4
+              ? Number(args[3])
+              : undefined;
+          createOpenp41geWindow(
+            newWin.id,
+            false,
+            src ?? undefined,
+            isFinite(dropScreenX) ? dropScreenX : undefined,
+            isFinite(dropScreenY) ? dropScreenY : undefined,
+          );
         }
       }
     }
   });
 
   ipcMain.on("openp41ge:create-window", (event: IpcMainEvent, data: string) => {
-    const { type: _type, windowId, _paneId, tabId, bounds } = JSON.parse(data);
+    const { type: _type, windowId, _paneId, tabId, bounds, dropScreenX, dropScreenY } =
+      JSON.parse(data);
     dispatcher.apply("detachTabToWindow", [windowId, tabId, bounds]);
     const ws = dispatcher.getWorkspace();
     const newWin = ws.windows[ws.windows.length - 1];
@@ -49,7 +66,11 @@ export function registerDispatchHandlers(dispatcher: OperationDispatcher): void 
       dispatcher.broadcast();
       closeOrphanedWindows();
       const src = BrowserWindow.fromWebContents(event.sender);
-      createOpenp41geWindow(newWin.id, false, src ?? undefined, bounds?.x, bounds?.y);
+      // Use the true screen coordinates if provided, falling back to
+      // bounds.x/y (which may have a -50px offset baked in).
+      const sx = isFinite(dropScreenX) ? dropScreenX : bounds?.x;
+      const sy = isFinite(dropScreenY) ? dropScreenY : bounds?.y;
+      createOpenp41geWindow(newWin.id, false, src ?? undefined, sx, sy);
     }
   });
 
