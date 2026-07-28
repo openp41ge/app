@@ -120,8 +120,8 @@ export class DragGhostManager implements IDragGhostManager {
               width: cw,
               height: ch,
             });
-          } catch (err) {
-            console.warn("[DragGhostManager] setBounds failed:", err, "bounds:", boundsX, boundsY, cw, ch);
+          } catch {
+            // setBounds can throw if the window is closing. Swallow.
           }
           // Only show after the window is correctly sized
           if (!process.env.OPENP41GE_E2E_TEST) {
@@ -149,9 +149,15 @@ export class DragGhostManager implements IDragGhostManager {
       const y = screenY - this._offsetY;
       if (isFinite(x) && isFinite(y)) {
         try {
-          this._ghost.setBounds({ x: Math.round(x), y: Math.round(y), width: this._contentW, height: this._contentH });
-        } catch (err) {
-          console.warn("[DragGhostManager] move setBounds failed:", err, "pos:", x, y, "offset:", this._offsetX, this._offsetY);
+          this._ghost.setBounds({
+            x: Math.round(x),
+            y: Math.round(y),
+            width: this._contentW,
+            height: this._contentH,
+          });
+        } catch {
+          // setBounds can throw if the window enters a closing/destroyed state
+          // between the isDestroyed() check above and this call. Swallow.
         }
       }
     }
