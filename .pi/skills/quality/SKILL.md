@@ -20,6 +20,12 @@ Run all available tooling in sequence to verify the health of the codebase. Alwa
 | **Build**                    | `nx run-many -t build`      | All 17 packages                                                     |
 | **Coverage**                 | `npx vitest run --coverage` | All packages                                                        |
 
+## ⚠️ Nx Cache and Root-Level Targets
+
+Root-level targets (`lint`, `format:check`) run from the monorepo root project but Nx only considers the root project's own files for its cache key by default. Changing files under `packages/` won't invalidate the cache.
+
+**Fix:** `nx.json` now has explicit `inputs: ["{workspaceRoot}/packages/**/*"]` on the `lint` target default so any change under `packages/` properly invalidates the cache. If you add new root-level targets, ensure they have similar `inputs` coverage.
+
 ## Quick Checks (pre-commit)
 
 ```bash

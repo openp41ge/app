@@ -21,6 +21,7 @@
       "cache": true
     },
     "lint": {
+      "inputs": ["{workspaceRoot}/packages/**/*"],
       "cache": true
     }
   },
