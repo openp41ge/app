@@ -372,6 +372,19 @@ export class Openp41geProjectPicker extends LitElement {
       margin-bottom: 0;
     }
 
+    .detail-card .repo-group.drag-placeholder .repo-header,
+    .detail-card .repo-group.drag-placeholder .worktree-list {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .detail-card .repo-group.drag-placeholder {
+      background: rgba(74,158,255,0.15);
+      outline: 1px solid rgba(74,158,255,0.4);
+      outline-offset: -1px;
+      box-shadow: inset 0 0 0 1px rgba(74,158,255,0.3);
+    }
+
     .detail-card .repo-group .repo-header {
       font-size: 13px;
       color: var(--openp41ge-text-color, #f0f0f0);
@@ -1235,7 +1248,7 @@ export class Openp41geProjectPicker extends LitElement {
                               >
                                 ${this._detailRepos.map(
                                   (repo, idx) => html`
-                                    <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'background:rgba(74,158,255,0.15);outline:1px solid rgba(74,158,255,0.4);outline-offset:-1px;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(74,158,255,0.3);' : ''}">
+                                    <li class="repo-group${this._detailReposDragIdx === idx ? ' drag-placeholder' : ''}">
                                       <div class="repo-header"
                                         @pointerdown=${(e: PointerEvent) => {
                                           if (e.button !== 0 || this._detailReposDragIdx >= 0 || !this._detailRepos) return;
