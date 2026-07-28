@@ -478,24 +478,24 @@ class Openp41geWorktreeTree extends LitElement {
                   ${this._dropIndex === idx
                     ? html`<div style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"></div>`
                     : nothing}
-                  <div style="display:flex;align-items:stretch;width:100%;${this._explorerDragIdx === idx ? 'opacity:0.3;' : ''}">
-                    <!-- Grip area for drag reorder -->
-                    <span
-                      style="display:flex;align-items:center;justify-content:center;width:16px;flex-shrink:0;cursor:grab;color:#444;"
-                      @pointerdown=${(e: PointerEvent) => {
-                        if (e.button !== 0 || this._explorerDragIdx >= 0) return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this._startExplorerDrag(e, repo.name, idx);
-                      }}
-                      title="Drag to reorder"
-                    >
-                      <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
-                        <circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/>
-                        <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
-                        <circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/>
-                      </svg>
-                    </span>
+                  <div style="display:flex;align-items:stretch;width:100%;${this._explorerDragIdx === idx ? 'opacity:0.3;' : ''}" @pointerdown=${(e: PointerEvent) => {
+                    if (e.button !== 0 || this._explorerDragIdx >= 0) return;
+                    // Only start drag after a small movement threshold (avoid conflict with click-to-expand)
+                    const startY = e.clientY;
+                    const onMove = (ev: PointerEvent) => {
+                      if (Math.abs(ev.clientY - startY) > 4) {
+                        document.removeEventListener("pointermove", onMove);
+                        document.removeEventListener("pointerup", onUp);
+                        this._startExplorerDrag(ev, repo.name, idx);
+                      }
+                    };
+                    const onUp = () => {
+                      document.removeEventListener("pointermove", onMove);
+                      document.removeEventListener("pointerup", onUp);
+                    };
+                    document.addEventListener("pointermove", onMove);
+                    document.addEventListener("pointerup", onUp);
+                  }}>
                     <openp41ge-repo-tree-item style="flex:1;min-width:0;"
                       .repoName=${repo.name}
                       .repoUrl=${repo.url}
