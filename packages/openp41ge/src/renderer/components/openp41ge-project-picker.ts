@@ -1341,6 +1341,13 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._boundPointerUp = (ev: PointerEvent) => {
                                             if (this._detailReposDragIdx < 0) return;
                                             ev.preventDefault();
+                                            // Persist the new repo order before cleanup
+                                            if (this._detailRepos && this._detailProject) {
+                                              const order = this._detailRepos.map((r) => r.name);
+                                              window.openp41ge.project.setRepoOrder(this._detailProject.name, order);
+                                              // Notify explorer and other views to refresh
+                                              document.dispatchEvent(new CustomEvent("project:changed"));
+                                            }
                                             // Remove the drag clone and its wrapper
                                             if (this._dragWrapper) {
                                               this._dragWrapper.remove();

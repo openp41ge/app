@@ -67,6 +67,8 @@ export function registerProjectHandlers(
    * Walks the repos directory tree recursively and returns repo paths
    * relative to the repos dir (e.g. "github.com/owner/repo").
    * For each repo, runs git worktree list to find worktree branches.
+   * Repos are sorted by the persisted order (if any), falling back to
+   * alphabetical order.
    */
   ipcMain.handle("project:listRepos", (_event, name: string) => {
     const reposDir = projectStore.reposDir(name);
@@ -105,11 +107,31 @@ export function registerProjectHandlers(
       };
 
       walk(reposDir);
-      repos.sort((a, b) => a.name.localeCompare(b.name));
+      // Apply persisted order, fall back to alphabetical
+      const order = projectStore.readRepoOrder(name);
+      if (order) {
+        const orderMap = new Map(order.map((n, i) => [n, i]));
+        repos.sort((a, b) => {
+          const ai = orderMap.get(a.name);
+          const bi = orderMap.get(b.name);
+          if (ai !== undefined && bi !== undefined) return ai - bi;
+          if (ai !== undefined) return -1;
+          if (bi !== undefined) return 1;
+          return a.name.localeCompare(b.name);
+        });
+      } else {
+        repos.sort((a, b) => a.name.localeCompare(b.name));
+      }
       return repos;
     } catch {
       return [];
     }
+  });
+
+  /** Persist the repo display order for a project. */
+  ipcMain.handle("project:setRepoOrder", (_event, name: string, order: string[]) => {
+    projectStore.writeRepoOrder(name, order);
+    return true;
   });
 
   /**

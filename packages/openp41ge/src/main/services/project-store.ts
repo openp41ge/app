@@ -57,6 +57,27 @@ export class ProjectStore {
     return path.join(this._openp41geDir, name, "config.json");
   }
 
+  /** Get the repo-order file path for a given project. */
+  repoOrderPath(name: string): string {
+    return path.join(this._openp41geDir, name, "repo-order.json");
+  }
+
+  /** Read persisted repo order for a project. Returns null if none saved. */
+  readRepoOrder(name: string): string[] | null {
+    try {
+      const p = this.repoOrderPath(name);
+      if (!fs.existsSync(p)) return null;
+      return JSON.parse(fs.readFileSync(p, "utf-8")) as string[];
+    } catch {
+      return null;
+    }
+  }
+
+  /** Write persisted repo order for a project. */
+  writeRepoOrder(name: string, order: string[]): void {
+    fs.writeFileSync(this.repoOrderPath(name), JSON.stringify(order), "utf-8");
+  }
+
   /** List all projects (directories under ~/.openp41ge/ that have a config.json). */
   list(): string[] {
     try {

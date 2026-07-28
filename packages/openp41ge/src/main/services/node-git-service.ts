@@ -200,6 +200,26 @@ export class NodeGitService implements IGitService {
         /* skip */
       }
     }
+
+    // Apply persisted repo order from <reposDir>/../repo-order.json
+    const orderPath = path.join(this._reposDir, "..", "repo-order.json");
+    try {
+      if (fs.existsSync(orderPath)) {
+        const order = JSON.parse(fs.readFileSync(orderPath, "utf-8")) as string[];
+        const orderMap = new Map(order.map((n, i) => [n, i]));
+        repos.sort((a, b) => {
+          const ai = orderMap.get(a.name);
+          const bi = orderMap.get(b.name);
+          if (ai !== undefined && bi !== undefined) return ai - bi;
+          if (ai !== undefined) return -1;
+          if (bi !== undefined) return 1;
+          return a.name.localeCompare(b.name);
+        });
+      }
+    } catch {
+      /* ignore order file errors */
+    }
+
     return repos;
   }
 

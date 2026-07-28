@@ -490,6 +490,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     isDraft: (name) => ipcRenderer.invoke("project:isDraft", name),
     gcDrafts: () => ipcRenderer.invoke("project:gcDrafts"),
     createDraft: () => ipcRenderer.invoke("project:createDraft"),
+    setRepoOrder: (name, order) => ipcRenderer.invoke("project:setRepoOrder", name, order),
     rename: (oldName, newName) => ipcRenderer.invoke("project:rename", oldName, newName),
     /** Register callback for when the File > "Save Project As..." menu item is clicked. */
     onShowSaveDraftDialog: (callback) => {
