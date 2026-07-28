@@ -4,10 +4,10 @@ import type { RepoInfo, WorktreeInfo, BranchEntry, CommitEntry, DiffStatEntry } 
 // Access workspaceController via the runtime API. The actual type is
 // declared in the main app's global.d.ts — here we use a minimal cast
 // to keep the package self-contained.
-function getWC(): any {
-  const wc = (window as any).openp41ge?.workspaceController;
+function getWC(): Record<string, unknown> {
+  const wc = (window as Record<string, unknown>).openp41ge?.workspaceController;
   if (!wc) throw new Error("workspaceController not available");
-  return wc;
+  return wc as Record<string, unknown>;
 }
 
 export class IpcGitAdapter implements GitAdapter {
@@ -35,7 +35,7 @@ export class IpcGitAdapter implements GitAdapter {
     return getWC().checkoutWorktree(repoName, branch);
   }
 
-  async addWorktree(repoName: string, branch: string): Promise<WorktreeInfo> {
+  async addWorktree(_repoName: string, _branch: string): Promise<WorktreeInfo> {
     throw new Error("addWorktree not available via workspaceController");
   }
 

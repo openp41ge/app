@@ -30,8 +30,6 @@ import {
   setDispatcher,
   setTabNames,
   createOpenp41geWindow,
-  handleNewTab,
-  handleNewColumn,
   promptQuit,
 } from "./window-manager.js";
 

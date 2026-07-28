@@ -22,7 +22,7 @@
  *   CustomEvent('project:dismissed') — when Escape is pressed or close clicked
  */
 
-import { LitElement, html, css, nothing, type TemplateResult } from "lit";
+import { LitElement, html, css, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
 import { GitService, IpcGitAdapter } from "openp41ge-git";
@@ -552,6 +552,7 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _clonePercent = 0;
   @state() private _loading = true;
   private _disconnected = false;
+  private _renameCleanup: (() => void) | null = null;
 
   /** When the repo order changes elsewhere (explorer), refresh the current project's repos. */
   private _onProjectChanged = (): void => {
@@ -723,7 +724,7 @@ export class Openp41geProjectPicker extends LitElement {
 
   private _getFocusable(): NodeListOf<HTMLElement> {
     const root = this.shadowRoot;
-    if (!root) return document.createDocumentFragment().querySelectorAll("*") as any;
+    if (!root) return document.createDocumentFragment().querySelectorAll("*") as unknown as NodeListOf<HTMLElement>;
     return root.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
     );
@@ -836,7 +837,7 @@ export class Openp41geProjectPicker extends LitElement {
 
     // Import and show the confirm modal
     await import("./openp41ge-confirm-modal");
-    const modal = document.createElement("openp41ge-confirm-modal") as any;
+    const modal = document.createElement("openp41ge-confirm-modal") as unknown as HTMLElement & { title: string; message: string; detail: string; confirmLabel: string; _confirmStyle: string; waitForResult: () => Promise<boolean>; };
     modal.title = "Delete Project";
     modal.message = `Delete "${name}"?`;
     modal.detail =
@@ -981,7 +982,7 @@ export class Openp41geProjectPicker extends LitElement {
         };
         document.addEventListener("mousedown", onOutsideClick, true);
         // Store the cleanup function
-        (this as any).__renameCleanup = () =>
+        this._renameCleanup = () =>
           document.removeEventListener("mousedown", onOutsideClick, true);
       }
     });
@@ -1026,10 +1027,9 @@ export class Openp41geProjectPicker extends LitElement {
   }
 
   private _cleanupRename(): void {
-    const fn = (this as any).__renameCleanup;
-    if (fn) {
-      fn();
-      (this as any).__renameCleanup = null;
+    if (this._renameCleanup) {
+      this._renameCleanup();
+      this._renameCleanup = null;
     }
   }
 
