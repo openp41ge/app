@@ -43,11 +43,13 @@ export class DragGhostManager implements IDragGhostManager {
     const ghostW = tabWidth ?? 110;
     const ghostH = tabHeight ?? 35;
 
+    const initialX = screenX - this._offsetX;
+    const initialY = screenY - this._offsetY;
     const ghost = new this._BrowserWindow({
       width: ghostW,
       height: ghostH,
-      x: screenX - this._offsetX,
-      y: screenY - this._offsetY,
+      x: isFinite(initialX) ? initialX : 0,
+      y: isFinite(initialY) ? initialY : 0,
       frame: false,
       transparent: true,
       roundedCorners: false,
@@ -109,12 +111,18 @@ export class DragGhostManager implements IDragGhostManager {
           const ch = Math.ceil(h);
           this._contentW = cw;
           this._contentH = ch;
-          ghost.setBounds({
-            x: screenX - this._offsetX,
-            y: screenY - this._offsetY,
-            width: cw,
-            height: ch,
-          });
+          const boundsX = isFinite(screenX - this._offsetX) ? screenX - this._offsetX : 0;
+          const boundsY = isFinite(screenY - this._offsetY) ? screenY - this._offsetY : 0;
+          try {
+            ghost.setBounds({
+              x: boundsX,
+              y: boundsY,
+              width: cw,
+              height: ch,
+            });
+          } catch (err) {
+            console.warn("[DragGhostManager] setBounds failed:", err, "bounds:", boundsX, boundsY, cw, ch);
+          }
           // Only show after the window is correctly sized
           if (!process.env.OPENP41GE_E2E_TEST) {
             ghost.show();
@@ -137,7 +145,15 @@ export class DragGhostManager implements IDragGhostManager {
 
   move(screenX: number, screenY: number): void {
     if (this._ghost && !this._ghost.isDestroyed()) {
-      this._ghost.setPosition(screenX - this._offsetX, screenY - this._offsetY);
+      const x = screenX - this._offsetX;
+      const y = screenY - this._offsetY;
+      if (isFinite(x) && isFinite(y)) {
+        try {
+          this._ghost.setBounds({ x: Math.round(x), y: Math.round(y), width: this._contentW, height: this._contentH });
+        } catch (err) {
+          console.warn("[DragGhostManager] move setBounds failed:", err, "pos:", x, y, "offset:", this._offsetX, this._offsetY);
+        }
+      }
     }
   }
 
