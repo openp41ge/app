@@ -20,7 +20,6 @@ export interface UserConfig {
     fontSize: number;
     fontFamily: string;
   };
-  syntaxThemes: Record<string, string>;
 }
 
 // ─── ConfigService ───────────────────────────────────────────────────────
@@ -109,10 +108,9 @@ export class ConfigService {
     }
   }
 
-  /** Get the syntax theme ID for a given file extension. */
-  getSyntaxTheme(extension: string): string {
-    if (!this._config) return "openp41ge-dark";
-    return this._config.syntaxThemes[extension] ?? "openp41ge-dark";
+  /** Get the default syntax theme ID. */
+  getSyntaxTheme(): string {
+    return "openp41ge-dark";
   }
 
   /** Get the app theme ("dark" | "light"). */

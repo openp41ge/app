@@ -40,18 +40,7 @@ const DEFAULT_CONFIG: UserConfig = {
     fontSize: 14,
     fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
   },
-  syntaxThemes: {
-    ".ts": "openp41ge-dark",
-    ".tsx": "openp41ge-dark",
-    ".js": "openp41ge-dark",
-    ".jsx": "openp41ge-dark",
-    ".json": "openp41ge-dark",
-    ".md": "github-dark",
-    ".css": "openp41ge-dark",
-    ".html": "openp41ge-dark",
-    ".yaml": "openp41ge-dark",
-    ".sh": "openp41ge-dark",
-  },
+  syntaxThemes: {},
 };
 
 // ─── Helper: deep merge ──────────────────────────────────────────────────

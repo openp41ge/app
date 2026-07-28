@@ -22,15 +22,6 @@ import { ExtensionFormatterRegistry, registerBuiltinFormatters } from "openp41ge
 import type { IFormatter } from "openp41ge-file-editor";
 import { appServices } from "../../app";
 
-/** Get file extension from a path. */
-function fileExtension(path: string): string {
-  const dot = path.lastIndexOf(".");
-  if (dot < 0) return "";
-  const slash = path.lastIndexOf("/");
-  if (dot < slash) return "";
-  return path.slice(dot);
-}
-
 /** Built-in JSON formatter (pretty-print). */
 const jsonFormatter: IFormatter = {
   name: "JSON Pretty Print",
@@ -107,8 +98,8 @@ export class FileEditorController extends BaseController implements FileViewerCo
     container.appendChild(editor);
     this._editor = editor;
 
-    // Apply syntax theme and editor settings from config
-    this._applySyntaxTheme();
+    // Apply editor settings from config
+    this._applyEditorTheme();
     this._applyEditorSettings();
 
     // Bridge CustomEvents to Openp41ge
@@ -237,11 +228,10 @@ export class FileEditorController extends BaseController implements FileViewerCo
 
   // ── Private helpers ──
 
-  /** Apply the syntax theme to the editor based on file extension. */
-  private _applySyntaxTheme(): void {
+  /** Apply the editor syntax theme. Uses a single consistent theme for all files. */
+  private _applyEditorTheme(): void {
     if (!this._editor) return;
-    const extension = fileExtension(this.filePath);
-    const themeId = appServices.configService.getSyntaxTheme(extension);
+    const themeId = appServices.configService.getSyntaxTheme();
     this._editor.setTheme(themeId);
   }
 
@@ -327,10 +317,6 @@ export class FileEditorController extends BaseController implements FileViewerCo
     this._boundConfigChanged = (e: Event) => {
       const detail = (e as CustomEvent).detail as { key?: string; value?: unknown };
       if (!detail || !detail.key) return;
-      // React to syntax theme changes that affect this file's extension
-      if (detail.key === "syntaxThemes") {
-        this._applySyntaxTheme();
-      }
       // React to editor config changes
       if (detail.key === "editor.lineHeight" || detail.key === "editor.fontSize") {
         this._applyEditorSettings();

@@ -15,12 +15,7 @@ const mockConfig = {
     fontSize: 14,
     fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
   },
-  syntaxThemes: {
-    ".ts": "openp41ge-dark",
-    ".tsx": "openp41ge-dark",
-    ".js": "openp41ge-dark",
-    ".md": "github-dark",
-  },
+  syntaxThemes: {},
 };
 
 let setCallKey: string | null = null;
@@ -116,15 +111,9 @@ describe("ConfigService (renderer)", () => {
     expect(configService.get("nonexistent")).toBeUndefined();
   });
 
-  test("getSyntaxTheme() returns correct theme for known extensions", async () => {
+  test("getSyntaxTheme() returns the default theme", async () => {
     await configService.load();
-    expect(configService.getSyntaxTheme(".ts")).toBe("openp41ge-dark");
-    expect(configService.getSyntaxTheme(".md")).toBe("github-dark");
-  });
-
-  test("getSyntaxTheme() falls back to openp41ge-dark for unknown extensions", async () => {
-    await configService.load();
-    expect(configService.getSyntaxTheme(".unknown")).toBe("openp41ge-dark");
+    expect(configService.getSyntaxTheme()).toBe("openp41ge-dark");
   });
 
   test("getAppTheme() returns dark before load()", () => {

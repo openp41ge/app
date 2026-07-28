@@ -38,7 +38,7 @@ describe("ConfigService (main process)", () => {
     expect(parsed.appTheme).toBe("dark");
     expect(parsed.editor.lineHeight).toBe(20);
     expect(parsed.editor.fontSize).toBe(14);
-    expect(parsed.syntaxThemes[".ts"]).toBe("openp41ge-dark");
+    expect(parsed.syntaxThemes).toEqual({});
   });
 
   test("init() reads existing config file correctly", () => {
@@ -63,6 +63,7 @@ describe("ConfigService (main process)", () => {
     expect(configService.get("editor.fontSize")).toBe(16);
     const themes = configService.get("syntaxThemes") as Record<string, string>;
     expect(themes[".ts"]).toBe("monokai");
+    // Theme no longer has per-extension defaults; only what user set
   });
 
   test("init() deep-merges existing config with defaults", () => {
@@ -86,7 +87,8 @@ describe("ConfigService (main process)", () => {
     expect(configService.get("editor.lineHeight")).toBe(20);
     expect(configService.get("editor.fontSize")).toBe(14);
     const themes = configService.get("syntaxThemes") as Record<string, string>;
-    expect(themes[".ts"]).toBe("openp41ge-dark");
+    // syntaxThemes default is now empty — existing config is merged
+    expect(themes).toEqual({});
   });
 
   test("getAll() returns the full config object", () => {
@@ -97,6 +99,7 @@ describe("ConfigService (main process)", () => {
     expect(all.appTheme).toBeDefined();
     expect(all.editor).toBeDefined();
     expect(all.syntaxThemes).toBeDefined();
+    expect(all.syntaxThemes).toEqual({});
   });
 
   test("get() returns undefined for unknown keys", () => {
