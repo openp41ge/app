@@ -1251,13 +1251,15 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._dragOffsetX = e.clientX - rect.left;
                                           this._dragOffsetY = e.clientY - rect.top;
                                           const clone = header.cloneNode(true) as HTMLElement;
-                                          // Copy ALL computed styles recursively (parent + children) so the clone
-                                          // looks identical outside the shadow DOM where class selectors don't apply.
+                                          // Copy computed styles recursively so the clone looks identical outside shadow DOM.
+                                          // Skip width/height/min-width/max-width — we set those explicitly.
                                           const copyStyles = (src: Element, dst: Element) => {
                                             const cs = getComputedStyle(src);
                                             for (let i = 0; i < cs.length; i++) {
                                               const prop = cs[i];
-                                              if (prop.startsWith("--") || prop === "cursor" || prop === "pointer-events") continue;
+                                              if (prop.startsWith("--")) continue;
+                                              if (prop === "cursor" || prop === "pointer-events") continue;
+                                              if (prop === "width" || prop === "height" || prop === "min-width" || prop === "min-height" || prop === "max-width" || prop === "max-height") continue;
                                               if (dst instanceof HTMLElement || dst instanceof SVGElement) {
                                                 dst.style.setProperty(prop, cs.getPropertyValue(prop));
                                               }
@@ -1275,7 +1277,7 @@ export class Openp41geProjectPicker extends LitElement {
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
-                                          clone.style.opacity = "0.9";
+                                          clone.style.opacity = "1";
                                           clone.style.width = rect.width + "px";
                                           clone.style.height = rect.height + "px";
                                           clone.style.top = (e.clientY - this._dragOffsetY) + "px";
