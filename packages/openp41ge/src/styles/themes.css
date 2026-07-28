@@ -5,6 +5,12 @@
  * All components should use var(--*) instead of hardcoded hex colors.
  */
 
+/* Prevent text selection on all UI chrome — re-enable in editable areas */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* ═══ Dark theme (default) ═══ */
 [data-app-theme="dark"],
 :root {

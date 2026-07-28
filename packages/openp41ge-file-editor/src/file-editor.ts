@@ -309,7 +309,7 @@ export class FileEditorElement extends LitElement {
     this._viewportEl = document.createElement("div");
     this._viewportEl.className = "fe-viewport";
     this._viewportEl.style.cssText =
-      "flex:1;overflow-y:auto;overflow-x:hidden;position:relative;outline:none;cursor:text;";
+      "flex:1;overflow-y:auto;overflow-x:hidden;position:relative;outline:none;cursor:text;user-select:text;-webkit-user-select:text;";
     this._viewportEl.style.fontFamily =
       "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace";
     this._viewportEl.style.fontSize = this._fontSize + "px";
