@@ -197,7 +197,6 @@ export class Openp41geProjectPicker extends LitElement {
       font-size: 14px;
       display: flex;
       align-items: center;
-      gap: 8px;
       min-width: 0;
     }
 
@@ -205,6 +204,7 @@ export class Openp41geProjectPicker extends LitElement {
       width: 16px;
       height: 16px;
       flex-shrink: 0;
+      margin-right: 4px;
     }
 
     .project-item .icon.folder {
@@ -399,7 +399,7 @@ export class Openp41geProjectPicker extends LitElement {
       width: 14px;
       height: 14px;
       flex-shrink: 0;
-      color: var(--openp41ge-accent-color, #4a9eff);
+      color: var(--openp41ge-muted-text, #888);
     }
 
     .detail-card .repo-group .worktree-list {
@@ -410,7 +410,7 @@ export class Openp41geProjectPicker extends LitElement {
 
     .detail-card .repo-group .worktree-list li {
       position: relative;
-      padding: 3px 0 3px 31px;
+      padding: 3px 0 3px 54px;
       font-size: 13px;
       color: var(--openp41ge-muted-text, #888);
     }
@@ -419,7 +419,7 @@ export class Openp41geProjectPicker extends LitElement {
     .detail-card .repo-group .worktree-list li::before {
       content: "";
       position: absolute;
-      left: 17px;
+      left: 40px;
       top: 0;
       bottom: 50%;
       width: 1px;
@@ -430,7 +430,7 @@ export class Openp41geProjectPicker extends LitElement {
     .detail-card .repo-group .worktree-list li::after {
       content: "";
       position: absolute;
-      left: 17px;
+      left: 40px;
       top: 50%;
       width: 10px;
       height: 1px;
@@ -459,7 +459,7 @@ export class Openp41geProjectPicker extends LitElement {
       border-radius: 3px;
       display: inline-block;
       padding: 2px 4px;
-      margin: 2px 0 2px 10px;
+      margin: 2px 0 2px 32px;
       font-size: 13px;
     }
 
