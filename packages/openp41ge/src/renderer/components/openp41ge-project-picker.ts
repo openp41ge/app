@@ -814,7 +814,12 @@ export class Openp41geProjectPicker extends LitElement {
         }),
       );
       // Reload project list to reflect the new active state
-      this._loadProjects();
+      await this._loadProjects();
+      // Refocus the search input so keyboard shortcuts (Escape) work
+      requestAnimationFrame(() => {
+        const input = this.shadowRoot?.querySelector(".search-row input") as HTMLInputElement | null;
+        input?.focus();
+      });
     } else {
       log.error(`Failed to activate project "${name}": ${result.error}`);
     }
