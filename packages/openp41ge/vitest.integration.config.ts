@@ -25,6 +25,7 @@ export default defineConfig({
     alias: {
       "@openp41ge": path.resolve(__dirname, "./src"),
       "openp41ge-file-editor": path.resolve(__dirname, "../openp41ge-file-editor/src"),
+      "openp41ge-git": path.resolve(__dirname, "../openp41ge-git/src"),
       "openp41ge-logger": path.resolve(__dirname, "../openp41ge-logger/src"),
       "@openp41ge-terminal": path.resolve(__dirname, "../openp41ge-terminal/src"),
       "@openp41ge-agent-chat": path.resolve(__dirname, "../openp41ge-agent-chat/src"),

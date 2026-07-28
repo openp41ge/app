@@ -18,6 +18,33 @@
       "cache": true
     },
     "test": {
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/test/**/*",
+        "{projectRoot}/tsconfig*.json",
+        "{projectRoot}/*.config.*",
+        "{projectRoot}/package.json"
+      ],
+      "cache": true
+    },
+    "test:unit": {
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/test/unit/**/*",
+        "{projectRoot}/tsconfig*.json",
+        "{projectRoot}/vitest*.config.*",
+        "{projectRoot}/package.json"
+      ],
+      "cache": true
+    },
+    "test:integration": {
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/test/integration/**/*",
+        "{projectRoot}/tsconfig*.json",
+        "{projectRoot}/vitest*.config.*",
+        "{projectRoot}/package.json"
+      ],
       "cache": true
     },
     "lint": {
