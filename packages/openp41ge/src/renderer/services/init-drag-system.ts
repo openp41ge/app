@@ -59,6 +59,10 @@ let _pendingFileDragStart: {
   screenY: number;
   filePath: string;
   winId: string;
+  offsetX: number;
+  offsetY: number;
+  elementWidth: number;
+  elementHeight: number;
 } | null = null;
 
 /**
@@ -164,7 +168,17 @@ export function initDragSystem(): () => void {
     const label = fileName;
     const winId = _resolveMyWinId();
 
+    // Calculate offset from cursor to element's top-left corner
+    const fileRect = fileEl.getBoundingClientRect();
+    const fileScreenX = window.screenX + fileRect.left;
+    const fileScreenY = window.screenY + fileRect.top;
+    const offsetX = e.screenX - fileScreenX;
+    const offsetY = e.screenY - fileScreenY;
+    const elementWidth = fileEl.offsetWidth;
+    const elementHeight = fileEl.offsetHeight;
+
     const dragSource = new FileDragSource(filePath, fileName);
+    dragSource.setOffset(offsetX, offsetY);
     _currentSource = dragSource;
     _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
 
@@ -175,6 +189,10 @@ export function initDragSystem(): () => void {
       screenY: e.screenY,
       filePath,
       winId,
+      offsetX,
+      offsetY,
+      elementWidth,
+      elementHeight,
     };
   };
 
@@ -239,13 +257,15 @@ export function initDragSystem(): () => void {
       if (_localFileDragActive && _pendingFileDetachPath) {
         const filePath = _pendingFileDetachPath;
         _pendingFileDetachPath = null;
+        // Use a short delay so cross-window IPC (endSession) has time to
+        // set _fileDropHandled before we decide to create a new window.
         setTimeout(() => {
           if (!_fileDropHandled) {
             const fileName = filePath.split("/").filter(Boolean).pop() || "file";
             window.openp41ge.workspace.dispatch("actionOpenFileInNewWindow", filePath, fileName);
           }
           _fileDropHandled = false;
-        }, 0);
+        }, 200);
       }
       _localDragActive = false;
       _localFileDragActive = false;
@@ -305,10 +325,10 @@ export function initDragSystem(): () => void {
             undefined,
             p.winId,
             undefined,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
+            p.elementWidth,
+            p.elementHeight,
+            p.offsetX,
+            p.offsetY,
             "file",
             p.filePath,
           );
@@ -436,12 +456,15 @@ export function initDragSystem(): () => void {
 
   // ── Incoming end-session event (source window cleanup) ────────────────
   window.openp41ge.drag.onEndSession(() => {
+    // Mark the file as handled — this tells the deferred timeout in
+    // onMouseUp NOT to create a new window (because the cross-window
+    // drop was successfully handled by the target window).
+    _fileDropHandled = true;
     _dragActivated = false;
     _focusedOnEntry = false;
     _localDragActive = false;
     _localFileDragActive = false;
     _pendingFileDetachPath = null;
-    _fileDropHandled = false;
     _orchestrator?.cancelDrag();
     window.openp41ge.drag.end();
     clearGridGhost();

@@ -11,6 +11,9 @@ export class FileDragSource implements IDragSource {
 
   private _filePath: string;
   private _fileName: string;
+  /** Offset from cursor to element top-left, set via setOffset(). */
+  private _offsetX = 0;
+  private _offsetY = 0;
   private _ghost: HTMLElement | null = null;
 
   constructor(filePath: string, fileName?: string) {
@@ -18,36 +21,29 @@ export class FileDragSource implements IDragSource {
     this._fileName = fileName || filePath.split("/").pop() || "file";
   }
 
+  /** Set the cursor offset for the main-process ghost positioning. */
+  setOffset(offsetX: number, offsetY: number): void {
+    this._offsetX = offsetX;
+    this._offsetY = offsetY;
+  }
+
+  get offsetX(): number {
+    return this._offsetX;
+  }
+
+  get offsetY(): number {
+    return this._offsetY;
+  }
+
+  /**
+   * Create an invisible ghost — the visual ghost is rendered by the
+   * main-process DragGhostManager (BrowserWindow overlay), not by
+   * an in-DOM element. This prevents double-ghost rendering.
+   */
   createGhost(): HTMLElement {
     const ghost = document.createElement("div");
-    ghost.classList.add("openp41ge-drag-ghost");
-    ghost.style.position = "fixed";
-    ghost.style.pointerEvents = "none";
-    ghost.style.zIndex = "99999";
-    ghost.style.opacity = "0.85";
-    ghost.style.display = "flex";
-    ghost.style.alignItems = "center";
-    ghost.style.gap = "6px";
-    ghost.style.padding = "4px 10px";
-    ghost.style.background = "#2a2a2a";
-    ghost.style.border = "1px solid #555";
-    ghost.style.borderRadius = "4px";
-    ghost.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
-    ghost.style.fontSize = "13px";
-    ghost.style.color = "#ddd";
-    ghost.style.whiteSpace = "nowrap";
-
-    // File icon
-    const icon = document.createElement("span");
-    icon.textContent = "📄";
-    icon.style.fontSize = "14px";
-    ghost.appendChild(icon);
-
-    // File name
-    const label = document.createElement("span");
-    label.textContent = this._fileName;
-    ghost.appendChild(label);
-
+    ghost.style.cssText =
+      "position:fixed;pointer-events:none;opacity:0;width:1px;height:1px;z-index:-1;";
     this._ghost = ghost;
     return ghost;
   }
