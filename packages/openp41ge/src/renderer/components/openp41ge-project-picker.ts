@@ -1251,14 +1251,26 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._dragOffsetX = e.clientX - rect.left;
                                           this._dragOffsetY = e.clientY - rect.top;
                                           const clone = header.cloneNode(true) as HTMLElement;
-                                          // Copy ALL computed styles so the clone looks identical outside shadow DOM
-                                          const cs = getComputedStyle(header);
-                                          for (let i = 0; i < cs.length; i++) {
-                                            const prop = cs[i];
-                                            const val = cs.getPropertyValue(prop);
-                                            if (prop.startsWith("--") || prop === "cursor" || prop === "pointer-events") continue;
-                                            clone.style.setProperty(prop, val);
-                                          }
+                                          // Copy ALL computed styles recursively (parent + children) so the clone
+                                          // looks identical outside the shadow DOM where class selectors don't apply.
+                                          const copyStyles = (src: Element, dst: Element) => {
+                                            const cs = getComputedStyle(src);
+                                            for (let i = 0; i < cs.length; i++) {
+                                              const prop = cs[i];
+                                              if (prop.startsWith("--") || prop === "cursor" || prop === "pointer-events") continue;
+                                              if (dst instanceof HTMLElement || dst instanceof SVGElement) {
+                                                dst.style.setProperty(prop, cs.getPropertyValue(prop));
+                                              }
+                                            }
+                                            for (let i = 0; i < src.children.length; i++) {
+                                              const sc = src.children[i];
+                                              const dc = dst.children[i];
+                                              if (dc && (dc instanceof HTMLElement || dc instanceof SVGElement)) {
+                                                copyStyles(sc, dc);
+                                              }
+                                            }
+                                          };
+                                          copyStyles(header, clone);
                                           // Override positioning and visual extras
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
