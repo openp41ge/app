@@ -259,6 +259,8 @@ export function initDragSystem(): () => void {
       // if the orchestrator drops the file on a valid target.
       if (_localFileDragActive && _pendingFileDetachPath) {
         const filePath = _pendingFileDetachPath;
+        const dropScreenX = _lastScreenPos.screenX;
+        const dropScreenY = _lastScreenPos.screenY;
         _pendingFileDetachPath = null;
         // Use setTimeout(0) to yield to the event loop, allowing any
         // pending IPC messages (endSession from cross-window drops) to
@@ -270,8 +272,8 @@ export function initDragSystem(): () => void {
               "actionOpenFileInNewWindow",
               filePath,
               fileName,
-              _lastScreenPos.screenX,
-              _lastScreenPos.screenY,
+              dropScreenX,
+              dropScreenY,
             );
           }
           _fileDropHandled = false;
