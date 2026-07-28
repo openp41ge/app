@@ -1277,7 +1277,7 @@ export class Openp41geProjectPicker extends LitElement {
                                             }
                                             const r = this._detailRepos;
                                             const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
-                                            let toIdx = r.length - 1;
+                                            let toIdx = r.length;
                                             if (items) {
                                               for (let i = 0; i < items.length; i++) {
                                                 const rect = items[i].getBoundingClientRect();
