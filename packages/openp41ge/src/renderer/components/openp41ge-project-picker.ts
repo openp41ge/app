@@ -1232,7 +1232,7 @@ export class Openp41geProjectPicker extends LitElement {
                               >
                                 ${this._detailRepos.map(
                                   (repo, idx) => html`
-                                    <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'opacity:0.3;' : ''}">
+                                    <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'background:rgba(74,158,255,0.15);border:1px solid rgba(74,158,255,0.4);border-radius:6px;box-shadow:inset 0 0 0 1px rgba(74,158,255,0.3);' : ''}">
                                       <div class="repo-header"
                                         @pointerdown=${(e: PointerEvent) => {
                                           if (e.button !== 0 || this._detailReposDragIdx >= 0 || !this._detailRepos) return;
@@ -1243,22 +1243,20 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._detailReposDragIdx = fromIdx;
                                           this._dragRepoName = repo.name;
                                           this._dragEl = e.currentTarget as HTMLElement;
-                                          // Create a compact drag indicator that follows the cursor
+                                          // Create a clone of the repo header that follows the cursor
                                           const header = e.currentTarget as HTMLElement;
                                           const rect = header.getBoundingClientRect();
-                                          const clone = document.createElement("div");
-                                          clone.textContent = repo.name;
+                                          const clone = header.cloneNode(true) as HTMLElement;
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
-                                          clone.style.opacity = "0.85";
-                                          clone.style.padding = "6px 12px";
-                                          clone.style.fontSize = "13px";
-                                          clone.style.color = "#f0f0f0";
+                                          clone.style.opacity = "0.9";
+                                          clone.style.width = rect.width + "px";
                                           clone.style.background = "var(--openp41ge-hover-bg, #2a2a2a)";
                                           clone.style.borderRadius = "6px";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-                                          clone.style.whiteSpace = "nowrap";
+                                          clone.style.margin = "0";
+                                          clone.style.padding = "2px 10px";
                                           clone.style.left = e.clientX + "px";
                                           clone.style.top = e.clientY + "px";
                                           clone.style.transform = "translate(-50%, -50%)";
