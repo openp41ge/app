@@ -1273,13 +1273,9 @@ export class Openp41geProjectPicker extends LitElement {
                                             }
                                           };
                                           copyStyles(row, clone);
-                                          // Remove all bottom spacing — the ghost is floating, no need for row spacing
-                                          clone.style.padding = "";
-                                          clone.style.marginBottom = "0";
-                                          clone.style.paddingTop = "2px";
+                                          // Remove bottom spacing only — the ghost is floating, no need for row spacing
                                           clone.style.paddingBottom = "0";
-                                          clone.style.paddingLeft = "";
-                                          clone.style.paddingRight = "";
+                                          clone.style.marginBottom = "0";
                                           // Also strip bottom padding from the worktree list inside the clone
                                           const wtList = clone.querySelector(".worktree-list");
                                           if (wtList) {
