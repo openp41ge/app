@@ -529,6 +529,7 @@ export class Openp41geProjectPicker extends LitElement {
   private _boundPointerMove: ((e: PointerEvent) => void) | null = null;
   private _boundPointerUp: ((e: PointerEvent) => void) | null = null;
   private _dragEl: HTMLElement | null = null;
+  private _dragWrapper: HTMLElement | null = null;
   private _dragOffsetX = 0;
   private _dragOffsetY = 0;
   @state() private _loadingRepos = false;
@@ -1289,8 +1290,15 @@ export class Openp41geProjectPicker extends LitElement {
                                           clone.style.margin = "0";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
                                           clone.style.boxSizing = getComputedStyle(row).boxSizing;
+                                          // Wrap clone in a .detail-card container so CSS selectors like
+                                          // .detail-card .repo-group .worktree-list li::before still match.
+                                          const wrapper = document.createElement("div");
+                                          wrapper.className = "detail-card";
+                                          wrapper.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;";
+                                          wrapper.appendChild(clone);
                                           this._dragEl = clone;
-                                          document.body.appendChild(clone);
+                                          this._dragWrapper = wrapper;
+                                          this.shadowRoot?.appendChild(wrapper);
                                           // Add document-level listeners (avoids pointer capture invalidation on re-render)
                                           this._boundPointerMove = (ev: PointerEvent) => {
                                             if (this._detailReposDragIdx < 0 || !this._detailRepos) return;
@@ -1320,11 +1328,12 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._boundPointerUp = (ev: PointerEvent) => {
                                             if (this._detailReposDragIdx < 0) return;
                                             ev.preventDefault();
-                                            // Remove the drag clone
-                                            if (this._dragEl) {
-                                              this._dragEl.remove();
-                                              this._dragEl = null;
+                                            // Remove the drag clone and its wrapper
+                                            if (this._dragWrapper) {
+                                              this._dragWrapper.remove();
+                                              this._dragWrapper = null;
                                             }
+                                            this._dragEl = null;
                                             this._detailReposDragIdx = -1;
                                             this._dragRepoName = null;
                                             if (this._boundPointerMove) {
