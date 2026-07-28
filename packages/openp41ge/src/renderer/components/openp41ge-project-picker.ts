@@ -529,6 +529,8 @@ export class Openp41geProjectPicker extends LitElement {
   private _boundPointerMove: ((e: PointerEvent) => void) | null = null;
   private _boundPointerUp: ((e: PointerEvent) => void) | null = null;
   private _dragEl: HTMLElement | null = null;
+  private _dragOffsetX = 0;
+  private _dragOffsetY = 0;
   @state() private _loadingRepos = false;
   @state() private _searchText = "";
   @state() private _activeProjectName: string | null = null;
@@ -1243,37 +1245,23 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._detailReposDragIdx = fromIdx;
                                           this._dragRepoName = repo.name;
                                           this._dragEl = e.currentTarget as HTMLElement;
-                                          // Clone the repo header — same size, same content
+                                          // Clone the repo header — preserves its inline styles from the template
                                           const header = e.currentTarget as HTMLElement;
                                           const rect = header.getBoundingClientRect();
+                                          this._dragOffsetX = e.clientX - rect.left;
+                                          this._dragOffsetY = e.clientY - rect.top;
                                           const clone = header.cloneNode(true) as HTMLElement;
-                                          // Override inline styles set by the template's style attribute
-                                          clone.removeAttribute("style");
-                                          clone.style.cssText = "";
-                                          // Apply positioning
+                                          // Position fixed, same exact size, offset by grab point
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
                                           clone.style.opacity = "0.9";
                                           clone.style.width = rect.width + "px";
-                                          clone.style.maxWidth = rect.width + "px";
-                                          clone.style.minWidth = rect.width + "px";
                                           clone.style.height = rect.height + "px";
-                                          clone.style.left = e.clientX + "px";
-                                          clone.style.top = e.clientY + "px";
-                                          clone.style.transform = "translate(-50%, -50%)";
-                                          clone.style.overflow = "hidden";
-                                          // Copy computed styles from the original header
-                                          const cs = getComputedStyle(header);
-                                          clone.style.display = cs.display;
-                                          clone.style.alignItems = cs.alignItems;
-                                          clone.style.background = cs.background;
-                                          clone.style.borderRadius = cs.borderRadius;
+                                          clone.style.top = (e.clientY - this._dragOffsetY) + "px";
+                                          clone.style.left = (e.clientX - this._dragOffsetX) + "px";
+                                          clone.style.margin = "0";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-                                          clone.style.fontSize = cs.fontSize;
-                                          clone.style.color = cs.color;
-                                          clone.style.gap = cs.gap;
-                                          clone.style.padding = "2px 10px";
                                           this._dragEl = clone;
                                           document.body.appendChild(clone);
                                           this._dragCloneX = header.getBoundingClientRect().left;
@@ -1282,10 +1270,10 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._boundPointerMove = (ev: PointerEvent) => {
                                             if (this._detailReposDragIdx < 0 || !this._detailRepos) return;
                                             ev.preventDefault();
-                                            // Move the clone with the cursor
+                                            // Move the clone with the cursor, preserving the grab offset
                                             if (this._dragEl) {
-                                              this._dragEl.style.left = ev.clientX + "px";
-                                              this._dragEl.style.top = ev.clientY + "px";
+                                              this._dragEl.style.left = (ev.clientX - this._dragOffsetX) + "px";
+                                              this._dragEl.style.top = (ev.clientY - this._dragOffsetY) + "px";
                                             }
                                             const r = this._detailRepos;
                                             const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
