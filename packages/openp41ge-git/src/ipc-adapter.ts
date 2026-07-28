@@ -9,7 +9,6 @@ import type {
   CloneProgress,
 } from "./types";
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface Openp41geWindow extends Window {}
 
 interface WorkspaceController {
