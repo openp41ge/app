@@ -178,73 +178,6 @@ class Openp41geWorktreeTree extends LitElement {
   };
 
   /** Initiate a pointer-event drag to reorder a repo in the explorer tree. */
-  private _startExplorerDrag(e: PointerEvent, repoName: string, idx: number): void {
-    if (this._explorerDragIdx >= 0) return;
-    const repos = this._repos;
-    const fromIdx = repos.findIndex((r) => r.name === repoName);
-    if (fromIdx < 0) return;
-
-    this._explorerDragIdx = fromIdx;
-    this._explorerDragRepoName = repoName;
-
-    // Document-level listeners for live reorder
-    this._boundExplorerPointerMove = (ev: PointerEvent) => {
-      if (this._explorerDragIdx < 0) return;
-      ev.preventDefault();
-      // Find drop index
-      const items = this.renderRoot?.querySelectorAll("openp41ge-repo-tree-item");
-      let toIdx = repos.length;
-      if (items) {
-        for (let i = 0; i < items.length; i++) {
-          const r = items[i].getBoundingClientRect();
-          if (ev.clientY < r.top + r.height / 2) { toIdx = i; break; }
-        }
-      }
-      const from = this._explorerDragIdx;
-      if (toIdx === from) return;
-      const adjustedTo = toIdx > from ? toIdx - 1 : toIdx;
-      const [moved] = repos.splice(from, 1);
-      repos.splice(adjustedTo, 0, moved);
-      this._repos = [...repos];
-      this._explorerDragIdx = adjustedTo;
-    };
-
-    this._boundExplorerPointerUp = (ev: PointerEvent) => {
-      if (this._explorerDragIdx < 0) return;
-      ev.preventDefault();
-      // Persist the new repo order
-      const orderNames = this._repos.map((r) => r.name);
-      const pn = window.__openp41geProjectName;
-      const projectName = pn ?? "";
-      // Update in-memory cache immediately (shared with project picker)
-      if (projectName) repoOrderCache.set(projectName, orderNames);
-      // Persist to disk via IPC
-      const doSave = (name: string) => {
-        window.openp41ge.project.setRepoOrder(name, orderNames);
-        document.dispatchEvent(new CustomEvent("project:changed"));
-      };
-      if (projectName) {
-        doSave(projectName);
-      } else {
-        window.openp41ge.project.current().then((n) => { if (n) doSave(n); });
-      }
-      // Clean up
-      this._explorerDragIdx = -1;
-      this._explorerDragRepoName = null;
-      if (this._boundExplorerPointerMove) {
-        document.removeEventListener("pointermove", this._boundExplorerPointerMove);
-      }
-      if (this._boundExplorerPointerUp) {
-        document.removeEventListener("pointerup", this._boundExplorerPointerUp);
-      }
-      this._boundExplorerPointerMove = null;
-      this._boundExplorerPointerUp = null;
-    };
-
-    document.addEventListener("pointermove", this._boundExplorerPointerMove);
-    document.addEventListener("pointerup", this._boundExplorerPointerUp);
-  }
-
   private _loading = true;
   private _errorMessage = "";
   private _errorRetry: (() => void) | null = null;
@@ -253,9 +186,6 @@ class Openp41geWorktreeTree extends LitElement {
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
   @state() private _dropIndex: number = -1;
   @state() private _explorerDragIdx: number = -1;
-  private _explorerDragRepoName: string | null = null;
-  private _boundExplorerPointerMove: ((e: PointerEvent) => void) | null = null;
-  private _boundExplorerPointerUp: ((e: PointerEvent) => void) | null = null;
   private _addWsContainer: HTMLElement | null = null;
   constructor() {
     super();
@@ -428,6 +358,16 @@ class Openp41geWorktreeTree extends LitElement {
             style="position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;"
           >
             <div class="wt-tree-scroll-content"
+              @dragstart=${(e: DragEvent) => {
+                const dragName = e.dataTransfer?.getData("application/x-openp41ge-repo");
+                if (!dragName) return;
+                const idx = this._repos.findIndex((r) => r.name === dragName);
+                if (idx >= 0) this._explorerDragIdx = idx;
+              }}
+              @dragend=${() => {
+                this._explorerDragIdx = -1;
+                this._dropIndex = -1;
+              }}
               @dragenter=${(e: DragEvent) => {
                 if (e.dataTransfer?.types.includes("application/x-openp41ge-repo")) e.preventDefault();
               }}
@@ -453,6 +393,7 @@ class Openp41geWorktreeTree extends LitElement {
               }}
               @drop=${(e: DragEvent) => {
                 this._dropIndex = -1;
+                this._explorerDragIdx = -1;
                 const dragName = e.dataTransfer?.getData("application/x-openp41ge-repo");
                 if (!dragName) return;
                 e.preventDefault();
@@ -470,6 +411,20 @@ class Openp41geWorktreeTree extends LitElement {
                 const [moved] = newRepos.splice(fromIdx, 1);
                 newRepos.splice(dropIndex > fromIdx ? dropIndex - 1 : dropIndex, 0, moved);
                 this._repos = newRepos;
+                // Persist the new order
+                const orderNames = newRepos.map((r) => r.name);
+                const pn = window.__openp41geProjectName;
+                const projectName = pn ?? "";
+                if (projectName) repoOrderCache.set(projectName, orderNames);
+                const doSave = (name: string) => {
+                  window.openp41ge.project.setRepoOrder(name, orderNames);
+                  document.dispatchEvent(new CustomEvent("project:changed"));
+                };
+                if (projectName) {
+                  doSave(projectName);
+                } else {
+                  window.openp41ge.project.current().then((n) => { if (n) doSave(n); });
+                }
               }}
             >
               ${this._repos.map((repo, idx) => {
@@ -478,24 +433,7 @@ class Openp41geWorktreeTree extends LitElement {
                   ${this._dropIndex === idx
                     ? html`<div style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"></div>`
                     : nothing}
-                  <div style="display:flex;align-items:stretch;width:100%;${this._explorerDragIdx === idx ? 'opacity:0.3;' : ''}" @pointerdown=${(e: PointerEvent) => {
-                    if (e.button !== 0 || this._explorerDragIdx >= 0) return;
-                    // Only start drag after a small movement threshold (avoid conflict with click-to-expand)
-                    const startY = e.clientY;
-                    const onMove = (ev: PointerEvent) => {
-                      if (Math.abs(ev.clientY - startY) > 4) {
-                        document.removeEventListener("pointermove", onMove);
-                        document.removeEventListener("pointerup", onUp);
-                        this._startExplorerDrag(ev, repo.name, idx);
-                      }
-                    };
-                    const onUp = () => {
-                      document.removeEventListener("pointermove", onMove);
-                      document.removeEventListener("pointerup", onUp);
-                    };
-                    document.addEventListener("pointermove", onMove);
-                    document.addEventListener("pointerup", onUp);
-                  }}>
+                  <div style="display:flex;align-items:stretch;width:100%;${this._explorerDragIdx === idx ? 'opacity:0.3;' : ''}">
                     <openp41ge-repo-tree-item style="flex:1;min-width:0;"
                       .repoName=${repo.name}
                       .repoUrl=${repo.url}
