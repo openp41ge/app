@@ -523,6 +523,8 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _detailProject: ProjectInfo | null = null;
   @state() private _detailRepos: Array<{ name: string; worktrees: string[] }> | null = null;
   @state() private _detailReposDragIdx: number = -1;
+  @state() private _dragCloneX: number = 0;
+  @state() private _dragCloneY: number = 0;
   private _dragRepoName: string | null = null;
   private _boundPointerMove: ((e: PointerEvent) => void) | null = null;
   private _boundPointerUp: ((e: PointerEvent) => void) | null = null;
@@ -1241,10 +1243,31 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._detailReposDragIdx = fromIdx;
                                           this._dragRepoName = repo.name;
                                           this._dragEl = e.currentTarget as HTMLElement;
+                                          // Create and track a drag clone that follows the cursor
+                                          const header = e.currentTarget as HTMLElement;
+                                          const clone = header.cloneNode(true) as HTMLElement;
+                                          clone.style.position = "fixed";
+                                          clone.style.pointerEvents = "none";
+                                          clone.style.zIndex = "99999";
+                                          clone.style.opacity = "0.85";
+                                          clone.style.width = header.offsetWidth + "px";
+                                          clone.style.background = "var(--openp41ge-hover-bg, #2a2a2a)";
+                                          clone.style.borderRadius = "6px";
+                                          clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
+                                          clone.style.left = header.getBoundingClientRect().left + "px";
+                                          clone.style.top = e.clientY + "px";
+                                          this._dragEl = clone;
+                                          document.body.appendChild(clone);
+                                          this._dragCloneX = header.getBoundingClientRect().left;
+                                          this._dragCloneY = e.clientY;
                                           // Add document-level listeners (avoids pointer capture invalidation on re-render)
                                           this._boundPointerMove = (ev: PointerEvent) => {
                                             if (this._detailReposDragIdx < 0 || !this._detailRepos) return;
                                             ev.preventDefault();
+                                            // Move the clone with the cursor
+                                            if (this._dragEl) {
+                                              this._dragEl.style.top = ev.clientY + "px";
+                                            }
                                             const r = this._detailRepos;
                                             const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
                                             let toIdx = r.length - 1;
@@ -1265,6 +1288,11 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._boundPointerUp = (ev: PointerEvent) => {
                                             if (this._detailReposDragIdx < 0) return;
                                             ev.preventDefault();
+                                            // Remove the drag clone
+                                            if (this._dragEl) {
+                                              this._dragEl.remove();
+                                              this._dragEl = null;
+                                            }
                                             this._detailReposDragIdx = -1;
                                             this._dragRepoName = null;
                                             if (this._boundPointerMove) {
