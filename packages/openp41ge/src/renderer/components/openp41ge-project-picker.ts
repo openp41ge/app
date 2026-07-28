@@ -1259,8 +1259,9 @@ export class Openp41geProjectPicker extends LitElement {
                                           clone.style.borderRadius = "6px";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
                                           clone.style.whiteSpace = "nowrap";
-                                          clone.style.left = rect.left + "px";
+                                          clone.style.left = e.clientX + "px";
                                           clone.style.top = e.clientY + "px";
+                                          clone.style.transform = "translate(-50%, -50%)";
                                           this._dragEl = clone;
                                           document.body.appendChild(clone);
                                           this._dragCloneX = header.getBoundingClientRect().left;
@@ -1271,6 +1272,7 @@ export class Openp41geProjectPicker extends LitElement {
                                             ev.preventDefault();
                                             // Move the clone with the cursor
                                             if (this._dragEl) {
+                                              this._dragEl.style.left = ev.clientX + "px";
                                               this._dragEl.style.top = ev.clientY + "px";
                                             }
                                             const r = this._detailRepos;
