@@ -47,7 +47,13 @@ declare global {
         activate: () => void;
         ghostForward: (screenX: number, screenY: number) => void;
         check: (screenX: number, screenY: number, dragData?: string) => Promise<{ target: Record<string, unknown> | null; windowId: string } | null>;
-        getActive: () => Promise<{ sourceWinId: string; label: string; dragData: { tabId: string; winId: string; worksetId: string; type: string; title?: string } } | null>;
+        getActive: () => Promise<{
+          sourceWinId: string;
+          label: string;
+          dragData:
+            | { tabId: string; winId: string; worksetId: string; type: "tab"; title?: string }
+            | { type: "file"; filePath: string; fileName?: string };
+        } | null>;
         endSession: () => void;
         onEndSession: (callback: () => void) => () => void;
         ghostShow: (targetWinId: string, screenX: number, screenY: number, label: string) => void;

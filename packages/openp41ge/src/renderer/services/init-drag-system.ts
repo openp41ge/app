@@ -526,7 +526,9 @@ async function _handleCrossWindowDrop(
     if (data.type === "file") {
       const filePath = data.filePath;
       if (filePath) {
-        const gridEl = (target as IDropTarget & { element: HTMLElement }).element.closest("tab-grid") as HTMLElement | null;
+        const gridEl = (target as IDropTarget & { element: HTMLElement }).element.closest(
+          "tab-grid",
+        ) as HTMLElement | null;
         if (gridEl) {
           const gridRect = gridEl.getBoundingClientRect();
           const relX = clientX - gridRect.left;
@@ -571,6 +573,9 @@ async function _handleCrossWindowDrop(
         window.openp41ge.drag.endSession();
         return;
       }
+      // filePath was falsy — nothing to handle
+      window.openp41ge.drag.endSession();
+      return;
     }
 
     if (target.type === "tab-bar") {

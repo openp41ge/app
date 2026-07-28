@@ -10,7 +10,7 @@ import { registerTab, addTabToCell, addColumnTab } from "./tab-operations.js";
 import { makeTabId, mapGridInWindow } from "./common.js";
 import { resizeGrid, findEmptyCell } from "./grid-operations.js";
 import { openTabInCell } from "./cell-operations.js";
-import { addWindow, newWindow } from "./window-operations.js";
+import { addWindow } from "./window-operations.js";
 
 export function actionAddTab(
   workspace: Workspace,
