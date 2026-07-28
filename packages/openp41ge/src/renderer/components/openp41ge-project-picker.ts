@@ -1245,12 +1245,16 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._detailReposDragIdx = fromIdx;
                                           this._dragRepoName = repo.name;
                                           this._dragEl = e.currentTarget as HTMLElement;
-                                          // Clone the repo header
+                                          // Clone the full repo row (.repo-group <li>) for exact visual match
                                           const header = e.currentTarget as HTMLElement;
-                                          const rect = header.getBoundingClientRect();
+                                          const row = header.closest(".repo-group") as HTMLElement;
+                                          const rect = row.getBoundingClientRect();
                                           this._dragOffsetX = e.clientX - rect.left;
                                           this._dragOffsetY = e.clientY - rect.top;
-                                          const clone = header.cloneNode(true) as HTMLElement;
+                                          const clone = row.cloneNode(true) as HTMLElement;
+                                          // Remove worktree list from clone (only need the header row)
+                                          const wtList = clone.querySelector(".worktree-list");
+                                          if (wtList) wtList.remove();
                                           // Copy computed styles recursively so the clone looks identical outside shadow DOM.
                                           const copyStyles = (src: Element, dst: Element) => {
                                             const cs = getComputedStyle(src);
@@ -1271,10 +1275,7 @@ export class Openp41geProjectPicker extends LitElement {
                                               }
                                             }
                                           };
-                                          copyStyles(header, clone);
-                                          // The repo-header has no own background (inherits from .repo-group <li>),
-                                          // so read it from the parent and apply explicitly on the clone.
-                                          const parentBg = getComputedStyle(header.parentElement!).background;
+                                          copyStyles(row, clone);
                                           // Override positioning and visual extras
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
@@ -1282,17 +1283,13 @@ export class Openp41geProjectPicker extends LitElement {
                                           clone.style.opacity = "1";
                                           clone.style.width = Math.round(rect.width) + "px";
                                           clone.style.height = Math.round(rect.height) + "px";
-                                          clone.style.background = parentBg !== "rgba(0, 0, 0, 0)" && parentBg !== "transparent" ? parentBg : "#2a2a2a";
                                           clone.style.top = (e.clientY - this._dragOffsetY) + "px";
                                           clone.style.left = (e.clientX - this._dragOffsetX) + "px";
                                           clone.style.margin = "0";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-                                          clone.style.borderRadius = "6px";
-                                          clone.style.boxSizing = getComputedStyle(header).boxSizing;
+                                          clone.style.boxSizing = getComputedStyle(row).boxSizing;
                                           this._dragEl = clone;
                                           document.body.appendChild(clone);
-                                          this._dragCloneX = header.getBoundingClientRect().left;
-                                          this._dragCloneY = e.clientY;
                                           // Add document-level listeners (avoids pointer capture invalidation on re-render)
                                           this._boundPointerMove = (ev: PointerEvent) => {
                                             if (this._detailReposDragIdx < 0 || !this._detailRepos) return;
