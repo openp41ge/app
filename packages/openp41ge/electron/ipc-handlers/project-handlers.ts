@@ -13,6 +13,10 @@
 import { ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
+
+/** In-memory cache: projectName → repo name order. Populated by setRepoOrder,
+ *  read by listRepos, survives across IPC calls within the same process lifetime. */
+const _repoOrderCache = new Map<string, string[]>();
 import type { WorkspaceStateStore } from "../../src/main/services/workspace-state-store";
 import type { ProjectStore } from "../../src/main/services/project-store";
 import type { OperationDispatcher } from "../../src/main/services/operation-dispatcher";
@@ -107,8 +111,8 @@ export function registerProjectHandlers(
       };
 
       walk(reposDir);
-      // Apply persisted order, fall back to alphabetical
-      const order = projectStore.readRepoOrder(name);
+      // Apply persisted order (check in-memory cache first, then file), fall back to alphabetical
+      const order = _repoOrderCache.has(name) ? _repoOrderCache.get(name)! : projectStore.readRepoOrder(name);
       if (order) {
         const orderMap = new Map(order.map((n, i) => [n, i]));
         repos.sort((a, b) => {
@@ -128,9 +132,10 @@ export function registerProjectHandlers(
     }
   });
 
-  /** Persist the repo display order for a project. */
+  /** Persist the repo display order for a project and update the in-memory cache. */
   ipcMain.handle("project:setRepoOrder", (_event, name: string, order: string[]) => {
     projectStore.writeRepoOrder(name, order);
+    _repoOrderCache.set(name, order);
     return true;
   });
 
