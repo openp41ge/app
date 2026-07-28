@@ -172,17 +172,6 @@ class Openp41geWorktreeTree extends LitElement {
   // ── Git panel state ───────────────────────────────────────────────────────
   private _gitDisconnected = false;
   private _repoDropHandler: ((e: Event) => void) | null = null;
-  /** Persist the current repo order and notify the project picker. */
-  private _persistExplorerRepoOrder(): void {
-    const order = this._repos.map((r) => r.name);
-    window.openp41ge.project.current().then((currentName) => {
-      if (currentName) {
-        window.openp41ge.project.setRepoOrder(currentName, order);
-        document.dispatchEvent(new CustomEvent("project:changed"));
-      }
-    });
-  }
-
   private _onProjectChanged = (): void => {
     this._loadRepos();
   };
@@ -201,11 +190,6 @@ class Openp41geWorktreeTree extends LitElement {
     this._boundExplorerPointerMove = (ev: PointerEvent) => {
       if (this._explorerDragIdx < 0) return;
       ev.preventDefault();
-      // Move the clone
-      if (this._explorerDragClone) {
-        this._explorerDragClone.style.left = (ev.clientX - this._explorerDragOffsetX) + "px";
-        this._explorerDragClone.style.top = (ev.clientY - this._explorerDragOffsetY) + "px";
-      }
       // Find drop index
       const items = this.renderRoot?.querySelectorAll("openp41ge-repo-tree-item");
       let toIdx = repos.length;
@@ -227,8 +211,17 @@ class Openp41geWorktreeTree extends LitElement {
     this._boundExplorerPointerUp = (ev: PointerEvent) => {
       if (this._explorerDragIdx < 0) return;
       ev.preventDefault();
-      // Persist order
-      this._persistExplorerRepoOrder();
+      const finalOrder = [...this._repos];
+      // Immediately save the order without waiting — the IPC message will be
+      // processed in order by the main process before any subsequent listRepos IPC.
+      const order = finalOrder.map((r) => r.name);
+      window.openp41ge.project.current().then((currentName) => {
+        if (currentName) {
+          window.openp41ge.project.setRepoOrder(currentName, order).then(() => {
+            document.dispatchEvent(new CustomEvent("project:changed"));
+          });
+        }
+      });
       // Clean up
       this._explorerDragIdx = -1;
       this._explorerDragRepoName = null;
@@ -254,13 +247,7 @@ class Openp41geWorktreeTree extends LitElement {
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
   @state() private _dropIndex: number = -1;
   @state() private _explorerDragIdx: number = -1;
-  @state() private _explorerDragCloneX = 0;
-  @state() private _explorerDragCloneY = 0;
   private _explorerDragRepoName: string | null = null;
-  private _explorerDragClone: HTMLElement | null = null;
-  private _explorerDragWrapper: HTMLElement | null = null;
-  private _explorerDragOffsetX = 0;
-  private _explorerDragOffsetY = 0;
   private _boundExplorerPointerMove: ((e: PointerEvent) => void) | null = null;
   private _boundExplorerPointerUp: ((e: PointerEvent) => void) | null = null;
   private _addWsContainer: HTMLElement | null = null;
