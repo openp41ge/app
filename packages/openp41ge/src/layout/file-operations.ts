@@ -7,10 +7,10 @@
 import type { Workspace } from "./types.js";
 import { createTab, type TabId } from "./types.js";
 import { registerTab, addTabToCell, addColumnTab } from "./tab-operations.js";
-import { makeTabId } from "./common.js";
+import { makeTabId, mapGridInWindow } from "./common.js";
 import { resizeGrid, findEmptyCell } from "./grid-operations.js";
 import { openTabInCell } from "./cell-operations.js";
-import { mapGridInWindow } from "./common.js";
+import { addWindow, newWindow } from "./window-operations.js";
 
 export function actionAddTab(
   workspace: Workspace,
@@ -155,4 +155,31 @@ export function splitFileOpen(
   });
 
   return result;
+}
+
+/**
+ * Open a file in a new window.
+ *
+ * Creates a new window, creates a file-viewer tab, and opens the file.
+ * Used by cross-window file drag-and-drop when the file is dropped
+ * outside any existing window.
+ */
+export function actionOpenFileInNewWindow(
+  workspace: Workspace,
+  filePath: string,
+  fileName?: string,
+): Workspace {
+  const tabId = makeTabId();
+  const name = fileName || filePath.split("/").filter(Boolean).pop() || "file";
+  const config: Record<string, unknown> = { filePath };
+  const tab = createTab(tabId, "file-viewer", name, config);
+
+  let result = registerTab(workspace, tab);
+
+  // Create a new window
+  const newWinId = `win-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  result = addWindow(result, newWinId);
+
+  // Add the tab to the new window's grid
+  return addTabToCell(result, newWinId, tab, 0, 0);
 }

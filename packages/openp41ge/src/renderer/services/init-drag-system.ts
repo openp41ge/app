@@ -20,6 +20,8 @@ import {
   type IDropTarget,
 } from "../openp41ge-tabs-adapter";
 
+import { FileDragSource } from "./drag-sources/file-drag-source";
+
 let _orchestrator: DragOrchestrator | null = null;
 let _currentSource: IDragSource | null = null;
 let _ghostManager = new GhostManager();
@@ -29,7 +31,14 @@ let _remoteDragActive = false;
 /** Whether our window has an active local drag. */
 let _localDragActive = false;
 
-/** Deferred drag:start params, captured on mousedown, fired on first POSITION event. */
+/** Set when a file drag meets the threshold. Used to create new window on mouseup if not dropped on target. */
+let _localFileDragActive = false;
+/** Pending file path for new-window creation when file drag ends without a valid drop target. */
+let _pendingFileDetachPath: string | null = null;
+/** Set to true when a file is successfully dropped on a grid target (via grid-open-tab). */
+let _fileDropHandled = false;
+
+/** Deferred drag:start params for tab drags, captured on mousedown, fired on first POSITION event. */
 let _pendingDragStart: {
   label: string;
   screenX: number;
@@ -41,6 +50,15 @@ let _pendingDragStart: {
   tabHeight: number;
   offsetX: number;
   offsetY: number;
+} | null = null;
+
+/** Deferred drag:start params for file drags. */
+let _pendingFileDragStart: {
+  label: string;
+  screenX: number;
+  screenY: number;
+  filePath: string;
+  winId: string;
 } | null = null;
 
 /**
@@ -134,6 +152,35 @@ export function initDragSystem(): () => void {
   document.addEventListener("mousedown", onMouseDown);
   cleanups.push(() => document.removeEventListener("mousedown", onMouseDown));
 
+  // ── Mousedown: initiate file drags from the explorer ─────────────────
+  const onFileMouseDown = (e: MouseEvent) => {
+    const fileEl = (e.target as HTMLElement).closest?.("[data-file-path]");
+    if (!fileEl || !(fileEl instanceof HTMLElement)) return;
+
+    e.preventDefault();
+
+    const filePath = fileEl.getAttribute("data-file-path") || "";
+    const fileName = filePath.split("/").filter(Boolean).pop() || "file";
+    const label = fileName;
+    const winId = _resolveMyWinId();
+
+    const dragSource = new FileDragSource(filePath, fileName);
+    _currentSource = dragSource;
+    _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
+
+    // Defer drag:start until the POSITION event fires (after threshold met)
+    _pendingFileDragStart = {
+      label,
+      screenX: e.screenX,
+      screenY: e.screenY,
+      filePath,
+      winId,
+    };
+  };
+
+  document.addEventListener("mousedown", onFileMouseDown);
+  cleanups.push(() => document.removeEventListener("mousedown", onFileMouseDown));
+
   // ── Click: activate tab (short clicks that don't become drags) ────────
   const onClick = (e: MouseEvent) => {
     const tabBtn = (e.target as HTMLElement).closest?.("[data-tab-id]");
@@ -180,9 +227,28 @@ export function initDragSystem(): () => void {
   // ── Mouseup: handle cross-window drops ───────────────────────────────
   const onMouseUp = async (e: MouseEvent) => {
     _pendingDragStart = null;
+    _pendingFileDragStart = null;
     if (_localDragActive) {
       clearGridGhost();
+
+      // Defer new-window creation to after the orchestrator's mouseup
+      // handler has processed the target drop (setTimeout(0) so the
+      // orchestrator's synchronous handler runs first).
+      // _fileDropHandled is set to true by the grid-open-tab handler
+      // if the orchestrator drops the file on a valid target.
+      if (_localFileDragActive && _pendingFileDetachPath) {
+        const filePath = _pendingFileDetachPath;
+        _pendingFileDetachPath = null;
+        setTimeout(() => {
+          if (!_fileDropHandled) {
+            const fileName = filePath.split("/").filter(Boolean).pop() || "file";
+            window.openp41ge.workspace.dispatch("actionOpenFileInNewWindow", filePath, fileName);
+          }
+          _fileDropHandled = false;
+        }, 0);
+      }
       _localDragActive = false;
+      _localFileDragActive = false;
       _currentSource = null;
       return;
     }
@@ -205,6 +271,10 @@ export function initDragSystem(): () => void {
       if (!_dragActivated) {
         _dragActivated = true;
         _localDragActive = true;
+        _localFileDragActive = !!_pendingFileDragStart;
+        if (_pendingFileDragStart) {
+          _pendingFileDetachPath = _pendingFileDragStart.filePath;
+        }
 
         // First POSITION event fires after the drag threshold is met — now
         // it's safe to show the main-process BrowserWindow ghost and broadcast
@@ -225,6 +295,24 @@ export function initDragSystem(): () => void {
             p.offsetY,
           );
           _pendingDragStart = null;
+        } else if (_pendingFileDragStart) {
+          const p = _pendingFileDragStart;
+          window.openp41ge.drag.start(
+            p.label,
+            p.screenX,
+            p.screenY,
+            undefined,
+            undefined,
+            p.winId,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            "file",
+            p.filePath,
+          );
+          _pendingFileDragStart = null;
         }
         window.openp41ge.drag.activate();
       }
@@ -238,6 +326,9 @@ export function initDragSystem(): () => void {
     window.openp41ge.drag.end();
     clearGridGhost();
     _localDragActive = false;
+    _localFileDragActive = false;
+    _pendingFileDetachPath = null;
+    _fileDropHandled = false;
     _currentSource = null;
   };
 
@@ -297,6 +388,19 @@ export function initDragSystem(): () => void {
   document.addEventListener(DRAG_EVENTS.CROSS, onCross);
   cleanups.push(() => document.removeEventListener(DRAG_EVENTS.CROSS, onCross));
 
+  // ── Listen for grid-open-tab to mark file drop handled ──────────────
+  // When a file is dropped on a valid grid target (same-window), the
+  // orchestrator fires grid-open-tab. We set _fileDropHandled so the
+  // deferred check in onMouseUp doesn't create a new window.
+  const onGridOpenTab = (e: Event) => {
+    const detail = (e as CustomEvent).detail as { tabConfig?: { filePath?: string } };
+    if (detail?.tabConfig?.filePath) {
+      _fileDropHandled = true;
+    }
+  };
+  document.addEventListener("grid-open-tab", onGridOpenTab);
+  cleanups.push(() => document.removeEventListener("grid-open-tab", onGridOpenTab));
+
   // ── Incoming ghost position from main process poll ───────────────────
   // The main process polls screen.getCursorScreenPoint() at ~20fps during
   // a drag and broadcasts the position to all windows. This is the only
@@ -335,6 +439,9 @@ export function initDragSystem(): () => void {
     _dragActivated = false;
     _focusedOnEntry = false;
     _localDragActive = false;
+    _localFileDragActive = false;
+    _pendingFileDetachPath = null;
+    _fileDropHandled = false;
     _orchestrator?.cancelDrag();
     window.openp41ge.drag.end();
     clearGridGhost();
@@ -371,6 +478,57 @@ async function _handleCrossWindowDrop(
 
     const data = active.dragData;
     const sourceWinId = active.sourceWinId;
+
+    // Handle file drops: open the file in the target window/grid
+    if (data.type === "file") {
+      const filePath = data.filePath;
+      if (filePath) {
+        const gridEl = (target as IDropTarget & { element: HTMLElement }).element.closest("tab-grid") as HTMLElement | null;
+        if (gridEl) {
+          const gridRect = gridEl.getBoundingClientRect();
+          const relX = clientX - gridRect.left;
+          const cols = (gridEl as HTMLElement & { cols?: number }).cols || 1;
+          const pos = computeDropTarget(gridEl, relX, gridRect.width, cols);
+          const targetCol = pos.col;
+          const winId = (gridEl as HTMLElement & { winId?: string }).winId || _resolveMyWinId();
+
+          if (pos.isBoundary) {
+            // For file splits, use splitFileOpen which creates a new column
+            const splitLeft =
+              pos.boundaryIndex === 0
+                ? true
+                : pos.boundaryIndex >= cols
+                  ? false
+                  : targetCol >= pos.boundaryIndex;
+            const splitCol =
+              pos.boundaryIndex === 0 ? 0 : pos.boundaryIndex >= cols ? cols - 1 : targetCol;
+            const fileName = filePath.split("/").filter(Boolean).pop() || "file";
+            window.openp41ge.workspace.dispatch(
+              "splitFileOpen",
+              winId,
+              "file-viewer",
+              fileName,
+              filePath,
+              splitCol,
+              splitLeft,
+            );
+          } else {
+            const fileName = filePath.split("/").filter(Boolean).pop() || "file";
+            window.openp41ge.workspace.dispatch(
+              "actionOpenFile",
+              winId,
+              "file-viewer",
+              fileName,
+              filePath,
+              targetCol,
+              true,
+            );
+          }
+        }
+        window.openp41ge.drag.endSession();
+        return;
+      }
+    }
 
     if (target.type === "tab-bar") {
       const tabBarTarget = target as IDropTarget & { winId: string; element: HTMLElement };

@@ -386,17 +386,13 @@ export class Openp41geRepoTreeItem extends LitElement {
       }
       return html`
         <div
-          draggable="true"
+          data-file-path="${entry.path}"
           style="display:flex;align-items:center;height:24px;padding:0 12px 0 ${28 + depth * 14}px;cursor:pointer;font-size:11px;color:${isUntracked ? "#666" : "#aaa"};gap:4px;transition:background 0.1s;${isUntracked ? "opacity:0.6;" : ""}"
           @mouseenter=${(e: MouseEvent) => {
             (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
           }}
           @mouseleave=${(e: MouseEvent) => {
             (e.currentTarget as HTMLElement).style.background = "transparent";
-          }}
-          @dragstart=${(e: DragEvent) => {
-            e.dataTransfer!.setData("text/plain", entry.path);
-            e.dataTransfer!.effectAllowed = "copy";
           }}
           @click=${(e: MouseEvent) => {
             const name = entry.path.split("/").pop() ?? entry.path;

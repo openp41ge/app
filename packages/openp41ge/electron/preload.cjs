@@ -168,6 +168,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
       tabHeight,
       offsetX,
       offsetY,
+      dragType,
+      filePath,
     ) => {
       ipcRenderer.send(
         "openp41ge:drag-start",
@@ -183,6 +185,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
           tabHeight,
           offsetX,
           offsetY,
+          dragType,
+          filePath,
         }),
       );
     },

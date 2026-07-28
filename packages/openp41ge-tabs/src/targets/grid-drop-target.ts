@@ -175,6 +175,22 @@ export class GridDropTarget implements IDropTarget {
       return { success: true };
     }
 
+    if (data.type === "file") {
+      // For file boundary drops, fire grid-open-tab with split info.
+      // The Openp41geTabsEventHandler will dispatch splitFileOpen.
+      this._fire(GRID_EVENTS.OPEN_TAB, {
+        winId: this.winId,
+        tabType: "file-viewer",
+        tabConfig: { filePath: data.filePath },
+        targetCol: splitCol,
+        isBoundary: true,
+        splitCol,
+        splitLeft,
+        pinned: true,
+      });
+      return { success: true };
+    }
+
     return { success: false, reason: "boundary drop not supported for this type" };
   }
 

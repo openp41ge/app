@@ -29,6 +29,7 @@ interface ActiveDragSession {
     worksetId: string;
     type: string;
     title?: string;
+    filePath?: string;
   };
 }
 
@@ -90,6 +91,8 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       tabHeight,
       offsetX,
       offsetY,
+      dragType,
+      filePath,
     } = parsed;
     dragGhost.show(label, screenX, screenY, emoji, tabWidth, tabHeight, offsetX, offsetY);
 
@@ -97,6 +100,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     const sender = _event.sender;
     for (const [sid, bw] of openp41geWindows) {
       if (bw.webContents === sender) {
+        const type = dragType || "tab";
         _activeSession = {
           sourceWinId: sid,
           label,
@@ -104,8 +108,9 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
             tabId: tabId || "",
             winId: winId || sid,
             worksetId: worksetId || sid,
-            type: "tab",
+            type,
             title: label,
+            ...(type === "file" && filePath ? { filePath } : {}),
           },
         };
         break;

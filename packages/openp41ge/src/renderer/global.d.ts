@@ -35,7 +35,7 @@ declare global {
         onReset: (callback: () => void) => () => void;
       };
       drag: {
-        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number) => void;
+        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number, dragType?: string, filePath?: string) => void;
         move: (screenX: number, screenY: number) => void;
         end: () => void;
         activate: () => void;
