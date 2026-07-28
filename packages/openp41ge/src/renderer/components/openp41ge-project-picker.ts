@@ -1273,9 +1273,22 @@ export class Openp41geProjectPicker extends LitElement {
                                             }
                                           };
                                           copyStyles(row, clone);
-                                          // Remove bottom padding/margin — the ghost is floating, no need for row spacing
-                                          clone.style.paddingBottom = "0";
+                                          // Remove all bottom spacing — the ghost is floating, no need for row spacing
+                                          clone.style.padding = "";
                                           clone.style.marginBottom = "0";
+                                          clone.style.paddingTop = "2px";
+                                          clone.style.paddingBottom = "0";
+                                          clone.style.paddingLeft = "";
+                                          clone.style.paddingRight = "";
+                                          // Also strip bottom padding from the worktree list inside the clone
+                                          const wtList = clone.querySelector(".worktree-list");
+                                          if (wtList) {
+                                            (wtList as HTMLElement).style.paddingBottom = "0";
+                                            const items = wtList.querySelectorAll("li");
+                                            items.forEach((item) => {
+                                              (item as HTMLElement).style.paddingBottom = "0";
+                                            });
+                                          }
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
