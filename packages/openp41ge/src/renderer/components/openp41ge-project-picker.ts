@@ -1252,7 +1252,6 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._dragOffsetY = e.clientY - rect.top;
                                           const clone = header.cloneNode(true) as HTMLElement;
                                           // Copy computed styles recursively so the clone looks identical outside shadow DOM.
-                                          // Skip width/height/min-width/max-width — we set those explicitly.
                                           const copyStyles = (src: Element, dst: Element) => {
                                             const cs = getComputedStyle(src);
                                             for (let i = 0; i < cs.length; i++) {
@@ -1273,6 +1272,9 @@ export class Openp41geProjectPicker extends LitElement {
                                             }
                                           };
                                           copyStyles(header, clone);
+                                          // The repo-header has no own background (inherits from .repo-group <li>),
+                                          // so read it from the parent and apply explicitly on the clone.
+                                          const parentBg = getComputedStyle(header.parentElement!).background;
                                           // Override positioning and visual extras
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
@@ -1280,6 +1282,7 @@ export class Openp41geProjectPicker extends LitElement {
                                           clone.style.opacity = "1";
                                           clone.style.width = rect.width + "px";
                                           clone.style.height = rect.height + "px";
+                                          clone.style.background = parentBg !== "rgba(0, 0, 0, 0)" && parentBg !== "transparent" ? parentBg : "#2a2a2a";
                                           clone.style.top = (e.clientY - this._dragOffsetY) + "px";
                                           clone.style.left = (e.clientX - this._dragOffsetX) + "px";
                                           clone.style.margin = "0";
