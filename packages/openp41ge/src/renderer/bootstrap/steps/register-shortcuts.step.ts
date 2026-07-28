@@ -3,11 +3,6 @@
  *
  * All keyboard bindings are registered here. New shortcuts should be added
  * by registering with the keyboardManager, not by adding switch cases.
- *
- * Note: Some shortcut handlers (handleCmdW, handlePinTab, showPanePicker,
- * handleCmdS) are defined as inline fallbacks that log warnings if triggered
- * without proper implementations being registered. These are pre-existing
- * gaps from the legacy code that will be addressed in separate changes.
  */
 
 import type { IStartupStep } from "../startup-step";
@@ -18,6 +13,7 @@ const log = createLogger("bootstrap:register-shortcuts");
 
 import { showCloneDialog } from "../../components/openp41ge-worktree-controller";
 import { showProjectPicker } from "../../services/project-switch-service";
+import { Openp41geTabsEventHandler } from "../../services/openp41ge-tabs-event-handler";
 
 export class RegisterShortcutsStep implements IStartupStep {
   readonly name = "register-shortcuts";
@@ -46,8 +42,25 @@ export class RegisterShortcutsStep implements IStartupStep {
       code: "KeyW",
       handler: () => {
         try {
-          // handleCmdW — close tab (delegated to workspace controller)
-          window.openp41ge.workspace.cmdCloseTab();
+          // Close the tab in the focused cell using the last focused column.
+          // This is handled in the renderer (not IPC) so we can use the
+          // focus tracking from Openp41geTabsEventHandler.
+          const ws = context.workspaceState.getWorkspace();
+          if (!ws) return;
+          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+          if (!myWindowId) return;
+          const win = ws.windows.find((w) => w.id === myWindowId);
+          if (!win) return;
+
+          // Get the last focused column, falling back to the first placement
+          const focusedCol = Openp41geTabsEventHandler.getLastFocusedCol(myWindowId);
+          const placement = win.grid.placements.find((p) => p.position.col === focusedCol)
+            ?? win.grid.placements[0];
+          if (!placement || placement.tabIds.length === 0) return;
+          const activeTabId = placement.activeTabId ?? placement.tabIds[0];
+          if (!activeTabId) return;
+
+          context.commandBus.dispatch("removeTabFromCell", myWindowId, activeTabId);
         } catch (err) {
           log.warn("Cmd+W handler error:", err);
         }
