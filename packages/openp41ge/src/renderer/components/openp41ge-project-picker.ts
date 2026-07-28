@@ -1280,14 +1280,15 @@ export class Openp41geProjectPicker extends LitElement {
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
                                           clone.style.opacity = "1";
-                                          clone.style.width = rect.width + "px";
-                                          clone.style.height = rect.height + "px";
+                                          clone.style.width = Math.round(rect.width) + "px";
+                                          clone.style.height = Math.round(rect.height) + "px";
                                           clone.style.background = parentBg !== "rgba(0, 0, 0, 0)" && parentBg !== "transparent" ? parentBg : "#2a2a2a";
                                           clone.style.top = (e.clientY - this._dragOffsetY) + "px";
                                           clone.style.left = (e.clientX - this._dragOffsetX) + "px";
                                           clone.style.margin = "0";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
                                           clone.style.borderRadius = "6px";
+                                          clone.style.boxSizing = getComputedStyle(header).boxSizing;
                                           this._dragEl = clone;
                                           document.body.appendChild(clone);
                                           this._dragCloneX = header.getBoundingClientRect().left;
