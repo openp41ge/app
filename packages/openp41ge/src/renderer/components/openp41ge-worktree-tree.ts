@@ -357,7 +357,8 @@ class Openp41geWorktreeTree extends LitElement {
             class="wt-tree-scroll"
             style="position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;"
           >
-            <div class="wt-tree-scroll-content"
+            <div
+              class="wt-tree-scroll-content"
               @dragend=${() => {
                 this._explorerDragIdx = -1;
                 this._dropIndex = -1;
@@ -381,7 +382,10 @@ class Openp41geWorktreeTree extends LitElement {
                 if (items) {
                   for (let i = 0; i < items.length; i++) {
                     const rect = items[i].getBoundingClientRect();
-                    if (e.clientY < rect.top + rect.height / 2) { idx = i; break; }
+                    if (e.clientY < rect.top + rect.height / 2) {
+                      idx = i;
+                      break;
+                    }
                   }
                 }
                 this._dropIndex = idx;
@@ -403,7 +407,10 @@ class Openp41geWorktreeTree extends LitElement {
                 if (items) {
                   for (let i = 0; i < items.length; i++) {
                     const rect = items[i].getBoundingClientRect();
-                    if (e.clientY < rect.top + rect.height / 2) { dropIndex = i; break; }
+                    if (e.clientY < rect.top + rect.height / 2) {
+                      dropIndex = i;
+                      break;
+                    }
                   }
                 }
                 const fromIdx = this._repos.findIndex((r) => r.name === dragName);
@@ -424,18 +431,27 @@ class Openp41geWorktreeTree extends LitElement {
                 if (projectName) {
                   doSave(projectName);
                 } else {
-                  window.openp41ge.project.current().then((n) => { if (n) doSave(n); });
+                  window.openp41ge.project.current().then((n) => {
+                    if (n) doSave(n);
+                  });
                 }
               }}
             >
               ${this._repos.map((repo, idx) => {
                 const worktrees = this._worktreesByRepo.get(repo.name) ?? [];
                 return html`
-                  ${this._dropIndex === idx
-                    ? html`<div style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"></div>`
-                    : nothing}
-                  <div style="display:flex;align-items:stretch;width:100%;${this._explorerDragIdx === idx ? 'opacity:0.3;' : ''}">
-                    <openp41ge-repo-tree-item style="flex:1;min-width:0;"
+                  ${
+                    this._dropIndex === idx
+                      ? html`<div
+                          style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"
+                        ></div>`
+                      : nothing
+                  }
+                  <div
+                    style="display:flex;align-items:stretch;width:100%;${this._explorerDragIdx === idx ? "opacity:0.3;" : ""}"
+                  >
+                    <openp41ge-repo-tree-item
+                      style="flex:1;min-width:0;"
                       .repoName=${repo.name}
                       .repoUrl=${repo.url}
                       .worksetId=${this.worksetId}
@@ -443,7 +459,8 @@ class Openp41geWorktreeTree extends LitElement {
                       .editMode=${this._editMode}
                       @repo-toggle-expand=${(e: CustomEvent) => {
                         const { repoName: rn, expanded } = e.detail;
-                        if (expanded) _expandedRepos.add(rn); else _expandedRepos.delete(rn);
+                        if (expanded) _expandedRepos.add(rn);
+                        else _expandedRepos.delete(rn);
                         savePersistedState();
                       }}
                       @repo-add-worktree=${(e: CustomEvent) => {
@@ -455,13 +472,15 @@ class Openp41geWorktreeTree extends LitElement {
                       @worktree-files-toggle=${(e: CustomEvent) => {
                         const { repoName: rn, branch, expanded } = e.detail;
                         const key = rn + ":" + branch;
-                        if (expanded) _expandedWorktrees.add(key); else _expandedWorktrees.delete(key);
+                        if (expanded) _expandedWorktrees.add(key);
+                        else _expandedWorktrees.delete(key);
                         savePersistedState();
                       }}
                       @dir-toggle-expand=${(e: CustomEvent) => {
                         const { branch, path, expanded } = e.detail;
                         const key = branch + ":" + path;
-                        if (expanded) _expandedDirs.add(key); else _expandedDirs.delete(key);
+                        if (expanded) _expandedDirs.add(key);
+                        else _expandedDirs.delete(key);
                         savePersistedState();
                       }}
                       @worktree-delete=${async (e: CustomEvent) => {
@@ -469,13 +488,19 @@ class Openp41geWorktreeTree extends LitElement {
                         const confirmed = await showConfirmModal({
                           message: "Delete worktree",
                           detail: 'Are you sure you want to delete worktree "' + branch + '"?',
-                          confirmLabel: "Delete", confirmStyle: "danger",
+                          confirmLabel: "Delete",
+                          confirmStyle: "danger",
                         });
                         if (confirmed) {
                           try {
-                            await window.openp41ge.workspaceController.deleteWorktree(repo.name, branch);
+                            await window.openp41ge.workspaceController.deleteWorktree(
+                              repo.name,
+                              branch,
+                            );
                             await this._loadRepos();
-                          } catch { /* ignore */ }
+                          } catch {
+                            /* ignore */
+                          }
                         }
                       }}
                       @file-open=${(e: CustomEvent) => {
@@ -490,12 +515,108 @@ class Openp41geWorktreeTree extends LitElement {
                   </div>
                 `;
               })}
-              ${this._dropIndex === this._repos.length
-                ? html`<div style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"></div>`
-                : nothing}
-              ${_showingAddRepo
-                ? html`<div id="wt-addrepo-row" style="display:flex;align-items:center;height:30px;padding-left:12px;padding-right:8px;font-size:12px;border-bottom:1px solid var(--border-divider);outline:2px solid #2a6fd1;outline-offset:-2px;transition:background 0.1s;"><span style="display:none;">${unsafeHTML(plusIconThick(16))}</span><input id="wt-addrepo-input" type="text" placeholder="git clone URL" style="flex:1;min-width:0;height:24px;background:transparent;border:none;border-radius:0;color:#e0e0e0;font-size:11px;padding:0 6px;outline:none;font-family:inherit;margin-left:8px;" @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); this._confirmAddRepo(); } if (e.key === "Escape") { e.preventDefault(); this._cancelAddRepo(); } }} @blur=${(_e: FocusEvent) => { setTimeout(() => { if (_showingAddRepo) this._cancelAddRepo(); }, 150); }}/><span id="wt-addrepo-confirm" style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;margin-left:4px;color:var(--text-secondary);" @click=${() => this._confirmAddRepo()} @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }} @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }} title="Confirm"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,8 7,11 12,4"/></svg></span><span id="wt-addrepo-cancel" style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--text-secondary);" @click=${() => this._cancelAddRepo()} @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }} @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }} title="Cancel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></span></div>`
-                : html`<div style="display:flex;align-items:center;height:30px;padding-left:12px;padding-right:8px;cursor:pointer;user-select:none;font-size:12px;color:var(--text-muted);transition:color 0.1s,background 0.1s;border-bottom:1px solid var(--border-divider);" @click=${() => this._showAddRepoInline()} @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "#1e1e1e"; }} @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><span style="width:10px;height:30px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="transform:translateX(-1px);display:inline-flex;">${unsafeHTML(plusIconThick(11))}</span></span><span class="add-repo-label" style="margin-left:4px;color:var(--text-muted);flex:1;">add repository</span></div>`
+              ${
+                this._dropIndex === this._repos.length
+                  ? html`<div style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"></div>`
+                  : nothing
+              }
+              ${
+                _showingAddRepo
+                  ? html`<div
+                      id="wt-addrepo-row"
+                      style="display:flex;align-items:center;height:30px;padding-left:12px;padding-right:8px;font-size:12px;border-bottom:1px solid var(--border-divider);outline:2px solid #2a6fd1;outline-offset:-2px;transition:background 0.1s;"
+                    >
+                      <span style="display:none;">${unsafeHTML(plusIconThick(16))}</span
+                      ><input
+                        id="wt-addrepo-input"
+                        type="text"
+                        placeholder="git clone URL"
+                        style="flex:1;min-width:0;height:24px;background:transparent;border:none;border-radius:0;color:#e0e0e0;font-size:11px;padding:0 6px;outline:none;font-family:inherit;margin-left:8px;"
+                        @keydown=${(e: KeyboardEvent) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            this._confirmAddRepo();
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            this._cancelAddRepo();
+                          }
+                        }}
+                        @blur=${(_e: FocusEvent) => {
+                          setTimeout(() => {
+                            if (_showingAddRepo) this._cancelAddRepo();
+                          }, 150);
+                        }}
+                      /><span
+                        id="wt-addrepo-confirm"
+                        style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;margin-left:4px;color:var(--text-secondary);"
+                        @click=${() => this._confirmAddRepo()}
+                        @mouseenter=${(e: MouseEvent) => {
+                          (e.currentTarget as HTMLElement).style.background =
+                            "rgba(255,255,255,0.06)";
+                        }}
+                        @mouseleave=${(e: MouseEvent) => {
+                          (e.currentTarget as HTMLElement).style.background = "transparent";
+                        }}
+                        title="Confirm"
+                        ><svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <polyline points="4,8 7,11 12,4" /></svg></span
+                      ><span
+                        id="wt-addrepo-cancel"
+                        style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--text-secondary);"
+                        @click=${() => this._cancelAddRepo()}
+                        @mouseenter=${(e: MouseEvent) => {
+                          (e.currentTarget as HTMLElement).style.background =
+                            "rgba(255,255,255,0.06)";
+                        }}
+                        @mouseleave=${(e: MouseEvent) => {
+                          (e.currentTarget as HTMLElement).style.background = "transparent";
+                        }}
+                        title="Cancel"
+                        ><svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <line x1="4" y1="4" x2="12" y2="12" />
+                          <line x1="12" y1="4" x2="4" y2="12" /></svg
+                      ></span>
+                    </div>`
+                  : html`<div
+                      style="display:flex;align-items:center;height:30px;padding-left:12px;padding-right:8px;cursor:pointer;user-select:none;font-size:12px;color:var(--text-muted);transition:color 0.1s,background 0.1s;border-bottom:1px solid var(--border-divider);"
+                      @click=${() => this._showAddRepoInline()}
+                      @mouseenter=${(e: MouseEvent) => {
+                        (e.currentTarget as HTMLElement).style.background = "#1e1e1e";
+                      }}
+                      @mouseleave=${(e: MouseEvent) => {
+                        (e.currentTarget as HTMLElement).style.background = "transparent";
+                      }}
+                    >
+                      <span
+                        style="width:10px;height:30px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"
+                        ><span style="transform:translateX(-1px);display:inline-flex;"
+                          >${unsafeHTML(plusIconThick(11))}</span
+                        ></span
+                      ><span
+                        class="add-repo-label"
+                        style="margin-left:4px;color:var(--text-muted);flex:1;"
+                        >add repository</span
+                      >
+                    </div>`
               }
             </div>
             <!-- wt-tree-scroll-content -->

@@ -31,6 +31,7 @@ Activity Bar                Sidebar                     Grid
 ### 1. New sidebar view: `openp41ge-projects-view`
 
 A new sidebar view (registered alongside explorer, search, git) that shows:
+
 - **Search bar** at top — filter project list
 - **Project list** — clickable items, shows active indicator, right-click context menu (rename, delete)
 - **"New project"** button at bottom
@@ -42,6 +43,7 @@ The component follows the existing sidebar view pattern (like `openp41ge-worktre
 ### 2. New app type: `project-manager`
 
 A new pane type registered in `app-registry.ts` as `"project-manager"`:
+
 - Shows project details (name, created/modified dates, draft badge)
 - Shows repo tree with worktrees (reuses `<openp41ge-repo-tree-item>`)
 - Inline add-repo with clone progress and URL input
@@ -54,6 +56,7 @@ This is essentially the **right panel** of the current picker, rendered in a tab
 ### 3. Remove `openp41ge-project-picker`
 
 Delete the modal component entirely. Its functionality is split:
+
 - Left panel → `openp41ge-projects-view` sidebar
 - Right panel → `project-manager` tab
 - Top bar (search, close) → sidebar header
@@ -65,6 +68,7 @@ Add a new activity bar button for the projects view. The existing activity bar i
 ### 5. Titlebar changes
 
 The titlebar already shows the active project name. When clicked, instead of opening the modal, it:
+
 - Opens the projects sidebar view (toggle)
 - Or switches to an already-open project-manager tab
 
@@ -83,11 +87,13 @@ The titlebar already shows the active project name. When clicked, instead of ope
 ## Files Changed
 
 ### New files
+
 - `src/renderer/components/sidebar-views/projects-view.ts` — Sidebar view component
 - `src/renderer/apps/project-manager/project-manager-controller.ts` — Pane controller
 - `src/renderer/apps/project-manager/index.ts` — Registration entry
 
 ### Modified files
+
 - `src/renderer/apps/app-registry.ts` — Register `"project-manager"` type
 - `src/renderer/components/openp41ge-windowview.ts` — Add activity bar icon
 - `src/renderer/components/openp41ge-titlebar.ts` — Click opens sidebar instead of modal
@@ -97,6 +103,7 @@ The titlebar already shows the active project name. When clicked, instead of ope
 - `src/renderer/bootstrap/steps/check-project.step.ts` — May need updating
 
 ### No changes to
+
 - IPC handlers / preload / `global.d.ts`
 - `openp41ge-git` package
 - Layout data model
@@ -105,10 +112,12 @@ The titlebar already shows the active project name. When clicked, instead of ope
 ## Testing Strategy
 
 ### Unit tests
+
 - New: `project-manager-controller.test.ts` — mount, render, state transitions
 - Updated: `project-switch-service.test.ts` — sidebar toggle vs modal show
 
 ### Integration tests
+
 - Sidebar view renders project list, responds to search filter
 - Clicking a project in sidebar opens a tab
 - Inline add-repo with clone progress renders in tab
@@ -116,6 +125,7 @@ The titlebar already shows the active project name. When clicked, instead of ope
 - Draft auto-opens as tab on startup
 
 ### E2E tests
+
 - Full flow: startup → draft shown as tab → save as → rename → add repo → switch projects
 
 ## UX Considerations

@@ -486,7 +486,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
     listRepos: (name) => ipcRenderer.invoke("project:listRepos", name),
     current: () => ipcRenderer.invoke("project:current"),
     switchTo: (name) => ipcRenderer.invoke("project:switch", name),
-    saveDraftAs: (draftName, newName) => ipcRenderer.invoke("project:saveDraftAs", draftName, newName),
+    saveDraftAs: (draftName, newName) =>
+      ipcRenderer.invoke("project:saveDraftAs", draftName, newName),
     isDraft: (name) => ipcRenderer.invoke("project:isDraft", name),
     gcDrafts: () => ipcRenderer.invoke("project:gcDrafts"),
     createDraft: () => ipcRenderer.invoke("project:createDraft"),

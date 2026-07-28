@@ -371,10 +371,10 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     .detail-card .repo-group.drag-placeholder {
-      background: rgba(74,158,255,0.15);
-      outline: 1px solid rgba(74,158,255,0.4);
+      background: rgba(74, 158, 255, 0.15);
+      outline: 1px solid rgba(74, 158, 255, 0.4);
       outline-offset: -1px;
-      box-shadow: inset 0 0 0 1px rgba(74,158,255,0.3);
+      box-shadow: inset 0 0 0 1px rgba(74, 158, 255, 0.3);
     }
 
     .detail-card .repo-group .repo-header {
@@ -517,8 +517,12 @@ export class Openp41geProjectPicker extends LitElement {
     }
 
     @keyframes spinner-rotate {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
     }
   `;
 
@@ -641,14 +645,14 @@ export class Openp41geProjectPicker extends LitElement {
     if (!q) {
       this._filteredProjects = [...this._projects];
     } else {
-      this._filteredProjects = this._projects.filter((p) =>
-        p.name.toLowerCase().includes(q),
-      );
+      this._filteredProjects = this._projects.filter((p) => p.name.toLowerCase().includes(q));
     }
   }
 
   private get _listLength(): number {
-    return this._searchText.trim() ? this._filteredProjects.length + 1 : this._filteredProjects.length;
+    return this._searchText.trim()
+      ? this._filteredProjects.length + 1
+      : this._filteredProjects.length;
   }
 
   private _onKeyDown(e: KeyboardEvent): void {
@@ -719,7 +723,7 @@ export class Openp41geProjectPicker extends LitElement {
 
   private _getFocusable(): NodeListOf<HTMLElement> {
     const root = this.shadowRoot;
-    if (!root) return document.createDocumentFragment().querySelectorAll('*') as any;
+    if (!root) return document.createDocumentFragment().querySelectorAll("*") as any;
     return root.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
     );
@@ -817,7 +821,9 @@ export class Openp41geProjectPicker extends LitElement {
       await this._loadProjects();
       // Refocus the search input so keyboard shortcuts (Escape) work
       requestAnimationFrame(() => {
-        const input = this.shadowRoot?.querySelector(".search-row input") as HTMLInputElement | null;
+        const input = this.shadowRoot?.querySelector(
+          ".search-row input",
+        ) as HTMLInputElement | null;
         input?.focus();
       });
     } else {
@@ -833,7 +839,8 @@ export class Openp41geProjectPicker extends LitElement {
     const modal = document.createElement("openp41ge-confirm-modal") as any;
     modal.title = "Delete Project";
     modal.message = `Delete "${name}"?`;
-    modal.detail = "All project data including repositories and workspace state will be permanently deleted. This cannot be undone.";
+    modal.detail =
+      "All project data including repositories and workspace state will be permanently deleted. This cannot be undone.";
     modal.confirmLabel = "Delete";
     modal._confirmStyle =
       "background:#e06c75;border:none;border-radius:4px;color:#fff;font-size:12px;padding:6px 16px;cursor:pointer;";
@@ -860,7 +867,9 @@ export class Openp41geProjectPicker extends LitElement {
         this._selectedIndex = -1;
         window.__openp41geProjectName = undefined;
         await window.openp41ge.project.createDraft();
-        document.dispatchEvent(new CustomEvent("project:changed", { bubbles: true, detail: { name: null } }));
+        document.dispatchEvent(
+          new CustomEvent("project:changed", { bubbles: true, detail: { name: null } }),
+        );
       }
     } else {
       log.error(`Failed to delete project "${name}"`);
@@ -972,7 +981,8 @@ export class Openp41geProjectPicker extends LitElement {
         };
         document.addEventListener("mousedown", onOutsideClick, true);
         // Store the cleanup function
-        (this as any).__renameCleanup = () => document.removeEventListener("mousedown", onOutsideClick, true);
+        (this as any).__renameCleanup = () =>
+          document.removeEventListener("mousedown", onOutsideClick, true);
       }
     });
   }
@@ -989,13 +999,22 @@ export class Openp41geProjectPicker extends LitElement {
     if (result) {
       log.info(`Project renamed to "${trimmed}"`);
       // Update local state
-      this._detailProject = { ...this._detailProject, name: trimmed, config: this._detailProject.config ? { ...this._detailProject.config, name: trimmed } : null };
-      this._activeProjectName = this._activeProjectName === this._detailProject.name ? trimmed : this._activeProjectName;
+      this._detailProject = {
+        ...this._detailProject,
+        name: trimmed,
+        config: this._detailProject.config
+          ? { ...this._detailProject.config, name: trimmed }
+          : null,
+      };
+      this._activeProjectName =
+        this._activeProjectName === this._detailProject.name ? trimmed : this._activeProjectName;
       this._renaming = false;
       // Reload project list
       this._loadProjects();
       // Dispatch event so titlebar etc refresh
-      document.dispatchEvent(new CustomEvent("project:changed", { bubbles: true, detail: { name: trimmed } }));
+      document.dispatchEvent(
+        new CustomEvent("project:changed", { bubbles: true, detail: { name: trimmed } }),
+      );
     } else {
       log.error(`Failed to rename project`);
     }
@@ -1103,7 +1122,6 @@ export class Openp41geProjectPicker extends LitElement {
                           ? html`
                               <div
                                 class="project-item create-item ${this._selectedIndex === 0 ? "selected" : ""}"
-
                                 @click=${() => this._createAndSelect(this._searchText.trim())}
                               >
                                 <span class="name">
@@ -1127,23 +1145,24 @@ export class Openp41geProjectPicker extends LitElement {
                             `
                           : ""
                       }
-                      ${listItems.map(
-                        (project, i) => {
-                          const idx = showCreateOption ? i + 1 : i;
-                          const isDraft = project.config?.draft === true;
-                          const isActive = project.name === this._activeProjectName;
-                          return html`
-                            <div
-                              class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
-                              @click=${(e: Event) => { e.stopPropagation(); this._showDetails(project); }}
-                            >
-                              <span class="name">${project.name}</span>
-                              ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
-                              ${isActive ? html`<span class="active-tag">Active</span>` : ""}
-                            </div>
-                          `;
-                        },
-                      )}
+                      ${listItems.map((project, i) => {
+                        const idx = showCreateOption ? i + 1 : i;
+                        const isDraft = project.config?.draft === true;
+                        const isActive = project.name === this._activeProjectName;
+                        return html`
+                          <div
+                            class="project-item ${this._selectedIndex === idx ? "selected" : ""} ${isActive ? "active" : ""}"
+                            @click=${(e: Event) => {
+                                e.stopPropagation();
+                                this._showDetails(project);
+                              }}
+                          >
+                            <span class="name">${project.name}</span>
+                            ${isDraft ? html`<span class="draft-tag">Draft</span>` : ""}
+                            ${isActive ? html`<span class="active-tag">Active</span>` : ""}
+                          </div>
+                        `;
+                      })}
                     `
             }
           </div>
@@ -1159,7 +1178,10 @@ export class Openp41geProjectPicker extends LitElement {
                       ${
                         this._renaming
                           ? html`
-                              <div class="rename-container" style="display:flex;align-items:center;flex:1;gap:4px;padding:0 4px 0 8px;margin:0 0 0 -8px;box-shadow:0 0 0 1px var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);">
+                              <div
+                                class="rename-container"
+                                style="display:flex;align-items:center;flex:1;gap:4px;padding:0 4px 0 8px;margin:0 0 0 -8px;box-shadow:0 0 0 1px var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);"
+                              >
                                 <input
                                   class="rename-input"
                                   type="text"
@@ -1171,57 +1193,132 @@ export class Openp41geProjectPicker extends LitElement {
                                 <button
                                   title="Confirm"
                                   style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:4px;background:transparent;color:var(--openp41ge-accent-color,#4a9eff);cursor:pointer;transition:background 0.1s;"
-                                  @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(74,158,255,0.12)"; }}
-                                  @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                  @mouseenter=${(e: MouseEvent) => {
+                                    (e.currentTarget as HTMLElement).style.background =
+                                      "rgba(74,158,255,0.12)";
+                                  }}
+                                  @mouseleave=${(e: MouseEvent) => {
+                                    (e.currentTarget as HTMLElement).style.background =
+                                      "transparent";
+                                  }}
                                   @click=${this._confirmRename}
                                 >
-                                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></svg>
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 16 16"
+                                    fill="currentColor"
+                                  >
+                                    <path
+                                      d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"
+                                    />
+                                  </svg>
                                 </button>
                                 <button
                                   title="Cancel"
                                   style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:4px;background:transparent;color:var(--openp41ge-muted-text,#888);cursor:pointer;transition:background 0.1s;"
-                                  @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)"; }}
-                                  @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                  @mouseenter=${(e: MouseEvent) => {
+                                    (e.currentTarget as HTMLElement).style.background =
+                                      "rgba(255,255,255,0.08)";
+                                  }}
+                                  @mouseleave=${(e: MouseEvent) => {
+                                    (e.currentTarget as HTMLElement).style.background =
+                                      "transparent";
+                                  }}
                                   @click=${this._cancelRename}
                                 >
-                                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4.22 4.22a.75.75 0 0 1 1.06 0L8 6.94l2.72-2.72a.75.75 0 1 1 1.06 1.06L9.06 8l2.72 2.72a.75.75 0 1 1-1.06 1.06L8 9.06l-2.72 2.72a.75.75 0 0 1-1.06-1.06L6.94 8 4.22 5.28a.75.75 0 0 1 0-1.06z"/></svg>
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 16 16"
+                                    fill="currentColor"
+                                  >
+                                    <path
+                                      d="M4.22 4.22a.75.75 0 0 1 1.06 0L8 6.94l2.72-2.72a.75.75 0 1 1 1.06 1.06L9.06 8l2.72 2.72a.75.75 0 1 1-1.06 1.06L8 9.06l-2.72 2.72a.75.75 0 0 1-1.06-1.06L6.94 8 4.22 5.28a.75.75 0 0 1 0-1.06z"
+                                    />
+                                  </svg>
                                 </button>
                               </div>
                             `
                           : html`
                               <div
                                 style="display:flex;align-items:center;gap:4px;cursor:pointer;border-radius:4px;padding:2px 4px 2px 8px;margin-left:-8px;transition:background 0.1s;"
-                                @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "var(--openp41ge-hover-bg,#333)"; }}
-                                @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                @mouseenter=${(e: MouseEvent) => {
+                                  (e.currentTarget as HTMLElement).style.background =
+                                    "var(--openp41ge-hover-bg,#333)";
+                                }}
+                                @mouseleave=${(e: MouseEvent) => {
+                                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                                }}
                                 @click=${this._startRename}
                                 title="Rename project"
                               >
-                                <h2 style="margin:0;font-size:20px;font-weight:600;line-height:1.2;color:var(--openp41ge-text-color,#e0e0e0);">${this._detailProject.name}</h2>
-                                <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--openp41ge-muted-text,#888)" style="flex-shrink:0;">
-                                  <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25a1.75 1.75 0 0 1 .445-.758l8.61-8.61zm1.414 1.06a.25.25 0 0 0-.354 0L3.245 11.315a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l8.61-8.61a.25.25 0 0 0 0-.353l-1.086-1.086z"/>
+                                <h2
+                                  style="margin:0;font-size:20px;font-weight:600;line-height:1.2;color:var(--openp41ge-text-color,#e0e0e0);"
+                                >
+                                  ${this._detailProject.name}
+                                </h2>
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 16 16"
+                                  fill="var(--openp41ge-muted-text,#888)"
+                                  style="flex-shrink:0;"
+                                >
+                                  <path
+                                    d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25a1.75 1.75 0 0 1 .445-.758l8.61-8.61zm1.414 1.06a.25.25 0 0 0-.354 0L3.245 11.315a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l8.61-8.61a.25.25 0 0 0 0-.353l-1.086-1.086z"
+                                  />
                                 </svg>
                               </div>
                             `
                       }
                       ${
-                        this._renaming ? ""
+                        this._renaming
+                          ? ""
                           : html`
                               <div style="display:flex;align-items:center;gap:8px;">
                                 ${
                                   this._detailProject.name !== this._activeProjectName
                                     ? html`
-                                        <button class="switch-btn" @click=${() => this._activateProject(this._detailProject!.name)}>
+                                        <button
+                                          class="switch-btn"
+                                          @click=${() => this._activateProject(this._detailProject!.name)}
+                                        >
                                           Activate
-                                          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor" style="vertical-align:middle;margin-left:4px;"><path d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"/></svg>
+                                          <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            height="16px"
+                                            viewBox="0 -960 960 960"
+                                            width="16px"
+                                            fill="currentColor"
+                                            style="vertical-align:middle;margin-left:4px;"
+                                          >
+                                            <path
+                                              d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"
+                                            />
+                                          </svg>
                                         </button>
-                                      ` : ""
+                                      `
+                                    : ""
                                 }
                                 <button
                                   class="detail-delete-btn"
                                   title="Delete project"
-                                @click=${(e: Event) => this._deleteProject(e, this._detailProject!.name)}
+                                  @click=${(e: Event) => this._deleteProject(e, this._detailProject!.name)}
                                 >
-                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path d="M2 4a1 1 0 0 1 1-1h2.5a1 1 0 0 1 .8-.4h3.4a1 1 0 0 1 .8.4H13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1-1-1V4zm2 1v7a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V5H4zm-1-1h10V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/></svg>
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 16 16"
+                                    fill="currentColor"
+                                  >
+                                    <path
+                                      d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"
+                                    />
+                                    <path
+                                      d="M2 4a1 1 0 0 1 1-1h2.5a1 1 0 0 1 .8-.4h3.4a1 1 0 0 1 .8.4H13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1-1-1V4zm2 1v7a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V5H4zm-1-1h10V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"
+                                    />
+                                  </svg>
                                 </button>
                               </div>
                             `
@@ -1237,11 +1334,15 @@ export class Openp41geProjectPicker extends LitElement {
                         ? html`
                             <div class="detail-row">
                               <span class="detail-label">Created</span>
-                              <span class="detail-value">${this._formatDate(this._detailProject.config.createdAt)}</span>
+                              <span class="detail-value"
+                                >${this._formatDate(this._detailProject.config.createdAt)}</span
+                              >
                             </div>
                             <div class="detail-row">
                               <span class="detail-label">Modified</span>
-                              <span class="detail-value">${this._formatDate(this._detailProject.config.updatedAt)}</span>
+                              <span class="detail-value"
+                                >${this._formatDate(this._detailProject.config.updatedAt)}</span
+                              >
                             </div>
                           `
                         : ""
@@ -1253,18 +1354,26 @@ export class Openp41geProjectPicker extends LitElement {
                         ? html`<div class="loading-text">Loading...</div>`
                         : this._detailRepos && this._detailRepos.length > 0
                           ? html`
-                              <ul class="repo-tree"
-
-                              >
+                              <ul class="repo-tree">
                                 ${this._detailRepos.map(
                                   (repo, idx) => html`
-                                    <li class="repo-group${this._detailReposDragIdx === idx ? ' drag-placeholder' : ''}">
-                                      <div class="repo-header"
+                                    <li
+                                      class="repo-group${this._detailReposDragIdx === idx ? " drag-placeholder" : ""}"
+                                    >
+                                      <div
+                                        class="repo-header"
                                         @pointerdown=${(e: PointerEvent) => {
-                                          if (e.button !== 0 || this._detailReposDragIdx >= 0 || !this._detailRepos) return;
+                                          if (
+                                            e.button !== 0 ||
+                                            this._detailReposDragIdx >= 0 ||
+                                            !this._detailRepos
+                                          )
+                                            return;
                                           e.preventDefault();
                                           const repos = this._detailRepos;
-                                          const fromIdx = repos.findIndex((r) => r.name === repo.name);
+                                          const fromIdx = repos.findIndex(
+                                            (r) => r.name === repo.name,
+                                          );
                                           if (fromIdx < 0) return;
                                           this._detailReposDragIdx = fromIdx;
                                           this._dragRepoName = repo.name;
@@ -1282,16 +1391,35 @@ export class Openp41geProjectPicker extends LitElement {
                                             for (let i = 0; i < cs.length; i++) {
                                               const prop = cs[i];
                                               if (prop.startsWith("--")) continue;
-                                              if (prop === "cursor" || prop === "pointer-events") continue;
-                                              if (prop === "width" || prop === "height" || prop === "min-width" || prop === "min-height" || prop === "max-width" || prop === "max-height") continue;
-                                              if (dst instanceof HTMLElement || dst instanceof SVGElement) {
-                                                dst.style.setProperty(prop, cs.getPropertyValue(prop));
+                                              if (prop === "cursor" || prop === "pointer-events")
+                                                continue;
+                                              if (
+                                                prop === "width" ||
+                                                prop === "height" ||
+                                                prop === "min-width" ||
+                                                prop === "min-height" ||
+                                                prop === "max-width" ||
+                                                prop === "max-height"
+                                              )
+                                                continue;
+                                              if (
+                                                dst instanceof HTMLElement ||
+                                                dst instanceof SVGElement
+                                              ) {
+                                                dst.style.setProperty(
+                                                  prop,
+                                                  cs.getPropertyValue(prop),
+                                                );
                                               }
                                             }
                                             for (let i = 0; i < src.children.length; i++) {
                                               const sc = src.children[i];
                                               const dc = dst.children[i];
-                                              if (dc && (dc instanceof HTMLElement || dc instanceof SVGElement)) {
+                                              if (
+                                                dc &&
+                                                (dc instanceof HTMLElement ||
+                                                  dc instanceof SVGElement)
+                                              ) {
                                                 copyStyles(sc, dc);
                                               }
                                             }
@@ -1299,7 +1427,8 @@ export class Openp41geProjectPicker extends LitElement {
                                           copyStyles(row, clone);
                                           // Tighten bottom spacing: remove the row's bottom padding/margin
                                           // so the ghost doesn't show extra gap. Deduct the removed padding from height.
-                                          const origPadBottom = parseInt(getComputedStyle(row).paddingBottom) || 0;
+                                          const origPadBottom =
+                                            parseInt(getComputedStyle(row).paddingBottom) || 0;
                                           clone.style.paddingBottom = "0";
                                           clone.style.marginBottom = "0";
                                           clone.style.position = "fixed";
@@ -1307,9 +1436,10 @@ export class Openp41geProjectPicker extends LitElement {
                                           clone.style.zIndex = "99999";
                                           clone.style.opacity = "1";
                                           clone.style.width = Math.round(rect.width) + "px";
-                                          clone.style.height = Math.round(rect.height - origPadBottom) + "px";
-                                          clone.style.top = (e.clientY - this._dragOffsetY) + "px";
-                                          clone.style.left = (e.clientX - this._dragOffsetX) + "px";
+                                          clone.style.height =
+                                            Math.round(rect.height - origPadBottom) + "px";
+                                          clone.style.top = e.clientY - this._dragOffsetY + "px";
+                                          clone.style.left = e.clientX - this._dragOffsetX + "px";
                                           clone.style.margin = "0";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
                                           clone.style.boxSizing = getComputedStyle(row).boxSizing;
@@ -1317,27 +1447,37 @@ export class Openp41geProjectPicker extends LitElement {
                                           // .detail-card .repo-group .worktree-list li::before still match.
                                           const wrapper = document.createElement("div");
                                           wrapper.className = "detail-card";
-                                          wrapper.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;";
+                                          wrapper.style.cssText =
+                                            "position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;";
                                           wrapper.appendChild(clone);
                                           this._dragEl = clone;
                                           this._dragWrapper = wrapper;
                                           this.shadowRoot?.appendChild(wrapper);
                                           // Add document-level listeners (avoids pointer capture invalidation on re-render)
                                           this._boundPointerMove = (ev: PointerEvent) => {
-                                            if (this._detailReposDragIdx < 0 || !this._detailRepos) return;
+                                            if (this._detailReposDragIdx < 0 || !this._detailRepos)
+                                              return;
                                             ev.preventDefault();
                                             // Move the clone with the cursor, preserving the grab offset
                                             if (this._dragEl) {
-                                              this._dragEl.style.left = (ev.clientX - this._dragOffsetX) + "px";
-                                              this._dragEl.style.top = (ev.clientY - this._dragOffsetY) + "px";
+                                              this._dragEl.style.left =
+                                                ev.clientX - this._dragOffsetX + "px";
+                                              this._dragEl.style.top =
+                                                ev.clientY - this._dragOffsetY + "px";
                                             }
                                             const r = this._detailRepos;
-                                            const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
+                                            const items =
+                                              this.shadowRoot?.querySelectorAll(
+                                                ".repo-tree .repo-group",
+                                              );
                                             let toIdx = r.length;
                                             if (items) {
                                               for (let i = 0; i < items.length; i++) {
                                                 const rect = items[i].getBoundingClientRect();
-                                                if (ev.clientY < rect.top + rect.height / 2) { toIdx = i; break; }
+                                                if (ev.clientY < rect.top + rect.height / 2) {
+                                                  toIdx = i;
+                                                  break;
+                                                }
                                               }
                                             }
                                             const from = this._detailReposDragIdx;
@@ -1354,9 +1494,13 @@ export class Openp41geProjectPicker extends LitElement {
                                             // Persist the new repo order before cleanup
                                             if (this._detailRepos && this._detailProject) {
                                               const order = this._detailRepos.map((r) => r.name);
-                                              window.openp41ge.project.setRepoOrder(this._detailProject.name, order).then(() => {
-                                                document.dispatchEvent(new CustomEvent("project:changed"));
-                                              });
+                                              window.openp41ge.project
+                                                .setRepoOrder(this._detailProject.name, order)
+                                                .then(() => {
+                                                  document.dispatchEvent(
+                                                    new CustomEvent("project:changed"),
+                                                  );
+                                                });
                                             }
                                             // Remove the drag clone and its wrapper
                                             if (this._dragWrapper) {
@@ -1367,44 +1511,89 @@ export class Openp41geProjectPicker extends LitElement {
                                             this._detailReposDragIdx = -1;
                                             this._dragRepoName = null;
                                             if (this._boundPointerMove) {
-                                              document.removeEventListener("pointermove", this._boundPointerMove);
+                                              document.removeEventListener(
+                                                "pointermove",
+                                                this._boundPointerMove,
+                                              );
                                             }
                                             if (this._boundPointerUp) {
-                                              document.removeEventListener("pointerup", this._boundPointerUp);
+                                              document.removeEventListener(
+                                                "pointerup",
+                                                this._boundPointerUp,
+                                              );
                                             }
                                             this._boundPointerMove = null;
                                             this._boundPointerUp = null;
                                           };
-                                          document.addEventListener("pointermove", this._boundPointerMove);
-                                          document.addEventListener("pointerup", this._boundPointerUp);
-                                        }}>
-                                        <span style="display:inline-flex;align-items:center;color:#555;cursor:grab;margin-right:4px;">
-                                          <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
-                                            <path d="M360-160q-33 0-56.5-23.5T280-240q0-33 23.5-56.5T360-320q33 0 56.5 23.5T440-240q0 33-23.5 56.5T360-160Zm240 0q-33 0-56.5-23.5T520-240q0-33 23.5-56.5T600-320q33 0 56.5 23.5T680-240q0 33-23.5 56.5T600-160ZM360-400q-33 0-56.5-23.5T280-480q0-33 23.5-56.5T360-560q33 0 56.5 23.5T440-480q0 33-23.5 56.5T360-400Zm240 0q-33 0-56.5-23.5T520-480q0-33 23.5-56.5T600-560q33 0 56.5 23.5T680-480q0 33-23.5 56.5T600-400ZM360-640q-33 0-56.5-23.5T280-720q0-33 23.5-56.5T360-800q33 0 56.5 23.5T440-720q0 33-23.5 56.5T360-640Zm240 0q-33 0-56.5-23.5T520-720q0-33 23.5-56.5T600-800q33 0 56.5 23.5T680-720q0 33-23.5 56.5T600-640Z"/>
+                                          document.addEventListener(
+                                            "pointermove",
+                                            this._boundPointerMove,
+                                          );
+                                          document.addEventListener(
+                                            "pointerup",
+                                            this._boundPointerUp,
+                                          );
+                                        }}
+                                      >
+                                        <span
+                                          style="display:inline-flex;align-items:center;color:#555;cursor:grab;margin-right:4px;"
+                                        >
+                                          <svg
+                                            width="14"
+                                            height="14"
+                                            viewBox="0 -960 960 960"
+                                            fill="currentColor"
+                                          >
+                                            <path
+                                              d="M360-160q-33 0-56.5-23.5T280-240q0-33 23.5-56.5T360-320q33 0 56.5 23.5T440-240q0 33-23.5 56.5T360-160Zm240 0q-33 0-56.5-23.5T520-240q0-33 23.5-56.5T600-320q33 0 56.5 23.5T680-240q0 33-23.5 56.5T600-160ZM360-400q-33 0-56.5-23.5T280-480q0-33 23.5-56.5T360-560q33 0 56.5 23.5T440-480q0 33-23.5 56.5T360-400Zm240 0q-33 0-56.5-23.5T520-480q0-33 23.5-56.5T600-560q33 0 56.5 23.5T680-480q0 33-23.5 56.5T600-400ZM360-640q-33 0-56.5-23.5T280-720q0-33 23.5-56.5T360-800q33 0 56.5 23.5T440-720q0 33-23.5 56.5T360-640Zm240 0q-33 0-56.5-23.5T520-720q0-33 23.5-56.5T600-800q33 0 56.5 23.5T680-720q0 33-23.5 56.5T600-640Z"
+                                            />
                                           </svg>
                                         </span>
-                                        <svg class="repo-icon" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;position:relative;top:-1px;">
-                                          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                                        <svg
+                                          class="repo-icon"
+                                          viewBox="0 0 16 16"
+                                          fill="currentColor"
+                                          style="vertical-align:middle;position:relative;top:-1px;"
+                                        >
+                                          <path
+                                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+                                          />
                                         </svg>
                                         ${repo.name}
                                       </div>
-                                      ${
-                                        html`
-                                          <ul class="worktree-list">
-                                            ${repo.worktrees.map(
-                                              (wt) => html`
-                                                <li>${wt}</li>
-                                              `,
-                                            )}
-                                            <li class="add-wt-item" tabindex="0" @click=${() => this._addWorktree(repo.name)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.stopPropagation(); this._addWorktree(repo.name); } }}>
-                                              <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:2px;position:relative;top:-1px;">
-                                                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
-                                              </svg>
-                                              add worktree
-                                            </li>
-                                          </ul>
-                                        `
-                                      }
+                                      ${html`
+                                        <ul class="worktree-list">
+                                          ${repo.worktrees.map((wt) => html` <li>${wt}</li> `)}
+                                          <li
+                                            class="add-wt-item"
+                                            tabindex="0"
+                                            @click=${() => this._addWorktree(repo.name)}
+                                            @keydown=${(e: KeyboardEvent) => {
+                                              if (e.key === "Enter") {
+                                                e.stopPropagation();
+                                                this._addWorktree(repo.name);
+                                              }
+                                            }}
+                                          >
+                                            <svg
+                                              width="10"
+                                              height="10"
+                                              viewBox="0 0 16 16"
+                                              fill="currentColor"
+                                              style="vertical-align:middle;margin-right:2px;position:relative;top:-1px;"
+                                            >
+                                              <path
+                                                d="M8 2v12M2 8h12"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                fill="none"
+                                              />
+                                            </svg>
+                                            add worktree
+                                          </li>
+                                        </ul>
+                                      `}
                                     </li>
                                   `,
                                 )}
@@ -1417,54 +1606,135 @@ export class Openp41geProjectPicker extends LitElement {
                       ${
                         this._cloning
                           ? html`
-                              <div style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);font-size:12px;color:var(--openp41ge-muted-text,#888);gap:8px;">
-                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="animation:spinner-rotate 0.8s linear infinite;">
-                                  <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/>
+                              <div
+                                style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);font-size:12px;color:var(--openp41ge-muted-text,#888);gap:8px;"
+                              >
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 16 16"
+                                  fill="none"
+                                  style="animation:spinner-rotate 0.8s linear infinite;"
+                                >
+                                  <circle
+                                    cx="8"
+                                    cy="8"
+                                    r="6"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-dasharray="28"
+                                    stroke-dashoffset="10"
+                                    stroke-linecap="round"
+                                  />
                                 </svg>
-                                <span style="flex:1;">Cloning... ${this._clonePercent > 0 ? html`${this._clonePercent}%` : ""}</span>
+                                <span style="flex:1;"
+                                  >Cloning...
+                                  ${this._clonePercent > 0 ? html`${this._clonePercent}%` : ""}</span
+                                >
                                 <span
                                   style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--openp41ge-muted-text,#888);"
                                   @click=${this._cancelClone}
                                   title="Cancel"
-                                >✕</span>
+                                  >✕</span
+                                >
                               </div>
                             `
                           : this._addingRepo
                             ? html`
-                                <div style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);outline:2px solid var(--openp41ge-accent-color,#4a9eff);outline-offset:-2px;">
+                                <div
+                                  style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);outline:2px solid var(--openp41ge-accent-color,#4a9eff);outline-offset:-2px;"
+                                >
                                   <input
                                     class="add-repo-input"
                                     type="text"
                                     placeholder="git clone URL"
                                     .value=${this._repoUrl}
-                                    @input=${(e: Event) => { this._repoUrl = (e.target as HTMLInputElement).value; }}
+                                    @input=${(e: Event) => {
+                                      this._repoUrl = (e.target as HTMLInputElement).value;
+                                    }}
                                     @keydown=${this._onRepoUrlKeydown}
                                     style="flex:1;min-width:0;height:24px;background:transparent;border:none;color:var(--openp41ge-text-color,#e0e0e0);font-size:12px;outline:none;font-family:inherit;"
                                   />
                                   <span
                                     style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;margin-left:4px;color:var(--openp41ge-accent-color,#4a9eff);"
                                     @click=${this._confirmAddRepo}
-                                    @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(74,158,255,0.12)"; }}
-                                    @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                    @mouseenter=${(e: MouseEvent) => {
+                                      (e.currentTarget as HTMLElement).style.background =
+                                        "rgba(74,158,255,0.12)";
+                                    }}
+                                    @mouseleave=${(e: MouseEvent) => {
+                                      (e.currentTarget as HTMLElement).style.background =
+                                        "transparent";
+                                    }}
                                     title="Confirm"
                                   >
-                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,8 7,11 12,4"/></svg>
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 16 16"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                    >
+                                      <polyline points="4,8 7,11 12,4" />
+                                    </svg>
                                   </span>
                                   <span
                                     style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--openp41ge-muted-text,#888);"
                                     @click=${this._cancelAddRepo}
-                                    @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
-                                    @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                    @mouseenter=${(e: MouseEvent) => {
+                                      (e.currentTarget as HTMLElement).style.background =
+                                        "rgba(255,255,255,0.06)";
+                                    }}
+                                    @mouseleave=${(e: MouseEvent) => {
+                                      (e.currentTarget as HTMLElement).style.background =
+                                        "transparent";
+                                    }}
                                     title="Cancel"
                                   >
-                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 16 16"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                    >
+                                      <line x1="4" y1="4" x2="12" y2="12" />
+                                      <line x1="12" y1="4" x2="4" y2="12" />
+                                    </svg>
                                   </span>
                                 </div>
                               `
                             : html`
-                                <div class="add-repo-btn" tabindex="0" @click=${this._startAddRepo} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.stopPropagation(); this._startAddRepo(); } }}>
-                                  <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-left:4px;position:relative;top:0;">
-                                    <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+                                <div
+                                  class="add-repo-btn"
+                                  tabindex="0"
+                                  @click=${this._startAddRepo}
+                                  @keydown=${(e: KeyboardEvent) => {
+                                  if (e.key === "Enter") {
+                                    e.stopPropagation();
+                                    this._startAddRepo();
+                                  }
+                                }}
+                                >
+                                  <svg
+                                    width="10"
+                                    height="10"
+                                    viewBox="0 0 16 16"
+                                    fill="currentColor"
+                                    style="vertical-align:middle;margin-left:4px;position:relative;top:0;"
+                                  >
+                                    <path
+                                      d="M8 2v12M2 8h12"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                      fill="none"
+                                    />
                                   </svg>
                                   add repository
                                 </div>
@@ -1475,9 +1745,7 @@ export class Openp41geProjectPicker extends LitElement {
                 `
               : html`
                   <div class="empty-hint">
-                    ${this._projects.length > 0
-                      ? "Click a project to see details"
-                      : ""}
+                    ${this._projects.length > 0 ? "Click a project to see details" : ""}
                   </div>
                 `
           }

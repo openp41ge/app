@@ -1,11 +1,5 @@
 import type { GitAdapter } from "./git-adapter";
-import type {
-  RepoInfo,
-  WorktreeInfo,
-  BranchEntry,
-  CommitEntry,
-  DiffStatEntry,
-} from "./types";
+import type { RepoInfo, WorktreeInfo, BranchEntry, CommitEntry, DiffStatEntry } from "./types";
 
 // Access workspaceController via the runtime API. The actual type is
 // declared in the main app's global.d.ts — here we use a minimal cast

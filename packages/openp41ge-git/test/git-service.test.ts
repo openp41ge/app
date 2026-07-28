@@ -196,9 +196,7 @@ describe("GitService", () => {
     });
 
     it("deleteWorktree on non-existent branch does not throw", async () => {
-      await expect(
-        service.deleteWorktree("my-repo", "nonexistent"),
-      ).resolves.toBeUndefined();
+      await expect(service.deleteWorktree("my-repo", "nonexistent")).resolves.toBeUndefined();
     });
   });
 
@@ -239,15 +237,11 @@ describe("GitService", () => {
 
   describe("pull & fetch", () => {
     it("pullBranch resolves", async () => {
-      await expect(
-        service.pullBranch("my-repo", "main"),
-      ).resolves.toBeUndefined();
+      await expect(service.pullBranch("my-repo", "main")).resolves.toBeUndefined();
     });
 
     it("fetch resolves", async () => {
-      await expect(
-        service.fetch("my-repo"),
-      ).resolves.toBeUndefined();
+      await expect(service.fetch("my-repo")).resolves.toBeUndefined();
     });
   });
 
@@ -317,13 +311,9 @@ describe("GitService", () => {
     });
 
     it("worksetGetRepoRefs returns JSON string", async () => {
-      adapter.repoRefs = JSON.stringify([
-        { name: "repo1", url: "url1", worktrees: ["main"] },
-      ]);
+      adapter.repoRefs = JSON.stringify([{ name: "repo1", url: "url1", worktrees: ["main"] }]);
       const refs = await service.worksetGetRepoRefs();
-      expect(refs).toBe(
-        JSON.stringify([{ name: "repo1", url: "url1", worktrees: ["main"] }]),
-      );
+      expect(refs).toBe(JSON.stringify([{ name: "repo1", url: "url1", worktrees: ["main"] }]));
     });
   });
 

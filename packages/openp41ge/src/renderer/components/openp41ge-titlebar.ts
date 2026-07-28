@@ -11,7 +11,6 @@ import { property, state } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
 import { showProjectPicker } from "../services/project-switch-service";
 
-
 const isMac = (() => {
   try {
     return window.openp41ge?.platform === "darwin" || navigator.platform.startsWith("Mac");

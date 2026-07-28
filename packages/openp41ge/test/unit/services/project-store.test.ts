@@ -189,7 +189,11 @@ describe("ProjectStore — draft support", () => {
       // Manually back-date the config
       const config = projectStore.readConfig(oldProject)!;
       config.createdAt = new Date(0).toISOString(); // epoch — very old
-      fs.writeFileSync(projectStore.configPath(oldProject), JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        projectStore.configPath(oldProject),
+        JSON.stringify(config, null, 2),
+        "utf-8",
+      );
 
       const deleted = projectStore.gcDrafts(DRAFT_MAX_AGE_MS);
 
@@ -210,7 +214,11 @@ describe("ProjectStore — draft support", () => {
       const config = projectStore.readConfig(fakeDraftName)!;
       config.draft = false;
       config.createdAt = new Date(0).toISOString();
-      fs.writeFileSync(projectStore.configPath(fakeDraftName), JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        projectStore.configPath(fakeDraftName),
+        JSON.stringify(config, null, 2),
+        "utf-8",
+      );
 
       const deleted = projectStore.gcDrafts(DRAFT_MAX_AGE_MS);
 

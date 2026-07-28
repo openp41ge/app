@@ -456,9 +456,7 @@ export class ProjectManagerController extends BaseController implements TabContr
       this._projectName = newName;
       this._renaming = false;
       window.__openp41geProjectName = newName;
-      document.dispatchEvent(
-        new CustomEvent("project:changed", { detail: { name: newName } }),
-      );
+      document.dispatchEvent(new CustomEvent("project:changed", { detail: { name: newName } }));
       this._render();
     } catch (err) {
       log.error("Rename failed:", err);
@@ -482,9 +480,7 @@ export class ProjectManagerController extends BaseController implements TabContr
         this._isDraft = false;
         this._projectName = name;
         window.__openp41geProjectName = name;
-        document.dispatchEvent(
-          new CustomEvent("project:changed", { detail: { name } }),
-        );
+        document.dispatchEvent(new CustomEvent("project:changed", { detail: { name } }));
         toastService.show(`Project saved as "${name}"`, "success");
         this._loadProjectInfo();
       } else {
@@ -513,9 +509,7 @@ export class ProjectManagerController extends BaseController implements TabContr
         await window.openp41ge.project.createDraft();
         const draftName = await window.openp41ge.project.current();
         window.__openp41geProjectName = draftName ?? undefined;
-        document.dispatchEvent(
-          new CustomEvent("project:changed", { detail: { name: draftName } }),
-        );
+        document.dispatchEvent(new CustomEvent("project:changed", { detail: { name: draftName } }));
       }
 
       // Close this tab
@@ -574,10 +568,7 @@ export class ProjectManagerController extends BaseController implements TabContr
       await this._loadRepos();
       this._render();
     } catch (err) {
-      toastService.show(
-        err instanceof Error ? err.message : "Failed to create worktree",
-        "error",
-      );
+      toastService.show(err instanceof Error ? err.message : "Failed to create worktree", "error");
     }
   }
 

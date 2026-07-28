@@ -8,11 +8,7 @@ adapter.addBranch("demo-repo", "main");
 adapter.addBranch("demo-repo", "develop");
 adapter.addBranch("demo-repo", "feature/new-ui");
 adapter.addWorktreeData("demo-repo", "main", "/workspaces/demo-repo/main");
-adapter.addRepo(
-  "demo-repo",
-  "https://github.com/example/demo-repo.git",
-  "/workspaces/demo-repo",
-);
+adapter.addRepo("demo-repo", "https://github.com/example/demo-repo.git", "/workspaces/demo-repo");
 
 // ---- DOM refs ----
 const $ = (id: string) => document.getElementById(id)!;

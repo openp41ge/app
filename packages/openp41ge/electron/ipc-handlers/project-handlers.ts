@@ -112,7 +112,9 @@ export function registerProjectHandlers(
 
       walk(reposDir);
       // Apply persisted order (check in-memory cache first, then file), fall back to alphabetical
-      const order = _repoOrderCache.has(name) ? _repoOrderCache.get(name)! : projectStore.readRepoOrder(name);
+      const order = _repoOrderCache.has(name)
+        ? _repoOrderCache.get(name)!
+        : projectStore.readRepoOrder(name);
       if (order) {
         const orderMap = new Map(order.map((n, i) => [n, i]));
         repos.sort((a, b) => {

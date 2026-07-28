@@ -61,9 +61,14 @@ export class TestGitAdapter implements GitAdapter {
       promise,
       onProgress: (fn: (progress: CloneProgress) => void) => {
         progressCb = fn;
-        return () => { progressCb = null; };
+        return () => {
+          progressCb = null;
+        };
       },
-      destroy: () => { cancel?.(); cancel = null; },
+      destroy: () => {
+        cancel?.();
+        cancel = null;
+      },
     };
   }
 

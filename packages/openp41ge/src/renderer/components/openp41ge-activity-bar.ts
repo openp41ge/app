@@ -24,9 +24,7 @@ export interface ActivityBarItem {
   icon: string; // SVG or icon name
 }
 
-const DEFAULT_ACTIVITIES: ActivityBarItem[] = [
-  { id: "explorer", label: "Explorer", icon: "file" },
-];
+const DEFAULT_ACTIVITIES: ActivityBarItem[] = [{ id: "explorer", label: "Explorer", icon: "file" }];
 
 const ACTIVITY_BAR_WIDTH = 48;
 

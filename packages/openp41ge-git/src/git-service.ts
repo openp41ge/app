@@ -1,12 +1,6 @@
 import type { GitAdapter } from "./git-adapter";
 import { CloneSession } from "./clone-session";
-import type {
-  RepoInfo,
-  WorktreeInfo,
-  BranchEntry,
-  CommitEntry,
-  DiffStatEntry,
-} from "./types";
+import type { RepoInfo, WorktreeInfo, BranchEntry, CommitEntry, DiffStatEntry } from "./types";
 
 const CLONE_URL_RE = /^(https?:\/\/|git@|ssh:\/\/)/;
 
@@ -27,9 +21,7 @@ export class GitService {
   clone(url: string): CloneSession {
     const trimmed = url.trim();
     if (!CLONE_URL_RE.test(trimmed)) {
-      throw new Error(
-        'Invalid URL format. Use https://, git@, or ssh://',
-      );
+      throw new Error("Invalid URL format. Use https://, git@, or ssh://");
     }
     const raw = this._adapter.clone(trimmed);
     return new CloneSession(raw.promise, raw.onProgress, raw.destroy);
@@ -85,11 +77,7 @@ export class GitService {
     return this._adapter.fetch(repoName);
   }
 
-  async deleteLocalBranch(
-    repoName: string,
-    branchName: string,
-    force?: boolean,
-  ): Promise<void> {
+  async deleteLocalBranch(repoName: string, branchName: string, force?: boolean): Promise<void> {
     return this._adapter.deleteLocalBranch(repoName, branchName, force);
   }
 
@@ -107,10 +95,7 @@ export class GitService {
     return this._adapter.getBranches(repoName);
   }
 
-  async getDiffStat(
-    repoName: string,
-    commitHash?: string,
-  ): Promise<DiffStatEntry[]> {
+  async getDiffStat(repoName: string, commitHash?: string): Promise<DiffStatEntry[]> {
     return this._adapter.getDiffStat(repoName, commitHash);
   }
 
@@ -120,11 +105,7 @@ export class GitService {
 
   // ── Openp41ge repoRefs ──
 
-  async worksetAddRepo(
-    name: string,
-    url: string,
-    worktrees?: string[],
-  ): Promise<boolean> {
+  async worksetAddRepo(name: string, url: string, worktrees?: string[]): Promise<boolean> {
     return this._adapter.worksetAddRepo(name, url, worktrees);
   }
 
@@ -136,10 +117,7 @@ export class GitService {
     return this._adapter.worksetHasRepo(name);
   }
 
-  async worksetAddWorktreeToRepo(
-    repoName: string,
-    branch: string,
-  ): Promise<boolean> {
+  async worksetAddWorktreeToRepo(repoName: string, branch: string): Promise<boolean> {
     return this._adapter.worksetAddWorktreeToRepo(repoName, branch);
   }
 
