@@ -557,11 +557,25 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _loading = true;
   private _disconnected = false;
 
+  /** When the repo order changes elsewhere (explorer), refresh the current project's repos. */
+  private _onProjectChanged = (): void => {
+    if (this._detailProject && !this._disconnected) {
+      this._loadingRepos = true;
+      window.openp41ge.project.listRepos(this._detailProject.name).then((repos) => {
+        if (!this._disconnected && this._detailProject) {
+          this._detailRepos = repos;
+          this._loadingRepos = false;
+        }
+      });
+    }
+  };
+
   connectedCallback(): void {
     super.connectedCallback();
     appServices.keyboardManager.pushModal();
     this._loadProjects();
     this.addEventListener("keydown", this._onKeyDown);
+    document.addEventListener("project:changed", this._onProjectChanged);
   }
 
   firstUpdated(): void {
@@ -577,6 +591,7 @@ export class Openp41geProjectPicker extends LitElement {
     appServices.keyboardManager.popModal();
     this._disconnected = true;
     this.removeEventListener("keydown", this._onKeyDown);
+    document.removeEventListener("project:changed", this._onProjectChanged);
     this._cleanupRename();
   }
 
