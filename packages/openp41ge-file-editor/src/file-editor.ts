@@ -297,6 +297,14 @@ export class FileEditorElement extends LitElement {
     // Find and store the status bar reference
     this._statusBar = this.renderRoot.querySelector("fe-status-bar") as FeStatusBar | null;
 
+    // Remove any existing viewport (from a previous firstUpdated call after
+    // reconnection). When the editor's container is orphaned by a grid re-render
+    // and then re-appended via mountController, connectedCallback re-runs
+    // firstUpdated, which would create a duplicate viewportEl in the container.
+    if (this._viewportEl && this._viewportEl.parentNode) {
+      this._viewportEl.parentNode.removeChild(this._viewportEl);
+    }
+
     // Create viewport programmatically (not in Lit's template)
     this._viewportEl = document.createElement("div");
     this._viewportEl.className = "fe-viewport";
@@ -338,8 +346,14 @@ export class FileEditorElement extends LitElement {
     if (!this._textMateInitPromise) {
       this._textMateInitPromise = this._initTextMateOnce();
     }
-    // On reconnect (pane move), re-init viewport if needed
-    if (this._initDone && (!this._viewportEl || !this._viewportEl.isConnected)) {
+    // On reconnect (pane move), re-init viewport if needed.
+    // Check both viewport connection state AND pipeline state:
+    //   - !_viewportEl.isConnected: viewport was removed from DOM with the container
+    //   - !this._viewModel: pipeline was torn down by _teardownPipeline() but
+    //     the viewport was reconnected (container moved within document by
+    //     mountController's appendChild). The viewport DOM node came back but
+    //     the rendering pipeline is destroyed.
+    if (this._initDone && (!this._viewportEl || !this._viewportEl.isConnected || !this._viewModel)) {
       this._initDone = false;
       this.firstUpdated();
     }
