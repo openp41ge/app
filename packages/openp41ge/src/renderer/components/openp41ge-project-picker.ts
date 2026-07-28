@@ -1243,20 +1243,25 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._detailReposDragIdx = fromIdx;
                                           this._dragRepoName = repo.name;
                                           this._dragEl = e.currentTarget as HTMLElement;
-                                          // Create a clone of the repo header that follows the cursor
+                                          // Create a compact visual clone that follows the cursor
                                           const header = e.currentTarget as HTMLElement;
                                           const rect = header.getBoundingClientRect();
-                                          const clone = header.cloneNode(true) as HTMLElement;
+                                          const clone = document.createElement("div");
+                                          clone.textContent = repo.name;
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
                                           clone.style.opacity = "0.9";
-                                          clone.style.width = rect.width + "px";
+                                          clone.style.fontSize = "13px";
+                                          clone.style.color = "#f0f0f0";
                                           clone.style.background = "var(--openp41ge-hover-bg, #2a2a2a)";
+                                          clone.style.padding = "6px 14px";
                                           clone.style.borderRadius = "6px";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-                                          clone.style.margin = "0";
-                                          clone.style.padding = "2px 10px";
+                                          clone.style.whiteSpace = "nowrap";
+                                          clone.style.maxWidth = Math.min(rect.width, 400) + "px";
+                                          clone.style.overflow = "hidden";
+                                          clone.style.textOverflow = "ellipsis";
                                           clone.style.left = e.clientX + "px";
                                           clone.style.top = e.clientY + "px";
                                           clone.style.transform = "translate(-50%, -50%)";
