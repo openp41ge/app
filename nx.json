@@ -25,6 +25,7 @@
       "cache": true
     }
   },
+  "defaultBase": "master",
   "neverConnectToCloud": true,
   "useDaemonProcess": false,
   "analytics": false
