@@ -1243,18 +1243,23 @@ export class Openp41geProjectPicker extends LitElement {
                                           this._detailReposDragIdx = fromIdx;
                                           this._dragRepoName = repo.name;
                                           this._dragEl = e.currentTarget as HTMLElement;
-                                          // Create and track a drag clone that follows the cursor
+                                          // Create a compact drag indicator that follows the cursor
                                           const header = e.currentTarget as HTMLElement;
-                                          const clone = header.cloneNode(true) as HTMLElement;
+                                          const rect = header.getBoundingClientRect();
+                                          const clone = document.createElement("div");
+                                          clone.textContent = repo.name;
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
                                           clone.style.opacity = "0.85";
-                                          clone.style.width = header.offsetWidth + "px";
+                                          clone.style.padding = "6px 12px";
+                                          clone.style.fontSize = "13px";
+                                          clone.style.color = "#f0f0f0";
                                           clone.style.background = "var(--openp41ge-hover-bg, #2a2a2a)";
                                           clone.style.borderRadius = "6px";
                                           clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-                                          clone.style.left = header.getBoundingClientRect().left + "px";
+                                          clone.style.whiteSpace = "nowrap";
+                                          clone.style.left = rect.left + "px";
                                           clone.style.top = e.clientY + "px";
                                           this._dragEl = clone;
                                           document.body.appendChild(clone);
