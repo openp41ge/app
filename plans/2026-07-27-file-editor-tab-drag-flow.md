@@ -103,10 +103,42 @@ However, the model is already shared via `ModelRegistry`, so content state is pr
 
 ## Completion Criteria
 
-- [ ] `TabMountManager.sync()` re-mounts controller containers on every sync, not just on first creation
-- [ ] File drag-to-grid creates a working file-editor tab with content loaded
-- [ ] Tab drag-to-another-cell re-mounts the editor in the correct column
-- [ ] Cross-window tab drag opens the editor in the target window
-- [ ] No regressions in existing tab operations (reorder, close, activation)
-- [ ] All existing tests pass
-- [ ] `__pendingFilePath` removed as a dependency for file-editor controller
+- [x] `TabMountManager.sync()` re-mounts controller containers on every sync, not just on first creation
+- [x] File drag-to-grid creates a working file-editor tab with content loaded (file path passed through config, not global)
+- [x] Tab drag-to-another-cell re-mounts the editor in the correct column
+- [x] Cross-window tab drag opens the editor in the target window
+- [x] No regressions in existing tab operations (reorder, close, activation)
+- [x] All existing tests pass (767/767, 41 test files)
+- [x] `__pendingFilePath` removed as a dependency for file-editor controller
+
+## Changes Made
+
+### 1. `SubscribeStateUpdatesStep._render()` — Fix timing race with Lit update cycle
+**File**: `packages/openp41ge/src/renderer/bootstrap/steps/subscribe-state-updates.step.ts`
+
+Added `await (el as Openp41geWindowviewElement).updateComplete` after setting `windowData` and before calling `sync()`. 
+
+**Problem**: Setting `.windowData` on the Lit `openp41ge-windowview` element queues an async microtask for the re-render. `sync()` was called synchronously after setting properties, before the microtask fired. This meant `grid.placements` were still stale from the previous render cycle. When `grid.mountController()` searched placements for the tab, it couldn't find it (new tabs) or found the wrong column (moved tabs), causing the controller container to be appended to the wrong column or orphaned.
+
+**Fix**: Awaiting `updateComplete` on the windowview ensures the Lit update cycle completes first — the windowview re-renders, sets the grid's updated `.placements` property, and the grid re-renders — before `sync()` mounts controllers.
+
+### 2. `TabMountManager.sync()` — Re-mount containers on every sync
+**File**: `packages/openp41ge/src/renderer/services/tab-mount-manager.ts`
+
+After obtaining a mount entry (existing or new), calls `grid.mountController(tabId, entry.container)` on every sync iteration. This ensures the container is re-parented to the correct column's `<tab-content>` controller slot after Lit re-renders the grid.
+
+### 3. `FileEditorController.mount()` — Use config as primary file path source
+**File**: `packages/openp41ge/src/renderer/apps/file-viewer/file-editor-controller.ts`
+
+Removed the `window.__pendingFilePath` block in `mount()`. The file path is already set by `restore()` from `tab.config.filePath` before `mount()` is called (see `_getOrCreateEntry` in `tab-mount-manager.ts`).
+
+### 4. Removed `__pendingFilePath`/`__pendingFileName` assignments
+**Files**:
+- `packages/openp41ge/src/renderer/services/file-drop-handler.ts` — removed globals from `_handleFileDrop`
+- `packages/openp41ge/src/renderer/services/file-open-handler.ts` — removed globals from `handleOpenFile` (2 locations) and `_openFile`
+- `packages/openp41ge/src/renderer/apps/file-viewer/index.ts` — updated comment to reflect new approach
+- `packages/openp41ge/src/renderer/global.d.ts` — marked globals as `@deprecated`
+
+### Verification
+- `nx run openp41ge:test` — 767 tests pass (41 test files)
+- Typecheck shows only pre-existing errors (unrelated to our changes)
