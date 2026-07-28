@@ -1234,7 +1234,7 @@ export class Openp41geProjectPicker extends LitElement {
                               >
                                 ${this._detailRepos.map(
                                   (repo, idx) => html`
-                                    <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'background:rgba(74,158,255,0.15);border:1px solid rgba(74,158,255,0.4);border-radius:6px;box-shadow:inset 0 0 0 1px rgba(74,158,255,0.3);' : ''}">
+                                    <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'background:rgba(74,158,255,0.15);outline:1px solid rgba(74,158,255,0.4);outline-offset:-1px;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(74,158,255,0.3);' : ''}">
                                       <div class="repo-header"
                                         @pointerdown=${(e: PointerEvent) => {
                                           if (e.button !== 0 || this._detailReposDragIdx >= 0 || !this._detailRepos) return;
@@ -1273,24 +1273,17 @@ export class Openp41geProjectPicker extends LitElement {
                                             }
                                           };
                                           copyStyles(row, clone);
-                                          // Remove bottom spacing only — the ghost is floating, no need for row spacing
+                                          // Tighten bottom spacing: remove the row's bottom padding/margin
+                                          // so the ghost doesn't show extra gap. Deduct the removed padding from height.
+                                          const origPadBottom = parseInt(getComputedStyle(row).paddingBottom) || 0;
                                           clone.style.paddingBottom = "0";
                                           clone.style.marginBottom = "0";
-                                          // Also strip bottom padding from the worktree list inside the clone
-                                          const wtList = clone.querySelector(".worktree-list");
-                                          if (wtList) {
-                                            (wtList as HTMLElement).style.paddingBottom = "0";
-                                            const items = wtList.querySelectorAll("li");
-                                            items.forEach((item) => {
-                                              (item as HTMLElement).style.paddingBottom = "0";
-                                            });
-                                          }
                                           clone.style.position = "fixed";
                                           clone.style.pointerEvents = "none";
                                           clone.style.zIndex = "99999";
                                           clone.style.opacity = "1";
                                           clone.style.width = Math.round(rect.width) + "px";
-                                          clone.style.height = Math.round(rect.height) + "px";
+                                          clone.style.height = Math.round(rect.height - origPadBottom) + "px";
                                           clone.style.top = (e.clientY - this._dragOffsetY) + "px";
                                           clone.style.left = (e.clientX - this._dragOffsetX) + "px";
                                           clone.style.margin = "0";
