@@ -27,6 +27,7 @@ import { state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
 import { GitService, IpcGitAdapter } from "openp41ge-git";
 import { appServices } from "../app";
+import { repoOrderCache } from "../repo-order-cache";
 
 const log = createLogger("openp41ge-project-picker");
 const gitService = new GitService(new IpcGitAdapter());
@@ -560,6 +561,23 @@ export class Openp41geProjectPicker extends LitElement {
   /** When the repo order changes elsewhere (explorer), refresh the current project's repos. */
   private _onProjectChanged = (): void => {
     if (this._detailProject && !this._disconnected) {
+      // Check in-memory cache first (no IPC latency)
+      const cached = repoOrderCache.get(this._detailProject.name);
+      if (cached && this._detailRepos) {
+        // Reorder local array to match cache
+        const orderMap = new Map(cached.map((n, i) => [n, i]));
+        const sorted = [...this._detailRepos].sort((a, b) => {
+          const ai = orderMap.get(a.name);
+          const bi = orderMap.get(b.name);
+          if (ai !== undefined && bi !== undefined) return ai - bi;
+          if (ai !== undefined) return -1;
+          if (bi !== undefined) return 1;
+          return 0;
+        });
+        this._detailRepos = sorted;
+        return;
+      }
+      // Fallback: fetch via IPC
       this._loadingRepos = true;
       window.openp41ge.project.listRepos(this._detailProject.name).then((repos) => {
         if (!this._disconnected && this._detailProject) {

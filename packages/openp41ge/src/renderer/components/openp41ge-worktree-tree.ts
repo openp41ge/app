@@ -23,6 +23,7 @@ import { plusIconThick } from "../icons";
 import { createOpenp41geContextMenu } from "../interfaces/element-guards";
 import { showConfirmModal } from "./openp41ge-confirm-modal";
 import "./openp41ge-repo-tree-item";
+import { repoOrderCache } from "../repo-order-cache";
 import "./openp41ge-clone-dialog";
 import "./openp41ge-add-worktree-dialog";
 import { appServices } from "../app";
@@ -213,17 +214,19 @@ class Openp41geWorktreeTree extends LitElement {
       ev.preventDefault();
       // Persist the new repo order
       const orderNames = this._repos.map((r) => r.name);
-      const saveOrder = (name: string) => {
-        window.openp41ge.project.setRepoOrder(name, orderNames).then(() => {
-          document.dispatchEvent(new CustomEvent("project:changed"));
-        });
-      };
       const pn = window.__openp41geProjectName;
-      if (pn) {
-        saveOrder(pn);
+      const projectName = pn ?? "";
+      // Update in-memory cache immediately (shared with project picker)
+      if (projectName) repoOrderCache.set(projectName, orderNames);
+      // Persist to disk via IPC
+      const doSave = (name: string) => {
+        window.openp41ge.project.setRepoOrder(name, orderNames);
+        document.dispatchEvent(new CustomEvent("project:changed"));
+      };
+      if (projectName) {
+        doSave(projectName);
       } else {
-        // Fallback: get project name via IPC
-        window.openp41ge.project.current().then((n) => { if (n) saveOrder(n); });
+        window.openp41ge.project.current().then((n) => { if (n) doSave(n); });
       }
       // Clean up
       this._explorerDragIdx = -1;
@@ -493,7 +496,7 @@ class Openp41geWorktreeTree extends LitElement {
                         <circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/>
                       </svg>
                     </span>
-                    <openp41ge-repo-tree-item
+                    <openp41ge-repo-tree-item style="flex:1;min-width:0;"
                       .repoName=${repo.name}
                       .repoUrl=${repo.url}
                       .worksetId=${this.worksetId}
