@@ -358,18 +358,19 @@ class Openp41geWorktreeTree extends LitElement {
             style="position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;"
           >
             <div class="wt-tree-scroll-content"
-              @dragstart=${(e: DragEvent) => {
-                const dragName = e.dataTransfer?.getData("application/x-openp41ge-repo");
-                if (!dragName) return;
-                const idx = this._repos.findIndex((r) => r.name === dragName);
-                if (idx >= 0) this._explorerDragIdx = idx;
-              }}
               @dragend=${() => {
                 this._explorerDragIdx = -1;
                 this._dropIndex = -1;
               }}
               @dragenter=${(e: DragEvent) => {
-                if (e.dataTransfer?.types.includes("application/x-openp41ge-repo")) e.preventDefault();
+                if (e.dataTransfer?.types.includes("application/x-openp41ge-repo")) {
+                  e.preventDefault();
+                  const dragName = e.dataTransfer!.getData("application/x-openp41ge-repo");
+                  if (dragName) {
+                    const idx = this._repos.findIndex((r) => r.name === dragName);
+                    if (idx >= 0) this._explorerDragIdx = idx;
+                  }
+                }
               }}
               @dragover=${(e: DragEvent) => {
                 if (!e.dataTransfer?.types.includes("application/x-openp41ge-repo")) return;
