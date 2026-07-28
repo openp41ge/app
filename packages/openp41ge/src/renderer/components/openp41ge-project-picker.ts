@@ -523,7 +523,10 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _detailProject: ProjectInfo | null = null;
   @state() private _detailRepos: Array<{ name: string; worktrees: string[] }> | null = null;
   @state() private _detailReposDragIdx: number = -1;
-  private _dragStartY = 0;
+  private _dragRepoName: string | null = null;
+  private _boundPointerMove: ((e: PointerEvent) => void) | null = null;
+  private _boundPointerUp: ((e: PointerEvent) => void) | null = null;
+  private _dragEl: HTMLElement | null = null;
   @state() private _loadingRepos = false;
   @state() private _searchText = "";
   @state() private _activeProjectName: string | null = null;
@@ -1230,41 +1233,51 @@ export class Openp41geProjectPicker extends LitElement {
                                     <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'opacity:0.3;' : ''}">
                                       <div class="repo-header"
                                         @pointerdown=${(e: PointerEvent) => {
-                                          if (e.button !== 0 || this._detailReposDragIdx >= 0) return;
-                                          e.preventDefault();
-                                          this._detailReposDragIdx = idx;
-                                          this._dragStartY = e.clientY;
-                                          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-                                        }}
-                                        @pointermove=${(e: PointerEvent) => {
-                                          if (this._detailReposDragIdx < 0 || !this._detailRepos) return;
+                                          if (e.button !== 0 || this._detailReposDragIdx >= 0 || !this._detailRepos) return;
                                           e.preventDefault();
                                           const repos = this._detailRepos;
-                                          const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
-                                          let toIdx = repos.length - 1;
-                                          if (items) {
-                                            for (let i = 0; i < items.length; i++) {
-                                              const rect = items[i].getBoundingClientRect();
-                                              if (e.clientY < rect.top + rect.height / 2) { toIdx = i; break; }
+                                          const fromIdx = repos.findIndex((r) => r.name === repo.name);
+                                          if (fromIdx < 0) return;
+                                          this._detailReposDragIdx = fromIdx;
+                                          this._dragRepoName = repo.name;
+                                          this._dragEl = e.currentTarget as HTMLElement;
+                                          // Add document-level listeners (avoids pointer capture invalidation on re-render)
+                                          this._boundPointerMove = (ev: PointerEvent) => {
+                                            if (this._detailReposDragIdx < 0 || !this._detailRepos) return;
+                                            ev.preventDefault();
+                                            const r = this._detailRepos;
+                                            const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
+                                            let toIdx = r.length - 1;
+                                            if (items) {
+                                              for (let i = 0; i < items.length; i++) {
+                                                const rect = items[i].getBoundingClientRect();
+                                                if (ev.clientY < rect.top + rect.height / 2) { toIdx = i; break; }
+                                              }
                                             }
-                                          }
-                                          const fromIdx = this._detailReposDragIdx;
-                                          if (toIdx === fromIdx) return;
-                                          const adjustedTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
-                                          const [moved] = repos.splice(fromIdx, 1);
-                                          repos.splice(adjustedTo, 0, moved);
-                                          this._detailRepos = [...repos];
-                                          this._detailReposDragIdx = adjustedTo;
-                                        }}
-                                        @pointerup=${(e: PointerEvent) => {
-                                          if (this._detailReposDragIdx < 0) return;
-                                          e.preventDefault();
-                                          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-                                          this._detailReposDragIdx = -1;
-                                        }}
-                                        @pointercancel=${(e: PointerEvent) => {
-                                          this._detailReposDragIdx = -1;
-                                          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                                            const from = this._detailReposDragIdx;
+                                            if (toIdx === from) return;
+                                            const adjustedTo = toIdx > from ? toIdx - 1 : toIdx;
+                                            const [moved] = r.splice(from, 1);
+                                            r.splice(adjustedTo, 0, moved);
+                                            this._detailRepos = [...r];
+                                            this._detailReposDragIdx = adjustedTo;
+                                          };
+                                          this._boundPointerUp = (ev: PointerEvent) => {
+                                            if (this._detailReposDragIdx < 0) return;
+                                            ev.preventDefault();
+                                            this._detailReposDragIdx = -1;
+                                            this._dragRepoName = null;
+                                            if (this._boundPointerMove) {
+                                              document.removeEventListener("pointermove", this._boundPointerMove);
+                                            }
+                                            if (this._boundPointerUp) {
+                                              document.removeEventListener("pointerup", this._boundPointerUp);
+                                            }
+                                            this._boundPointerMove = null;
+                                            this._boundPointerUp = null;
+                                          };
+                                          document.addEventListener("pointermove", this._boundPointerMove);
+                                          document.addEventListener("pointerup", this._boundPointerUp);
                                         }}>
                                         <span style="display:inline-flex;align-items:center;color:#555;cursor:grab;margin-right:4px;">
                                           <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
