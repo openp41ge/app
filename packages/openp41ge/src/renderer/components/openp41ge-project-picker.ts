@@ -522,8 +522,8 @@ export class Openp41geProjectPicker extends LitElement {
   @state() private _selectedIndex = 0;
   @state() private _detailProject: ProjectInfo | null = null;
   @state() private _detailRepos: Array<{ name: string; worktrees: string[] }> | null = null;
-  @state() private _detailReposDropIndex: number = -1;
   @state() private _detailReposDragIdx: number = -1;
+  private _dragStartY = 0;
   @state() private _loadingRepos = false;
   @state() private _searchText = "";
   @state() private _activeProjectName: string | null = null;
@@ -1223,68 +1223,48 @@ export class Openp41geProjectPicker extends LitElement {
                         : this._detailRepos && this._detailRepos.length > 0
                           ? html`
                               <ul class="repo-tree"
-                                @dragenter=${(e: DragEvent) => {
-                                  if (e.dataTransfer?.types.includes("application/x-openp41ge-project-repo")) e.preventDefault();
-                                }}
-                                @dragover=${(e: DragEvent) => {
-                                  if (!e.dataTransfer?.types.includes("application/x-openp41ge-project-repo")) return;
-                                  e.preventDefault();
-                                  e.dataTransfer.dropEffect = "move";
-                                  const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
-                                  let idx = this._detailRepos?.length ?? 0;
-                                  if (items) {
-                                    for (let i = 0; i < items.length; i++) {
-                                      const rect = items[i].getBoundingClientRect();
-                                      if (e.clientY < rect.top + rect.height / 2) { idx = i; break; }
-                                    }
-                                  }
-                                  this._detailReposDropIndex = idx;
-                                }}
-                                @dragleave=${(e: DragEvent) => {
-                                  const t = e.currentTarget as HTMLElement;
-                                  const r = e.relatedTarget as Node | null;
-                                  if (r && t.contains(r)) return;
-                                  this._detailReposDropIndex = -1;
-                                }}
-                                @drop=${(e: DragEvent) => {
-                                  this._detailReposDropIndex = -1;
-                                  this._detailReposDragIdx = -1;
-                                  const dragName = e.dataTransfer?.getData("application/x-openp41ge-project-repo");
-                                  if (!dragName || !this._detailRepos) return;
-                                  e.preventDefault();
-                                  const repos = [...this._detailRepos];
-                                  const fromIdx = repos.findIndex((r) => r.name === dragName);
-                                  if (fromIdx === -1) return;
-                                  const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
-                                  let dropIndex = repos.length;
-                                  if (items) {
-                                    for (let i = 0; i < items.length; i++) {
-                                      const rect = items[i].getBoundingClientRect();
-                                      if (e.clientY < rect.top + rect.height / 2) { dropIndex = i; break; }
-                                    }
-                                  }
-                                  if (fromIdx === dropIndex || dropIndex === fromIdx + 1) return;
-                                  const [moved] = repos.splice(fromIdx, 1);
-                                  repos.splice(dropIndex > fromIdx ? dropIndex - 1 : dropIndex, 0, moved);
-                                  this._detailRepos = repos;
-                                }}
-                                @dragend=${() => {
-                                  this._detailReposDropIndex = -1;
-                                  this._detailReposDragIdx = -1;
-                                }}
+
                               >
                                 ${this._detailRepos.map(
                                   (repo, idx) => html`
-                                    ${this._detailReposDropIndex === idx
-                                      ? html`<li style="height:16px;list-style:none;margin:0;padding:0;"></li>`
-                                      : nothing}
-                                    <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'opacity:0;' : ''}">
+                                    <li class="repo-group" style="${this._detailReposDragIdx === idx ? 'opacity:0.3;' : ''}">
                                       <div class="repo-header"
-                                        draggable="true"
-                                        @dragstart=${(e: DragEvent) => {
-                                          e.dataTransfer!.setData("application/x-openp41ge-project-repo", repo.name);
-                                          e.dataTransfer!.effectAllowed = "move";
+                                        @pointerdown=${(e: PointerEvent) => {
+                                          if (e.button !== 0 || this._detailReposDragIdx >= 0) return;
+                                          e.preventDefault();
                                           this._detailReposDragIdx = idx;
+                                          this._dragStartY = e.clientY;
+                                          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                                        }}
+                                        @pointermove=${(e: PointerEvent) => {
+                                          if (this._detailReposDragIdx < 0 || !this._detailRepos) return;
+                                          e.preventDefault();
+                                          const repos = this._detailRepos;
+                                          const items = this.shadowRoot?.querySelectorAll(".repo-tree .repo-group");
+                                          let toIdx = repos.length - 1;
+                                          if (items) {
+                                            for (let i = 0; i < items.length; i++) {
+                                              const rect = items[i].getBoundingClientRect();
+                                              if (e.clientY < rect.top + rect.height / 2) { toIdx = i; break; }
+                                            }
+                                          }
+                                          const fromIdx = this._detailReposDragIdx;
+                                          if (toIdx === fromIdx) return;
+                                          const adjustedTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
+                                          const [moved] = repos.splice(fromIdx, 1);
+                                          repos.splice(adjustedTo, 0, moved);
+                                          this._detailRepos = [...repos];
+                                          this._detailReposDragIdx = adjustedTo;
+                                        }}
+                                        @pointerup=${(e: PointerEvent) => {
+                                          if (this._detailReposDragIdx < 0) return;
+                                          e.preventDefault();
+                                          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                                          this._detailReposDragIdx = -1;
+                                        }}
+                                        @pointercancel=${(e: PointerEvent) => {
+                                          this._detailReposDragIdx = -1;
+                                          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
                                         }}>
                                         <span style="display:inline-flex;align-items:center;color:#555;cursor:grab;margin-right:4px;">
                                           <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
@@ -1316,9 +1296,6 @@ export class Openp41geProjectPicker extends LitElement {
                                     </li>
                                   `,
                                 )}
-                              ${this._detailReposDropIndex === (this._detailRepos?.length ?? 0)
-                                ? html`<li style="height:16px;list-style:none;margin:0;padding:0;"></li>`
-                                : nothing}
                               </ul>
                             `
                           : html`<div class="loading-text">No repositories</div>`
