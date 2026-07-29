@@ -50,6 +50,14 @@ export class Openp41geRepoTreeItem extends LitElement {
 
   @state() private _expanded = false;
   @state() private _showingAddWorktree = false;
+  @state() private _addWorktreeName = "";
+
+  /** True when the add-worktree input value matches an existing worktree name. */
+  private get _isDuplicateWorktreeName(): boolean {
+    const name = this._addWorktreeName.trim().toLowerCase();
+    if (!name) return false;
+    return this.worktrees.some((wt) => wt.branch.toLowerCase() === name);
+  }
   @state() private _expandedWorktrees = new Set<string>();
   @state() private _expandedDirs = new Map<string, Set<string>>();
   @state() private _pullingBranches = new Set<string>();
@@ -439,6 +447,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         .wt-row-btn:hover svg { color: var(--accent, #4a9eff); }
         .wt-row-btn svg { transition: color 0.1s; }
         #wt-addwt-input:focus { outline: none !important; }
+        #wt-addwt-row.duplicate-name:focus-within { outline-color: #e81123 !important; }
       </style>
       <div class="select-none">
         <!-- Repo header -->
@@ -544,13 +553,17 @@ export class Openp41geRepoTreeItem extends LitElement {
           this._showingAddWorktree
             ? html` <div
                 id="wt-addwt-row"
-                class="flex items-center h-[26px] px-2 pl-7 text-xs gap-1 border-b border-[#232323] transition-colors duration-100"
+                class="flex items-center h-[26px] px-2 pl-7 text-xs gap-1 border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
               >
                 <input
                   id="wt-addwt-input"
                   type="text"
                   placeholder="enter branch name"
                   class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-xs pl-[14px] outline-none font-inherit"
+                  .value=${this._addWorktreeName}
+                  @input=${(e: InputEvent) => {
+                    this._addWorktreeName = (e.target as HTMLInputElement).value;
+                  }}
                   @keydown=${(e: KeyboardEvent) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -614,6 +627,7 @@ export class Openp41geRepoTreeItem extends LitElement {
   }
 
   private _showAddWorktreeInline(): void {
+    this._addWorktreeName = "";
     this._showingAddWorktree = true;
     this.requestUpdate();
     requestAnimationFrame(() => {
@@ -622,17 +636,17 @@ export class Openp41geRepoTreeItem extends LitElement {
   }
 
   private _cancelAddWorktree(): void {
+    this._addWorktreeName = "";
     this._showingAddWorktree = false;
     this.requestUpdate();
   }
 
   private _confirmAddWorktree(): void {
-    const input = this.querySelector("#wt-addwt-input") as HTMLInputElement | null;
-    if (!input) return;
-
-    const branch = input.value.trim();
+    if (this._isDuplicateWorktreeName) return;
+    const branch = this._addWorktreeName.trim();
     if (!branch) return;
 
+    this._addWorktreeName = "";
     this._showingAddWorktree = false;
     this.requestUpdate();
 
