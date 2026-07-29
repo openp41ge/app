@@ -307,10 +307,10 @@ export class Openp41geRepoTreeItem extends LitElement {
                       (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                     }}
                     @mouseover=${(e: MouseEvent) => {
-                      (e.currentTarget as HTMLElement).style.color = "#4a9eff";
+                      (e.currentTarget as HTMLElement).classList.add("text-accent");
                     }}
                     @mouseout=${(e: MouseEvent) => {
-                      (e.currentTarget as HTMLElement).style.color = "#666";
+                      (e.currentTarget as HTMLElement).classList.remove("text-accent");
                     }}
                     >${unsafeHTML(refreshIcon(14))}</span
                   >
@@ -508,10 +508,10 @@ export class Openp41geRepoTreeItem extends LitElement {
                   (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                 }}
                 @mouseover=${(e: MouseEvent) => {
-                  (e.currentTarget as HTMLElement).style.color = "#4a9eff";
+                  (e.currentTarget as HTMLElement).classList.add("text-accent");
                 }}
                 @mouseout=${(e: MouseEvent) => {
-                  (e.currentTarget as HTMLElement).style.color = "#666";
+                  (e.currentTarget as HTMLElement).classList.remove("text-accent");
                 }}
                 >${unsafeHTML(refreshIcon(14))}</span
               >
@@ -593,10 +593,10 @@ export class Openp41geRepoTreeItem extends LitElement {
                   class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-secondary"
                   @click=${() => this._confirmAddWorktree()}
                   @mouseenter=${(e: MouseEvent) => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)";
+                    (e.currentTarget as HTMLElement).classList.add("bg-hover");
                   }}
                   @mouseleave=${(e: MouseEvent) => {
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                    (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                   }}
                   title="Confirm"
                 >

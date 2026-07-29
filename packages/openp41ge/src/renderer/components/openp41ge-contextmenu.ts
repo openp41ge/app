@@ -123,7 +123,7 @@ class Openp41geContextMenu extends LitElement {
               class="px-4 py-1.5 cursor-pointer text-primary text-sm transition-[background] duration-100 flex items-center justify-between"
               @mouseenter=${(e: MouseEvent) => {
                 const row = e.currentTarget as HTMLElement;
-                row.style.background = "#333";
+                row.classList.add("bg-[#333]");
                 if (hasChildren && item.children) {
                   const r = row.getBoundingClientRect();
                   this.querySelectorAll("openp41ge-contextmenu").forEach((el) => el.remove());
@@ -138,7 +138,7 @@ class Openp41geContextMenu extends LitElement {
                 }
               }}
               @mouseleave=${(e: MouseEvent) => {
-                (e.currentTarget as HTMLElement).style.background = "transparent";
+                (e.currentTarget as HTMLElement).classList.remove("bg-[#333]");
               }}
               @click=${() => {
                 if (!hasChildren && item.action) {

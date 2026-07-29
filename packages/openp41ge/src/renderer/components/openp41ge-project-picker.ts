@@ -1203,12 +1203,10 @@ export class Openp41geProjectPicker extends LitElement {
                                   title="Confirm"
                                   class="inline-flex items-center justify-center w-7 h-7 border-none rounded bg-transparent text-[var(--openp41ge-accent-color,#4a9eff)] cursor-pointer transition-[background] duration-100"
                                   @mouseenter=${(e: MouseEvent) => {
-                                    (e.currentTarget as HTMLElement).style.background =
-                                      "rgba(74,158,255,0.12)";
+                                    (e.currentTarget as HTMLElement).classList.add("bg-[rgba(74,158,255,0.12)]");
                                   }}
                                   @mouseleave=${(e: MouseEvent) => {
-                                    (e.currentTarget as HTMLElement).style.background =
-                                      "transparent";
+                                    (e.currentTarget as HTMLElement).classList.remove("bg-[rgba(74,158,255,0.12)]");
                                   }}
                                   @click=${this._confirmRename}
                                 >
@@ -1227,12 +1225,10 @@ export class Openp41geProjectPicker extends LitElement {
                                   title="Cancel"
                                   class="inline-flex items-center justify-center w-7 h-7 border-none rounded bg-transparent text-[var(--openp41ge-muted-text,#888)] cursor-pointer transition-[background] duration-100"
                                   @mouseenter=${(e: MouseEvent) => {
-                                    (e.currentTarget as HTMLElement).style.background =
-                                      "rgba(255,255,255,0.08)";
+                                    (e.currentTarget as HTMLElement).classList.add("bg-[rgba(255,255,255,0.08)]");
                                   }}
                                   @mouseleave=${(e: MouseEvent) => {
-                                    (e.currentTarget as HTMLElement).style.background =
-                                      "transparent";
+                                    (e.currentTarget as HTMLElement).classList.remove("bg-[rgba(255,255,255,0.08)]");
                                   }}
                                   @click=${this._cancelRename}
                                 >
@@ -1253,11 +1249,10 @@ export class Openp41geProjectPicker extends LitElement {
                               <div
                                 class="flex items-center gap-1 cursor-pointer rounded py-0.5 pr-1 pl-2 -ml-2 transition-[background] duration-100"
                                 @mouseenter=${(e: MouseEvent) => {
-                                  (e.currentTarget as HTMLElement).style.background =
-                                    "var(--openp41ge-hover-bg,#333)";
+                                  (e.currentTarget as HTMLElement).classList.add("bg-hover");
                                 }}
                                 @mouseleave=${(e: MouseEvent) => {
-                                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                                  (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                                 }}
                                 @click=${this._startRename}
                                 title="Rename project"
@@ -1668,12 +1663,10 @@ export class Openp41geProjectPicker extends LitElement {
                                     class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 ml-1 text-[var(--openp41ge-accent-color,#4a9eff)]"
                                     @click=${this._confirmAddRepo}
                                     @mouseenter=${(e: MouseEvent) => {
-                                      (e.currentTarget as HTMLElement).style.background =
-                                        "rgba(74,158,255,0.12)";
+                                      (e.currentTarget as HTMLElement).classList.add("bg-[rgba(74,158,255,0.12)]");
                                     }}
                                     @mouseleave=${(e: MouseEvent) => {
-                                      (e.currentTarget as HTMLElement).style.background =
-                                        "transparent";
+                                      (e.currentTarget as HTMLElement).classList.remove("bg-[rgba(74,158,255,0.12)]");
                                     }}
                                     title="Confirm"
                                   >
@@ -1694,12 +1687,10 @@ export class Openp41geProjectPicker extends LitElement {
                                     class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-[var(--openp41ge-muted-text,#888)]"
                                     @click=${this._cancelAddRepo}
                                     @mouseenter=${(e: MouseEvent) => {
-                                      (e.currentTarget as HTMLElement).style.background =
-                                        "rgba(255,255,255,0.06)";
+                                      (e.currentTarget as HTMLElement).classList.add("bg-[rgba(255,255,255,0.06)]");
                                     }}
                                     @mouseleave=${(e: MouseEvent) => {
-                                      (e.currentTarget as HTMLElement).style.background =
-                                        "transparent";
+                                      (e.currentTarget as HTMLElement).classList.remove("bg-[rgba(255,255,255,0.06)]");
                                     }}
                                     title="Cancel"
                                   >

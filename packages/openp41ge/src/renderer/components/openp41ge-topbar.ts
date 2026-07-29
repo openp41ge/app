@@ -69,13 +69,13 @@ class Openp41geTopBar extends LitElement {
         class="w-[46px] h-full flex items-center justify-center cursor-pointer text-sm text-secondary transition-[background] duration-100 -webkit-app-region:no-drag"
         @mouseenter=${(e: MouseEvent) => {
           const el = e.currentTarget as HTMLElement;
-          el.style.background = isClose ? "#e81123" : "#333";
-          if (isClose) el.style.color = "#fff";
+          el.classList.add(isClose ? "bg-[#e81123]" : "bg-[#333]");
+          if (isClose) el.classList.add("text-white");
         }}
         @mouseleave=${(e: MouseEvent) => {
           const el = e.currentTarget as HTMLElement;
-          el.style.background = "transparent";
-          if (isClose) el.style.color = "#999";
+          el.classList.remove("bg-[#e81123]", "bg-[#333]");
+          if (isClose) el.classList.remove("text-white");
         }}
         @click=${onClick}
       >

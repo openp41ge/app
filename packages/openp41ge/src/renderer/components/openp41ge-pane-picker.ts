@@ -335,12 +335,10 @@ class Openp41gePanePicker extends LitElement {
         if (!(el instanceof HTMLElement)) return;
         const idx = parseInt(el.getAttribute("data-idx") ?? "-1", 10);
         if (idx === this._selectedIndex) {
-          el.style.background = "#2a2a2a";
-          el.style.color = "#fff";
+          el.classList.add("pi-selected");
           el.scrollIntoView({ block: "nearest" });
         } else {
-          el.style.background = "transparent";
-          el.style.color = "#bbb";
+          el.classList.remove("pi-selected");
         }
       });
     });

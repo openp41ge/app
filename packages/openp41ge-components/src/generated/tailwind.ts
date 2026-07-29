@@ -826,6 +826,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   background-color: rgb(74 158 255 / var(--tw-bg-opacity, 1))
 }
 
+.bg-\[\#e81123\] {
+  --tw-bg-opacity: 1;
+  background-color: rgb(232 17 35 / var(--tw-bg-opacity, 1))
+}
+
 .bg-\[rgba\(0\2c 0\2c 0\2c \.3\)\] {
   background-color: rgba(0,0,0,.3)
 }
@@ -844,6 +849,14 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .bg-\[rgba\(255\2c 255\2c 255\2c 0\.03\)\] {
   background-color: rgba(255,255,255,0.03)
+}
+
+.bg-\[rgba\(255\2c 255\2c 255\2c 0\.06\)\] {
+  background-color: rgba(255,255,255,0.06)
+}
+
+.bg-\[rgba\(255\2c 255\2c 255\2c 0\.08\)\] {
+  background-color: rgba(255,255,255,0.08)
 }
 
 .bg-\[rgba\(42\2c 111\2c 209\2c 0\.08\)\] {
@@ -1358,6 +1371,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .opacity-0 {
   opacity: 0
+}
+
+.opacity-100 {
+  opacity: 1
 }
 
 .opacity-30 {
