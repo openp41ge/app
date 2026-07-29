@@ -18,6 +18,7 @@ export default defineConfig({
       // used by nx run-many -t build for production builds.
       { find: "openp41ge-git", replacement: path.resolve(__dirname, "../openp41ge-git/src") },
       { find: "openp41ge-logger", replacement: path.resolve(__dirname, "../openp41ge-logger/src") },
+      { find: "openp41ge-filesystem", replacement: path.resolve(__dirname, "../openp41ge-filesystem/src") },
       { find: "openp41ge-uikit", replacement: path.resolve(__dirname, "../openp41ge-uikit/src") },
       { find: "openp41ge-uikit/theme", replacement: path.resolve(__dirname, "../openp41ge-uikit/src/theme") },
       { find: "openp41ge-syntax-highlighting", replacement: path.resolve(__dirname, "../openp41ge-syntax-highlighting/src") },

@@ -5,7 +5,7 @@
  * across page navigations and app restarts.
  */
 
-import type { WorktreeData } from "../components/openp41ge-repo-tree-item";
+import type { WorktreeData } from "./types";
 
 /**
  * Global persistence state interface.

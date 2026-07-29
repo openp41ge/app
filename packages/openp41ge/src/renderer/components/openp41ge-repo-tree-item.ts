@@ -17,22 +17,14 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { plusIconThick, refreshIcon } from "../icons";
-import { WorktreeFileLoader } from "../services/worktree-file-loader";
-import { DirPersistenceService } from "../services/dir-persistence-service";
+import {
+  WorktreeFileLoader,
+  DirPersistenceService,
+  type WorktreeData,
+  type FileEntry,
+} from "openp41ge-filesystem";
 
-export interface WorktreeData {
-  branch: string;
-  path: string;
-  exists: boolean;
-}
-
-export interface FileEntry {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  size: number;
-  modifiedAt: number;
-}
+export type { WorktreeData, FileEntry };
 
 // Injected CSS for custom property driven dynamic styles
 (function injectRepTreeItemStyles(): void {

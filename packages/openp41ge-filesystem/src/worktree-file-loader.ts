@@ -13,7 +13,7 @@
  * so we store the worktree root and relativize when comparing.
  */
 
-import type { FileEntry, WorktreeData } from "../components/openp41ge-repo-tree-item";
+import type { FileEntry, WorktreeData } from "./types";
 
 interface BranchUntrackedInfo {
   /** Root path of the worktree (e.g. /Users/foo/repo). */
