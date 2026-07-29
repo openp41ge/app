@@ -4,7 +4,6 @@
 
 import { html, LitElement, type TemplateResult } from "lit";
 import { customElement, query } from "lit/decorators.js";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Meta, StoryObj } from "@storybook/web-components";
 import "openp41ge-uikit";
 import {
@@ -12,6 +11,7 @@ import {
   TabDragSource,
   GhostManager,
   type IDragSource,
+  type TreeNode,
 } from "openp41ge-uikit";
 
 // ─── Tab data helpers ─────────────────────────────────────────────────
@@ -141,20 +141,40 @@ class GridState {
 
 }
 
-// ─── Icons ────────────────────────────────────────────────────────────
+// ─── File tree data ────────────────────────────────────────────────────
 
-const FILE_ICONS: Record<string, string> = {
-  ts: `<svg viewBox="0 0 24 24" fill="#3178c6" width="14" height="14"><rect width="24" height="24" rx="2"/><text x="5" y="17" fill="white" font-size="14" font-weight="bold">TS</text></svg>`,
-  tsx: `<svg viewBox="0 0 24 24" fill="#3178c6" width="14" height="14"><rect width="24" height="24" rx="2"/><text x="5" y="17" fill="white" font-size="14" font-weight="bold">TS</text></svg>`,
-  css: `<svg viewBox="0 0 24 24" fill="#2965f1" width="14" height="14"><rect width="24" height="24" rx="2"/><text x="4" y="17" fill="white" font-size="12" font-weight="bold">CSS</text></svg>`,
-  md: `<svg viewBox="0 0 24 24" fill="#083fa1" width="14" height="14"><rect width="24" height="24" rx="2"/><text x="4" y="17" fill="white" font-size="12" font-weight="bold">MD</text></svg>`,
-  default: `<svg viewBox="0 0 24 24" fill="#666" width="14" height="14"><rect width="24" height="24" rx="2"/><text x="6" y="17" fill="white" font-size="12" font-weight="bold">*</text></svg>`,
-};
-
-function fileIcon(filename: string): string {
-  const ext = filename.split(".").pop() || "";
-  return FILE_ICONS[ext] || FILE_ICONS.default;
+function buildFileTree(): TreeNode[] {
+  return [
+    {
+      id: "src",
+      label: "src",
+      icon: "folder",
+      children: [
+        { id: "src/app.ts", label: "app.ts", icon: "typescript", draggable: true },
+        { id: "src/utils.ts", label: "utils.ts", icon: "typescript", draggable: true },
+        { id: "src/components", label: "components", icon: "folder", children: [
+          { id: "src/components/header.ts", label: "header.ts", icon: "typescript", draggable: true },
+          { id: "src/components/footer.ts", label: "footer.ts", icon: "typescript", draggable: true },
+        ]},
+      ],
+    },
+    {
+      id: "styles",
+      label: "styles",
+      icon: "folder",
+      children: [
+        { id: "styles/global.css", label: "global.css", icon: "css", draggable: true },
+        { id: "styles/theme.css", label: "theme.css", icon: "css", draggable: true },
+      ],
+    },
+    { id: "README.md", label: "README.md", icon: "markdown", draggable: true },
+    { id: "package.json", label: "package.json", icon: "json", draggable: true },
+    { id: "tsconfig.json", label: "tsconfig.json", icon: "json", draggable: true },
+  ];
 }
+
+// ─── Icons ────────────────────────────────────────────────────────────
+// FILE_ICONS removed — no longer used with file cards
 
 // ─── Demo app ─────────────────────────────────────────────────────────
 
@@ -209,13 +229,9 @@ class TabsDemoApp extends LitElement {
     this._orchestrator = new DragOrchestrator(this._targetResolver);
     this._renderAll();
 
-    // ── File explorer drag ────────────────────────────────────────
-    this.querySelectorAll(".file-card").forEach((card) => {
-      card.addEventListener("dragstart", (e: Event) => {
-        const de = e as DragEvent;
-        de.dataTransfer?.setData("text/plain", (card as HTMLElement).dataset.filepath || "");
-      });
-    });
+    // ── Tree interactions ────────────────────────────────────────────
+    this._openFile = this._openFile.bind(this);
+    this.addEventListener("tree-node-click", this._openFile);
 
     // ── Tab drag start (mousedown on [role='tab']) ────────────────
     document.addEventListener("mousedown", (e: Event) => {
@@ -375,6 +391,20 @@ class TabsDemoApp extends LitElement {
     });
   }
 
+  private _openFile(e: any): void {
+    const filePath = e.detail?.nodeId;
+    if (!filePath) return;
+    const state = this._state("editor");
+    if (!state) return;
+    const firstCol = state.placements[0]?.position.col ?? 0;
+    state.addTab(
+      firstCol,
+      filePath,
+      `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened from tree.</p></div>`,
+    );
+    this._renderAll();
+  }
+
   private _state(winId: string): GridState | null {
     if (winId === "editor") return this._editorState;
     if (winId === "side-a") return this._sideState;
@@ -394,54 +424,67 @@ class TabsDemoApp extends LitElement {
         .tabs-demo h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
         .tabs-demo h1 span { color: rgb(74, 158, 255); }
         .tabs-demo p { margin: 0 0 16px; font-size: 12px; color: #888; }
+        .multi-body { display: flex; gap: 12px; align-items: flex-start; }
+        .multi-main { flex: 1; min-width: 0; }
         .grid-row { display: flex; gap: 12px; margin-bottom: 16px; }
         .editor-wrapper { flex: 1; min-height: 250px; display: flex; flex-direction: column; }
         .bottom-grids { display: flex; gap: 12px; }
         .bottom-grid { flex: 1; min-height: 150px; display: flex; flex-direction: column; }
-        .demo-section { margin-bottom: 16px; }
-        .demo-section h2 { font-size: 13px; margin: 0 0 8px; color: #aaa; }
-        h2 small { font-weight: normal; font-size: 11px; color: #666; margin-left: 8px; }
-        .file-explorer { display: flex; gap: 8px; flex-wrap: wrap; }
-        .file-card { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 4px; cursor: grab; font-size: 12px; color: #ccc; user-select: none; }
-        .file-card:hover { border-color: #4a9eff; }
         .demo-add-tab-btn { background: rgba(74, 158, 255, 0.15); color: rgb(74, 158, 255); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 4px; width: 24px; height: 24px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 4px; }
         .demo-add-tab-btn:hover { background: rgba(74, 158, 255, 0.3); }
         tab-grid { flex: 1; }
+        .tree-panel {
+          width: 220px;
+          flex-shrink: 0;
+          background: #252526;
+          border: 1px solid #333;
+          border-radius: 4px;
+          overflow-y: auto;
+        }
+        .tree-panel h3 {
+          font-size: 11px;
+          font-weight: 600;
+          margin: 0;
+          padding: 8px 12px;
+          color: #888;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          border-bottom: 1px solid #333;
+        }
       </style>
 
       <div class="tabs-demo">
         <h1>Openp41ge <span>Tabs</span></h1>
         <p>VS Code-style editor groups. Drag tabs to column edges to split, across columns to rearrange, or between grids to move between groups.</p>
 
-        <div class="grid-row">
-          <div class="editor-wrapper">
-            <tab-grid id="editor-grid"></tab-grid>
-            <button class="demo-add-tab-btn" data-win-id="editor" data-col="0">+</button>
-          </div>
-        </div>
+        <div class="multi-body">
+          <div class="multi-main">
+            <div class="grid-row">
+              <div class="editor-wrapper">
+                <tab-grid id="editor-grid"></tab-grid>
+                <button class="demo-add-tab-btn" data-win-id="editor" data-col="0">+</button>
+              </div>
+            </div>
 
-        <div class="demo-section">
-          <h2>File Explorer <small>drag files onto the editor grid</small></h2>
-          <div class="file-explorer">
-            <div class="file-card" draggable="true" data-filepath="src/app.ts"><span class="file-icon">${unsafeHTML(fileIcon("app.ts"))}</span><span class="file-name">app.ts</span></div>
-            <div class="file-card" draggable="true" data-filepath="src/utils.ts"><span class="file-icon">${unsafeHTML(fileIcon("utils.ts"))}</span><span class="file-name">utils.ts</span></div>
-            <div class="file-card" draggable="true" data-filepath="README.md"><span class="file-icon">${unsafeHTML(fileIcon("README.md"))}</span><span class="file-name">README.md</span></div>
-          </div>
-        </div>
+            <div class="bottom-grids">
+              <div class="bottom-grid">
+                <tab-grid id="side-grid-a"></tab-grid>
+                <button class="demo-add-tab-btn" data-win-id="side-a" data-col="0">+</button>
+              </div>
+              <div class="bottom-grid">
+                <tab-grid id="side-grid-b"></tab-grid>
+                <button class="demo-add-tab-btn" data-win-id="side-b" data-col="0">+</button>
+              </div>
+            </div>
 
-        <div class="bottom-grids">
-          <div class="bottom-grid">
-            <tab-grid id="side-grid-a"></tab-grid>
-            <button class="demo-add-tab-btn" data-win-id="side-a" data-col="0">+</button>
+            <div style="margin-top:8px;">
+              <button id="btn-reset" style="padding:4px 12px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#ccc;cursor:pointer;font-size:11px;">Reset Demo</button>
+            </div>
           </div>
-          <div class="bottom-grid">
-            <tab-grid id="side-grid-b"></tab-grid>
-            <button class="demo-add-tab-btn" data-win-id="side-b" data-col="0">+</button>
+          <div class="tree-panel">
+            <h3>EXPLORER</h3>
+            <openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree>
           </div>
-        </div>
-
-        <div style="margin-top:8px;">
-          <button id="btn-reset" style="padding:4px 12px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#ccc;cursor:pointer;font-size:11px;">Reset Demo</button>
         </div>
       </div>
     `;
@@ -485,6 +528,10 @@ class SingleGridApp extends LitElement {
   override firstUpdated(): void {
     this._orchestrator = new DragOrchestrator(this._targetResolver);
     this._state.applyTo(this._gridEl);
+
+    // ── Tree interactions ────────────────────────────────────────────
+    this._openFile = this._openFile.bind(this);
+    this.addEventListener("tree-node-click", this._openFile);
 
     // ── Tab drag start ───────────────────────────────────────────
     document.addEventListener("mousedown", (e: Event) => {
@@ -609,6 +656,18 @@ class SingleGridApp extends LitElement {
     });
   }
 
+  private _openFile(e: any): void {
+    const filePath = e.detail?.nodeId;
+    if (!filePath) return;
+    const col = this._state.placements[0]?.position.col ?? 0;
+    this._state.addTab(
+      col,
+      filePath,
+      `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened from tree.</p></div>`,
+    );
+    this._render();
+  }
+
   private _render(): void {
     this._state.applyTo(this._gridEl);
   }
@@ -631,9 +690,39 @@ class SingleGridApp extends LitElement {
           margin: 0 0 8px;
           color: #aaa;
         }
-        .single-demo tab-grid {
+        .single-body {
+          display: flex;
+          gap: 12px;
+          flex: 1;
+          min-height: 0;
+        }
+        .single-grid-wrap {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        .single-grid-wrap tab-grid {
           flex: 1;
           min-height: 200px;
+        }
+        .tree-panel {
+          width: 220px;
+          flex-shrink: 0;
+          background: #252526;
+          border: 1px solid #333;
+          border-radius: 4px;
+          overflow-y: auto;
+        }
+        .tree-panel h3 {
+          font-size: 11px;
+          font-weight: 600;
+          margin: 0;
+          padding: 8px 12px;
+          color: #888;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          border-bottom: 1px solid #333;
         }
         .single-toolbar {
           display: flex;
@@ -659,7 +748,15 @@ class SingleGridApp extends LitElement {
           <button id="single-add-tab">+ Add Tab</button>
           <button id="single-reset">Reset</button>
         </div>
-        <tab-grid id="single-grid"></tab-grid>
+        <div class="single-body">
+          <div class="single-grid-wrap">
+            <tab-grid id="single-grid"></tab-grid>
+          </div>
+          <div class="tree-panel">
+            <h3>EXPLORER</h3>
+            <openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree>
+          </div>
+        </div>
       </div>
     `;
   }
