@@ -126,11 +126,11 @@ export const tailwindCSS: string = `.static {
 }
 
 .border-divider {
-  border-color: var(--border-divider, #2a2a2a)
+  border-color: var(--border-divider, #2d2d2d)
 }
 
 .border-t-accent {
-  border-top-color: var(--accent-hover, #4a9eff)
+  border-top-color: var(--text-accent, #569cd6)
 }
 
 .px-2 {
@@ -183,22 +183,22 @@ export const tailwindCSS: string = `.static {
 }
 
 .text-muted {
-  color: var(--text-muted, #888)
+  color: var(--text-muted, #666)
 }
 
 .text-primary {
-  color: var(--text-primary, #ccc)
+  color: var(--text-primary, #d4d4d4)
 }
 
 .text-secondary {
-  color: var(--text-secondary, #aaa)
+  color: var(--text-secondary, #999)
 }
 
 .hover\:bg-hover:hover {
-  background-color: rgba(255,255,255,0.04)
+  background-color: var(--bg-hover, #2a2d2e)
 }
 
 .hover\:text-secondary:hover {
-  color: var(--text-secondary, #aaa)
+  color: var(--text-secondary, #999)
 }
 `;

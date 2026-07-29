@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "outDir": "dist-storybook",
-    "rootDir": "."
-  },
-  "include": ["src/**/*.ts", "stories/**/*.ts", ".storybook/**/*.ts"]
-}

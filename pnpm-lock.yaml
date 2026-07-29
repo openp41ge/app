@@ -150,24 +150,12 @@ importers:
         specifier: ^3.2.0
         version: 3.3.3
     devDependencies:
-      '@storybook/addon-essentials':
-        specifier: ^8.6.0
-        version: 8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/web-components':
-        specifier: ^8.6.0
-        version: 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/web-components-vite':
-        specifier: ^8.6.0
-        version: 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))(vite@6.4.3(@types/node@24.13.2)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))
       autoprefixer:
         specifier: ^10.4.0
         version: 10.5.4(postcss@8.5.15)
       postcss:
         specifier: ^8.5.0
         version: 8.5.15
-      storybook:
-        specifier: ^8.6.0
-        version: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
       tailwindcss:
         specifier: ^3.4.0
         version: 3.4.19(tsx@4.23.1)(yaml@2.9.0)
@@ -177,6 +165,31 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/openp41ge-components-demo:
+    dependencies:
+      lit:
+        specifier: ^3.0.0
+        version: 3.3.3
+      openp41ge-components:
+        specifier: workspace:*
+        version: link:../openp41ge-components
+    devDependencies:
+      '@storybook/addon-essentials':
+        specifier: ^8.6.0
+        version: 8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/web-components':
+        specifier: ^8.6.0
+        version: 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/web-components-vite':
+        specifier: ^8.6.0
+        version: 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))(vite@6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      storybook:
+        specifier: ^8.6.0
+        version: 8.6.18(prettier@3.9.6)
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/openp41ge-file-editor:
     dependencies:
@@ -6566,112 +6579,112 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@storybook/addon-actions@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-actions@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       '@storybook/global': 5.0.0
       '@types/uuid': 9.0.8
       dequal: 2.0.3
       polished: 4.3.1
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       uuid: 9.0.1
 
-  '@storybook/addon-backgrounds@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-backgrounds@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       '@storybook/global': 5.0.0
       memoizerific: 1.11.3
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       ts-dedent: 2.3.0
 
-  '@storybook/addon-controls@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-controls@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       '@storybook/global': 5.0.0
       dequal: 2.0.3
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       ts-dedent: 2.3.0
 
-  '@storybook/addon-docs@8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-docs@8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       '@mdx-js/react': 3.1.1(@types/react@19.2.17)(react@19.2.8)
-      '@storybook/blocks': 8.6.14(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/csf-plugin': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/react-dom-shim': 8.6.14(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
+      '@storybook/blocks': 8.6.14(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/csf-plugin': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/react-dom-shim': 8.6.14(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@8.6.18(prettier@3.9.6))
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       ts-dedent: 2.3.0
     transitivePeerDependencies:
       - '@types/react'
 
-  '@storybook/addon-essentials@8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-essentials@8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      '@storybook/addon-actions': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/addon-backgrounds': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/addon-controls': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/addon-docs': 8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/addon-highlight': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/addon-measure': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/addon-outline': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/addon-toolbars': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/addon-viewport': 8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      '@storybook/addon-actions': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/addon-backgrounds': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/addon-controls': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/addon-docs': 8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/addon-highlight': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/addon-measure': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/addon-outline': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/addon-toolbars': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/addon-viewport': 8.6.14(storybook@8.6.18(prettier@3.9.6))
+      storybook: 8.6.18(prettier@3.9.6)
       ts-dedent: 2.3.0
     transitivePeerDependencies:
       - '@types/react'
 
-  '@storybook/addon-highlight@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-highlight@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       '@storybook/global': 5.0.0
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
 
-  '@storybook/addon-measure@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-measure@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       '@storybook/global': 5.0.0
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       tiny-invariant: 1.3.3
 
-  '@storybook/addon-outline@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-outline@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       '@storybook/global': 5.0.0
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       ts-dedent: 2.3.0
 
-  '@storybook/addon-toolbars@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-toolbars@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
 
-  '@storybook/addon-viewport@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/addon-viewport@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       memoizerific: 1.11.3
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
 
-  '@storybook/blocks@8.6.14(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/blocks@8.6.14(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       '@storybook/icons': 1.6.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       ts-dedent: 2.3.0
     optionalDependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@storybook/builder-vite@8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))(vite@6.4.3(@types/node@24.13.2)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))':
+  '@storybook/builder-vite@8.6.18(storybook@8.6.18(prettier@3.9.6))(vite@6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
-      '@storybook/csf-plugin': 8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
+      '@storybook/csf-plugin': 8.6.18(storybook@8.6.18(prettier@3.9.6))
       browser-assert: 1.2.1
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       ts-dedent: 2.3.0
-      vite: 6.4.3(@types/node@24.13.2)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  '@storybook/components@8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/components@8.6.18(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
 
-  '@storybook/core@8.6.18(prettier@3.9.6)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))(supports-color@7.2.0)':
+  '@storybook/core@8.6.18(prettier@3.9.6)(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      '@storybook/theming': 8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
+      '@storybook/theming': 8.6.18(storybook@8.6.18(prettier@3.9.6))
       better-opn: 3.0.2
       browser-assert: 1.2.1
       esbuild: 0.25.12
-      esbuild-register: 3.6.0(esbuild@0.25.12)(supports-color@7.2.0)
+      esbuild-register: 3.6.0(esbuild@0.25.12)
       jsdoc-type-pratt-parser: 4.8.0
       process: 0.11.10
       recast: 0.23.12
@@ -6686,14 +6699,14 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@storybook/csf-plugin@8.6.14(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/csf-plugin@8.6.14(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       unplugin: 1.16.1
 
-  '@storybook/csf-plugin@8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/csf-plugin@8.6.18(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       unplugin: 1.16.1
 
   '@storybook/global@5.0.0': {}
@@ -6703,43 +6716,43 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@storybook/manager-api@8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/manager-api@8.6.18(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
 
-  '@storybook/preview-api@8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/preview-api@8.6.18(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
 
-  '@storybook/react-dom-shim@8.6.14(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/react-dom-shim@8.6.14(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
 
-  '@storybook/theming@8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/theming@8.6.18(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
 
-  '@storybook/web-components-vite@8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))(vite@6.4.3(@types/node@24.13.2)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))':
+  '@storybook/web-components-vite@8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))(vite@6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
-      '@storybook/builder-vite': 8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))(vite@6.4.3(@types/node@24.13.2)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))
-      '@storybook/web-components': 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
+      '@storybook/builder-vite': 8.6.18(storybook@8.6.18(prettier@3.9.6))(vite@6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@storybook/web-components': 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))
       magic-string: 0.30.21
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
     transitivePeerDependencies:
       - lit
       - vite
 
-  '@storybook/web-components@8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))':
+  '@storybook/web-components@8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))':
     dependencies:
-      '@storybook/components': 8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
+      '@storybook/components': 8.6.18(storybook@8.6.18(prettier@3.9.6))
       '@storybook/global': 5.0.0
-      '@storybook/manager-api': 8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/preview-api': 8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
-      '@storybook/theming': 8.6.18(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))
+      '@storybook/manager-api': 8.6.18(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/preview-api': 8.6.18(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/theming': 8.6.18(storybook@8.6.18(prettier@3.9.6))
       lit: 3.3.3
-      storybook: 8.6.18(prettier@3.9.6)(supports-color@7.2.0)
+      storybook: 8.6.18(prettier@3.9.6)
       tiny-invariant: 1.3.3
       ts-dedent: 2.3.0
 
@@ -7486,7 +7499,7 @@ snapshots:
       has-tostringtag: 1.0.2
       hasown: 2.0.4
 
-  esbuild-register@3.6.0(esbuild@0.25.12)(supports-color@7.2.0):
+  esbuild-register@3.6.0(esbuild@0.25.12):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       esbuild: 0.25.12
@@ -8727,9 +8740,9 @@ snapshots:
 
   std-env@4.2.0: {}
 
-  storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0):
+  storybook@8.6.18(prettier@3.9.6):
     dependencies:
-      '@storybook/core': 8.6.18(prettier@3.9.6)(storybook@8.6.18(prettier@3.9.6)(supports-color@7.2.0))(supports-color@7.2.0)
+      '@storybook/core': 8.6.18(prettier@3.9.6)(storybook@8.6.18(prettier@3.9.6))
     optionalDependencies:
       prettier: 3.9.6
     transitivePeerDependencies:

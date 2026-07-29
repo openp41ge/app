@@ -1,8 +1,8 @@
 import { html } from "lit";
 import type { Meta, StoryObj } from "@storybook/web-components";
 import "../src/components/openp41ge-icon";
-import type { IconName } from "../src/components/openp41ge-icon";
-import { iconRegistry } from "../src/icons/registry";
+import type { IconName } from "openp41ge-components";
+import { iconRegistry } from "openp41ge-components";
 
 const meta: Meta = {
   title: "Components/Icon",

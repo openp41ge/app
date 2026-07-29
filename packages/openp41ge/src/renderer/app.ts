@@ -117,6 +117,7 @@ export const appServices = {
 
 import { unmountAllControllers } from "./controllers/registry";
 import { resetTabDragState } from "./services/drag-context";
+import { injectGlobalTailwind } from "./services/inject-global-tailwind";
 
 /**
  * Renderer-side teardown for app state reset.
@@ -229,6 +230,9 @@ export const renderer = {
   /** Start the renderer bootstrap. Returns immediately — UI renders synchronously. */
   start(): void {
     log.info("starting renderer");
+
+    // Inject global Tailwind utility classes before any UI renders
+    injectGlobalTailwind();
 
     // Start the bootstrap (returns a promise, but we don't await it)
     // The UI renders synchronously in the first phase of start()

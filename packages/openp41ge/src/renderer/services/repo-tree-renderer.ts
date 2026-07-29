@@ -1,8 +1,12 @@
 /**
  * RepoTreeRenderer — pure DOM tree rendering for worktree explorer.
  *
- * Single Responsibility: turn workspace data into DOM elements.
+ * Single Responsibility: turn workspace data into DOM elements using
+ * Tailwind utility classes (injected globally from openp41ge-components).
  * No IPC, no state management, no event wiring beyond what's passed in.
+ *
+ * Colour/font tokens reference CSS custom properties set by themes.css,
+ * so dark/light mode works automatically.
  */
 
 import {
@@ -36,14 +40,14 @@ export interface TreeRowCallbacks {
 class RepoTreeRenderer {
   renderEmpty(container: HTMLElement, onCloneClick: () => void): void {
     container.innerHTML = `
-      <div style="padding:32px 16px;text-align:center;">
-        <div style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">
+      <div class="p-8 text-center">
+        <div class="text-muted text-13 mb-4">
           No repositories cloned yet
         </div>
-        <button id="wt-clone-btn" style="
-          background:var(--accent);border:none;border-radius:4px;color:#fff;
-          font-size:12px;padding:7px 20px;cursor:pointer;
-          transition:background 0.15s;
+        <button id="wt-clone-btn" class="
+          bg-accent border-none rounded text-white text-sm
+          py-[7px] px-5 cursor-pointer
+          transition-[background] duration-150 ease-linear
         ">Clone Repository</button>
       </div>
     `;
@@ -51,45 +55,45 @@ class RepoTreeRenderer {
     if (btn) {
       btn.addEventListener("click", onCloneClick);
       btn.addEventListener("mouseenter", () => (btn.style.background = "#1e5bb5"));
-      btn.addEventListener("mouseleave", () => (btn.style.background = "#2a6fd1"));
+      btn.addEventListener("mouseleave", () => (btn.style.background = ""));
     }
   }
 
   renderCloneProgress(container: HTMLElement, percent: number, message: string): void {
     container.innerHTML = `
-      <div style="padding:24px 16px;text-align:center;">
-        <div style="color:var(--text-secondary);font-size:12px;margin-bottom:8px;">Cloning repository...</div>
-        <div style="
-          width:100%;height:6px;background:var(--bg-tertiary);border-radius:3px;
-          overflow:hidden;margin-bottom:8px;
+      <div class="p-6 text-center">
+        <div class="text-secondary text-sm mb-2">Cloning repository...</div>
+        <div class="
+          w-full h-[6px] bg-bg-tertiary rounded-[3px]
+          overflow-hidden mb-2
         ">
-          <div style="
-            width:${percent}%;height:100%;background:var(--accent);
-            border-radius:3px;transition:width 0.3s ease;
-          "></div>
+          <div class="
+            h-full bg-accent rounded-[3px]
+            transition-[width] duration-300 ease-[ease]
+          " style="width:${percent}%"></div>
         </div>
-        <div style="color:var(--text-muted);font-size:10px;font-family:monospace;">${this._escapeHtml(message)}</div>
+        <div class="text-muted text-2xs font-mono">${this._escapeHtml(message)}</div>
       </div>
     `;
   }
 
   renderLoading(container: HTMLElement): void {
     container.innerHTML = `
-      <div style="padding:32px 16px;text-align:center;">
-        <div style="color:var(--text-muted);font-size:12px;">Loading...</div>
+      <div class="p-8 text-center">
+        <div class="text-muted text-sm">Loading...</div>
       </div>
     `;
   }
 
   renderError(container: HTMLElement, message: string, onRetry: () => void): void {
     container.innerHTML = `
-      <div style="padding:24px 16px;text-align:center;">
-        <div style="color:#c55;font-size:12px;margin-bottom:12px;">
+      <div class="p-6 text-center">
+        <div class="text-error text-sm mb-3">
           ${this._escapeHtml(message)}
         </div>
-        <button id="wt-retry-btn" style="
-          background:var(--bg-tertiary);border:1px solid var(--border-light);border-radius:4px;color:#ccc;
-          font-size:11px;padding:5px 14px;cursor:pointer;
+        <button id="wt-retry-btn" class="
+          bg-bg-primary border border-border-light rounded
+          text-primary text-xs py-[5px] px-[14px] cursor-pointer
         ">Retry</button>
       </div>
     `;
@@ -112,70 +116,40 @@ class RepoTreeRenderer {
     const row = document.createElement("div");
     row.dataset.branch = branch;
     row.dataset.path = branch;
-    row.style.cssText = `
-      display:flex;flex-direction:column;
-    `;
+    row.className = "flex flex-col";
 
     // Worktree header
     const header = document.createElement("div");
-    header.style.cssText = `
-      display:flex;align-items:center;height:28px;
-      padding-left:${8 + depth * 16}px;padding-right:8px;
-      cursor:pointer;user-select:none;font-size:13px;
-      transition:background 0.1s;
-      background:rgba(42,111,209,0.08);
-      border-bottom:1px solid var(--border-divider);
+    header.className = `
+      flex items-center h-row px-2 cursor-pointer select-none text-13
+      bg-[rgba(42,111,209,0.08)] border-b border-divider
+      transition-[background] duration-100
     `;
     if (selectedPath === branch) {
-      header.style.background = "rgba(74,158,255,0.12)";
+      header.classList.add("bg-[rgba(74,158,255,0.12)]");
     }
 
     // Chevron
     const chevron = document.createElement("span");
     chevron.innerHTML = expanded ? chevronDown(10) : chevronRight(10);
-    chevron.style.cssText =
-      "width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+    chevron.className = "w-4 flex items-center justify-center shrink-0";
     header.appendChild(chevron);
 
-    // Branch icon (always the same, no open/closed variant)
+    // Branch icon
     const icon = document.createElement("span");
     icon.innerHTML = gitBranchIcon(12);
-    icon.style.cssText =
-      "width:16px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+    icon.className = "w-4 h-row flex items-center justify-center shrink-0";
     header.appendChild(icon);
 
     // Branch name
     const label = document.createElement("span");
     label.textContent = branch;
-    label.style.cssText =
-      "margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd;flex:1;";
+    label.className = "ml-1 overflow-hidden text-ellipsis whitespace-nowrap text-primary flex-1";
     header.appendChild(label);
 
     // Visibility toggle button (edit mode)
     if (onVisibilityToggle !== undefined && visible !== undefined) {
-      const visBtn = document.createElement("span");
-      visBtn.innerHTML = visible ? eyeIcon(13) : eyeOffIcon(13);
-      visBtn.style.cssText = `
-        width:22px;height:22px;display:flex;
-        align-items:center;justify-content:center;
-        cursor:pointer;border-radius:3px;
-        color:${visible ? "#4a9eff" : "#555"};font-size:12px;flex-shrink:0;
-        margin-left:auto;margin-right:4px;
-        transition:color 0.1s,background 0.1s;
-      `;
-      visBtn.title = visible ? "Click to hide worktree" : "Click to show worktree";
-      visBtn.addEventListener("mouseenter", () => {
-        visBtn.style.background = "rgba(255,255,255,0.08)";
-        visBtn.style.color = visible ? "#5aafff" : "#888";
-      });
-      visBtn.addEventListener("mouseleave", () => {
-        visBtn.style.background = "transparent";
-        visBtn.style.color = visible ? "#4a9eff" : "#555";
-      });
-      visBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onVisibilityToggle();
-      });
+      const visBtn = this._createVisToggle(visible, () => onVisibilityToggle());
       header.appendChild(visBtn);
     }
 
@@ -199,7 +173,7 @@ class RepoTreeRenderer {
 
     // Hover
     header.addEventListener("mouseenter", () => {
-      if (!header.style.background.includes("rgba(74,158,255")) {
+      if (!header.classList.contains("bg-[rgba(74,158,255,0.12)]")) {
         header.style.background = "#252525";
       }
     });
@@ -221,10 +195,7 @@ class RepoTreeRenderer {
 
       if (files.length === 0) {
         const empty = document.createElement("div");
-        empty.style.cssText = `
-          padding:8px 8px 8px ${8 + (depth + 1) * 16}px;
-          color:#444;font-size:11px;font-style:italic;
-        `;
+        empty.className = `text-muted text-xs italic pl-[${8 + (depth + 1) * 16}px] pr-2 py-2`;
         empty.textContent = "No files";
         filesContainer.appendChild(empty);
       } else {
@@ -247,6 +218,34 @@ class RepoTreeRenderer {
     return this._createFileRow(file, depth, selectedPath, callbacks);
   }
 
+  private _createVisToggle(
+    visible: boolean,
+    onToggle: () => void,
+  ): HTMLElement {
+    const visBtn = document.createElement("span");
+    visBtn.innerHTML = visible ? eyeIcon(13) : eyeOffIcon(13);
+    visBtn.className = `
+      w-[22px] h-[22px] flex items-center justify-center
+      cursor-pointer rounded shrink-0 ml-auto mr-1
+      text-sm transition-[color,background] duration-100
+    `;
+    visBtn.style.color = visible ? "#4a9eff" : "#555";
+    visBtn.title = visible ? "Click to hide worktree" : "Click to show worktree";
+    visBtn.addEventListener("mouseenter", () => {
+      visBtn.style.background = "rgba(255,255,255,0.08)";
+      visBtn.style.color = visible ? "#5aafff" : "#888";
+    });
+    visBtn.addEventListener("mouseleave", () => {
+      visBtn.style.background = "transparent";
+      visBtn.style.color = visible ? "#4a9eff" : "#555";
+    });
+    visBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onToggle();
+    });
+    return visBtn;
+  }
+
   private _createFileRow(
     file: FileEntry,
     depth: number,
@@ -255,54 +254,39 @@ class RepoTreeRenderer {
   ): HTMLElement {
     const row = document.createElement("div");
     row.dataset.path = file.path;
+    row.dataset.type = file.isDirectory ? "folder" : "file";
 
-    if (file.isDirectory) {
-      row.dataset.type = "folder";
-    } else {
-      row.dataset.type = "file";
-    }
-
-    row.style.cssText = `
-      display:flex;align-items:center;height:26px;
-      padding-left:${8 + depth * 16}px;padding-right:8px;
-      cursor:pointer;user-select:none;font-size:12px;
-      transition:background 0.1s;
-    `;
-
+    row.className = `flex items-center h-[26px] pl-[${8 + depth * 16}px] pr-2 cursor-pointer select-none text-sm transition-[background] duration-100`;
     if (selectedPath === file.path) {
-      row.style.background = "rgba(74,158,255,0.12)";
+      row.classList.add("bg-[rgba(74,158,255,0.12)]");
     }
 
     // Icon
     if (file.isDirectory) {
-      // Folder — show chevron + folder icon
       const chevron = document.createElement("span");
       chevron.innerHTML = chevronRight(10);
-      chevron.style.cssText =
-        "width:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+      chevron.className = "w-[14px] flex items-center justify-center shrink-0";
       row.appendChild(chevron);
 
       const icon = document.createElement("span");
       icon.innerHTML = folderClosedIcon(12);
-      icon.style.cssText =
-        "width:16px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+      icon.className = "w-4 h-[26px] flex items-center justify-center shrink-0";
       row.appendChild(icon);
     } else {
       const spacer = document.createElement("span");
-      spacer.style.cssText = "width:14px;flex-shrink:0;";
+      spacer.className = "w-[14px] shrink-0";
       row.appendChild(spacer);
 
       const icon = document.createElement("span");
       icon.innerHTML = fileIcon(12);
-      icon.style.cssText =
-        "width:16px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+      icon.className = "w-4 h-[26px] flex items-center justify-center shrink-0";
       row.appendChild(icon);
     }
 
     const label = document.createElement("span");
     label.textContent = file.name;
-    label.style.cssText =
-      "margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#aaa;flex:1;";
+    label.className =
+      "ml-1 overflow-hidden text-ellipsis whitespace-nowrap text-secondary flex-1";
     row.appendChild(label);
 
     // Events
@@ -351,67 +335,39 @@ class RepoTreeRenderer {
     onVisibilityToggle?: () => void,
   ): HTMLElement {
     const header = document.createElement("div");
-    header.style.cssText = `
-      display:flex;align-items:center;height:30px;
-      padding-left:8px;padding-right:8px;
-      cursor:pointer;user-select:none;font-size:12px;font-weight:600;
-      background:var(--bg-primary);border-bottom:1px solid var(--border-divider);
-      transition:background 0.1s;
+    header.className = `
+      flex items-center h-[30px] px-2 cursor-pointer select-none
+      text-sm font-semibold bg-bg-primary border-b border-divider
+      transition-[background] duration-100
     `;
 
     // Chevron
     const chevron = document.createElement("span");
     chevron.innerHTML = expanded ? chevronDown(10) : chevronRight(10);
-    chevron.style.cssText =
-      "width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+    chevron.className = "w-4 flex items-center justify-center shrink-0";
     header.appendChild(chevron);
 
     // Label
     const label = document.createElement("span");
     label.textContent = this._formatRepoLabel(name, url);
-    label.style.cssText =
-      "margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ccc;flex:1;";
+    label.className = "ml-1.5 overflow-hidden text-ellipsis whitespace-nowrap text-primary flex-1";
     header.appendChild(label);
 
     // Visibility toggle button (edit mode)
     if (onVisibilityToggle !== undefined && visible !== undefined) {
-      const visBtn = document.createElement("span");
-      visBtn.innerHTML = visible ? eyeIcon(13) : eyeOffIcon(13);
-      visBtn.style.cssText = `
-        width:22px;height:22px;display:flex;
-        align-items:center;justify-content:center;
-        cursor:pointer;border-radius:3px;
-        color:${visible ? "#4a9eff" : "#555"};font-size:12px;flex-shrink:0;
-        margin-left:auto;margin-right:4px;
-        transition:color 0.1s,background 0.1s;
-      `;
-      visBtn.title = visible ? "Click to hide" : "Click to show";
-      visBtn.addEventListener("mouseenter", () => {
-        visBtn.style.background = "rgba(255,255,255,0.08)";
-        visBtn.style.color = visible ? "#5aafff" : "#888";
-      });
-      visBtn.addEventListener("mouseleave", () => {
-        visBtn.style.background = "transparent";
-        visBtn.style.color = visible ? "#4a9eff" : "#555";
-      });
-      visBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onVisibilityToggle();
-      });
+      const visBtn = this._createVisToggle(visible, () => onVisibilityToggle());
       header.appendChild(visBtn);
     } else {
       // Git info button (only show when not in edit mode)
       if (onGitInfo) {
         const gitBtn = document.createElement("span");
         gitBtn.innerHTML = gitInfoIcon(13);
-        gitBtn.style.cssText = `
-          width:22px;height:22px;display:flex;
-          align-items:center;justify-content:center;
-          cursor:pointer;border-radius:3px;
-          color:var(--text-muted);font-size:12px;flex-shrink:0;
-          margin-left:auto;margin-right:2px;
-          transition:color 0.1s,background 0.1s;
+        gitBtn.className = `
+          w-[22px] h-[22px] flex items-center justify-center
+          cursor-pointer rounded shrink-0 ml-auto mr-0.5
+          text-sm transition-[color,background] duration-100
         `;
+        gitBtn.style.color = "#555";
         gitBtn.title = "Git info";
         gitBtn.addEventListener("mouseenter", () => {
           gitBtn.style.background = "rgba(255,255,255,0.08)";
@@ -443,7 +399,7 @@ class RepoTreeRenderer {
       header.style.background = "#252525";
     });
     header.addEventListener("mouseleave", () => {
-      header.style.background = "#1e1e1e";
+      header.style.background = "";
     });
 
     return header;
@@ -451,13 +407,11 @@ class RepoTreeRenderer {
 
   /** Format a short label from repo name and URL. */
   private _formatRepoLabel(name: string, _url: string): string {
-    // Just use the name (e.g. "org/repo"); URL shown on hover or in sub-label
     return name;
   }
 
   /**
    * Render a full repo section: header followed by children (worktrees + add-row).
-   * Children are pre-built by the caller.
    */
   renderRepoSection(
     container: HTMLElement,
@@ -483,40 +437,35 @@ class RepoTreeRenderer {
 
     if (repoExpanded) {
       const childWrapper = document.createElement("div");
-      childWrapper.style.cssText = "display:flex;flex-direction:column;";
+      childWrapper.className = "flex flex-col";
       for (const child of children) {
         childWrapper.appendChild(child);
       }
 
-      // "+ Add worktree" row (structure matches worktree rows at depth 1)
+      // "+ Add worktree" row
       if (repo.name) {
         const addRow = document.createElement("div");
-        addRow.style.cssText = `
-          display:flex;align-items:center;height:28px;
-          padding-left:${8 + 1 * 16}px;padding-right:8px;
-          cursor:pointer;user-select:none;font-size:12px;
-          color:var(--text-muted);transition:color 0.1s,background 0.1s;
-          border-bottom:1px solid var(--border-divider);
+        addRow.className = `
+          flex items-center h-row pl-[24px] pr-2 cursor-pointer select-none
+          text-sm text-muted border-b border-divider
+          transition-[color,background] duration-100
         `;
 
         // Chevron spacer (matches worktree rows)
         const chevronSpacer = document.createElement("span");
-        chevronSpacer.style.cssText =
-          "width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+        chevronSpacer.className = "w-4 flex items-center justify-center shrink-0";
         addRow.appendChild(chevronSpacer);
 
         // Plus icon
         const icon = document.createElement("span");
         icon.innerHTML = plusIcon(12);
-        icon.style.cssText =
-          "width:16px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+        icon.className = "w-4 h-row flex items-center justify-center shrink-0";
         addRow.appendChild(icon);
 
         // Label
         const label = document.createElement("span");
         label.textContent = "add worktree";
-        label.style.cssText =
-          "margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);flex:1;";
+        label.className = "ml-1 overflow-hidden text-ellipsis whitespace-nowrap text-muted flex-1";
         addRow.appendChild(label);
 
         addRow.addEventListener("mouseenter", () => {
@@ -525,7 +474,7 @@ class RepoTreeRenderer {
         });
         addRow.addEventListener("mouseleave", () => {
           addRow.style.background = "transparent";
-          label.style.color = "#666";
+          label.style.color = "";
         });
         addRow.addEventListener("click", () => onAddWorktree());
         childWrapper.appendChild(addRow);

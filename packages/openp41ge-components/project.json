@@ -29,13 +29,6 @@
       ],
       "cache": true
     },
-    "storybook": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "tailwindcss -i src/styles.css -o dist/styles.css && node scripts/inline-css.mjs && pnpm exec storybook dev -p 6006",
-        "cwd": "{projectRoot}"
-      }
-    },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
