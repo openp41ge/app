@@ -11,7 +11,7 @@
 
 import { RenderedLinesCollection } from "./view-layer";
 import { ViewLine } from "../rendering/view-line";
-import type { IToken } from "../tokenization/line-tokens";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 import { createFastDomNode, FastDomNode } from "./fast-dom-node";
 import { computeWrapSegments } from "./word-wrap-helper";
 import { TokenSegmentAdjuster } from "./token-segment-adjuster";

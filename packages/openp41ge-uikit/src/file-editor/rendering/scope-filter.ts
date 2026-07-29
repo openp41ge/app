@@ -5,7 +5,7 @@
  * excluded from bracket colorization based on its scope.
  */
 
-import type { IToken } from "../tokenization/line-tokens";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 
 /**
  * Filters positions that should be skipped (e.g., inside strings/comments).

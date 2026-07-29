@@ -9,14 +9,13 @@
  * (or the line length for the last token).
  */
 
-import type { StateStack } from "vscode-textmate";
 import { EncodedTokenAttributes } from "./encoded-token-attributes";
 
 /**
  * Token types that map to CSS classes for syntax highlighting.
  * Mirrors vscode-textmate's StandardTokenType.
  */
-export enum StandardTokenType {
+export const enum StandardTokenType {
   Other = 0,
   Comment = 1,
   String = 2,
@@ -26,7 +25,7 @@ export enum StandardTokenType {
 /**
  * Font style flags.
  */
-export enum FontStyle {
+export const enum FontStyle {
   NotSet = -1,
   None = 0,
   Italic = 1,
@@ -67,8 +66,7 @@ export interface IToken {
  */
 export interface ITokenizeLineResult {
   readonly tokens: IToken[];
-  /** StateStack from vscode-textmate for continuations across lines. */
-  readonly ruleStack: StateStack | null;
+  readonly ruleStack: unknown; // StateStack from vscode-textmate
 }
 
 /**

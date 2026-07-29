@@ -14,7 +14,7 @@
  * ```
  */
 
-import type { IToken } from "../tokenization/line-tokens";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 
 /**
  * Interface for adjusting token offsets to a substring segment.

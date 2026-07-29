@@ -15,8 +15,8 @@
  *     corresponding input text offset
  */
 
-import type { IToken } from "../tokenization/line-tokens";
-import { StandardTokenType } from "../tokenization/line-tokens";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
+import { StandardTokenType } from "openp41ge-syntax-highlighting/line-tokens";
 import { StringBuilder } from "../view/string-builder";
 
 /**

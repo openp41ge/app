@@ -42,8 +42,8 @@ import { IndentationGuides } from "../../file-editor/rendering/indentation-guide
 import { findMatchingBracket } from "../../file-editor/rendering/bracket-matching";
 import { BracketPairService } from "../../file-editor/rendering/bracket-pair-service";
 import type { BracketLineInput } from "../../file-editor/rendering/bracket-pair-service";
-import { initTextMate } from "../../file-editor/tokenization/textmate-init";
-import { TokenRegistry } from "../../file-editor/tokenization/token-registry";
+import { initTextMate } from "openp41ge-syntax-highlighting/textmate-init";
+import { TokenRegistry } from "openp41ge-syntax-highlighting/token-registry";
 
 // ── Global TokenRegistry singleton ──
 // Declared at module top level to avoid temporal dead zone (TDZ) issues
@@ -51,7 +51,7 @@ import { TokenRegistry } from "../../file-editor/tokenization/token-registry";
 let _tokenRegistryInstance: TokenRegistry | null = null;
 import { getThemeById, generateThemeCSS, generateGlobalEditorCSS } from "../../file-editor/themes";
 import type { SyntaxTheme } from "../../file-editor/themes";
-import type { IToken } from "../../file-editor/tokenization/line-tokens";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 import { ClipboardHandler } from "../../file-editor/input/clipboard-handler";
 import { CompositionHandler } from "../../file-editor/input/composition-handler";
 import { MouseHandler } from "../../file-editor/input/mouse-handler";

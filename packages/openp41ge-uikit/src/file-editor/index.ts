@@ -75,14 +75,14 @@ export {
   FontStyle,
   initTextMate,
   resetTextMateInit,
-} from "./tokenization";
+} from "openp41ge-syntax-highlighting";
 export type {
   ITokenizer,
   LanguageDefinition,
   TokenizationConfig,
   IToken,
   ITokenizeLineResult,
-} from "./tokenization";
+} from "openp41ge-syntax-highlighting";
 
 // View
 export {

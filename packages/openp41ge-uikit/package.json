@@ -16,10 +16,6 @@
       "types": "./dist/tabs/index.d.ts",
       "import": "./dist/tabs/index.js"
     },
-    "./syntax-highlighting": {
-      "types": "./dist/syntax-highlighting/index.d.ts",
-      "import": "./dist/syntax-highlighting/index.js"
-    },
     "./file-editor": {
       "types": "./dist/file-editor/index.d.ts",
       "import": "./dist/file-editor/index.js"
@@ -43,9 +39,8 @@
   },
   "dependencies": {
     "lit": "^3.2.0",
-    "vscode-oniguruma": "^2.0.1",
-    "vscode-textmate": "^9.3.2",
-    "openp41ge-piece-tree": "workspace:*"
+    "openp41ge-piece-tree": "workspace:*",
+    "openp41ge-syntax-highlighting": "workspace:*"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",

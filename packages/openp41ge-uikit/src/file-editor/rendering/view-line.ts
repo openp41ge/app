@@ -10,7 +10,7 @@
 import type { FastDomNode } from "../view/fast-dom-node";
 import { createFastDomNode } from "../view/fast-dom-node";
 import { renderViewLine, type RenderLineOutput } from "./view-line-renderer";
-import type { IToken } from "../tokenization/line-tokens";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 
 /**
  * A single rendered view line.

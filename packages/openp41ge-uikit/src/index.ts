@@ -42,34 +42,6 @@ export {
 } from "./tabs/boundary";
 export type { GridPosition } from "./tabs/boundary";
 
-// ─── Syntax Highlighting (merged from openp41ge-syntax-highlighting) ─────
-export {
-  LazyTokenizationManager,
-  TextMateTokenizer,
-  pickBestScope,
-  decodeTokens,
-  StandardTokenType,
-  FontStyle,
-  ContiguousTokensStore,
-  initTextMate,
-  resetTextMateInit,
-  EncodedTokenAttributes,
-  TokenRegistry,
-  BUILTIN_LANGUAGES,
-} from "./syntax-highlighting/tokenization";
-export type {
-  ITokenizer,
-  StateStack,
-  IToken,
-  ITokenizeLineResult,
-  TokenizationConfig,
-  LanguageDefinition,
-} from "./syntax-highlighting/tokenization";
-export type { ISyntaxHighlighter, IGrammar, IGrammarRegistry } from "./syntax-highlighting/interfaces";
-export { SyntaxHighlighter, highlightCode, escapeHtml } from "./syntax-highlighting/services/syntax-highlighter";
-export type { HighlightResult } from "./syntax-highlighting/services/syntax-highlighter";
-export { renderTokensToHtml } from "./syntax-highlighting/services/token-html-renderer";
-
 // ─── Git Repository Browser (merged from openp41ge-git-repository) ────────
 export { FileEditorElement } from "./components/file-editor/file-editor";
 export type { FileEditorState } from "./components/file-editor/file-editor";

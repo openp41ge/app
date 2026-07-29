@@ -20,7 +20,7 @@ export interface BracketLineInput {
   readonly tokens: IToken[] | null;
 }
 
-import type { IToken } from "../tokenization/line-tokens";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 
 // ── Stack entry for matching ────────────────────────────────────────────
 

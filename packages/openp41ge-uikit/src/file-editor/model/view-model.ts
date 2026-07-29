@@ -15,9 +15,9 @@ import type { PieceTreeTextContentModel } from "./piece-tree-text-content-model"
 import type { TextContentChangeEvent } from "./piece-tree-text-content-model";
 import { CoordinatesConverter } from "./coordinates-converter";
 import { Emitter } from "./event-emitter";
-import { LazyTokenizationManager } from "../tokenization/lazy-tokenization-manager";
-import type { ITokenizer } from "../tokenization/tokenizer";
-import type { IToken } from "../tokenization/line-tokens";
+import { LazyTokenizationManager } from "openp41ge-syntax-highlighting/lazy-tokenization-manager";
+import type { ITokenizer } from "openp41ge-syntax-highlighting/tokenizer";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 
 /**
  * Events emitted by the ViewModel.
