@@ -1,24 +1,15 @@
 /**
  * TabGrid stories — demonstrates the <tab-grid> component with
  * multi-grid drag-and-drop, file explorer, and event logging.
- *
- * Wires TabGrid, DragOrchestrator, TabDragSource, and GhostManager
- * to simulate a VS Code-style editor tab environment.
  */
 
 import { html, LitElement, type TemplateResult } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Meta, StoryObj } from "@storybook/web-components";
 import "openp41ge-uikit";
 import {
-  DragOrchestrator,
   TabDragSource,
-  GhostManager,
-  type IDragSource,
-  type DragResult,
-  type TargetFeedback,
-  type GhostFactory,
 } from "openp41ge-uikit";
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -31,11 +22,73 @@ interface TabData {
 }
 
 class GridState {
+  winId: string;
   lastFocusedCol = 0;
-  tabs: TabData[];
+  cols = 1;
+  tabs: Record<string, { title: string; content: string; pinned?: boolean }> = {};
+  activeTabIds: Record<string, string> = {};
+  placements: Array<{ position: { row: number; col: number }; tabIds: string[] }> = [];
 
-  constructor(initialTabs: TabData[]) {
-    this.tabs = initialTabs;
+  constructor(winId: string, initialTabs: TabData[]) {
+    this.winId = winId;
+    const tabIds: string[] = [];
+    for (const tab of initialTabs) {
+      this.tabs[tab.id] = { title: tab.title, content: tab.content, pinned: tab.pinned ?? true };
+      tabIds.push(tab.id);
+    }
+    this.placements.push({ position: { row: 0, col: 0 }, tabIds });
+    if (tabIds.length > 0) this.activeTabIds["0"] = tabIds[0];
+  }
+
+  applyTo(gridEl: any): void {
+    gridEl.winId = this.winId;
+    gridEl.cols = this.cols;
+    gridEl.tabData = { ...this.tabs };
+    gridEl.activeTabIds = { ...this.activeTabIds };
+    gridEl.placements = this.placements.map((p) => ({
+      position: { ...p.position },
+      tabIds: [...p.tabIds],
+    }));
+  }
+
+  addTab(col: number, title: string, content: string): TabData {
+    const id = "tab-" + Date.now() + Math.random().toString(36).slice(2, 6);
+    const tab: TabData = { id, title, content, pinned: false };
+    this.tabs[tab.id] = { title: tab.title, content: tab.content, pinned: tab.pinned };
+    const colKey = String(col);
+    const placement = this.placements.find((p) => String(p.position.col) === colKey);
+    if (placement) {
+      placement.tabIds.push(tab.id);
+    } else {
+      this.placements.push({ position: { row: 0, col }, tabIds: [tab.id] });
+      this.cols = Math.max(this.cols, col + 1);
+    }
+    this.activeTabIds[colKey] = tab.id;
+    return tab;
+  }
+
+  setActive(col: number, tabId: string): void {
+    this.activeTabIds[String(col)] = tabId;
+  }
+
+  removeTab(tabId: string): void {
+    delete this.tabs[tabId];
+    for (const p of this.placements) {
+      const idx = p.tabIds.indexOf(tabId);
+      if (idx !== -1) p.tabIds.splice(idx, 1);
+    }
+    this.placements = this.placements.filter((p) => p.tabIds.length > 0);
+    // Clean up orphaned activeTabIds
+    for (const col of Object.keys(this.activeTabIds)) {
+      if (!this.tabs[this.activeTabIds[col]]) {
+        const placement = this.placements.find((p) => String(p.position.col) === col);
+        if (placement && placement.tabIds.length > 0) {
+          this.activeTabIds[col] = placement.tabIds[0];
+        } else {
+          delete this.activeTabIds[col];
+        }
+      }
+    }
   }
 }
 
@@ -61,15 +114,6 @@ function createTab(title: string, content: string, pinned = true): TabData {
   return { id: "tab-" + nextTabId++, title, content, pinned };
 }
 
-const INITIAL_EDITOR_TABS: TabData[] = [
-  createTab("app.ts", "export function App() { return <div>Hello</div>; }"),
-  createTab("utils.ts", 'export const PI = 3.14159;\n\nexport function clamp(v: number, min: number, max: number): number {\n  return Math.max(min, Math.min(max, v));\n}'),
-];
-
-const INITIAL_SIDE_TABS: TabData[] = [
-  createTab("README.md", "# Project\n\n## Getting Started\n\nRun `npm install` then `npm start`."),
-];
-
 // ─── Story component ─────────────────────────────────────────────────
 
 @customElement("tabs-demo-app")
@@ -81,43 +125,40 @@ class TabsDemoApp extends LitElement {
     return this;
   }
 
-  editorGridState = new GridState(INITIAL_EDITOR_TABS.map((t) => ({ ...t })));
-  sideGridState = new GridState(INITIAL_SIDE_TABS.map((t) => ({ ...t })));
+  private _editorState = new GridState(
+    "editor",
+    [
+      createTab(
+        "README.md",
+        '<div class="content-placeholder"><h3>README.md</h3><p>Welcome! Drag tabs to edges to create new columns, or drag to side panels.</p></div>',
+      ),
+      createTab(
+        "index.js",
+        '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const grid = document.querySelector("tab-grid");</pre></div>',
+      ),
+    ],
+  );
 
-  private _editorGrid!: HTMLElement & { setTabs?: (tabs: TabData[]) => void; setFocusedCol?: (col: number) => void };
-  private _sideGrid!: HTMLElement & { setTabs?: (tabs: TabData[]) => void; setFocusedCol?: (col: number) => void };
+  private _sideState = new GridState("side-a", [
+    createTab(
+      "Terminal",
+      '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>',
+    ),
+  ]);
+
   private _logEl!: HTMLElement;
-  private _orchestrator!: DragOrchestrator;
   private _logCount = 0;
 
-  private _ghostFactory: GhostFactory = (tabId, rect) => {
-    const ghost = document.createElement("div");
-    ghost.textContent = tabId;
-    ghost.style.cssText = `
-      position: fixed; left: ${rect.left}px; top: ${rect.top}px;
-      width: ${rect.width}px; height: ${rect.height}px;
-      background: rgba(74, 158, 255, 0.2); border: 1px solid rgba(74, 158, 255, 0.5);
-      border-radius: 4px; pointer-events: none; z-index: 9999;
-      display: flex; align-items: center; padding: 0 8px;
-      font-size: 12px; color: #ccc;
-    `;
-    document.body.appendChild(ghost);
-    return ghost;
-  };
+  @query("#editor-grid")
+  private _editorGrid!: any;
+
+  @query("#side-grid-a")
+  private _sideGrid!: any;
 
   override firstUpdated(): void {
-    this._editorGrid = this.querySelector("#editor-grid") as any;
-    this._sideGrid = this.querySelector("#side-grid-a") as any;
     this._logEl = this.querySelector("#log") as HTMLElement;
 
-    this._editorGrid.setTabs?.(this.editorGridState.tabs);
-    this._sideGrid.setTabs?.(this.sideGridState.tabs);
-
-    this._wireGrid(this._editorGrid, this.editorGridState, "editor");
-    this._wireGrid(this._sideGrid, this.sideGridState, "side-a");
-
-    this._editorGrid.setFocusedCol?.(0);
-    this._sideGrid.setFocusedCol?.(0);
+    this._renderAll();
 
     // File explorer drag sources
     this.querySelectorAll(".file-card").forEach((card) => {
@@ -134,48 +175,68 @@ class TabsDemoApp extends LitElement {
       btn.addEventListener("click", () => {
         const winId = (btn as HTMLElement).dataset.winId || "editor";
         const col = parseInt((btn as HTMLElement).dataset.col || "0", 10);
-        const state = winId === "editor" ? this.editorGridState : this.sideGridState;
-        const grid = winId === "editor" ? this._editorGrid : this._sideGrid;
-        const newTab = createTab("untitled-" + state.tabs.length, "// new file");
-        state.tabs.push(newTab);
-        grid.setTabs?.(state.tabs);
-        this._log("Added tab: " + newTab.title);
+        const state = winId === "editor" ? this._editorState : this._sideState;
+        const tab = state.addTab(
+          col,
+          "New Tab",
+          '<div class="content-placeholder"><h3>New Tab</h3><p>Added from + button.</p></div>',
+        );
+        this._renderAll();
+        this._log(`Added tab "${tab.id}" to ${winId}`);
       });
     });
 
     // Reset button
     this.querySelector("#btn-reset")?.addEventListener("click", () => {
-      this.editorGridState = new GridState(INITIAL_EDITOR_TABS.map((t) => ({ ...t })));
-      this.sideGridState = new GridState(INITIAL_SIDE_TABS.map((t) => ({ ...t })));
-      this._editorGrid.setTabs?.(this.editorGridState.tabs);
-      this._sideGrid.setTabs?.(this.sideGridState.tabs);
-      while (this._logEl?.firstChild) this._logEl.removeChild(this._logEl.firstChild);
+      this._editorState = new GridState("editor", [
+        createTab(
+          "README.md",
+          '<div class="content-placeholder"><h3>README.md</h3><p>Welcome! Drag tabs to edges to create new columns, or drag to side panels.</p></div>',
+        ),
+        createTab(
+          "index.js",
+          '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const grid = document.querySelector("tab-grid");</pre></div>',
+        ),
+      ]);
+      this._sideState = new GridState("side-a", [
+        createTab(
+          "Terminal",
+          '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>',
+        ),
+      ]);
+      this._renderAll();
+      this._logEl.innerHTML = "";
       this._logCount = 0;
       this._log("Demo reset");
     });
 
     // Clear log button
     this.querySelector("#btn-clear-log")?.addEventListener("click", () => {
-      while (this._logEl?.firstChild) this._logEl.removeChild(this._logEl.firstChild);
+      this._logEl.innerHTML = "";
       this._logCount = 0;
+    });
+
+    // Tab close — listen on document for bubbling events
+    document.addEventListener("click", (e: Event) => {
+      const closeBtn = (e.target as HTMLElement).closest(".tab-close");
+      if (closeBtn) {
+        const tabBar = closeBtn.closest("tab-bar");
+        if (!tabBar) return;
+        const tabId = closeBtn.getAttribute("data-close-tab-id");
+        if (!tabId) return;
+        const winId = tabBar.getAttribute("data-win-id") || tabBar.winId;
+        const state = winId === "editor" ? this._editorState : this._sideState;
+        if (!state) return;
+        state.removeTab(tabId);
+        this._renderAll();
+        this._log(`Closed tab "${tabId}" from ${winId}`);
+      }
     });
   }
 
-  private _wireGrid(gridEl: any, state: GridState, winId: string): void {
-    // Listen for tab events
-    gridEl.addEventListener("tab-drag-start", (e: any) => {
-      this._log(`Drag start: ${e.detail.tabId || e.detail.tab?.title}`);
-    });
-    gridEl.addEventListener("tab-drag-end", (e: any) => {
-      this._log(`Drag end`);
-    });
-
-    // Proxy setTabs to GridState
-    const origSetTabs = gridEl.setTabs?.bind(gridEl);
-    gridEl.setTabs = (tabs: TabData[]) => {
-      state.tabs = tabs;
-      origSetTabs?.(tabs);
-    };
+  private _renderAll(): void {
+    this._editorState.applyTo(this._editorGrid);
+    this._sideState.applyTo(this._sideGrid);
   }
 
   private _log(msg: string): void {
@@ -191,118 +252,26 @@ class TabsDemoApp extends LitElement {
   override render(): TemplateResult {
     return html`
       <style>
-        .tabs-demo {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          background: #1e1e1e;
-          color: #ccc;
-          padding: 16px;
-          min-height: 100vh;
-        }
-        .tabs-demo h1 {
-          font-size: 18px;
-          margin: 0 0 4px;
-          color: #fff;
-        }
+        .tabs-demo { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #ccc; padding: 16px; min-height: 100vh; }
+        .tabs-demo h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
         .tabs-demo h1 span { color: rgb(74, 158, 255); }
-        .tabs-demo p {
-          margin: 0 0 16px;
-          font-size: 12px;
-          color: #888;
-        }
-        .grid-row {
-          display: flex;
-          gap: 12px;
-          margin-bottom: 16px;
-        }
-        .editor-wrapper {
-          flex: 1;
-          min-height: 250px;
-          display: flex;
-          flex-direction: column;
-        }
-        .side-grid {
-          width: 300px;
-          min-height: 250px;
-          display: flex;
-          flex-direction: column;
-        }
-        .demo-section {
-          margin-bottom: 16px;
-        }
-        .demo-section h2 {
-          font-size: 13px;
-          margin: 0 0 8px;
-          color: #aaa;
-        }
-        .demo-section h2 small {
-          font-weight: normal;
-          font-size: 11px;
-          color: #666;
-          margin-left: 8px;
-        }
-        .file-explorer {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .file-card {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 10px;
-          background: #2a2a2a;
-          border: 1px solid #3a3a3a;
-          border-radius: 4px;
-          cursor: grab;
-          font-size: 12px;
-          color: #ccc;
-          user-select: none;
-        }
+        .tabs-demo p { margin: 0 0 16px; font-size: 12px; color: #888; }
+        .grid-row { display: flex; gap: 12px; margin-bottom: 16px; }
+        .editor-wrapper { flex: 1; min-height: 250px; display: flex; flex-direction: column; }
+        .side-grid { width: 300px; min-height: 250px; display: flex; flex-direction: column; }
+        .demo-section { margin-bottom: 16px; }
+        .demo-section h2 { font-size: 13px; margin: 0 0 8px; color: #aaa; }
+        .demo-section h2 small { font-weight: normal; font-size: 11px; color: #666; margin-left: 8px; }
+        .file-explorer { display: flex; gap: 8px; flex-wrap: wrap; }
+        .file-card { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 4px; cursor: grab; font-size: 12px; color: #ccc; user-select: none; }
         .file-card:hover { border-color: #4a9eff; }
         .file-card .file-icon { flex-shrink: 0; }
-        .event-log {
-          margin-bottom: 16px;
-        }
-        .log-controls {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 8px;
-        }
-        .log-controls button {
-          padding: 4px 12px;
-          background: #2a2a2a;
-          border: 1px solid #3a3a3a;
-          border-radius: 4px;
-          color: #ccc;
-          cursor: pointer;
-          font-size: 11px;
-        }
+        .event-log { margin-bottom: 16px; }
+        .log-controls { display: flex; gap: 8px; margin-bottom: 8px; }
+        .log-controls button { padding: 4px 12px; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 11px; }
         .log-controls button:hover { border-color: #4a9eff; }
-        #log {
-          background: #252525;
-          border: 1px solid #333;
-          border-radius: 4px;
-          padding: 8px;
-          max-height: 200px;
-          overflow-y: auto;
-          font-family: monospace;
-          font-size: 11px;
-        }
-        .demo-add-tab-btn {
-          background: rgba(74, 158, 255, 0.15);
-          color: rgb(74, 158, 255);
-          border: 1px solid rgba(74, 158, 255, 0.3);
-          border-radius: 4px;
-          width: 24px;
-          height: 24px;
-          font-size: 14px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          margin: 4px;
-        }
+        #log { background: #252525; border: 1px solid #333; border-radius: 4px; padding: 8px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 11px; }
+        .demo-add-tab-btn { background: rgba(74, 158, 255, 0.15); color: rgb(74, 158, 255); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 4px; width: 24px; height: 24px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 4px; }
         .demo-add-tab-btn:hover { background: rgba(74, 158, 255, 0.3); }
         tab-grid { flex: 1; }
       </style>
@@ -323,7 +292,7 @@ class TabsDemoApp extends LitElement {
         </div>
 
         <div class="demo-section">
-          <h2>File Explorer <small>drag files onto the editor grid or click to open</small></h2>
+          <h2>File Explorer <small>drag files onto the editor grid</small></h2>
           <div class="file-explorer">
             <div class="file-card" draggable="true" data-filepath="src/app.ts">
               <span class="file-icon">${unsafeHTML(fileIcon("app.ts"))}</span>
@@ -332,10 +301,6 @@ class TabsDemoApp extends LitElement {
             <div class="file-card" draggable="true" data-filepath="src/utils.ts">
               <span class="file-icon">${unsafeHTML(fileIcon("utils.ts"))}</span>
               <span class="file-name">utils.ts</span>
-            </div>
-            <div class="file-card" draggable="true" data-filepath="src/components/header.tsx">
-              <span class="file-icon">${unsafeHTML(fileIcon("header.tsx"))}</span>
-              <span class="file-name">header.tsx</span>
             </div>
             <div class="file-card" draggable="true" data-filepath="README.md">
               <span class="file-icon">${unsafeHTML(fileIcon("README.md"))}</span>
