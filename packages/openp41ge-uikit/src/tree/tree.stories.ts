@@ -35,14 +35,18 @@ function treeIcon(name: string, size: number) {
     );
     return html`${unsafeHTML(scaled)}`;
   }
-  // 2. Material icon theme for file names (app.ts → typescript icon)
-  const material = getFileIcon(name);
-  if (material) {
-    return html`${unsafeHTML(material)}`;
-  }
-  // 3. Icon registry fallback (folder-closed, git-branch, plus, refresh)
+  // 2. Icon registry (folder-closed, git-branch, plus, refresh, eye)
   if (iconRegistry[name as keyof typeof iconRegistry]) {
     return html`<openp41ge-icon name=${name} size=${size}></openp41ge-icon>`;
+  }
+  // 3. Material icon theme for file names (app.ts → typescript icon)
+  const material = getFileIcon(name);
+  if (material) {
+    const sized = material.replace(
+      '<svg',
+      `<svg width="${size}" height="${size}"`,
+    );
+    return html`${unsafeHTML(sized)}`;
   }
   return html``;
 }
