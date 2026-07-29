@@ -53,6 +53,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   left: 0px
 }
 
+.right-1 {
+  right: 0.25rem
+}
+
 .right-1\.5 {
   right: 0.375rem
 }
@@ -73,6 +77,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   top: 50%
 }
 
+.top-\[30px\] {
+  top: 30px
+}
+
 .z-10 {
   z-index: 10
 }
@@ -87,6 +95,14 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .z-\[1000\] {
   z-index: 1000
+}
+
+.z-\[1\] {
+  z-index: 1
+}
+
+.z-\[2\] {
+  z-index: 2
 }
 
 .z-\[99999\] {
@@ -288,6 +304,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 2.25rem
 }
 
+.h-\[10px\] {
+  height: 10px
+}
+
 .h-\[14px\] {
   height: 14px
 }
@@ -366,6 +386,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .w-4 {
   width: 1rem
+}
+
+.w-5 {
+  width: 1.25rem
 }
 
 .w-6 {
@@ -481,6 +505,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .transform {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
+}
+
+.animate-\[pull-indeterminate_1\.2s_linear_infinite\] {
+  animation: pull-indeterminate 1.2s linear infinite
 }
 
 .animate-\[wt-spin_0\.8s_linear_infinite\] {
@@ -653,6 +681,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-width: 2px
 }
 
+.border-\[1\.5px\] {
+  border-width: 1.5px
+}
+
 .border-b {
   border-bottom-width: 1px
 }
@@ -667,6 +699,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .border-none {
   border-style: none
+}
+
+.border-\[\#232323\] {
+  --tw-border-opacity: 1;
+  border-color: rgb(35 35 35 / var(--tw-border-opacity, 1))
 }
 
 .border-\[\#3a3a3a\] {
@@ -730,6 +767,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   background-color: rgba(255,255,255,.1)
 }
 
+.bg-\[rgba\(255\2c 255\2c 255\2c 0\.03\)\] {
+  background-color: rgba(255,255,255,0.03)
+}
+
 .bg-\[rgba\(42\2c 111\2c 209\2c 0\.08\)\] {
   background-color: rgba(42,111,209,0.08)
 }
@@ -768,6 +809,29 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .bg-transparent {
   background-color: transparent
+}
+
+.bg-gradient-to-r {
+  background-image: linear-gradient(to right, var(--tw-gradient-stops))
+}
+
+.from-\[\#2a6fd1\] {
+  --tw-gradient-from: #2a6fd1 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(42 111 209 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to)
+}
+
+.via-\[transparent_50\%\] {
+  --tw-gradient-to: rgb(255 255 255 / 0)  var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), transparent 50% var(--tw-gradient-via-position), var(--tw-gradient-to)
+}
+
+.to-\[\#2a6fd1\] {
+  --tw-gradient-to: #2a6fd1 var(--tw-gradient-to-position)
+}
+
+.bg-\[length\:200\%_100\%\] {
+  background-size: 200% 100%
 }
 
 .p-0 {
@@ -901,6 +965,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-left: 1rem
 }
 
+.pl-7 {
+  padding-left: 1.75rem
+}
+
 .pl-\[24px\] {
   padding-left: 24px
 }
@@ -915,6 +983,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .text-center {
   text-align: center
+}
+
+.align-middle {
+  vertical-align: middle
 }
 
 .font-mono {
@@ -1002,6 +1074,21 @@ export const tailwindCSS: string = `.pointer-events-none {
 .text-\[\#4caf50\] {
   --tw-text-opacity: 1;
   color: rgb(76 175 80 / var(--tw-text-opacity, 1))
+}
+
+.text-\[\#8a8a8a\] {
+  --tw-text-opacity: 1;
+  color: rgb(138 138 138 / var(--tw-text-opacity, 1))
+}
+
+.text-\[\#b0b0b0\] {
+  --tw-text-opacity: 1;
+  color: rgb(176 176 176 / var(--tw-text-opacity, 1))
+}
+
+.text-\[\#ccc\] {
+  --tw-text-opacity: 1;
+  color: rgb(204 204 204 / var(--tw-text-opacity, 1))
 }
 
 .text-\[\#ddd\] {
@@ -1197,6 +1284,12 @@ export const tailwindCSS: string = `.pointer-events-none {
   transition-duration: 150ms
 }
 
+.transition-opacity {
+  transition-property: opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms
+}
+
 .duration-100 {
   transition-duration: 100ms
 }
@@ -1209,12 +1302,20 @@ export const tailwindCSS: string = `.pointer-events-none {
   transition-duration: 300ms
 }
 
+.duration-500 {
+  transition-duration: 500ms
+}
+
 .ease-\[ease\] {
   transition-timing-function: ease
 }
 
 .ease-linear {
   transition-timing-function: linear
+}
+
+.ease-out {
+  transition-timing-function: cubic-bezier(0, 0, 0.2, 1)
 }
 
 .hover\:bg-hover:hover {

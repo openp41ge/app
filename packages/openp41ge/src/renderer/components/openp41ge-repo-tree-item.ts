@@ -216,15 +216,15 @@ export class Openp41geRepoTreeItem extends LitElement {
     const showGreen = pullDoneTime !== undefined && Date.now() - pullDoneTime < 2500;
     return html`
       <div
-        style="position:sticky;top:30px;z-index:1;background:var(--bg-gutter);height:26px;pointer-events:none;border-bottom:1px solid #232323;"
+        class="sticky top-[30px] z-[1] bg-gutter h-[26px] pointer-events-none border-b border-[#232323]"
       >
         <div
-          style="pointer-events:auto;display:flex;align-items:center;height:26px;padding:0 8px 0 28px;cursor:pointer;font-size:11px;color:#b0b0b0;gap:4px;overflow:hidden;"
+          class="pointer-events-auto flex items-center h-[26px] px-2 pl-7 cursor-pointer text-xs text-[#b0b0b0] gap-1 overflow-hidden transition-[background] duration-100"
           @mouseenter=${(e: MouseEvent) => {
-            (e.currentTarget as HTMLElement).style.background = "#2a2a2a";
+            (e.currentTarget as HTMLElement).classList.add("bg-hover");
           }}
           @mouseleave=${(e: MouseEvent) => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).classList.remove("bg-hover");
           }}
           @click=${() => {
             const path = wt.path || `${this.repoName}/${wt.branch}`;
@@ -249,31 +249,30 @@ export class Openp41geRepoTreeItem extends LitElement {
           ${
             isPulling
               ? html`<div
-                  style="position:absolute;inset:0;background:linear-gradient(90deg, #2a6fd1 0%, #2a6fd1 30%, transparent 50%, #2a6fd1 70%, #2a6fd1 100%);background-size:200% 100%;animation:pull-indeterminate 1.2s linear infinite;opacity:0.3;pointer-events:none;"
+                  class="absolute inset-0 bg-gradient-to-r from-[#2a6fd1] via-[transparent_50%] to-[#2a6fd1] bg-[length:200%_100%] animate-[pull-indeterminate_1.2s_linear_infinite] opacity-30 pointer-events-none"
                 ></div>`
               : showGreen
                 ? html`<div
-                    style="position:absolute;inset:0;background:var(--accent);opacity:0.25;transition:opacity 0.5s ease;pointer-events:none;"
+                    class="absolute inset-0 bg-accent/25 transition-opacity duration-500 ease-out pointer-events-none"
                   ></div>`
                 : ""
           }
-          <span style="color:#8a8a8a;font-size:10px;width:10px;"
+          <span class="text-[#8a8a8a] text-2xs w-[10px]"
             >${isExpanded ? "\u25BC" : "\u25B6"}</span
           >
-          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
             >${wt.branch}</span
           >
-          ${!wt.exists ? html`<span style="color:var(--text-muted);font-size:10px;">(pending)</span>` : ""}
+          ${!wt.exists ? html`<span class="text-muted text-2xs">(pending)</span>` : ""}
           ${
             this._fileLoader.isRefreshingWorktree(wt.branch) ||
             this._fileLoader.isLoadingWorktree(wt.branch)
               ? html`<div
-                  class="wt-spinner"
-                  style="width:14px;height:14px;flex-shrink:0;border:2px solid #444;border-top-color:var(--accent-hover);border-radius:50%;animation:wt-spin 0.8s linear infinite;"
+                  class="wt-spinner w-[14px] h-[14px] shrink-0 border-2 border-[#444] border-t-accent-hover rounded-full animate-[wt-spin_0.8s_linear_infinite]"
                 ></div>`
               : html` <!-- Refresh button -->
                   <span
-                    style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:3px;cursor:pointer;flex-shrink:0;color:var(--text-muted);"
+                    class="w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-[background] duration-100"
                     title="Refresh"
                     @click=${(e: MouseEvent) => {
                       e.stopPropagation();
@@ -285,10 +284,10 @@ export class Openp41geRepoTreeItem extends LitElement {
                       );
                     }}
                     @mouseenter=${(e: MouseEvent) => {
-                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)";
+                      (e.currentTarget as HTMLElement).classList.add("bg-hover");
                     }}
                     @mouseleave=${(e: MouseEvent) => {
-                      (e.currentTarget as HTMLElement).style.background = "transparent";
+                      (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                     }}
                     @mouseover=${(e: MouseEvent) => {
                       (e.currentTarget as HTMLElement).style.color = "#4a9eff";
@@ -300,13 +299,13 @@ export class Openp41geRepoTreeItem extends LitElement {
                   >
                   <!-- 3-dot button -->
                   <span
-                    style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:3px;cursor:pointer;flex-shrink:0;color:var(--text-muted);"
+                    class="w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-[background] duration-100"
                     title="More"
                     @mouseenter=${(e: MouseEvent) => {
-                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)";
+                      (e.currentTarget as HTMLElement).classList.add("bg-hover");
                     }}
                     @mouseleave=${(e: MouseEvent) => {
-                      (e.currentTarget as HTMLElement).style.background = "transparent";
+                      (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                     }}
                   >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -343,27 +342,27 @@ export class Openp41geRepoTreeItem extends LitElement {
           isExpanded && hasCache ? this._fileLoader.dirContents.get(entry.path) : undefined;
         return html`
           <div
-            style="display:flex;align-items:center;height:24px;padding:0 12px 0 ${28 + depth * 14}px;cursor:pointer;font-size:11px;color:${isUntracked ? "#666" : "#999"};gap:4px;transition:background 0.1s;${isUntracked ? "opacity:0.6;" : ""}"
+            class="flex items-center h-6 cursor-pointer text-xs gap-1 transition-[background] duration-100"
+            style="padding:0 12px 0 ${28 + depth * 14}px;color:${isUntracked ? "#666" : "#999"};${isUntracked ? "opacity:0.6;" : ""}"
             @mouseenter=${(e: MouseEvent) => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
+              (e.currentTarget as HTMLElement).classList.add("bg-[rgba(255,255,255,0.03)]");
             }}
             @mouseleave=${(e: MouseEvent) => {
-              (e.currentTarget as HTMLElement).style.background = "transparent";
+              (e.currentTarget as HTMLElement).classList.remove("bg-[rgba(255,255,255,0.03)]");
             }}
             @click=${() => this._toggleDir(branch, entry.path)}
           >
             <span
-              style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;color:#8a8a8a;font-size:10px;"
+              class="inline-flex items-center justify-center w-4 h-4 shrink-0 text-[#8a8a8a] text-2xs"
               >${isExpanded ? "\u25BC" : "\u25B6"}</span
             >
-            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
               >${entry.name}</span
             >
             ${
               (isLoading || isRefreshing) && isExpanded
                 ? html`<div
-                    class="wt-spinner"
-                    style="width:10px;height:10px;flex-shrink:0;border:1.5px solid #444;border-top-color:var(--accent-hover);border-radius:50%;animation:wt-spin 0.8s linear infinite;"
+                    class="wt-spinner w-[10px] h-[10px] shrink-0 border-[1.5px] border-[#444] border-t-accent-hover rounded-full animate-[wt-spin_0.8s_linear_infinite]"
                   ></div>`
                 : ""
             }
@@ -372,11 +371,11 @@ export class Openp41geRepoTreeItem extends LitElement {
           ${
             isExpanded && !hasCache && isLoading
               ? html`<div
-                  style="padding:2px 0 2px ${28 + (depth + 1) * 14}px;font-size:10px;color:var(--text-muted);"
+                  class="text-2xs text-muted"
+                  style="padding:2px 0 2px ${28 + (depth + 1) * 14}px;"
                 >
                   <div
-                    class="wt-spinner"
-                    style="width:10px;height:10px;display:inline-block;border:1.5px solid #444;border-top-color:var(--accent-hover);border-radius:50%;animation:wt-spin 0.8s linear infinite;margin-right:4px;vertical-align:middle;"
+                    class="wt-spinner w-[10px] h-[10px] inline-block border-[1.5px] border-[#444] border-t-accent-hover rounded-full animate-[wt-spin_0.8s_linear_infinite] mr-1 align-middle"
                   ></div>
                   Loading...
                 </div>`
@@ -387,12 +386,13 @@ export class Openp41geRepoTreeItem extends LitElement {
       return html`
         <div
           data-file-path="${entry.path}"
-          style="display:flex;align-items:center;height:24px;padding:0 12px 0 ${28 + depth * 14}px;cursor:pointer;font-size:11px;color:${isUntracked ? "#666" : "#aaa"};gap:4px;transition:background 0.1s;${isUntracked ? "opacity:0.6;" : ""}"
+          class="flex items-center h-6 cursor-pointer text-xs gap-1 transition-[background] duration-100"
+          style="padding:0 12px 0 ${28 + depth * 14}px;color:${isUntracked ? "#666" : "#aaa"};${isUntracked ? "opacity:0.6;" : ""}"
           @mouseenter=${(e: MouseEvent) => {
-            (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
+            (e.currentTarget as HTMLElement).classList.add("bg-[rgba(255,255,255,0.03)]");
           }}
           @mouseleave=${(e: MouseEvent) => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).classList.remove("bg-[rgba(255,255,255,0.03)]");
           }}
           @click=${(e: MouseEvent) => {
             const name = entry.path.split("/").pop() ?? entry.path;
@@ -412,11 +412,13 @@ export class Openp41geRepoTreeItem extends LitElement {
           }}
         >
           <span
-            style="display:inline-flex;align-items:center;flex-shrink:0;width:16px;height:16px;${isUntracked ? "opacity:0.5;" : ""}"
+            class="inline-flex items-center shrink-0 w-4 h-4"
+            style="${isUntracked ? "opacity:0.5;" : ""}"
             >${unsafeHTML(getFileIcon(entry.name))}</span
           >
           <span
-            style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isUntracked ? "opacity:0.5;" : ""}"
+            class="overflow-hidden text-ellipsis whitespace-nowrap"
+            style="${isUntracked ? "opacity:0.5;" : ""}"
             >${entry.name}</span
           >
         </div>
@@ -426,20 +428,20 @@ export class Openp41geRepoTreeItem extends LitElement {
 
   render() {
     return html`
-      <div style="user-select:none;">
-        <!-- Repo header - outer shell: sticky visual only, events pass through to file rows behind -->
+      <div class="select-none">
+        <!-- Repo header -->
         <div
-          style="position:sticky;top:0;z-index:2;background:var(--bg-gutter);height:30px;border-bottom:1px solid #232323;pointer-events:none;"
+          class="sticky top-0 z-[2] bg-gutter h-[30px] border-b border-[#232323] pointer-events-none"
         >
-          <!-- Inner wrapper: receives all pointer events, click/drag/contextmenu -->
+          <!-- Inner wrapper: receives all pointer events -->
           <div
             draggable="true"
-            style="pointer-events:auto;display:flex;align-items:center;height:30px;padding:0 8px 0 12px;cursor:pointer;font-size:12px;color:#ccc;gap:4px;"
+            class="pointer-events-auto flex items-center h-[30px] px-2 pl-3 cursor-pointer text-sm text-[#ccc] gap-1 transition-[background] duration-100"
             @mouseenter=${(e: MouseEvent) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.08)";
+              (e.currentTarget as HTMLElement).classList.add("bg-hover");
             }}
             @mouseleave=${(e: MouseEvent) => {
-              (e.currentTarget as HTMLElement).style.background = "transparent";
+              (e.currentTarget as HTMLElement).classList.remove("bg-hover");
             }}
             @click=${this._toggleExpand}
             @dragstart=${(e: DragEvent) => {
@@ -462,16 +464,16 @@ export class Openp41geRepoTreeItem extends LitElement {
               );
             }}
           >
-            <span style="color:#8a8a8a;font-size:10px;width:10px;"
+            <span class="text-[#8a8a8a] text-2xs w-[10px]"
               >${this._expanded ? "\u25BC" : "\u25B6"}</span
             >
-            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
               >${this.repoName}</span
             >
             ${html`
               <!-- Refresh button -->
               <span
-                style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:3px;cursor:pointer;flex-shrink:0;color:var(--text-muted);"
+                class="w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-[background] duration-100"
                 title="Refresh"
                 @click=${(e: MouseEvent) => {
                   e.stopPropagation();
@@ -483,10 +485,10 @@ export class Openp41geRepoTreeItem extends LitElement {
                   );
                 }}
                 @mouseenter=${(e: MouseEvent) => {
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)";
+                  (e.currentTarget as HTMLElement).classList.add("bg-hover");
                 }}
                 @mouseleave=${(e: MouseEvent) => {
-                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                 }}
                 @mouseover=${(e: MouseEvent) => {
                   (e.currentTarget as HTMLElement).style.color = "#4a9eff";
@@ -498,13 +500,13 @@ export class Openp41geRepoTreeItem extends LitElement {
               >
               <!-- 3-dot button -->
               <span
-                style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:3px;cursor:pointer;flex-shrink:0;color:var(--text-muted);"
+                class="w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-[background] duration-100"
                 title="More"
                 @mouseenter=${(e: MouseEvent) => {
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)";
+                  (e.currentTarget as HTMLElement).classList.add("bg-hover");
                 }}
                 @mouseleave=${(e: MouseEvent) => {
-                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -543,14 +545,14 @@ export class Openp41geRepoTreeItem extends LitElement {
           this._showingAddWorktree
             ? html` <div
                 id="wt-addwt-row"
-                style="display:flex;align-items:center;height:26px;padding:0 8px 0 28px;font-size:11px;gap:4px;border-bottom:1px solid #232323;outline:2px solid #2a6fd1;outline-offset:-2px;transition:background 0.1s;"
+                class="flex items-center h-[26px] px-2 pl-7 text-xs gap-1 border-b border-[#232323] outline outline-2 outline-offset-[-2px] outline-[#2a6fd1] transition-[background] duration-100"
               >
-                <span style="display:none;"></span>
+                <span class="hidden"></span>
                 <input
                   id="wt-addwt-input"
                   type="text"
                   placeholder="enter branch name"
-                  style="flex:1;min-width:0;height:22px;background:transparent;border:none;border-radius:0;color:#e0e0e0;font-size:11px;padding:0 6px;outline:none;font-family:inherit;margin-left:8px;"
+                  class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-xs px-1.5 outline-none font-inherit ml-2"
                   @keydown=${(e: KeyboardEvent) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -571,7 +573,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                 />
                 <span
                   id="wt-addwt-confirm"
-                  style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--text-secondary);"
+                  class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-secondary"
                   @click=${() => this._confirmAddWorktree()}
                   @mouseenter=${(e: MouseEvent) => {
                     (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)";
@@ -623,7 +625,7 @@ export class Openp41geRepoTreeItem extends LitElement {
               </div>`
             : this._expanded
               ? html` <div
-                  style="display:flex;align-items:center;height:26px;padding:0 8px 0 28px;cursor:pointer;font-size:11px;color:var(--text-muted);gap:4px;border-bottom:1px solid #232323;transition:background 0.1s;user-select:none;"
+                  class="flex items-center h-[26px] px-2 pl-7 cursor-pointer text-xs text-muted gap-1 border-b border-[#232323] transition-[background] duration-100 select-none"
                   @click=${(e: MouseEvent) => {
                     e.stopPropagation();
                     this._showingAddWorktree = true;
@@ -633,20 +635,20 @@ export class Openp41geRepoTreeItem extends LitElement {
                     });
                   }}
                   @mouseenter=${(e: MouseEvent) => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
+                    (e.currentTarget as HTMLElement).classList.add("bg-hover");
                   }}
                   @mouseleave=${(e: MouseEvent) => {
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                    (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                   }}
                 >
                   <span
-                    style="width:10px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"
+                    class="w-[10px] h-[26px] flex items-center justify-center shrink-0"
                     ><span
-                      style="transform:translateX(-1px);display:inline-flex;color:var(--text-muted);"
+                      class="-translate-x-px inline-flex text-muted"
                       >${unsafeHTML(plusIconThick(11))}</span
                     ></span
                   >
-                  <span style="color:var(--text-muted);">add worktree</span>
+                  <span class="text-muted">add worktree</span>
                 </div>`
               : nothing
         }
