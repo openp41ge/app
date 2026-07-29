@@ -168,4 +168,66 @@ export const treeStyles = css`
     color: var(--tree-action-hover-fg, var(--text-secondary, #999));
     background: var(--tree-action-hover-bg, var(--bg-hover, rgba(255, 255, 255, 0.1)));
   }
+
+  /* ─── Loading Spinner ──────────────────────────────────── */
+
+  .tree-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--tree-spinner-track, rgba(255, 255, 255, 0.15));
+    border-top-color: var(--tree-spinner-color, #4a9eff);
+    border-radius: 50%;
+    animation: tree-spin 0.6s linear infinite;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+
+  @keyframes tree-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .tree-node.is-loading .tree-chevron-cell {
+    cursor: default;
+  }
+
+  /* ─── Badge ────────────────────────────────────────────── */
+
+  .tree-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--tree-badge-fg, var(--text-muted, #888));
+    background: var(--tree-badge-bg, transparent);
+    border-radius: 2px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* ─── Status variants ──────────────────────────────────── */
+
+  .tree-node--status-untracked {
+    opacity: var(--tree-status-untracked-opacity, 0.6);
+  }
+
+  .tree-node--status-pending {
+    opacity: var(--tree-status-pending-opacity, 0.7);
+  }
+
+  .tree-node--status-warning {
+    color: var(--tree-status-warning-fg, #d4a84b);
+  }
+
+  .tree-node--status-error {
+    color: var(--tree-status-error-fg, #e06c75);
+  }
+
+  .tree-node--status-success {
+    color: var(--tree-status-success-fg, #7ecb8e);
+  }
 `;

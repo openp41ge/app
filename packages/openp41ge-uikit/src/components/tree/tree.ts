@@ -43,6 +43,8 @@ export {
   type TreeNodeActionEventDetail,
   type TreeDragStartEventDetail,
   type TreeDropEventDetail,
+  type TreeContextMenuEventDetail,
+  type TreeToggleErrorEventDetail,
 } from "./types";
 
 const INDENT = 16; // pixels per depth level
@@ -69,11 +71,32 @@ export class Openp41geTree extends LitElement {
   @property({ type: Number })
   depth = 0;
 
+  /**
+   * Optional async callback invoked when a collapsible node is expanded.
+   * While the returned promise is pending, a loading spinner replaces the
+   * chevron. If the promise resolves, the tree stays expanded (the consumer
+   * is expected to have populated `node.children`). If it rejects, the node
+   * collapses back.
+   */
+  @property({ attribute: false })
+  onToggle: ((node: TreeNode) => Promise<void>) | null = null;
+
+  /**
+   * Optional callback fired whenever a node's expanded state changes.
+   * The consumer can persist the state externally.
+   */
+  @property({ attribute: false })
+  onExpandedChange: ((nodeId: string, expanded: boolean) => void) | null = null;
+
   @state()
   private _hoveredNodeId: string | null = null;
 
   @state()
   private _focusableNodeId: string | null = null;
+
+  /** Node IDs currently being asynchronously loaded */
+  @state()
+  private _loadingNodeIds: Set<string> = new Set();
 
   private _rootEl: HTMLElement | null = null;
 
@@ -258,7 +281,51 @@ export class Openp41geTree extends LitElement {
 
   private _toggleNode(node: TreeNode): void {
     const expanded = !this._isExpandedLocal(node);
+
+    if (expanded && this.onToggle && this._hasChildren(node)) {
+      // Async expansion: mark loading, flip expanded, do async, then resolve
+      this._loadingNodeIds = new Set(this._loadingNodeIds).add(node.id);
+      this._updateExpanded(node.id, true);
+      this.onToggle(node)
+        .then(() => {
+          // Consumer populated children — keep expanded
+          const next = new Set(this._loadingNodeIds);
+          next.delete(node.id);
+          this._loadingNodeIds = next;
+          this.requestUpdate();
+        })
+        .catch((err) => {
+          // Async failure — collapse back
+          const next = new Set(this._loadingNodeIds);
+          next.delete(node.id);
+          this._loadingNodeIds = next;
+          this._updateExpanded(node.id, false);
+          this.dispatchEvent(
+            new CustomEvent("tree-node-toggle-error", {
+              bubbles: true,
+              composed: true,
+              detail: { nodeId: node.id, meta: node.meta, error: err },
+            }),
+          );
+        });
+      // Fire toggle event even while loading
+      this._notifyToggle(node, true);
+      return;
+    }
+
+    if (!expanded && this._loadingNodeIds.has(node.id)) {
+      // Collapse a loading node — cancel by removing from loading set
+      const next = new Set(this._loadingNodeIds);
+      next.delete(node.id);
+      this._loadingNodeIds = next;
+      // Don't attempt to collapse children that never loaded
+    }
+
     this._updateExpanded(node.id, expanded);
+    this._notifyToggle(node, expanded);
+  }
+
+  private _notifyToggle(node: TreeNode, expanded: boolean): void {
     this.dispatchEvent(
       new CustomEvent("tree-node-toggle", {
         bubbles: true,
@@ -266,6 +333,9 @@ export class Openp41geTree extends LitElement {
         detail: { nodeId: node.id, expanded, meta: node.meta },
       }),
     );
+    if (this.onExpandedChange) {
+      this.onExpandedChange(node.id, expanded);
+    }
   }
 
   private _emitClick(node: TreeNode): void {
@@ -318,6 +388,23 @@ export class Openp41geTree extends LitElement {
         bubbles: true,
         composed: true,
         detail: { nodeId: node.id, meta: node.meta },
+      }),
+    );
+  }
+
+  private _onContextMenu(e: MouseEvent, node: TreeNode): void {
+    e.preventDefault();
+    e.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent("tree-node-contextmenu", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          nodeId: node.id,
+          meta: node.meta,
+          clientX: e.clientX,
+          clientY: e.clientY,
+        },
       }),
     );
   }
@@ -411,6 +498,7 @@ export class Openp41geTree extends LitElement {
     const hovered = this._hoveredNodeId === node.id;
     const isSection = this._isSection(node);
     const isFocusable = this._focusableNodeId === node.id;
+    const isLoading = this._loadingNodeIds.has(node.id);
 
     // Indentation: section headers get extra left padding
     const rowIndent = isSection
@@ -419,6 +507,9 @@ export class Openp41geTree extends LitElement {
     // Content inside the row is shifted so chevron/icon start at the indent
     const contentPad = isSection ? 8 : 8; // base padding on left
 
+    // Status CSS class
+    const statusClass = node.status ? `tree-node--status-${node.status}` : "";
+
     return html`
       <div
         class="tree-node ${classMap({
@@ -426,6 +517,8 @@ export class Openp41geTree extends LitElement {
           hovered,
           "is-section": isSection,
           "has-children": hasChildren,
+          "is-loading": isLoading,
+          [statusClass]: !!node.status,
         })}"
         style=${styleMap({
           paddingLeft: `${rowIndent + contentPad}px`,
@@ -438,6 +531,7 @@ export class Openp41geTree extends LitElement {
         aria-selected=${selected ? "true" : "false"}
         draggable=${node.draggable ? "true" : "false"}
         @click=${(e: Event) => this._onNodeClick(e, node)}
+        @contextmenu=${(e: MouseEvent) => this._onContextMenu(e, node)}
         @mouseenter=${() => (this._hoveredNodeId = node.id)}
         @mouseleave=${() =>
           this._hoveredNodeId === node.id ? (this._hoveredNodeId = null) : null}
@@ -445,12 +539,16 @@ export class Openp41geTree extends LitElement {
         @dragover=${this._onDragOver}
         @drop=${(e: DragEvent) => this._onDrop(e, node)}
       >
-        <!-- Chevron (▶/▼) -->
+        <!-- Chevron (▶/▼) / Loading spinner -->
         <span
           class="tree-chevron-cell"
           @click=${(e: Event) => this._onChevronClick(e, node)}
         >
-          ${showChevron ? this._renderChevron(expanded) : nothing}
+          ${isLoading
+            ? this._renderSpinner()
+            : showChevron
+              ? this._renderChevron(expanded)
+              : nothing}
         </span>
 
         <!-- Icon column (may be empty for section headers) -->
@@ -464,6 +562,11 @@ export class Openp41geTree extends LitElement {
 
         <!-- Label -->
         <span class="tree-label">${node.label}</span>
+
+        <!-- Badge -->
+        ${node.badge
+          ? html`<span class="tree-badge">${node.badge}</span>`
+          : nothing}
 
         <!-- Actions (show on hover) -->
         ${hovered && node.actions && node.actions.length > 0
@@ -487,19 +590,29 @@ export class Openp41geTree extends LitElement {
       </div>
 
       <!-- Children (recursive) -->
-      ${hasChildren && expanded
+      ${hasChildren && expanded && !isLoading
         ? html`<openp41ge-tree
             .nodes=${node.children!}
             .selectedId=${this.selectedId}
             .renderIcon=${this.renderIcon}
+            .onToggle=${this.onToggle}
+            .onExpandedChange=${this.onExpandedChange}
             depth=${this.depth + 1}
             @tree-node-click=${(e: Event) => this._forwardEvent(e, "tree-node-click")}
             @tree-node-toggle=${(e: Event) => this._forwardEvent(e, "tree-node-toggle")}
+            @tree-node-toggle-error=${(e: Event) => this._forwardEvent(e, "tree-node-toggle-error")}
             @tree-node-action=${(e: Event) => this._forwardEvent(e, "tree-node-action")}
+            @tree-node-contextmenu=${(e: Event) => this._forwardEvent(e, "tree-node-contextmenu")}
             @tree-drag-start=${(e: Event) => this._forwardEvent(e, "tree-drag-start")}
             @tree-drop=${(e: Event) => this._forwardEvent(e, "tree-drop")}
           ></openp41ge-tree>`
         : nothing}
+    `;
+  }
+
+  private _renderSpinner(): TemplateResult {
+    return html`
+      <span class="tree-spinner" part="spinner"></span>
     `;
   }
 

@@ -40,6 +40,13 @@ export interface TreeNode {
   actions?: TreeNodeAction[];
   /** Show a chevron toggle before the icon (default: true for nodes with children) */
   showChevron?: boolean;
+  /**
+   * Row status — adds CSS class `tree-node--status-{status}` so consumers
+   * can style via theme variables (e.g. --tree-status-untracked-opacity).
+   */
+  status?: "untracked" | "pending" | "warning" | "error" | "success";
+  /** Optional label rendered after the main label (e.g. "(pending)") */
+  badge?: string;
   /** App-specific metadata passed through events */
   meta?: Record<string, unknown>;
 }
@@ -73,6 +80,19 @@ export interface TreeNodeActionEventDetail {
 export interface TreeDragStartEventDetail {
   nodeId: string;
   meta?: Record<string, unknown>;
+}
+
+export interface TreeContextMenuEventDetail {
+  nodeId: string;
+  meta?: Record<string, unknown>;
+  clientX: number;
+  clientY: number;
+}
+
+export interface TreeToggleErrorEventDetail {
+  nodeId: string;
+  meta?: Record<string, unknown>;
+  error: unknown;
 }
 
 /** Callback type for rendering icons — host app provides its own resolver */
