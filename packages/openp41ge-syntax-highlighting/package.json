@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "vscode-textmate": "^9.1.0",
-    "vscode-oniguruma": "^1.7.0"
+    "vscode-oniguruma": "^2.0.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
