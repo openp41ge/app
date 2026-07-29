@@ -117,7 +117,6 @@ class Openp41geWindowView extends LitElement {
           <openp41ge-sidebar
             .windowId=${win.id}
             .activeViewId=${win.sidebar?.activeViewId ?? null}
-            .width=${win.sidebar?.width ?? 280}
           ></openp41ge-sidebar>
           <openp41ge-activity-bar
             .activeViewId=${win.sidebar?.activeViewId ?? null}
