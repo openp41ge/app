@@ -101,7 +101,7 @@ class Openp41gePanePicker extends LitElement {
     return html`
       <div
         id="openp41ge-picker-backdrop"
-        style="position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);display:flex;align-items:flex-start;justify-content:center;padding-top:80px;"
+        class="fixed inset-0 z-[1000] bg-[rgba(0,0,0,0.4)] flex items-start justify-center pt-20"
         @mousedown=${(e: MouseEvent) => {
           const target = e.target as HTMLElement;
           if (target.id === "openp41ge-picker-backdrop") this._close();
@@ -109,25 +109,25 @@ class Openp41gePanePicker extends LitElement {
       >
         <div
           id="openp41ge-picker-panel"
-          style="width:800px;max-height:600px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden;"
+          class="w-[800px] max-h-[600px] bg-bg-primary border border-border-color rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden"
         >
           <input
             id="openp41ge-picker-input"
             type="text"
             placeholder="Search apps and files…"
             autofocus
-            style="width:100%;padding:12px 16px;background:var(--bg-secondary);border:none;border-bottom:1px solid var(--border-divider);color:#ddd;font-size:14px;outline:none;box-sizing:border-box;"
+            class="w-full px-4 py-3 bg-bg-secondary border-none border-b border-divider text-[#ddd] text-sm outline-none box-border"
             @input=${() => this._onInput()}
             @keydown=${(e: KeyboardEvent) => this._keyHandler(e)}
           />
-          <div style="flex:1;display:flex;overflow:hidden;min-height:0;">
+          <div class="flex-1 flex overflow-hidden min-h-0">
             <div
               id="openp41ge-picker-apps"
-              style="flex:1;overflow-y:overlay;padding:4px 0;border-right:1px solid var(--border-divider);"
+              class="flex-1 overflow-y-overlay py-1 border-r border-divider"
             ></div>
-            <div id="openp41ge-picker-files" style="flex:1;overflow-y:overlay;padding:4px 0;">
+            <div id="openp41ge-picker-files" class="flex-1 overflow-y-overlay py-1">
               <div
-                style="padding:8px 16px 4px;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;"
+                class="px-4 pt-2 pb-1 text-2xs text-muted uppercase tracking-wider"
               >
                 Files
               </div>
@@ -135,10 +135,10 @@ class Openp41gePanePicker extends LitElement {
           </div>
           <div
             id="openp41ge-picker-footer"
-            style="padding:6px 16px;border-top:1px solid var(--border-divider);font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between;"
+            class="px-4 py-1.5 border-t border-divider text-xs text-muted flex justify-between"
           >
             <span id="openp41ge-picker-status">${this._statusText}</span>
-            <span style="color:#444;">↑↓ navigate ⏎ select ⎋ close</span>
+            <span class="text-[#444]">↑↓ navigate ⏎ select ⎋ close</span>
           </div>
         </div>
       </div>
@@ -252,21 +252,21 @@ class Openp41gePanePicker extends LitElement {
   private _renderApps(): void {
     if (!this._appsListEl) return;
     if (this._filteredApps.length === 0) {
-      this._appsListEl.innerHTML = `<div style="padding:16px;color:var(--text-muted);text-align:center;font-size:12px;">No matching apps</div>`;
+      this._appsListEl.innerHTML = `<div class="p-4 text-muted text-center text-xs">No matching apps</div>`;
       return;
     }
     const showHeader = this._fileResults.length > 0;
     this._appsListEl.innerHTML =
       (showHeader
-        ? `<div style="padding:8px 16px 4px;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Apps</div>`
+        ? `<div class="px-4 pt-2 pb-1 text-2xs text-muted uppercase tracking-wider">Apps</div>`
         : "") +
       this._filteredApps
         .map((t, i) => {
           const sel = i === this._selectedIndex;
-          return `<div data-idx="${i}" class="picker-item" style="display:flex;align-items:center;gap:10px;padding:0 16px;height:${ITEM_HEIGHT}px;cursor:pointer;background:${sel ? "#2a2a2a" : "transparent"};color:${sel ? "#fff" : "#bbb"};font-size:13px;">
-            <span style="font-size:16px;width:24px;text-align:center;">${unsafeHTML(t.icon)}</span>
+          return `<div data-idx="${i}" class="picker-item flex items-center gap-2.5 px-4 cursor-pointer text-13" style="height:${ITEM_HEIGHT}px;background:${sel ? "#2a2a2a" : "transparent"};color:${sel ? "#fff" : "#bbb"};">
+            <span class="text-base w-6 text-center">${unsafeHTML(t.icon)}</span>
             <span>${t.label}</span>
-            <span style="margin-left:auto;color:var(--text-muted);font-size:11px;">${t.id}</span>
+            <span class="ml-auto text-muted text-xs">${t.id}</span>
           </div>`;
         })
         .join("");
@@ -287,30 +287,30 @@ class Openp41gePanePicker extends LitElement {
     if (!this._filesListEl) return;
 
     if (this._isSearching) {
-      this._filesListEl.innerHTML = `<div style="padding:8px 16px 4px;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Files</div>
-        <div style="padding:16px;color:var(--text-muted);text-align:center;font-size:12px;">Searching\u2026</div>`;
+      this._filesListEl.innerHTML = `<div class="px-4 pt-2 pb-1 text-2xs text-muted uppercase tracking-wider">Files</div>
+        <div class="p-4 text-muted text-center text-xs">Searching\u2026</div>`;
       return;
     }
 
     const appsCount = this._filteredApps.length;
 
     if (this._fileResults.length === 0) {
-      this._filesListEl.innerHTML = `<div style="padding:8px 16px 4px;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Files</div>
-        <div style="padding:16px;color:var(--text-muted);text-align:center;font-size:12px;">No files \u2014 add folders via Cmd+B</div>`;
+      this._filesListEl.innerHTML = `<div class="px-4 pt-2 pb-1 text-2xs text-muted uppercase tracking-wider">Files</div>
+        <div class="p-4 text-muted text-center text-xs">No files \u2014 add folders via Cmd+B</div>`;
       return;
     }
 
-    this._filesListEl.innerHTML = `<div style="padding:8px 16px 4px;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Files</div>
+    this._filesListEl.innerHTML = `<div class="px-4 pt-2 pb-1 text-2xs text-muted uppercase tracking-wider">Files</div>
       ${this._fileResults
         .map((f, i) => {
           const idx = appsCount + i;
           const sel = idx === this._selectedIndex;
           const dirName = f.dir.split("/").filter(Boolean).pop() || f.dir;
-          return `<div data-idx="${idx}" class="picker-item" style="display:flex;align-items:center;gap:6px;padding:0 16px;height:${ITEM_HEIGHT}px;cursor:pointer;background:${sel ? "#2a2a2a" : "transparent"};color:${sel ? "#fff" : "#bbb"};font-size:13px;">
-            <span style="font-size:14px;width:20px;text-align:center;flex-shrink:0;">\uD83D\uDCC4</span>
-            <div style="flex:1;overflow:hidden;">
-              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</div>
-              <div style="font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${dirName}</div>
+          return `<div data-idx="${idx}" class="picker-item flex items-center gap-1.5 px-4 cursor-pointer text-13" style="height:${ITEM_HEIGHT}px;background:${sel ? "#2a2a2a" : "transparent"};color:${sel ? "#fff" : "#bbb"};">
+            <span class="text-[14px] w-5 text-center shrink-0">\uD83D\uDCC4</span>
+            <div class="flex-1 overflow-hidden">
+              <div class="overflow-hidden text-ellipsis whitespace-nowrap">${f.name}</div>
+              <div class="text-2xs text-muted overflow-hidden text-ellipsis whitespace-nowrap">${dirName}</div>
             </div>
           </div>`;
         })

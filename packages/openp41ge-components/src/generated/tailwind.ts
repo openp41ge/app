@@ -368,6 +368,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   max-height: 203px
 }
 
+.max-h-\[600px\] {
+  max-height: 600px
+}
+
 .max-h-\[85vh\] {
   max-height: 85vh
 }
@@ -438,6 +442,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .w-\[46px\] {
   width: 46px
+}
+
+.w-\[800px\] {
+  width: 800px
 }
 
 .w-\[90\%\] {
@@ -637,6 +645,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   gap: 0.5rem
 }
 
+.gap-2\.5 {
+  gap: 0.625rem
+}
+
 .self-stretch {
   align-self: stretch
 }
@@ -717,6 +729,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-left-width: 1px
 }
 
+.border-r {
+  border-right-width: 1px
+}
+
 .border-t {
   border-top-width: 1px
 }
@@ -783,6 +799,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   background-color: rgba(0,0,0,.3)
 }
 
+.bg-\[rgba\(0\2c 0\2c 0\2c 0\.4\)\] {
+  background-color: rgba(0,0,0,0.4)
+}
+
 .bg-\[rgba\(0\2c 0\2c 0\2c 0\.5\)\] {
   background-color: rgba(0,0,0,0.5)
 }
@@ -817,6 +837,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .bg-bg-primary {
   background-color: var(--bg-primary, #1e1e1e)
+}
+
+.bg-bg-secondary {
+  background-color: var(--bg-secondary, #181818)
 }
 
 .bg-bg-tertiary {
@@ -880,6 +904,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .p-2\.5 {
   padding: 0.625rem
+}
+
+.p-4 {
+  padding: 1rem
 }
 
 .p-6 {
@@ -960,6 +988,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 0.5rem
 }
 
+.py-3 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem
+}
+
 .py-4 {
   padding-top: 1rem;
   padding-bottom: 1rem
@@ -983,6 +1016,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 .py-\[7px\] {
   padding-top: 7px;
   padding-bottom: 7px
+}
+
+.pb-1 {
+  padding-bottom: 0.25rem
 }
 
 .pb-3 {
@@ -1021,6 +1058,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-top: 0.5rem
 }
 
+.pt-20 {
+  padding-top: 5rem
+}
+
 .text-center {
   text-align: center
 }
@@ -1054,6 +1095,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .text-\[20px\] {
   font-size: 20px
+}
+
+.text-base {
+  font-size: 1rem;
+  line-height: 1.5rem
 }
 
 .text-lg {
@@ -1118,6 +1164,15 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .tracking-\[0\.5px\] {
   letter-spacing: 0.5px
+}
+
+.tracking-wider {
+  letter-spacing: 0.05em
+}
+
+.text-\[\#444\] {
+  --tw-text-opacity: 1;
+  color: rgb(68 68 68 / var(--tw-text-opacity, 1))
 }
 
 .text-\[\#4caf50\] {
