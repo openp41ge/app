@@ -328,20 +328,12 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 14px
 }
 
-.h-\\[18px\\] {
-  height: 18px
-}
-
 .h-\\[22px\\] {
   height: 22px
 }
 
 .h-\\[26px\\] {
   height: 26px
-}
-
-.h-\\[28px\\] {
-  height: 28px
 }
 
 .h-\\[30px\\] {
@@ -422,10 +414,6 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .w-\\[14px\\] {
   width: 14px
-}
-
-.w-\\[18px\\] {
-  width: 18px
 }
 
 .w-\\[200px\\] {
@@ -1043,11 +1031,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 1.25rem
 }
 
-.py-\\[3px\\] {
-  padding-top: 3px;
-  padding-bottom: 3px
-}
-
 .py-\\[5px\\] {
   padding-top: 5px;
   padding-bottom: 5px
@@ -1213,10 +1196,6 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .leading-none {
   line-height: 1
-}
-
-.tracking-\\[0\\.5px\\] {
-  letter-spacing: 0.5px
 }
 
 .tracking-wider {
@@ -1519,13 +1498,5 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .ease-out {
   transition-timing-function: cubic-bezier(0, 0, 0.2, 1)
-}
-
-.hover\\:bg-hover:hover {
-  background-color: var(--bg-hover, #2a2d2e)
-}
-
-.hover\\:text-secondary:hover {
-  color: var(--text-secondary, #999)
 }
 `;
