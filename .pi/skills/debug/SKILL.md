@@ -20,7 +20,7 @@ This runs `scripts/dev.sh`, which:
 
 1. Builds `openp41ge-file-editor` (generates `.d.ts`)
 2. Compiles Electron main process TypeScript (`build-electron.sh`)
-3. Starts the Vite dev server on `http://localhost:5173`
+3. Starts the Vite dev server on `http://localhost:7392`
 4. Launches Electron pointing at the Vite dev server (hot-reload)
 
 **With DevTools auto-open:**
@@ -44,7 +44,7 @@ The main process TypeScript does **not** hot-reload — restart `pnpm dev` after
 
 ```bash
 cd packages/openp41ge && bash scripts/dev-renderer.sh
-# Then open http://localhost:5173 in a browser
+# Then open http://localhost:7392 in a browser
 ```
 
 ### Chrome DevTools Remote Debugging

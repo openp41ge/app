@@ -17,7 +17,7 @@ Skill for interactively testing the `packages/openp41ge-file-editor` demo in the
 ```bash
 cd packages/openp41ge-file-editor
 pnpm dev:demo
-# → opens http://localhost:6180/demo/ (Vite dev server)
+# → opens http://localhost:7291/demo/ (Vite dev server)
 ```
 
 Uses Vite dev server with `vite.demo.config.ts` to serve the demo HTML entry point, with HMR and live reload.
@@ -114,7 +114,7 @@ cd packages/openp41ge-file-editor
 pnpm test:e2e
 ```
 
-Starts the Vite dev server automatically (via Playwright `webServer` config on port 6180), runs all E2E tests in headless Chromium, and tears down the server on completion.
+Starts the Vite dev server automatically (via Playwright `webServer` config on port 7291), runs all E2E tests in headless Chromium, and tears down the server on completion.
 
 ### Test Scenarios
 
@@ -171,4 +171,4 @@ select.dispatchEvent(new Event("change"));
 - **`data-panel` vs `data-editor-id`**: Toolbar elements use `data-panel`, the `<file-editor>` uses `data-editor-id`. This avoids selector conflicts in `createEditorState()`.
 - **IPC mock**: The demo provides `window.openp41ge.file.readRange()` and `writeFile()` backed by sessionStorage. If a future feature calls an unmocked method, it will throw.
 - **Grammar resolution**: Grammar `.tmLanguage.json` files are imported as static assets. If a grammar fails to load, that language will have no highlighting.
-- **Port conflicts**: If port 6180 is in use, the Playwright `webServer` will fail. Kill existing processes or update the port.
+- **Port conflicts**: If port 7291 is in use, the Playwright `webServer` will fail. Kill existing processes or update the port.

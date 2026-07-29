@@ -17,7 +17,7 @@ Skill for interactively testing the `packages/openp41ge-tabs` demo in the browse
 ```bash
 cd packages/openp41ge-tabs
 pnpm dev:demo
-# → opens http://localhost:5173/demo/index.html (Vite default port)
+# → opens http://localhost:7291/demo/index.html (Vite default port)
 ```
 
 Uses Vite dev server with `--config vite.demo.config.ts` to serve the demo HTML entry point from the package root, with HMR and live reload. TypeScript is compiled on the fly by Vite's esbuild integration.

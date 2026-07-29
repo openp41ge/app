@@ -16,7 +16,7 @@ Skill for interactively testing the `packages/openp41ge-git-repository` demo in 
 ```bash
 cd packages/openp41ge-git-repository
 pnpm dev:demo
-# → opens http://localhost:5173/demo/index.html (Vite default port)
+# → opens http://localhost:9034/demo/index.html (Vite default port)
 ```
 
 Uses Vite dev server with `DEMO=true` to serve the demo HTML entry point, with HMR and live reload.
