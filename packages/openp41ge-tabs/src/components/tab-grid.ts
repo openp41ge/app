@@ -389,17 +389,22 @@ export class TabGrid extends LitElement {
     };
     this.addEventListener("grid-pin", this._boundOnGridPin);
 
-    // ── Native file drop support ────────────────────────────
+    // ── Native file / repo drop support ──────────────────────
     this._boundOnDragOver = (e: DragEvent) => {
       if (!e.dataTransfer) return;
       const types = e.dataTransfer.types ?? [];
       if (
         types.includes("Files") ||
         types.includes("text/uri-list") ||
-        types.includes("text/plain")
+        types.includes("text/plain") ||
+        types.includes("application/x-openp41ge-repo")
       ) {
         e.preventDefault();
-        e.dataTransfer.dropEffect = "copy";
+        // Repo drags use effectAllowed="move" (set in repo-tree-item dragstart),
+        // so set dropEffect="move" to match. File/URL/text drops use "copy".
+        e.dataTransfer.dropEffect = types.includes("application/x-openp41ge-repo")
+          ? "move"
+          : "copy";
         this._showFileDropGhost(e);
       }
     };
@@ -416,6 +421,62 @@ export class TabGrid extends LitElement {
       this._ghostManager.hideGhost(this);
       if (!e.dataTransfer) return;
 
+      // ── Repo drop ────────────────────────────────────────────
+      const repoName = e.dataTransfer.getData("application/x-openp41ge-repo");
+      if (repoName) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const rect = this.getBoundingClientRect();
+        const relX = e.clientX - rect.left;
+        const pos = computeDropTarget(this, relX, rect.width, this.cols);
+
+        if (pos.isBoundary) {
+          const splitCol =
+            pos.boundaryIndex === 0
+              ? 0
+              : pos.boundaryIndex >= this.cols
+                ? this.cols - 1
+                : pos.col;
+          const splitLeft =
+            pos.boundaryIndex === 0
+              ? true
+              : pos.boundaryIndex >= this.cols
+                ? false
+                : pos.col >= pos.boundaryIndex;
+          this.dispatchEvent(
+            new CustomEvent("grid-open-tab", {
+              bubbles: true,
+              detail: {
+                winId: this.winId,
+                tabType: "git-repository",
+                tabConfig: { repoName },
+                targetCol: splitCol,
+                isBoundary: true,
+                splitCol,
+                splitLeft,
+                pinned: true,
+              },
+            }),
+          );
+        } else {
+          this.dispatchEvent(
+            new CustomEvent("grid-open-tab", {
+              bubbles: true,
+              detail: {
+                winId: this.winId,
+                tabType: "git-repository",
+                tabConfig: { repoName },
+                targetCol: pos.col,
+                pinned: true,
+              },
+            }),
+          );
+        }
+        return;
+      }
+
+      // ── File drop ────────────────────────────────────────────
       const filePaths: string[] = [];
       if (e.dataTransfer.files?.length) {
         for (const file of Array.from(e.dataTransfer.files)) {

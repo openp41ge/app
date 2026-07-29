@@ -134,7 +134,7 @@ export class Openp41geTabsEventHandler {
       this._dispatch("removeTabFromCell", winId, tabId);
     });
 
-    // ── Grid open tab (file drop on cell center or boundary) ───────
+    // ── Grid open tab (file/repo drop on cell center or boundary) ──
     this._on("grid-open-tab", (detail) => {
       const {
         winId: eventWinId,
@@ -148,7 +148,7 @@ export class Openp41geTabsEventHandler {
       } = detail as {
         winId?: string;
         tabType: string;
-        tabConfig: { filePath: string };
+        tabConfig: { filePath: string; repoName?: string };
         targetCol: number;
         isBoundary?: boolean;
         splitCol?: number;
@@ -157,6 +157,47 @@ export class Openp41geTabsEventHandler {
       };
       const winId = eventWinId || this._findWinId();
       if (!winId) return;
+
+      // ── Git repository drop ─────────────────────────────────
+      if (_tabType === "git-repository") {
+        const repoName = tabConfig.repoName;
+        if (!repoName) return;
+
+        // Set pending repo for GitRepositoryController to pick up on mount
+        (window as unknown as Record<string, unknown>).__pendingGitRepo = repoName;
+
+        const focusCol = isBoundary
+          ? (splitLeft ?? true)
+            ? (splitCol ?? targetCol)
+            : (splitCol ?? targetCol) + 1
+          : targetCol;
+        Openp41geTabsEventHandler.lastFocusedCol[winId] = focusCol;
+
+        if (isBoundary) {
+          this._dispatch(
+            "splitFileOpen",
+            winId,
+            "git-repository",
+            repoName,
+            repoName,
+            splitCol ?? targetCol,
+            splitLeft ?? true,
+          );
+        } else {
+          this._dispatch(
+            "actionOpenFile",
+            winId,
+            "git-repository",
+            repoName,
+            repoName,
+            targetCol,
+            true,
+          );
+        }
+        return;
+      }
+
+      // ── File drop ───────────────────────────────────────────
       const filePath = tabConfig.filePath;
       const fileName = filePath.split("/").pop() || filePath;
       const isPinned = pinned ?? true;

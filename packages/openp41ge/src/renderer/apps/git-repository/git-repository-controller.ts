@@ -79,8 +79,11 @@ export class GitRepositoryController extends BaseController implements TabContro
   }
 
   restore(state: Record<string, unknown>): void {
-    if (state.repoName && typeof state.repoName === "string") {
-      this.repoName = state.repoName;
+    // repoName is set by snapshot(); filePath is the tab config key
+    // used by actionOpenFile/openTabInCell (passed from the drag-drop flow).
+    const name = state.repoName || state.filePath;
+    if (name && typeof name === "string") {
+      this.repoName = name;
     }
   }
 
