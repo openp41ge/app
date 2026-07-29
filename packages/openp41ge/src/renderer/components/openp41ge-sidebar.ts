@@ -41,8 +41,16 @@ class Openp41geSidebar extends LitElement {
   @property({ attribute: false })
   activeViewId: string | null = null;
 
+  /** Override width default with persisted value BEFORE first Lit render. */
   @property({ attribute: false })
-  width: number = 280;
+  width: number = (() => {
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (saved) {
+      const w = parseInt(saved, 10);
+      if (!isNaN(w) && w >= 180 && w <= 600) return w;
+    }
+    return 280;
+  })();
 
   @state()
   private _view: SidebarView | null = null;
@@ -54,15 +62,6 @@ class Openp41geSidebar extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     document.addEventListener("openp41ge:activity-click", this._onActivityClick as EventListener);
-    // Restore persisted sidebar width — the parent no longer passes .width,
-    // so localStorage is the single source of truth on initial load.
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    if (saved) {
-      const w = parseInt(saved, 10);
-      if (!isNaN(w) && w >= 180 && w <= 600) {
-        this.width = w;
-      }
-    }
   }
 
   disconnectedCallback(): void {
