@@ -429,12 +429,10 @@ export class Openp41geRepoTreeItem extends LitElement {
           }}
         >
           <span
-            class="inline-flex items-center shrink-0 w-4 h-4"
             class="rti-icon inline-flex items-center shrink-0 w-4 h-4${isUntracked ? " untracked" : ""}"
             >${unsafeHTML(getFileIcon(entry.name))}</span
           >
           <span
-            class="overflow-hidden text-ellipsis whitespace-nowrap"
             class="rti-label overflow-hidden text-ellipsis whitespace-nowrap${isUntracked ? " untracked" : ""}"
             >${entry.name}</span
           >

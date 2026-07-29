@@ -102,8 +102,8 @@ class Openp41geWindowView extends LitElement {
           class="openp41ge-main-area flex flex-1 overflow-hidden min-h-0 relative"
         >
           <div
-            class="openp41ge-grid-area relative overflow-hidden"
-            class="wv-code" style="--wv-code-min:200px"
+            class="wv-code openp41ge-grid-area relative overflow-hidden"
+            style="--wv-code-min:200px"
           >
             <tab-grid
               winId=${win.id}
@@ -194,8 +194,8 @@ class Openp41geWindowView extends LitElement {
           }
         </div>
         <div
-          class="prompt-overlay bg-bg-primary border border-border-color rounded-xl px-3 py-2 z-50 shrink-0 opacity-0 invisible pointer-events-none transition-all duration-150 ease-[ease] origin-bottom-center"
-          class="wv-search" style="--wv-b:36px;--wv-l:50%;--wv-t:translateX(-50%) scale(0.85) translateY(8px);--wv-w:520px;--wv-mw:90vw;--wv-s:0 -4px 20px rgba(0,0,0,0.4);"
+          class="wv-search prompt-overlay bg-bg-primary border border-border-color rounded-xl px-3 py-2 z-50 shrink-0 opacity-0 invisible pointer-events-none transition-all duration-150 ease-[ease] origin-bottom-center"
+          style="--wv-b:36px;--wv-l:50%;--wv-t:translateX(-50%) scale(0.85) translateY(8px);--wv-w:520px;--wv-mw:90vw;--wv-s:0 -4px 20px rgba(0,0,0,0.4);"
         >
           <div class="flex items-start gap-2">
             <textarea

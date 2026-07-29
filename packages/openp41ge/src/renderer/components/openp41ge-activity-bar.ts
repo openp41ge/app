@@ -66,8 +66,8 @@ class Openp41geActivityBar extends LitElement {
   render(): TemplateResult | typeof nothing {
     return html`
       <div
-        class="flex flex-col items-center bg-gutter border-l border-divider shrink-0 select-none"
-        class="ab-panel h-full" style="--ab-w:${ACTIVITY_BAR_WIDTH}px"
+        class="ab-panel h-full flex flex-col items-center bg-gutter border-l border-divider shrink-0 select-none"
+        style="--ab-w:${ACTIVITY_BAR_WIDTH}px"
       >
         <!-- Activity buttons -->
         <div

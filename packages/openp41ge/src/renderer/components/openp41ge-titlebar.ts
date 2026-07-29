@@ -79,8 +79,8 @@ class Openp41geTitleBar extends LitElement {
 
     return html`
       <div
-        class="flex items-center bg-gutter border-b border-divider shrink-0 select-none relative"
-        class="tb-row" style="--tb-h:${HEIGHT}px;-webkit-app-region:drag;"
+        class="tb-row flex items-center bg-gutter border-b border-divider shrink-0 select-none relative"
+        style="--tb-h:${HEIGHT}px;-webkit-app-region:drag;"
       >
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
         <div class="tb-mw shrink-0" style="--tb-mw:${isMac ? 85 : 12}px"></div>
