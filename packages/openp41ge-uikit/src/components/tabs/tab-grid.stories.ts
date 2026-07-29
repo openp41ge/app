@@ -774,7 +774,7 @@ export default meta;
 type Story = StoryObj;
 
 export const SingleGridDemo: Story = {
-  render: () => html`<single-grid-app></single-grid-app>`,
+  render: () => html`<single-grid-demo></single-grid-demo>`,
 };
 
 export const MultiGridDemo: Story = {
