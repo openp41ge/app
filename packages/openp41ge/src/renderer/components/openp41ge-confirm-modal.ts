@@ -75,13 +75,6 @@ class Openp41geConfirmModal extends LitElement {
       this._confirmStyle = v;
     }
   }
-  get confirmStyle(): string {
-    return this._confirmStyle;
-  }
-  set confirmStyle(v: string) {
-    this._confirmStyle = v;
-  }
-
   private _resolve: ((value: boolean) => void) | null = null;
   private _cleanup: (() => void) | null = null;
   private _renderDone = false;
