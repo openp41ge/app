@@ -12,6 +12,7 @@
  *     window.openp41ge.workspaceController
  */
 
+import { chevronRight, chevronDown } from "../../icons";
 import type { SidebarView } from "./sidebar-view";
 
 interface RepoEntry {
@@ -181,18 +182,12 @@ export class GitSidebarView implements SidebarView {
       header.style.background = "transparent";
     });
 
-    // Chevron
+    // Chevron (same SVG size as explorer sidebar: 10px)
     const chevron = document.createElement("span");
-    chevron.textContent = expanded ? "\u25BE" : "\u25B8";
+    chevron.innerHTML = expanded ? chevronDown(10) : chevronRight(10);
     chevron.style.cssText =
-      "width:12px;text-align:center;flex-shrink:0;color:#888;font-size:8px;margin-right:4px;";
+      "width:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#888;";
     header.appendChild(chevron);
-
-    // Repo icon
-    const icon = document.createElement("span");
-    icon.textContent = "\u{1F4E6}";
-    icon.style.cssText = "margin-right:4px;font-size:12px;flex-shrink:0;";
-    header.appendChild(icon);
 
     // Repo name
     const name = document.createElement("span");
@@ -227,12 +222,6 @@ export class GitSidebarView implements SidebarView {
           const wtRow = document.createElement("div");
           wtRow.style.cssText =
             "display:flex;align-items:center;padding:2px 8px 2px 24px;font-size:11px;color:#aaa;user-select:none;";
-
-          // Branch icon
-          const branchIcon = document.createElement("span");
-          branchIcon.textContent = "\u2442";
-          branchIcon.style.cssText = "margin-right:4px;color:#666;font-size:10px;flex-shrink:0;";
-          wtRow.appendChild(branchIcon);
 
           const wtName = document.createElement("span");
           wtName.textContent = wt.branch;
