@@ -529,9 +529,13 @@ export class Openp41geTree extends LitElement {
     const isLoading = this._loadingNodeIds.has(node.id);
 
     // Indentation: section headers get extra left padding
+    const extraIndent = parseInt(
+      getComputedStyle(this).getPropertyValue("--tree-indent").trim() || "0",
+      10,
+    );
     const rowIndent = isSection
-      ? this.depth * INDENT + SECTION_EXTRA
-      : this.depth * INDENT;
+      ? this.depth * INDENT + SECTION_EXTRA + extraIndent
+      : this.depth * INDENT + extraIndent;
     // Content inside the row is shifted so chevron/icon start at the indent
     const contentPad = isSection ? 8 : 8; // base padding on left
 
