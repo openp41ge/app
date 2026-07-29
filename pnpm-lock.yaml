@@ -218,6 +218,25 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/openp41ge-editor-engine:
+    dependencies:
+      openp41ge-piece-tree:
+        specifier: workspace:*
+        version: link:../openp41ge-piece-tree
+      openp41ge-syntax-highlighting:
+        specifier: workspace:*
+        version: link:../openp41ge-syntax-highlighting
+      vscode-textmate:
+        specifier: ^9.3.2
+        version: 9.3.2
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/openp41ge-git:
     devDependencies:
       typescript:
@@ -307,6 +326,9 @@ importers:
       lit:
         specifier: ^3.2.0
         version: 3.3.3
+      openp41ge-editor-engine:
+        specifier: workspace:*
+        version: link:../openp41ge-editor-engine
       openp41ge-piece-tree:
         specifier: workspace:*
         version: link:../openp41ge-piece-tree

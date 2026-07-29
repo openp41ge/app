@@ -22,6 +22,7 @@ export default defineConfig({
       { find: "openp41ge-uikit/theme", replacement: path.resolve(__dirname, "../openp41ge-uikit/src/theme") },
       { find: "openp41ge-syntax-highlighting", replacement: path.resolve(__dirname, "../openp41ge-syntax-highlighting/src") },
       { find: "openp41ge-tabs", replacement: path.resolve(__dirname, "../openp41ge-tabs/src") },
+      { find: "openp41ge-editor-engine", replacement: path.resolve(__dirname, "../openp41ge-editor-engine/src") },
       {
         find: "openp41ge-file-editor",
         replacement: path.resolve(__dirname, "../openp41ge-uikit/src/file-editor"),

@@ -14,34 +14,34 @@ import {
   EVENT_DIRTY_CHANGED,
   EVENT_FILE_SAVED,
   EVENT_REQUEST_CLOSE,
-} from "../../file-editor/events";
+} from "openp41ge-editor-engine/events";
 import type {
   TitleChangedDetail,
   DirtyChangedDetail,
   FileSavedDetail,
   RequestCloseDetail,
-} from "../../file-editor/events";
+} from "openp41ge-editor-engine/events";
 
-import type { PieceTreeTextContentModel } from "../../file-editor/model/piece-tree-text-content-model";
-import type { TextContentChangeEvent, TextPosition, TextSelection } from "../../file-editor/model";
-import { ViewModel } from "../../file-editor/model/view-model";
-import type { ViewModelEvent } from "../../file-editor/model/view-model";
-import { ViewLines } from "../../file-editor/view/view-lines";
-import { computeWrapSegments } from "../../file-editor/view/word-wrap-helper";
-import { ViewportWrapColumnCalculator } from "../../file-editor/view/wrap-column-calculator";
-import type { IWrapColumnCalculator } from "../../file-editor/view/wrap-column-calculator";
-import { ScrollManager } from "../../file-editor/view/scroll-manager";
-import { CursorController } from "../../file-editor/cursor/cursor-controller";
-import { TextAreaInput } from "../../file-editor/input/text-area-input";
-import { KeyboardHandler } from "../../file-editor/input/keyboard-handler";
-import { CursorRenderer } from "../../file-editor/rendering/cursor-renderer";
-import { SelectionRenderer } from "../../file-editor/rendering/selection-renderer";
-import { LineNumbersOverlay } from "../../file-editor/rendering/line-numbers-overlay";
-import { CurrentLineHighlight } from "../../file-editor/rendering/current-line-highlight";
-import { IndentationGuides } from "../../file-editor/rendering/indentation-guides";
-import { findMatchingBracket } from "../../file-editor/rendering/bracket-matching";
-import { BracketPairService } from "../../file-editor/rendering/bracket-pair-service";
-import type { BracketLineInput } from "../../file-editor/rendering/bracket-pair-service";
+import type { PieceTreeTextContentModel } from "openp41ge-editor-engine/model/piece-tree-text-content-model";
+import type { TextContentChangeEvent, TextPosition, TextSelection } from "openp41ge-editor-engine/model";
+import { ViewModel } from "openp41ge-editor-engine/model/view-model";
+import type { ViewModelEvent } from "openp41ge-editor-engine/model/view-model";
+import { ViewLines } from "openp41ge-editor-engine/view/view-lines";
+import { computeWrapSegments } from "openp41ge-editor-engine/view/word-wrap-helper";
+import { ViewportWrapColumnCalculator } from "openp41ge-editor-engine/view/wrap-column-calculator";
+import type { IWrapColumnCalculator } from "openp41ge-editor-engine/view/wrap-column-calculator";
+import { ScrollManager } from "openp41ge-editor-engine/view/scroll-manager";
+import { CursorController } from "openp41ge-editor-engine/cursor/cursor-controller";
+import { TextAreaInput } from "openp41ge-editor-engine/input/text-area-input";
+import { KeyboardHandler } from "openp41ge-editor-engine/input/keyboard-handler";
+import { CursorRenderer } from "openp41ge-editor-engine/rendering/cursor-renderer";
+import { SelectionRenderer } from "openp41ge-editor-engine/rendering/selection-renderer";
+import { LineNumbersOverlay } from "openp41ge-editor-engine/rendering/line-numbers-overlay";
+import { CurrentLineHighlight } from "openp41ge-editor-engine/rendering/current-line-highlight";
+import { IndentationGuides } from "openp41ge-editor-engine/rendering/indentation-guides";
+import { findMatchingBracket } from "openp41ge-editor-engine/rendering/bracket-matching";
+import { BracketPairService } from "openp41ge-editor-engine/rendering/bracket-pair-service";
+import type { BracketLineInput } from "openp41ge-editor-engine/rendering/bracket-pair-service";
 import { initTextMate } from "openp41ge-syntax-highlighting/textmate-init";
 import { TokenRegistry } from "openp41ge-syntax-highlighting/token-registry";
 
@@ -49,16 +49,16 @@ import { TokenRegistry } from "openp41ge-syntax-highlighting/token-registry";
 // Declared at module top level to avoid temporal dead zone (TDZ) issues
 // when the class references it during connectedCallback / firstUpdated.
 let _tokenRegistryInstance: TokenRegistry | null = null;
-import { getThemeById, generateThemeCSS, generateGlobalEditorCSS } from "../../file-editor/themes";
-import type { SyntaxTheme } from "../../file-editor/themes";
+import { getThemeById, generateThemeCSS, generateGlobalEditorCSS } from "openp41ge-editor-engine/themes";
+import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
 import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
-import { ClipboardHandler } from "../../file-editor/input/clipboard-handler";
-import { CompositionHandler } from "../../file-editor/input/composition-handler";
-import { MouseHandler } from "../../file-editor/input/mouse-handler";
-import { checkAutoClose, shouldSkipClose } from "../../file-editor/input/auto-closing-pairs";
+import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
+import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
+import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
+import { checkAutoClose, shouldSkipClose } from "openp41ge-editor-engine/input/auto-closing-pairs";
 import "./openp41ge-bottom-bar";
 import type { FeStatusBar } from "./openp41ge-bottom-bar";
-import type { IFormatterRegistry } from "../../file-editor/interfaces/formatter-registry";
+import type { IFormatterRegistry } from "openp41ge-editor-engine/interfaces/formatter-registry";
 
 export type FileEditorState = "loading" | "ready" | "error" | "empty";
 

@@ -132,8 +132,26 @@ Each extraction follows the same pattern:
 - [ ] file-editor engine extracted, builds, components import from new package  
 - [ ] git-repository extracted, builds
 - [ ] uikit `index.ts` exports only UI components/icons/theme
-- [ ] Full `nx build` passes
+- [x] Full `nx build` passes
 - [ ] `nx dev` launches without errors
+
+## Remaining Work
+
+### File-editor engine extraction (~80 files)
+This is the largest extraction. The plan is:
+- New package: packages/openp41ge-editor-engine/
+- Move: model/, cursor/, input/, rendering/, view/, themes/, interfaces/, services/, events.ts
+- Keep in uikit: src/components/file-editor/ (web component only)
+- File-editor component imports from openp41ge-editor-engine
+- Tokenization already in openp41ge-syntax-highlighting (removed from file-editor)
+
+### Git-repository extraction (small)
+- Move src/git-repository/ → packages/openp41ge-git-repository/
+- Keep in uikit re-exports
+
+### Uikit cleanup
+- Remove empty directories
+- Finalize index.ts exports
 
 ## Resolved
 
