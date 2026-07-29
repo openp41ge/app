@@ -9,7 +9,7 @@ export { tailwindCSS } from "./generated/tailwind";
 // Re-export theme definitions from the merged openp41ge-themes package
 export * from "./theme";
 
-// ─── Tabs (merged from openp41ge-tabs) ────────────────────────────────────
+// ─── Tabs (from openp41ge-tabs) ────────────────────────────────────────────
 export type {
   IDragSource,
   IDropTarget,
@@ -18,18 +18,18 @@ export type {
   DragResult,
   TargetFeedback,
   GhostFactory,
-} from "./tabs/interfaces";
-export { TabDragSource } from "./tabs/sources/tab-drag-source";
-export { TabBarDropTarget, TAB_BAR_EVENTS } from "./tabs/targets/tab-bar-drop-target";
-export { GridDropTarget, GRID_EVENTS } from "./tabs/targets/grid-drop-target";
-export type { WorkspaceLike, GridElementLike } from "./tabs/targets/grid-drop-target";
-export { DragOrchestrator, DRAG_EVENTS, defaultTargetResolver } from "./tabs/orchestrator";
-export type { TargetResolver } from "./tabs/orchestrator";
-export { GhostManager } from "./tabs/ghost-manager";
-export type { GhostPreview } from "./tabs/ghost-manager";
-export { computeGhostLayout } from "./tabs/ghost-layout";
-export type { GhostColumn } from "./tabs/ghost-layout";
-export { CursorManager } from "./tabs/cursor-manager";
+} from "openp41ge-tabs/interfaces";
+export { TabDragSource } from "openp41ge-tabs/sources/tab-drag-source";
+export { TabBarDropTarget, TAB_BAR_EVENTS } from "openp41ge-tabs/targets/tab-bar-drop-target";
+export { GridDropTarget, GRID_EVENTS } from "openp41ge-tabs/targets/grid-drop-target";
+export type { WorkspaceLike, GridElementLike } from "openp41ge-tabs/targets/grid-drop-target";
+export { DragOrchestrator, DRAG_EVENTS, defaultTargetResolver } from "openp41ge-tabs/orchestrator";
+export type { TargetResolver } from "openp41ge-tabs/orchestrator";
+export { GhostManager } from "openp41ge-tabs/ghost-manager";
+export type { GhostPreview } from "openp41ge-tabs/ghost-manager";
+export { computeGhostLayout } from "openp41ge-tabs/ghost-layout";
+export type { GhostColumn } from "openp41ge-tabs/ghost-layout";
+export { CursorManager } from "openp41ge-tabs/cursor-manager";
 export { TabGrid, TabBar, TabView, TabContent } from "./components/tabs/index";
 export {
   INSERT_BOUNDARY_THRESHOLD,
@@ -39,8 +39,8 @@ export {
   getDropIndexInBar,
   splitCellForBoundary,
   isSameFilePathInCell,
-} from "./tabs/boundary";
-export type { GridPosition } from "./tabs/boundary";
+} from "openp41ge-tabs/boundary";
+export type { GridPosition } from "openp41ge-tabs/boundary";
 
 // ─── Git Repository Browser (merged from openp41ge-git-repository) ────────
 export { FileEditorElement } from "./components/file-editor/file-editor";

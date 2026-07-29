@@ -38,9 +38,6 @@ export type { GhostColumn } from "./ghost-layout";
 // ─── Cursor ───────────────────────────────────────────────────────────────
 export { CursorManager } from "./cursor-manager";
 
-// ─── Components ────────────────────────────────────────────────────────────
-export { TabGrid, TabBar, TabView, TabContent } from "../components/tabs/index";
-
 // ─── Boundary / utilities ─────────────────────────────────────────────────
 export {
   INSERT_BOUNDARY_THRESHOLD,

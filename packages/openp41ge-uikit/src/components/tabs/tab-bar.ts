@@ -8,8 +8,8 @@
 
 import { LitElement, html, nothing } from "lit";
 import { property } from "lit/decorators.js";
-import { TabBarDropTarget } from "../../tabs/targets/tab-bar-drop-target";
-import { getDropIndexInBar } from "../../tabs/boundary";
+import { TabBarDropTarget } from "openp41ge-tabs/targets/tab-bar-drop-target";
+import { getDropIndexInBar } from "openp41ge-tabs/boundary";
 
 /** Scroll speed for overflowing tab text (pixels per second). */
 const TAB_TEXT_SCROLL_SPEED = 40;

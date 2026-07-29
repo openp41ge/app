@@ -20,7 +20,8 @@ export default defineConfig({
       { find: "openp41ge-logger", replacement: path.resolve(__dirname, "../openp41ge-logger/src") },
       { find: "openp41ge-uikit", replacement: path.resolve(__dirname, "../openp41ge-uikit/src") },
       { find: "openp41ge-uikit/theme", replacement: path.resolve(__dirname, "../openp41ge-uikit/src/theme") },
-      { find: "openp41ge-uikit/syntax-highlighting", replacement: path.resolve(__dirname, "../openp41ge-uikit/src/syntax-highlighting") },
+      { find: "openp41ge-syntax-highlighting", replacement: path.resolve(__dirname, "../openp41ge-syntax-highlighting/src") },
+      { find: "openp41ge-tabs", replacement: path.resolve(__dirname, "../openp41ge-tabs/src") },
       {
         find: "openp41ge-file-editor",
         replacement: path.resolve(__dirname, "../openp41ge-uikit/src/file-editor"),

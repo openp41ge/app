@@ -7,7 +7,6 @@ export default defineConfig({
       entry: {
         index: path.resolve(__dirname, "src/index.ts"),
         theme: path.resolve(__dirname, "src/theme/index.ts"),
-        tabs: path.resolve(__dirname, "src/tabs/index.ts"),
         "git-repository": path.resolve(__dirname, "src/git-repository/index.ts"),
         "file-editor": path.resolve(__dirname, "src/file-editor/index.ts"),
       },
@@ -19,5 +18,10 @@ export default defineConfig({
     sourcemap: true,
     // Don't extract CSS — components inline it from generated/tailwind.ts
     cssCodeSplit: false,
+    rollupOptions: {
+      external: [
+        /^openp41ge-/,
+      ],
+    },
   },
 });
