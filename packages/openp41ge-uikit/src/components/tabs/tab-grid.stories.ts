@@ -444,33 +444,29 @@ class TabsDemoApp extends LitElement {
   override render(): TemplateResult {
     return html`
       <style>
-        .tabs-demo { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #ccc; padding: 16px; min-height: 100vh; }
-        .tabs-demo h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
-        .tabs-demo h1 span { color: rgb(74, 158, 255); }
-        .tabs-demo p { margin: 0 0 16px; font-size: 12px; color: #888; }
-        .tabs-demo { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #ccc; padding: 16px; min-height: 100vh; box-sizing: border-box; }
+        .tabs-demo { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #ccc; padding: 16px; height: 100vh; overflow-y: auto; box-sizing: border-box; }
         .tabs-demo h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
         .tabs-demo h1 span { color: rgb(74, 158, 255); }
         .tabs-demo p { margin: 0 0 16px; font-size: 12px; color: #888; }
         tab-grid { flex: 1; }
       </style>
 
-      <div class="tabs-demo" style="display:flex;flex-direction:column;height:100vh;overflow-y:auto;">
+      <div class="tabs-demo" style="display:flex;flex-direction:column;height:100vh;">
         <h1>Openp41ge <span>Tabs</span></h1>
         <p>VS Code-style editor groups. Drag tabs to column edges to split, across columns to rearrange, or between grids to move between groups.</p>
 
-        <div class="multi-body" style="display:flex;flex:1;gap:12px;min-height:0;">
-          <div class="multi-grids" style="display:flex;flex-direction:column;gap:12px;flex:1;min-width:0;">
-            <tab-grid id="editor-grid" style="flex:1;min-height:100px;"></tab-grid>
-            <div class="multi-bottom" style="display:flex;gap:8px;flex:1;min-height:80px;">
-              <tab-grid id="side-grid-a" style="flex:1;"></tab-grid>
-              <tab-grid id="side-grid-b" style="flex:1;"></tab-grid>
-            </div>
+        <div class="multi-body" style="display:flex;flex-direction:column;flex:1;gap:12px;min-height:0;">
+          <div class="multi-row" style="display:flex;gap:8px;flex:1;min-height:0;">
+            <tab-grid id="editor-grid" style="flex:1;"></tab-grid>
+            <div class="multi-tree-panel" style="width:220px;flex-shrink:0;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
           </div>
-          <div class="multi-tree-column" style="width:220px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
-            <div class="multi-tree-panel" style="flex:1;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
-            <div class="multi-tree-panel" style="flex:1;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
-            <div class="multi-tree-panel" style="flex:1;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+          <div class="multi-row" style="display:flex;gap:8px;flex:1;min-height:0;">
+            <tab-grid id="side-grid-a" style="flex:1;"></tab-grid>
+            <div class="multi-tree-panel" style="width:220px;flex-shrink:0;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+          </div>
+          <div class="multi-row" style="display:flex;gap:8px;flex:1;min-height:0;">
+            <tab-grid id="side-grid-b" style="flex:1;"></tab-grid>
+            <div class="multi-tree-panel" style="width:220px;flex-shrink:0;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
           </div>
         </div>
 
