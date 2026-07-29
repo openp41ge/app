@@ -40,6 +40,10 @@ export default defineConfig({
         find: "openp41ge-agent-chat",
         replacement: path.resolve(__dirname, "../openp41ge-agent-chat/src"),
       },
+      {
+        find: "openp41ge-components",
+        replacement: path.resolve(__dirname, "../openp41ge-components/src"),
+      },
     ],
   },
   server: {

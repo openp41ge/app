@@ -6,26 +6,30 @@
  *
  * Tokens reference existing CSS custom properties where possible so they
  * respond to theme changes (dark/light mode) at runtime.
+ *
+ * Usage in components:
+ *   <div class="text-muted bg-gutter border-divider">…</div>
+ *   <div class="text-accent bg-hover:hover">…</div>
  */
 
 export default {
   theme: {
     extend: {
       colors: {
-        // Backgrounds
+        // Text colours
+        primary: "var(--text-primary, #ccc)",
+        secondary: "var(--text-secondary, #aaa)",
+        muted: "var(--text-muted, #888)",
+        accent: "var(--accent-hover, #4a9eff)",
+
+        // Background colours
         "bg-primary": "var(--bg-primary, #1a1a1a)",
-        "bg-gutter": "var(--bg-gutter, #161616)",
-        "bg-hover": "var(--bg-hover, rgba(255,255,255,0.04))",
-        "bg-selected": "rgba(74,158,255,0.08)",
+        gutter: "var(--bg-gutter, #161616)",
+        hover: "rgba(255,255,255,0.04)",
+        selected: "rgba(74,158,255,0.08)",
 
-        // Text
-        "text-primary": "var(--text-primary, #ccc)",
-        "text-secondary": "var(--text-secondary, #aaa)",
-        "text-muted": "var(--text-muted, #888)",
-        "text-accent": "var(--accent-hover, #4a9eff)",
-
-        // Borders
-        "border-divider": "var(--border-divider, #2a2a2a)",
+        // Border
+        divider: "var(--border-divider, #2a2a2a)",
       },
       fontFamily: {
         mono: ['"SF Mono"', "Monaco", "Menlo", "Consolas", "monospace"],
