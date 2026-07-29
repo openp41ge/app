@@ -25,6 +25,8 @@ const GRID_MIN_WIDTH = 200;
 const ACTIVITY_BAR_WIDTH = 48;
 const BORDER_WIDTH = 3;
 
+const SIDEBAR_WIDTH_KEY = "openp41ge:sidebar-width";
+
 class Openp41geSidebar extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -39,8 +41,24 @@ class Openp41geSidebar extends LitElement {
   @property({ attribute: false })
   activeViewId: string | null = null;
 
+  /**
+   * The sidebar width. Initialises to the persisted localStorage value
+   * (if available) to avoid a visible jump when the async workspace state
+   * arrives with the stored width.
+   */
   @property({ attribute: false })
-  width: number = 280;
+  get width(): number {
+    return this._width;
+  }
+  set width(val: number) {
+    // If we have a saved width and the parent passes the default (280),
+    // ignore it — the saved value was already applied in connectedCallback.
+    if (val === 280 && this._hasSavedWidth && this._width !== 280) return;
+    this._width = val;
+    this.requestUpdate("width", this._width);
+  }
+  private _width: number = 280;
+  private _hasSavedWidth = false;
 
   @state()
   private _view: SidebarView | null = null;
@@ -52,6 +70,15 @@ class Openp41geSidebar extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     document.addEventListener("openp41ge:activity-click", this._onActivityClick as EventListener);
+    // Restore persisted sidebar width synchronously to avoid initial jump
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (saved) {
+      const w = parseInt(saved, 10);
+      if (!isNaN(w) && w >= 180 && w <= 600) {
+        this._width = w;
+        this._hasSavedWidth = true;
+      }
+    }
   }
 
   disconnectedCallback(): void {
@@ -176,6 +203,7 @@ class Openp41geSidebar extends LitElement {
     if (notch) notch.classList.remove("dragging");
 
     // Persist the new width
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(this.width));
     if (this.windowId && this.worksetId) {
       dispatch("setSidebarWidthOp", this.windowId, this.worksetId, this.width);
     }
