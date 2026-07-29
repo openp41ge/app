@@ -32,7 +32,7 @@
     "storybook": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tailwindcss -i src/styles.css -o dist/styles.css && node scripts/inline-css.mjs && storybook dev -p 6006",
+        "command": "tailwindcss -i src/styles.css -o dist/styles.css && node scripts/inline-css.mjs && ./node_modules/.bin/storybook dev -p 6006",
         "cwd": "{projectRoot}"
       }
     },

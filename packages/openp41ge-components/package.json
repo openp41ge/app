@@ -18,8 +18,8 @@
     "build:css": "tailwindcss -i src/styles.css -o dist/styles.css",
     "build:inline": "node scripts/inline-css.mjs",
     "build": "npm run build:css && npm run build:inline && vite build",
-    "storybook": "storybook dev -p 6006",
-    "build:storybook": "storybook build",
+    "storybook": "./node_modules/.bin/storybook dev -p 6006",
+    "build:storybook": "./node_modules/.bin/storybook build",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist src/generated"
   },
