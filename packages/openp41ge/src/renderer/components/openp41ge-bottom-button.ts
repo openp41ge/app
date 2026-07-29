@@ -6,10 +6,13 @@
  * so its icon isn't clipped by the window's rounded corner.
  */
 
-import { LitElement, html } from "lit";
+import { LitElement, html, unsafeCSS } from "lit";
 import { property } from "lit/decorators.js";
+import { tailwindCSS } from "openp41ge-components";
 
 export class Openp41geBottomButton extends LitElement {
+  static styles = unsafeCSS(tailwindCSS);
+
   /** When true, adds extra right padding (for the rightmost button). */
   @property({ type: Boolean, reflect: true })
   flat = false;
