@@ -74,7 +74,7 @@ const EventLogPanelWrapper: React.FC = () => {
                   lineHeight: "1.4",
                 } as React.CSSProperties,
               },
-              `[${i + 1}] ${event}`,
+              `[${reverse ? events.length - i : i + 1}] ${event}`,
             ),
           ),
     ),
