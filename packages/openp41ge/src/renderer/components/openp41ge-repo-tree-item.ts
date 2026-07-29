@@ -517,16 +517,19 @@ export class Openp41geRepoTreeItem extends LitElement {
                           ${
                             this._expandedWorktrees.has(wt.branch) &&
                             this._fileLoader.isWorktreeLoaded(wt.branch)
-                              ? html`<openp41ge-tree
-                                  .nodes=${this._buildFileTreeNodes(wt.branch)}
-                                  .renderIcon=${this._renderIcon}
-                                  .onToggle=${this._makeDirToggle(wt.branch)}
-                                  .onExpandedChange=${this._makeDirExpandedChange(wt.branch)}
-                                  depth="0"
-                                  @tree-node-click=${this._onFileClick}
-                                  @tree-node-dblclick=${this._onFileDblClick}
-                                  @tree-node-contextmenu=${this._onFileContextMenu}
-                                ></openp41ge-tree>`
+                              ? html`<div style="padding-left:20px">
+                                  <openp41ge-tree
+                                    style="--tree-font-size:12px"
+                                    .nodes=${this._buildFileTreeNodes(wt.branch)}
+                                    .renderIcon=${this._renderIcon}
+                                    .onToggle=${this._makeDirToggle(wt.branch)}
+                                    .onExpandedChange=${this._makeDirExpandedChange(wt.branch)}
+                                    depth="0"
+                                    @tree-node-click=${this._onFileClick}
+                                    @tree-node-dblclick=${this._onFileDblClick}
+                                    @tree-node-contextmenu=${this._onFileContextMenu}
+                                  ></openp41ge-tree>
+                                </div>`
                               : ""
                           }
                         `,
