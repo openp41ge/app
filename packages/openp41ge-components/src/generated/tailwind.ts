@@ -49,6 +49,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   left: -1px
 }
 
+.-top-px {
+  top: -1px
+}
+
 .left-0 {
   left: 0px
 }
@@ -126,6 +130,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 .my-1 {
   margin-top: 0.25rem;
   margin-bottom: 0.25rem
+}
+
+.-ml-2 {
+  margin-left: -0.5rem
 }
 
 .-mt-px {
@@ -300,6 +308,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 1.75rem
 }
 
+.h-8 {
+  height: 2rem
+}
+
 .h-9 {
   height: 2.25rem
 }
@@ -394,6 +406,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .w-6 {
   width: 1.5rem
+}
+
+.w-7 {
+  width: 1.75rem
 }
 
 .w-9 {
@@ -511,6 +527,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   animation: pull-indeterminate 1.2s linear infinite
 }
 
+.animate-\[spinner-rotate_0\.8s_linear_infinite\] {
+  animation: spinner-rotate 0.8s linear infinite
+}
+
 .animate-\[wt-spin_0\.8s_linear_infinite\] {
   animation: wt-spin 0.8s linear infinite
 }
@@ -531,6 +551,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .cursor-default {
   cursor: default
+}
+
+.cursor-grab {
+  cursor: grab
 }
 
 .cursor-pointer {
@@ -779,6 +803,14 @@ export const tailwindCSS: string = `.pointer-events-none {
   background-color: rgba(74,158,255,0.12)
 }
 
+.bg-\[var\(--openp41ge-hover-bg\2c \#2a2a2a\)\] {
+  background-color: var(--openp41ge-hover-bg,#2a2a2a)
+}
+
+.bg-\[var\(--openp41ge-input-bg\2c \#2a2a2a\)\] {
+  background-color: var(--openp41ge-input-bg,#2a2a2a)
+}
+
 .bg-accent {
   background-color: var(--text-accent, #569cd6)
 }
@@ -957,6 +989,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 0.75rem
 }
 
+.pl-2 {
+  padding-left: 0.5rem
+}
+
 .pl-3 {
   padding-left: 0.75rem
 }
@@ -971,6 +1007,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .pl-\[24px\] {
   padding-left: 24px
+}
+
+.pr-1 {
+  padding-right: 0.25rem
 }
 
 .pr-2 {
@@ -1026,6 +1066,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   line-height: 18px
 }
 
+.text-xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem
+}
+
 .text-xs {
   font-size: 11px;
   line-height: 16px
@@ -1055,6 +1100,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   font-style: normal
 }
 
+.leading-\[1\.2\] {
+  line-height: 1.2
+}
+
 .leading-\[1\.4\] {
   line-height: 1.4
 }
@@ -1074,6 +1123,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 .text-\[\#4caf50\] {
   --tw-text-opacity: 1;
   color: rgb(76 175 80 / var(--tw-text-opacity, 1))
+}
+
+.text-\[\#555\] {
+  --tw-text-opacity: 1;
+  color: rgb(85 85 85 / var(--tw-text-opacity, 1))
 }
 
 .text-\[\#8a8a8a\] {
@@ -1125,6 +1179,18 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .text-\[rgba\(255\2c 255\2c 255\2c \.7\)\] {
   color: rgba(255,255,255,.7)
+}
+
+.text-\[var\(--openp41ge-accent-color\2c \#4a9eff\)\] {
+  color: var(--openp41ge-accent-color,#4a9eff)
+}
+
+.text-\[var\(--openp41ge-muted-text\2c \#888\)\] {
+  color: var(--openp41ge-muted-text,#888)
+}
+
+.text-\[var\(--openp41ge-text-color\2c \#e0e0e0\)\] {
+  color: var(--openp41ge-text-color,#e0e0e0)
 }
 
 .text-accent {
@@ -1182,6 +1248,12 @@ export const tailwindCSS: string = `.pointer-events-none {
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
 }
 
+.shadow-\[0_0_0_1px_var\(--openp41ge-accent-color\2c \#4a9eff\)\] {
+  --tw-shadow: 0 0 0 1px var(--openp41ge-accent-color,#4a9eff);
+  --tw-shadow-colored: 0 0 0 1px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
+}
+
 .shadow-\[0_4px_12px_rgba\(0\2c 0\2c 0\2c 0\.3\)\] {
   --tw-shadow: 0 4px 12px rgba(0,0,0,0.3);
   --tw-shadow-colored: 0 4px 12px var(--tw-shadow-color);
@@ -1225,6 +1297,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .outline-\[\#2a6fd1\] {
   outline-color: #2a6fd1
+}
+
+.outline-\[var\(--openp41ge-accent-color\2c \#4a9eff\)\] {
+  outline-color: var(--openp41ge-accent-color,#4a9eff)
 }
 
 .ring {

@@ -1098,7 +1098,7 @@ export class Openp41geProjectPicker extends LitElement {
     return html`
       <!-- Top bar -->
       <div class="topbar">
-        <div style="flex:1;"></div>
+        <div class="flex-1"></div>
         <button class="close-btn" @click=${this._dismiss} title="Close (Esc)">✕</button>
       </div>
 
@@ -1189,7 +1189,7 @@ export class Openp41geProjectPicker extends LitElement {
                           ? html`
                               <div
                                 class="rename-container"
-                                style="display:flex;align-items:center;flex:1;gap:4px;padding:0 4px 0 8px;margin:0 0 0 -8px;box-shadow:0 0 0 1px var(--openp41ge-accent-color,#4a9eff);border-radius:4px;background:var(--openp41ge-input-bg,#2a2a2a);"
+                                class="flex items-center flex-1 gap-1 px-1 pl-2 -ml-2 shadow-[0_0_0_1px_var(--openp41ge-accent-color,#4a9eff)] rounded bg-[var(--openp41ge-input-bg,#2a2a2a)]"
                               >
                                 <input
                                   class="rename-input"
@@ -1197,11 +1197,11 @@ export class Openp41geProjectPicker extends LitElement {
                                   .value=${this._renameValue}
                                   @input=${this._onRenameInput}
                                   @keydown=${this._onRenameKeyDown}
-                                  style="flex:1;border:none;outline:none;background:transparent;color:var(--openp41ge-text-color,#e0e0e0);font-size:20px;font-weight:600;font-family:inherit;line-height:1.2;padding:2px 0;"
+                                  class="flex-1 border-none outline-none bg-transparent text-[var(--openp41ge-text-color,#e0e0e0)] text-xl font-semibold font-inherit leading-[1.2] py-0.5"
                                 />
                                 <button
                                   title="Confirm"
-                                  style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:4px;background:transparent;color:var(--openp41ge-accent-color,#4a9eff);cursor:pointer;transition:background 0.1s;"
+                                  class="inline-flex items-center justify-center w-7 h-7 border-none rounded bg-transparent text-[var(--openp41ge-accent-color,#4a9eff)] cursor-pointer transition-[background] duration-100"
                                   @mouseenter=${(e: MouseEvent) => {
                                     (e.currentTarget as HTMLElement).style.background =
                                       "rgba(74,158,255,0.12)";
@@ -1225,7 +1225,7 @@ export class Openp41geProjectPicker extends LitElement {
                                 </button>
                                 <button
                                   title="Cancel"
-                                  style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:4px;background:transparent;color:var(--openp41ge-muted-text,#888);cursor:pointer;transition:background 0.1s;"
+                                  class="inline-flex items-center justify-center w-7 h-7 border-none rounded bg-transparent text-[var(--openp41ge-muted-text,#888)] cursor-pointer transition-[background] duration-100"
                                   @mouseenter=${(e: MouseEvent) => {
                                     (e.currentTarget as HTMLElement).style.background =
                                       "rgba(255,255,255,0.08)";
@@ -1251,7 +1251,7 @@ export class Openp41geProjectPicker extends LitElement {
                             `
                           : html`
                               <div
-                                style="display:flex;align-items:center;gap:4px;cursor:pointer;border-radius:4px;padding:2px 4px 2px 8px;margin-left:-8px;transition:background 0.1s;"
+                                class="flex items-center gap-1 cursor-pointer rounded py-0.5 pr-1 pl-2 -ml-2 transition-[background] duration-100"
                                 @mouseenter=${(e: MouseEvent) => {
                                   (e.currentTarget as HTMLElement).style.background =
                                     "var(--openp41ge-hover-bg,#333)";
@@ -1263,7 +1263,7 @@ export class Openp41geProjectPicker extends LitElement {
                                 title="Rename project"
                               >
                                 <h2
-                                  style="margin:0;font-size:20px;font-weight:600;line-height:1.2;color:var(--openp41ge-text-color,#e0e0e0);"
+                                  class="m-0 text-xl font-semibold leading-[1.2] text-[var(--openp41ge-text-color,#e0e0e0)]"
                                 >
                                   ${this._detailProject.name}
                                 </h2>
@@ -1272,7 +1272,7 @@ export class Openp41geProjectPicker extends LitElement {
                                   height="14"
                                   viewBox="0 0 16 16"
                                   fill="var(--openp41ge-muted-text,#888)"
-                                  style="flex-shrink:0;"
+                                  class="shrink-0"
                                 >
                                   <path
                                     d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25a1.75 1.75 0 0 1 .445-.758l8.61-8.61zm1.414 1.06a.25.25 0 0 0-.354 0L3.245 11.315a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l8.61-8.61a.25.25 0 0 0 0-.353l-1.086-1.086z"
@@ -1285,7 +1285,7 @@ export class Openp41geProjectPicker extends LitElement {
                         this._renaming
                           ? ""
                           : html`
-                              <div style="display:flex;align-items:center;gap:8px;">
+                              <div class="flex items-center gap-2">
                                 ${
                                   this._detailProject.name !== this._activeProjectName
                                     ? html`
@@ -1300,7 +1300,7 @@ export class Openp41geProjectPicker extends LitElement {
                                             viewBox="0 -960 960 960"
                                             width="16px"
                                             fill="currentColor"
-                                            style="vertical-align:middle;margin-left:4px;"
+                                            class="align-middle ml-1"
                                           >
                                             <path
                                               d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z"
@@ -1545,7 +1545,7 @@ export class Openp41geProjectPicker extends LitElement {
                                         }}
                                       >
                                         <span
-                                          style="display:inline-flex;align-items:center;color:#555;cursor:grab;margin-right:4px;"
+                                          class="inline-flex items-center text-[#555] cursor-grab mr-1"
                                         >
                                           <svg
                                             width="14"
@@ -1562,7 +1562,7 @@ export class Openp41geProjectPicker extends LitElement {
                                           class="repo-icon"
                                           viewBox="0 0 16 16"
                                           fill="currentColor"
-                                          style="vertical-align:middle;position:relative;top:-1px;"
+                                          class="align-middle relative -top-px"
                                         >
                                           <path
                                             d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"
@@ -1589,7 +1589,7 @@ export class Openp41geProjectPicker extends LitElement {
                                               height="10"
                                               viewBox="0 0 16 16"
                                               fill="currentColor"
-                                              style="vertical-align:middle;margin-right:2px;position:relative;top:-1px;"
+                                              class="align-middle mr-0.5 relative -top-px"
                                             >
                                               <path
                                                 d="M8 2v12M2 8h12"
@@ -1616,14 +1616,14 @@ export class Openp41geProjectPicker extends LitElement {
                         this._cloning
                           ? html`
                               <div
-                                style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);font-size:12px;color:var(--openp41ge-muted-text,#888);gap:8px;"
+                                class="flex items-center h-8 px-2.5 rounded bg-[var(--openp41ge-hover-bg,#2a2a2a)] text-xs text-[var(--openp41ge-muted-text,#888)] gap-2"
                               >
                                 <svg
                                   width="14"
                                   height="14"
                                   viewBox="0 0 16 16"
                                   fill="none"
-                                  style="animation:spinner-rotate 0.8s linear infinite;"
+                                  class="animate-[spinner-rotate_0.8s_linear_infinite]"
                                 >
                                   <circle
                                     cx="8"
@@ -1636,12 +1636,12 @@ export class Openp41geProjectPicker extends LitElement {
                                     stroke-linecap="round"
                                   />
                                 </svg>
-                                <span style="flex:1;"
+                                <span class="flex-1"
                                   >Cloning...
                                   ${this._clonePercent > 0 ? html`${this._clonePercent}%` : ""}</span
                                 >
                                 <span
-                                  style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--openp41ge-muted-text,#888);"
+                                  class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-[var(--openp41ge-muted-text,#888)]"
                                   @click=${this._cancelClone}
                                   title="Cancel"
                                   >✕</span
@@ -1651,7 +1651,7 @@ export class Openp41geProjectPicker extends LitElement {
                           : this._addingRepo
                             ? html`
                                 <div
-                                  style="display:flex;align-items:center;height:32px;padding:0 10px;border-radius:6px;background:var(--openp41ge-hover-bg,#2a2a2a);outline:2px solid var(--openp41ge-accent-color,#4a9eff);outline-offset:-2px;"
+                                  class="flex items-center h-8 px-2.5 rounded bg-[var(--openp41ge-hover-bg,#2a2a2a)] outline outline-2 outline-offset-[-2px] outline-[var(--openp41ge-accent-color,#4a9eff)]"
                                 >
                                   <input
                                     class="add-repo-input"
@@ -1662,10 +1662,10 @@ export class Openp41geProjectPicker extends LitElement {
                                       this._repoUrl = (e.target as HTMLInputElement).value;
                                     }}
                                     @keydown=${this._onRepoUrlKeydown}
-                                    style="flex:1;min-width:0;height:24px;background:transparent;border:none;color:var(--openp41ge-text-color,#e0e0e0);font-size:12px;outline:none;font-family:inherit;"
+                                    class="flex-1 min-w-0 h-6 bg-transparent border-none text-[var(--openp41ge-text-color,#e0e0e0)] text-xs outline-none font-inherit"
                                   />
                                   <span
-                                    style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;margin-left:4px;color:var(--openp41ge-accent-color,#4a9eff);"
+                                    class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 ml-1 text-[var(--openp41ge-accent-color,#4a9eff)]"
                                     @click=${this._confirmAddRepo}
                                     @mouseenter=${(e: MouseEvent) => {
                                       (e.currentTarget as HTMLElement).style.background =
@@ -1691,7 +1691,7 @@ export class Openp41geProjectPicker extends LitElement {
                                     </svg>
                                   </span>
                                   <span
-                                    style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--openp41ge-muted-text,#888);"
+                                    class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-[var(--openp41ge-muted-text,#888)]"
                                     @click=${this._cancelAddRepo}
                                     @mouseenter=${(e: MouseEvent) => {
                                       (e.currentTarget as HTMLElement).style.background =
@@ -1735,7 +1735,7 @@ export class Openp41geProjectPicker extends LitElement {
                                     height="10"
                                     viewBox="0 0 16 16"
                                     fill="currentColor"
-                                    style="vertical-align:middle;margin-left:4px;position:relative;top:0;"
+                                    class="align-middle ml-1 relative top-0"
                                   >
                                     <path
                                       d="M8 2v12M2 8h12"
