@@ -206,15 +206,22 @@ class TabsDemoApp extends LitElement {
   @query("#side-grid-b")
   private _outputGrid!: any;
 
-  private _logEl!: HTMLElement;
   private _logCount = 0;
 
   // ── Lifecycle ────────────────────────────────────────────────────
 
   override firstUpdated(): void {
-    this._logEl = this.querySelector("#log") as HTMLElement;
     this._orchestrator = new DragOrchestrator(this._targetResolver);
     this._renderAll();
+
+    // ── Log to Storybook actions panel ──────────────────────────
+    const actions = (this as any).__sb_actions;
+    const log = (msg: string) => {
+      this._logCount++;
+      if (actions?.onEvent) {
+        actions.onEvent(`[${this._logCount}] ${msg}`);
+      }
+    };
 
     // ── File explorer drag ────────────────────────────────────────
     this.querySelectorAll(".file-card").forEach((card) => {
@@ -273,7 +280,7 @@ class TabsDemoApp extends LitElement {
     // ── GRID EVENTS — handle actual drops ─────────────────────────
     document.addEventListener("grid-split", (e: any) => {
       const { sourceWinId, winId, tabId, splitCol, splitLeft } = e.detail;
-      this._log(`grid-split: tab ${tabId} from ${sourceWinId} → ${winId} split@${splitCol} left=${splitLeft}`);
+      log(`grid-split: tab ${tabId} from ${sourceWinId} → ${winId} split@${splitCol} left=${splitLeft}`);
       const source = this._state(sourceWinId);
       const target = this._state(winId);
       if (!source || !target) return;
@@ -285,7 +292,7 @@ class TabsDemoApp extends LitElement {
 
     document.addEventListener("grid-move", (e: any) => {
       const { sourceWinId, tabId, targetWinId, targetCol } = e.detail;
-      this._log(`grid-move: tab ${tabId} from ${sourceWinId} → ${targetWinId} col=${targetCol}`);
+      log(`grid-move: tab ${tabId} from ${sourceWinId} → ${targetWinId} col=${targetCol}`);
       const source = this._state(sourceWinId);
       const target = this._state(targetWinId);
       if (!source || !target) return;
@@ -296,13 +303,13 @@ class TabsDemoApp extends LitElement {
     });
 
     document.addEventListener("grid-activate", (e: any) => {
-      this._log(`grid-activate: ${e.detail.winId} col=${e.detail.col} tab=${e.detail.tabId}`);
+      log(`grid-activate: ${e.detail.winId} col=${e.detail.col} tab=${e.detail.tabId}`);
     });
 
     document.addEventListener("grid-open-tab", (e: any) => {
       const { winId, tabConfig, targetCol } = e.detail;
       const filePath = tabConfig.filePath || tabConfig.repoName || "untitled";
-      this._log(`grid-open-tab: ${filePath} → ${winId} col=${targetCol}`);
+      log(`grid-open-tab: ${filePath} → ${winId} col=${targetCol}`);
       const state = this._state(winId);
       if (!state) return;
       state.addTab(
@@ -322,7 +329,7 @@ class TabsDemoApp extends LitElement {
         if (!state) return;
         const tab = state.addTab(col, "New Tab", '<div class="content-placeholder"><h3>New Tab</h3><p>Added from + button.</p></div>');
         this._renderAll();
-        this._log(`Added tab "${tab.id}" to ${winId}`);
+        log(`Added tab "${tab.id}" to ${winId}`);
       });
     });
 
@@ -338,7 +345,7 @@ class TabsDemoApp extends LitElement {
       if (!state) return;
       state.removeTab(tabId);
       this._renderAll();
-      this._log(`Closed tab "${tabId}" from ${tabBar.winId}`);
+      log(`Closed tab "${tabId}" from ${tabBar.winId}`);
     });
 
     // ── Reset ────────────────────────────────────────────────────
@@ -354,16 +361,10 @@ class TabsDemoApp extends LitElement {
         createTab("Output", '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>'),
       ]);
       this._renderAll();
-      this._logEl.innerHTML = "";
       this._logCount = 0;
-      this._log("Demo reset");
+      log("Demo reset");
     });
 
-    // ── Clear log ────────────────────────────────────────────────
-    this.querySelector("#btn-clear-log")?.addEventListener("click", () => {
-      this._logEl.innerHTML = "";
-      this._logCount = 0;
-    });
   }
 
   private _state(winId: string): GridState | null {
@@ -406,11 +407,7 @@ class TabsDemoApp extends LitElement {
         .file-explorer { display: flex; gap: 8px; flex-wrap: wrap; }
         .file-card { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 4px; cursor: grab; font-size: 12px; color: #ccc; user-select: none; }
         .file-card:hover { border-color: #4a9eff; }
-        .event-log { margin-bottom: 16px; }
-        .log-controls { display: flex; gap: 8px; margin-bottom: 8px; }
-        .log-controls button { padding: 4px 12px; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 11px; }
-        .log-controls button:hover { border-color: #4a9eff; }
-        #log { background: #252525; border: 1px solid #333; border-radius: 4px; padding: 8px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 11px; }
+
         .demo-add-tab-btn { background: rgba(74, 158, 255, 0.15); color: rgb(74, 158, 255); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 4px; width: 24px; height: 24px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 4px; }
         .demo-add-tab-btn:hover { background: rgba(74, 158, 255, 0.3); }
         tab-grid { flex: 1; }
@@ -446,13 +443,8 @@ class TabsDemoApp extends LitElement {
           </div>
         </div>
 
-        <div class="event-log">
-          <h2>Event Log</h2>
-          <div class="log-controls">
-            <button id="btn-clear-log">Clear</button>
-            <button id="btn-reset">Reset Demo</button>
-          </div>
-          <div id="log">Waiting for events…</div>
+        <div style="margin-bottom:8px;">
+          <button id="btn-reset" style="padding:4px 12px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#ccc;cursor:pointer;font-size:11px;">Reset Demo</button>
         </div>
       </div>
     `;
@@ -464,7 +456,12 @@ class TabsDemoApp extends LitElement {
 const meta: Meta = {
   title: "Components/TabGrid",
   component: "tabs-demo-app",
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    actions: {
+      handles: ["grid-split", "grid-move", "grid-open-tab", "grid-activate", "grid-remove", "tab-bar-reorder", "tab-bar-move-cell"],
+    },
+  },
 };
 
 export default meta;
