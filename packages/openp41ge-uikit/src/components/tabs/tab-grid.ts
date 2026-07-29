@@ -491,6 +491,28 @@ export class TabGrid extends LitElement {
         e.preventDefault();
         e.stopPropagation();
 
+        // If drop is on a tab bar, add to that cell without splitting
+        if (this._isOverTabBar(e)) {
+          const tabBarEl = document.elementFromPoint(e.clientX, e.clientY)
+            ?.closest?.("tab-bar") as any;
+          const col = tabBarEl?.col ?? 0;
+          for (const filePath of filePaths) {
+            this.dispatchEvent(
+              new CustomEvent("grid-open-tab", {
+                bubbles: true,
+                detail: {
+                  winId: this.winId,
+                  tabType: "file-viewer",
+                  tabConfig: { filePath },
+                  targetCol: col,
+                  pinned: true,
+                },
+              }),
+            );
+          }
+          return;
+        }
+
         const rect = this.getBoundingClientRect();
         const relX = e.clientX - rect.left;
         const pos = computeDropTarget(this, relX, rect.width, this.cols);

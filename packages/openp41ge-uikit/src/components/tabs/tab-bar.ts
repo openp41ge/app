@@ -9,7 +9,7 @@
 import { LitElement, html, nothing } from "lit";
 import { property } from "lit/decorators.js";
 import { TabBarDropTarget } from "openp41ge-tabs/targets/tab-bar-drop-target";
-import { getDropIndexInBar } from "openp41ge-tabs/boundary";
+import { getDropIndexInBar, getTabButtonsInBar } from "openp41ge-tabs/boundary";
 
 /** Scroll speed for overflowing tab text (pixels per second). */
 const TAB_TEXT_SCROLL_SPEED = 40;
@@ -207,18 +207,16 @@ export class TabBar extends LitElement {
     if (!barEl || !this._indicatorEl) return;
 
     const dropIndex = getDropIndexInBar(barEl, clientX);
-    const children = Array.from(barEl.children).filter(
-      (c): c is HTMLElement => c instanceof HTMLElement && c !== this._indicatorEl && true,
-    );
+    const tabs = getTabButtonsInBar(barEl);
 
     let pos: number;
-    if (children.length === 0 || dropIndex <= 0) {
+    if (tabs.length === 0 || dropIndex <= 0) {
       pos = 0;
-    } else if (dropIndex >= children.length) {
-      const last = children[children.length - 1];
+    } else if (dropIndex >= tabs.length) {
+      const last = tabs[tabs.length - 1];
       pos = last.offsetLeft + last.offsetWidth;
     } else {
-      pos = children[dropIndex].offsetLeft;
+      pos = tabs[dropIndex].offsetLeft;
     }
 
     this._indicatorEl.style.display = "block";
