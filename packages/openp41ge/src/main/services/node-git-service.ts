@@ -387,13 +387,11 @@ export class NodeGitService implements IGitService {
   async fetch(repoName: string): Promise<void> {
     const gitDir = this._gitDir(repoName);
     if (!fs.existsSync(gitDir)) return;
-    // Update checked-out branches safely (--update-head-ok bypasses
-    // the "refusing to fetch into checked-out branch" safety check
-    // for worktree-checked-out branches)
-    await this._execGit(
-      ["fetch", "origin", "+refs/heads/*:refs/heads/*", "--update-head-ok"],
-      repoName,
-    );
+    // Fetch into remote-tracking refs (refs/remotes/origin/*) rather than
+    // updating local branches directly. This avoids "cannot lock ref" errors
+    // when a local branch has diverged from the remote, and ensures we don't
+    // create local branches for every remote branch.
+    await this._execGit(["fetch", "origin", "--prune"], repoName);
   }
 
   async getCurrentBranch(dirPath: string): Promise<string | null> {
