@@ -1,8 +1,8 @@
-import { html, unsafeHTML } from "lit";
+import { html } from "lit";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Meta, StoryObj } from "@storybook/web-components";
 import type { TreeNode } from "./types";
-import { iconRegistry } from "../icons/registry";
-import { getFileIcon } from "../../../../packages/openp41ge/src/renderer/icons/material-icons";
+import { iconRegistry, getFileIcon } from "../icons";
 import "../components/openp41ge-icon";
 import "./tree";
 
@@ -35,14 +35,14 @@ function treeIcon(name: string, size: number) {
     );
     return html`${unsafeHTML(scaled)}`;
   }
-  // 2. Icon registry (folder-closed, git-branch, plus, refresh, eye, etc.)
-  if (iconRegistry[name as keyof typeof iconRegistry]) {
-    return html`<openp41ge-icon name=${name} size=${size}></openp41ge-icon>`;
-  }
-  // 3. Material icon theme for file names (app.ts → typescript icon)
+  // 2. Material icon theme for file names (app.ts → typescript icon)
   const material = getFileIcon(name);
   if (material) {
     return html`${unsafeHTML(material)}`;
+  }
+  // 3. Icon registry fallback (folder-closed, git-branch, plus, refresh)
+  if (iconRegistry[name as keyof typeof iconRegistry]) {
+    return html`<openp41ge-icon name=${name} size=${size}></openp41ge-icon>`;
   }
   return html``;
 }

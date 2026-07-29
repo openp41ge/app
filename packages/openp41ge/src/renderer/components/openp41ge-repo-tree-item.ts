@@ -17,7 +17,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { plusIconThick, refreshIcon } from "../icons";
-import { getFileIcon } from "../icons/material-icons";
+import { getFileIcon } from "openp41ge-uikit";
 import { WorktreeFileLoader } from "../services/worktree-file-loader";
 import { DirPersistenceService } from "../services/dir-persistence-service";
 

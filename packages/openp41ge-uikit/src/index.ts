@@ -1,6 +1,6 @@
 export { Openp41geIcon } from "./components/openp41ge-icon";
 export type { IconName } from "./components/openp41ge-icon";
-export { iconRegistry } from "./icons/registry";
+export { iconRegistry, getFileIcon } from "./icons";
 
 // Re-export the inline tailwind CSS for component static styles
 export { tailwindCSS } from "./generated/tailwind";
