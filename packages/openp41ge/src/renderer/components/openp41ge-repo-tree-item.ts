@@ -330,10 +330,11 @@ export class Openp41geRepoTreeItem extends LitElement {
           label: entry.name,
           icon: "folder-closed",
           expanded: isExpanded,
+          expandable: true,
           status: isUntracked ? ("untracked" as const) : undefined,
           children: isExpanded && this._fileLoader.dirContents.has(entry.path)
             ? this._buildFileTreeNodes(branch, entry.path)
-            : [],
+            : undefined,
           meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
         };
       }

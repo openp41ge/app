@@ -41,6 +41,12 @@ export interface TreeNode {
   /** Show a chevron toggle before the icon (default: true for nodes with children) */
   showChevron?: boolean;
   /**
+   * Mark as expandable even when children[] is empty (for async/lazy loading).
+   * When true, clicking the node toggles it and calls onToggle (if set) instead
+   * of firing tree-node-click.
+   */
+  expandable?: boolean;
+  /**
    * Row status — adds CSS class `tree-node--status-{status}` so consumers
    * can style via theme variables (e.g. --tree-status-untracked-opacity).
    */

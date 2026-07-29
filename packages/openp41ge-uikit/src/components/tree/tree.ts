@@ -128,9 +128,14 @@ export class Openp41geTree extends LitElement {
     return !!(node.children && node.children.length > 0);
   }
 
+  /** True if node can be toggled (has actual children or is marked expandable for async). */
+  private _isExpandable(node: TreeNode): boolean {
+    return this._hasChildren(node) || !!node.expandable;
+  }
+
   private _showChevron(node: TreeNode): boolean {
     if (node.showChevron !== undefined) return node.showChevron;
-    return this._hasChildren(node);
+    return this._isExpandable(node);
   }
 
   private _isSection(node: TreeNode): boolean {
@@ -283,7 +288,7 @@ export class Openp41geTree extends LitElement {
   private _toggleNode(node: TreeNode): void {
     const expanded = !this._isExpandedLocal(node);
 
-    if (expanded && this.onToggle && this._hasChildren(node)) {
+    if (expanded && this.onToggle && this._isExpandable(node)) {
       // Async expansion: mark loading, flip expanded, do async, then resolve
       this._loadingNodeIds = new Set(this._loadingNodeIds).add(node.id);
       this._updateExpanded(node.id, true);
@@ -362,9 +367,9 @@ export class Openp41geTree extends LitElement {
     this._focusableNodeId = node.id;
     // Don't toggle on dblclick — the dblclick handler will fire separately
     if (e.detail >= 2) return;
-    // Toggle expand/collapse for nodes with children
+    // Toggle expand/collapse for expandable nodes (with children or expandable flag)
     // Activate (click) for leaf nodes
-    if (this._hasChildren(node)) {
+    if (this._isExpandable(node)) {
       this._toggleNode(node);
     } else {
       this._emitClick(node);
@@ -373,7 +378,7 @@ export class Openp41geTree extends LitElement {
 
   private _onNodeDblClick(e: MouseEvent, node: TreeNode): void {
     e.stopPropagation();
-    if (this._hasChildren(node)) {
+    if (this._isExpandable(node)) {
       this._toggleNode(node);
     } else {
       this._emitDblClick(node);
