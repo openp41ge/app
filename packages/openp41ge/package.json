@@ -27,6 +27,7 @@
     "openp41ge-git-repository": "workspace:*",
     "openp41ge-logger": "workspace:*",
     "openp41ge-tabs": "workspace:*",
+    "openp41ge-components": "workspace:*",
     "zod": "^3.24.0"
   },
   "devDependencies": {

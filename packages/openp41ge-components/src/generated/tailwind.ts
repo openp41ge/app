@@ -21,6 +21,10 @@ export const tailwindCSS: string = `.static {
   display: grid
 }
 
+.hidden {
+  display: none
+}
+
 .h-3 {
   height: 0.75rem
 }
@@ -49,12 +53,20 @@ export const tailwindCSS: string = `.static {
   flex: 1 1 0%
 }
 
+.flex-shrink {
+  flex-shrink: 1
+}
+
 .flex-shrink-0 {
   flex-shrink: 0
 }
 
 .shrink-0 {
   flex-shrink: 0
+}
+
+.transform {
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
 }
 
 @keyframes spin {
