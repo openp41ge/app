@@ -1337,6 +1337,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   opacity: 0.3
 }
 
+.opacity-40 {
+  opacity: 0.4
+}
+
 .opacity-50 {
   opacity: 0.5
 }

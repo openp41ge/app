@@ -583,7 +583,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                   }}
                 />
                 <span
-                  class="wt-row-btn w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-secondary transition-colors duration-100"
+                  class="wt-row-btn w-[22px] h-[22px] flex items-center justify-center rounded shrink-0 text-secondary transition-colors duration-100 ${this._isDuplicateWorktreeName ? "pointer-events-none opacity-40" : "cursor-pointer"}"
                   @click=${() => this._confirmAddWorktree()}
                   title="Confirm"
                 >
