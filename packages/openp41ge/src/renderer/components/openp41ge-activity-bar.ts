@@ -16,7 +16,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { property } from "lit/decorators.js";
-import { fileIcon } from "../icons";
+import { fileIcon, gitIcon } from "../icons";
 
 export interface ActivityBarItem {
   id: string;
@@ -24,7 +24,10 @@ export interface ActivityBarItem {
   icon: string; // SVG or icon name
 }
 
-const DEFAULT_ACTIVITIES: ActivityBarItem[] = [{ id: "explorer", label: "Explorer", icon: "file" }];
+const DEFAULT_ACTIVITIES: ActivityBarItem[] = [
+  { id: "explorer", label: "Explorer", icon: "file" },
+  { id: "git", label: "Git", icon: "git" },
+];
 
 const ACTIVITY_BAR_WIDTH = 48;
 
@@ -52,6 +55,9 @@ class Openp41geActivityBar extends LitElement {
   private _renderIcon(activity: ActivityBarItem): TemplateResult {
     if (activity.id === "explorer") {
       return html`${unsafeHTML(fileIcon(20))}`;
+    }
+    if (activity.id === "git") {
+      return html`${unsafeHTML(gitIcon(20))}`;
     }
     // Fallback: use the icon string as raw HTML
     return html`<span style="font-size:20px;">${activity.icon}</span>`;

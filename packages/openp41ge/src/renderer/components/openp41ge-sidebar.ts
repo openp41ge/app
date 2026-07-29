@@ -18,6 +18,7 @@ import { property, state } from "lit/decorators.js";
 import type { SidebarView } from "./sidebar-views/sidebar-view";
 import { dispatch } from "../app";
 import { ExplorerSidebarView } from "./sidebar-views/explorer-view";
+import { GitSidebarView } from "./sidebar-views/git-sidebar-view";
 
 const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 600;
@@ -139,6 +140,8 @@ class Openp41geSidebar extends LitElement {
 
     if (this.activeViewId === "explorer") {
       view = new ExplorerSidebarView(this.worksetId);
+    } else if (this.activeViewId === "git") {
+      view = new GitSidebarView(this.worksetId);
     }
 
     if (view) {
