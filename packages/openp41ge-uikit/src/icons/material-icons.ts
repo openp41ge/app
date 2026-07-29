@@ -181,6 +181,11 @@ const fileNameMap: Record<string, string> = {
   ".gitkeep": "folder",
 };
 
+/** Return all available icon names (SVG filenames without extension). */
+export function getAllIconNames(): string[] {
+  return Array.from(iconMap.keys()).sort();
+}
+
 /**
  * Get the Material icon SVG for a given filename.
  * Looks up by exact file name first, then by extension.

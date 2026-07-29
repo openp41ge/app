@@ -17,7 +17,6 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { plusIconThick, refreshIcon } from "../icons";
-import { getFileIcon } from "openp41ge-uikit";
 import { WorktreeFileLoader } from "../services/worktree-file-loader";
 import { DirPersistenceService } from "../services/dir-persistence-service";
 
@@ -430,7 +429,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         >
           <span
             class="rti-icon inline-flex items-center shrink-0 w-4 h-4${isUntracked ? " untracked" : ""}"
-            >${unsafeHTML(getFileIcon(entry.name))}</span
+            ><file-extension-svg filename=${entry.name} size="14"></file-extension-svg></span
           >
           <span
             class="rti-label overflow-hidden text-ellipsis whitespace-nowrap${isUntracked ? " untracked" : ""}"
