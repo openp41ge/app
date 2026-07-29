@@ -390,17 +390,19 @@ class TabsDemoApp extends LitElement {
     });
 
     // ── Reset ────────────────────────────────────────────────────
-    this.querySelector("#btn-reset")?.addEventListener("click", () => {
-      _tabCounter = 0;
-      this._editorState = editorStateFromFiles("editor", 3);
-      this._sideState = GridState.from("side-a", [
-        { id: createTabId(), title: "Terminal", content: '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>' },
-      ]);
-      this._outputState = GridState.from("side-b", [
-        { id: createTabId(), title: "Output", content: '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>' },
-      ]);
-      this._renderAll();
-    });
+    this.reset = this.reset.bind(this);
+  }
+
+  reset(): void {
+    _tabCounter = 0;
+    this._editorState = editorStateFromFiles("editor", 3);
+    this._sideState = GridState.from("side-a", [
+      { id: createTabId(), title: "Terminal", content: '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>' },
+    ]);
+    this._outputState = GridState.from("side-b", [
+      { id: createTabId(), title: "Output", content: '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>' },
+    ]);
+    this._renderAll();
   }
 
   private _openFile(e: any): void {
@@ -467,9 +469,6 @@ class TabsDemoApp extends LitElement {
           </div>
         </div>
 
-        <div style="margin-top:8px;flex-shrink:0;">
-          <button id="btn-reset" style="padding:4px 12px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#ccc;cursor:pointer;font-size:11px;">Reset Demo</button>
-        </div>
       </div>
     `;
   }
@@ -625,11 +624,13 @@ class SingleGridApp extends LitElement {
     });
 
     // ── Reset ────────────────────────────────────────────────────
-    this.querySelector("#single-reset")?.addEventListener("click", () => {
-      _tabCounter = 0;
-      this._state = editorStateFromFiles("editor", 3);
-      this._render();
-    });
+    this.reset = this.reset.bind(this);
+  }
+
+  reset(): void {
+    _tabCounter = 0;
+    this._state = editorStateFromFiles("editor", 3);
+    this._render();
   }
 
   private _openFile(e: any): void {
@@ -722,7 +723,6 @@ class SingleGridApp extends LitElement {
       <div class="single-demo">
         <div class="single-toolbar">
           <button id="single-add-tab">+ Add Tab</button>
-          <button id="single-reset">Reset</button>
         </div>
         <div class="single-body">
           <div class="single-grid-wrap">
@@ -740,6 +740,15 @@ class SingleGridApp extends LitElement {
 
 // ─── Storybook stories ────────────────────────────────────────────────
 
+const btnReset = () => {
+  const el = document.querySelector("tabs-demo-app");
+  if (el && typeof (el as any).reset === "function") (el as any).reset();
+};
+const singleReset = () => {
+  const el = document.querySelector("single-grid-demo");
+  if (el && typeof (el as any).reset === "function") (el as any).reset();
+};
+
 const meta: Meta = {
   title: "Components/TabGrid",
   component: "tabs-demo-app",
@@ -751,8 +760,16 @@ type Story = StoryObj;
 
 export const SingleGridDemo: Story = {
   render: () => html`<single-grid-demo></single-grid-demo>`,
+  argTypes: {
+    reset: { control: { type: "button" }, description: "Reset the demo" },
+  },
+  args: { reset: singleReset },
 };
 
 export const MultiGridDemo: Story = {
   render: () => html`<tabs-demo-app></tabs-demo-app>`,
+  argTypes: {
+    reset: { control: { type: "button" }, description: "Reset the demo" },
+  },
+  args: { reset: btnReset },
 };
