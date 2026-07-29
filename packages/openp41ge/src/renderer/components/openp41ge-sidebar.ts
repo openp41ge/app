@@ -64,9 +64,10 @@ class Openp41geSidebar extends LitElement {
     document.addEventListener("openp41ge:activity-click", this._onActivityClick as EventListener);
     // Set the element's own flex-basis so the parent flex container uses
     // the persisted width, not the content's intrinsic size (which is
-    // just min-width 200px). Without this, the sidebar element shrinks
-    // to its content's natural width regardless of this.width.
-    this.style.flex = `0 1 ${this.width}px`;
+    // just min-width 200px). Only do this when the sidebar is visible.
+    if (this.activeViewId) {
+      this.style.flex = `0 1 ${this.width}px`;
+    }
   }
 
   disconnectedCallback(): void {
@@ -98,6 +99,11 @@ class Openp41geSidebar extends LitElement {
       this._unmountView();
       if (this.activeViewId) {
         this._mountView();
+        // Restore the element's flex-basis now that the sidebar is visible
+        this.style.flex = `0 1 ${this.width}px`;
+      } else {
+        // Sidebar closed — collapse the element so the grid fills the space
+        this.style.flex = "";
       }
     } else if (this.activeViewId && !this._view) {
       // Initial mount
@@ -105,6 +111,7 @@ class Openp41geSidebar extends LitElement {
     } else if (!this.activeViewId && this._view) {
       // Sidebar closed
       this._unmountView();
+      this.style.flex = "";
     }
   }
 
