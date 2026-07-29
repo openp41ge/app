@@ -288,8 +288,14 @@ export class Openp41geTree extends LitElement {
 
   private _onNodeClick(e: Event, node: TreeNode): void {
     e.stopPropagation();
-    this._emitClick(node);
     this._focusableNodeId = node.id;
+    // Toggle expand/collapse for nodes with children
+    // Activate (click) for leaf nodes
+    if (this._hasChildren(node)) {
+      this._toggleNode(node);
+    } else {
+      this._emitClick(node);
+    }
   }
 
   private _onActionClick(e: Event, node: TreeNode, action: TreeNodeAction): void {
@@ -376,7 +382,10 @@ export class Openp41geTree extends LitElement {
   }
 
   private _renderChevron(expanded: boolean): TemplateResult {
-    return html`<span class="tree-chevron ${classMap({ expanded })}">▶</span>`;
+    return html`
+      <span class="tree-chevron">
+        <openp41ge-icon name=${expanded ? "chevron-down" : "chevron-right"} size="10"></openp41ge-icon>
+      </span>`;
   }
 
   // ─── Render ────────────────────────────────────────────────────
@@ -438,10 +447,7 @@ export class Openp41geTree extends LitElement {
       >
         <!-- Chevron (▶/▼) -->
         <span
-          class="tree-chevron-cell ${classMap({
-            expanded,
-            hidden: !showChevron,
-          })}"
+          class="tree-chevron-cell"
           @click=${(e: Event) => this._onChevronClick(e, node)}
         >
           ${showChevron ? this._renderChevron(expanded) : nothing}

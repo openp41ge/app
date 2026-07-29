@@ -91,7 +91,7 @@ export const treeStyles = css`
     cursor: pointer;
   }
 
-  .tree-chevron-cell.hidden {
+  .tree-chevron-cell.empty {
     visibility: hidden;
     pointer-events: none;
   }
@@ -100,14 +100,10 @@ export const treeStyles = css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 8px;
+    width: 16px;
+    height: 16px;
     color: var(--tree-chevron, var(--text-muted, #666));
-    transition: transform 0.1s ease;
     line-height: 1;
-  }
-
-  .tree-chevron.expanded {
-    transform: rotate(90deg);
   }
 
   /* ─── Icon Cell ─────────────────────────────────────────── */

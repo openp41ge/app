@@ -1,6 +1,8 @@
 import { html, unsafeHTML } from "lit";
 import type { Meta, StoryObj } from "@storybook/web-components";
 import type { TreeNode } from "./types";
+import { iconRegistry } from "../icons/registry";
+import { getFileIcon } from "../../../../packages/openp41ge/src/renderer/icons/material-icons";
 import "../components/openp41ge-icon";
 import "./tree";
 
@@ -16,19 +18,33 @@ const meta: Meta = {
 export default meta;
 type Story = StoryObj;
 
-// ─── Icon fallback for stories (no material icons in Storybook) ─────
+// ─── Icon renderer — uses iconRegistry for standard icons, branded inline SVGs for hosts ─
 
-function storyIcon(name: string, size: number): string {
-  // Minimal SVG icons for stories
-  const icons: Record<string, string> = {
-    "git-branch": `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="3.5" r="2"/><circle cx="12" cy="3.5" r="2"/><circle cx="5" cy="12.5" r="2"/><path d="M5 5.5V10.5"/><path d="M12 5.5L5.5 9.5"/></svg>`,
-    plus: `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`,
-    refresh: `<svg width="${size}" height="${size}" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/></svg>`,
-    "git-info": `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5.2" r="0.8" fill="currentColor" stroke="none"/></svg>`,
-    eye: `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8C1 8 3.5 3 8 3C12.5 3 15 8 15 8C15 8 12.5 13 8 13C3.5 13 1 8 1 8Z"/><circle cx="8" cy="8" r="2.5"/></svg>`,
-    "eye-off": `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8C1 8 3.5 3 8 3C12.5 3 15 8 15 8C15 8 12.5 13 8 13C3.5 13 1 8 1 8Z"/><circle cx="8" cy="8" r="2.5"/><line x1="2" y1="2" x2="14" y2="14"/></svg>`,
-  };
-  return icons[name] ?? "";
+const brandedIcons: Record<string, string> = {
+  github: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1C4.1 1 1 4.1 1 8c0 3.1 2 5.7 4.8 6.6.35.07.48-.15.48-.34v-1.2c-2 .44-2.42-.97-2.42-.97-.32-.82-.8-1.04-.8-1.04-.66-.45.05-.44.05-.44.73.05 1.12.75 1.12.75.65 1.1 1.7.78 2.12.6.06-.47.25-.78.46-.96-1.62-.18-3.32-.8-3.32-3.58 0-.8.28-1.44.74-1.95-.07-.18-.32-.92.07-1.92 0 0 .6-.2 1.97.74A6.74 6.74 0 018 4.05c.6 0 1.2.08 1.77.24 1.36-.93 1.97-.73 1.97-.73.4 1 .14 1.74.07 1.92.46.5.73 1.15.73 1.94 0 2.78-1.7 3.4-3.32 3.58.26.22.5.67.5 1.35v2c0 .2.13.42.5.34C13 13.7 15 11.1 15 8c0-3.9-3.1-7-7-7z"/></svg>`,
+  gitlab: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M15.1 9.1L13.4 4.6c-.1-.2-.3-.4-.5-.4s-.4.2-.5.4L11.1 8H4.9L3.6 4.6c-.1-.2-.3-.4-.5-.4s-.4.2-.5.4L.9 9.1c-.2.5 0 1.1.4 1.4l6.2 4.5c.1.1.2.1.3.1h.2c.1 0 .2 0 .3-.1l6.2-4.5c.5-.3.7-.9.6-1.4z"/></svg>`,
+};
+
+function treeIcon(name: string, size: number) {
+  // 1. Branded icons (github, gitlab)
+  const branded = brandedIcons[name];
+  if (branded) {
+    const scaled = branded.replace(
+      'viewBox="0 0 16 16"',
+      `viewBox="0 0 16 16" width="${size}" height="${size}"`,
+    );
+    return html`${unsafeHTML(scaled)}`;
+  }
+  // 2. Icon registry (folder-closed, git-branch, plus, refresh, eye, etc.)
+  if (iconRegistry[name as keyof typeof iconRegistry]) {
+    return html`<openp41ge-icon name=${name} size=${size}></openp41ge-icon>`;
+  }
+  // 3. Material icon theme for file names (app.ts → typescript icon)
+  const material = getFileIcon(name);
+  if (material) {
+    return html`${unsafeHTML(material)}`;
+  }
+  return html``;
 }
 
 // ─── Mock Data ──────────────────────────────────────────────────────
@@ -38,35 +54,42 @@ const basicNodes: TreeNode[] = [
   {
     id: "src",
     label: "src",
-    icon: "folder",
+    icon: "folder-closed",
     expanded: true,
     children: [
       {
         id: "components",
         label: "components",
-        icon: "folder",
+        icon: "folder-closed",
         expanded: true,
         children: [
-          { id: "app.ts", label: "app.ts", icon: "file" },
-          { id: "header.tsx", label: "header.tsx", icon: "file" },
-          { id: "styles.css", label: "styles.css", icon: "file" },
+          { id: "app.ts", label: "app.ts", icon: "app.ts" },
+          { id: "header.tsx", label: "header.tsx", icon: "header.tsx" },
+          { id: "styles.css", label: "styles.css", icon: "styles.css" },
         ],
       },
-      { id: "utils.ts", label: "utils.ts", icon: "file" },
-      { id: "index.ts", label: "index.ts", icon: "file" },
+      { id: "utils.ts", label: "utils.ts", icon: "utils.ts" },
+      { id: "index.ts", label: "index.ts", icon: "index.ts" },
     ],
   },
   {
     id: "package.json",
     label: "package.json",
-    icon: "file",
+    icon: "package.json",
     draggable: true,
   },
   {
     id: "tsconfig.json",
     label: "tsconfig.json",
-    icon: "file",
+    icon: "tsconfig.json",
     draggable: true,
+  },
+  {
+    id: "add-repo",
+    label: "add repository",
+    icon: "plus",
+    showChevron: false,
+    variant: "worktree",
   },
 ];
 
@@ -74,7 +97,8 @@ const basicNodes: TreeNode[] = [
 const repoNodes: TreeNode[] = [
   {
     id: "repo-app",
-    label: "app",
+    label: "github.com/me/app",
+    icon: "github",
     variant: "section",
     expanded: true,
     actions: [
@@ -91,16 +115,16 @@ const repoNodes: TreeNode[] = [
           {
             id: "dir-readme",
             label: "README.md",
-            icon: "file",
+            icon: "README.md",
           },
           {
             id: "dir-src-wt",
             label: "src",
-            icon: "folder",
+            icon: "folder-closed",
             expanded: false,
             children: [
-              { id: "wt-index", label: "index.ts", icon: "file" },
-              { id: "wt-app", label: "app.ts", icon: "file" },
+              { id: "wt-index", label: "index.ts", icon: "index.ts" },
+              { id: "wt-app", label: "app.ts", icon: "app.ts" },
             ],
           },
         ],
@@ -112,24 +136,41 @@ const repoNodes: TreeNode[] = [
         expanded: false,
         actions: [{ id: "pull", icon: "refresh", label: "Pull" }],
         children: [
-          { id: "wt-feat-readme", label: "README.md", icon: "file" },
+          { id: "wt-feat-readme", label: "README.md", icon: "README.md" },
         ],
-      },
-      {
-        id: "add-worktree-row",
-        label: "add worktree",
-        icon: "plus",
-        showChevron: false,
-        variant: "worktree",
       },
     ],
   },
   {
     id: "repo-toolkit",
-    label: "toolkit",
+    label: "github.com/me/toolkit",
+    icon: "github",
     variant: "section",
     actions: [{ id: "add-worktree", icon: "plus", label: "Add worktree" }],
     children: [],
+  },
+  {
+    id: "repo-other",
+    label: "gitlab.com/team/other",
+    icon: "gitlab",
+    variant: "section",
+    actions: [{ id: "add-worktree", icon: "plus", label: "Add worktree" }],
+    children: [],
+  },
+  {
+    id: "repo-custom",
+    label: "git.sr.ht/~user/tool",
+    icon: "git",
+    variant: "section",
+    actions: [{ id: "add-worktree", icon: "plus", label: "Add worktree" }],
+    children: [],
+  },
+  {
+    id: "add-repo-top",
+    label: "add repository",
+    icon: "plus",
+    showChevron: false,
+    variant: "worktree",
   },
 ];
 
@@ -142,7 +183,7 @@ export const Basic: Story = {
     >
       <openp41ge-tree
         .nodes=${basicNodes}
-        .renderIcon=${(name: string, size: number) => html`${unsafeHTML(storyIcon(name, size))}`}
+        .renderIcon=${treeIcon}
       ></openp41ge-tree>
     </div>
   `,
@@ -156,7 +197,7 @@ export const Expanded: Story = {
       <openp41ge-tree
         .nodes=${basicNodes}
         selectedId="utils.ts"
-        .renderIcon=${(name: string, size: number) => html`${unsafeHTML(storyIcon(name, size))}`}
+        .renderIcon=${treeIcon}
       ></openp41ge-tree>
     </div>
   `,
@@ -169,7 +210,7 @@ export const WithRepoStructure: Story = {
     >
       <openp41ge-tree
         .nodes=${repoNodes}
-        .renderIcon=${(name: string, size: number) => html`${unsafeHTML(storyIcon(name, size))}`}
+        .renderIcon=${treeIcon}
       ></openp41ge-tree>
     </div>
   `,
@@ -182,7 +223,7 @@ export const WithActions: Story = {
     >
       <openp41ge-tree
         .nodes=${repoNodes}
-        .renderIcon=${(name: string, size: number) => html`${unsafeHTML(storyIcon(name, size))}`}
+        .renderIcon=${treeIcon}
       ></openp41ge-tree>
     </div>
   `,
@@ -195,7 +236,7 @@ export const NestedDeep: Story = {
     >
       <openp41ge-tree
         .nodes=${_buildDeepTree(5)}
-        .renderIcon=${(name: string, size: number) => html`${unsafeHTML(storyIcon(name, size))}`}
+        .renderIcon=${treeIcon}
       ></openp41ge-tree>
     </div>
   `,
@@ -216,7 +257,7 @@ export const DraggableNodes: Story = {
     >
       <openp41ge-tree
         .nodes=${basicNodes}
-        .renderIcon=${(name: string, size: number) => html`${unsafeHTML(storyIcon(name, size))}`}
+        .renderIcon=${treeIcon}
       ></openp41ge-tree>
     </div>
   `,
@@ -229,14 +270,14 @@ function _buildDeepTree(levels: number): TreeNode[] {
   const root: TreeNode = {
     id: `level-${levels}`,
     label: `folder-${levels}`,
-    icon: "folder",
+    icon: "folder-closed",
     expanded: levels <= 2,
     children:
       levels > 1
         ? _buildDeepTree(levels - 1)
         : [
-            { id: `file-${levels}-a`, label: "index.ts", icon: "file" },
-            { id: `file-${levels}-b`, label: "styles.css", icon: "file" },
+            { id: `file-${levels}-a`, label: "index.ts", icon: "index.ts" },
+            { id: `file-${levels}-b`, label: "styles.css", icon: "styles.css" },
           ],
   };
   return [root];
