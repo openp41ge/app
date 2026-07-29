@@ -577,13 +577,17 @@ export class TabGrid extends LitElement {
   }
 
   private _isOverTabBar(e: DragEvent): boolean {
-    // During drop, e.target is the element under the cursor.
-    // During dragover, elementFromPoint works but may fail for unknown
-    // elements; fall back to e.target's closest ancestor.
-    if ((e.target as HTMLElement)?.closest?.("tab-bar")) return true;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el || !(el instanceof HTMLElement)) return false;
-    return !!el.closest("tab-bar");
+    // Check from shadow root first (document.elementFromPoint only sees
+    // the grid host, hiding tab-bar elements inside shadow DOM).
+    const root = this.renderRoot;
+    if (root && "elementFromPoint" in root) {
+      const el = (root as any).elementFromPoint(e.clientX, e.clientY);
+      if (el instanceof HTMLElement && el.closest("tab-bar")) return true;
+    }
+    // Fallback: document-level elementFromPoint (works for light DOM tab-bars)
+    const docEl = document.elementFromPoint(e.clientX, e.clientY);
+    if (docEl instanceof HTMLElement && docEl.closest("tab-bar")) return true;
+    return false;
   }
 
   private _hideBarIndicators(): void {
