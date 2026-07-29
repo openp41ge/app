@@ -2,10 +2,16 @@
  * <openp41ge-tree> — Generic tree web component.
  *
  * Renders a hierarchical TreeNode[] structure with expand/collapse,
- * icons, hover action buttons, and drag-and-drop support.
+ * keyboard navigation, configurable icon rendering, row variant
+ * support (section headers, worktree rows, standard rows), hover
+ * action buttons, and drag-and-drop.
  *
- * Usage:
- *   <openp41ge-tree .nodes=${treeNodes}></openp41ge-tree>
+ * Keyboard navigation:
+ *   ArrowUp/Down  — move selection
+ *   ArrowRight    — expand node
+ *   ArrowLeft     — collapse node
+ *   Enter/Space   — toggle expand/collapse
+ *   Home/End      — first/last visible node
  *
  * Events:
  *   tree-node-click   — { nodeId, meta }
@@ -23,6 +29,7 @@ import type {
   TreeNode,
   TreeNodeAction,
   DropPosition,
+  IconRenderer,
 } from "./types";
 import { treeStyles } from "./tree-styles";
 
@@ -30,6 +37,7 @@ export {
   type TreeNode,
   type TreeNodeAction,
   type DropPosition,
+  type IconRenderer,
   type TreeNodeClickEventDetail,
   type TreeNodeToggleEventDetail,
   type TreeNodeActionEventDetail,
@@ -37,41 +45,219 @@ export {
   type TreeDropEventDetail,
 } from "./types";
 
-const INDENT = 18; // pixels per depth level
+const INDENT = 16; // pixels per depth level
+const CHEVRON_WIDTH = 16; // chevron column width
+const ICON_WIDTH = 16; // icon column width
+const SECTION_EXTRA = 8; // extra indent for section headers
 
 export class Openp41geTree extends LitElement {
   static styles = treeStyles;
 
+  /** Tree data — flat or nested TreeNode[] */
   @property({ type: Array })
   nodes: TreeNode[] = [];
 
+  /** Currently selected node ID */
   @property({ attribute: false })
   selectedId: string | null = null;
 
+  /** Callback for rendering icons. Defaults to a simple inline SVG fallback. */
+  @property({ attribute: false })
+  renderIcon: IconRenderer | null = null;
+
+  /** Current depth level (auto-managed for nested trees) */
   @property({ type: Number })
   depth = 0;
 
   @state()
   private _hoveredNodeId: string | null = null;
 
-  // ─── Helpers ───────────────────────────────────────────────────
+  @state()
+  private _focusableNodeId: string | null = null;
 
-  private _isExpanded(node: TreeNode): boolean {
-    // Use Node.expanded if set, otherwise check children
-    if (node.expanded !== undefined) return node.expanded;
-    if (node.children && node.children.length > 0) return false;
-    return false;
+  private _rootEl: HTMLElement | null = null;
+
+  private _isInternalUpdate = false;
+
+  // ─── Lifecycle ───────────────────────────────────────────────────
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.addEventListener("keydown", this._onKeyDown);
+    this.addEventListener("focus", this._onFocus);
   }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.removeEventListener("keydown", this._onKeyDown);
+    this.removeEventListener("focus", this._onFocus);
+  }
+
+  firstUpdated(): void {
+    this._rootEl = this.renderRoot?.querySelector(".tree-root") as HTMLElement | null;
+    this._ensureFocusableNode();
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────
 
   private _hasChildren(node: TreeNode): boolean {
     return !!(node.children && node.children.length > 0);
   }
 
-  // ─── Event Handlers ────────────────────────────────────────────
+  private _showChevron(node: TreeNode): boolean {
+    if (node.showChevron !== undefined) return node.showChevron;
+    return this._hasChildren(node);
+  }
 
-  private _onChevronClick(e: Event, node: TreeNode): void {
-    e.stopPropagation();
-    const expanded = !this._isExpanded(node);
+  private _isSection(node: TreeNode): boolean {
+    return node.variant === "section";
+  }
+
+  // ─── Flatten visible nodes for keyboard nav ──────────────────────
+
+  /** Get all currently visible nodes in order (flat list). */
+  private _getVisibleNodes(): TreeNode[] {
+    const result: TreeNode[] = [];
+    this._collectVisible(this.nodes, result);
+    return result;
+  }
+
+  private _collectVisible(nodes: TreeNode[], out: TreeNode[]): void {
+    for (const node of nodes) {
+      out.push(node);
+      if (this._hasChildren(node) && this._isExpandedLocal(node)) {
+        this._collectVisible(node.children!, out);
+      }
+    }
+  }
+
+  /** Resolve expanded from node.expanded or our local override. */
+  private _isExpandedLocal(node: TreeNode): boolean {
+    if (node.expanded !== undefined) return node.expanded;
+    if (this._hasChildren(node)) return false;
+    return false;
+  }
+
+  private _getExpandedNodes(): Set<string> {
+    const set = new Set<string>();
+    this._collectExpanded(this.nodes, set);
+    return set;
+  }
+
+  private _collectExpanded(nodes: TreeNode[], out: Set<string>): void {
+    for (const node of nodes) {
+      if (this._isExpandedLocal(node)) {
+        out.add(node.id);
+        if (node.children) this._collectExpanded(node.children, out);
+      }
+    }
+  }
+
+  // ─── Keyboard Navigation ────────────────────────────────────────
+
+  private _onFocus(): void {
+    if (!this._focusableNodeId && this.nodes.length > 0) {
+      this._focusableNodeId = this.nodes[0].id;
+    }
+  }
+
+  private _onKeyDown(e: KeyboardEvent): void {
+    const visible = this._getVisibleNodes();
+    if (visible.length === 0) return;
+
+    let idx = this.selectedId
+      ? visible.findIndex((n) => n.id === this.selectedId)
+      : -1;
+
+    switch (e.key) {
+      case "ArrowDown": {
+        e.preventDefault();
+        idx = Math.min(idx + 1, visible.length - 1);
+        this._selectAndFocus(visible[idx].id);
+        break;
+      }
+      case "ArrowUp": {
+        e.preventDefault();
+        idx = Math.max(idx - 1, 0);
+        this._selectAndFocus(visible[idx].id);
+        break;
+      }
+      case "ArrowRight": {
+        e.preventDefault();
+        const node = visible[idx];
+        if (node && this._hasChildren(node) && !this._isExpandedLocal(node)) {
+          this._toggleNode(node);
+        }
+        break;
+      }
+      case "ArrowLeft": {
+        e.preventDefault();
+        const node = visible[idx];
+        if (node && this._hasChildren(node) && this._isExpandedLocal(node)) {
+          this._toggleNode(node);
+        }
+        break;
+      }
+      case "Enter":
+      case " ": {
+        e.preventDefault();
+        const node = visible[idx];
+        if (node && this._hasChildren(node)) {
+          this._toggleNode(node);
+        } else if (node) {
+          // Activate leaf node (click)
+          this._emitClick(node);
+        }
+        break;
+      }
+      case "Home": {
+        e.preventDefault();
+        if (visible.length > 0) {
+          this._selectAndFocus(visible[0].id);
+        }
+        break;
+      }
+      case "End": {
+        e.preventDefault();
+        if (visible.length > 0) {
+          this._selectAndFocus(visible[visible.length - 1].id);
+        }
+        break;
+      }
+    }
+  }
+
+  private _selectAndFocus(nodeId: string): void {
+    this.selectedId = nodeId;
+    this._focusableNodeId = nodeId;
+    this._ensureFocusableNode();
+    // Scroll into view
+    const el = this.renderRoot?.querySelector(`[data-node-id="${CSS.escape(nodeId)}"]`) as HTMLElement | null;
+    el?.scrollIntoView({ block: "nearest" });
+    this.requestUpdate();
+  }
+
+  private _ensureFocusableNode(): void {
+    if (!this._focusableNodeId || !this.nodes.find((n) => this._findNode(n, this._focusableNodeId!))) {
+      this._focusableNodeId = this.nodes.length > 0 ? this._getVisibleNodes()[0]?.id ?? null : null;
+    }
+  }
+
+  private _findNode(root: TreeNode, id: string): TreeNode | undefined {
+    if (root.id === id) return root;
+    if (root.children) {
+      for (const child of root.children) {
+        const found = this._findNode(child, id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  }
+
+  // ─── Toggle / Select ────────────────────────────────────────────
+
+  private _toggleNode(node: TreeNode): void {
+    const expanded = !this._isExpandedLocal(node);
     this._updateExpanded(node.id, expanded);
     this.dispatchEvent(
       new CustomEvent("tree-node-toggle", {
@@ -82,8 +268,7 @@ export class Openp41geTree extends LitElement {
     );
   }
 
-  private _onNodeClick(e: Event, node: TreeNode): void {
-    e.stopPropagation();
+  private _emitClick(node: TreeNode): void {
     this.selectedId = node.id;
     this.dispatchEvent(
       new CustomEvent("tree-node-click", {
@@ -92,6 +277,19 @@ export class Openp41geTree extends LitElement {
         detail: { nodeId: node.id, meta: node.meta },
       }),
     );
+  }
+
+  // ─── Event Handlers ────────────────────────────────────────────
+
+  private _onChevronClick(e: Event, node: TreeNode): void {
+    e.stopPropagation();
+    this._toggleNode(node);
+  }
+
+  private _onNodeClick(e: Event, node: TreeNode): void {
+    e.stopPropagation();
+    this._emitClick(node);
+    this._focusableNodeId = node.id;
   }
 
   private _onActionClick(e: Event, node: TreeNode, action: TreeNodeAction): void {
@@ -134,16 +332,11 @@ export class Openp41geTree extends LitElement {
       new CustomEvent("tree-drop", {
         bubbles: true,
         composed: true,
-        detail: {
-          targetNodeId: targetNode.id,
-          position,
-          dragData,
-        },
+        detail: { targetNodeId: targetNode.id, position, dragData },
       }),
     );
   }
 
-  /** Compute whether the drop is before, after, or inside the target node. */
   private _computeDropPosition(e: DragEvent, _targetNode: TreeNode): DropPosition {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const relY = (e.clientY - rect.top) / rect.height;
@@ -171,13 +364,30 @@ export class Openp41geTree extends LitElement {
     });
   }
 
+  // ─── Icon rendering ────────────────────────────────────────────
+
+  private _resolveIcon(name: string | undefined, size: number): TemplateResult | string {
+    if (!name) return "";
+    if (this.renderIcon) {
+      return this.renderIcon(name, size);
+    }
+    // Default: use openp41ge-icon component
+    return html`<openp41ge-icon name=${name} size=${size}></openp41ge-icon>`;
+  }
+
+  private _renderChevron(expanded: boolean): TemplateResult {
+    return html`<span class="tree-chevron ${classMap({ expanded })}">▶</span>`;
+  }
+
   // ─── Render ────────────────────────────────────────────────────
 
   render(): TemplateResult {
     if (!this.nodes || this.nodes.length === 0) {
       return html`<div class="tree-empty">No items</div>`;
     }
-    return html`<div class="tree-root" role="tree">${this._renderNodes(this.nodes)}</div>`;
+    return html`
+      <div class="tree-root" role="tree">${this._renderNodes(this.nodes)}</div>
+    `;
   }
 
   private _renderNodes(nodes: TreeNode[]): TemplateResult[] {
@@ -185,42 +395,66 @@ export class Openp41geTree extends LitElement {
   }
 
   private _renderNode(node: TreeNode): TemplateResult {
-    const expanded = this._isExpanded(node);
+    const expanded = this._isExpandedLocal(node);
     const hasChildren = this._hasChildren(node);
+    const showChevron = this._showChevron(node);
     const selected = this.selectedId === node.id;
     const hovered = this._hoveredNodeId === node.id;
-    const indent = this.depth * INDENT;
+    const isSection = this._isSection(node);
+    const isFocusable = this._focusableNodeId === node.id;
+
+    // Indentation: section headers get extra left padding
+    const rowIndent = isSection
+      ? this.depth * INDENT + SECTION_EXTRA
+      : this.depth * INDENT;
+    // Content inside the row is shifted so chevron/icon start at the indent
+    const contentPad = isSection ? 8 : 8; // base padding on left
 
     return html`
       <div
         class="tree-node ${classMap({
           selected,
           hovered,
-          draggable: !!node.draggable,
+          "is-section": isSection,
+          "has-children": hasChildren,
         })}"
-        style=${styleMap({ paddingLeft: `${indent + 8}px` })}
+        style=${styleMap({
+          paddingLeft: `${rowIndent + contentPad}px`,
+          paddingRight: "8px",
+        })}
         role="treeitem"
+        tabindex=${isFocusable ? "0" : "-1"}
+        data-node-id=${node.id}
         aria-expanded=${hasChildren ? (expanded ? "true" : "false") : undefined}
+        aria-selected=${selected ? "true" : "false"}
         draggable=${node.draggable ? "true" : "false"}
         @click=${(e: Event) => this._onNodeClick(e, node)}
         @mouseenter=${() => (this._hoveredNodeId = node.id)}
-        @mouseleave=${() => (this._hoveredNodeId === node.id ? (this._hoveredNodeId = null) : null)}
+        @mouseleave=${() =>
+          this._hoveredNodeId === node.id ? (this._hoveredNodeId = null) : null}
         @dragstart=${(e: DragEvent) => this._onDragStart(e, node)}
         @dragover=${this._onDragOver}
         @drop=${(e: DragEvent) => this._onDrop(e, node)}
       >
-        <!-- Chevron -->
+        <!-- Chevron (▶/▼) -->
         <span
-          class="tree-chevron ${classMap({ expanded, invisible: !hasChildren })}"
+          class="tree-chevron-cell ${classMap({
+            expanded,
+            hidden: !showChevron,
+          })}"
           @click=${(e: Event) => this._onChevronClick(e, node)}
         >
-          ▶
+          ${showChevron ? this._renderChevron(expanded) : nothing}
         </span>
 
-        <!-- Icon -->
+        <!-- Icon column (may be empty for section headers) -->
         ${node.icon
-          ? html`<span class="tree-icon"><openp41ge-icon name=${node.icon} size="16"></openp41ge-icon></span>`
-          : html`<span class="tree-icon tree-icon-placeholder"></span>`}
+          ? html`
+              <span class="tree-icon-cell">
+                ${this._resolveIcon(node.icon, node.iconSize ?? 14)}
+              </span>
+            `
+          : html`<span class="tree-icon-spacer"></span>`}
 
         <!-- Label -->
         <span class="tree-label">${node.label}</span>
@@ -234,9 +468,11 @@ export class Openp41geTree extends LitElement {
                     class="tree-action-btn"
                     title=${action.label}
                     aria-label=${action.label}
+                    role="button"
+                    tabindex="-1"
                     @click=${(e: Event) => this._onActionClick(e, node, action)}
                   >
-                    <openp41ge-icon name=${action.icon} size="14"></openp41ge-icon>
+                    ${this._resolveIcon(action.icon, 14)}
                   </span>
                 `,
               )}
@@ -244,11 +480,12 @@ export class Openp41geTree extends LitElement {
           : nothing}
       </div>
 
-      <!-- Children -->
+      <!-- Children (recursive) -->
       ${hasChildren && expanded
         ? html`<openp41ge-tree
             .nodes=${node.children!}
             .selectedId=${this.selectedId}
+            .renderIcon=${this.renderIcon}
             depth=${this.depth + 1}
             @tree-node-click=${(e: Event) => this._forwardEvent(e, "tree-node-click")}
             @tree-node-toggle=${(e: Event) => this._forwardEvent(e, "tree-node-toggle")}
