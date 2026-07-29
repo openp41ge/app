@@ -496,6 +496,9 @@ export class TabGrid extends LitElement {
           const tabBarEl = document.elementFromPoint(e.clientX, e.clientY)
             ?.closest?.("tab-bar") as any;
           const col = tabBarEl?.col ?? 0;
+          const insertAt = tabBarEl?.getInsertionIndex
+            ? tabBarEl.getInsertionIndex(e.clientX)
+            : -1;
           for (const filePath of filePaths) {
             this.dispatchEvent(
               new CustomEvent("grid-open-tab", {
@@ -505,6 +508,7 @@ export class TabGrid extends LitElement {
                   tabType: "file-viewer",
                   tabConfig: { filePath },
                   targetCol: col,
+                  insertAt,
                   pinned: true,
                 },
               }),
