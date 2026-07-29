@@ -228,6 +228,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-top: 0.375rem
 }
 
+.mt-2 {
+  margin-top: 0.5rem
+}
+
 .mt-4 {
   margin-top: 1rem
 }
@@ -282,6 +286,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .h-0\.5 {
   height: 0.125rem
+}
+
+.h-1 {
+  height: 0.25rem
 }
 
 .h-2 {
@@ -432,6 +440,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   width: 18px
 }
 
+.w-\[200px\] {
+  width: 200px
+}
+
 .w-\[22px\] {
   width: 22px
 }
@@ -529,6 +541,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .transform {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
+}
+
+.animate-\[add-repo-spin_0\.8s_linear_infinite\] {
+  animation: add-repo-spin 0.8s linear infinite
 }
 
 .animate-\[pull-indeterminate_1\.2s_linear_infinite\] {
@@ -756,6 +772,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-color: rgb(68 68 68 / var(--tw-border-opacity, 1))
 }
 
+.border-\[\#4a9eff\] {
+  --tw-border-opacity: 1;
+  border-color: rgb(74 158 255 / var(--tw-border-opacity, 1))
+}
+
 .border-\[\#555\] {
   --tw-border-opacity: 1;
   border-color: rgb(85 85 85 / var(--tw-border-opacity, 1))
@@ -781,6 +802,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-color: var(--border-divider, #2d2d2d)
 }
 
+.border-t-\[\#4a9eff\] {
+  --tw-border-opacity: 1;
+  border-top-color: rgb(74 158 255 / var(--tw-border-opacity, 1))
+}
+
 .border-t-accent {
   border-top-color: var(--text-accent, #569cd6)
 }
@@ -793,6 +819,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 .bg-\[\#333\] {
   --tw-bg-opacity: 1;
   background-color: rgb(51 51 51 / var(--tw-bg-opacity, 1))
+}
+
+.bg-\[\#4a9eff\] {
+  --tw-bg-opacity: 1;
+  background-color: rgb(74 158 255 / var(--tw-bg-opacity, 1))
 }
 
 .bg-\[rgba\(0\2c 0\2c 0\2c \.3\)\] {
@@ -1018,6 +1049,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 7px
 }
 
+.py-px {
+  padding-top: 1px;
+  padding-bottom: 1px
+}
+
 .pb-1 {
   padding-bottom: 0.25rem
 }
@@ -1052,6 +1088,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .pr-2 {
   padding-right: 0.5rem
+}
+
+.pr-3 {
+  padding-right: 0.75rem
 }
 
 .pt-2 {
@@ -1175,6 +1215,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   color: rgb(68 68 68 / var(--tw-text-opacity, 1))
 }
 
+.text-\[\#4a9eff\] {
+  --tw-text-opacity: 1;
+  color: rgb(74 158 255 / var(--tw-text-opacity, 1))
+}
+
 .text-\[\#4caf50\] {
   --tw-text-opacity: 1;
   color: rgb(76 175 80 / var(--tw-text-opacity, 1))
@@ -1185,9 +1230,24 @@ export const tailwindCSS: string = `.pointer-events-none {
   color: rgb(85 85 85 / var(--tw-text-opacity, 1))
 }
 
+.text-\[\#666\] {
+  --tw-text-opacity: 1;
+  color: rgb(102 102 102 / var(--tw-text-opacity, 1))
+}
+
+.text-\[\#888\] {
+  --tw-text-opacity: 1;
+  color: rgb(136 136 136 / var(--tw-text-opacity, 1))
+}
+
 .text-\[\#8a8a8a\] {
   --tw-text-opacity: 1;
   color: rgb(138 138 138 / var(--tw-text-opacity, 1))
+}
+
+.text-\[\#aaa\] {
+  --tw-text-opacity: 1;
+  color: rgb(170 170 170 / var(--tw-text-opacity, 1))
 }
 
 .text-\[\#b0b0b0\] {
@@ -1203,6 +1263,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 .text-\[\#ddd\] {
   --tw-text-opacity: 1;
   color: rgb(221 221 221 / var(--tw-text-opacity, 1))
+}
+
+.text-\[\#e06c75\] {
+  --tw-text-opacity: 1;
+  color: rgb(224 108 117 / var(--tw-text-opacity, 1))
 }
 
 .text-\[\#e0e0e0\] {

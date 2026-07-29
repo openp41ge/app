@@ -85,7 +85,7 @@ export class ProjectManagerController extends BaseController implements TabContr
     if (!container) return;
 
     // Show loading state
-    container.innerHTML = `<div class="pm-loading" style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">Loading project...</div>`;
+    container.innerHTML = `<div class="pm-loading flex items-center justify-center h-full text-muted text-xs">Loading project...</div>`;
 
     try {
       // Determine the project name — either from snapshot or current project
@@ -95,7 +95,7 @@ export class ProjectManagerController extends BaseController implements TabContr
 
       if (!this._projectName) {
         container.innerHTML =
-          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">No project selected</div>';
+          '<div class="flex items-center justify-center h-full text-muted text-xs">No project selected</div>';
         return;
       }
 
@@ -126,7 +126,7 @@ export class ProjectManagerController extends BaseController implements TabContr
       log.error("Failed to load project info:", err);
       if (container) {
         container.innerHTML =
-          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">Failed to load project</div>';
+          '<div class="flex items-center justify-center h-full text-muted text-xs">Failed to load project</div>';
       }
     }
   }
@@ -161,7 +161,7 @@ export class ProjectManagerController extends BaseController implements TabContr
     const d = this._detailProject;
     if (!d) {
       container.innerHTML =
-        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">Project not found</div>';
+        '<div class="flex items-center justify-center h-full text-muted text-xs">Project not found</div>';
       return;
     }
 
@@ -173,113 +173,113 @@ export class ProjectManagerController extends BaseController implements TabContr
     const wtColor = "#888";
 
     container.innerHTML = `
-      <div class="pm-scroll" style="flex:1;overflow-y:auto;padding:16px;">
+      <div class="pm-scroll flex-1 overflow-y-auto p-4">
         <!-- Header -->
-        <div class="pm-header" style="margin-bottom:16px;">
-          <div class="pm-name-row" style="display:flex;align-items:center;gap:8px;">
-            <span class="pm-name" style="font-size:16px;font-weight:600;color:#eee;">${this._escapeHtml(d.name)}</span>
+        <div class="pm-header mb-4">
+          <div class="pm-name-row flex items-center gap-2">
+            <span class="pm-name text-base font-semibold text-[#eee]">${this._escapeHtml(d.name)}</span>
             ${
               this._renaming
                 ? `
-              <div class="pm-rename" style="display:flex;align-items:center;gap:4px;">
+              <div class="pm-rename flex items-center gap-1">
                 <input id="pm-rename-input" type="text" value="${this._escapeHtml(d.name)}"
-                  style="font-size:13px;padding:2px 6px;background:var(--bg-gutter);border:1px solid #4a9eff;border-radius:3px;color:#eee;outline:none;width:200px;" />
-                <span id="pm-rename-confirm" style="cursor:pointer;color:#4a9eff;font-size:14px;font-weight:bold;">\u2713</span>
-                <span id="pm-rename-cancel" style="cursor:pointer;color:#888;font-size:14px;">\u2715</span>
+                  class="text-13 px-1.5 py-0.5 bg-gutter border border-[#4a9eff] rounded text-[#eee] outline-none w-[200px]" />
+                <span id="pm-rename-confirm" class="cursor-pointer text-[#4a9eff] text-sm font-bold">\u2713</span>
+                <span id="pm-rename-cancel" class="cursor-pointer text-[#888] text-sm">\u2715</span>
               </div>`
-                : `<span id="pm-rename-btn" style="cursor:pointer;color:#888;font-size:13px;" title="Rename">\u270E</span>`
+                : `<span id="pm-rename-btn" class="cursor-pointer text-[#888] text-13" title="Rename">\u270E</span>`
             }
-            ${this._isDraft ? '<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#2a2a2a;color:#888;">draft</span>' : ""}
+            ${this._isDraft ? '<span class="text-xs px-1.5 py-px rounded bg-[#2a2a2a] text-[#888]">draft</span>' : ""}
           </div>
-          <div style="font-size:11px;color:#666;margin-top:4px;">
+          <div class="text-xs text-[#666] mt-1">
             Created ${created} &middot; Modified ${modified}
           </div>
         </div>
 
         <!-- Actions -->
-        <div class="pm-actions" style="display:flex;gap:8px;margin-bottom:16px;">
+        <div class="pm-actions flex gap-2 mb-4">
           ${
             this._isDraft
-              ? `<button id="pm-save-btn" style="padding:4px 12px;font-size:12px;border:none;border-radius:4px;background:#4a9eff;color:#fff;cursor:pointer;">Save Project</button>`
+              ? `<button id="pm-save-btn" class="px-3 py-1 text-xs border-none rounded bg-[#4a9eff] text-white cursor-pointer">Save Project</button>`
               : ""
           }
-          <button id="pm-delete-btn" style="padding:4px 12px;font-size:12px;border:none;border-radius:4px;background:transparent;color:#e06c75;cursor:pointer;">Delete Project</button>
+          <button id="pm-delete-btn" class="px-3 py-1 text-xs border-none rounded bg-transparent text-[#e06c75] cursor-pointer">Delete Project</button>
         </div>
 
         <!-- Repos -->
-        <div class="pm-repos" style="margin-bottom:8px;">
-          <div style="font-size:12px;font-weight:600;color:#ccc;margin-bottom:8px;">Repositories</div>
-          ${this._repos.length === 0 && !this._loadingRepos ? '<div style="font-size:12px;color:#666;padding:8px 0;">No repositories cloned for this project.</div>' : ""}
+        <div class="pm-repos mb-2">
+          <div class="text-xs font-semibold text-[#ccc] mb-2">Repositories</div>
+          ${this._repos.length === 0 && !this._loadingRepos ? '<div class="text-xs text-[#666] py-2">No repositories cloned for this project.</div>' : ""}
           ${this._repos
             .map(
               (repo, ri) => `
-            <div class="pm-repo-group" style="background:var(--bg-gutter);border-radius:6px;margin-bottom:8px;overflow:hidden;">
-              <div class="pm-repo-header" style="display:flex;align-items:center;height:32px;padding:0 12px;gap:8px;cursor:pointer;user-select:none;"
+            <div class="pm-repo-group bg-gutter rounded mb-2 overflow-hidden">
+              <div class="pm-repo-header flex items-center h-8 px-3 gap-2 cursor-pointer select-none"
                 data-repo-index="${ri}">
-                <span style="width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span class="w-4 flex items-center justify-center shrink-0">
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M2 4L8 1L14 4V12L8 15L2 12V4Z" stroke="currentColor" stroke-width="1.2" fill="none"/>
                     <circle cx="8" cy="4" r="1.5" fill="#4a9eff"/>
                   </svg>
                 </span>
-                <span style="flex:1;font-size:13px;color:${repoColor};">${this._escapeHtml(repo.name)}</span>
-                <span style="font-size:11px;color:#666;">${repo.worktrees.length} worktrees</span>
+                <span class="flex-1 text-13" style="color:${repoColor};">${this._escapeHtml(repo.name)}</span>
+                <span class="text-xs text-[#666]">${repo.worktrees.length} worktrees</span>
               </div>
               <!-- Worktrees -->
-              <div class="pm-worktree-list" style="padding-left:12px;">
+              <div class="pm-worktree-list pl-3">
                 ${repo.worktrees
                   .map(
                     (wt) => `
-                  <div class="pm-wt-item" style="display:flex;align-items:center;height:28px;padding-left:28px;padding-right:12px;font-size:13px;color:${wtColor};gap:8px;">
-                    <span style="flex:1;">${this._escapeHtml(wt.branch)}</span>
-                    <span style="font-size:11px;color:#555;">${this._escapeHtml(wt.path)}</span>
+                  <div class="pm-wt-item flex items-center h-7 pl-7 pr-3 text-13 gap-2" style="color:${wtColor};">
+                    <span class="flex-1">${this._escapeHtml(wt.branch)}</span>
+                    <span class="text-xs text-[#555]">${this._escapeHtml(wt.path)}</span>
                   </div>
                 `,
                   )
                   .join("")}
                 <!-- Add worktree inline -->
-                <div class="pm-add-wt-row" data-repo="${this._escapeHtml(repo.name)}" style="display:flex;align-items:center;height:28px;padding-left:28px;padding-right:12px;cursor:pointer;font-size:12px;color:var(--accent-hover);"
+                <div class="pm-add-wt-row flex items-center h-7 pl-7 pr-3 cursor-pointer text-xs text-accent-hover" data-repo="${this._escapeHtml(repo.name)}"
                   @click=\${showAddWt}>
-                  <span style="margin-right:4px;">+</span>
+                  <span class="mr-1">+</span>
                   <span>add worktree</span>
                 </div>
-                <div class="pm-add-wt-input" style="display:none;align-items:center;height:28px;padding-left:28px;padding-right:12px;gap:4px;">
-                  <input type="text" placeholder="branch name" style="flex:1;height:20px;font-size:12px;background:transparent;border:1px solid #444;border-radius:3px;color:#eee;padding:0 4px;outline:none;" />
-                  <span class="pm-add-wt-confirm" style="cursor:pointer;color:#4a9eff;font-size:12px;">\u2713</span>
-                  <span class="pm-add-wt-cancel" style="cursor:pointer;color:#888;font-size:12px;">\u2715</span>
+                <div class="pm-add-wt-input flex items-center h-7 pl-7 pr-3 gap-1" style="display:none;">
+                  <input type="text" placeholder="branch name" class="flex-1 h-5 text-xs bg-transparent border border-[#444] rounded text-[#eee] px-1 outline-none" />
+                  <span class="pm-add-wt-confirm cursor-pointer text-[#4a9eff] text-xs">\u2713</span>
+                  <span class="pm-add-wt-cancel cursor-pointer text-[#888] text-xs">\u2715</span>
                 </div>
               </div>
             </div>
           `,
             )
             .join("")}
-          ${this._loadingRepos ? '<div style="font-size:12px;color:#666;padding:8px 0;">Loading repos...</div>' : ""}
+          ${this._loadingRepos ? '<div class="text-xs text-[#666] py-2">Loading repos...</div>' : ""}
         </div>
 
         <!-- Add repo -->
-        <div class="pm-add-repo" style="margin-top:8px;">
+        <div class="pm-add-repo mt-2">
           ${
             this._cloning
               ? `
-            <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-gutter);border-radius:6px;">
-              <span class="pm-spinner" style="width:14px;height:14px;border:2px solid #444;border-top-color:#4a9eff;border-radius:50%;flex-shrink:0;"></span>
-              <span style="font-size:12px;color:#aaa;">Cloning... ${this._clonePercent}%</span>
-              <div style="flex:1;height:4px;background:#333;border-radius:2px;overflow:hidden;">
-                <div style="height:100%;width:${this._clonePercent}%;background:#4a9eff;border-radius:2px;transition:width 0.3s;"></div>
+            <div class="flex items-center gap-2 px-3 py-2 bg-gutter rounded">
+              <span class="pm-spinner w-[14px] h-[14px] border-2 border-[#444] border-t-[#4a9eff] rounded-full shrink-0 animate-[add-repo-spin_0.8s_linear_infinite]"></span>
+              <span class="text-xs text-[#aaa]">Cloning... ${this._clonePercent}%</span>
+              <div class="flex-1 h-1 bg-[#333] rounded overflow-hidden">
+                <div class="h-full bg-[#4a9eff] rounded transition-[width] duration-300" style="width:${this._clonePercent}%;"></div>
               </div>
             </div>`
               : `
-            <div class="pm-add-repo-row" style="display:flex;align-items:center;height:32px;padding:0 12px;gap:8px;cursor:pointer;"
+            <div class="pm-add-repo-row flex items-center h-8 px-3 gap-2 cursor-pointer"
               id="pm-add-repo-row">
-              <span style="font-size:12px;color:var(--accent-hover);">+ add repository</span>
+              <span class="text-xs text-accent-hover">+ add repository</span>
             </div>
-            <div class="pm-add-repo-input" style="display:none;align-items:center;height:32px;padding:0 12px;gap:4px;">
-              <input id="pm-add-repo-url" type="text" placeholder="git clone URL" style="flex:1;height:22px;font-size:12px;background:var(--bg-gutter);border:1px solid #4a9eff;border-radius:3px;color:#eee;padding:0 6px;outline:none;" />
-              <span id="pm-add-repo-confirm" style="cursor:pointer;color:#4a9eff;font-size:14px;font-weight:bold;">\u2713</span>
-              <span id="pm-add-repo-cancel" style="cursor:pointer;color:#888;font-size:14px;">\u2715</span>
+            <div class="pm-add-repo-input flex items-center h-8 px-3 gap-1" style="display:none;">
+              <input id="pm-add-repo-url" type="text" placeholder="git clone URL" class="flex-1 h-[22px] text-xs bg-gutter border border-[#4a9eff] rounded text-[#eee] px-1.5 outline-none" />
+              <span id="pm-add-repo-confirm" class="cursor-pointer text-[#4a9eff] text-sm font-bold">\u2713</span>
+              <span id="pm-add-repo-cancel" class="cursor-pointer text-[#888] text-sm">\u2715</span>
             </div>`
           }
-          ${this._cloneError ? `<div style="font-size:11px;color:#e06c75;padding:4px 12px;">${this._escapeHtml(this._cloneError)}</div>` : ""}
+          ${this._cloneError ? `<div class="text-xs text-[#e06c75] px-3 py-1">${this._escapeHtml(this._cloneError)}</div>` : ""}
         </div>
       </div>
 
