@@ -51,6 +51,10 @@ class GridState {
     return s;
   }
 
+  setActive(col: number, tabId: string): void {
+    this.activeTabIds[String(col)] = tabId;
+  }
+
   applyTo(gridEl: any): void {
     gridEl.winId = this.winId;
     gridEl.cols = this.cols;
@@ -282,6 +286,11 @@ class TabsDemoApp extends LitElement {
     });
 
     document.addEventListener("grid-activate", (e: any) => {
+      const { winId, col, tabId } = e.detail;
+      const state = this._state(winId);
+      if (!state) return;
+      state.setActive(col, tabId);
+      this._renderAll();
     });
 
     document.addEventListener("grid-open-tab", (e: any) => {
@@ -535,6 +544,13 @@ class SingleGridApp extends LitElement {
       const removed = this._state.removeTab(tabId);
       if (!removed) return;
       this._state.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, -1);
+      this._render();
+    });
+
+    document.addEventListener("grid-activate", (e: any) => {
+      const { winId, col, tabId } = e.detail;
+      if (winId !== "editor") return;
+      this._state.setActive(col, tabId);
       this._render();
     });
 
