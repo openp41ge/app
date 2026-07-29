@@ -129,7 +129,7 @@ Each extraction follows the same pattern:
 
 - [x] syntax-highlighting extracted, builds, app imports from new package
 - [x] tabs engine extracted, builds, components import from new package
-- [ ] file-editor engine extracted, builds, components import from new package  
+- [x] file-editor engine extracted, builds, components import from new package
 - [ ] git-repository extracted, builds
 - [ ] uikit `index.ts` exports only UI components/icons/theme
 - [x] Full `nx build` passes
@@ -137,21 +137,19 @@ Each extraction follows the same pattern:
 
 ## Remaining Work
 
-### File-editor engine extraction (~80 files)
-This is the largest extraction. The plan is:
-- New package: packages/openp41ge-editor-engine/
-- Move: model/, cursor/, input/, rendering/, view/, themes/, interfaces/, services/, events.ts
-- Keep in uikit: src/components/file-editor/ (web component only)
-- File-editor component imports from openp41ge-editor-engine
-- Tokenization already in openp41ge-syntax-highlighting (removed from file-editor)
-
-### Git-repository extraction (small)
-- Move src/git-repository/ → packages/openp41ge-git-repository/
-- Keep in uikit re-exports
+### Git-repository extraction (optional, small)
+- 3 files: git-browser-renderer.ts, types.ts, index.ts
+- No external dependencies, no component
+- Can extract later if needed
 
 ### Uikit cleanup
-- Remove empty directories
-- Finalize index.ts exports
+- All extractions done. uikit now contains only:
+  - components/ (web components)
+  - icons/ + material-icons/
+  - theme/
+  - git-repository/ (3 files, ~22KB)
+  - file-editor/index.ts (re-export barrel)
+  - generated/ (tailwind)
 
 ## Resolved
 
