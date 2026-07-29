@@ -9,7 +9,7 @@
  * backing data structure, with file I/O provided by the Electron IPC bridge.
  */
 
-import { PieceTreeTextContentModel } from "openp41ge-file-editor";
+import { PieceTreeTextContentModel } from "openp41ge-uikit/file-editor";
 
 /**
  * Detect the line ending sequence from file content.

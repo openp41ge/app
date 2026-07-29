@@ -13,7 +13,7 @@
  */
 
 import { createIpcTextContentModel } from "./ipc-text-content-model";
-import type { PieceTreeTextContentModel } from "openp41ge-file-editor";
+import type { PieceTreeTextContentModel } from "openp41ge-uikit/file-editor";
 
 export class ModelRegistry {
   /** Map of file path → model instance. */

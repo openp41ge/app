@@ -30,11 +30,11 @@ export default defineConfig({
       "@openp41ge-terminal": path.resolve(__dirname, "../openp41ge-terminal/src"),
       "@openp41ge-agent-chat": path.resolve(__dirname, "../openp41ge-agent-chat/src"),
       "openp41ge-uikit": path.resolve(__dirname, "../openp41ge-uikit/src"),
-      ,
       "openp41ge-syntax-highlighting": path.resolve(
         __dirname,
         "../openp41ge-syntax-highlighting/src/index.ts",
       ),
+      "openp41ge-tabs": path.resolve(__dirname, "../openp41ge-tabs/src"),
       "openp41ge-uikit/theme": path.resolve(__dirname, "../openp41ge-uikit/src/theme/index.ts"),
     },
   },

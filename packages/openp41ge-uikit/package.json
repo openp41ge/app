@@ -37,7 +37,9 @@
     "lit": "^3.2.0",
     "openp41ge-piece-tree": "workspace:*",
     "openp41ge-syntax-highlighting": "workspace:*",
-    "openp41ge-tabs": "workspace:*"
+    "openp41ge-tabs": "workspace:*",
+    "vscode-textmate": "^9.3.2",
+    "vscode-oniguruma": "^2.0.1"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",

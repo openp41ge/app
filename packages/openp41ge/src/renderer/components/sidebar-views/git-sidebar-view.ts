@@ -9,7 +9,6 @@
  */
 
 import type { SidebarView } from "./sidebar-view";
-import { RepoRow, WorktreeRow, SideHeader } from "openp41ge-uikit";
 
 interface RepoEntry {
   name: string;

@@ -127,8 +127,8 @@ Each extraction follows the same pattern:
 
 ## Completion Criteria
 
-- [ ] syntax-highlighting extracted, builds, app imports from new package
-- [ ] tabs engine extracted, builds, components import from new package
+- [x] syntax-highlighting extracted, builds, app imports from new package
+- [x] tabs engine extracted, builds, components import from new package
 - [ ] file-editor engine extracted, builds, components import from new package  
 - [ ] git-repository extracted, builds
 - [ ] uikit `index.ts` exports only UI components/icons/theme

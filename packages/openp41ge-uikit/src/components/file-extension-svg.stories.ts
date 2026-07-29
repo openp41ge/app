@@ -1,7 +1,7 @@
 import { html } from "lit";
 import type { Meta, StoryObj } from "@storybook/web-components";
-import "./components/file-extension-svg";
-import { getAllIconNames } from "./icons/material-icons";
+import "./file-extension-svg";
+import { getAllIconNames } from "../icons/material-icons";
 
 const meta: Meta = {
   title: "Components/FileExtensionSvg",
