@@ -1065,11 +1065,7 @@ class Openp41geWorktreeTree extends LitElement {
     // Edit mode indicator bar
     if (this._editMode) {
       const editBar = document.createElement("div");
-      editBar.style.cssText = `
-        display:flex;align-items:center;height:28px;
-        padding:0 12px;font-size:11px;font-weight:600;
-        background:var(--accent-hover);color:#fff;
-      `;
+      editBar.className = "flex items-center h-7 px-3 text-xs font-semibold bg-accent text-white";
       editBar.textContent = "editing workspace…";
       drawer.appendChild(editBar);
     }
@@ -1080,18 +1076,14 @@ class Openp41geWorktreeTree extends LitElement {
     }
 
     const inner = document.createElement("div");
-    inner.style.cssText = "padding:4px 0;";
+    inner.className = "py-1";
 
     for (const ws of this._workspaceList) {
       const isActive = ws.id === this._activeWsId;
       const isRenaming = ws.id === this._renamingWsId;
       const row = document.createElement("div");
-      row.style.cssText = `
-        display:flex;align-items:center;gap:6px;height:30px;
-        padding:0 12px;cursor:pointer;font-size:12px;
-        color:${isActive ? "#4a9eff" : "#ccc"};
-        transition:background 0.1s;
-      `;
+      row.className = "flex items-center gap-1.5 h-[30px] px-3 cursor-pointer text-sm transition-[background] duration-100";
+      row.style.color = isActive ? "#4a9eff" : "#ccc";
 
       // Grid icon
       const icon = document.createElement("span");
@@ -1105,8 +1097,7 @@ class Openp41geWorktreeTree extends LitElement {
         '" stroke-width="1.5"/><rect x="13" y="13" width="8" height="8" rx="1" stroke="' +
         (isActive ? "#4a9eff" : "#666") +
         '" stroke-width="1.5"/></svg>';
-      icon.style.cssText =
-        "width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+      icon.className = "w-4 flex items-center justify-center shrink-0";
       row.appendChild(icon);
 
       if (isRenaming) {
@@ -1116,26 +1107,16 @@ class Openp41geWorktreeTree extends LitElement {
         input.value = ws.name;
         input.spellcheck = false;
         input.id = `ws-rename-input-${ws.id}`;
-        input.style.cssText = `
-          flex:1;min-width:0;margin-left:6px;height:100%;
-          background:transparent;border:none;outline:none;
-          color:#eee;font-size:12px;font-family:inherit;
-          padding:0;
-        `;
+        input.className = "flex-1 min-w-0 ml-1.5 h-full bg-transparent border-none outline-none text-[#eee] text-sm font-inherit p-0";
         row.appendChild(input);
 
         // Confirm icon
         const confirmIcon = document.createElement("span");
         confirmIcon.textContent = "\u2713";
-        confirmIcon.style.cssText =
-          "width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;color:var(--accent-hover);font-size:13px;font-weight:bold;transition:background 0.1s;";
+        confirmIcon.className = "w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded text-accent text-13 font-bold transition-[background] duration-100";
         confirmIcon.title = "Rename";
-        confirmIcon.addEventListener("mouseenter", () => {
-          confirmIcon.style.background = "rgba(255,255,255,0.08)";
-        });
-        confirmIcon.addEventListener("mouseleave", () => {
-          confirmIcon.style.background = "transparent";
-        });
+        confirmIcon.addEventListener("mouseenter", () => confirmIcon.classList.add("bg-hover"));
+        confirmIcon.addEventListener("mouseleave", () => confirmIcon.classList.remove("bg-hover"));
         confirmIcon.addEventListener("click", (e) => {
           e.stopPropagation();
           this._confirmRename(ws.id);
@@ -1145,15 +1126,10 @@ class Openp41geWorktreeTree extends LitElement {
         // Cancel icon
         const cancelIcon = document.createElement("span");
         cancelIcon.textContent = "\u2715";
-        cancelIcon.style.cssText =
-          "width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;color:var(--text-secondary);font-size:12px;transition:background 0.1s;margin-left:2px;";
+        cancelIcon.className = "w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded text-secondary text-xs transition-[background] duration-100 ml-0.5";
         cancelIcon.title = "Cancel rename";
-        cancelIcon.addEventListener("mouseenter", () => {
-          cancelIcon.style.background = "rgba(255,255,255,0.08)";
-        });
-        cancelIcon.addEventListener("mouseleave", () => {
-          cancelIcon.style.background = "transparent";
-        });
+        cancelIcon.addEventListener("mouseenter", () => cancelIcon.classList.add("bg-hover"));
+        cancelIcon.addEventListener("mouseleave", () => cancelIcon.classList.remove("bg-hover"));
         cancelIcon.addEventListener("click", (e) => {
           e.stopPropagation();
           this._renamingWsId = null;
@@ -1181,7 +1157,7 @@ class Openp41geWorktreeTree extends LitElement {
       } else {
         const label = document.createElement("span");
         label.textContent = ws.name;
-        label.style.cssText = "flex:1;";
+        label.className = "flex-1";
         row.appendChild(label);
 
         if (isActive) {
@@ -1189,15 +1165,10 @@ class Openp41geWorktreeTree extends LitElement {
             // Confirm button
             const confirmIcon = document.createElement("span");
             confirmIcon.textContent = "\u2713";
-            confirmIcon.style.cssText =
-              "width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;color:var(--accent-hover);font-size:13px;font-weight:bold;transition:background 0.1s;";
+            confirmIcon.className = "w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded text-accent text-13 font-bold transition-[background] duration-100";
             confirmIcon.title = "Save workspace";
-            confirmIcon.addEventListener("mouseenter", () => {
-              confirmIcon.style.background = "rgba(255,255,255,0.08)";
-            });
-            confirmIcon.addEventListener("mouseleave", () => {
-              confirmIcon.style.background = "transparent";
-            });
+            confirmIcon.addEventListener("mouseenter", () => confirmIcon.classList.add("bg-hover"));
+            confirmIcon.addEventListener("mouseleave", () => confirmIcon.classList.remove("bg-hover"));
             confirmIcon.addEventListener("click", (e) => {
               e.stopPropagation();
               this._confirmEditWorkspace();
@@ -1207,15 +1178,10 @@ class Openp41geWorktreeTree extends LitElement {
             // Cancel button
             const cancelIcon = document.createElement("span");
             cancelIcon.textContent = "\u2715";
-            cancelIcon.style.cssText =
-              "width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;color:var(--text-secondary);font-size:12px;transition:background 0.1s;margin-left:2px;";
+            cancelIcon.className = "w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded text-secondary text-xs transition-[background] duration-100 ml-0.5";
             cancelIcon.title = "Cancel editing";
-            cancelIcon.addEventListener("mouseenter", () => {
-              cancelIcon.style.background = "rgba(255,255,255,0.08)";
-            });
-            cancelIcon.addEventListener("mouseleave", () => {
-              cancelIcon.style.background = "transparent";
-            });
+            cancelIcon.addEventListener("mouseenter", () => cancelIcon.classList.add("bg-hover"));
+            cancelIcon.addEventListener("mouseleave", () => cancelIcon.classList.remove("bg-hover"));
             cancelIcon.addEventListener("click", (e) => {
               e.stopPropagation();
               this._cancelEditWorkspace();
@@ -1226,15 +1192,10 @@ class Openp41geWorktreeTree extends LitElement {
             const editBtn = document.createElement("span");
             editBtn.innerHTML =
               '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="#888"/></svg>';
-            editBtn.style.cssText =
-              "width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;transition:background 0.1s;";
+            editBtn.className = "w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded transition-[background] duration-100";
             editBtn.title = "Edit workspace visibility";
-            editBtn.addEventListener("mouseenter", () => {
-              editBtn.style.background = "rgba(255,255,255,0.08)";
-            });
-            editBtn.addEventListener("mouseleave", () => {
-              editBtn.style.background = "transparent";
-            });
+            editBtn.addEventListener("mouseenter", () => editBtn.classList.add("bg-hover"));
+            editBtn.addEventListener("mouseleave", () => editBtn.classList.remove("bg-hover"));
             editBtn.addEventListener("click", (e) => {
               e.stopPropagation();
               this._enterEditMode();
@@ -1251,15 +1212,11 @@ class Openp41geWorktreeTree extends LitElement {
         });
       }
 
-      row.addEventListener("mouseenter", () => {
-        row.style.background = "rgba(255,255,255,0.04)";
-      });
-      row.addEventListener("mouseleave", () => {
-        row.style.background = "transparent";
-      });
+      row.addEventListener("mouseenter", () => row.classList.add("bg-hover"));
+      row.addEventListener("mouseleave", () => row.classList.remove("bg-hover"));
       row.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (isRenaming) return; // don't close drawer while renaming
+        if (isRenaming) return;
         if (ws.id !== this._activeWsId) {
           this._setActiveWorkspace(ws.id);
         }
@@ -1275,37 +1232,28 @@ class Openp41geWorktreeTree extends LitElement {
 
     // Separator
     const sep = document.createElement("div");
-    sep.style.cssText = "height:1px;background:var(--bg-tertiary);margin:4px 12px;";
+    sep.className = "h-px bg-bg-tertiary my-1 mx-3";
     inner.appendChild(sep);
 
-    // "Add workspace" row — clickable to reveal inline input
+    // "Add workspace" row
     const addRow = document.createElement("div");
-    addRow.style.cssText = `
-      display:flex;align-items:center;gap:6px;height:30px;
-      padding:0 12px;cursor:pointer;font-size:12px;color:var(--accent-hover);
-      transition:background 0.1s;
-    `;
+    addRow.className = "flex items-center gap-1.5 h-[30px] px-3 cursor-pointer text-sm text-accent transition-[background] duration-100";
     addRow.id = "ws-add-row";
 
     const plusIcon = document.createElement("span");
     plusIcon.innerHTML =
       '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16M4 12h16" stroke="#4a9eff" stroke-width="2" stroke-linecap="round"/></svg>';
-    plusIcon.style.cssText =
-      "width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+    plusIcon.className = "w-4 flex items-center justify-center shrink-0";
     addRow.appendChild(plusIcon);
 
     const addLabel = document.createElement("span");
     addLabel.textContent = "New workspace...";
-    addLabel.style.cssText = "flex:1;";
+    addLabel.className = "flex-1";
     addLabel.id = "ws-add-label";
     addRow.appendChild(addLabel);
 
-    addRow.addEventListener("mouseenter", () => {
-      addRow.style.background = "rgba(255,255,255,0.04)";
-    });
-    addRow.addEventListener("mouseleave", () => {
-      addRow.style.background = "transparent";
-    });
+    addRow.addEventListener("mouseenter", () => addRow.classList.add("bg-hover"));
+    addRow.addEventListener("mouseleave", () => addRow.classList.remove("bg-hover"));
     addRow.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!this._addWsContainer) {
@@ -1326,14 +1274,13 @@ class Openp41geWorktreeTree extends LitElement {
 
     // Replace contents with input + actions
     addRow.innerHTML = "";
-    addRow.style.background = "rgba(42,111,209,0.08)";
+    addRow.classList.add("bg-[rgba(42,111,209,0.08)]");
 
     // Plus icon
     const plusIcon = document.createElement("span");
     plusIcon.innerHTML =
       '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16M4 12h16" stroke="#4a9eff" stroke-width="2" stroke-linecap="round"/></svg>';
-    plusIcon.style.cssText =
-      "width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+    plusIcon.className = "w-4 flex items-center justify-center shrink-0";
     addRow.appendChild(plusIcon);
 
     // Input
@@ -1342,12 +1289,7 @@ class Openp41geWorktreeTree extends LitElement {
     input.placeholder = "new workspace name";
     input.spellcheck = false;
     input.id = "ws-add-input";
-    input.style.cssText = `
-      flex:1;min-width:0;margin-left:6px;height:100%;
-      padding:0;box-sizing:border-box;
-      background:transparent;border:none;outline:none;
-      color:#ddd;font-size:12px;font-family:inherit;
-    `;
+    input.className = "flex-1 min-w-0 ml-1.5 h-full p-0 box-border bg-transparent border-none outline-none text-[#ddd] text-sm font-inherit";
     addRow.addEventListener("click", (e) => {
       if (e.target === addRow) input.focus();
     });
@@ -1355,23 +1297,14 @@ class Openp41geWorktreeTree extends LitElement {
 
     // Action icons
     const actions = document.createElement("span");
-    actions.style.cssText = "display:flex;align-items:center;gap:4px;flex-shrink:0;";
+    actions.className = "flex items-center gap-1 shrink-0";
 
     // Confirm
     const confirmIcon = document.createElement("span");
     confirmIcon.textContent = "✓";
-    confirmIcon.style.cssText = `
-      width:22px;height:22px;display:flex;
-      align-items:center;justify-content:center;
-      cursor:pointer;border-radius:3px;
-      color:var(--text-secondary);font-size:14px;font-weight:bold;
-    `;
-    confirmIcon.addEventListener("mouseenter", () => {
-      confirmIcon.style.background = "rgba(255,255,255,0.08)";
-    });
-    confirmIcon.addEventListener("mouseleave", () => {
-      confirmIcon.style.background = "transparent";
-    });
+    confirmIcon.className = "w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded text-secondary text-13 font-bold";
+    confirmIcon.addEventListener("mouseenter", () => confirmIcon.classList.add("bg-hover"));
+    confirmIcon.addEventListener("mouseleave", () => confirmIcon.classList.remove("bg-hover"));
     confirmIcon.addEventListener("click", (e) => {
       e.stopPropagation();
       this._confirmAddWorkspace();
@@ -1381,18 +1314,9 @@ class Openp41geWorktreeTree extends LitElement {
     // Cancel
     const cancelIcon = document.createElement("span");
     cancelIcon.textContent = "✕";
-    cancelIcon.style.cssText = `
-      width:22px;height:22px;display:flex;
-      align-items:center;justify-content:center;
-      cursor:pointer;border-radius:3px;
-      color:var(--text-muted);font-size:12px;
-    `;
-    cancelIcon.addEventListener("mouseenter", () => {
-      cancelIcon.style.background = "rgba(255,255,255,0.08)";
-    });
-    cancelIcon.addEventListener("mouseleave", () => {
-      cancelIcon.style.background = "transparent";
-    });
+    cancelIcon.className = "w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded text-muted text-xs";
+    cancelIcon.addEventListener("mouseenter", () => cancelIcon.classList.add("bg-hover"));
+    cancelIcon.addEventListener("mouseleave", () => cancelIcon.classList.remove("bg-hover"));
     cancelIcon.addEventListener("click", (e) => {
       e.stopPropagation();
       this._cancelAddWorkspace();
@@ -1571,11 +1495,11 @@ class Openp41geWorktreeTree extends LitElement {
     const row = input.closest("[style*='height:30px']") as HTMLElement | null;
     if (row) {
       row.innerHTML = `
-        <span style="width:16px;display:flex;align-items:center;justify-content:center;">
+        <span class="w-4 flex items-center justify-center">
           <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><polyline points="6,4 10,8 6,12" stroke="#666" stroke-width="1.5" fill="none"/></svg>
         </span>
-        <span style="margin-left:6px;flex:1;color:var(--text-secondary);font-size:12px;">${this._escapeHtml(url)}</span>
-        <div class="wt-spinner" style="width:14px;height:14px;flex-shrink:0;border:2px solid #444;border-top-color:var(--accent-hover);border-radius:50%;animation:wt-spin 0.8s linear infinite;"></div>
+        <span class="ml-1.5 flex-1 text-secondary text-sm">${this._escapeHtml(url)}</span>
+        <div class="w-[14px] h-[14px] shrink-0 border-2 border-[#444] border-t-accent rounded-full animate-[wt-spin_0.8s_linear_infinite]"></div>
       `;
     }
 
@@ -1616,7 +1540,7 @@ class Openp41geWorktreeTree extends LitElement {
           const spinner = this._treeEl.querySelector(".wt-spinner") as HTMLElement | null;
           if (spinner) {
             spinner.outerHTML =
-              '<span class="wt-check-icon" style="color:#4caf50;font-size:14px;font-weight:bold;">\u2713</span>';
+              '<span class="wt-check-icon text-[#4caf50] text-13 font-bold">\u2713</span>';
           }
         }
         toastService.show("Repository cloned successfully", "success");
@@ -2049,19 +1973,19 @@ class Openp41geWorktreeTree extends LitElement {
     const row = this.querySelector("#wt-addrepo-row") as HTMLElement | null;
     if (row) {
       row.innerHTML = `
-        <span style="width:16px;display:flex;align-items:center;justify-content:center;">
+        <span class="w-4 flex items-center justify-center">
           <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><polyline points="6,4 10,8 6,12" stroke="#666" stroke-width="1.5" fill="none"/></svg>
         </span>
-        <span style="margin-left:6px;flex:1;color:var(--text-secondary);font-size:12px;">${this._escapeHtml(url)}</span>
-        <div class="wt-spinner" style="width:14px;height:14px;flex-shrink:0;border:2px solid #444;border-top-color:var(--accent-hover);border-radius:50%;animation:wt-spin 0.8s linear infinite;"></div>
+        <span class="ml-1.5 flex-1 text-secondary text-sm">${this._escapeHtml(url)}</span>
+        <div class="w-[14px] h-[14px] shrink-0 border-2 border-[#444] border-t-accent rounded-full animate-[wt-spin_0.8s_linear_infinite]"></div>
       `;
     }
 
     // Create progress bar if needed
     if (!this._cloneProgressBar) {
       this._cloneProgressBar = document.createElement("div");
-      this._cloneProgressBar.style.cssText =
-        "display:none;height:3px;background:var(--accent);width:0%;transition:width 0.3s ease;";
+      this._cloneProgressBar.className = "hidden h-0.5 bg-accent transition-[width] duration-300 ease-[ease]";
+      this._cloneProgressBar.style.width = "0%";
       this._treeEl?.appendChild(this._cloneProgressBar);
     }
     if (this._cloneProgressBar) {
@@ -2084,54 +2008,46 @@ class Openp41geWorktreeTree extends LitElement {
     }
 
     const overlay = document.createElement("div");
-    overlay.style.cssText = `
-      position:fixed;inset:0;z-index:1000;
-      background:rgba(0,0,0,0.5);
-      display:flex;align-items:center;justify-content:center;
-    `;
+    overlay.className = "fixed inset-0 z-[1000] bg-[rgba(0,0,0,0.5)] flex items-center justify-center";
 
     const dialog = document.createElement("div");
-    dialog.style.cssText = `
-      background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:8px;
-      padding:24px;width:360px;max-width:90vw;
-      box-shadow:0 8px 32px rgba(0,0,0,0.4);
-    `;
+    dialog.className = "bg-bg-tertiary border border-border-color rounded-lg p-6 w-[360px] max-w-[90vw] shadow-[0_8px_32px_rgba(0,0,0,0.4)]";
 
     const branchOptions = branches
       .map((b) => `<option value="${b.replace(/"/g, "&quot;")}">${this._escapeHtml(b)}</option>`)
       .join("");
 
     dialog.innerHTML = `
-      <div style="margin-bottom:16px;">
-        <div style="color:#eee;font-size:14px;font-weight:600;margin-bottom:4px;">Add Worktree</div>
-        <div style="color:var(--text-muted);font-size:11px;">Select or type a branch name for ${this._escapeHtml(repoName)}</div>
+      <div class="mb-4">
+        <div class="text-[#eee] text-13 font-semibold mb-1">Add Worktree</div>
+        <div class="text-muted text-xs">Select or type a branch name for ${this._escapeHtml(repoName)}</div>
       </div>
-      <div style="margin-bottom:8px;">
-        <select id="wt-branch-select" style="
-          width:100%;box-sizing:border-box;padding:8px 10px;
-          background:var(--bg-gutter);border:1px solid var(--border-color);border-radius:4px;
-          color:#ddd;font-size:12px;
+      <div class="mb-2">
+        <select id="wt-branch-select" class="
+          w-full box-border px-2.5 py-2
+          bg-gutter border border-border-color rounded
+          text-[#ddd] text-sm
         ">
           <option value="">-- Type a new branch or select --</option>
           ${branchOptions}
         </select>
       </div>
       <input id="wt-branch-input" type="text" placeholder="Or type a new branch name"
-        style="
-          width:100%;box-sizing:border-box;padding:8px 10px;
-          background:var(--bg-gutter);border:1px solid var(--border-color);border-radius:4px;
-          color:#ddd;font-size:13px;
+        class="
+          w-full box-border px-2.5 py-2
+          bg-gutter border border-border-color rounded
+          text-[#ddd] text-13
         "
       />
-      <div id="wt-addwt-error" style="color:#c55;font-size:11px;margin-top:6px;display:none;"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
-        <button id="wt-addwt-cancel" style="
-          background:var(--bg-tertiary);border:1px solid var(--border-light);border-radius:4px;
-          color:#aaa;font-size:12px;padding:6px 16px;cursor:pointer;
+      <div id="wt-addwt-error" class="text-error text-xs mt-1.5 hidden"></div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="wt-addwt-cancel" class="
+          bg-bg-tertiary border border-border-light rounded
+          text-secondary text-sm px-4 py-1.5 cursor-pointer
         ">Cancel</button>
-        <button id="wt-addwt-confirm" style="
-          background:var(--accent);border:none;border-radius:4px;
-          color:#fff;font-size:12px;padding:6px 16px;cursor:pointer;
+        <button id="wt-addwt-confirm" class="
+          bg-accent border-none rounded
+          text-white text-sm px-4 py-1.5 cursor-pointer
         ">Add</button>
       </div>
     `;
