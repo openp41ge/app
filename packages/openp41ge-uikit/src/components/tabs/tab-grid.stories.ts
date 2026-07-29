@@ -184,10 +184,7 @@ class TabsDemoApp extends LitElement {
     return this;
   }
 
-  private _editorState = GridState.from("editor", [
-    { id: createTabId(), title: "README.md", content: '<div class="content-placeholder"><h3>README.md</h3><p>Welcome! Drag tabs to edges to create new columns.</p></div>' },
-    { id: createTabId(), title: "index.js", content: '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const grid = document.querySelector("tab-grid");</pre></div>' },
-  ]);
+  private _editorState = editorStateFromFiles("editor", 3);
 
   private _sideState = GridState.from("side-a", [
     { id: createTabId(), title: "Terminal", content: '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>' },
@@ -377,10 +374,7 @@ class TabsDemoApp extends LitElement {
     // ── Reset ────────────────────────────────────────────────────
     this.querySelector("#btn-reset")?.addEventListener("click", () => {
       _tabCounter = 0;
-      this._editorState = GridState.from("editor", [
-        { id: createTabId(), title: "README.md", content: '<div class="content-placeholder"><h3>README.md</h3><p>Welcome! Drag tabs to edges to create new columns.</p></div>' },
-        { id: createTabId(), title: "index.js", content: '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const grid = document.querySelector("tab-grid");</pre></div>' },
-      ]);
+      this._editorState = editorStateFromFiles("editor", 3);
       this._sideState = GridState.from("side-a", [
         { id: createTabId(), title: "Terminal", content: '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>' },
       ]);
@@ -429,7 +423,10 @@ class TabsDemoApp extends LitElement {
         .grid-row { display: flex; gap: 12px; margin-bottom: 16px; }
         .editor-wrapper { flex: 1; min-height: 250px; display: flex; flex-direction: column; }
         .bottom-grids { display: flex; gap: 12px; }
-        .bottom-grid { flex: 1; min-height: 150px; display: flex; flex-direction: column; }
+        .bottom-grid { flex: 1; min-height: 150px; display: flex; flex-direction: column; box-sizing: border-box; }
+        .bottom-grid-row { display: flex; gap: 8px; flex: 1; }
+        .bottom-grid-row tab-grid { flex: 1; }
+        .bottom-tree-panel { width: 140px; flex-shrink: 0; background: #252526; border: 1px solid #333; border-radius: 4px; overflow-y: auto; }
         .demo-add-tab-btn { background: rgba(74, 158, 255, 0.15); color: rgb(74, 158, 255); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 4px; width: 24px; height: 24px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 4px; }
         .demo-add-tab-btn:hover { background: rgba(74, 158, 255, 0.3); }
         tab-grid { flex: 1; }
@@ -468,11 +465,17 @@ class TabsDemoApp extends LitElement {
 
             <div class="bottom-grids">
               <div class="bottom-grid">
-                <tab-grid id="side-grid-a"></tab-grid>
+                <div class="bottom-grid-row">
+                  <tab-grid id="side-grid-a"></tab-grid>
+                  <div class="bottom-tree-panel"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+                </div>
                 <button class="demo-add-tab-btn" data-win-id="side-a" data-col="0">+</button>
               </div>
               <div class="bottom-grid">
-                <tab-grid id="side-grid-b"></tab-grid>
+                <div class="bottom-grid-row">
+                  <tab-grid id="side-grid-b"></tab-grid>
+                  <div class="bottom-tree-panel"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+                </div>
                 <button class="demo-add-tab-btn" data-win-id="side-b" data-col="0">+</button>
               </div>
             </div>
@@ -499,11 +502,7 @@ class SingleGridApp extends LitElement {
     return this;
   }
 
-  private _state = GridState.from("editor", [
-    { id: createTabId(), title: "README.md", content: '<div class="content-placeholder"><h3>README.md</h3><p>A single grid. Drag tabs to column edges to split.</p></div>' },
-    { id: createTabId(), title: "index.js", content: '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const x = 1;</pre></div>' },
-    { id: createTabId(), title: "style.css", content: '<div class="content-placeholder"><h3>style.css</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">body { background: #1e1e1e; }</pre></div>' },
-  ]);
+  private _state = editorStateFromFiles("editor", 3);
 
   // ── Drag state ─────────────────────────────────────────────────
 
@@ -647,11 +646,7 @@ class SingleGridApp extends LitElement {
     // ── Reset ────────────────────────────────────────────────────
     this.querySelector("#single-reset")?.addEventListener("click", () => {
       _tabCounter = 0;
-      this._state = GridState.from("editor", [
-        { id: createTabId(), title: "README.md", content: '<div class="content-placeholder"><h3>README.md</h3><p>A single grid. Drag tabs to column edges to split.</p></div>' },
-        { id: createTabId(), title: "index.js", content: '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const x = 1;</pre></div>' },
-        { id: createTabId(), title: "style.css", content: '<div class="content-placeholder"><h3>style.css</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">body { background: #1e1e1e; }</pre></div>' },
-      ]);
+      this._state = editorStateFromFiles("editor", 3);
       this._render();
     });
   }
