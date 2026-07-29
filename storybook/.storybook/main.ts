@@ -10,6 +10,9 @@ const config: StorybookConfig = {
   docs: {
     autodocs: true,
   },
+  core: {
+    disableTelemetry: true,
+  },
 };
 
 export default config;
