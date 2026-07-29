@@ -127,8 +127,7 @@ export class VideoController extends BaseController implements TabController {
 
     // ── Player container ──
     this.playerContainer = document.createElement("div");
-    this.playerContainer.style.cssText =
-      "flex:1;min-height:0;position:relative;background:#000;display:flex;align-items:center;justify-content:center;";
+    this.playerContainer.className = "flex-1 min-h-0 relative bg-black flex items-center justify-center";
     container.appendChild(this.playerContainer);
 
     // If we have a saved URL, load it
@@ -210,7 +209,7 @@ export class VideoController extends BaseController implements TabController {
 
   private _showPlaceholder(message: string): void {
     if (!this.playerContainer) return;
-    this.playerContainer.innerHTML = `<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:24px;font-style:italic;">${message}</div>`;
+    this.playerContainer.innerHTML = `<div class="text-muted text-sm text-center p-6 italic">${message}</div>`;
   }
 
   private _loadUrl(url: string): void {
@@ -257,7 +256,7 @@ export class VideoController extends BaseController implements TabController {
     video.controls = true;
     video.autoplay = false;
     video.preload = "metadata";
-    video.style.cssText = "width:100%;height:100%;object-fit:contain;background:#000;";
+    video.className = "w-full h-full object-contain bg-black";
 
     // Set time if we have a saved position
     if (this.savedTime > 0) {
@@ -296,7 +295,7 @@ export class VideoController extends BaseController implements TabController {
     iframe.allow =
       "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
     iframe.allowFullscreen = true;
-    iframe.style.cssText = "width:100%;height:100%;border:none;background:#000;";
+    iframe.className = "w-full h-full border-none bg-black";
 
     this.playerContainer.appendChild(iframe);
     this.videoEl = iframe;

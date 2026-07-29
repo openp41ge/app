@@ -35,10 +35,10 @@ class Openp41geTopBar extends LitElement {
     return html`
       <div
         class="flex items-center bg-gutter border-b border-divider shrink-0 select-none relative -webkit-app-region:drag"
-        style="height:${HEIGHT}px;"
+        class="tb-row" style="--tb-h:${HEIGHT}px"
       >
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
-        <div style="width:${isMac ? 85 : 12}px;" class="shrink-0"></div>
+        <div class="tb-mw shrink-0" style="--tb-mw:${isMac ? 85 : 12}px"></div>
 
         <!-- Project name / window title -->
         <div

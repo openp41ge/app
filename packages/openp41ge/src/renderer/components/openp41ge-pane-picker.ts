@@ -263,7 +263,7 @@ class Openp41gePanePicker extends LitElement {
       this._filteredApps
         .map((t, i) => {
           const sel = i === this._selectedIndex;
-          return `<div data-idx="${i}" class="picker-item flex items-center gap-2.5 px-4 cursor-pointer text-13" style="height:${ITEM_HEIGHT}px;background:${sel ? "#2a2a2a" : "transparent"};color:${sel ? "#fff" : "#bbb"};">
+          return `<div data-idx="${i}" class="picker-item pi-item flex items-center gap-2.5 px-4 cursor-pointer text-13${sel ? " pi-selected" : ""}" style="--pi-h:${ITEM_HEIGHT}px;--pi-c:${sel ? "#fff" : "#bbb"};--pi-bg:${sel ? "#2a2a2a" : "transparent"}">
             <span class="text-base w-6 text-center">${unsafeHTML(t.icon)}</span>
             <span>${t.label}</span>
             <span class="ml-auto text-muted text-xs">${t.id}</span>
@@ -306,7 +306,7 @@ class Openp41gePanePicker extends LitElement {
           const idx = appsCount + i;
           const sel = idx === this._selectedIndex;
           const dirName = f.dir.split("/").filter(Boolean).pop() || f.dir;
-          return `<div data-idx="${idx}" class="picker-item flex items-center gap-1.5 px-4 cursor-pointer text-13" style="height:${ITEM_HEIGHT}px;background:${sel ? "#2a2a2a" : "transparent"};color:${sel ? "#fff" : "#bbb"};">
+          return `<div data-idx="${idx}" class="picker-item pi-item flex items-center gap-1.5 px-4 cursor-pointer text-13${sel ? " pi-selected" : ""}" style="--pi-h:${ITEM_HEIGHT}px;--pi-c:${sel ? "#fff" : "#bbb"};--pi-bg:${sel ? "#2a2a2a" : "transparent"}">
             <span class="text-[14px] w-5 text-center shrink-0">\uD83D\uDCC4</span>
             <div class="flex-1 overflow-hidden">
               <div class="overflow-hidden text-ellipsis whitespace-nowrap">${f.name}</div>

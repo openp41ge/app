@@ -878,6 +878,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   background-color: var(--bg-tertiary, #2a2a2a)
 }
 
+.bg-black {
+  --tw-bg-opacity: 1;
+  background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))
+}
+
 .bg-error {
   background-color: var(--accent-error, #f44747)
 }
@@ -919,6 +924,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .bg-\[length\:200\%_100\%\] {
   background-size: 200% 100%
+}
+
+.object-contain {
+  -o-object-fit: contain;
+     object-fit: contain
 }
 
 .p-0 {

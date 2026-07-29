@@ -50,6 +50,18 @@ export class ProjectManagerController extends BaseController implements TabContr
 
   constructor(tabId: string, appType: string) {
     super(tabId, appType);
+    // One-time style injection for CSS custom property driven dynamic values
+    if (!document.getElementById("openp41ge-pm-styles")) {
+      const s = document.createElement("style");
+      s.id = "openp41ge-pm-styles";
+      s.textContent = [
+        ".pm-repo-color { color:var(--repo-col); }",
+        ".pm-wt-color { color:var(--wt-col); }",
+        ".pm-clone-bar { width:var(--clone-w); }",
+        ".pm-hidden { display:none; }",
+      ].join("\n");
+      document.head.appendChild(s);
+    }
   }
 
   mount(container: HTMLElement): void {
@@ -222,7 +234,7 @@ export class ProjectManagerController extends BaseController implements TabContr
                     <circle cx="8" cy="4" r="1.5" fill="#4a9eff"/>
                   </svg>
                 </span>
-                <span class="flex-1 text-13" style="color:${repoColor};">${this._escapeHtml(repo.name)}</span>
+                <span class="pm-repo-color flex-1 text-13" style="--repo-col:${repoColor};">${this._escapeHtml(repo.name)}</span>
                 <span class="text-xs text-[#666]">${repo.worktrees.length} worktrees</span>
               </div>
               <!-- Worktrees -->
@@ -230,7 +242,7 @@ export class ProjectManagerController extends BaseController implements TabContr
                 ${repo.worktrees
                   .map(
                     (wt) => `
-                  <div class="pm-wt-item flex items-center h-7 pl-7 pr-3 text-13 gap-2" style="color:${wtColor};">
+                  <div class="pm-wt-color pm-wt-item flex items-center h-7 pl-7 pr-3 text-13 gap-2" style="--wt-col:${wtColor};">
                     <span class="flex-1">${this._escapeHtml(wt.branch)}</span>
                     <span class="text-xs text-[#555]">${this._escapeHtml(wt.path)}</span>
                   </div>
@@ -243,7 +255,7 @@ export class ProjectManagerController extends BaseController implements TabContr
                   <span class="mr-1">+</span>
                   <span>add worktree</span>
                 </div>
-                <div class="pm-add-wt-input flex items-center h-7 pl-7 pr-3 gap-1" style="display:none;">
+                <div class="pm-add-wt-input pm-hidden flex items-center h-7 pl-7 pr-3 gap-1"
                   <input type="text" placeholder="branch name" class="flex-1 h-5 text-xs bg-transparent border border-[#444] rounded text-[#eee] px-1 outline-none" />
                   <span class="pm-add-wt-confirm cursor-pointer text-[#4a9eff] text-xs">\u2713</span>
                   <span class="pm-add-wt-cancel cursor-pointer text-[#888] text-xs">\u2715</span>
@@ -265,7 +277,7 @@ export class ProjectManagerController extends BaseController implements TabContr
               <span class="pm-spinner w-[14px] h-[14px] border-2 border-[#444] border-t-[#4a9eff] rounded-full shrink-0 animate-[add-repo-spin_0.8s_linear_infinite]"></span>
               <span class="text-xs text-[#aaa]">Cloning... ${this._clonePercent}%</span>
               <div class="flex-1 h-1 bg-[#333] rounded overflow-hidden">
-                <div class="h-full bg-[#4a9eff] rounded transition-[width] duration-300" style="width:${this._clonePercent}%;"></div>
+                <div class="pm-clone-bar h-full bg-[#4a9eff] rounded transition-[width] duration-300" style="--clone-w:${this._clonePercent}%;"></div>
               </div>
             </div>`
               : `
@@ -273,7 +285,7 @@ export class ProjectManagerController extends BaseController implements TabContr
               id="pm-add-repo-row">
               <span class="text-xs text-accent-hover">+ add repository</span>
             </div>
-            <div class="pm-add-repo-input flex items-center h-8 px-3 gap-1" style="display:none;">
+            <div class="pm-add-repo-input pm-hidden flex items-center h-8 px-3 gap-1"
               <input id="pm-add-repo-url" type="text" placeholder="git clone URL" class="flex-1 h-[22px] text-xs bg-gutter border border-[#4a9eff] rounded text-[#eee] px-1.5 outline-none" />
               <span id="pm-add-repo-confirm" class="cursor-pointer text-[#4a9eff] text-sm font-bold">\u2713</span>
               <span id="pm-add-repo-cancel" class="cursor-pointer text-[#888] text-sm">\u2715</span>
@@ -359,9 +371,9 @@ export class ProjectManagerController extends BaseController implements TabContr
     if (addRepoRow) {
       addRepoRow.addEventListener("click", () => {
         const row = addRepoRow as HTMLElement;
-        row.style.display = "none";
+        row.classList.add("pm-hidden");
         const inputRow = container.querySelector(".pm-add-repo-input") as HTMLElement;
-        if (inputRow) inputRow.style.display = "flex";
+        if (inputRow) inputRow.classList.remove("pm-hidden");
         const input = container.querySelector("#pm-add-repo-url") as HTMLInputElement | null;
         if (input) setTimeout(() => input.focus(), 50);
       });
@@ -401,9 +413,9 @@ export class ProjectManagerController extends BaseController implements TabContr
     container.querySelectorAll(".pm-add-wt-row").forEach((el) => {
       el.addEventListener("click", (e) => {
         const row = e.currentTarget as HTMLElement;
-        row.style.display = "none";
+        row.classList.add("pm-hidden");
         const inputRow = row.nextElementSibling as HTMLElement;
-        if (inputRow) inputRow.style.display = "flex";
+        if (inputRow) inputRow.classList.remove("pm-hidden");
         const input = inputRow.querySelector("input") as HTMLInputElement | null;
         if (input) setTimeout(() => input.focus(), 50);
       });
@@ -430,8 +442,8 @@ export class ProjectManagerController extends BaseController implements TabContr
         ) as HTMLElement;
         if (inputRow) {
           const row = inputRow.previousElementSibling as HTMLElement;
-          inputRow.style.display = "none";
-          if (row) row.style.display = "flex";
+          inputRow.classList.add("pm-hidden");
+          if (row) row.classList.remove("pm-hidden");
         }
       });
     });

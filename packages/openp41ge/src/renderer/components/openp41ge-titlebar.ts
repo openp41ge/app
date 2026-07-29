@@ -80,10 +80,10 @@ class Openp41geTitleBar extends LitElement {
     return html`
       <div
         class="flex items-center bg-gutter border-b border-divider shrink-0 select-none relative"
-        style="height:${HEIGHT}px;-webkit-app-region:drag;"
+        class="tb-row" style="--tb-h:${HEIGHT}px;-webkit-app-region:drag;"
       >
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
-        <div style="width:${isMac ? 85 : 12}px;" class="shrink-0"></div>
+        <div class="tb-mw shrink-0" style="--tb-mw:${isMac ? 85 : 12}px"></div>
 
         <!-- Title (clickable to open project picker) -->
         <span

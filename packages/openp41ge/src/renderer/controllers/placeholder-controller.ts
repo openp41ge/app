@@ -28,13 +28,13 @@ export class PlaceholderController extends BaseController {
     const label = appType?.label ?? this.appType ?? "pane";
 
     container.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 8px;height:28px;background:var(--bg-tertiary);border-bottom:1px solid var(--border-divider);flex-shrink:0;user-select:none;cursor:grab;">
-        <span class="pane-label" style="font-size:11px;color:var(--text-secondary);letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</span>
+      <div class="flex items-center justify-between px-2 h-7 bg-bg-tertiary border-b border-divider shrink-0 select-none cursor-grab">
+        <span class="pane-label text-xs text-secondary tracking-wider whitespace-nowrap overflow-hidden text-ellipsis">${label}</span>
       </div>
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;font-style:italic;background:var(--bg-secondary);">${icon}</div>
+      <div class="flex-1 flex items-center justify-center text-muted text-sm italic bg-bg-secondary">${icon}</div>
     `;
-    container.style.cssText =
-      "width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg-gutter);overflow:hidden;cursor:grab;";
+    container.className =
+      "w-full h-full flex flex-col bg-gutter overflow-hidden cursor-grab";
 
     // Append close button via the shared component
     const headerEl = container.querySelector("div");

@@ -67,7 +67,7 @@ class Openp41geActivityBar extends LitElement {
     return html`
       <div
         class="flex flex-col items-center bg-gutter border-l border-divider shrink-0 select-none"
-        style="width:${ACTIVITY_BAR_WIDTH}px;height:100%;"
+        class="ab-panel h-full" style="--ab-w:${ACTIVITY_BAR_WIDTH}px"
       >
         <!-- Activity buttons -->
         <div
@@ -78,17 +78,17 @@ class Openp41geActivityBar extends LitElement {
               <div
                 data-activity-id="${activity.id}"
                 title="${activity.label}"
-                class="flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer transition-[color] duration-100 relative"
-                style="color:${this.activeViewId === activity.id ? "var(--accent-hover, #4a9eff)" : "var(--text-secondary, #888)"};background:${this.activeViewId === activity.id ? "rgba(74,158,255,0.12)" : "transparent"};"
+                class="ab-item flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer transition-[color] duration-100 relative"
+                style="--ab-c:${this.activeViewId === activity.id ? "var(--accent-hover, #4a9eff)" : "var(--text-secondary, #888)"};--ab-bg:${this.activeViewId === activity.id ? "rgba(74,158,255,0.12)" : "transparent"}"
                 @click=${() => this._handleClick(activity.id)}
                 @mouseenter=${(e: MouseEvent) => {
                   if (this.activeViewId !== activity.id) {
-                    (e.currentTarget as HTMLElement).style.color = "#e0e0e0";
+                    (e.currentTarget as HTMLElement).style.setProperty("--ab-c", "#e0e0e0");
                   }
                 }}
                 @mouseleave=${(e: MouseEvent) => {
                   if (this.activeViewId !== activity.id) {
-                    (e.currentTarget as HTMLElement).style.color = "#888";
+                    (e.currentTarget as HTMLElement).style.setProperty("--ab-c", "#888");
                   }
                 }}
               >
