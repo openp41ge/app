@@ -294,15 +294,20 @@ class TabsDemoApp extends LitElement {
     });
 
     document.addEventListener("grid-open-tab", (e: any) => {
-      const { winId, tabConfig, targetCol } = e.detail;
+      const { winId, tabConfig, targetCol, isBoundary, splitCol, splitLeft } = e.detail;
       const filePath = tabConfig.filePath || tabConfig.repoName || "untitled";
       const state = this._state(winId);
       if (!state) return;
-      state.addTab(
-        targetCol,
-        filePath,
-        `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`,
-      );
+      if (isBoundary) {
+        const tab = { id: createTabId(), title: filePath, content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`, pinned: true };
+        state.insertTabInSplit(tab, splitCol, splitLeft);
+      } else {
+        state.addTab(
+          targetCol,
+          filePath,
+          `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`,
+        );
+      }
       this._renderAll();
     });
 

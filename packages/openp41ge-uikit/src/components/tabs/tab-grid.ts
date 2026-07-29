@@ -410,12 +410,14 @@ export class TabGrid extends LitElement {
     this._boundOnDragLeave = (e: DragEvent) => {
       if (!(e.relatedTarget instanceof HTMLElement) || !this.contains(e.relatedTarget)) {
         this._ghostManager.hideGhost(this);
+        this._hideBarIndicators();
       }
     };
     this.addEventListener("dragleave", this._boundOnDragLeave);
 
     this._boundOnDrop = (e: DragEvent) => {
       this._ghostManager.hideGhost(this);
+      this._hideBarIndicators();
       if (!e.dataTransfer) return;
 
       // ── Repo drop ────────────────────────────────────────────
@@ -548,12 +550,26 @@ export class TabGrid extends LitElement {
     return !!el.closest("tab-bar");
   }
 
+  private _hideBarIndicators(): void {
+    this.querySelectorAll("tab-bar").forEach((bar) => {
+      const tb = bar as any;
+      if (tb.hideDropIndicator) tb.hideDropIndicator();
+    });
+  }
+
   private _showFileDropGhost(e: DragEvent): void {
-    // Don't show grid ghost when cursor is over the tab bar
+    // Show tab bar indicator when cursor is over the tab bar
     if (this._isOverTabBar(e)) {
       this._ghostManager.hideGhost(this);
+      const tabBar = document.elementFromPoint(e.clientX, e.clientY)
+        ?.closest?.("tab-bar") as any;
+      if (tabBar?.showDropIndicator) {
+        tabBar.showDropIndicator(e.clientX);
+      }
       return;
     }
+    // Not over tab bar — ensure tab bar indicators are hidden
+    this._hideBarIndicators();
 
     const rect = this.getBoundingClientRect();
     const relX = e.clientX - rect.left;
