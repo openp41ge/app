@@ -416,7 +416,7 @@ class TabsDemoApp extends LitElement {
 // ─── Single grid demo ──────────────────────────────────────────────────
 
 @customElement("single-grid-demo")
-class SingleGridDemo extends LitElement {
+class SingleGridApp extends LitElement {
   override createRenderRoot(): HTMLElement | ShadowRoot {
     return this;
   }
@@ -620,5 +620,5 @@ export const MultiGridDemo: Story = {
 };
 
 export const SingleGridDemo: Story = {
-  render: () => html`<single-grid-demo></single-grid-demo>`,
+  render: () => html`<single-grid-app></single-grid-app>`,
 };
