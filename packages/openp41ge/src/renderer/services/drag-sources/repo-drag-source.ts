@@ -18,27 +18,19 @@ export class RepoDragSource implements IDragSource {
 
   createGhost(): HTMLElement {
     const ghost = document.createElement("div");
-    ghost.classList.add("openp41ge-drag-ghost");
-    ghost.style.position = "fixed";
-    ghost.style.pointerEvents = "none";
-    ghost.style.zIndex = "99999";
-    ghost.style.opacity = "0.85";
-    ghost.style.display = "flex";
-    ghost.style.alignItems = "center";
-    ghost.style.gap = "6px";
-    ghost.style.padding = "4px 10px";
-    ghost.style.background = "#2a2a2a";
-    ghost.style.border = "1px solid #555";
-    ghost.style.borderRadius = "4px";
-    ghost.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
-    ghost.style.fontSize = "13px";
-    ghost.style.color = "#ddd";
-    ghost.style.whiteSpace = "nowrap";
+    ghost.className = [
+      "openp41ge-drag-ghost",
+      "fixed", "pointer-events-none", "z-[99999]", "opacity-85",
+      "flex", "items-center", "gap-1.5", "px-2.5", "py-1",
+      "bg-[#2a2a2a]", "border", "border-[#555]", "rounded",
+      "shadow-[0_4px_12px_rgba(0,0,0,0.3)]",
+      "text-13", "text-[#ddd]", "whitespace-nowrap",
+    ].join(" ");
 
     // Repo icon
     const icon = document.createElement("span");
     icon.textContent = "📁";
-    icon.style.fontSize = "14px";
+    icon.className = "text-[14px]";
     ghost.appendChild(icon);
 
     // Repo name

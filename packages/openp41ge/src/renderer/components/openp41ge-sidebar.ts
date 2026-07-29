@@ -219,12 +219,12 @@ class Openp41geSidebar extends LitElement {
 
     return html`
       <div
-        style="display:flex;flex-direction:column;flex:0 1 ${this.width}px;min-width:${MIN_SIDEBAR_WIDTH}px;height:100%;background:var(--bg-gutter);border-left:1px solid var(--border-divider);overflow:hidden;position:relative;"
+        class="flex flex-col bg-gutter border-l border-divider overflow-hidden relative"
+        style="flex:0 1 ${this.width}px;min-width:${MIN_SIDEBAR_WIDTH}px;height:100%;"
       >
         <!-- Resize notch on the left edge -->
         <div
-          class="sidebar-resize-notch"
-          style="position:absolute;left:0;top:0;width:4px;height:100%;cursor:col-resize;z-index:10;pointer-events:auto;touch-action:none;background:transparent;"
+          class="sidebar-resize-notch absolute left-0 top-0 w-1 h-full cursor-col-resize z-10 pointer-events-auto touch-none bg-transparent"
           @mousedown=${this._startResize}
         ></div>
         <style>
@@ -248,8 +248,7 @@ class Openp41geSidebar extends LitElement {
 
         <!-- View content area -->
         <div
-          class="sidebar-content"
-          style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;"
+          class="sidebar-content flex-1 min-h-0 overflow-hidden flex flex-col"
         ></div>
       </div>
     `;

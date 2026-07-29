@@ -49,12 +49,24 @@ export const tailwindCSS: string = `.pointer-events-none {
   left: -1px
 }
 
+.left-0 {
+  left: 0px
+}
+
+.top-0 {
+  top: 0px
+}
+
 .top-1 {
   top: 0.25rem
 }
 
 .top-1\/2 {
   top: 50%
+}
+
+.z-10 {
+  z-index: 10
 }
 
 .z-50 {
@@ -67,6 +79,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .z-\[1000\] {
   z-index: 1000
+}
+
+.z-\[99999\] {
+  z-index: 99999
 }
 
 .m-0 {
@@ -292,6 +308,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 28px
 }
 
+.max-h-\[120px\] {
+  max-height: 120px
+}
+
 .max-h-\[203px\] {
   max-height: 203px
 }
@@ -310,6 +330,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .w-0\.5 {
   width: 0.125rem
+}
+
+.w-1 {
+  width: 0.25rem
 }
 
 .w-3 {
@@ -376,8 +400,16 @@ export const tailwindCSS: string = `.pointer-events-none {
   min-width: 320px
 }
 
+.min-w-\[360px\] {
+  min-width: 360px
+}
+
 .max-w-\[420px\] {
   max-width: 420px
+}
+
+.max-w-\[480px\] {
+  max-width: 480px
 }
 
 .max-w-\[90vw\] {
@@ -433,12 +465,20 @@ export const tailwindCSS: string = `.pointer-events-none {
   animation: spin 1s linear infinite
 }
 
+.cursor-col-resize {
+  cursor: col-resize
+}
+
 .cursor-default {
   cursor: default
 }
 
 .cursor-pointer {
   cursor: pointer
+}
+
+.touch-none {
+  touch-action: none
 }
 
 .select-none {
@@ -597,6 +637,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-color: rgb(68 68 68 / var(--tw-border-opacity, 1))
 }
 
+.border-\[\#555\] {
+  --tw-border-opacity: 1;
+  border-color: rgb(85 85 85 / var(--tw-border-opacity, 1))
+}
+
 .border-border-color {
   border-color: var(--border-color, #333)
 }
@@ -611,6 +656,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .border-t-accent {
   border-top-color: var(--text-accent, #569cd6)
+}
+
+.bg-\[\#2a2a2a\] {
+  --tw-bg-opacity: 1;
+  background-color: rgb(42 42 42 / var(--tw-bg-opacity, 1))
 }
 
 .bg-\[\#333\] {
@@ -810,6 +860,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   line-height: 14px
 }
 
+.text-\[14px\] {
+  font-size: 14px
+}
+
 .text-\[20px\] {
   font-size: 20px
 }
@@ -929,9 +983,19 @@ export const tailwindCSS: string = `.pointer-events-none {
   opacity: 0.5
 }
 
+.opacity-85 {
+  opacity: 0.85
+}
+
 .shadow {
   --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
+}
+
+.shadow-\[0_4px_12px_rgba\(0\2c 0\2c 0\2c 0\.3\)\] {
+  --tw-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  --tw-shadow-colored: 0 4px 12px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
 }
 

@@ -25,9 +25,9 @@ import { property } from "lit/decorators.js";
 import { appServices } from "../app";
 
 const DEFAULT_EXPAND_STYLE =
-  "background:var(--accent);border:none;border-radius:4px;color:#fff;font-size:12px;padding:6px 16px;cursor:pointer;";
+  "bg-accent border-none rounded text-white text-sm px-4 py-1.5 cursor-pointer";
 const DEFAULT_CANCEL_STYLE =
-  "background:var(--bg-tertiary);border:none;border-radius:4px;color:var(--text-secondary);font-size:12px;padding:6px 16px;cursor:pointer;outline:none;";
+  "bg-bg-tertiary border-none rounded text-secondary text-sm px-4 py-1.5 cursor-pointer outline-none";
 
 export class Openp41geScopeExpandModal extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -106,52 +106,50 @@ export class Openp41geScopeExpandModal extends LitElement {
     const pathsHtml = this._proposedAdditions
       .map(
         (p) =>
-          `<div style="padding:2px 0;font-family:var(--font-mono,'SF Mono',monospace);font-size:11px;color:var(--text-secondary);">${this._esc(p)}</div>`,
+          `<div class="py-0.5 font-mono text-xs text-secondary">${this._esc(p)}</div>`,
       )
       .join("");
 
     return html`
       <div
-        style="position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;"
+        class="fixed inset-0 z-[10000] bg-[rgba(0,0,0,0.5)] flex items-center justify-center"
       >
         <div
-          style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);padding:20px 24px;min-width:360px;max-width:480px;"
+          class="bg-bg-primary border border-border-color rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] px-6 py-5 min-w-[360px] max-w-[480px]"
         >
           <div
-            style="font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:8px;display:flex;align-items:center;gap:8px;"
+            class="text-13 font-semibold text-primary mb-2 flex items-center gap-2"
           >
             <span>🔍</span>
             <span>Expand Worktree Visibility?</span>
           </div>
-          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">
+          <div class="text-sm text-muted mb-3 leading-[1.5]">
             This ${this._esc(this._tabType)} tab references files from:
           </div>
           <div
-            style="background:var(--bg-tertiary);border-radius:4px;padding:8px 12px;margin-bottom:12px;max-height:120px;overflow-y:auto;"
+            class="bg-bg-tertiary rounded p-2 mb-3 max-h-[120px] overflow-y-auto"
           >
             ${
               this._proposedAdditions.length > 0
                 ? html`${this._unsafeHtml(pathsHtml)}`
-                : html`<div style="font-size:11px;color:var(--text-muted);">(no paths)</div>`
+                : html`<div class="text-xs text-muted">(no paths)</div>`
             }
           </div>
           <div
-            style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;line-height:1.4;"
+            class="text-sm text-secondary mb-4 leading-[1.4]"
           >
             Moving it to this openp41ge will also show these directories in the worktree explorer.
             You can manage worktree visibility anytime from the explorer.
           </div>
-          <div style="display:flex;gap:8px;justify-content:flex-start;">
+          <div class="flex gap-2 justify-start">
             <button
-              class="openp41ge-scope-cancel"
-              style="${DEFAULT_CANCEL_STYLE}"
+              class="openp41ge-scope-cancel ${DEFAULT_CANCEL_STYLE}"
               @click=${() => this._done(false)}
             >
               Cancel
             </button>
             <button
-              class="openp41ge-scope-ok"
-              style="${DEFAULT_EXPAND_STYLE}"
+              class="openp41ge-scope-ok ${DEFAULT_EXPAND_STYLE}"
               @click=${() => this._done(true)}
             >
               Expand &amp; Move
