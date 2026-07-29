@@ -5,6 +5,11 @@ import { AddonPanel } from "@storybook/components";
 const ADDON_ID = "openp41ge/event-log";
 const PANEL_ID = `${ADDON_ID}/panel`;
 
+interface LogEntry {
+  id: number;
+  message: string;
+}
+
 const eventsContainerStyle: React.CSSProperties = {
   flex: 1,
   overflowY: "auto",
@@ -33,14 +38,16 @@ const btnStyle: React.CSSProperties = {
   fontSize: "11px",
 };
 
+let nextId = 1;
+
 const EventLogPanelWrapper: React.FC = () => {
-  const [events, setEvents] = useState<string[]>([]);
+  const [events, setEvents] = useState<LogEntry[]>([]);
   const [reverse, setReverse] = useState(true);
 
   useEffect(() => {
     const channel = addons.getChannel();
-    const handler = (event: string) => {
-      setEvents((prev) => [...prev, event]);
+    const handler = (message: string) => {
+      setEvents((prev) => [...prev, { id: nextId++, message }]);
     };
     channel.on("openp41ge/event" as any, handler);
     return () => {
@@ -49,7 +56,7 @@ const EventLogPanelWrapper: React.FC = () => {
   }, []);
 
   const toggleReverse = useCallback(() => setReverse((r) => !r), []);
-  const clearAll = useCallback(() => setEvents([]), []);
+  const clearAll = useCallback(() => { setEvents([]); nextId = 1; }, []);
 
   const visible = reverse ? [...events].reverse() : events;
 
@@ -62,11 +69,11 @@ const EventLogPanelWrapper: React.FC = () => {
       { style: eventsContainerStyle },
       visible.length === 0
         ? React.createElement("div", { style: { color: "#888", padding: "8px" } as React.CSSProperties }, "Waiting for events…")
-        : visible.map((event, i) =>
+        : visible.map((entry) =>
             React.createElement(
               "div",
               {
-                key: reverse ? events.length - 1 - i : i,
+                key: entry.id,
                 style: {
                   padding: "3px 0",
                   color: "#ccc",
@@ -74,7 +81,7 @@ const EventLogPanelWrapper: React.FC = () => {
                   lineHeight: "1.4",
                 } as React.CSSProperties,
               },
-              `[${reverse ? events.length - i : i + 1}] ${event}`,
+              `[${entry.id}] ${entry.message}`,
             ),
           ),
     ),
