@@ -12,7 +12,6 @@
  *     window.openp41ge.workspaceController
  */
 
-import { chevronRight, chevronDown } from "../../icons";
 import type { SidebarView } from "./sidebar-view";
 
 interface RepoEntry {
@@ -182,12 +181,12 @@ export class GitSidebarView implements SidebarView {
       header.style.background = "transparent";
     });
 
-    // Chevron (same SVG size as explorer sidebar: 10px)
-    const chevron = document.createElement("span");
-    chevron.innerHTML = expanded ? chevronDown(10) : chevronRight(10);
-    chevron.style.cssText =
-      "width:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#888;";
-    header.appendChild(chevron);
+    // Triangle
+    const triangle = document.createElement("span");
+    triangle.textContent = expanded ? "\u25BE" : "\u25B8";
+    triangle.style.cssText =
+      "width:16px;text-align:center;flex-shrink:0;color:#888;font-size:14px;line-height:1;";
+    header.appendChild(triangle);
 
     // Repo name
     const name = document.createElement("span");
@@ -221,7 +220,12 @@ export class GitSidebarView implements SidebarView {
         for (const wt of repo.worktrees) {
           const wtRow = document.createElement("div");
           wtRow.style.cssText =
-            "display:flex;align-items:center;padding:2px 8px 2px 24px;font-size:11px;color:#aaa;user-select:none;";
+            "display:flex;align-items:center;padding:2px 8px;font-size:11px;color:#aaa;user-select:none;";
+
+          // Indent spacer (matches explorer tree's icon column width)
+          const indent = document.createElement("span");
+          indent.style.cssText = "width:16px;flex-shrink:0;";
+          wtRow.appendChild(indent);
 
           const wtName = document.createElement("span");
           wtName.textContent = wt.branch;
