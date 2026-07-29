@@ -35,6 +35,23 @@ export interface FileEntry {
   modifiedAt: number;
 }
 
+// Injected CSS for custom property driven dynamic styles
+(function injectRepTreeItemStyles(): void {
+  if (document.getElementById("openp41ge-repo-tree-item-styles")) return;
+  const s = document.createElement("style");
+  s.id = "openp41ge-repo-tree-item-styles";
+  s.textContent = [
+    ".rti-dir-row { padding:0 12px 0 var(--dp); color:var(--fg); }",
+    ".rti-dir-row.untracked { opacity:0.6; }",
+    ".rti-file-row { padding:0 12px 0 var(--dp); color:var(--fg); }",
+    ".rti-file-row.untracked { opacity:0.6; }",
+    ".rti-loading { padding:2px 0 2px var(--dp-l); }",
+    ".rti-icon.untracked { opacity:0.5; }",
+    ".rti-label.untracked { opacity:0.5; }",
+  ].join("\n");
+  document.head.appendChild(s);
+})();
+
 export class Openp41geRepoTreeItem extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -342,8 +359,8 @@ export class Openp41geRepoTreeItem extends LitElement {
           isExpanded && hasCache ? this._fileLoader.dirContents.get(entry.path) : undefined;
         return html`
           <div
-            class="flex items-center h-6 cursor-pointer text-xs gap-1 transition-[background] duration-100"
-            style="padding:0 12px 0 ${28 + depth * 14}px;color:${isUntracked ? "#666" : "#999"};${isUntracked ? "opacity:0.6;" : ""}"
+            class="rti-dir-row flex items-center h-6 cursor-pointer text-xs gap-1 transition-[background] duration-100${isUntracked ? " untracked" : ""}"
+            style="--dp:${28 + depth * 14}px;--fg:${isUntracked ? "#666" : "#999"}"
             @mouseenter=${(e: MouseEvent) => {
               (e.currentTarget as HTMLElement).classList.add("bg-[rgba(255,255,255,0.03)]");
             }}
@@ -371,8 +388,8 @@ export class Openp41geRepoTreeItem extends LitElement {
           ${
             isExpanded && !hasCache && isLoading
               ? html`<div
-                  class="text-2xs text-muted"
-                  style="padding:2px 0 2px ${28 + (depth + 1) * 14}px;"
+                  class="rti-loading text-2xs text-muted"
+                  style="--dp-l:${28 + (depth + 1) * 14}px"
                 >
                   <div
                     class="wt-spinner w-[10px] h-[10px] inline-block border-[1.5px] border-[#444] border-t-accent-hover rounded-full animate-[wt-spin_0.8s_linear_infinite] mr-1 align-middle"
@@ -386,8 +403,8 @@ export class Openp41geRepoTreeItem extends LitElement {
       return html`
         <div
           data-file-path="${entry.path}"
-          class="flex items-center h-6 cursor-pointer text-xs gap-1 transition-[background] duration-100"
-          style="padding:0 12px 0 ${28 + depth * 14}px;color:${isUntracked ? "#666" : "#aaa"};${isUntracked ? "opacity:0.6;" : ""}"
+          class="rti-file-row flex items-center h-6 cursor-pointer text-xs gap-1 transition-[background] duration-100${isUntracked ? " untracked" : ""}"
+          style="--dp:${28 + depth * 14}px;--fg:${isUntracked ? "#666" : "#aaa"}"
           @mouseenter=${(e: MouseEvent) => {
             (e.currentTarget as HTMLElement).classList.add("bg-[rgba(255,255,255,0.03)]");
           }}
@@ -413,12 +430,12 @@ export class Openp41geRepoTreeItem extends LitElement {
         >
           <span
             class="inline-flex items-center shrink-0 w-4 h-4"
-            style="${isUntracked ? "opacity:0.5;" : ""}"
+            class="rti-icon inline-flex items-center shrink-0 w-4 h-4${isUntracked ? " untracked" : ""}"
             >${unsafeHTML(getFileIcon(entry.name))}</span
           >
           <span
             class="overflow-hidden text-ellipsis whitespace-nowrap"
-            style="${isUntracked ? "opacity:0.5;" : ""}"
+            class="rti-label overflow-hidden text-ellipsis whitespace-nowrap${isUntracked ? " untracked" : ""}"
             >${entry.name}</span
           >
         </div>
@@ -598,13 +615,13 @@ export class Openp41geRepoTreeItem extends LitElement {
                 </span>
                 <span
                   id="wt-addwt-cancel"
-                  style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--text-secondary);"
+                  class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-secondary"
                   @click=${() => this._cancelAddWorktree()}
                   @mouseenter=${(e: MouseEvent) => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)";
+                    (e.currentTarget as HTMLElement).classList.add("bg-hover");
                   }}
                   @mouseleave=${(e: MouseEvent) => {
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                    (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                   }}
                   title="Cancel"
                 >

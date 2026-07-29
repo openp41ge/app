@@ -172,7 +172,7 @@ export class VirtualScroll {
     this.showLineNumbers = options?.showLineNumbers ?? false;
     this.formatLine = options?.formatLine ?? null;
 
-    // One-time hover effect for line numbers, cursor blink, and selection
+    // One-time style injection
     if (!document.getElementById("openp41ge-line-hover-style")) {
       const style = document.createElement("style");
       style.id = "openp41ge-line-hover-style";
@@ -181,6 +181,18 @@ export class VirtualScroll {
         ".cursor-blink { animation: cursorBlink 1s step-end infinite; }",
         "@keyframes cursorBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }",
         "::selection { color: inherit; background: rgba(42,111,209,0.4); }",
+        // CSS custom property driven styles — set via style="--var:value"
+        ".vs-loading { height:var(--lh); line-height:var(--lh); padding:0 8px; font-size:13px; font-family:monospace; color:var(--text-muted); font-style:italic; }",
+        ".vs-spacer { height:var(--h); }",
+        ".vs-row { display:flex; height:var(--lh); line-height:var(--lh); font-size:13px; font-family:monospace; box-sizing:border-box; }",
+        ".vs-row.hl { background:rgba(42,111,209,0.12); }",
+        ".vs-ln { display:inline-block; line-height:var(--lh); }",
+        ".vs-content { flex:1; white-space:pre; margin-left:8px; box-sizing:border-box; position:relative; cursor:text; }",
+        ".vs-row-noln { height:var(--lh); line-height:var(--lh); white-space:pre; font-size:13px; font-family:monospace; padding:0 8px; box-sizing:border-box; position:relative; cursor:text; }",
+        ".vs-row-noln.hl { background:rgba(42,111,209,0.12); }",
+        ".cursor-blink { position:absolute; left:var(--cx); top:0; width:1px; height:100%; background:#d4d4d4; }",
+        ".vs-bottom { display:flex; align-items:stretch; height:var(--h); }",
+        ".vs-bottom > span { flex:1; }",
       ].join("\n");
       document.head.appendChild(style);
     }
@@ -521,11 +533,11 @@ export class VirtualScroll {
 
     const loadingIndicator =
       startLine >= bufferLines && bufferLines > 0 && totalLines > bufferLines
-        ? `<div style="height:${this.lineHeight}px;line-height:${this.lineHeight}px;padding:0 8px;font-size:13px;font-family:monospace;color:var(--text-muted);font-style:italic;">Loading more…</div>`
+        ? `<div class="vs-loading" style="--lh:${this.lineHeight}px">Loading more…</div>`
         : "";
 
     const contentHtml =
-      (topSpacer > 0 ? `<div style="height:${topSpacer}px;"></div>` : "") +
+      (topSpacer > 0 ? `<div class="vs-spacer" style="--h:${topSpacer}px"></div>` : "") +
       lines
         .map((line, i) => {
           const absLine = startLine + i + 1;
@@ -536,32 +548,29 @@ export class VirtualScroll {
               ? absLine >= Math.min(this._selectionAnchor, this._selectionEnd) &&
                 absLine <= Math.max(this._selectionAnchor, this._selectionEnd)
               : this._highlightedLine === absLine;
-          const bgStyle = isHighlighted ? "background:rgba(42,111,209,0.12);" : "";
           let formatted = this.formatLine ? this.formatLine(line) : escapeHtml(line);
           // Insert cursor indicator if this line has the cursor.
-          // Use an absolutely-positioned thin bar so it works regardless of
-          // syntax highlighting (formatted HTML with spans).
           const cursorHtml =
             this._cursorLine === absLine
-              ? `<span class="cursor-blink" style="position:absolute;left:${this._cursorCol * this._charWidth}px;top:0;width:1px;height:100%;background:#d4d4d4;"></span>`
+              ? `<span class="cursor-blink" style="--cx:${this._cursorCol * this._charWidth}px"></span>`
               : "";
           if (this.showLineNumbers) {
-            return `<div data-line-container="${absLine}" style="display:flex;height:${this.lineHeight}px;line-height:${this.lineHeight}px;font-size:13px;font-family:monospace;box-sizing:border-box;${bgStyle}">
-  <span data-line="${absLine}" class="ln-cell" style="display:inline-block;line-height:${this.lineHeight}px;">${absLine}</span>
-  <span style="flex:1;white-space:pre;margin-left:8px;box-sizing:border-box;position:relative;cursor:text;">${cursorHtml}${formatted}</span>
+            return `<div data-line-container="${absLine}" class="vs-row${isHighlighted ? " hl" : ""}" style="--lh:${this.lineHeight}px">
+  <span data-line="${absLine}" class="vs-ln" style="--lh:${this.lineHeight}px">${absLine}</span>
+  <span class="vs-content">${cursorHtml}${formatted}</span>
 </div>`;
           }
-          return `<div style="height:${this.lineHeight}px;line-height:${this.lineHeight}px;white-space:pre;font-size:13px;font-family:monospace;padding:0 8px;box-sizing:border-box;position:relative;cursor:text;${bgStyle}">${cursorHtml}${formatted}</div>`;
+          return `<div class="vs-row-noln${isHighlighted ? " hl" : ""}" style="--lh:${this.lineHeight}px">${cursorHtml}${formatted}</div>`;
         })
         .join("") +
       loadingIndicator +
       (totalBottomPadding > 0
         ? this.showLineNumbers
-          ? `<div style="height:${totalBottomPadding}px;display:flex;align-items:stretch;">
+          ? `<div class="vs-bottom" style="--h:${totalBottomPadding}px">
   <div class="ln-filler"></div>
-  <span style="flex:1;"></span>
+  <span></span>
 </div>`
-          : `<div style="height:${totalBottomPadding}px;"></div>`
+          : `<div class="vs-spacer" style="--h:${totalBottomPadding}px"></div>`
         : "");
 
     this.viewport.innerHTML = contentHtml;
