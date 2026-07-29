@@ -34,8 +34,8 @@ class Openp41geTopBar extends LitElement {
 
     return html`
       <div
-        class="tb-row flex items-center bg-gutter border-b border-divider shrink-0 select-none relative -webkit-app-region:drag"
-        style="--tb-h:${HEIGHT}px"
+        class="tb-row flex items-center bg-gutter border-b border-divider shrink-0 select-none relative"
+        style="--tb-h:${HEIGHT}px;-webkit-app-region:drag"
       >
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
         <div class="tb-mw shrink-0" style="--tb-mw:${isMac ? 85 : 12}px"></div>
@@ -66,7 +66,8 @@ class Openp41geTopBar extends LitElement {
   private _winBtn(label: string, isClose: boolean, onClick: () => void): TemplateResult {
     return html`
       <div
-        class="w-[46px] h-full flex items-center justify-center cursor-pointer text-sm text-secondary transition-[background] duration-100 -webkit-app-region:no-drag"
+        class="w-[46px] h-full flex items-center justify-center cursor-pointer text-sm text-secondary transition-[background] duration-100"
+        style="-webkit-app-region:no-drag"
         @mouseenter=${(e: MouseEvent) => {
           const el = e.currentTarget as HTMLElement;
           el.classList.add(isClose ? "bg-[#e81123]" : "bg-[#333]");

@@ -88,7 +88,8 @@ class Openp41geTitleBar extends LitElement {
         <!-- Title (clickable to open project picker) -->
         <span
           title="Switch project"
-          class="inline-block px-1.5 py-0.5 text-sm text-muted whitespace-nowrap cursor-pointer rounded mr-12 -webkit-app-region:no-drag transition-[color,background] duration-100"
+          class="inline-block px-1.5 py-0.5 text-sm text-muted whitespace-nowrap cursor-pointer rounded mr-12 transition-[color,background] duration-100"
+          style="-webkit-app-region:no-drag"
           @mouseenter=${(e: MouseEvent) => {
             const el = e.currentTarget as HTMLElement;
             el.classList.add("text-primary", "bg-hover");
@@ -123,7 +124,8 @@ class Openp41geTitleBar extends LitElement {
   private _winBtn(label: string, isClose: boolean, onClick: () => void): TemplateResult {
     return html`
       <div
-        class="w-[46px] h-full flex items-center justify-center cursor-pointer text-sm text-secondary transition-[background] duration-100 -webkit-app-region:no-drag"
+        class="w-[46px] h-full flex items-center justify-center cursor-pointer text-sm text-secondary transition-[background] duration-100"
+        style="-webkit-app-region:no-drag"
         @mouseenter=${(e: MouseEvent) => {
           const el = e.currentTarget as HTMLElement;
           el.classList.add(isClose ? "bg-[#e81123]" : "bg-[#333]");

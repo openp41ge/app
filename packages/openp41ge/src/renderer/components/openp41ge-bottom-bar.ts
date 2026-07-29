@@ -113,7 +113,8 @@ class Openp41geBottomBar extends LitElement {
                     this._hasFormatter
                       ? html`
                           <div
-                            class="sbb-format-btn shrink-0 min-w-7 h-6 grid place-items-center px-2 bg-transparent text-muted opacity-50 border-none box-border select-none -webkit-app-region:no-drag transition-[background,color,opacity] duration-100"
+                            class="sbb-format-btn shrink-0 min-w-7 h-6 grid place-items-center px-2 bg-transparent text-muted opacity-50 border-none box-border select-none transition-[background,color,opacity] duration-100"
+                            style="-webkit-app-region:no-drag"
                             title="Format document"
                             @click=${() => this._formatterHandler?.()}
                             @mouseenter=${(e: MouseEvent) => {
@@ -147,8 +148,8 @@ class Openp41geBottomBar extends LitElement {
                   ${this._buttons.map(
                     (btn) => html`
                       <div
-                        class="sbb-custom-btn shrink-0 min-w-7 h-6 place-items-center px-2 bg-transparent text-muted opacity-50 border-none box-border select-none -webkit-app-region:no-drag transition-[background,color,opacity] duration-100"
-                        style="display:${this._isVisible(btn) ? "grid" : "none"};"
+                        class="sbb-custom-btn shrink-0 min-w-7 h-6 place-items-center px-2 bg-transparent text-muted opacity-50 border-none box-border select-none transition-[background,color,opacity] duration-100"
+                        style="-webkit-app-region:no-drag;display:${this._isVisible(btn) ? "grid" : "none"};"
                         title=${btn.title ?? ""}
                         @click=${() => btn.onClick()}
                         @mouseenter=${(e: MouseEvent) => {
