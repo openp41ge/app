@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from "@storybook/web-components";
 import type { TreeNode } from "./types";
 import { iconRegistry } from "../../icons";
 import { getFileIcon } from "../../icons/material-icons";
-import "../components/openp41ge-icon";
+import "../openp41ge-icon";
 import "./tree";
 
 const meta: Meta = {
