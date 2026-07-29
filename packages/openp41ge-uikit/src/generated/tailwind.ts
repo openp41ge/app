@@ -599,6 +599,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   flex-direction: column
 }
 
+.flex-wrap {
+  flex-wrap: wrap
+}
+
 .place-items-center {
   place-items: center
 }
