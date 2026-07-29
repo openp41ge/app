@@ -36,8 +36,9 @@ function treeIcon(name: string, size: number) {
     return html`${unsafeHTML(scaled)}`;
   }
   // 2. Icon registry (folder-closed, git-branch, plus, refresh, eye)
-  if (iconRegistry[name as keyof typeof iconRegistry]) {
-    return html`<openp41ge-icon name=${name} size=${size}></openp41ge-icon>`;
+  const registered = iconRegistry[name as keyof typeof iconRegistry];
+  if (registered) {
+    return html`${unsafeHTML(registered(size))}`;
   }
   // 3. Material icon theme for file names (app.ts → typescript icon)
   const material = getFileIcon(name);
