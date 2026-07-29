@@ -391,7 +391,13 @@ export class NodeGitService implements IGitService {
     // updating local branches directly. This avoids "cannot lock ref" errors
     // when a local branch has diverged from the remote, and ensures we don't
     // create local branches for every remote branch.
-    await this._execGit(["fetch", "origin", "--prune"], repoName);
+    //
+    // An explicit refspec is needed because bare repos cloned via the app may
+    // not have remote.origin.fetch configured (which defaults to empty).
+    await this._execGit(
+      ["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"],
+      repoName,
+    );
   }
 
   async getCurrentBranch(dirPath: string): Promise<string | null> {
