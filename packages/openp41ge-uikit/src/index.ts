@@ -49,7 +49,7 @@ export type { FileEditorState } from "./components/file-editor/file-editor";
 // Full file-editor API available at "openp41ge-uikit/file-editor"
 
 // ─── Git Repository Browser (merged from openp41ge-git-repository) ────────
-export { gitBrowserRenderer } from "./git-repository/git-browser-renderer";
+export { gitBrowserRenderer } from "openp41ge-git-repository";
 
 // ─── Tree Component ──────────────────────────────────────────────────────
 export { Openp41geTree } from "./components/tree";
@@ -69,4 +69,4 @@ export type {
   BranchEntry,
   CommitEntry,
   DiffStatEntry,
-} from "./git-repository/types";
+} from "openp41ge-git-repository";

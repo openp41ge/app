@@ -39,6 +39,7 @@
     "openp41ge-syntax-highlighting": "workspace:*",
     "openp41ge-tabs": "workspace:*",
     "openp41ge-editor-engine": "workspace:*",
+    "openp41ge-git-repository": "workspace:*",
     "vscode-textmate": "^9.3.2",
     "vscode-oniguruma": "^2.0.1"
   },
