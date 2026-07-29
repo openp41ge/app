@@ -68,17 +68,17 @@ export class Openp41geCloneDialog extends LitElement {
     return html`
       <div
         id="wt-addrepo-row"
-        style="display:flex;flex-direction:column;gap:4px;padding:6px 12px;"
+        class="flex flex-col gap-1 px-3 py-1.5"
         @keydown=${this._onKeyDown}
       >
-        <div style="display:flex;align-items:center;gap:6px;">
+        <div class="flex items-center gap-1.5">
           <input
             id="clone-url-input"
             type="text"
             placeholder="Git clone URL"
             .value=${this._url}
             ?disabled=${this._cloning}
-            style="flex:1;min-width:0;height:24px;background:var(--bg-tertiary);border:1px solid #3a3a3a;border-radius:3px;color:#e0e0e0;font-size:11px;padding:0 6px;outline:none;font-family:inherit;"
+            class="flex-1 min-w-0 h-6 bg-bg-tertiary border border-[#3a3a3a] rounded text-[#e0e0e0] text-xs px-1.5 outline-none font-inherit"
             @input=${(e: InputEvent) => {
               this._url = (e.target as HTMLInputElement).value;
             }}
@@ -94,7 +94,7 @@ export class Openp41geCloneDialog extends LitElement {
             }}
           />
           <button
-            style="height:22px;padding:0 8px;background:var(--accent);border:none;border-radius:3px;color:#fff;font-size:11px;cursor:pointer;white-space:nowrap;${this._cloning ? "opacity:0.5;cursor:default;" : ""}"
+            class="h-[22px] px-2 bg-accent border-none rounded text-white text-xs cursor-pointer whitespace-nowrap ${this._cloning ? "opacity-50 cursor-default" : ""}"
             ?disabled=${this._cloning}
             @click=${() => {
               if (this._url.trim()) {
@@ -113,7 +113,7 @@ export class Openp41geCloneDialog extends LitElement {
             !this._cloning
               ? html`
                   <button
-                    style="height:22px;padding:0 6px;background:transparent;border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;"
+                    class="h-[22px] px-1.5 bg-transparent border-none text-secondary text-13 cursor-pointer"
                     @click=${() => this.dispatchEvent(new CustomEvent("clone-close", { bubbles: true }))}
                   >
                     ×
@@ -125,12 +125,11 @@ export class Openp41geCloneDialog extends LitElement {
         ${
           this._cloning
             ? html`
-                <div style="display:flex;align-items:center;gap:6px;">
+                <div class="flex items-center gap-1.5">
                   <div
-                    class="wt-spinner"
-                    style="width:12px;height:12px;flex-shrink:0;border:2px solid #444;border-top-color:var(--accent-hover);border-radius:50%;animation:wt-spin 0.8s linear infinite;"
+                    class="w-3 h-3 shrink-0 border-2 border-[#444] border-t-accent rounded-full animate-[wt-spin_0.8s_linear_infinite]"
                   ></div>
-                  <span style="color:var(--text-secondary);font-size:10px;">${this._progress}</span>
+                  <span class="text-secondary text-2xs">${this._progress}</span>
                 </div>
               `
             : ""
@@ -138,10 +137,10 @@ export class Openp41geCloneDialog extends LitElement {
         ${
           this._error
             ? html`
-                <div style="color:#e06c75;font-size:10px;padding:2px 0;">
+                <div class="text-error text-2xs py-0.5">
                   ${this._error}
                   <button
-                    style="margin-left:4px;background:transparent;border:none;color:var(--accent-hover);cursor:pointer;font-size:10px;text-decoration:underline;"
+                    class="ml-1 bg-transparent border-none text-accent cursor-pointer text-2xs underline"
                     @click=${() => {
                       this._error = "";
                       this.requestUpdate();

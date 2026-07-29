@@ -95,16 +95,15 @@ class Openp41geWindowView extends LitElement {
 
     return html`
       <div
-        style="display:flex;flex-direction:column;width:100%;height:100%;background:var(--bg-surface);position:relative"
+        class="flex flex-col w-full h-full bg-surface relative"
       >
         <openp41ge-titlebar .windowData=${win}></openp41ge-titlebar>
         <div
-          class="openp41ge-main-area"
-          style="display:flex;flex:1;overflow:hidden;min-height:0;position:relative;"
+          class="openp41ge-main-area flex flex-1 overflow-hidden min-h-0 relative"
         >
           <div
-            class="openp41ge-grid-area"
-            style="flex:1 1 200px;min-width:200px;position:relative;overflow:hidden"
+            class="openp41ge-grid-area relative overflow-hidden"
+            style="flex:1 1 200px;min-width:200px;"
           >
             <tab-grid
               winId=${win.id}
@@ -123,14 +122,13 @@ class Openp41geWindowView extends LitElement {
           ></openp41ge-activity-bar>
         </div>
         <div
-          class="openp41ge-bottom-bar"
-          style="display:flex;align-items:center;height:28px;background:var(--bg-primary);border-top:1px solid var(--border-divider);flex-shrink:0;"
+          class="openp41ge-bottom-bar flex items-center h-7 bg-bg-primary border-t border-divider shrink-0"
         >
           <span
             id="cursor-position"
-            style="color:var(--text-muted);font-size:11px;padding:0 8px;font-style:normal;white-space:nowrap;"
+            class="text-muted text-xs px-2 not-italic whitespace-nowrap"
           ></span>
-          <div style="flex:1"></div>
+          <div class="flex-1"></div>
           <openp41ge-bottom-button
             @click=${(e: MouseEvent) => {
               e.stopPropagation();
@@ -164,7 +162,7 @@ class Openp41geWindowView extends LitElement {
                       viewBox="0 -960 960 960"
                       width="16px"
                       fill="currentColor"
-                      style="margin-top:-1px"
+                      class="-mt-px"
                     >
                       <path
                         d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"
@@ -185,7 +183,7 @@ class Openp41geWindowView extends LitElement {
                       viewBox="0 -960 960 960"
                       width="16px"
                       fill="currentColor"
-                      style="margin-top:-1px"
+                      class="-mt-px"
                     >
                       <path
                         d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-155.5t86-127Q252-817 325-848.5T480-880q83 0 155.5 31.5t127 86.5q54.5 55 86 127T880-480h-80q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q97 0 183-57t115-143h82q-31 114-123 187T480-80Zm238-240-56-58 102-102H520v-80h244L662-662l56-58 162 162-162 238Z"
@@ -196,15 +194,15 @@ class Openp41geWindowView extends LitElement {
           }
         </div>
         <div
-          class="prompt-overlay"
-          style="position:absolute;bottom:36px;left:50%;transform:translateX(-50%) scale(0.85) translateY(8px);width:520px;max-width:90vw;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:12px;padding:8px 12px;z-index:50;box-shadow:0 -4px 20px rgba(0,0,0,0.4);flex-shrink:0;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.15s ease,transform 0.15s ease,box-shadow 0.15s ease;transform-origin:bottom center;"
+          class="prompt-overlay bg-bg-primary border border-border-color rounded-xl px-3 py-2 z-50 shrink-0 opacity-0 invisible pointer-events-none transition-all duration-150 ease-[ease] origin-bottom-center"
+          style="position:absolute;bottom:36px;left:50%;transform:translateX(-50%) scale(0.85) translateY(8px);width:520px;max-width:90vw;box-shadow:0 -4px 20px rgba(0,0,0,0.4);"
         >
-          <div style="display:flex;align-items:flex-start;gap:8px;">
+          <div class="flex items-start gap-2">
             <textarea
               class="prompt-input"
               placeholder="Type a command or ask a question…"
               rows="2"
-              style="flex:1;background:transparent;border:none;color:#e0e0e0;font-size:13px;padding:4px 0;outline:none;font-family:inherit;resize:none;line-height:1.5;min-height:47px;max-height:203px;overflow-y:auto;"
+              class="flex-1 bg-transparent border-none text-[#e0e0e0] text-13 p-1 outline-none font-inherit resize-none leading-[1.5] min-h-[47px] max-h-[203px] overflow-y-auto"
               @keydown=${(e: KeyboardEvent) => {
                 if (e.key === "Escape") this._hidePromptOverlay();
               }}
@@ -221,8 +219,7 @@ class Openp41geWindowView extends LitElement {
               }}
             ></textarea>
             <button
-              class="prompt-submit"
-              style="background:var(--accent);border:none;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;cursor:pointer;line-height:1;padding:0;flex-shrink:0;margin-top:2px;"
+              class="prompt-submit bg-accent border-none rounded-full w-6 h-6 flex items-center justify-center text-white text-sm cursor-pointer leading-none p-0 shrink-0 mt-0.5"
               @click=${() => {
                 const input = this.querySelector(".prompt-input") as HTMLTextAreaElement | null;
                 if (input) input.value = "";

@@ -34,14 +34,15 @@ class Openp41geTopBar extends LitElement {
 
     return html`
       <div
-        style="display:flex;align-items:center;height:${HEIGHT}px;background:var(--bg-gutter);border-bottom:1px solid var(--border-divider);flex-shrink:0;user-select:none;-webkit-app-region:drag;position:relative;"
+        class="flex items-center bg-gutter border-b border-divider shrink-0 select-none relative -webkit-app-region:drag"
+        style="height:${HEIGHT}px;"
       >
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
-        <div style="width:${isMac ? 85 : 12}px;flex-shrink:0;"></div>
+        <div style="width:${isMac ? 85 : 12}px;" class="shrink-0"></div>
 
         <!-- Project name / window title -->
         <div
-          style="flex:1;min-width:0;padding:0 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+          class="flex-1 min-w-0 px-3 text-sm text-muted whitespace-nowrap overflow-hidden text-ellipsis"
         >
           Openp41ge
         </div>
@@ -51,7 +52,7 @@ class Openp41geTopBar extends LitElement {
             ? ""
             : html`
                 <!-- Non-Mac window controls -->
-                <div style="display:flex;height:100%;flex-shrink:0;">
+                <div class="flex h-full shrink-0">
                   ${this._winBtn("\u2500", false, () => window.openp41ge?.window.minimize())}
                   ${this._winBtn("\u25a1", false, () => window.openp41ge?.window.maximize())}
                   ${this._winBtn("\u2715", true, () => window.openp41ge?.window.close())}
@@ -65,7 +66,7 @@ class Openp41geTopBar extends LitElement {
   private _winBtn(label: string, isClose: boolean, onClick: () => void): TemplateResult {
     return html`
       <div
-        style="width:46px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;color:var(--text-secondary);transition:background 0.1s;-webkit-app-region:no-drag;"
+        class="w-[46px] h-full flex items-center justify-center cursor-pointer text-sm text-secondary transition-[background] duration-100 -webkit-app-region:no-drag"
         @mouseenter=${(e: MouseEvent) => {
           const el = e.currentTarget as HTMLElement;
           el.style.background = isClose ? "#e81123" : "#333";

@@ -79,24 +79,23 @@ class Openp41geTitleBar extends LitElement {
 
     return html`
       <div
-        style="display:flex;align-items:center;height:${HEIGHT}px;background:var(--bg-gutter);border-bottom:1px solid var(--border-divider);flex-shrink:0;user-select:none;-webkit-app-region:drag;position:relative;"
+        class="flex items-center bg-gutter border-b border-divider shrink-0 select-none relative"
+        style="height:${HEIGHT}px;-webkit-app-region:drag;"
       >
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
-        <div style="width:${isMac ? 85 : 12}px;flex-shrink:0;"></div>
+        <div style="width:${isMac ? 85 : 12}px;" class="shrink-0"></div>
 
         <!-- Title (clickable to open project picker) -->
         <span
           title="Switch project"
-          style="display:inline-block;padding:3px 6px;font-size:12px;color:var(--text-muted);white-space:nowrap;cursor:pointer;border-radius:4px;-webkit-app-region:no-drag;transition:color 0.1s,background 0.1s;margin-right:48px;"
+          class="inline-block px-1.5 py-0.5 text-sm text-muted whitespace-nowrap cursor-pointer rounded mr-12 -webkit-app-region:no-drag transition-[color,background] duration-100"
           @mouseenter=${(e: MouseEvent) => {
             const el = e.currentTarget as HTMLElement;
-            el.style.color = "var(--text-primary, #e0e0e0)";
-            el.style.background = "var(--hover-bg, #333)";
+            el.classList.add("text-primary", "bg-hover");
           }}
           @mouseleave=${(e: MouseEvent) => {
             const el = e.currentTarget as HTMLElement;
-            el.style.color = "var(--text-muted, #888)";
-            el.style.background = "transparent";
+            el.classList.remove("text-primary", "bg-hover");
           }}
           @click=${() => this._openProjectPicker()}
         >
@@ -104,13 +103,13 @@ class Openp41geTitleBar extends LitElement {
         </span>
 
         <!-- Spacer to push content to the right -->
-        <div style="flex:1;min-width:0;"></div>
+        <div class="flex-1 min-w-0"></div>
 
         ${
           isMac
             ? ""
             : html`
-                <div style="display:flex;height:100%;flex-shrink:0;">
+                <div class="flex h-full shrink-0">
                   ${this._winBtn("\u2500", false, () => window.openp41ge?.window.minimize())}
                   ${this._winBtn("\u25a1", false, () => window.openp41ge?.window.maximize())}
                   ${this._winBtn("\u2715", true, () => window.openp41ge?.window.close())}
@@ -124,7 +123,7 @@ class Openp41geTitleBar extends LitElement {
   private _winBtn(label: string, isClose: boolean, onClick: () => void): TemplateResult {
     return html`
       <div
-        style="width:46px;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;color:var(--text-secondary);transition:background 0.1s;-webkit-app-region:no-drag;"
+        class="w-[46px] h-full flex items-center justify-center cursor-pointer text-sm text-secondary transition-[background] duration-100 -webkit-app-region:no-drag"
         @mouseenter=${(e: MouseEvent) => {
           const el = e.currentTarget as HTMLElement;
           el.style.background = isClose ? "#e81123" : "#333";

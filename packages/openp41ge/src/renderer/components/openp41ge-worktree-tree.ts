@@ -545,11 +545,10 @@ class Openp41geWorktreeTree extends LitElement {
                         class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 ml-1 text-secondary"
                         @click=${() => this._confirmAddRepo()}
                         @mouseenter=${(e: MouseEvent) => {
-                          (e.currentTarget as HTMLElement).style.background =
-                            "rgba(255,255,255,0.06)";
+                          (e.currentTarget as HTMLElement).classList.add("bg-hover");
                         }}
                         @mouseleave=${(e: MouseEvent) => {
-                          (e.currentTarget as HTMLElement).style.background = "transparent";
+                          (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                         }}
                         title="Confirm"
                         ><svg
@@ -568,11 +567,10 @@ class Openp41geWorktreeTree extends LitElement {
                         class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-secondary"
                         @click=${() => this._cancelAddRepo()}
                         @mouseenter=${(e: MouseEvent) => {
-                          (e.currentTarget as HTMLElement).style.background =
-                            "rgba(255,255,255,0.06)";
+                          (e.currentTarget as HTMLElement).classList.add("bg-hover");
                         }}
                         @mouseleave=${(e: MouseEvent) => {
-                          (e.currentTarget as HTMLElement).style.background = "transparent";
+                          (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                         }}
                         title="Cancel"
                         ><svg
@@ -593,10 +591,10 @@ class Openp41geWorktreeTree extends LitElement {
                       class="flex items-center h-[30px] pl-3 pr-2 cursor-pointer select-none text-sm text-muted border-b border-divider transition-[color,background] duration-100"
                       @click=${() => this._showAddRepoInline()}
                       @mouseenter=${(e: MouseEvent) => {
-                        (e.currentTarget as HTMLElement).style.background = "#1e1e1e";
+                        (e.currentTarget as HTMLElement).classList.add("bg-hover");
                       }}
                       @mouseleave=${(e: MouseEvent) => {
-                        (e.currentTarget as HTMLElement).style.background = "transparent";
+                        (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                       }}
                     >
                       <span

@@ -30,36 +30,25 @@ export function paneHeaderButton(options: PaneHeaderButtonOptions): HTMLElement 
   if (title) btn.title = title;
 
   btn.textContent = content;
-  btn.style.cssText = [
-    "flex-shrink:0",
-    "min-width:28px",
-    "align-self:stretch",
-    "display:flex",
-    "align-items:center",
-    "justify-content:center",
-    "padding:0 8px",
-    "background:transparent",
-    "color:var(--text-muted)",
-    "cursor:pointer",
-    "font-size:12px",
-    "line-height:1",
-    "opacity:0.5",
-    "border:none",
-    "box-sizing:border-box",
-    "transition:background 0.1s,color 0.1s,opacity 0.1s",
-    "user-select:none",
-    "-webkit-app-region:no-drag",
-  ].join(";");
+  btn.className = className || "";
+  btn.classList.add(
+    "shrink-0", "min-w-[28px]", "self-stretch",
+    "flex", "items-center", "justify-center",
+    "px-2", "bg-transparent", "text-muted",
+    "cursor-pointer", "text-sm", "leading-none",
+    "opacity-50", "border-none", "box-border",
+    "transition-[background,color,opacity]", "duration-100",
+    "select-none"
+  );
+  if (title) btn.title = title;
 
   // Consistent hover / leave
   btn.addEventListener("mouseenter", () => {
-    btn.style.background = "rgba(255,255,255,0.1)";
-    btn.style.color = "#e0e0e0";
+    btn.classList.add("bg-hover", "text-primary");
     btn.style.opacity = "1";
   });
   btn.addEventListener("mouseleave", () => {
-    btn.style.background = "transparent";
-    btn.style.color = "#666";
+    btn.classList.remove("bg-hover", "text-primary");
     btn.style.opacity = "0.5";
   });
 

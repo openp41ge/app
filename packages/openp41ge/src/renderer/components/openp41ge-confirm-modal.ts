@@ -15,9 +15,9 @@ import { property } from "lit/decorators.js";
 import { appServices } from "../app";
 
 const DEFAULT_CONFIRM_STYLE =
-  "background:var(--accent);border:none;border-radius:4px;color:#fff;font-size:12px;padding:6px 16px;cursor:pointer;";
+  "bg-accent border-none rounded text-white text-sm px-4 py-1.5 cursor-pointer";
 const DEFAULT_CANCEL_STYLE =
-  "background:var(--bg-tertiary);border:none;border-radius:4px;color:var(--text-secondary);font-size:12px;padding:6px 16px;cursor:pointer;outline:none;";
+  "bg-bg-tertiary border-none rounded text-secondary text-sm px-4 py-1.5 cursor-pointer outline-none";
 
 class Openp41geConfirmModal extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -60,6 +60,20 @@ class Openp41geConfirmModal extends LitElement {
   }
   set cancelLabel(v: string) {
     this._cancelLabel = v;
+  }
+  get confirmStyle(): string {
+    return this._confirmStyle;
+  }
+  set confirmStyle(v: string) {
+    // Map legacy style names to Tailwind classes
+    if (v === "danger") {
+      this._confirmStyle = "bg-error text-white";
+    } else if (v.includes(";") || v.includes(":")) {
+      // Legacy inline style string — keep as-is for backward compat
+      this._confirmStyle = v;
+    } else {
+      this._confirmStyle = v;
+    }
   }
   get confirmStyle(): string {
     return this._confirmStyle;
@@ -121,7 +135,7 @@ class Openp41geConfirmModal extends LitElement {
 
     const titlePart = this._title
       ? html`<div
-          style="font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:8px;"
+          class="text-13 font-semibold text-primary mb-2"
         >
           ${this._title}
         </div>`
@@ -129,7 +143,7 @@ class Openp41geConfirmModal extends LitElement {
 
     const detailPart = this._detail
       ? html`<div
-          style="font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.4;"
+          class="text-sm text-muted mb-4 leading-[1.4]"
         >
           ${this._detail}
         </div>`
@@ -137,32 +151,30 @@ class Openp41geConfirmModal extends LitElement {
 
     return html`
       <div
-        style="position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;"
+        class="fixed inset-0 z-[10000] bg-[rgba(0,0,0,0.5)] flex items-center justify-center"
         @click=${(e: MouseEvent) => {
           if ((e.target as HTMLElement) === e.currentTarget) this._done(false);
         }}
       >
         <div
-          style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);padding:20px 24px;min-width:320px;max-width:420px;"
+          class="bg-bg-primary border border-border-color rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] px-6 py-5 min-w-[320px] max-w-[420px]"
         >
           ${titlePart}
           <div
-            style="font-size:13px;color:var(--text-secondary);white-space:pre-line;margin-bottom:${detailPart ? "4" : "16"}px;"
+            class="text-13 text-secondary whitespace-pre-line mb-${detailPart ? "1" : "4"}"
           >
             ${this._message}
           </div>
           ${detailPart}
-          <div style="display:flex;gap:8px;justify-content:flex-start;">
+          <div class="flex gap-2 justify-start">
             <button
-              class="openp41ge-confirm-cancel"
-              style="${DEFAULT_CANCEL_STYLE}"
+              class="openp41ge-confirm-cancel ${DEFAULT_CANCEL_STYLE}"
               @click=${() => this._done(false)}
             >
               ${this._cancelLabel}
             </button>
             <button
-              class="openp41ge-confirm-ok"
-              style="${this._confirmStyle}"
+              class="openp41ge-confirm-ok ${this._confirmStyle}"
               @click=${() => this._done(true)}
             >
               ${this._confirmLabel}

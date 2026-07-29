@@ -18,12 +18,13 @@ export class Openp41geBottomButton extends LitElement {
     const padding = this.flat ? "0 18px 0 6px" : "0 6px";
     return html`
       <button
-        style="display:flex;align-items:center;background:transparent;border:none;color:var(--text-secondary);cursor:pointer;padding:${padding};height:100%;outline:none;transition:color 0.1s;"
+        class="flex items-center bg-transparent border-none text-secondary cursor-pointer outline-none transition-[color] duration-100"
+        style="padding:${padding};height:100%;"
         @mouseenter=${(e: MouseEvent) => {
-          (e.currentTarget as HTMLElement).style.color = "#4a9eff";
+          (e.currentTarget as HTMLElement).classList.add("text-accent");
         }}
         @mouseleave=${(e: MouseEvent) => {
-          (e.currentTarget as HTMLElement).style.color = "#888";
+          (e.currentTarget as HTMLElement).classList.remove("text-accent");
         }}
       >
         <slot></slot>

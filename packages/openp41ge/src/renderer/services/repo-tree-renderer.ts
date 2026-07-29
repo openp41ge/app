@@ -54,8 +54,8 @@ class RepoTreeRenderer {
     const btn = container.querySelector("#wt-clone-btn") as HTMLElement | null;
     if (btn) {
       btn.addEventListener("click", onCloneClick);
-      btn.addEventListener("mouseenter", () => (btn.style.background = "#1e5bb5"));
-      btn.addEventListener("mouseleave", () => (btn.style.background = ""));
+      btn.addEventListener("mouseenter", () => btn.classList.add("bg-hover"));
+      btn.addEventListener("mouseleave", () => btn.classList.remove("bg-hover"));
     }
   }
 
@@ -174,10 +174,11 @@ class RepoTreeRenderer {
     // Hover
     header.addEventListener("mouseenter", () => {
       if (!header.classList.contains("bg-[rgba(74,158,255,0.12)]")) {
-        header.style.background = "#252525";
+        header.classList.add("bg-hover");
       }
     });
     header.addEventListener("mouseleave", () => {
+      header.classList.remove("bg-hover");
       if (selectedPath === branch) {
         header.style.background = "rgba(74,158,255,0.12)";
       } else {
@@ -232,11 +233,11 @@ class RepoTreeRenderer {
     visBtn.style.color = visible ? "#4a9eff" : "#555";
     visBtn.title = visible ? "Click to hide worktree" : "Click to show worktree";
     visBtn.addEventListener("mouseenter", () => {
-      visBtn.style.background = "rgba(255,255,255,0.08)";
+      visBtn.classList.add("bg-hover");
       visBtn.style.color = visible ? "#5aafff" : "#888";
     });
     visBtn.addEventListener("mouseleave", () => {
-      visBtn.style.background = "transparent";
+      visBtn.classList.remove("bg-hover");
       visBtn.style.color = visible ? "#4a9eff" : "#555";
     });
     visBtn.addEventListener("click", (e) => {
@@ -292,12 +293,12 @@ class RepoTreeRenderer {
     // Events
     row.addEventListener("mouseenter", () => {
       if (selectedPath !== file.path) {
-        row.style.background = "#252525";
+        row.classList.add("bg-hover");
       }
     });
     row.addEventListener("mouseleave", () => {
       if (selectedPath !== file.path) {
-        row.style.background = "transparent";
+        row.classList.remove("bg-hover");
       }
     });
 
@@ -370,11 +371,11 @@ class RepoTreeRenderer {
         gitBtn.style.color = "#555";
         gitBtn.title = "Git info";
         gitBtn.addEventListener("mouseenter", () => {
-          gitBtn.style.background = "rgba(255,255,255,0.08)";
+          gitBtn.classList.add("bg-hover");
           gitBtn.style.color = "#aaa";
         });
         gitBtn.addEventListener("mouseleave", () => {
-          gitBtn.style.background = "transparent";
+          gitBtn.classList.remove("bg-hover");
           gitBtn.style.color = "#555";
         });
         gitBtn.addEventListener("click", (e) => {
@@ -396,10 +397,10 @@ class RepoTreeRenderer {
 
     // Hover
     header.addEventListener("mouseenter", () => {
-      header.style.background = "#252525";
+      header.classList.add("bg-hover");
     });
     header.addEventListener("mouseleave", () => {
-      header.style.background = "";
+      header.classList.remove("bg-hover");
     });
 
     return header;
@@ -469,11 +470,11 @@ class RepoTreeRenderer {
         addRow.appendChild(label);
 
         addRow.addEventListener("mouseenter", () => {
-          addRow.style.background = "#1e1e1e";
+          addRow.classList.add("bg-hover");
           label.style.color = "#aaa";
         });
         addRow.addEventListener("mouseleave", () => {
-          addRow.style.background = "transparent";
+          addRow.classList.remove("bg-hover");
           label.style.color = "";
         });
         addRow.addEventListener("click", () => onAddWorktree());

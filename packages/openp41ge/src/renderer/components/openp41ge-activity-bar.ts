@@ -60,24 +60,26 @@ class Openp41geActivityBar extends LitElement {
       return html`${unsafeHTML(gitIcon(20))}`;
     }
     // Fallback: use the icon string as raw HTML
-    return html`<span style="font-size:20px;">${activity.icon}</span>`;
+    return html`<span class="text-[20px]">${activity.icon}</span>`;
   }
 
   render(): TemplateResult | typeof nothing {
     return html`
       <div
-        style="display:flex;flex-direction:column;align-items:center;width:${ACTIVITY_BAR_WIDTH}px;height:100%;background:var(--bg-gutter);border-left:1px solid var(--border-divider);flex-shrink:0;user-select:none;"
+        class="flex flex-col items-center bg-gutter border-l border-divider shrink-0 select-none"
+        style="width:${ACTIVITY_BAR_WIDTH}px;height:100%;"
       >
         <!-- Activity buttons -->
         <div
-          style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:8px;flex:1;"
+          class="flex flex-col items-center gap-1 pt-2 flex-1"
         >
           ${this.activities.map(
             (activity) => html`
               <div
                 data-activity-id="${activity.id}"
                 title="${activity.label}"
-                style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;cursor:pointer;color:${this.activeViewId === activity.id ? "var(--accent-hover, #4a9eff)" : "var(--text-secondary, #888)"};background:${this.activeViewId === activity.id ? "rgba(74,158,255,0.12)" : "transparent"};transition:color 0.1s;position:relative;"
+                class="flex items-center justify-center w-9 h-9 rounded-lg cursor-pointer transition-[color] duration-100 relative"
+                style="color:${this.activeViewId === activity.id ? "var(--accent-hover, #4a9eff)" : "var(--text-secondary, #888)"};background:${this.activeViewId === activity.id ? "rgba(74,158,255,0.12)" : "transparent"};"
                 @click=${() => this._handleClick(activity.id)}
                 @mouseenter=${(e: MouseEvent) => {
                   if (this.activeViewId !== activity.id) {
@@ -94,7 +96,7 @@ class Openp41geActivityBar extends LitElement {
                 ${
                   this.activeViewId === activity.id
                     ? html`<div
-                        style="position:absolute;left:-1px;top:50%;transform:translateY(-50%);width:2px;height:20px;background:var(--accent-hover, #4a9eff);border-radius:1px;"
+                        class="absolute -left-px top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-sm"
                       ></div>`
                     : nothing
                 }
@@ -104,7 +106,7 @@ class Openp41geActivityBar extends LitElement {
         </div>
 
         <!-- Bottom spacer -->
-        <div style="height:8px;"></div>
+        <div class="h-2"></div>
       </div>
     `;
   }
