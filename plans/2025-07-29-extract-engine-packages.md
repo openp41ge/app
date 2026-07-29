@@ -130,8 +130,8 @@ Each extraction follows the same pattern:
 - [x] syntax-highlighting extracted, builds, app imports from new package
 - [x] tabs engine extracted, builds, components import from new package
 - [x] file-editor engine extracted, builds, components import from new package
-- [ ] git-repository extracted, builds
-- [ ] uikit `index.ts` exports only UI components/icons/theme
+- [x] git-repository extracted, builds
+- [x] uikit `index.ts` exports only UI components/icons/theme
 - [x] Full `nx build` passes
 - [ ] `nx dev` launches without errors
 
