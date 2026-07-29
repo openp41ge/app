@@ -627,13 +627,8 @@ class SingleGridApp extends LitElement {
     });
 
     // ── Add tab ──────────────────────────────────────────────────
-    this.querySelector("#single-add-tab")?.addEventListener("click", () => {
-      let col = 0;
-      const lastIdx = this._state.placements.length - 1;
-      if (lastIdx >= 0) col = this._state.placements[lastIdx].position.col;
-      this._state.addTab(col, "New Tab", '<div class="content-placeholder"><h3>New Tab</h3></div>');
-      this._render();
-    });
+    // ── Add tab ──────────────────────────────────────────────────
+    // (removed — not needed for the single-grid demo)
 
     // ── Tab close ────────────────────────────────────────────────
     document.addEventListener("click", (e: Event) => {
@@ -732,29 +727,10 @@ class SingleGridApp extends LitElement {
           letter-spacing: 0.5px;
           border-bottom: 1px solid #333;
         }
-        .single-toolbar {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 8px;
-        }
-        .single-toolbar button {
-          padding: 4px 12px;
-          background: #2a2a2a;
-          border: 1px solid #3a3a3a;
-          border-radius: 4px;
-          color: #ccc;
-          cursor: pointer;
-          font-size: 11px;
-        }
-        .single-toolbar button:hover {
-          border-color: #4a9eff;
-        }
+
       </style>
 
       <div class="single-demo">
-        <div class="single-toolbar">
-          <button id="single-add-tab">+ Add Tab</button>
-        </div>
         <div class="single-body">
           <div class="single-grid-wrap">
             <tab-grid id="single-grid"></tab-grid>
