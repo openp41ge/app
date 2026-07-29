@@ -81,6 +81,19 @@ export type { FileEditorState } from "./file-editor/file-editor";
 
 // ─── Git Repository Browser (merged from openp41ge-git-repository) ────────
 export { gitBrowserRenderer } from "./git-repository/git-browser-renderer";
+
+// ─── Tree Component ──────────────────────────────────────────────────────
+export { Openp41geTree } from "./tree";
+export type {
+  TreeNode,
+  TreeNodeAction,
+  DropPosition,
+  TreeNodeClickEventDetail,
+  TreeNodeToggleEventDetail,
+  TreeNodeActionEventDetail,
+  TreeDragStartEventDetail,
+  TreeDropEventDetail,
+} from "./tree";
 export type {
   GitBrowserData,
   GitBrowserCallbacks,
