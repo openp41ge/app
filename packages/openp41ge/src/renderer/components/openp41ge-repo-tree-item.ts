@@ -328,7 +328,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         return {
           id: entry.path,
           label: entry.name,
-          icon: "folder",
+          icon: "folder-closed",
           expanded: isExpanded,
           status: isUntracked ? ("untracked" as const) : undefined,
           children: isExpanded && this._fileLoader.dirContents.has(entry.path)
@@ -348,10 +348,11 @@ export class Openp41geRepoTreeItem extends LitElement {
     });
   }
 
-  /** Icon renderer for file nodes — renders <file-extension-svg> for files, folder icon otherwise. */
+  /** Icon renderer for tree nodes — renders <openp41ge-icon> for known icon names, <file-extension-svg> for files. */
   private _renderIcon: IconRenderer = (name: string, size: number) => {
-    if (name === "folder") {
-      return html`<openp41ge-icon name="folder" size=${size}></openp41ge-icon>`;
+    // Icon registry names (folder-closed, git-branch, etc.)
+    if (name.startsWith("folder") || name.startsWith("git") || name.startsWith("chevron")) {
+      return html`<openp41ge-icon name=${name} size=${size}></openp41ge-icon>`;
     }
     // name is the filename — render file extension icon
     return html`<file-extension-svg filename=${name} size=${size}></file-extension-svg>`;
