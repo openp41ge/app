@@ -28,7 +28,7 @@ export function injectGlobalTailwind(): void {
     ".ab-panel { width:var(--ab-w); }",
     ".ab-item { color:var(--ab-c); background:var(--ab-bg); }",
     ".wv-code { flex:1 1 var(--wv-code-min); min-width:var(--wv-code-min); }",
-    ".wv-search { position:absolute; bottom:var(--wv-b); left:var(--wv-l); transform:var(--wv-t); width:var(--wv-w); max-width:var(--wv-mw); box-shadow:var(--wv-s); }",
+
     ".pi-item { height:var(--pi-h); }",
     ".pi-selected { color:var(--pi-c); background:var(--pi-bg); }",
   ].join("\n");

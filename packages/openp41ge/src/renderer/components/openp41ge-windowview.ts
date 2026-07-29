@@ -129,24 +129,7 @@ class Openp41geWindowView extends LitElement {
             class="text-muted text-xs px-2 not-italic whitespace-nowrap"
           ></span>
           <div class="flex-1"></div>
-          <openp41ge-bottom-button
-            @click=${(e: MouseEvent) => {
-              e.stopPropagation();
-              this._togglePromptOverlay();
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              height="16px"
-              viewBox="0 -960 960 960"
-              width="16px"
-              fill="currentColor"
-            >
-              <path
-                d="M80-80v-720q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H240L80-80Zm126-240h594v-480H160v525l46-45Zm-46 0v-480 480Z"
-              />
-            </svg>
-          </openp41ge-bottom-button>
+
           ${
             window.openp41ge.isDev()
               ? html`<openp41ge-bottom-button
@@ -193,65 +176,7 @@ class Openp41geWindowView extends LitElement {
               : nothing
           }
         </div>
-        <div
-          class="wv-search prompt-overlay bg-bg-primary border border-border-color rounded-xl px-3 py-2 z-50 shrink-0 opacity-0 invisible pointer-events-none transition-all duration-150 ease-[ease] origin-bottom-center"
-          style="--wv-b:36px;--wv-l:50%;--wv-t:translateX(-50%) scale(0.85) translateY(8px);--wv-w:520px;--wv-mw:90vw;--wv-s:0 -4px 20px rgba(0,0,0,0.4);"
-        >
-          <div class="flex items-start gap-2">
-            <textarea
-              class="prompt-input"
-              placeholder="Type a command or ask a question…"
-              rows="2"
-              class="flex-1 bg-transparent border-none text-[#e0e0e0] text-13 p-1 outline-none font-inherit resize-none leading-[1.5] min-h-[47px] max-h-[203px] overflow-y-auto"
-              @keydown=${(e: KeyboardEvent) => {
-                if (e.key === "Escape") this._hidePromptOverlay();
-              }}
-              @input=${(e: InputEvent) => {
-                const ta = e.target as HTMLTextAreaElement;
-                ta.style.height = "auto";
-                ta.style.height = ta.scrollHeight + "px";
-              }}
-              @focus=${() => {
-                this.querySelector(".prompt-overlay")?.classList.add("prompt-focus");
-              }}
-              @blur=${() => {
-                this.querySelector(".prompt-overlay")?.classList.remove("prompt-focus");
-              }}
-            ></textarea>
-            <button
-              class="prompt-submit bg-accent border-none rounded-full w-6 h-6 flex items-center justify-center text-white text-sm cursor-pointer leading-none p-0 shrink-0 mt-0.5"
-              @click=${() => {
-                const input = this.querySelector(".prompt-input") as HTMLTextAreaElement | null;
-                if (input) input.value = "";
-                this._hidePromptOverlay();
-              }}
-            >
-              →
-            </button>
-          </div>
-        </div>
-        <style>
-          .bottom-prompt-btn:hover {
-            color: #e0e0e0 !important;
-            background: var(--accent) !important;
-          }
-          .bottom-gear:hover {
-            color: #e0e0e0 !important;
-            background: var(--bg-tertiary) !important;
-          }
-          .prompt-overlay.prompt-open {
-            opacity: 1 !important;
-            visibility: visible !important;
-            pointer-events: auto !important;
-            transform: translateX(-50%) scale(1) translateY(0) !important;
-          }
-          .prompt-overlay.prompt-focus {
-            border-color: var(--accent-hover) !important;
-            box-shadow:
-              0 -4px 20px rgba(0, 0, 0, 0.4),
-              0 0 0 1px #4a9eff !important;
-          }
-        </style>
+
       </div>
     `;
   }
@@ -312,35 +237,7 @@ class Openp41geWindowView extends LitElement {
     this._contextMenu = null;
   }
 
-  // ═══ Prompt overlay ───────────────────────────────────────────────────
 
-  private _togglePromptOverlay(): void {
-    const overlay = this.querySelector(".prompt-overlay") as HTMLElement | null;
-    const input = this.querySelector(".prompt-input") as HTMLTextAreaElement | null;
-    if (!overlay) return;
-
-    if (!overlay.classList.contains("prompt-open")) {
-      overlay.classList.add("prompt-open");
-      if (input) {
-        input.value = "";
-        requestAnimationFrame(() => input.focus());
-        input.style.height = "auto";
-        input.style.height = input.scrollHeight + "px";
-      }
-    } else {
-      this._hidePromptOverlay();
-    }
-  }
-
-  private _hidePromptOverlay(): void {
-    const overlay = this.querySelector(".prompt-overlay") as HTMLElement | null;
-    const input = this.querySelector(".prompt-input") as HTMLTextAreaElement | null;
-    if (overlay) {
-      overlay.classList.remove("prompt-open");
-      overlay.classList.remove("prompt-focus");
-    }
-    if (input) input.value = "";
-  }
 }
 
 customElements.define("openp41ge-windowview", Openp41geWindowView);

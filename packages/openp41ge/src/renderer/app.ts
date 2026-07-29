@@ -147,7 +147,7 @@ export function resetApp(): void {
     .querySelectorAll(
       ".openp41ge-ghost-overlay, .openp41ge-split-overlay, .openp41ge-cell-target-highlight, " +
         "" +
-        ".openp41ge-confirm-modal, .prompt-overlay, .tab-drop-indicator",
+        ".openp41ge-confirm-modal, .tab-drop-indicator",
     )
     .forEach((el) => el.remove());
 
