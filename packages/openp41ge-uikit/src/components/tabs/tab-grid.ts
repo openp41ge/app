@@ -577,6 +577,10 @@ export class TabGrid extends LitElement {
   }
 
   private _isOverTabBar(e: DragEvent): boolean {
+    // During drop, e.target is the element under the cursor.
+    // During dragover, elementFromPoint works but may fail for unknown
+    // elements; fall back to e.target's closest ancestor.
+    if ((e.target as HTMLElement)?.closest?.("tab-bar")) return true;
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (!el || !(el instanceof HTMLElement)) return false;
     return !!el.closest("tab-bar");
