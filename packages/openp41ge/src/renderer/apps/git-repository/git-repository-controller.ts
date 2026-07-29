@@ -94,6 +94,14 @@ export class GitRepositoryController extends BaseController implements TabContro
     // Show loading indicator
     gitBrowserRenderer.renderLoading(container);
 
+    // Fetch latest from remote first so remote-tracking refs are fresh
+    try {
+      await window.openp41ge.workspaceController.fetch(repoName);
+    } catch {
+      // Non-fatal — show stale data if fetch fails
+    }
+    if (repoName !== this.repoName) return;
+
     try {
       // Fetch branches and diff stat in parallel
       const [branches, diffStat] = await Promise.all([
@@ -157,13 +165,31 @@ export class GitRepositoryController extends BaseController implements TabContro
     this.container.appendChild(rendered);
   }
 
+  /**
+   * Map a local branch name to its remote-tracking counterpart so we show the
+   * latest fetched data (fetch only updates refs/remotes/origin/*).
+   */
+  private _resolveBranchRef(branchName: string): string {
+    const data = this._data;
+    if (!data) return branchName;
+    // If the branch has a remote variant, show commits from the remote ref
+    const remoteRef = `origin/${branchName}`;
+    if (data.branches.some((b) => b.name === remoteRef)) {
+      return remoteRef;
+    }
+    return branchName;
+  }
+
   private _createCallbacks(): GitBrowserCallbacks {
     return {
       onSelectBranch: async (branchName: string) => {
         if (!this._data || !this.container || !this.repoName) return;
+        // Show commits from the remote-tracking ref when available (fetch
+        // only updates refs/remotes/origin/*, not refs/heads/*).
+        const commitRef = this._resolveBranchRef(branchName);
         this._data = {
           ...this._data,
-          selectedBranch: branchName,
+          selectedBranch: commitRef,
           loadingCommits: true,
           commits: [],
           commitSkipCount: 0,
@@ -177,7 +203,7 @@ export class GitRepositoryController extends BaseController implements TabContro
           const repoName = this.repoName;
           const commits = await window.openp41ge.workspaceController.getCommitLog(
             repoName,
-            branchName,
+            commitRef,
             { maxCount: 50 },
           );
           if (repoName !== this.repoName || !this._data) return;
