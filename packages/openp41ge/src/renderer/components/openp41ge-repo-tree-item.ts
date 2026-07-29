@@ -438,6 +438,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         .wt-row-btn:hover { background-color: var(--bg-hover, #2a2d2e); }
         .wt-row-btn:hover svg { color: var(--accent, #4a9eff); }
         .wt-row-btn svg { transition: color 0.1s; }
+        #wt-addwt-input:focus { outline: none !important; }
       </style>
       <div class="select-none">
         <!-- Repo header -->
