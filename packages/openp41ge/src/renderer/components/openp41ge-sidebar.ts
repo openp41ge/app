@@ -62,6 +62,11 @@ class Openp41geSidebar extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     document.addEventListener("openp41ge:activity-click", this._onActivityClick as EventListener);
+    // Set the element's own flex-basis so the parent flex container uses
+    // the persisted width, not the content's intrinsic size (which is
+    // just min-width 200px). Without this, the sidebar element shrinks
+    // to its content's natural width regardless of this.width.
+    this.style.flex = `0 1 ${this.width}px`;
   }
 
   disconnectedCallback(): void {
@@ -148,7 +153,12 @@ class Openp41geSidebar extends LitElement {
     e.preventDefault();
     this._isResizing = true;
     this._resizeStartX = e.clientX;
-    this._resizeStartWidth = this.width;
+    // Sync this.width to match the actual rendered width — the flex
+    // container may have constrained the element below localStorage's
+    // saved value. Otherwise the drag starts from an inflated value
+    // and the sidebar jumps.
+    this.width = this.clientWidth;
+    this._resizeStartWidth = this.clientWidth;
 
     document.addEventListener("mousemove", this._onResizeMove);
     document.addEventListener("mouseup", this._onResizeEnd);
