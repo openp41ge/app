@@ -225,19 +225,198 @@ class GitBrowserRenderer {
       return wrapper;
     }
 
+    // Group branches by shortName (e.g., "master" groups local master + origin/master)
+    const groups = new Map<string, BranchEntry[]>();
     for (const branch of data.branches) {
-      const isSelected = branch.name === data.selectedBranch;
-      const row = this.renderBranchRow(branch, isSelected);
-      row.addEventListener("click", () => callbacks.onSelectBranch(branch.name));
-      row.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        callbacks.onBranchContextMenu(branch.name, e.clientX, e.clientY);
+      const key = branch.shortName;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(branch);
+    }
+
+    // Sort: groups with a local branch first, then alphabetically
+    const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
+      const aHasLocal = a[1].some((v) => v.isLocal);
+      const bHasLocal = b[1].some((v) => v.isLocal);
+      if (aHasLocal && !bHasLocal) return -1;
+      if (!aHasLocal && bHasLocal) return 1;
+      return a[0].localeCompare(b[0]);
+    });
+
+    for (const [branchName, variants] of sortedGroups) {
+      const hasLocal = variants.some((v) => v.isLocal);
+      const localVariant = variants.find((v) => v.isLocal);
+
+      // Sort sub-items: local first (if any), then alphabetical by full name
+      const sortedVariants = [...variants].sort((a, b) => {
+        if (a.isLocal && !b.isLocal) return -1;
+        if (!a.isLocal && b.isLocal) return 1;
+        return a.name.localeCompare(b.name);
       });
-      wrapper.appendChild(row);
+
+      if (hasLocal && localVariant) {
+        // ── Branch name row IS the local entry ────────────────
+        const isSelected = localVariant.name === data.selectedBranch;
+        const row = document.createElement("div");
+        row.style.cssText = `
+          display:flex;align-items:center;
+          padding:4px 8px 2px 9px;cursor:pointer;user-select:none;
+          font-size:12px;font-family:monospace;font-weight:600;
+          color:${isSelected ? "#4a9eff" : "#ccc"};
+          background:${isSelected ? "rgba(74,158,255,0.08)" : "transparent"};
+          transition:background 0.1s;
+        `;
+
+        row.addEventListener("mouseenter", () => {
+          if (!isSelected) row.style.background = "rgba(255,255,255,0.04)";
+        });
+        row.addEventListener("mouseleave", () => {
+          if (!isSelected) row.style.background = "transparent";
+        });
+
+        // Branch name (no dot — it's implicit that the branch name is the local entry)
+        const nameEl = document.createElement("span");
+        nameEl.textContent = branchName;
+        nameEl.style.cssText = "margin-left:4px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+        row.appendChild(nameEl);
+
+        // Ahead/behind badges
+        if (localVariant.ahead > 0 || localVariant.behind > 0) {
+          const badges = document.createElement("span");
+          badges.style.cssText =
+            "display:flex;align-items:center;gap:3px;font-size:10px;flex-shrink:0;margin-left:6px;";
+
+          if (localVariant.ahead > 0) {
+            const aheadEl = document.createElement("span");
+            aheadEl.textContent = "\u2191" + localVariant.ahead;
+            aheadEl.style.cssText = "color:#4caf50;";
+            badges.appendChild(aheadEl);
+          }
+          if (localVariant.behind > 0) {
+            const behindEl = document.createElement("span");
+            behindEl.textContent = "\u2193" + localVariant.behind;
+            behindEl.style.cssText = "color:#f44;";
+            badges.appendChild(behindEl);
+          }
+
+          row.appendChild(badges);
+        }
+
+        row.addEventListener("click", () => callbacks.onSelectBranch(localVariant.name));
+        row.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          callbacks.onBranchContextMenu(localVariant.name, e.clientX, e.clientY);
+        });
+
+        wrapper.appendChild(row);
+
+        // ── Remote sub-items ──────────────────────────────────
+        for (const variant of sortedVariants) {
+          if (variant.isLocal) continue;
+          this._appendRemoteSubItem(wrapper, variant, data, callbacks);
+        }
+      } else {
+        // ── No local checkout — header with [remote] badge ────
+        const headerRow = document.createElement("div");
+        headerRow.style.cssText = `
+          display:flex;align-items:center;
+          padding:6px 8px 2px 9px;
+          font-size:12px;font-family:monospace;font-weight:600;
+          color:#ccc;
+        `;
+
+        const nameEl = document.createElement("span");
+        nameEl.textContent = branchName;
+        nameEl.style.cssText = "flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+        headerRow.appendChild(nameEl);
+
+        const remoteBadge = document.createElement("span");
+        remoteBadge.textContent = "[remote]";
+        remoteBadge.style.cssText =
+          "color:#888;font-size:10px;font-style:italic;flex-shrink:0;margin-left:auto;";
+        headerRow.appendChild(remoteBadge);
+
+        wrapper.appendChild(headerRow);
+
+        // ── Remote sub-items ──────────────────────────────────
+        for (const variant of sortedVariants) {
+          this._appendRemoteSubItem(wrapper, variant, data, callbacks);
+        }
+      }
     }
 
     return wrapper;
+  }
+
+  private _appendRemoteSubItem(
+    container: HTMLElement,
+    variant: BranchEntry,
+    data: GitBrowserData,
+    callbacks: GitBrowserCallbacks,
+  ): void {
+    const isSelected = variant.name === data.selectedBranch;
+    const source = variant.name.split("/")[0];
+
+    const subRow = document.createElement("div");
+    subRow.style.cssText = `
+      display:flex;align-items:center;
+      padding:2px 8px 2px 24px;cursor:pointer;user-select:none;
+      font-size:11px;font-family:monospace;
+      color:${isSelected ? "#4a9eff" : "#aaa"};
+      background:${isSelected ? "rgba(74,158,255,0.08)" : "transparent"};
+      transition:background 0.1s;
+    `;
+
+    subRow.addEventListener("mouseenter", () => {
+      if (!isSelected) subRow.style.background = "rgba(255,255,255,0.04)";
+    });
+    subRow.addEventListener("mouseleave", () => {
+      if (!isSelected) subRow.style.background = "transparent";
+    });
+
+    // Dot
+    const dot = document.createElement("span");
+    dot.textContent = "\u25CB";
+    dot.style.color = "#555";
+    dot.style.cssText = "width:12px;text-align:center;flex-shrink:0;font-size:8px;";
+    subRow.appendChild(dot);
+
+    // Remote source name
+    const sourceEl = document.createElement("span");
+    sourceEl.textContent = source;
+    sourceEl.style.cssText = "margin-left:4px;color:#888;flex-shrink:0;";
+    subRow.appendChild(sourceEl);
+
+    // Ahead/behind badges
+    if (variant.ahead > 0 || variant.behind > 0) {
+      const badges = document.createElement("span");
+      badges.style.cssText =
+        "display:flex;align-items:center;gap:3px;font-size:10px;flex-shrink:0;margin-left:6px;";
+
+      if (variant.ahead > 0) {
+        const aheadEl = document.createElement("span");
+        aheadEl.textContent = "\u2191" + variant.ahead;
+        aheadEl.style.cssText = "color:#4caf50;";
+        badges.appendChild(aheadEl);
+      }
+      if (variant.behind > 0) {
+        const behindEl = document.createElement("span");
+        behindEl.textContent = "\u2193" + variant.behind;
+        behindEl.style.cssText = "color:#f44;";
+        badges.appendChild(behindEl);
+      }
+
+      subRow.appendChild(badges);
+    }
+
+    subRow.addEventListener("click", () => callbacks.onSelectBranch(variant.name));
+    subRow.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      callbacks.onBranchContextMenu(variant.name, e.clientX, e.clientY);
+    });
+
+    container.appendChild(subRow);
   }
 
   private _renderCommitsContent(data: GitBrowserData, callbacks: GitBrowserCallbacks): HTMLElement {
@@ -439,24 +618,31 @@ class GitBrowserRenderer {
   }
 
   private _addBranchBadges(container: HTMLElement, branch: BranchEntry): void {
-    if (branch.ahead > 0 || branch.behind > 0) {
-      const badges = document.createElement("span");
-      badges.style.cssText =
-        "display:flex;align-items:center;gap:3px;font-size:10px;flex-shrink:0;";
+    const badges = document.createElement("span");
+    badges.style.cssText =
+      "display:flex;align-items:center;gap:3px;font-size:10px;flex-shrink:0;";
 
-      if (branch.ahead > 0) {
-        const ahead = document.createElement("span");
-        ahead.textContent = "\u2191" + branch.ahead;
-        ahead.style.cssText = "color:#4caf50;";
-        badges.appendChild(ahead);
-      }
-      if (branch.behind > 0) {
-        const behind = document.createElement("span");
-        behind.textContent = "\u2193" + branch.behind;
-        behind.style.cssText = "color:#f44;";
-        badges.appendChild(behind);
-      }
+    if (!branch.isLocal) {
+      const remote = document.createElement("span");
+      remote.textContent = "remote";
+      remote.style.cssText = "color:#888;font-size:9px;font-style:italic;padding:0 2px;";
+      badges.appendChild(remote);
+    }
 
+    if (branch.ahead > 0) {
+      const ahead = document.createElement("span");
+      ahead.textContent = "\u2191" + branch.ahead;
+      ahead.style.cssText = "color:#4caf50;";
+      badges.appendChild(ahead);
+    }
+    if (branch.behind > 0) {
+      const behind = document.createElement("span");
+      behind.textContent = "\u2193" + branch.behind;
+      behind.style.cssText = "color:#f44;";
+      badges.appendChild(behind);
+    }
+
+    if (badges.children.length > 0) {
       container.appendChild(badges);
     }
   }
