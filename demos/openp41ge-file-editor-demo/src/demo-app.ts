@@ -15,9 +15,7 @@ import type { FileEditorElement } from "openp41ge-uikit/file-editor";
 import { PieceTreeTextContentModel } from "openp41ge-uikit/file-editor";
 import type { DirtyChangedDetail } from "openp41ge-uikit/file-editor";
 
-import { initTextMate } from "openp41ge-uikit";
-import { TokenRegistry } from "openp41ge-uikit";
-import { darkPlusTheme } from "openp41ge-uikit/theme";
+import { initTextMate, TokenRegistry, darkPlusTheme } from "openp41ge-uikit/file-editor";
 
 import samples from "./samples";
 import type { SampleEntry } from "./samples";
@@ -42,17 +40,29 @@ function storageKey(filePath: string): string {
 
 // ─── Mock IPC ──────────────────────────────────────────────────────
 
-(window as Record<string, unknown>).openp41ge ??= {};
-(window as any).openp41ge.file = {
-  readRange: async (filePath: string, offset: number, length: number) => {
-    const content = sessionStorage.getItem(storageKey(filePath)) ?? "";
-    return { data: content.slice(offset, offset + length), totalSize: content.length };
-  },
-  writeFile: async (filePath: string, content: string) => {
-    sessionStorage.setItem(storageKey(filePath), content);
-    return { success: true };
-  },
-};
+// Ensure window.openp41ge.file exists for the file-editor component.
+// Use delete + re-assign to handle Electron preload's read-only property.
+try {
+  const target: Record<string, unknown> = {};
+  target.file = {
+    readRange: async (filePath: string, offset: number, length: number) => {
+      const content = sessionStorage.getItem(storageKey(filePath)) ?? "";
+      return { data: content.slice(offset, offset + length), totalSize: content.length };
+    },
+    writeFile: async (filePath: string, content: string) => {
+      sessionStorage.setItem(storageKey(filePath), content);
+      return { success: true };
+    },
+  };
+  try {
+    delete (window as any).openp41ge;
+  } catch {}
+  (window as any).openp41ge = target;
+} catch (e) {
+  console.error("[demo] Failed to set up mock IPC:", e);
+  // If we can't set window.openp41ge, the file editor won't be able to
+  // read/write files, but the demo can still function for UI testing.
+}
 
 // ─── Global theme state (shared across editors) ─────────────────────
 
