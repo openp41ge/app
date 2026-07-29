@@ -375,18 +375,6 @@ class TabsDemoApp extends LitElement {
       this._renderAll();
     });
 
-    // ── Add tab buttons ──────────────────────────────────────────
-    this.querySelectorAll(".demo-add-tab-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const winId = (btn as HTMLElement).dataset.winId || "editor";
-        const col = parseInt((btn as HTMLElement).dataset.col || "0", 10);
-        const state = this._state(winId);
-        if (!state) return;
-        state.addTab(col, "New Tab", '<div class="content-placeholder"><h3>New Tab</h3><p>Added from + button.</p></div>');
-        this._renderAll();
-      });
-    });
-
     // ── Tab close ────────────────────────────────────────────────
     document.addEventListener("click", (e: Event) => {
       const closeBtn = (e.target as HTMLElement).closest(".tab-close");
@@ -448,76 +436,39 @@ class TabsDemoApp extends LitElement {
         .tabs-demo h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
         .tabs-demo h1 span { color: rgb(74, 158, 255); }
         .tabs-demo p { margin: 0 0 16px; font-size: 12px; color: #888; }
-        .multi-body { display: flex; gap: 12px; align-items: flex-start; }
-        .multi-main { flex: 1; min-width: 0; }
-        .grid-row { display: flex; gap: 12px; margin-bottom: 16px; }
-        .editor-wrapper { flex: 1; min-height: 250px; display: flex; flex-direction: column; }
-        .bottom-grids { display: flex; gap: 12px; }
-        .bottom-grid { flex: 1; min-height: 150px; display: flex; flex-direction: column; box-sizing: border-box; }
-        .bottom-grid-row { display: flex; gap: 8px; flex: 1; }
-        .bottom-grid-row tab-grid { flex: 1; }
-        .bottom-tree-panel { width: 140px; flex-shrink: 0; background: #252526; border: 1px solid #333; border-radius: 4px; overflow-y: auto; }
-        .demo-add-tab-btn { background: rgba(74, 158, 255, 0.15); color: rgb(74, 158, 255); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 4px; width: 24px; height: 24px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 4px; }
-        .demo-add-tab-btn:hover { background: rgba(74, 158, 255, 0.3); }
+        .tabs-demo { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #ccc; padding: 16px; min-height: 100vh; box-sizing: border-box; }
+        .tabs-demo h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
+        .tabs-demo h1 span { color: rgb(74, 158, 255); }
+        .tabs-demo p { margin: 0 0 16px; font-size: 12px; color: #888; }
+        .multi-grids { display: flex; flex-direction: column; gap: 12px; }
+        .multi-row { display: flex; gap: 8px; min-height: 0; flex: 1; }
+        .multi-row tab-grid { flex: 1; }
+        .multi-tree-panel { width: 140px; flex-shrink: 0; background: #252526; border: 1px solid #333; border-radius: 4px; overflow-y: auto; }
+
         tab-grid { flex: 1; }
-        .tree-panel {
-          width: 220px;
-          flex-shrink: 0;
-          background: #252526;
-          border: 1px solid #333;
-          border-radius: 4px;
-          overflow-y: auto;
-        }
-        .tree-panel h3 {
-          font-size: 11px;
-          font-weight: 600;
-          margin: 0;
-          padding: 8px 12px;
-          color: #888;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          border-bottom: 1px solid #333;
-        }
       </style>
 
-      <div class="tabs-demo">
+      <div class="tabs-demo" style="display:flex;flex-direction:column;height:100vh;">
         <h1>Openp41ge <span>Tabs</span></h1>
         <p>VS Code-style editor groups. Drag tabs to column edges to split, across columns to rearrange, or between grids to move between groups.</p>
 
-        <div class="multi-body">
-          <div class="multi-main">
-            <div class="grid-row">
-              <div class="editor-wrapper">
-                <tab-grid id="editor-grid"></tab-grid>
-                <button class="demo-add-tab-btn" data-win-id="editor" data-col="0">+</button>
-              </div>
-            </div>
-
-            <div class="bottom-grids">
-              <div class="bottom-grid">
-                <div class="bottom-grid-row">
-                  <tab-grid id="side-grid-a"></tab-grid>
-                  <div class="bottom-tree-panel"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
-                </div>
-                <button class="demo-add-tab-btn" data-win-id="side-a" data-col="0">+</button>
-              </div>
-              <div class="bottom-grid">
-                <div class="bottom-grid-row">
-                  <tab-grid id="side-grid-b"></tab-grid>
-                  <div class="bottom-tree-panel"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
-                </div>
-                <button class="demo-add-tab-btn" data-win-id="side-b" data-col="0">+</button>
-              </div>
-            </div>
-
-            <div style="margin-top:8px;">
-              <button id="btn-reset" style="padding:4px 12px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#ccc;cursor:pointer;font-size:11px;">Reset Demo</button>
-            </div>
+        <div class="multi-grids" style="flex:1;">
+          <div class="multi-row">
+            <tab-grid id="editor-grid"></tab-grid>
+            <div class="multi-tree-panel"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
           </div>
-          <div class="tree-panel">
-            <h3>EXPLORER</h3>
-            <openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree>
+          <div class="multi-row">
+            <tab-grid id="side-grid-a"></tab-grid>
+            <div class="multi-tree-panel"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
           </div>
+          <div class="multi-row">
+            <tab-grid id="side-grid-b"></tab-grid>
+            <div class="multi-tree-panel"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;flex-shrink:0;">
+          <button id="btn-reset" style="padding:4px 12px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#ccc;cursor:pointer;font-size:11px;">Reset Demo</button>
         </div>
       </div>
     `;
