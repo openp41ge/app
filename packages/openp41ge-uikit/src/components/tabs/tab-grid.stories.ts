@@ -173,8 +173,38 @@ function buildFileTree(): TreeNode[] {
   ];
 }
 
-// ─── Icons ────────────────────────────────────────────────────────────
-// FILE_ICONS removed — no longer used with file cards
+// ─── Tree helpers — extract file paths, create tabs from tree data ────
+
+function collectFilePaths(nodes: TreeNode[]): string[] {
+  const paths: string[] = [];
+  for (const n of nodes) {
+    if (n.children) {
+      paths.push(...collectFilePaths(n.children));
+    } else if (n.draggable) {
+      paths.push(n.id);
+    }
+  }
+  return paths;
+}
+
+const _fileTreeData = buildFileTree();
+const _filePaths = collectFilePaths(_fileTreeData);
+
+function createTabData(filePath: string): { title: string; content: string } {
+  return {
+    title: filePath,
+    content: `<div class="content-placeholder"><h3>${filePath}</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;margin:8px 0;">// ${filePath}\n\n// Drag files from the explorer to open them.</pre></div>`,
+  };
+}
+
+function editorStateFromFiles(winId: string, count: number): GridState {
+  const tabs = _filePaths.slice(0, count).map((fp) => ({
+    id: createTabId(),
+    ...createTabData(fp),
+    pinned: true,
+  }));
+  return GridState.from(winId, tabs);
+}
 
 // ─── Demo app ─────────────────────────────────────────────────────────
 
