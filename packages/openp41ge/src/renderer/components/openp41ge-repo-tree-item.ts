@@ -476,6 +476,16 @@ export class Openp41geRepoTreeItem extends LitElement {
               >${this.repoName}</span
             >
             ${html`
+              <!-- + button (add worktree) -->
+              <span
+                class="repo-header-btn w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-colors duration-100"
+                title="Add worktree"
+                @click=${(e: MouseEvent) => {
+                  e.stopPropagation();
+                  this._showAddWorktreeInline();
+                }}
+                >${unsafeHTML(plusIconThick(14))}</span
+              >
               <!-- Refresh button -->
               <span
                 class="repo-header-btn w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-colors duration-100"
@@ -490,16 +500,6 @@ export class Openp41geRepoTreeItem extends LitElement {
                   );
                 }}
                 >${unsafeHTML(refreshIcon(14))}</span
-              >
-              <!-- + button (add worktree) -->
-              <span
-                class="repo-header-btn w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-colors duration-100"
-                title="Add worktree"
-                @click=${(e: MouseEvent) => {
-                  e.stopPropagation();
-                  this._showAddWorktreeInline();
-                }}
-                >${unsafeHTML(plusIconThick(14))}</span
               >
             `}
           </div>

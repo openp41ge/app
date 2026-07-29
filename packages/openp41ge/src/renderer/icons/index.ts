@@ -107,7 +107,7 @@ export function plusIcon(size?: number): string {
 
 /** Thick plus icon — heavier stroke for the add-repository button */
 export function plusIconThick(size?: number): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size ?? 16}" height="${size ?? 16}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size ?? 16}" height="${size ?? 16}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
 }
 
 /** Git branch icon — for worktree rows */
