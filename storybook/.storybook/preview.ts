@@ -9,6 +9,7 @@ const EVENT_NAMES = [
   "grid-remove",
   "tab-bar-reorder",
   "tab-bar-move-cell",
+  "grid-pin",
 ];
 
 function formatEvent(type: string, detail: Record<string, unknown>): string {

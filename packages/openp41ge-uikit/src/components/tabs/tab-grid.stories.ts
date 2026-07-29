@@ -297,6 +297,29 @@ class TabsDemoApp extends LitElement {
       this._renderAll();
     });
 
+    // ── TAB-BAR EVENTS — handle drops on tab bars ─────────────
+    document.addEventListener("tab-bar-move-cell", (e: any) => {
+      const { sourceWinId, tabId, targetWinId, targetCol, dropIndex } = e.detail;
+      const source = this._state(sourceWinId);
+      const target = this._state(targetWinId);
+      if (!source || !target) return;
+      const removed = source.removeTab(tabId);
+      if (!removed) return;
+      target.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, dropIndex);
+      this._renderAll();
+    });
+
+    document.addEventListener("tab-bar-reorder", (e: any) => {
+      const { winId, col, fromIndex, toIndex } = e.detail;
+      const state = this._state(winId);
+      if (!state) return;
+      const placement = state.placements.find((p) => p.position.col === col);
+      if (!placement) return;
+      const [moved] = placement.tabIds.splice(fromIndex, 1);
+      placement.tabIds.splice(toIndex, 0, moved);
+      this._renderAll();
+    });
+
     // ── Add tab buttons ──────────────────────────────────────────
     this.querySelectorAll(".demo-add-tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -512,6 +535,25 @@ class SingleGridApp extends LitElement {
       const removed = this._state.removeTab(tabId);
       if (!removed) return;
       this._state.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, -1);
+      this._render();
+    });
+
+    document.addEventListener("tab-bar-move-cell", (e: any) => {
+      const { sourceWinId, tabId, targetCol, dropIndex } = e.detail;
+      if (sourceWinId !== "editor" && targetCol === undefined) return;
+      const removed = this._state.removeTab(tabId);
+      if (!removed) return;
+      this._state.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, dropIndex);
+      this._render();
+    });
+
+    document.addEventListener("tab-bar-reorder", (e: any) => {
+      const { winId, col, fromIndex, toIndex } = e.detail;
+      if (winId !== "editor") return;
+      const placement = this._state.placements.find((p) => p.position.col === col);
+      if (!placement) return;
+      const [moved] = placement.tabIds.splice(fromIndex, 1);
+      placement.tabIds.splice(toIndex, 0, moved);
       this._render();
     });
 

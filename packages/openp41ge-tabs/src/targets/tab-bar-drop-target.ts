@@ -11,7 +11,7 @@
  */
 
 import type { IDragSource, IDropTarget, DragResult, TargetFeedback } from "../interfaces";
-import { getDropIndexInBar } from "../boundary";
+import { getDropIndexInBar, getTabButtonsInBar } from "../boundary";
 
 /**
  * Event types dispatched by TabBarDropTarget.
@@ -99,18 +99,17 @@ export class TabBarDropTarget implements IDropTarget {
       this.element.appendChild(this._indicatorEl);
     }
 
-    const children = Array.from(this.element.children).filter(
-      (c): c is HTMLElement => c instanceof HTMLElement && c !== this._indicatorEl,
-    );
+    // Use same element set as getDropIndexInBar — exclude injected overlays
+    const tabs = getTabButtonsInBar(this.element);
 
     let pos: number;
-    if (children.length === 0 || dropIndex <= 0) {
+    if (tabs.length === 0 || dropIndex <= 0) {
       pos = 0;
-    } else if (dropIndex >= children.length) {
-      const last = children[children.length - 1];
+    } else if (dropIndex >= tabs.length) {
+      const last = tabs[tabs.length - 1];
       pos = last.offsetLeft + last.offsetWidth;
     } else {
-      pos = children[dropIndex].offsetLeft;
+      pos = tabs[dropIndex].offsetLeft;
     }
 
     this._indicatorEl.style.display = "block";

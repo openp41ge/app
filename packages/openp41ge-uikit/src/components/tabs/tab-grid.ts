@@ -542,7 +542,19 @@ export class TabGrid extends LitElement {
     this.addEventListener("drop", this._boundOnDrop);
   }
 
+  private _isOverTabBar(e: DragEvent): boolean {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || !(el instanceof HTMLElement)) return false;
+    return !!el.closest("tab-bar");
+  }
+
   private _showFileDropGhost(e: DragEvent): void {
+    // Don't show grid ghost when cursor is over the tab bar
+    if (this._isOverTabBar(e)) {
+      this._ghostManager.hideGhost(this);
+      return;
+    }
+
     const rect = this.getBoundingClientRect();
     const relX = e.clientX - rect.left;
     const pos = computeDropTarget(this, relX, rect.width, this.cols);
