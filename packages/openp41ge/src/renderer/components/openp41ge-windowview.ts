@@ -58,14 +58,7 @@ class Openp41geWindowView extends LitElement {
       this._updateContextMenu();
     });
 
-    document.addEventListener("fe:cursor-changed", (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail) return;
-      const posEl = this.querySelector("#cursor-position");
-      if (posEl) {
-        posEl.textContent = "Ln " + detail.lineNumber + ", Col " + detail.column;
-      }
-    });
+
   }
 
   render(): TemplateResult | typeof nothing {
@@ -124,10 +117,6 @@ class Openp41geWindowView extends LitElement {
         <div
           class="openp41ge-bottom-bar flex items-center h-7 bg-bg-primary border-t border-divider shrink-0"
         >
-          <span
-            id="cursor-position"
-            class="text-muted text-xs px-2 not-italic whitespace-nowrap"
-          ></span>
           <div class="flex-1"></div>
 
           ${
