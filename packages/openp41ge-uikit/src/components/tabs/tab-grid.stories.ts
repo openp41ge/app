@@ -134,12 +134,7 @@ class GridState {
     });
   }
 
-  /** Replace content of an existing tab (used by event log). */
-  setContent(tabId: string, content: string): void {
-    if (this.tabs[tabId]) {
-      this.tabs[tabId] = { ...this.tabs[tabId], content };
-    }
-  }
+
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -177,10 +172,6 @@ class TabsDemoApp extends LitElement {
   private _outputState = GridState.from("side-b", [
     { id: createTabId(), title: "Output", content: '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>' },
   ]);
-
-  /** Event log tab — created once when the first event fires. */
-  private _logTabId: string | null = null;
-  private _logBuffer: string[] = [];
 
   // ── Drag state ───────────────────────────────────────────────────
 
@@ -270,7 +261,6 @@ class TabsDemoApp extends LitElement {
     // ── GRID EVENTS — handle actual drops ─────────────────────────
     document.addEventListener("grid-split", (e: any) => {
       const { sourceWinId, winId, tabId, splitCol, splitLeft } = e.detail;
-      this._logEvent(`grid-split: tab ${tabId} from ${sourceWinId} → ${winId} split@${splitCol} left=${splitLeft}`);
       const source = this._state(sourceWinId);
       const target = this._state(winId);
       if (!source || !target) return;
@@ -282,7 +272,6 @@ class TabsDemoApp extends LitElement {
 
     document.addEventListener("grid-move", (e: any) => {
       const { sourceWinId, tabId, targetWinId, targetCol } = e.detail;
-      this._logEvent(`grid-move: tab ${tabId} from ${sourceWinId} → ${targetWinId} col=${targetCol}`);
       const source = this._state(sourceWinId);
       const target = this._state(targetWinId);
       if (!source || !target) return;
@@ -293,13 +282,11 @@ class TabsDemoApp extends LitElement {
     });
 
     document.addEventListener("grid-activate", (e: any) => {
-      this._logEvent(`grid-activate: ${e.detail.winId} col=${e.detail.col} tab=${e.detail.tabId}`);
     });
 
     document.addEventListener("grid-open-tab", (e: any) => {
       const { winId, tabConfig, targetCol } = e.detail;
       const filePath = tabConfig.filePath || tabConfig.repoName || "untitled";
-      this._logEvent(`grid-open-tab: ${filePath} → ${winId} col=${targetCol}`);
       const state = this._state(winId);
       if (!state) return;
       state.addTab(
@@ -349,8 +336,6 @@ class TabsDemoApp extends LitElement {
       this._outputState = GridState.from("side-b", [
         { id: createTabId(), title: "Output", content: '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>' },
       ]);
-      this._logTabId = null;
-      this._logBuffer = [];
       this._renderAll();
     });
   }
@@ -367,40 +352,6 @@ class TabsDemoApp extends LitElement {
     this._sideState.applyTo(this._sideGrid);
     this._outputState.applyTo(this._outputGrid);
   }
-
-  /** Append an event to the log. Creates the log tab on first event. */
-  private _logEvent(msg: string): void {
-    // Create the log tab on first event
-    if (!this._logTabId) {
-      this._logTabId = createTabId();
-      this._outputState.tabs[this._logTabId] = {
-        title: "Event Log",
-        content: "<pre style='margin:0;padding:8px;font-size:11px;color:#888;overflow-y:auto;height:100%;box-sizing:border-box;'></pre>",
-        pinned: true,
-      };
-      const col0 = this._outputState.placements.find((p) => p.position.col === 0);
-      if (col0) {
-        col0.tabIds.push(this._logTabId);
-      }
-    }
-
-    // Append message to buffer
-    this._logBuffer.push(msg);
-    const html = this._logBuffer
-      .map((m, i) => `<div style="padding:1px 0;color:#888;">[${i + 1}] ${this._escapeHtml(m)}</div>`)
-      .join("");
-
-    const tab = this._outputState.tabs[this._logTabId];
-    if (tab) {
-      tab.content = `<pre style='margin:0;padding:8px;font-size:11px;overflow-y:auto;height:100%;box-sizing:border-box;background:#1a1a1a;'>${html}</pre>`;
-    }
-    this._renderAll();
-  }
-
-  private _escapeHtml(str: string): string {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
   override render(): TemplateResult {
     return html`
       <style>
