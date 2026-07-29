@@ -14,51 +14,51 @@ import {
   EVENT_DIRTY_CHANGED,
   EVENT_FILE_SAVED,
   EVENT_REQUEST_CLOSE,
-} from "./events";
+} from "../../file-editor/events";
 import type {
   TitleChangedDetail,
   DirtyChangedDetail,
   FileSavedDetail,
   RequestCloseDetail,
-} from "./events";
+} from "../../file-editor/events";
 
-import type { PieceTreeTextContentModel } from "./model/piece-tree-text-content-model";
-import type { TextContentChangeEvent, TextPosition, TextSelection } from "./model";
-import { ViewModel } from "./model/view-model";
-import type { ViewModelEvent } from "./model/view-model";
-import { ViewLines } from "./view/view-lines";
-import { computeWrapSegments } from "./view/word-wrap-helper";
-import { ViewportWrapColumnCalculator } from "./view/wrap-column-calculator";
-import type { IWrapColumnCalculator } from "./view/wrap-column-calculator";
-import { ScrollManager } from "./view/scroll-manager";
-import { CursorController } from "./cursor/cursor-controller";
-import { TextAreaInput } from "./input/text-area-input";
-import { KeyboardHandler } from "./input/keyboard-handler";
-import { CursorRenderer } from "./rendering/cursor-renderer";
-import { SelectionRenderer } from "./rendering/selection-renderer";
-import { LineNumbersOverlay } from "./rendering/line-numbers-overlay";
-import { CurrentLineHighlight } from "./rendering/current-line-highlight";
-import { IndentationGuides } from "./rendering/indentation-guides";
-import { findMatchingBracket } from "./rendering/bracket-matching";
-import { BracketPairService } from "./rendering/bracket-pair-service";
-import type { BracketLineInput } from "./rendering/bracket-pair-service";
-import { initTextMate } from "./tokenization/textmate-init";
-import { TokenRegistry } from "./tokenization/token-registry";
+import type { PieceTreeTextContentModel } from "../../file-editor/model/piece-tree-text-content-model";
+import type { TextContentChangeEvent, TextPosition, TextSelection } from "../../file-editor/model";
+import { ViewModel } from "../../file-editor/model/view-model";
+import type { ViewModelEvent } from "../../file-editor/model/view-model";
+import { ViewLines } from "../../file-editor/view/view-lines";
+import { computeWrapSegments } from "../../file-editor/view/word-wrap-helper";
+import { ViewportWrapColumnCalculator } from "../../file-editor/view/wrap-column-calculator";
+import type { IWrapColumnCalculator } from "../../file-editor/view/wrap-column-calculator";
+import { ScrollManager } from "../../file-editor/view/scroll-manager";
+import { CursorController } from "../../file-editor/cursor/cursor-controller";
+import { TextAreaInput } from "../../file-editor/input/text-area-input";
+import { KeyboardHandler } from "../../file-editor/input/keyboard-handler";
+import { CursorRenderer } from "../../file-editor/rendering/cursor-renderer";
+import { SelectionRenderer } from "../../file-editor/rendering/selection-renderer";
+import { LineNumbersOverlay } from "../../file-editor/rendering/line-numbers-overlay";
+import { CurrentLineHighlight } from "../../file-editor/rendering/current-line-highlight";
+import { IndentationGuides } from "../../file-editor/rendering/indentation-guides";
+import { findMatchingBracket } from "../../file-editor/rendering/bracket-matching";
+import { BracketPairService } from "../../file-editor/rendering/bracket-pair-service";
+import type { BracketLineInput } from "../../file-editor/rendering/bracket-pair-service";
+import { initTextMate } from "../../file-editor/tokenization/textmate-init";
+import { TokenRegistry } from "../../file-editor/tokenization/token-registry";
 
 // ── Global TokenRegistry singleton ──
 // Declared at module top level to avoid temporal dead zone (TDZ) issues
 // when the class references it during connectedCallback / firstUpdated.
 let _tokenRegistryInstance: TokenRegistry | null = null;
-import { getThemeById, generateThemeCSS, generateGlobalEditorCSS } from "./themes";
-import type { SyntaxTheme } from "./themes";
-import type { IToken } from "./tokenization/line-tokens";
-import { ClipboardHandler } from "./input/clipboard-handler";
-import { CompositionHandler } from "./input/composition-handler";
-import { MouseHandler } from "./input/mouse-handler";
-import { checkAutoClose, shouldSkipClose } from "./input/auto-closing-pairs";
-import "./ui/openp41ge-bottom-bar";
-import type { FeStatusBar } from "./ui/openp41ge-bottom-bar";
-import type { IFormatterRegistry } from "./interfaces/formatter-registry";
+import { getThemeById, generateThemeCSS, generateGlobalEditorCSS } from "../../file-editor/themes";
+import type { SyntaxTheme } from "../../file-editor/themes";
+import type { IToken } from "../../file-editor/tokenization/line-tokens";
+import { ClipboardHandler } from "../../file-editor/input/clipboard-handler";
+import { CompositionHandler } from "../../file-editor/input/composition-handler";
+import { MouseHandler } from "../../file-editor/input/mouse-handler";
+import { checkAutoClose, shouldSkipClose } from "../../file-editor/input/auto-closing-pairs";
+import "./openp41ge-bottom-bar";
+import type { FeStatusBar } from "./openp41ge-bottom-bar";
+import type { IFormatterRegistry } from "../../file-editor/interfaces/formatter-registry";
 
 export type FileEditorState = "loading" | "ready" | "error" | "empty";
 

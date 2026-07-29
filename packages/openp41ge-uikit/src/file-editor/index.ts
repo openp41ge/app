@@ -6,8 +6,8 @@
  * application via DOM CustomEvents.
  */
 
-export { FileEditorElement } from "./file-editor";
-export type { FileEditorState } from "./file-editor";
+export { FileEditorElement } from "../components/file-editor/file-editor";
+export type { FileEditorState } from "../components/file-editor/file-editor";
 
 // Event types (for host applications to listen)
 export {

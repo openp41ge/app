@@ -30,7 +30,7 @@ export type { GhostPreview } from "./tabs/ghost-manager";
 export { computeGhostLayout } from "./tabs/ghost-layout";
 export type { GhostColumn } from "./tabs/ghost-layout";
 export { CursorManager } from "./tabs/cursor-manager";
-export { TabGrid, TabBar, TabView, TabContent } from "./tabs/components/index";
+export { TabGrid, TabBar, TabView, TabContent } from "./components/tabs/index";
 export {
   INSERT_BOUNDARY_THRESHOLD,
   classifyGridPosition,
@@ -71,8 +71,8 @@ export type { HighlightResult } from "./syntax-highlighting/services/syntax-high
 export { renderTokensToHtml } from "./syntax-highlighting/services/token-html-renderer";
 
 // ─── Git Repository Browser (merged from openp41ge-git-repository) ────────
-export { FileEditorElement } from "./file-editor/file-editor";
-export type { FileEditorState } from "./file-editor/file-editor";
+export { FileEditorElement } from "./components/file-editor/file-editor";
+export type { FileEditorState } from "./components/file-editor/file-editor";
 
 // Full file-editor API available at "openp41ge-uikit/file-editor"
 
@@ -80,7 +80,7 @@ export type { FileEditorState } from "./file-editor/file-editor";
 export { gitBrowserRenderer } from "./git-repository/git-browser-renderer";
 
 // ─── Tree Component ──────────────────────────────────────────────────────
-export { Openp41geTree } from "./tree";
+export { Openp41geTree } from "./components/tree";
 export type {
   TreeNode,
   TreeNodeAction,
@@ -90,7 +90,7 @@ export type {
   TreeNodeActionEventDetail,
   TreeDragStartEventDetail,
   TreeDropEventDetail,
-} from "./tree";
+} from "./components/tree";
 export type {
   GitBrowserData,
   GitBrowserCallbacks,

@@ -2,8 +2,8 @@ import { html } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Meta, StoryObj } from "@storybook/web-components";
 import type { TreeNode } from "./types";
-import { iconRegistry } from "../icons";
-import { getFileIcon } from "../icons/material-icons";
+import { iconRegistry } from "../../icons";
+import { getFileIcon } from "../../icons/material-icons";
 import "../components/openp41ge-icon";
 import "./tree";
 

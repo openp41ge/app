@@ -39,7 +39,7 @@ export type { GhostColumn } from "./ghost-layout";
 export { CursorManager } from "./cursor-manager";
 
 // ─── Components ────────────────────────────────────────────────────────────
-export { TabGrid, TabBar, TabView, TabContent } from "./components/index";
+export { TabGrid, TabBar, TabView, TabContent } from "../components/tabs/index";
 
 // ─── Boundary / utilities ─────────────────────────────────────────────────
 export {

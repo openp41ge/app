@@ -6,10 +6,10 @@
 
 import { LitElement, html } from "lit";
 import { property } from "lit/decorators.js";
-import { GridDropTarget } from "../targets/grid-drop-target";
-import { GhostManager, type GhostPreview } from "../ghost-manager";
-import { computeDropTarget } from "../boundary";
-import type { IDragSource, TargetFeedback, GhostFactory } from "../interfaces";
+import { GridDropTarget } from "../../tabs/targets/grid-drop-target";
+import { GhostManager, type GhostPreview } from "../../tabs/ghost-manager";
+import { computeDropTarget } from "../../tabs/boundary";
+import type { IDragSource, TargetFeedback, GhostFactory } from "../../tabs/interfaces";
 import type { TabBar } from "./tab-bar";
 import type { TabContent } from "./tab-content";
 import "./tab-bar";
