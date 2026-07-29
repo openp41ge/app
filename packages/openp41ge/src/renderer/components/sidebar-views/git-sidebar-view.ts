@@ -4,6 +4,8 @@
  * Shows repositories and their worktrees, similar to the explorer but
  * without the file-tree. Uses repo-row and worktree-row from the
  * components library.
+ *
+ * All visual styles use Tailwind utility classes (injected globally).
  */
 
 import type { SidebarView } from "./sidebar-view";
@@ -33,8 +35,7 @@ export class GitSidebarView implements SidebarView {
 
   async mount(container: HTMLElement): Promise<void> {
     const wrapper = document.createElement("div");
-    wrapper.style.cssText =
-      "flex:1;min-height:0;display:flex;flex-direction:column;width:100%;overflow:hidden;";
+    wrapper.className = "flex-1 min-h-0 flex flex-col w-full overflow-hidden";
 
     wrapper.appendChild(this._createHeader());
     wrapper.appendChild(this._createList());
@@ -68,13 +69,12 @@ export class GitSidebarView implements SidebarView {
 
   private _createList(): HTMLElement {
     const list = document.createElement("div");
-    list.className = "git-sidebar-list";
-    list.style.cssText =
-      "flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;";
+    list.className =
+      "git-sidebar-list flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col";
 
     const loading = document.createElement("div");
     loading.textContent = "Loading...";
-    loading.style.cssText = "padding:8px;color:#555;font-size:11px;font-style:italic;";
+    loading.className = "p-2 text-muted text-xs italic";
     list.appendChild(loading);
 
     return list;
@@ -108,7 +108,7 @@ export class GitSidebarView implements SidebarView {
       this._renderList(list);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      list.innerHTML = `<div style="padding:8px;color:#c55;font-size:11px;">Failed to load: ${msg}</div>`;
+      list.innerHTML = `<div class="p-2 text-error text-xs">Failed to load: ${this._escapeHtml(msg)}</div>`;
     }
 
     this._loading = false;
@@ -120,7 +120,7 @@ export class GitSidebarView implements SidebarView {
     if (this._repos.length === 0) {
       const empty = document.createElement("div");
       empty.textContent = "No repositories";
-      empty.style.cssText = "padding:8px;color:#555;font-size:11px;font-style:italic;";
+      empty.className = "p-2 text-muted text-xs italic";
       list.appendChild(empty);
       return;
     }
@@ -150,8 +150,7 @@ export class GitSidebarView implements SidebarView {
         if (repo.worktrees.length === 0) {
           const empty = document.createElement("div");
           empty.textContent = "No worktrees";
-          empty.style.cssText =
-            "padding:2px 8px 2px 16px;color:#555;font-size:11px;font-style:italic;";
+          empty.className = "pl-4 pr-2 py-0.5 text-muted text-xs italic";
           list.appendChild(empty);
         } else {
           for (const wt of repo.worktrees) {
@@ -162,5 +161,13 @@ export class GitSidebarView implements SidebarView {
         }
       }
     }
+  }
+
+  private _escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 }

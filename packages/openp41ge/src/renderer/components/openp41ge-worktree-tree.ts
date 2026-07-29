@@ -272,14 +272,9 @@ class Openp41geWorktreeTree extends LitElement {
       getExpandedDirs: () => _expandedDirs,
     };
 
-    this.style.cssText = `
-      display:flex;flex-direction:row;
-      overflow:hidden;flex-shrink:0;
-      width:${_isOpen ? "280px" : "0"};
-      min-width:0;
-      background:var(--bg-gutter);
-      border-left:${_isOpen ? "1px solid #2a2a2a" : "none"};
-    `;
+    this.className = "flex flex-row overflow-hidden shrink-0 min-w-0 bg-gutter";
+    this.style.width = _isOpen ? "280px" : "0";
+    this.style.borderLeft = _isOpen ? "1px solid #2a2a2a" : "none";
 
     this.addEventListener("keydown", this._onKeyDown);
     if (!this.hasAttribute("tabindex")) {
@@ -349,13 +344,11 @@ class Openp41geWorktreeTree extends LitElement {
   render(): TemplateResult | typeof nothing {
     return html`
       <div
-        class="wt-drawer"
-        style="display:flex;flex-direction:column;overflow:hidden;flex:1;min-height:0;width:100%;background:var(--bg-gutter);position:relative;user-select:none;"
+        class="wt-drawer flex flex-col overflow-hidden flex-1 min-h-0 w-full bg-gutter relative select-none"
       >
-        <div class="wt-tree-scroll-wrapper" style="flex:1;position:relative;min-height:0;">
+        <div class="wt-tree-scroll-wrapper flex-1 relative min-h-0">
           <div
-            class="wt-tree-scroll"
-            style="position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;"
+            class="wt-tree-scroll absolute inset-0 overflow-y-auto overflow-x-hidden"
           >
             <div
               class="wt-tree-scroll-content"
@@ -443,15 +436,15 @@ class Openp41geWorktreeTree extends LitElement {
                   ${
                     this._dropIndex === idx
                       ? html`<div
-                          style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"
+                          class="h-0.5 bg-focus shrink-0 m-0"
                         ></div>`
                       : nothing
                   }
                   <div
-                    style="display:flex;align-items:stretch;width:100%;${this._explorerDragIdx === idx ? "opacity:0.3;" : ""}"
+                    class="flex items-stretch w-full ${this._explorerDragIdx === idx ? "opacity-30" : ""}"
                   >
                     <openp41ge-repo-tree-item
-                      style="flex:1;min-width:0;"
+                      class="flex-1 min-w-0"
                       .repoName=${repo.name}
                       .repoUrl=${repo.url}
                       .worksetId=${this.worksetId}
@@ -517,21 +510,21 @@ class Openp41geWorktreeTree extends LitElement {
               })}
               ${
                 this._dropIndex === this._repos.length
-                  ? html`<div style="height:2px;background:#4a9eff;flex-shrink:0;margin:0;"></div>`
+                  ? html`<div class="h-0.5 bg-focus shrink-0 m-0"></div>`
                   : nothing
               }
               ${
                 _showingAddRepo
                   ? html`<div
                       id="wt-addrepo-row"
-                      style="display:flex;align-items:center;height:30px;padding-left:12px;padding-right:8px;font-size:12px;border-bottom:1px solid var(--border-divider);outline:2px solid #2a6fd1;outline-offset:-2px;transition:background 0.1s;"
+                      class="flex items-center h-[30px] pl-3 pr-2 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100"
                     >
-                      <span style="display:none;">${unsafeHTML(plusIconThick(16))}</span
+                      <span class="hidden">${unsafeHTML(plusIconThick(16))}</span
                       ><input
                         id="wt-addrepo-input"
                         type="text"
                         placeholder="git clone URL"
-                        style="flex:1;min-width:0;height:24px;background:transparent;border:none;border-radius:0;color:#e0e0e0;font-size:11px;padding:0 6px;outline:none;font-family:inherit;margin-left:8px;"
+                        class="flex-1 min-w-0 h-6 bg-transparent border-none rounded-none text-[#e0e0e0] text-xs px-1.5 outline-none font-inherit ml-2"
                         @keydown=${(e: KeyboardEvent) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
@@ -549,7 +542,7 @@ class Openp41geWorktreeTree extends LitElement {
                         }}
                       /><span
                         id="wt-addrepo-confirm"
-                        style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;margin-left:4px;color:var(--text-secondary);"
+                        class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 ml-1 text-secondary"
                         @click=${() => this._confirmAddRepo()}
                         @mouseenter=${(e: MouseEvent) => {
                           (e.currentTarget as HTMLElement).style.background =
@@ -572,7 +565,7 @@ class Openp41geWorktreeTree extends LitElement {
                           <polyline points="4,8 7,11 12,4" /></svg></span
                       ><span
                         id="wt-addrepo-cancel"
-                        style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;flex-shrink:0;color:var(--text-secondary);"
+                        class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-secondary"
                         @click=${() => this._cancelAddRepo()}
                         @mouseenter=${(e: MouseEvent) => {
                           (e.currentTarget as HTMLElement).style.background =
@@ -597,7 +590,7 @@ class Openp41geWorktreeTree extends LitElement {
                       ></span>
                     </div>`
                   : html`<div
-                      style="display:flex;align-items:center;height:30px;padding-left:12px;padding-right:8px;cursor:pointer;user-select:none;font-size:12px;color:var(--text-muted);transition:color 0.1s,background 0.1s;border-bottom:1px solid var(--border-divider);"
+                      class="flex items-center h-[30px] pl-3 pr-2 cursor-pointer select-none text-sm text-muted border-b border-divider transition-[color,background] duration-100"
                       @click=${() => this._showAddRepoInline()}
                       @mouseenter=${(e: MouseEvent) => {
                         (e.currentTarget as HTMLElement).style.background = "#1e1e1e";
@@ -607,13 +600,12 @@ class Openp41geWorktreeTree extends LitElement {
                       }}
                     >
                       <span
-                        style="width:10px;height:30px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"
-                        ><span style="transform:translateX(-1px);display:inline-flex;"
+                        class="w-[10px] h-[30px] flex items-center justify-center shrink-0"
+                        ><span class="-translate-x-px inline-flex"
                           >${unsafeHTML(plusIconThick(11))}</span
                         ></span
                       ><span
-                        class="add-repo-label"
-                        style="margin-left:4px;color:var(--text-muted);flex:1;"
+                        class="add-repo-label ml-1 text-muted flex-1"
                         >add repository</span
                       >
                     </div>`
