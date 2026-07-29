@@ -5,6 +5,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   pointer-events: none
 }
 
+.pointer-events-auto {
+  pointer-events: auto
+}
+
 .visible {
   visibility: visible
 }
@@ -45,6 +49,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   left: -1px
 }
 
+.top-1 {
+  top: 0.25rem
+}
+
 .top-1\/2 {
   top: 50%
 }
@@ -63,6 +71,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .m-0 {
   margin: 0px
+}
+
+.mx-2 {
+  margin-left: 0.5rem;
+  margin-right: 0.5rem
 }
 
 .mx-3 {
@@ -115,6 +128,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-left: 0.5rem
 }
 
+.ml-4 {
+  margin-left: 1rem
+}
+
 .ml-auto {
   margin-left: auto
 }
@@ -133,6 +150,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .mr-12 {
   margin-right: 3rem
+}
+
+.mt-0 {
+  margin-top: 0px
 }
 
 .mt-0\.5 {
@@ -211,6 +232,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 0.75rem
 }
 
+.h-4 {
+  height: 1rem
+}
+
 .h-5 {
   height: 1.25rem
 }
@@ -279,6 +304,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   min-height: 47px
 }
 
+.w-0 {
+  width: 0px
+}
+
 .w-0\.5 {
   width: 0.125rem
 }
@@ -331,6 +360,14 @@ export const tailwindCSS: string = `.pointer-events-none {
   min-width: 0px
 }
 
+.min-w-7 {
+  min-width: 1.75rem
+}
+
+.min-w-\[150px\] {
+  min-width: 150px
+}
+
 .min-w-\[28px\] {
   min-width: 28px
 }
@@ -365,6 +402,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .-translate-x-px {
   --tw-translate-x: -1px;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
+}
+
+.-translate-y-1 {
+  --tw-translate-y: -0.25rem;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
 }
 
@@ -421,6 +463,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   flex-direction: column
 }
 
+.place-items-center {
+  place-items: center
+}
+
 .items-start {
   align-items: flex-start
 }
@@ -443,6 +489,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .justify-center {
   justify-content: center
+}
+
+.justify-between {
+  justify-content: space-between
 }
 
 .gap-1 {
@@ -561,6 +611,11 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .border-t-accent {
   border-top-color: var(--text-accent, #569cd6)
+}
+
+.bg-\[\#333\] {
+  --tw-bg-opacity: 1;
+  background-color: rgb(51 51 51 / var(--tw-bg-opacity, 1))
 }
 
 .bg-\[rgba\(0\2c 0\2c 0\2c 0\.5\)\] {
@@ -877,6 +932,12 @@ export const tailwindCSS: string = `.pointer-events-none {
 .shadow {
   --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
+}
+
+.shadow-\[0_8px_24px_rgba\(0\2c 0\2c 0\2c 0\.5\)\] {
+  --tw-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  --tw-shadow-colored: 0 8px 24px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
 }
 

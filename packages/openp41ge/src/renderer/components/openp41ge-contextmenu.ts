@@ -110,16 +110,17 @@ class Openp41geContextMenu extends LitElement {
 
     return html`
       <div
-        style="position:fixed;left:${this._x}px;top:${this._y}px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.5);padding:4px 0;min-width:150px;z-index:10000;pointer-events:auto;"
+        class="fixed bg-bg-tertiary border border-border-color rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.5)] py-1 min-w-[150px] z-[10000] pointer-events-auto"
+        style="left:${this._x}px;top:${this._y}px;"
       >
         ${this._items.map((item) => {
           if (item.type === "separator") {
-            return html`<div style="height:1px;background:#333;margin:4px 8px;"></div>`;
+            return html`<div class="h-px bg-[#333] my-1 mx-2"></div>`;
           }
           const hasChildren = item.children && item.children.length > 0;
           return html`
             <div
-              style="padding:6px 16px;cursor:pointer;color:var(--text-primary);font-size:12px;transition:background 0.1s;display:flex;align-items:center;justify-content:space-between;"
+              class="px-4 py-1.5 cursor-pointer text-primary text-sm transition-[background] duration-100 flex items-center justify-between"
               @mouseenter=${(e: MouseEvent) => {
                 const row = e.currentTarget as HTMLElement;
                 row.style.background = "#333";
@@ -147,7 +148,7 @@ class Openp41geContextMenu extends LitElement {
               }}
             >
               <span>${item.label ?? ""}</span>
-              ${hasChildren ? html`<span style="color:var(--text-muted);margin-left:16px;">▸</span>` : ""}
+              ${hasChildren ? html`<span class="text-muted ml-4">▸</span>` : ""}
             </div>
           `;
         })}

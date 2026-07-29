@@ -89,45 +89,41 @@ class Openp41geBottomBar extends LitElement {
   render(): TemplateResult {
     return html`
       <div
-        style="display:flex;flex-shrink:0;align-items:center;height:24px;background:var(--bg-primary);border-top:1px solid var(--border-divider);padding:0 8px;gap:8px;font-size:11px;color:var(--text-secondary);"
+        class="flex shrink-0 items-center h-6 bg-bg-primary border-t border-divider px-2 gap-2 text-xs text-secondary"
       >
         ${
           this._emptyMessage !== null
-            ? html`<span style="color:var(--text-muted);font-size:11px;"
+            ? html`<span class="text-muted text-xs"
                 >${this._emptyMessage}</span
               >`
             : html`
-                <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                <div class="flex items-center gap-2 flex-1 min-w-0">
                   <span
-                    class="sbb-position"
-                    style="color:var(--text-secondary);font-size:11px;font-style:normal;"
+                    class="sbb-position text-secondary text-xs not-italic"
                     >${this._positionText}</span
                   >
                   <span
-                    class="sbb-mode"
-                    style="color:${this._modeColor};font-size:11px;font-style:normal;"
+                    class="sbb-mode text-xs not-italic"
+                    style="color:${this._modeColor};"
                     >${this._modeText}</span
                   >
                 </div>
-                <div style="display:flex;align-items:stretch;gap:8px;height:24px;">
+                <div class="flex items-stretch gap-2 h-6">
                   ${
                     this._hasFormatter
                       ? html`
                           <div
-                            class="sbb-format-btn"
-                            style="flex-shrink:0;min-width:28px;height:24px;display:grid;place-items:center;padding:0 8px;background:transparent;color:var(--text-muted);cursor:pointer;opacity:0.5;border:none;box-sizing:border-box;user-select:none;-webkit-app-region:no-drag;"
+                            class="sbb-format-btn shrink-0 min-w-7 h-6 grid place-items-center px-2 bg-transparent text-muted cursor-pointer opacity-50 border-none box-border select-none -webkit-app-region:no-drag transition-[background,color,opacity] duration-100"
                             title="Format document"
                             @click=${() => this._formatterHandler?.()}
                             @mouseenter=${(e: MouseEvent) => {
                               const el = e.currentTarget as HTMLElement;
-                              el.style.background = "rgba(255,255,255,0.1)";
-                              el.style.color = "#e0e0e0";
+                              el.classList.add("bg-hover", "text-primary");
                               el.style.opacity = "1";
                             }}
                             @mouseleave=${(e: MouseEvent) => {
                               const el = e.currentTarget as HTMLElement;
-                              el.style.background = "transparent";
-                              el.style.color = "#666";
+                              el.classList.remove("bg-hover", "text-primary");
                               el.style.opacity = "0.5";
                             }}
                           >
@@ -140,7 +136,7 @@ class Openp41geBottomBar extends LitElement {
                               stroke-width="1.3"
                               stroke-linecap="round"
                               stroke-linejoin="round"
-                              style="display:block;width:16px;height:16px;"
+                              class="block w-4 h-4"
                             >
                               <path d="M5 4L3 8l2 4"></path>
                               <path d="M11 4l2 4-2 4"></path>
@@ -153,20 +149,18 @@ class Openp41geBottomBar extends LitElement {
                   ${this._buttons.map(
                     (btn) => html`
                       <div
-                        class="sbb-custom-btn"
-                        style="flex-shrink:0;min-width:28px;height:24px;display:${this._isVisible(btn) ? "grid" : "none"};place-items:center;padding:0 8px;background:transparent;color:var(--text-muted);cursor:pointer;opacity:0.5;border:none;box-sizing:border-box;user-select:none;-webkit-app-region:no-drag;"
+                        class="sbb-custom-btn shrink-0 min-w-7 h-6 place-items-center px-2 bg-transparent text-muted cursor-pointer opacity-50 border-none box-border select-none -webkit-app-region:no-drag transition-[background,color,opacity] duration-100"
+                        style="display:${this._isVisible(btn) ? "grid" : "none"};"
                         title=${btn.title ?? ""}
                         @click=${() => btn.onClick()}
                         @mouseenter=${(e: MouseEvent) => {
                           const el = e.currentTarget as HTMLElement;
-                          el.style.background = "rgba(255,255,255,0.1)";
-                          el.style.color = "#e0e0e0";
+                          el.classList.add("bg-hover", "text-primary");
                           el.style.opacity = "1";
                         }}
                         @mouseleave=${(e: MouseEvent) => {
                           const el = e.currentTarget as HTMLElement;
-                          el.style.background = "transparent";
-                          el.style.color = "#666";
+                          el.classList.remove("bg-hover", "text-primary");
                           el.style.opacity = "0.5";
                         }}
                       >
@@ -175,8 +169,7 @@ class Openp41geBottomBar extends LitElement {
                     `,
                   )}
                   <span
-                    class="sbb-size"
-                    style="color:var(--text-muted);font-size:11px;display:flex;align-items:center;height:100%;font-style:normal;"
+                    class="sbb-size text-muted text-xs flex items-center h-full not-italic"
                     >${this._sizeText}</span
                   >
                 </div>
