@@ -818,10 +818,8 @@ class Openp41geWorktreeTree extends LitElement {
 
   // ── Key handler ───────────────────────────────────────────────────────
 
-  private _onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      this.close();
-    }
+  private _onKeyDown = (_e: KeyboardEvent) => {
+    // Reserved for future keyboard shortcuts.
   };
 
   // ── Edit mode toggle ────────────────────────────────────────────────
