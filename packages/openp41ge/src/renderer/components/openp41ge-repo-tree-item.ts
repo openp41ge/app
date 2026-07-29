@@ -542,7 +542,8 @@ export class Openp41geRepoTreeItem extends LitElement {
         ${
           this._showingAddWorktree
             ? html` <div
-                class="flex items-center h-[26px] px-2 pl-7 text-xs gap-1 border-b border-[#232323] outline outline-2 outline-offset-[-2px] outline-[#2a6fd1] transition-colors duration-100"
+                id="wt-addwt-row"
+                class="flex items-center h-[26px] px-2 pl-7 text-xs gap-1 border-b border-[#232323] transition-colors duration-100"
               >
                 <span class="hidden"></span>
                 <input

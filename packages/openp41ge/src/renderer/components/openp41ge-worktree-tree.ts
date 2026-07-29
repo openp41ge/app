@@ -229,7 +229,7 @@ class Openp41geWorktreeTree extends LitElement {
          are never hidden underneath it. Row backgrounds fill the full width
          (edge to edge) because .wt-tree-scroll-content has no padding. */
       #wt-addrepo-row:focus-within,
-      #wt-addwt-row:focus-within { box-shadow: inset 0 0 0 1px #4a9eff; }
+      #wt-addwt-row:focus-within { outline: 2px solid #4a9eff; outline-offset: -2px; }
       #wt-addwt-input::placeholder,
       #wt-addrepo-input::placeholder,
       #ws-add-input::placeholder { font-style:italic; }
