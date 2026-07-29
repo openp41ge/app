@@ -14,7 +14,7 @@ import {
   type IDragSource,
 } from "openp41ge-uikit";
 
-// ─── Types ────────────────────────────────────────────────────────────
+// ─── Tab data helpers ─────────────────────────────────────────────────
 
 interface TabData {
   id: string;
@@ -23,23 +23,41 @@ interface TabData {
   pinned?: boolean;
 }
 
-class GridState {
-  winId: string;
-  lastFocusedCol = 0;
-  cols = 1;
-  tabs: Record<string, { title: string; content: string; pinned?: boolean }> = {};
-  activeTabIds: Record<string, string> = {};
-  placements: Array<{ position: { row: number; col: number }; tabIds: string[] }> = [];
+function createTab(title: string, content: string, pinned = true): TabData {
+  return { id: "tab-" + Date.now() + Math.random().toString(36).slice(2, 6), title, content, pinned };
+}
 
-  constructor(winId: string, initialTabs: TabData[]) {
-    this.winId = winId;
+// ─── Grid state — mirrors the original demo logic ────────────────────
+
+class GridState {
+  constructor(
+    public winId: string,
+    public cols = 1,
+    public tabs: Record<string, { title: string; content: string; pinned?: boolean }> = {},
+    public activeTabIds: Record<string, string> = {},
+    public placements: Array<{ position: { row: number; col: number }; tabIds: string[] }> = [],
+  ) {}
+
+  static from(winId: string, initialTabs: TabData[]): GridState {
+    const s = new GridState(winId);
     const tabIds: string[] = [];
     for (const tab of initialTabs) {
-      this.tabs[tab.id] = { title: tab.title, content: tab.content, pinned: tab.pinned ?? true };
+      s.tabs[tab.id] = { title: tab.title, content: tab.content, pinned: tab.pinned ?? true };
       tabIds.push(tab.id);
     }
-    this.placements.push({ position: { row: 0, col: 0 }, tabIds });
-    if (tabIds.length > 0) this.activeTabIds["0"] = tabIds[0];
+    s.placements.push({ position: { row: 0, col: 0 }, tabIds });
+    if (tabIds.length > 0) s.activeTabIds["0"] = tabIds[0];
+    return s;
+  }
+
+  clone(): GridState {
+    return new GridState(
+      this.winId,
+      this.cols,
+      { ...this.tabs },
+      { ...this.activeTabIds },
+      this.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] })),
+    );
   }
 
   applyTo(gridEl: any): void {
@@ -54,42 +72,79 @@ class GridState {
   }
 
   addTab(col: number, title: string, content: string): TabData {
-    const id = "tab-" + Date.now() + Math.random().toString(36).slice(2, 6);
-    const tab: TabData = { id, title, content, pinned: false };
-    this.tabs[id] = { title, content, pinned: false };
-    const colKey = String(col);
-    const placement = this.placements.find((p) => String(p.position.col) === colKey);
-    if (placement) {
-      placement.tabIds.push(id);
-    } else {
-      this.placements.push({ position: { row: 0, col }, tabIds: [id] });
-      this.cols = Math.max(this.cols, col + 1);
-    }
-    this.activeTabIds[colKey] = id;
+    const tab = createTab(title, content);
+    this.insertTab(tab, col, -1);
     return tab;
   }
 
-  removeTab(tabId: string): void {
-    delete this.tabs[tabId];
-    for (const p of this.placements) {
+  /** Remove a tab by id. Returns the removed record, or null. */
+  removeTab(tabId: string): { title: string; content: string; pinned?: boolean } | null {
+    for (let ci = 0; ci < this.placements.length; ci++) {
+      const p = this.placements[ci];
       const idx = p.tabIds.indexOf(tabId);
-      if (idx !== -1) p.tabIds.splice(idx, 1);
-    }
-    this.placements = this.placements.filter((p) => p.tabIds.length > 0);
-    for (const col of Object.keys(this.activeTabIds)) {
-      if (!this.tabs[this.activeTabIds[col]]) {
-        const placement = this.placements.find((p) => String(p.position.col) === col);
-        if (placement && placement.tabIds.length > 0) {
-          this.activeTabIds[col] = placement.tabIds[0];
-        } else {
-          delete this.activeTabIds[col];
+      if (idx >= 0) {
+        const tab = this.tabs[tabId];
+        p.tabIds.splice(idx, 1);
+        if (this.activeTabIds[String(ci)] === tabId) {
+          const next = p.tabIds[Math.min(idx, p.tabIds.length - 1)] || null;
+          if (next) this.activeTabIds[String(ci)] = next;
+          else delete this.activeTabIds[String(ci)];
         }
+        if (p.tabIds.length === 0 && this.placements.length > 1) {
+          this.placements.splice(ci, 1);
+          this.cols = this.placements.length;
+          this.placements.forEach((pp, i) => { pp.position.col = i; });
+          const newActive: Record<string, string> = {};
+          for (const [k, v] of Object.entries(this.activeTabIds)) {
+            const ki = parseInt(k, 10);
+            if (ki < ci) newActive[k] = v;
+            else if (ki > ci) newActive[String(ki - 1)] = v;
+          }
+          this.activeTabIds = newActive;
+        }
+        return tab || null;
       }
     }
+    return null;
+  }
+
+  /** Insert a tab into an existing column. */
+  insertTab(tab: TabData, col: number, index: number): void {
+    this.tabs[tab.id] = { title: tab.title, content: tab.content, pinned: tab.pinned ?? true };
+    let p = this.placements.find((p) => p.position.col === col);
+    if (!p) {
+      p = { position: { row: 0, col }, tabIds: [] };
+      this.placements.push(p);
+      this.placements.sort((a, b) => a.position.col - b.position.col);
+      this.cols = this.placements.length;
+    }
+    const insertAt = index >= 0 ? Math.min(index, p.tabIds.length) : p.tabIds.length;
+    p.tabIds.splice(insertAt, 0, tab.id);
+    this.activeTabIds[String(col)] = tab.id;
+  }
+
+  /** Insert a tab, splitting the column to create a new one. */
+  insertTabInSplit(tab: TabData, splitCol: number, splitLeft: boolean): void {
+    this.tabs[tab.id] = { title: tab.title, content: tab.content, pinned: tab.pinned ?? true };
+    const splitIdx = this.placements.findIndex((p) => p.position.col === splitCol);
+    if (splitIdx < 0) return;
+    const newCol = splitLeft ? splitCol : splitCol + 1;
+    const newPlacement = { position: { row: 0, col: newCol }, tabIds: [tab.id] };
+    if (splitLeft) {
+      this.placements.splice(splitIdx, 0, newPlacement);
+    } else {
+      this.placements.splice(splitIdx + 1, 0, newPlacement);
+    }
+    this.placements.forEach((p, i) => { p.position.col = i; });
+    this.cols = this.placements.length;
+    this.activeTabIds = {};
+    this.placements.forEach((p, i) => {
+      if (p.tabIds.length > 0) this.activeTabIds[String(i)] = p.tabIds[0];
+    });
   }
 }
 
-// ─── File icon helpers ────────────────────────────────────────────────
+// ─── Icons ────────────────────────────────────────────────────────────
 
 const FILE_ICONS: Record<string, string> = {
   ts: `<svg viewBox="0 0 24 24" fill="#3178c6" width="14" height="14"><rect width="24" height="24" rx="2"/><text x="5" y="17" fill="white" font-size="14" font-weight="bold">TS</text></svg>`,
@@ -104,10 +159,6 @@ function fileIcon(filename: string): string {
   return FILE_ICONS[ext] || FILE_ICONS.default;
 }
 
-function createTab(title: string, content: string, pinned = true): TabData {
-  return { id: "tab-" + Date.now() + Math.random().toString(36).slice(2, 6), title, content, pinned };
-}
-
 // ─── Demo app ─────────────────────────────────────────────────────────
 
 @customElement("tabs-demo-app")
@@ -116,12 +167,12 @@ class TabsDemoApp extends LitElement {
     return this;
   }
 
-  private _editorState = new GridState("editor", [
+  private _editorState = GridState.from("editor", [
     createTab("README.md", '<div class="content-placeholder"><h3>README.md</h3><p>Welcome! Drag tabs to edges to create new columns.</p></div>'),
     createTab("index.js", '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const grid = document.querySelector("tab-grid");</pre></div>'),
   ]);
 
-  private _sideState = new GridState("side-a", [
+  private _sideState = GridState.from("side-a", [
     createTab("Terminal", '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>'),
   ]);
 
@@ -142,8 +193,6 @@ class TabsDemoApp extends LitElement {
     return null;
   };
 
-  // ── Refs ─────────────────────────────────────────────────────────
-
   @query("#editor-grid")
   private _editorGrid!: any;
 
@@ -158,10 +207,9 @@ class TabsDemoApp extends LitElement {
   override firstUpdated(): void {
     this._logEl = this.querySelector("#log") as HTMLElement;
     this._orchestrator = new DragOrchestrator(this._targetResolver);
-
     this._renderAll();
 
-    // File explorer drag
+    // ── File explorer drag ────────────────────────────────────────
     this.querySelectorAll(".file-card").forEach((card) => {
       card.addEventListener("dragstart", (e: Event) => {
         const de = e as DragEvent;
@@ -170,23 +218,21 @@ class TabsDemoApp extends LitElement {
       });
     });
 
-    // ── Tab drag: mousedown on [role='tab'] ──────────────────────
+    // ── Tab drag start (mousedown on [role='tab']) ────────────────
     document.addEventListener("mousedown", (e: Event) => {
       const tabBtn = (e.target as HTMLElement).closest("[role='tab']");
       if (!tabBtn) return;
       if ((e.target as HTMLElement).closest(".tab-close")) return;
-
       const tabBar = tabBtn.closest("tab-bar") as any;
       if (!tabBar) return;
       const tabId = tabBtn.getAttribute("data-tab-id");
       if (!tabId) return;
-
       e.preventDefault();
       this._currentDragSource = new TabDragSource(tabBtn as HTMLElement, tabId, tabBar.winId, "workset-1");
       this._orchestrator.startDrag(this._currentDragSource, (e as MouseEvent).clientX, (e as MouseEvent).clientY);
     });
 
-    // ── mousemove: update ghost overlay ──────────────────────────
+    // ── Ghost overlay during drag ─────────────────────────────────
     document.addEventListener("mousemove", (e: Event) => {
       if (!this._orchestrator.isDragging) return;
       const me = e as MouseEvent;
@@ -209,7 +255,7 @@ class TabsDemoApp extends LitElement {
       this._ghostShownGrid = target.element;
     });
 
-    // ── mouseup: clear ghost ─────────────────────────────────────
+    // ── Clear ghost on mouseup ────────────────────────────────────
     document.addEventListener("mouseup", () => {
       if (this._ghostShownGrid) {
         this._ghostManager.hideGhost(this._ghostShownGrid);
@@ -217,12 +263,56 @@ class TabsDemoApp extends LitElement {
       }
     });
 
+    // ── GRID EVENTS — handle actual drops ─────────────────────────
+    document.addEventListener("grid-split", (e: any) => {
+      const { sourceWinId, winId, tabId, splitCol, splitLeft } = e.detail;
+      this._log(`grid-split: tab ${tabId} from ${sourceWinId} → ${winId} split@${splitCol} left=${splitLeft}`);
+      const source = this._state(sourceWinId);
+      const target = this._state(winId);
+      if (!source || !target) return;
+      const removed = source.removeTab(tabId);
+      if (!removed) return;
+      target.insertTabInSplit({ id: tabId, title: removed.title, content: removed.content }, splitCol, splitLeft);
+      this._renderAll();
+    });
+
+    document.addEventListener("grid-move", (e: any) => {
+      const { sourceWinId, tabId, targetWinId, targetCol } = e.detail;
+      this._log(`grid-move: tab ${tabId} from ${sourceWinId} → ${targetWinId} col=${targetCol}`);
+      const source = this._state(sourceWinId);
+      const target = this._state(targetWinId);
+      if (!source || !target) return;
+      const removed = source.removeTab(tabId);
+      if (!removed) return;
+      target.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, -1);
+      this._renderAll();
+    });
+
+    document.addEventListener("grid-activate", (e: any) => {
+      this._log(`grid-activate: ${e.detail.winId} col=${e.detail.col} tab=${e.detail.tabId}`);
+    });
+
+    document.addEventListener("grid-open-tab", (e: any) => {
+      const { winId, tabConfig, targetCol } = e.detail;
+      const filePath = tabConfig.filePath || tabConfig.repoName || "untitled";
+      this._log(`grid-open-tab: ${filePath} → ${winId} col=${targetCol}`);
+      const state = this._state(winId);
+      if (!state) return;
+      state.addTab(
+        targetCol,
+        filePath,
+        `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`,
+      );
+      this._renderAll();
+    });
+
     // ── Add tab buttons ──────────────────────────────────────────
     this.querySelectorAll(".demo-add-tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const winId = (btn as HTMLElement).dataset.winId || "editor";
         const col = parseInt((btn as HTMLElement).dataset.col || "0", 10);
-        const state = winId === "editor" ? this._editorState : this._sideState;
+        const state = this._state(winId);
+        if (!state) return;
         const tab = state.addTab(col, "New Tab", '<div class="content-placeholder"><h3>New Tab</h3><p>Added from + button.</p></div>');
         this._renderAll();
         this._log(`Added tab "${tab.id}" to ${winId}`);
@@ -237,21 +327,20 @@ class TabsDemoApp extends LitElement {
       if (!tabBar) return;
       const tabId = closeBtn.getAttribute("data-close-tab-id");
       if (!tabId) return;
-      const winId = tabBar.winId;
-      const state = winId === "editor" ? this._editorState : this._sideState;
+      const state = this._state(tabBar.winId);
       if (!state) return;
       state.removeTab(tabId);
       this._renderAll();
-      this._log(`Closed tab "${tabId}" from ${winId}`);
+      this._log(`Closed tab "${tabId}" from ${tabBar.winId}`);
     });
 
     // ── Reset ────────────────────────────────────────────────────
     this.querySelector("#btn-reset")?.addEventListener("click", () => {
-      this._editorState = new GridState("editor", [
+      this._editorState = GridState.from("editor", [
         createTab("README.md", '<div class="content-placeholder"><h3>README.md</h3><p>Welcome! Drag tabs to edges to create new columns.</p></div>'),
         createTab("index.js", '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const grid = document.querySelector("tab-grid");</pre></div>'),
       ]);
-      this._sideState = new GridState("side-a", [
+      this._sideState = GridState.from("side-a", [
         createTab("Terminal", '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>'),
       ]);
       this._renderAll();
@@ -265,6 +354,12 @@ class TabsDemoApp extends LitElement {
       this._logEl.innerHTML = "";
       this._logCount = 0;
     });
+  }
+
+  private _state(winId: string): GridState | null {
+    if (winId === "editor") return this._editorState;
+    if (winId === "side-a") return this._sideState;
+    return null;
   }
 
   private _renderAll(): void {
@@ -310,7 +405,7 @@ class TabsDemoApp extends LitElement {
 
       <div class="tabs-demo">
         <h1>Openp41ge <span>Tabs</span></h1>
-        <p>VS Code-style editor groups using &lt;tab-grid&gt;. Drag tabs to column edges to split, between columns to rearrange, or across grids to move between groups.</p>
+        <p>VS Code-style editor groups. Drag tabs to column edges to split, across columns to rearrange, or between grids to move between groups.</p>
 
         <div class="grid-row">
           <div class="editor-wrapper">
