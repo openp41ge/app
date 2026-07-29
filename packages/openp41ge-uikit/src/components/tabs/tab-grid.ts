@@ -397,11 +397,8 @@ export class TabGrid extends LitElement {
         types.includes("application/x-openp41ge-repo")
       ) {
         e.preventDefault();
-        // Repo drags use effectAllowed="move" (set in repo-tree-item dragstart),
-        // so set dropEffect="move" to match. File/URL/text drops use "copy".
-        e.dataTransfer.dropEffect = types.includes("application/x-openp41ge-repo")
-          ? "move"
-          : "copy";
+        // Repo / file drags use effectAllowed="move", so set dropEffect="move".
+        e.dataTransfer.dropEffect = "move";
         this._showFileDropGhost(e);
       }
     };

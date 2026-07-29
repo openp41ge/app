@@ -516,6 +516,14 @@ class SingleGridApp extends LitElement {
     this._openFile = this._openFile.bind(this);
     this.addEventListener("tree-node-click", this._openFile);
 
+    // ── Tree file drag: forward text/plain data from tree drag ───
+    this.addEventListener("tree-drag-start", (e: any) => {
+      const filePath = e.detail?.nodeId;
+      if (filePath) {
+        (window as any).__treeDragFilePath = filePath;
+      }
+    });
+
     // ── Tab drag start ───────────────────────────────────────────
     document.addEventListener("mousedown", (e: Event) => {
       const tabBtn = (e.target as HTMLElement).closest("[role='tab']");
