@@ -95,5 +95,10 @@ export interface TreeToggleErrorEventDetail {
   error: unknown;
 }
 
+export interface TreeNodeDblClickEventDetail {
+  nodeId: string;
+  meta?: Record<string, unknown>;
+}
+
 /** Callback type for rendering icons — host app provides its own resolver */
 export type IconRenderer = (name: string, size: number) => TemplateResult | string;

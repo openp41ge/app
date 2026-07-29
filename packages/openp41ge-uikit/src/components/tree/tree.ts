@@ -40,6 +40,7 @@ export {
   type IconRenderer,
   type TreeNodeClickEventDetail,
   type TreeNodeToggleEventDetail,
+  type TreeNodeDblClickEventDetail,
   type TreeNodeActionEventDetail,
   type TreeDragStartEventDetail,
   type TreeDropEventDetail,
@@ -356,9 +357,11 @@ export class Openp41geTree extends LitElement {
     this._toggleNode(node);
   }
 
-  private _onNodeClick(e: Event, node: TreeNode): void {
+  private _onNodeClick(e: MouseEvent, node: TreeNode): void {
     e.stopPropagation();
     this._focusableNodeId = node.id;
+    // Don't toggle on dblclick — the dblclick handler will fire separately
+    if (e.detail >= 2) return;
     // Toggle expand/collapse for nodes with children
     // Activate (click) for leaf nodes
     if (this._hasChildren(node)) {
@@ -366,6 +369,26 @@ export class Openp41geTree extends LitElement {
     } else {
       this._emitClick(node);
     }
+  }
+
+  private _onNodeDblClick(e: MouseEvent, node: TreeNode): void {
+    e.stopPropagation();
+    if (this._hasChildren(node)) {
+      this._toggleNode(node);
+    } else {
+      this._emitDblClick(node);
+    }
+  }
+
+  private _emitDblClick(node: TreeNode): void {
+    this.selectedId = node.id;
+    this.dispatchEvent(
+      new CustomEvent("tree-node-dblclick", {
+        bubbles: true,
+        composed: true,
+        detail: { nodeId: node.id, meta: node.meta },
+      }),
+    );
   }
 
   private _onActionClick(e: Event, node: TreeNode, action: TreeNodeAction): void {
@@ -530,7 +553,8 @@ export class Openp41geTree extends LitElement {
         aria-expanded=${hasChildren ? (expanded ? "true" : "false") : undefined}
         aria-selected=${selected ? "true" : "false"}
         draggable=${node.draggable ? "true" : "false"}
-        @click=${(e: Event) => this._onNodeClick(e, node)}
+        @click=${(e: MouseEvent) => this._onNodeClick(e, node)}
+        @dblclick=${(e: MouseEvent) => this._onNodeDblClick(e, node)}
         @contextmenu=${(e: MouseEvent) => this._onContextMenu(e, node)}
         @mouseenter=${() => (this._hoveredNodeId = node.id)}
         @mouseleave=${() =>
@@ -602,6 +626,7 @@ export class Openp41geTree extends LitElement {
             @tree-node-toggle=${(e: Event) => this._forwardEvent(e, "tree-node-toggle")}
             @tree-node-toggle-error=${(e: Event) => this._forwardEvent(e, "tree-node-toggle-error")}
             @tree-node-action=${(e: Event) => this._forwardEvent(e, "tree-node-action")}
+            @tree-node-dblclick=${(e: Event) => this._forwardEvent(e, "tree-node-dblclick")}
             @tree-node-contextmenu=${(e: Event) => this._forwardEvent(e, "tree-node-contextmenu")}
             @tree-drag-start=${(e: Event) => this._forwardEvent(e, "tree-drag-start")}
             @tree-drop=${(e: Event) => this._forwardEvent(e, "tree-drop")}
