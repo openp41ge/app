@@ -69,10 +69,10 @@ function renderOverlay(): void {
           The application is paused until all errors are resolved.
         </div>
       </div>
-      <div style="flex:1;overflow-y:auto;padding:4px 0;">
+      <div style="flex:1;overflow-y:auto;padding:4px 0">
         ${errors
           .map(
-            (e) => `
+            (e, _idx) => `
           <div style="
             background:rgba(0,0,0,.3);
             border-radius:4px;
@@ -80,14 +80,31 @@ function renderOverlay(): void {
             margin-bottom:6px;
             font-size:13px;
             line-height:1.5;
+            position:relative;
           ">
-            <div style="color:#ffcdd2;font-weight:600;margin-bottom:2px">
+            <button
+              onclick="(function(btn){var t=btn.parentElement.querySelector('.err-msg')?.textContent||'';navigator.clipboard.writeText(t).then(function(){var o=btn.textContent;btn.textContent='Copied!';setTimeout(function(){btn.textContent=o},1500)}).catch(function(){})})(this)"
+              style="
+                position:absolute;top:6px;right:6px;
+                background:rgba(255,255,255,.1);
+                border:1px solid rgba(255,255,255,.2);
+                border-radius:3px;
+                color:rgba(255,255,255,.7);
+                font-size:11px;
+                padding:2px 8px;
+                cursor:pointer;
+                line-height:1.4;
+                user-select:none;
+                -webkit-user-select:none;
+              "
+            >Copy</button>
+            <div class="err-msg" style="color:#ffcdd2;font-weight:600;margin-bottom:2px;user-select:text;-webkit-user-select:text;">
               ${escHtml(e.type === "main-process" ? "[MAIN PROCESS] " : "")}${escHtml(e.message)}
             </div>
-            <div style="color:rgba(255,255,255,.5);font-size:11px;margin-bottom:2px">
+            <div style="color:rgba(255,255,255,.5);font-size:11px;margin-bottom:2px;user-select:text;-webkit-user-select:text;">
               ${escHtml(e.source)}${e.stack ? " — stack available" : ""}
             </div>
-            ${e.stack ? `<pre style="margin:4px 0 0 0;white-space:pre-wrap;color:rgba(255,255,255,.4);font-size:11px">${escHtml(e.stack.slice(0, 1000))}</pre>` : ""}
+            ${e.stack ? `<pre style="margin:4px 0 0 0;white-space:pre-wrap;color:rgba(255,255,255,.4);font-size:11px;user-select:text;-webkit-user-select:text;">${escHtml(e.stack.slice(0, 1000))}</pre>` : ""}
           </div>
         `,
           )
@@ -220,6 +237,11 @@ export function installErrorCapture(): void {
   // eslint-disable-next-line no-console
   console.error = (...args: unknown[]) => {
     const msg = args.map((a) => (typeof a === "object" ? String(a) : String(a))).join(" ");
+    // Skip benign browser-internal warnings that are not real app errors
+    if (msg.includes("ResizeObserver loop completed with undelivered notifications")) {
+      origConsoleError.apply(console, args);
+      return;
+    }
     addError({
       message: msg,
       source: "",
