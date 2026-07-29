@@ -27,8 +27,13 @@ const css = fs.readFileSync(cssPath, "utf-8");
 // Ensure the output directory exists
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 
-// Escape backticks and template literals in the CSS
-const escaped = css.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+// Escape backticks, template literals, and backslashes in the CSS
+// Backslashes must be escaped first so CSS escapes like \\2c don't become
+// legacy octal escapes in the JS template literal.
+const escaped = css
+  .replace(/\\/g, "\\\\")
+  .replace(/`/g, "\\`")
+  .replace(/\$\{/g, "\\${");
 
 fs.writeFileSync(
   outPath,

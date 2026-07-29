@@ -61,7 +61,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   right: 0.25rem
 }
 
-.right-1\.5 {
+.right-1\\.5 {
   right: 0.375rem
 }
 
@@ -73,15 +73,15 @@ export const tailwindCSS: string = `.pointer-events-none {
   top: 0.25rem
 }
 
-.top-1\.5 {
+.top-1\\.5 {
   top: 0.375rem
 }
 
-.top-1\/2 {
+.top-1\\/2 {
   top: 50%
 }
 
-.top-\[30px\] {
+.top-\\[30px\\] {
   top: 30px
 }
 
@@ -89,27 +89,23 @@ export const tailwindCSS: string = `.pointer-events-none {
   z-index: 10
 }
 
-.z-50 {
-  z-index: 50
-}
-
-.z-\[10000\] {
+.z-\\[10000\\] {
   z-index: 10000
 }
 
-.z-\[1000\] {
+.z-\\[1000\\] {
   z-index: 1000
 }
 
-.z-\[1\] {
+.z-\\[1\\] {
   z-index: 1
 }
 
-.z-\[2\] {
+.z-\\[2\\] {
   z-index: 2
 }
 
-.z-\[99999\] {
+.z-\\[99999\\] {
   z-index: 99999
 }
 
@@ -144,7 +140,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-bottom: 0px
 }
 
-.mb-0\.5 {
+.mb-0\\.5 {
   margin-bottom: 0.125rem
 }
 
@@ -152,7 +148,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-bottom: 0.25rem
 }
 
-.mb-1\.5 {
+.mb-1\\.5 {
   margin-bottom: 0.375rem
 }
 
@@ -172,7 +168,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-left: 0px
 }
 
-.ml-0\.5 {
+.ml-0\\.5 {
   margin-left: 0.125rem
 }
 
@@ -180,7 +176,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-left: 0.25rem
 }
 
-.ml-1\.5 {
+.ml-1\\.5 {
   margin-left: 0.375rem
 }
 
@@ -200,7 +196,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-right: 0px
 }
 
-.mr-0\.5 {
+.mr-0\\.5 {
   margin-right: 0.125rem
 }
 
@@ -216,7 +212,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-top: 0px
 }
 
-.mt-0\.5 {
+.mt-0\\.5 {
   margin-top: 0.125rem
 }
 
@@ -224,7 +220,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-top: 0.25rem
 }
 
-.mt-1\.5 {
+.mt-1\\.5 {
   margin-top: 0.375rem
 }
 
@@ -264,7 +260,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   display: table
 }
 
-.\!grid {
+.\\!grid {
   display: grid !important
 }
 
@@ -284,7 +280,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 0px
 }
 
-.h-0\.5 {
+.h-0\\.5 {
   height: 0.125rem
 }
 
@@ -324,35 +320,35 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 2.25rem
 }
 
-.h-\[10px\] {
+.h-\\[10px\\] {
   height: 10px
 }
 
-.h-\[14px\] {
+.h-\\[14px\\] {
   height: 14px
 }
 
-.h-\[18px\] {
+.h-\\[18px\\] {
   height: 18px
 }
 
-.h-\[22px\] {
+.h-\\[22px\\] {
   height: 22px
 }
 
-.h-\[26px\] {
+.h-\\[26px\\] {
   height: 26px
 }
 
-.h-\[28px\] {
+.h-\\[28px\\] {
   height: 28px
 }
 
-.h-\[30px\] {
+.h-\\[30px\\] {
   height: 30px
 }
 
-.h-\[6px\] {
+.h-\\[6px\\] {
   height: 6px
 }
 
@@ -368,19 +364,15 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 28px
 }
 
-.max-h-\[120px\] {
+.max-h-\\[120px\\] {
   max-height: 120px
 }
 
-.max-h-\[203px\] {
-  max-height: 203px
-}
-
-.max-h-\[600px\] {
+.max-h-\\[600px\\] {
   max-height: 600px
 }
 
-.max-h-\[85vh\] {
+.max-h-\\[85vh\\] {
   max-height: 85vh
 }
 
@@ -388,15 +380,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   min-height: 0px
 }
 
-.min-h-\[47px\] {
-  min-height: 47px
-}
-
 .w-0 {
   width: 0px
 }
 
-.w-0\.5 {
+.w-0\\.5 {
   width: 0.125rem
 }
 
@@ -428,39 +416,39 @@ export const tailwindCSS: string = `.pointer-events-none {
   width: 2.25rem
 }
 
-.w-\[10px\] {
+.w-\\[10px\\] {
   width: 10px
 }
 
-.w-\[14px\] {
+.w-\\[14px\\] {
   width: 14px
 }
 
-.w-\[18px\] {
+.w-\\[18px\\] {
   width: 18px
 }
 
-.w-\[200px\] {
+.w-\\[200px\\] {
   width: 200px
 }
 
-.w-\[22px\] {
+.w-\\[22px\\] {
   width: 22px
 }
 
-.w-\[360px\] {
+.w-\\[360px\\] {
   width: 360px
 }
 
-.w-\[46px\] {
+.w-\\[46px\\] {
   width: 46px
 }
 
-.w-\[800px\] {
+.w-\\[800px\\] {
   width: 800px
 }
 
-.w-\[90\%\] {
+.w-\\[90\\%\\] {
   width: 90%
 }
 
@@ -476,35 +464,35 @@ export const tailwindCSS: string = `.pointer-events-none {
   min-width: 1.75rem
 }
 
-.min-w-\[150px\] {
+.min-w-\\[150px\\] {
   min-width: 150px
 }
 
-.min-w-\[28px\] {
+.min-w-\\[28px\\] {
   min-width: 28px
 }
 
-.min-w-\[320px\] {
+.min-w-\\[320px\\] {
   min-width: 320px
 }
 
-.min-w-\[360px\] {
+.min-w-\\[360px\\] {
   min-width: 360px
 }
 
-.max-w-\[420px\] {
+.max-w-\\[420px\\] {
   max-width: 420px
 }
 
-.max-w-\[480px\] {
+.max-w-\\[480px\\] {
   max-width: 480px
 }
 
-.max-w-\[800px\] {
+.max-w-\\[800px\\] {
   max-width: 800px
 }
 
-.max-w-\[90vw\] {
+.max-w-\\[90vw\\] {
   max-width: 90vw
 }
 
@@ -534,7 +522,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
 }
 
-.-translate-y-1\/2 {
+.-translate-y-1\\/2 {
   --tw-translate-y: -50%;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
 }
@@ -543,19 +531,19 @@ export const tailwindCSS: string = `.pointer-events-none {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
 }
 
-.animate-\[add-repo-spin_0\.8s_linear_infinite\] {
+.animate-\\[add-repo-spin_0\\.8s_linear_infinite\\] {
   animation: add-repo-spin 0.8s linear infinite
 }
 
-.animate-\[pull-indeterminate_1\.2s_linear_infinite\] {
+.animate-\\[pull-indeterminate_1\\.2s_linear_infinite\\] {
   animation: pull-indeterminate 1.2s linear infinite
 }
 
-.animate-\[spinner-rotate_0\.8s_linear_infinite\] {
+.animate-\\[spinner-rotate_0\\.8s_linear_infinite\\] {
   animation: spinner-rotate 0.8s linear infinite
 }
 
-.animate-\[wt-spin_0\.8s_linear_infinite\] {
+.animate-\\[wt-spin_0\\.8s_linear_infinite\\] {
   animation: wt-spin 0.8s linear infinite
 }
 
@@ -599,10 +587,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   -webkit-user-select: text;
      -moz-user-select: text;
           user-select: text
-}
-
-.resize-none {
-  resize: none
 }
 
 .resize {
@@ -653,7 +637,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   gap: 0.25rem
 }
 
-.gap-1\.5 {
+.gap-1\\.5 {
   gap: 0.375rem
 }
 
@@ -661,7 +645,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   gap: 0.5rem
 }
 
-.gap-2\.5 {
+.gap-2\\.5 {
   gap: 0.625rem
 }
 
@@ -701,7 +685,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-radius: 0.25rem
 }
 
-.rounded-\[3px\] {
+.rounded-\\[3px\\] {
   border-radius: 3px
 }
 
@@ -721,10 +705,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-radius: 0.125rem
 }
 
-.rounded-xl {
-  border-radius: 0.75rem
-}
-
 .border {
   border-width: 1px
 }
@@ -733,7 +713,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-width: 2px
 }
 
-.border-\[1\.5px\] {
+.border-\\[1\\.5px\\] {
   border-width: 1.5px
 }
 
@@ -757,36 +737,36 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-style: none
 }
 
-.border-\[\#232323\] {
+.border-\\[\\#232323\\] {
   --tw-border-opacity: 1;
   border-color: rgb(35 35 35 / var(--tw-border-opacity, 1))
 }
 
-.border-\[\#3a3a3a\] {
+.border-\\[\\#3a3a3a\\] {
   --tw-border-opacity: 1;
   border-color: rgb(58 58 58 / var(--tw-border-opacity, 1))
 }
 
-.border-\[\#444\] {
+.border-\\[\\#444\\] {
   --tw-border-opacity: 1;
   border-color: rgb(68 68 68 / var(--tw-border-opacity, 1))
 }
 
-.border-\[\#4a9eff\] {
+.border-\\[\\#4a9eff\\] {
   --tw-border-opacity: 1;
   border-color: rgb(74 158 255 / var(--tw-border-opacity, 1))
 }
 
-.border-\[\#555\] {
+.border-\\[\\#555\\] {
   --tw-border-opacity: 1;
   border-color: rgb(85 85 85 / var(--tw-border-opacity, 1))
 }
 
-.border-\[rgba\(255\2c 255\2c 255\2c \.15\)\] {
+.border-\\[rgba\\(255\\2c 255\\2c 255\\2c \\.15\\)\\] {
   border-color: rgba(255,255,255,.15)
 }
 
-.border-\[rgba\(255\2c 255\2c 255\2c \.2\)\] {
+.border-\\[rgba\\(255\\2c 255\\2c 255\\2c \\.2\\)\\] {
   border-color: rgba(255,255,255,.2)
 }
 
@@ -802,7 +782,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-color: var(--border-divider, #2d2d2d)
 }
 
-.border-t-\[\#4a9eff\] {
+.border-t-\\[\\#4a9eff\\] {
   --tw-border-opacity: 1;
   border-top-color: rgb(74 158 255 / var(--tw-border-opacity, 1))
 }
@@ -811,67 +791,67 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-top-color: var(--text-accent, #569cd6)
 }
 
-.bg-\[\#2a2a2a\] {
+.bg-\\[\\#2a2a2a\\] {
   --tw-bg-opacity: 1;
   background-color: rgb(42 42 42 / var(--tw-bg-opacity, 1))
 }
 
-.bg-\[\#333\] {
+.bg-\\[\\#333\\] {
   --tw-bg-opacity: 1;
   background-color: rgb(51 51 51 / var(--tw-bg-opacity, 1))
 }
 
-.bg-\[\#4a9eff\] {
+.bg-\\[\\#4a9eff\\] {
   --tw-bg-opacity: 1;
   background-color: rgb(74 158 255 / var(--tw-bg-opacity, 1))
 }
 
-.bg-\[\#e81123\] {
+.bg-\\[\\#e81123\\] {
   --tw-bg-opacity: 1;
   background-color: rgb(232 17 35 / var(--tw-bg-opacity, 1))
 }
 
-.bg-\[rgba\(0\2c 0\2c 0\2c \.3\)\] {
+.bg-\\[rgba\\(0\\2c 0\\2c 0\\2c \\.3\\)\\] {
   background-color: rgba(0,0,0,.3)
 }
 
-.bg-\[rgba\(0\2c 0\2c 0\2c 0\.4\)\] {
+.bg-\\[rgba\\(0\\2c 0\\2c 0\\2c 0\\.4\\)\\] {
   background-color: rgba(0,0,0,0.4)
 }
 
-.bg-\[rgba\(0\2c 0\2c 0\2c 0\.5\)\] {
+.bg-\\[rgba\\(0\\2c 0\\2c 0\\2c 0\\.5\\)\\] {
   background-color: rgba(0,0,0,0.5)
 }
 
-.bg-\[rgba\(255\2c 255\2c 255\2c \.1\)\] {
+.bg-\\[rgba\\(255\\2c 255\\2c 255\\2c \\.1\\)\\] {
   background-color: rgba(255,255,255,.1)
 }
 
-.bg-\[rgba\(255\2c 255\2c 255\2c 0\.03\)\] {
+.bg-\\[rgba\\(255\\2c 255\\2c 255\\2c 0\\.03\\)\\] {
   background-color: rgba(255,255,255,0.03)
 }
 
-.bg-\[rgba\(255\2c 255\2c 255\2c 0\.06\)\] {
+.bg-\\[rgba\\(255\\2c 255\\2c 255\\2c 0\\.06\\)\\] {
   background-color: rgba(255,255,255,0.06)
 }
 
-.bg-\[rgba\(255\2c 255\2c 255\2c 0\.08\)\] {
+.bg-\\[rgba\\(255\\2c 255\\2c 255\\2c 0\\.08\\)\\] {
   background-color: rgba(255,255,255,0.08)
 }
 
-.bg-\[rgba\(42\2c 111\2c 209\2c 0\.08\)\] {
+.bg-\\[rgba\\(42\\2c 111\\2c 209\\2c 0\\.08\\)\\] {
   background-color: rgba(42,111,209,0.08)
 }
 
-.bg-\[rgba\(74\2c 158\2c 255\2c 0\.12\)\] {
+.bg-\\[rgba\\(74\\2c 158\\2c 255\\2c 0\\.12\\)\\] {
   background-color: rgba(74,158,255,0.12)
 }
 
-.bg-\[var\(--openp41ge-hover-bg\2c \#2a2a2a\)\] {
+.bg-\\[var\\(--openp41ge-hover-bg\\2c \\#2a2a2a\\)\\] {
   background-color: var(--openp41ge-hover-bg,#2a2a2a)
 }
 
-.bg-\[var\(--openp41ge-input-bg\2c \#2a2a2a\)\] {
+.bg-\\[var\\(--openp41ge-input-bg\\2c \\#2a2a2a\\)\\] {
   background-color: var(--openp41ge-input-bg,#2a2a2a)
 }
 
@@ -920,22 +900,22 @@ export const tailwindCSS: string = `.pointer-events-none {
   background-image: linear-gradient(to right, var(--tw-gradient-stops))
 }
 
-.from-\[\#2a6fd1\] {
+.from-\\[\\#2a6fd1\\] {
   --tw-gradient-from: #2a6fd1 var(--tw-gradient-from-position);
   --tw-gradient-to: rgb(42 111 209 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to)
 }
 
-.via-\[transparent_50\%\] {
+.via-\\[transparent_50\\%\\] {
   --tw-gradient-to: rgb(255 255 255 / 0)  var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), transparent 50% var(--tw-gradient-via-position), var(--tw-gradient-to)
 }
 
-.to-\[\#2a6fd1\] {
+.to-\\[\\#2a6fd1\\] {
   --tw-gradient-to: #2a6fd1 var(--tw-gradient-to-position)
 }
 
-.bg-\[length\:200\%_100\%\] {
+.bg-\\[length\\:200\\%_100\\%\\] {
   background-size: 200% 100%
 }
 
@@ -948,15 +928,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding: 0px
 }
 
-.p-1 {
-  padding: 0.25rem
-}
-
 .p-2 {
   padding: 0.5rem
 }
 
-.p-2\.5 {
+.p-2\\.5 {
   padding: 0.625rem
 }
 
@@ -977,7 +953,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-right: 0.25rem
 }
 
-.px-1\.5 {
+.px-1\\.5 {
   padding-left: 0.375rem;
   padding-right: 0.375rem
 }
@@ -987,7 +963,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-right: 0.5rem
 }
 
-.px-2\.5 {
+.px-2\\.5 {
   padding-left: 0.625rem;
   padding-right: 0.625rem
 }
@@ -1012,7 +988,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-right: 1.5rem
 }
 
-.px-\[14px\] {
+.px-\\[14px\\] {
   padding-left: 14px;
   padding-right: 14px
 }
@@ -1022,7 +998,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 0px
 }
 
-.py-0\.5 {
+.py-0\\.5 {
   padding-top: 0.125rem;
   padding-bottom: 0.125rem
 }
@@ -1032,7 +1008,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 0.25rem
 }
 
-.py-1\.5 {
+.py-1\\.5 {
   padding-top: 0.375rem;
   padding-bottom: 0.375rem
 }
@@ -1057,17 +1033,17 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 1.25rem
 }
 
-.py-\[3px\] {
+.py-\\[3px\\] {
   padding-top: 3px;
   padding-bottom: 3px
 }
 
-.py-\[5px\] {
+.py-\\[5px\\] {
   padding-top: 5px;
   padding-bottom: 5px
 }
 
-.py-\[7px\] {
+.py-\\[7px\\] {
   padding-top: 7px;
   padding-bottom: 7px
 }
@@ -1101,7 +1077,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-left: 1.75rem
 }
 
-.pl-\[24px\] {
+.pl-\\[24px\\] {
   padding-left: 24px
 }
 
@@ -1152,11 +1128,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   line-height: 1
 }
 
-.text-\[14px\] {
+.text-\\[14px\\] {
   font-size: 14px
 }
 
-.text-\[20px\] {
+.text-\\[20px\\] {
   font-size: 20px
 }
 
@@ -1209,15 +1185,15 @@ export const tailwindCSS: string = `.pointer-events-none {
   font-style: normal
 }
 
-.leading-\[1\.2\] {
+.leading-\\[1\\.2\\] {
   line-height: 1.2
 }
 
-.leading-\[1\.4\] {
+.leading-\\[1\\.4\\] {
   line-height: 1.4
 }
 
-.leading-\[1\.5\] {
+.leading-\\[1\\.5\\] {
   line-height: 1.5
 }
 
@@ -1225,7 +1201,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   line-height: 1
 }
 
-.tracking-\[0\.5px\] {
+.tracking-\\[0\\.5px\\] {
   letter-spacing: 0.5px
 }
 
@@ -1233,106 +1209,106 @@ export const tailwindCSS: string = `.pointer-events-none {
   letter-spacing: 0.05em
 }
 
-.text-\[\#444\] {
+.text-\\[\\#444\\] {
   --tw-text-opacity: 1;
   color: rgb(68 68 68 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#4a9eff\] {
+.text-\\[\\#4a9eff\\] {
   --tw-text-opacity: 1;
   color: rgb(74 158 255 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#4caf50\] {
+.text-\\[\\#4caf50\\] {
   --tw-text-opacity: 1;
   color: rgb(76 175 80 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#555\] {
+.text-\\[\\#555\\] {
   --tw-text-opacity: 1;
   color: rgb(85 85 85 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#666\] {
+.text-\\[\\#666\\] {
   --tw-text-opacity: 1;
   color: rgb(102 102 102 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#888\] {
+.text-\\[\\#888\\] {
   --tw-text-opacity: 1;
   color: rgb(136 136 136 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#8a8a8a\] {
+.text-\\[\\#8a8a8a\\] {
   --tw-text-opacity: 1;
   color: rgb(138 138 138 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#aaa\] {
+.text-\\[\\#aaa\\] {
   --tw-text-opacity: 1;
   color: rgb(170 170 170 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#b0b0b0\] {
+.text-\\[\\#b0b0b0\\] {
   --tw-text-opacity: 1;
   color: rgb(176 176 176 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#ccc\] {
+.text-\\[\\#ccc\\] {
   --tw-text-opacity: 1;
   color: rgb(204 204 204 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#ddd\] {
+.text-\\[\\#ddd\\] {
   --tw-text-opacity: 1;
   color: rgb(221 221 221 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#e06c75\] {
+.text-\\[\\#e06c75\\] {
   --tw-text-opacity: 1;
   color: rgb(224 108 117 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#e0e0e0\] {
+.text-\\[\\#e0e0e0\\] {
   --tw-text-opacity: 1;
   color: rgb(224 224 224 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#eee\] {
+.text-\\[\\#eee\\] {
   --tw-text-opacity: 1;
   color: rgb(238 238 238 / var(--tw-text-opacity, 1))
 }
 
-.text-\[\#ffcdd2\] {
+.text-\\[\\#ffcdd2\\] {
   --tw-text-opacity: 1;
   color: rgb(255 205 210 / var(--tw-text-opacity, 1))
 }
 
-.text-\[rgba\(255\2c 255\2c 255\2c \.4\)\] {
+.text-\\[rgba\\(255\\2c 255\\2c 255\\2c \\.4\\)\\] {
   color: rgba(255,255,255,.4)
 }
 
-.text-\[rgba\(255\2c 255\2c 255\2c \.5\)\] {
+.text-\\[rgba\\(255\\2c 255\\2c 255\\2c \\.5\\)\\] {
   color: rgba(255,255,255,.5)
 }
 
-.text-\[rgba\(255\2c 255\2c 255\2c \.6\)\] {
+.text-\\[rgba\\(255\\2c 255\\2c 255\\2c \\.6\\)\\] {
   color: rgba(255,255,255,.6)
 }
 
-.text-\[rgba\(255\2c 255\2c 255\2c \.7\)\] {
+.text-\\[rgba\\(255\\2c 255\\2c 255\\2c \\.7\\)\\] {
   color: rgba(255,255,255,.7)
 }
 
-.text-\[var\(--openp41ge-accent-color\2c \#4a9eff\)\] {
+.text-\\[var\\(--openp41ge-accent-color\\2c \\#4a9eff\\)\\] {
   color: var(--openp41ge-accent-color,#4a9eff)
 }
 
-.text-\[var\(--openp41ge-muted-text\2c \#888\)\] {
+.text-\\[var\\(--openp41ge-muted-text\\2c \\#888\\)\\] {
   color: var(--openp41ge-muted-text,#888)
 }
 
-.text-\[var\(--openp41ge-text-color\2c \#e0e0e0\)\] {
+.text-\\[var\\(--openp41ge-text-color\\2c \\#e0e0e0\\)\\] {
   color: var(--openp41ge-text-color,#e0e0e0)
 }
 
@@ -1369,10 +1345,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   text-decoration-line: overline
 }
 
-.opacity-0 {
-  opacity: 0
-}
-
 .opacity-100 {
   opacity: 1
 }
@@ -1395,31 +1367,31 @@ export const tailwindCSS: string = `.pointer-events-none {
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
 }
 
-.shadow-\[0_0_0_1px_var\(--openp41ge-accent-color\2c \#4a9eff\)\] {
+.shadow-\\[0_0_0_1px_var\\(--openp41ge-accent-color\\2c \\#4a9eff\\)\\] {
   --tw-shadow: 0 0 0 1px var(--openp41ge-accent-color,#4a9eff);
   --tw-shadow-colored: 0 0 0 1px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
 }
 
-.shadow-\[0_4px_12px_rgba\(0\2c 0\2c 0\2c 0\.3\)\] {
+.shadow-\\[0_4px_12px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.3\\)\\] {
   --tw-shadow: 0 4px 12px rgba(0,0,0,0.3);
   --tw-shadow-colored: 0 4px 12px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
 }
 
-.shadow-\[0_8px_24px_rgba\(0\2c 0\2c 0\2c 0\.5\)\] {
+.shadow-\\[0_8px_24px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.5\\)\\] {
   --tw-shadow: 0 8px 24px rgba(0,0,0,0.5);
   --tw-shadow-colored: 0 8px 24px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
 }
 
-.shadow-\[0_8px_32px_rgba\(0\2c 0\2c 0\2c 0\.4\)\] {
+.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.4\\)\\] {
   --tw-shadow: 0 8px 32px rgba(0,0,0,0.4);
   --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
 }
 
-.shadow-\[0_8px_32px_rgba\(0\2c 0\2c 0\2c 0\.5\)\] {
+.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.5\\)\\] {
   --tw-shadow: 0 8px 32px rgba(0,0,0,0.5);
   --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)
@@ -1438,15 +1410,15 @@ export const tailwindCSS: string = `.pointer-events-none {
   outline-width: 2px
 }
 
-.outline-offset-\[-2px\] {
+.outline-offset-\\[-2px\\] {
   outline-offset: -2px
 }
 
-.outline-\[\#2a6fd1\] {
+.outline-\\[\\#2a6fd1\\] {
   outline-color: #2a6fd1
 }
 
-.outline-\[var\(--openp41ge-accent-color\2c \#4a9eff\)\] {
+.outline-\\[var\\(--openp41ge-accent-color\\2c \\#4a9eff\\)\\] {
   outline-color: var(--openp41ge-accent-color,#4a9eff)
 }
 
@@ -1471,38 +1443,32 @@ export const tailwindCSS: string = `.pointer-events-none {
   transition-duration: 150ms
 }
 
-.transition-\[background\2c color\2c opacity\] {
+.transition-\\[background\\2c color\\2c opacity\\] {
   transition-property: background,color,opacity;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms
 }
 
-.transition-\[background\] {
+.transition-\\[background\\] {
   transition-property: background;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms
 }
 
-.transition-\[color\2c background\] {
+.transition-\\[color\\2c background\\] {
   transition-property: color,background;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms
 }
 
-.transition-\[color\] {
+.transition-\\[color\\] {
   transition-property: color;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms
 }
 
-.transition-\[width\] {
+.transition-\\[width\\] {
   transition-property: width;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms
-}
-
-.transition-all {
-  transition-property: all;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms
 }
@@ -1529,7 +1495,7 @@ export const tailwindCSS: string = `.pointer-events-none {
   transition-duration: 500ms
 }
 
-.ease-\[ease\] {
+.ease-\\[ease\\] {
   transition-timing-function: ease
 }
 
@@ -1541,11 +1507,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   transition-timing-function: cubic-bezier(0, 0, 0.2, 1)
 }
 
-.hover\:bg-hover:hover {
+.hover\\:bg-hover:hover {
   background-color: var(--bg-hover, #2a2d2e)
 }
 
-.hover\:text-secondary:hover {
+.hover\\:text-secondary:hover {
   color: var(--text-secondary, #999)
 }
 `;
