@@ -390,10 +390,14 @@ class TabsDemoApp extends LitElement {
     });
 
     // ── Reset ────────────────────────────────────────────────────
-    this.reset = this.reset.bind(this);
+    this.resetDemo = this.resetDemo.bind(this);
   }
 
-  reset(): void {
+  resetDemo(): void {
+    this._resetState();
+  }
+
+  private _resetState(): void {
     _tabCounter = 0;
     this._editorState = editorStateFromFiles("editor", 3);
     this._sideState = GridState.from("side-a", [
@@ -624,10 +628,14 @@ class SingleGridApp extends LitElement {
     });
 
     // ── Reset ────────────────────────────────────────────────────
-    this.reset = this.reset.bind(this);
+    this.resetDemo = this.resetDemo.bind(this);
   }
 
-  reset(): void {
+  resetDemo(): void {
+    this._resetState();
+  }
+
+  private _resetState(): void {
     _tabCounter = 0;
     this._state = editorStateFromFiles("editor", 3);
     this._render();
@@ -740,14 +748,7 @@ class SingleGridApp extends LitElement {
 
 // ─── Storybook stories ────────────────────────────────────────────────
 
-const btnReset = () => {
-  const el = document.querySelector("tabs-demo-app");
-  if (el && typeof (el as any).reset === "function") (el as any).reset();
-};
-const singleReset = () => {
-  const el = document.querySelector("single-grid-demo");
-  if (el && typeof (el as any).reset === "function") (el as any).reset();
-};
+
 
 const meta: Meta = {
   title: "Components/TabGrid",
@@ -763,7 +764,7 @@ export const SingleGridDemo: Story = {
   argTypes: {
     reset: { control: { type: "button" }, description: "Reset the demo" },
   },
-  args: { reset: singleReset },
+  args: { reset: () => document.querySelector("single-grid-demo")?.requestUpdate() },
 };
 
 export const MultiGridDemo: Story = {
@@ -771,5 +772,5 @@ export const MultiGridDemo: Story = {
   argTypes: {
     reset: { control: { type: "button" }, description: "Reset the demo" },
   },
-  args: { reset: btnReset },
+  args: { reset: () => document.querySelector("tabs-demo-app")?.requestUpdate() },
 };
