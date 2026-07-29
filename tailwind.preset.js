@@ -9,10 +9,14 @@
  *
  * Usage in components:
  *   <div class="text-muted bg-gutter border-divider">…</div>
- *   <div class="text-accent bg-hover:hover">…</div>
+ *   <div class="text-accent hover:bg-hover">…</div>
+ *
+ * NOTE: This file uses module.exports (CJS) because Tailwind's config
+ * loader uses require() internally. ESM export default would fail
+ * silently and none of the custom colours/typography would apply.
  */
 
-export default {
+module.exports = {
   theme: {
     extend: {
       colors: {

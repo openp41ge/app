@@ -125,6 +125,14 @@ export const tailwindCSS: string = `.static {
   border-width: 2px
 }
 
+.border-divider {
+  border-color: var(--border-divider, #2a2a2a)
+}
+
+.border-t-accent {
+  border-top-color: var(--accent-hover, #4a9eff)
+}
+
 .px-2 {
   padding-left: 0.5rem;
   padding-right: 0.5rem
@@ -139,14 +147,19 @@ export const tailwindCSS: string = `.static {
   text-align: center
 }
 
+.text-2xs {
+  font-size: 10px;
+  line-height: 14px
+}
+
 .text-sm {
-  font-size: 0.875rem;
-  line-height: 1.25rem
+  font-size: 12px;
+  line-height: 18px
 }
 
 .text-xs {
-  font-size: 0.75rem;
-  line-height: 1rem
+  font-size: 11px;
+  line-height: 16px
 }
 
 .font-medium {
@@ -167,5 +180,25 @@ export const tailwindCSS: string = `.static {
 
 .tracking-\[0\.5px\] {
   letter-spacing: 0.5px
+}
+
+.text-muted {
+  color: var(--text-muted, #888)
+}
+
+.text-primary {
+  color: var(--text-primary, #ccc)
+}
+
+.text-secondary {
+  color: var(--text-secondary, #aaa)
+}
+
+.hover\:bg-hover:hover {
+  background-color: rgba(255,255,255,0.04)
+}
+
+.hover\:text-secondary:hover {
+  color: var(--text-secondary, #aaa)
 }
 `;
