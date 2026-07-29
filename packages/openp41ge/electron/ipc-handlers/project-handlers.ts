@@ -22,6 +22,7 @@ import type { ProjectStore } from "../../src/main/services/project-store";
 import type { OperationDispatcher } from "../../src/main/services/operation-dispatcher";
 import type { WorkspaceService } from "../../src/main/services/workspace-service";
 import type { NodeGitService } from "../../src/main/services/node-git-service";
+import type { NodeGitCommitService } from "../../src/main/services/node-git-commit-service";
 import { createWorkspace } from "../../src/layout/types.js";
 import { setSidebarViewOp } from "../../src/layout/window-operations.js";
 
@@ -31,6 +32,7 @@ export function registerProjectHandlers(
   dispatcher: OperationDispatcher,
   workspaceService: WorkspaceService,
   gitService: NodeGitService,
+  gitCommitService: NodeGitCommitService,
   currentProjectName: () => string | null,
   setCurrentProjectName: (name: string | null) => void,
 ): void {
@@ -191,6 +193,7 @@ export function registerProjectHandlers(
     setCurrentProjectName(name);
     const projectReposDir = projectStore.reposDir(name);
     gitService.setReposDir(projectReposDir);
+    gitCommitService.setReposDir(projectReposDir);
     workspaceService.setReposDir(projectReposDir);
     const statePath = projectStore.workspaceStatePath(name);
     const saved = workspaceStateStore.load(statePath);
@@ -226,6 +229,7 @@ export function registerProjectHandlers(
     // Point the git and workspace services to the project-scoped repos directory
     const projectReposDir = projectStore.reposDir(name);
     gitService.setReposDir(projectReposDir);
+    gitCommitService.setReposDir(projectReposDir);
     workspaceService.setReposDir(projectReposDir);
 
     // Load the project's workspace state

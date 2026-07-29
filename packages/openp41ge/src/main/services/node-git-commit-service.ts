@@ -15,9 +15,14 @@ import type {
 } from "../interfaces/git-commit-service.js";
 
 export class NodeGitCommitService implements IGitCommitService {
-  private readonly _reposDir: string;
+  private _reposDir: string;
 
   constructor(reposDir: string) {
+    this._reposDir = reposDir;
+  }
+
+  /** Update the repos directory (called when switching projects). */
+  setReposDir(reposDir: string): void {
     this._reposDir = reposDir;
   }
 
@@ -59,15 +64,47 @@ export class NodeGitCommitService implements IGitCommitService {
     const maxCount = options?.maxCount ?? 50;
     const skip = options?.skip ?? 0;
 
-    const args: string[] = [
-      "log",
-      branch,
-      `--max-count=${maxCount}`,
-      `--skip=${skip}`,
-      `--format=%H|%h|%an|%ae|%aI|%ar|%s|%b%n---BODY_END---%n%P%n%D%n---ENTRY_END---`,
-    ];
+    const tryGetLog = async (): Promise<string> => {
+      return this._execGit(
+        [
+          "log",
+          branch,
+          `--max-count=${maxCount}`,
+          `--skip=${skip}`,
+          `--format=%H|%h|%an|%ae|%aI|%ar|%s|%b%n---BODY_END---%n%P%n%D%n---ENTRY_END---`,
+        ],
+        repoName,
+      );
+    };
 
-    const output = await this._execGit(args, repoName);
+    let output: string;
+    try {
+      output = await tryGetLog();
+    } catch {
+      // If the branch is a remote ref that doesn't exist locally (e.g., listed
+      // via git ls-remote but never fetched), fetch the remote ref first.
+      if (branch.includes("/")) {
+        const slashIdx = branch.indexOf("/");
+        const remoteName = branch.slice(0, slashIdx);
+        const remoteBranch = branch.slice(slashIdx + 1);
+        try {
+          await this._execGit(
+            [
+              "fetch",
+              remoteName,
+              `+refs/heads/${remoteBranch}:refs/remotes/${remoteName}/${remoteBranch}`,
+              "--no-tags",
+            ],
+            repoName,
+          );
+          output = await tryGetLog();
+        } catch {
+          throw new Error(`Branch "${branch}" not found locally or on remote`);
+        }
+      } else {
+        throw new Error(`Branch "${branch}" not found locally`);
+      }
+    }
 
     if (!output) return [];
     return this._parseCommitLog(output);
@@ -156,7 +193,9 @@ export class NodeGitCommitService implements IGitCommitService {
       repoName,
     );
 
-    // Get remote branches
+    // Get remote branches — first try local remote-tracking refs, then
+    // fall back to querying the remote directly (in case the old fetch
+    // command bypassed refs/remotes/origin/*).
     let remoteOutput = "";
     try {
       remoteOutput = await this._execGit(
@@ -164,7 +203,26 @@ export class NodeGitCommitService implements IGitCommitService {
         repoName,
       );
     } catch {
-      // No remote branches
+      // No remote branches via refs
+    }
+
+    if (!remoteOutput.trim()) {
+      try {
+        const lsRemote = await this._execGit(
+          ["ls-remote", "--heads", "--refs", "origin"],
+          repoName,
+        );
+        remoteOutput = lsRemote
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => {
+            const match = line.match(/^[a-f0-9]+\s+refs\/heads\/(.+)$/);
+            return match ? `origin/${match[1]}` : "";
+          })
+          .join("\n");
+      } catch {
+        // No remote branches via ls-remote either
+      }
     }
 
     // Build a map of local branches
@@ -234,19 +292,18 @@ export class NodeGitCommitService implements IGitCommitService {
       });
     }
 
-    // Add remote-only branches
+    // Add all remote branches (renderer groups local+remote by shortName)
     for (const remoteName of remoteBranches) {
-      if (!localBranches.has(remoteName)) {
-        branches.push({
-          name: `origin/${remoteName}`,
-          shortName: remoteName,
-          isLocal: false,
-          isCurrent: false,
-          lastCommit: null,
-          ahead: 0,
-          behind: 0,
-        });
-      }
+      if (remoteName === "HEAD") continue;
+      branches.push({
+        name: `origin/${remoteName}`,
+        shortName: remoteName,
+        isLocal: false,
+        isCurrent: false,
+        lastCommit: null,
+        ahead: 0,
+        behind: 0,
+      });
     }
 
     // Sort: current branch first, then local, then remote

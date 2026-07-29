@@ -271,6 +271,7 @@ export class Openp41geApplication {
       this.dispatcher,
       this.workspaceService,
       this.gitService,
+      this.gitCommitService,
       () => this.projectName,
       (name) => {
         this.projectName = name;
