@@ -53,12 +53,20 @@ export const tailwindCSS: string = `.pointer-events-none {
   left: 0px
 }
 
+.right-1\.5 {
+  right: 0.375rem
+}
+
 .top-0 {
   top: 0px
 }
 
 .top-1 {
   top: 0.25rem
+}
+
+.top-1\.5 {
+  top: 0.375rem
 }
 
 .top-1\/2 {
@@ -108,8 +116,20 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-top: -1px
 }
 
+.mb-0 {
+  margin-bottom: 0px
+}
+
+.mb-0\.5 {
+  margin-bottom: 0.125rem
+}
+
 .mb-1 {
   margin-bottom: 0.25rem
+}
+
+.mb-1\.5 {
+  margin-bottom: 0.375rem
 }
 
 .mb-2 {
@@ -316,6 +336,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   max-height: 203px
 }
 
+.max-h-\[85vh\] {
+  max-height: 85vh
+}
+
 .min-h-0 {
   min-height: 0px
 }
@@ -376,6 +400,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   width: 46px
 }
 
+.w-\[90\%\] {
+  width: 90%
+}
+
 .w-full {
   width: 100%
 }
@@ -410,6 +438,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .max-w-\[480px\] {
   max-width: 480px
+}
+
+.max-w-\[800px\] {
+  max-width: 800px
 }
 
 .max-w-\[90vw\] {
@@ -485,6 +517,12 @@ export const tailwindCSS: string = `.pointer-events-none {
   -webkit-user-select: none;
      -moz-user-select: none;
           user-select: none
+}
+
+.select-text {
+  -webkit-user-select: text;
+     -moz-user-select: text;
+          user-select: text
 }
 
 .resize-none {
@@ -575,6 +613,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   white-space: pre-line
 }
 
+.whitespace-pre-wrap {
+  white-space: pre-wrap
+}
+
 .rounded {
   border-radius: 0.25rem
 }
@@ -642,6 +684,14 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-color: rgb(85 85 85 / var(--tw-border-opacity, 1))
 }
 
+.border-\[rgba\(255\2c 255\2c 255\2c \.15\)\] {
+  border-color: rgba(255,255,255,.15)
+}
+
+.border-\[rgba\(255\2c 255\2c 255\2c \.2\)\] {
+  border-color: rgba(255,255,255,.2)
+}
+
 .border-border-color {
   border-color: var(--border-color, #333)
 }
@@ -668,8 +718,16 @@ export const tailwindCSS: string = `.pointer-events-none {
   background-color: rgb(51 51 51 / var(--tw-bg-opacity, 1))
 }
 
+.bg-\[rgba\(0\2c 0\2c 0\2c \.3\)\] {
+  background-color: rgba(0,0,0,.3)
+}
+
 .bg-\[rgba\(0\2c 0\2c 0\2c 0\.5\)\] {
   background-color: rgba(0,0,0,0.5)
+}
+
+.bg-\[rgba\(255\2c 255\2c 255\2c \.1\)\] {
+  background-color: rgba(255,255,255,.1)
 }
 
 .bg-\[rgba\(42\2c 111\2c 209\2c 0\.08\)\] {
@@ -722,6 +780,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .p-2 {
   padding: 0.5rem
+}
+
+.p-2\.5 {
+  padding: 0.625rem
 }
 
 .p-6 {
@@ -802,6 +864,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 0.5rem
 }
 
+.py-4 {
+  padding-top: 1rem;
+  padding-bottom: 1rem
+}
+
 .py-5 {
   padding-top: 1.25rem;
   padding-bottom: 1.25rem
@@ -820,6 +887,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 .py-\[7px\] {
   padding-top: 7px;
   padding-bottom: 7px
+}
+
+.pb-3 {
+  padding-bottom: 0.75rem
 }
 
 .pl-3 {
@@ -860,12 +931,22 @@ export const tailwindCSS: string = `.pointer-events-none {
   line-height: 14px
 }
 
+.text-5xl {
+  font-size: 3rem;
+  line-height: 1
+}
+
 .text-\[14px\] {
   font-size: 14px
 }
 
 .text-\[20px\] {
   font-size: 20px
+}
+
+.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem
 }
 
 .text-sm {
@@ -936,6 +1017,27 @@ export const tailwindCSS: string = `.pointer-events-none {
 .text-\[\#eee\] {
   --tw-text-opacity: 1;
   color: rgb(238 238 238 / var(--tw-text-opacity, 1))
+}
+
+.text-\[\#ffcdd2\] {
+  --tw-text-opacity: 1;
+  color: rgb(255 205 210 / var(--tw-text-opacity, 1))
+}
+
+.text-\[rgba\(255\2c 255\2c 255\2c \.4\)\] {
+  color: rgba(255,255,255,.4)
+}
+
+.text-\[rgba\(255\2c 255\2c 255\2c \.5\)\] {
+  color: rgba(255,255,255,.5)
+}
+
+.text-\[rgba\(255\2c 255\2c 255\2c \.6\)\] {
+  color: rgba(255,255,255,.6)
+}
+
+.text-\[rgba\(255\2c 255\2c 255\2c \.7\)\] {
+  color: rgba(255,255,255,.7)
 }
 
 .text-accent {

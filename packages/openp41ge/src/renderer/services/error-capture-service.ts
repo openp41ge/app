@@ -48,63 +48,32 @@ function renderOverlay(): void {
   overlayEl.style.display = "flex";
 
   overlayEl.innerHTML = `
-    <div style="
-      width:90%;
-      max-width:800px;
-      max-height:85vh;
-      display:flex;
-      flex-direction:column;
-    ">
-      <div style="
-        text-align:center;
-        padding:16px 0 12px 0;
-        border-bottom:1px solid rgba(255,255,255,.15);
-        margin-bottom:8px;
-      ">
-        <div style="font-size:48px;font-weight:700;color:#fff;line-height:1">⚠</div>
-        <div style="font-size:18px;font-weight:600;color:#fff;margin-top:4px">
+    <div class="w-[90%] max-w-[800px] max-h-[85vh] flex flex-col">
+      <div class="text-center py-4 pb-3 border-b border-[rgba(255,255,255,.15)] mb-2">
+        <div class="text-5xl font-bold text-white leading-none">⚠</div>
+        <div class="text-lg font-semibold text-white mt-1">
           ${errors.length} Error${errors.length !== 1 ? "s" : ""} Detected
         </div>
-        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px">
+        <div class="text-sm text-[rgba(255,255,255,.6)] mt-0.5">
           The application is paused until all errors are resolved.
         </div>
       </div>
-      <div style="flex:1;overflow-y:auto;padding:4px 0">
+      <div class="flex-1 overflow-y-auto py-1">
         ${errors
           .map(
             (e, _idx) => `
-          <div style="
-            background:rgba(0,0,0,.3);
-            border-radius:4px;
-            padding:10px 14px;
-            margin-bottom:6px;
-            font-size:13px;
-            line-height:1.5;
-            position:relative;
-          ">
+          <div class="bg-[rgba(0,0,0,.3)] rounded p-2.5 mb-1.5 text-13 leading-[1.5] relative">
             <button
               onclick="(function(btn){var t=btn.parentElement.querySelector('.err-msg')?.textContent||'';navigator.clipboard.writeText(t).then(function(){var o=btn.textContent;btn.textContent='Copied!';setTimeout(function(){btn.textContent=o},1500)}).catch(function(){})})(this)"
-              style="
-                position:absolute;top:6px;right:6px;
-                background:rgba(255,255,255,.1);
-                border:1px solid rgba(255,255,255,.2);
-                border-radius:3px;
-                color:rgba(255,255,255,.7);
-                font-size:11px;
-                padding:2px 8px;
-                cursor:pointer;
-                line-height:1.4;
-                user-select:none;
-                -webkit-user-select:none;
-              "
+              class="absolute top-1.5 right-1.5 bg-[rgba(255,255,255,.1)] border border-[rgba(255,255,255,.2)] rounded text-[rgba(255,255,255,.7)] text-xs px-2 py-0.5 cursor-pointer leading-[1.4] select-none"
             >Copy</button>
-            <div class="err-msg" style="color:#ffcdd2;font-weight:600;margin-bottom:2px;user-select:text;-webkit-user-select:text;">
+            <div class="err-msg text-[#ffcdd2] font-semibold mb-0.5 select-text">
               ${escHtml(e.type === "main-process" ? "[MAIN PROCESS] " : "")}${escHtml(e.message)}
             </div>
-            <div style="color:rgba(255,255,255,.5);font-size:11px;margin-bottom:2px;user-select:text;-webkit-user-select:text;">
+            <div class="text-[rgba(255,255,255,.5)] text-xs mb-0.5 select-text">
               ${escHtml(e.source)}${e.stack ? " — stack available" : ""}
             </div>
-            ${e.stack ? `<pre style="margin:4px 0 0 0;white-space:pre-wrap;color:rgba(255,255,255,.4);font-size:11px;user-select:text;-webkit-user-select:text;">${escHtml(e.stack.slice(0, 1000))}</pre>` : ""}
+            ${e.stack ? `<pre class="mt-1 mb-0 whitespace-pre-wrap text-[rgba(255,255,255,.4)] text-xs select-text">${escHtml(e.stack.slice(0, 1000))}</pre>` : ""}
           </div>
         `,
           )
