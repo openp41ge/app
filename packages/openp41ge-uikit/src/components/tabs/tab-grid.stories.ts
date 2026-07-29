@@ -260,6 +260,12 @@ class TabsDemoApp extends LitElement {
     this._openFile = this._openFile.bind(this);
     this.addEventListener("tree-node-click", this._openFile);
 
+    // ── Tree file drag: stash path as fallback for grid drop ───
+    this.addEventListener("tree-drag-start", (e: any) => {
+      const fp = e.detail?.nodeId;
+      if (fp) (window as any).__treeDragFilePath = fp;
+    });
+
     // ── Tab drag start (mousedown on [role='tab']) ────────────────
     document.addEventListener("mousedown", (e: Event) => {
       const tabBtn = (e.target as HTMLElement).closest("[role='tab']");

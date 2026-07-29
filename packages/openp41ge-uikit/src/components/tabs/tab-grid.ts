@@ -484,6 +484,15 @@ export class TabGrid extends LitElement {
         filePaths.push(textData);
       }
 
+      // Fallback: tree drag data stored by story's tree-drag-start handler
+      if (filePaths.length === 0) {
+        const treePath = (window as any).__treeDragFilePath;
+        if (treePath) {
+          filePaths.push(treePath);
+          (window as any).__treeDragFilePath = null;
+        }
+      }
+
       if (filePaths.length > 0) {
         e.preventDefault();
         e.stopPropagation();
