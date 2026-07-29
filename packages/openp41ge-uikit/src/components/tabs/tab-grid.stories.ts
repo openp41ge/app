@@ -676,10 +676,10 @@ const meta: Meta = {
 export default meta;
 type Story = StoryObj;
 
-export const MultiGridDemo: Story = {
-  render: () => html`<tabs-demo-app></tabs-demo-app>`,
-};
-
 export const SingleGridDemo: Story = {
   render: () => html`<single-grid-app></single-grid-app>`,
+};
+
+export const MultiGridDemo: Story = {
+  render: () => html`<tabs-demo-app></tabs-demo-app>`,
 };
