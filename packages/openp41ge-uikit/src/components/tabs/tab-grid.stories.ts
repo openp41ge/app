@@ -176,6 +176,10 @@ class TabsDemoApp extends LitElement {
     createTab("Terminal", '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>'),
   ]);
 
+  private _outputState = GridState.from("side-b", [
+    createTab("Output", '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>'),
+  ]);
+
   // ── Drag state ───────────────────────────────────────────────────
 
   private _currentDragSource: IDragSource | null = null;
@@ -198,6 +202,9 @@ class TabsDemoApp extends LitElement {
 
   @query("#side-grid-a")
   private _sideGrid!: any;
+
+  @query("#side-grid-b")
+  private _outputGrid!: any;
 
   private _logEl!: HTMLElement;
   private _logCount = 0;
@@ -343,6 +350,9 @@ class TabsDemoApp extends LitElement {
       this._sideState = GridState.from("side-a", [
         createTab("Terminal", '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>'),
       ]);
+      this._outputState = GridState.from("side-b", [
+        createTab("Output", '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>'),
+      ]);
       this._renderAll();
       this._logEl.innerHTML = "";
       this._logCount = 0;
@@ -359,12 +369,14 @@ class TabsDemoApp extends LitElement {
   private _state(winId: string): GridState | null {
     if (winId === "editor") return this._editorState;
     if (winId === "side-a") return this._sideState;
+    if (winId === "side-b") return this._outputState;
     return null;
   }
 
   private _renderAll(): void {
     this._editorState.applyTo(this._editorGrid);
     this._sideState.applyTo(this._sideGrid);
+    this._outputState.applyTo(this._outputGrid);
   }
 
   private _log(msg: string): void {
@@ -386,7 +398,8 @@ class TabsDemoApp extends LitElement {
         .tabs-demo p { margin: 0 0 16px; font-size: 12px; color: #888; }
         .grid-row { display: flex; gap: 12px; margin-bottom: 16px; }
         .editor-wrapper { flex: 1; min-height: 250px; display: flex; flex-direction: column; }
-        .side-grid { width: 300px; min-height: 250px; display: flex; flex-direction: column; }
+        .bottom-grids { display: flex; gap: 12px; }
+        .bottom-grid { flex: 1; min-height: 150px; display: flex; flex-direction: column; }
         .demo-section { margin-bottom: 16px; }
         .demo-section h2 { font-size: 13px; margin: 0 0 8px; color: #aaa; }
         h2 small { font-weight: normal; font-size: 11px; color: #666; margin-left: 8px; }
@@ -412,9 +425,15 @@ class TabsDemoApp extends LitElement {
             <tab-grid id="editor-grid"></tab-grid>
             <button class="demo-add-tab-btn" data-win-id="editor" data-col="0">+</button>
           </div>
-          <div class="side-grid">
-            <tab-grid id="side-grid-a" class="side-grid"></tab-grid>
+        </div>
+        <div class="bottom-grids">
+          <div class="bottom-grid">
+            <tab-grid id="side-grid-a"></tab-grid>
             <button class="demo-add-tab-btn" data-win-id="side-a" data-col="0">+</button>
+          </div>
+          <div class="bottom-grid">
+            <tab-grid id="side-grid-b"></tab-grid>
+            <button class="demo-add-tab-btn" data-win-id="side-b" data-col="0">+</button>
           </div>
         </div>
 
