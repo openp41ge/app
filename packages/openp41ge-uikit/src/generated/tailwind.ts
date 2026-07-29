@@ -1224,11 +1224,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   color: rgb(136 136 136 / var(--tw-text-opacity, 1))
 }
 
-.text-\\[\\#8a8a8a\\] {
-  --tw-text-opacity: 1;
-  color: rgb(138 138 138 / var(--tw-text-opacity, 1))
-}
-
 .text-\\[\\#aaa\\] {
   --tw-text-opacity: 1;
   color: rgb(170 170 170 / var(--tw-text-opacity, 1))
@@ -1454,6 +1449,12 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .transition-\\[width\\] {
   transition-property: width;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms
+}
+
+.transition-colors {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms
 }

@@ -441,16 +441,39 @@ export function initDragSystem(): () => void {
   document.addEventListener("grid-open-tab", onGridOpenTab);
   cleanups.push(() => document.removeEventListener("grid-open-tab", onGridOpenTab));
 
+  // ── HTML5 drag from <openp41ge-tree> — new window on drag-out ──────
+  let _html5FileDragPath: string | null = null;
+  document.addEventListener("dragstart", (e: DragEvent) => {
+    if (e.dataTransfer?.types.includes("text/plain")) {
+      const data = e.dataTransfer.getData("text/plain");
+      if (data && (data.startsWith("/") || data.includes(".") || data.match(/^[\w.-]+\//))) {
+        _html5FileDragPath = data;
+        _fileDropHandled = false;
+      }
+    }
+  });
+  cleanups.push(() => document.removeEventListener("dragstart", () => {}));
+
+  document.addEventListener("dragend", (e: DragEvent) => {
+    if (!_html5FileDragPath) return;
+    const filePath = _html5FileDragPath;
+    _html5FileDragPath = null;
+    if (e.dataTransfer?.dropEffect === "none" && !_fileDropHandled) {
+      const fileName = filePath.split("/").filter(Boolean).pop() || "file";
+      window.openp41ge.workspace.dispatch(
+        "actionOpenFileInNewWindow",
+        filePath,
+        fileName,
+        e.screenX,
+        e.screenY,
+      );
+    }
+    _fileDropHandled = false;
+  });
+  cleanups.push(() => document.removeEventListener("dragend", () => {}));
+
   // ── Incoming ghost position from main process poll ───────────────────
   // The main process polls screen.getCursorScreenPoint() at ~20fps during
-  // a drag and broadcasts the position to all windows. This is the only
-  // reliable source of continuous cursor coordinates during cross-window
-  // drags — no renderer process receives mousemove events continuously.
-  // ── Incoming ghost position from main process poll ───────────────────
-  // The main process polls screen.getCursorScreenPoint() at ~20fps during
-  // a drag and broadcasts the position to all windows. This is the only
-  // reliable source of continuous cursor coordinates during cross-window
-  // drags — no renderer process receives mousemove events continuously.
   type GhostShowData = { screenX: number; screenY: number; label?: string };
   window.openp41ge.drag.onGhostShow((data: GhostShowData) => {
     const screenX = data.screenX;
