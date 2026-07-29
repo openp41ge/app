@@ -1,6 +1,6 @@
 import { html } from "lit";
 import type { Meta, StoryObj } from "@storybook/web-components";
-import "../src/components/repo-row";
+import "openp41ge-components";
 
 const meta: Meta = {
   title: "Components/RepoRow",
