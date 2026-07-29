@@ -571,6 +571,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                     }
                     if (e.key === "Escape") {
                       e.preventDefault();
+                      e.stopPropagation();
                       this._cancelAddWorktree();
                     }
                   }}
