@@ -1062,8 +1062,8 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-left: 1.75rem
 }
 
-.pl-\\[10px\\] {
-  padding-left: 10px
+.pl-\\[14px\\] {
+  padding-left: 14px
 }
 
 .pl-\\[24px\\] {

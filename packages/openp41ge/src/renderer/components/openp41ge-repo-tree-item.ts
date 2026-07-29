@@ -550,7 +550,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                   id="wt-addwt-input"
                   type="text"
                   placeholder="enter branch name"
-                  class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-xs pl-[10px] outline-none font-inherit"
+                  class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-xs pl-[14px] outline-none font-inherit"
                   @keydown=${(e: KeyboardEvent) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
