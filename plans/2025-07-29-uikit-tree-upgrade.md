@@ -113,12 +113,12 @@ Ensure all added event listeners in `connectedCallback` have corresponding remov
 
 ## Completion Criteria
 
-- [ ] `onToggle` callback works: loading spinner, async children, collapse on failure
-- [ ] `tree-node-contextmenu` event dispatched on right-click with correct detail
-- [ ] `status` field applies CSS class to row
-- [ ] `badge` field renders text after label
-- [ ] `onExpandedChange` callback fires on toggle
-- [ ] All event listeners properly cleaned up in `disconnectedCallback`
-- [ ] Unit tests pass
-- [ ] Build passes (`nx build openp41ge`)
-- [ ] Storybook demos render correctly
+- [x] `onToggle` callback works: loading spinner, async children, collapse on failure
+- [x] `tree-node-contextmenu` event dispatched on right-click with correct detail
+- [x] `tree-node-dblclick` event dispatched on double-click
+- [x] `status` field applies CSS class to row
+- [x] `badge` field renders text after label
+- [x] `onExpandedChange` callback fires on toggle
+- [x] All event listeners properly cleaned up in `disconnectedCallback`
+- [x] Unit tests pass (26 tests)
+- [x] Build passes (`nx build openp41ge`)
