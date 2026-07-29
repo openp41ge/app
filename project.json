@@ -5,7 +5,7 @@
     "lint": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "eslint packages/ --no-error-on-unmatched-pattern"
+        "command": "eslint packages/ demos/ --no-error-on-unmatched-pattern"
       }
     },
     "knip": {

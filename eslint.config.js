@@ -37,7 +37,7 @@ export default [
   },
   // ── Demo packages: lenient rules for quick prototyping ──
   {
-    files: ["packages/*-demo/**/*.ts"],
+    files: ["demos/*-demo/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "no-console": "off",

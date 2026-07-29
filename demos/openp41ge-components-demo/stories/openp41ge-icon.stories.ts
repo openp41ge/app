@@ -2,7 +2,7 @@ import { html } from "lit";
 import type { Meta, StoryObj } from "@storybook/web-components";
 import "openp41ge-components";
 import type { IconName } from "openp41ge-components";
-import { iconRegistry, Openp41geIcon } from "openp41ge-components";
+import { iconRegistry } from "openp41ge-components";
 
 const meta: Meta = {
   title: "Components/Icon",

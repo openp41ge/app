@@ -4,30 +4,35 @@
 
 Openp41ge is a desktop pane manager (Electron) that organises running processes, file editors, terminals, and other tools into a column-based grid layout with tabs, drag-and-drop, and multi-window support.
 
-The project is an **Nx + pnpm monorepo** at `/Users/rk/Repository/openp41ge/master/`. All packages live under `packages/`. There are **17 packages** total: 8 library packages, 8 demo packages, and 1 Electron app.
+The project is an **Nx + pnpm monorepo** at `/Users/rk/Repository/openp41ge/master/`. Library packages live under `packages/` and demo apps live under `demos/`. There are **19 packages** total: 9 library packages, 9 demo apps, and 1 Electron app.
 
 ## Project Structure
 
 ```
 openp41ge/
 ├── packages/
-│   ├── openp41ge/                          # Electron desktop app — the platform
-│   ├── openp41ge-file-editor/              # File editor web component (<file-editor>)
-│   ├── openp41ge-file-editor-demo/         # Demo app for the file editor
-│   ├── openp41ge-git-repository/           # Git repository browser
-│   ├── openp41ge-git-repository-demo/      # Demo app for the git browser
-│   ├── openp41ge-terminal/                 # Terminal emulator (xterm.js + child process)
-│   ├── openp41ge-terminal-demo/            # Demo app for the terminal
-│   ├── openp41ge-agent-chat/               # AI chat panel
-│   ├── openp41ge-agent-chat-demo/          # Demo app for the chat panel
-│   ├── openp41ge-logger/                   # Logging utility
-│   ├── openp41ge-logger-demo/              # Demo app for the logger
-│   ├── openp41ge-syntax-highlighting/      # Syntax highlighting engine
+│   ├── openp41ge/                        # Electron desktop app — the platform
+│   ├── openp41ge-file-editor/            # File editor web component (<file-editor>)
+│   ├── openp41ge-git-repository/         # Git repository browser
+│   ├── openp41ge-terminal/               # Terminal emulator (xterm.js + child process)
+│   ├── openp41ge-agent-chat/             # AI chat panel
+│   ├── openp41ge-logger/                 # Logging utility
+│   ├── openp41ge-syntax-highlighting/    # Syntax highlighting engine
+│   ├── openp41ge-themes/                 # Theme system
+│   ├── openp41ge-tabs/                   # Tab/drag-and-drop components
+│   ├── openp41ge-components/             # Shared UI components (Storybook)
+│   └── openp41ge-git/                    # Git integration utilities
+├── demos/
+│   ├── openp41ge-agent-chat-demo/        # Demo app for the chat panel
+│   ├── openp41ge-components-demo/        # Storybook-based shared component demos
+│   ├── openp41ge-file-editor-demo/       # Demo app for the file editor
+│   ├── openp41ge-git-demo/               # Demo app for git utilities
+│   ├── openp41ge-git-repository-demo/    # Demo app for the git browser
+│   ├── openp41ge-logger-demo/            # Demo app for the logger
 │   ├── openp41ge-syntax-highlighting-demo/ # Demo app for syntax highlighting
-│   ├── openp41ge-themes/                   # Theme system
-│   ├── openp41ge-themes-demo/              # Demo app for themes
-│   ├── openp41ge-tabs/                     # Tab/drag-and-drop components
-│   └── openp41ge-tabs-demo/                # Demo app for tabs
+│   ├── openp41ge-tabs-demo/              # Demo app for tabs
+│   ├── openp41ge-terminal-demo/          # Demo app for the terminal
+│   └── openp41ge-themes-demo/            # Demo app for themes
 ├── project.json                        # Root Nx project with workspace-level targets
 ├── nx.json                             # Nx configuration (cache, target defaults)
 ├── plans/                              # Active plans — write, update, delete on completion
@@ -41,7 +46,7 @@ All operations use **Nx** directly — there are no `package.json` scripts.
 
 | Command        | What it does                                        |
 | -------------- | --------------------------------------------------- |
-| `nx build`     | Build all 17 packages (libs → demos → Electron app) |
+| `nx build`     | Build all 19 packages (libs → demos → Electron app) |
 | `nx dev`       | Start Electron app in dev mode (vite + Electron)    |
 | `nx test`      | Run all vitest unit tests                           |
 | `nx e2e`       | Run Playwright e2e tests                            |
@@ -199,7 +204,7 @@ The monorepo uses **Nx v23** as its build orchestrator. Key files:
 | ------------------------- | ---------------------------------------------------- |
 | `nx.json`                 | Target defaults, caching configuration               |
 | `project.json` (root)     | Workspace-level targets (build, test, quality, etc.) |
-| `packages/*/project.json` | Per-package targets                                  |
+| `packages/*/project.json`, `demos/*/project.json` | Per-package targets                              |
 
 **Caching**: Nx caches all build outputs. Subsequent runs are near-instant. To force a fresh build: `nx build --skip-nx-cache`
 

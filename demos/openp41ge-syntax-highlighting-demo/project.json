@@ -1,6 +1,6 @@
 {
-  "name": "openp41ge-file-editor-demo",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "openp41ge-syntax-highlighting-demo",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
   "targets": {
     "dev": {
       "executor": "nx:run-commands",

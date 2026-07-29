@@ -4,7 +4,7 @@ import path from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      "openp41ge-agent-chat": path.resolve(__dirname, "../openp41ge-agent-chat/src"),
+      "openp41ge-logger": path.resolve(__dirname, "../../packages/openp41ge-logger/src"),
     },
   },
 });

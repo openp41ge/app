@@ -1,6 +1,6 @@
 {
-  "name": "openp41ge-agent-chat-demo",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "openp41ge-tabs-demo",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
   "targets": {
     "dev": {
       "executor": "nx:run-commands",

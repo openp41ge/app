@@ -4,7 +4,7 @@ import path from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      "openp41ge-file-editor": path.resolve(__dirname, "../openp41ge-file-editor/src"),
+      "openp41ge-themes": path.resolve(__dirname, "../../packages/openp41ge-themes/src"),
     },
   },
 });

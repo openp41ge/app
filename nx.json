@@ -48,7 +48,7 @@
       "cache": true
     },
     "lint": {
-      "inputs": ["{workspaceRoot}/packages/**/*"],
+      "inputs": ["{workspaceRoot}/packages/**/*", "{workspaceRoot}/demos/**/*"],
       "cache": true
     }
   },

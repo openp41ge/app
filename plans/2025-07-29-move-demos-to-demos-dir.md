@@ -130,12 +130,16 @@ No UX changes — this is a pure filesystem restructuring. All build outputs, de
 
 ## Completion Criteria
 
-- [ ] All 10 demo directories moved to `demos/`
-- [ ] `pnpm-workspace.yaml` updated with `"demos/*"`
-- [ ] All `project.json` `$schema` paths updated
-- [ ] All `vite.config.ts` source alias paths updated
-- [ ] `.gitignore` entries in moved demos (if any) still work
-- [ ] `pnpm install` succeeds
-- [ ] `nx show projects` lists all demos at new paths
-- [ ] `nx build --skip-nx-cache` succeeds
-- [ ] `AGENTS.md` updated to reflect new `demos/` directory
+- [x] All 10 demo directories moved to `demos/`
+- [x] `pnpm-workspace.yaml` updated with `"demos/*"`
+- [x] All `project.json` `$schema` paths updated
+- [x] All `vite.config.ts` source alias paths updated
+- [x] `.gitignore` entries in moved demos (if any) still work
+- [x] `pnpm install` succeeds
+- [x] `nx show projects` lists all demos at new paths
+- [x] `nx build --skip-nx-cache` succeeds (20 projects, root monorepo excluded)
+- [x] `AGENTS.md` updated to reflect new `demos/` directory
+- [x] `eslint.config.js` demo glob updated
+- [x] `knip.json` demo workspace path updated
+- [x] `nx.json` lint cache input includes `demos/**/*`
+- [x] Root `project.json` lint command includes `demos/`

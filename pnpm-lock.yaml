@@ -69,6 +69,121 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  demos/openp41ge-agent-chat-demo:
+    dependencies:
+      openp41ge-agent-chat:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-agent-chat
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-components-demo:
+    dependencies:
+      lit:
+        specifier: ^3.0.0
+        version: 3.3.3
+      openp41ge-components:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-components
+    devDependencies:
+      '@storybook/addon-essentials':
+        specifier: ^8.6.0
+        version: 8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/web-components':
+        specifier: ^8.6.0
+        version: 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))
+      '@storybook/web-components-vite':
+        specifier: ^8.6.0
+        version: 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))(vite@6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      storybook:
+        specifier: ^8.6.0
+        version: 8.6.18(prettier@3.9.6)
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-file-editor-demo:
+    dependencies:
+      openp41ge-file-editor:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-file-editor
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-git-demo:
+    dependencies:
+      openp41ge-git:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-git
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-git-repository-demo:
+    dependencies:
+      openp41ge-git-repository:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-git-repository
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-logger-demo:
+    dependencies:
+      openp41ge-logger:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-logger
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-syntax-highlighting-demo:
+    dependencies:
+      openp41ge-syntax-highlighting:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-syntax-highlighting
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-tabs-demo:
+    dependencies:
+      openp41ge-tabs:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-tabs
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-terminal-demo:
+    dependencies:
+      openp41ge-terminal:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-terminal
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  demos/openp41ge-themes-demo:
+    dependencies:
+      openp41ge-themes:
+        specifier: workspace:*
+        version: link:../../packages/openp41ge-themes
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/openp41ge:
     dependencies:
       '@xterm/addon-fit':
@@ -134,16 +249,6 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/openp41ge-agent-chat-demo:
-    dependencies:
-      openp41ge-agent-chat:
-        specifier: workspace:*
-        version: link:../openp41ge-agent-chat
-    devDependencies:
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
   packages/openp41ge-components:
     dependencies:
       lit:
@@ -165,31 +270,6 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0)
-
-  packages/openp41ge-components-demo:
-    dependencies:
-      lit:
-        specifier: ^3.0.0
-        version: 3.3.3
-      openp41ge-components:
-        specifier: workspace:*
-        version: link:../openp41ge-components
-    devDependencies:
-      '@storybook/addon-essentials':
-        specifier: ^8.6.0
-        version: 8.6.14(@types/react@19.2.17)(storybook@8.6.18(prettier@3.9.6))
-      '@storybook/web-components':
-        specifier: ^8.6.0
-        version: 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))
-      '@storybook/web-components-vite':
-        specifier: ^8.6.0
-        version: 8.6.18(lit@3.3.3)(storybook@8.6.18(prettier@3.9.6))(vite@6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
-      storybook:
-        specifier: ^8.6.0
-        version: 8.6.18(prettier@3.9.6)
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/openp41ge-file-editor:
     dependencies:
@@ -216,16 +296,6 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/openp41ge-file-editor-demo:
-    dependencies:
-      openp41ge-file-editor:
-        specifier: workspace:*
-        version: link:../openp41ge-file-editor
-    devDependencies:
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
   packages/openp41ge-git:
     devDependencies:
       typescript:
@@ -237,16 +307,6 @@ importers:
       vitest:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@24.13.2)(jiti@2.7.0)(jsdom@29.1.1)(supports-color@7.2.0)(tsx@4.23.1)(yaml@2.9.0)
-
-  packages/openp41ge-git-demo:
-    dependencies:
-      openp41ge-git:
-        specifier: workspace:*
-        version: link:../openp41ge-git
-    devDependencies:
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/openp41ge-git-repository:
     devDependencies:
@@ -263,16 +323,6 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@22.20.0)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/openp41ge-git-repository-demo:
-    dependencies:
-      openp41ge-git-repository:
-        specifier: workspace:*
-        version: link:../openp41ge-git-repository
-    devDependencies:
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
   packages/openp41ge-logger:
     dependencies:
       lit:
@@ -282,16 +332,6 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
-  packages/openp41ge-logger-demo:
-    dependencies:
-      openp41ge-logger:
-        specifier: workspace:*
-        version: link:../openp41ge-logger
-    devDependencies:
       vite:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -315,16 +355,6 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/openp41ge-syntax-highlighting-demo:
-    dependencies:
-      openp41ge-syntax-highlighting:
-        specifier: workspace:*
-        version: link:../openp41ge-syntax-highlighting
-    devDependencies:
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
   packages/openp41ge-tabs:
     dependencies:
       lit:
@@ -337,16 +367,6 @@ importers:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
-  packages/openp41ge-tabs-demo:
-    dependencies:
-      openp41ge-tabs:
-        specifier: workspace:*
-        version: link:../openp41ge-tabs
-    devDependencies:
       vite:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -376,16 +396,6 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@22.20.0)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/openp41ge-terminal-demo:
-    dependencies:
-      openp41ge-terminal:
-        specifier: workspace:*
-        version: link:../openp41ge-terminal
-    devDependencies:
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
   packages/openp41ge-themes:
     dependencies:
       vscode-textmate:
@@ -395,16 +405,6 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
-  packages/openp41ge-themes-demo:
-    dependencies:
-      openp41ge-themes:
-        specifier: workspace:*
-        version: link:../openp41ge-themes
-    devDependencies:
       vite:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)

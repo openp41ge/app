@@ -79,7 +79,7 @@
         "type": true
       }
     },
-    "packages/openp41ge-tabs-demo": {
+    "demos/openp41ge-tabs-demo": {
       "ignoreDependencies": ["openp41ge-tabs"]
     }
   }

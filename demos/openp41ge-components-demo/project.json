@@ -9,7 +9,7 @@
 
 {
   "name": "openp41ge-components-demo",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
   "targets": {
     "storybook": {
       "executor": "nx:run-commands",
