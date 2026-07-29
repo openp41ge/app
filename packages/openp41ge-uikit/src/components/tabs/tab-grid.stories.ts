@@ -456,17 +456,17 @@ class TabsDemoApp extends LitElement {
         <p>VS Code-style editor groups. Drag tabs to column edges to split, across columns to rearrange, or between grids to move between groups.</p>
 
         <div class="multi-body" style="display:flex;flex-direction:column;flex:1;gap:12px;min-height:0;">
-          <div class="multi-row" style="display:flex;gap:8px;flex:1;min-height:0;">
+          <div class="multi-row" style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;">
             <tab-grid id="editor-grid" style="flex:1;"></tab-grid>
-            <div class="multi-tree-panel" style="width:220px;flex-shrink:0;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+            <div style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
           </div>
-          <div class="multi-row" style="display:flex;gap:8px;flex:1;min-height:0;">
+          <div class="multi-row" style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;">
             <tab-grid id="side-grid-a" style="flex:1;"></tab-grid>
-            <div class="multi-tree-panel" style="width:220px;flex-shrink:0;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+            <div style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
           </div>
-          <div class="multi-row" style="display:flex;gap:8px;flex:1;min-height:0;">
+          <div class="multi-row" style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;">
             <tab-grid id="side-grid-b" style="flex:1;"></tab-grid>
-            <div class="multi-tree-panel" style="width:220px;flex-shrink:0;background:#252526;border:1px solid #333;border-radius:4px;overflow-y:auto;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+            <div style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
           </div>
         </div>
 
@@ -697,9 +697,13 @@ class SingleGridApp extends LitElement {
         }
         .single-body {
           display: flex;
-          gap: 12px;
+          gap: 0;
           flex: 1;
           min-height: 0;
+          background: #1e1e1e;
+          border: 1px solid #333;
+          border-radius: 4px;
+          overflow: hidden;
         }
         .single-grid-wrap {
           flex: 1;
@@ -715,9 +719,8 @@ class SingleGridApp extends LitElement {
           width: 220px;
           flex-shrink: 0;
           background: #252526;
-          border: 1px solid #333;
-          border-radius: 4px;
           overflow-y: auto;
+          border-left: 1px solid #333;
         }
         .tree-panel h3 {
           font-size: 11px;
