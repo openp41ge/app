@@ -10,7 +10,7 @@ import { css } from "lit";
 export const treeStyles = css`
   :host {
     display: block;
-    font-family: var(--tree-font, "SF Mono", Monaco, Menlo, Consolas, monospace);
+    font-family: var(--tree-font, inherit);
     font-size: var(--tree-font-size, 13px);
     color: var(--tree-fg, var(--text-primary, #d4d4d4));
     background: var(--tree-bg, transparent);

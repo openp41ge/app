@@ -220,7 +220,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         class="sticky top-[30px] z-[1] bg-gutter h-[26px] pointer-events-none border-b border-[#232323]"
       >
         <div
-          class="pointer-events-auto flex items-center h-[26px] px-2 pl-7 cursor-pointer text-xs text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
+          class="pointer-events-auto flex items-center h-[26px] px-2 pl-7 cursor-pointer text-sm text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
           @click=${() => {
             const path = wt.path || `${this.repoName}/${wt.branch}`;
             this._toggleWorktreeFiles(wt.branch, path);
@@ -551,13 +551,13 @@ export class Openp41geRepoTreeItem extends LitElement {
           this._showingAddWorktree
             ? html` <div
                 id="wt-addwt-row"
-                class="flex items-center h-[26px] px-2 pl-7 text-xs gap-1 border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
+                class="flex items-center h-[26px] px-2 pl-7 text-sm gap-1 border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
               >
                 <input
                   id="wt-addwt-input"
                   type="text"
                   placeholder="enter branch name"
-                  class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-xs pl-[14px] outline-none font-inherit"
+                  class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-sm pl-[14px] outline-none font-inherit"
                   .value=${this._addWorktreeName}
                   @input=${(e: InputEvent) => {
                     this._addWorktreeName = (e.target as HTMLInputElement).value;
