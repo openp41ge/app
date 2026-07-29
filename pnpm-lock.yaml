@@ -249,15 +249,6 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@24.13.2)(jiti@2.7.0)(jsdom@29.1.1)(supports-color@7.2.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/openp41ge-git-repository:
-    devDependencies:
-      typescript:
-        specifier: ^5.5.0
-        version: 5.9.3
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
   packages/openp41ge-logger:
     dependencies:
       lit:
@@ -338,9 +329,9 @@ importers:
       openp41ge-editor-engine:
         specifier: workspace:*
         version: link:../openp41ge-editor-engine
-      openp41ge-git-repository:
+      openp41ge-git:
         specifier: workspace:*
-        version: link:../openp41ge-git-repository
+        version: link:../openp41ge-git
       openp41ge-piece-tree:
         specifier: workspace:*
         version: link:../openp41ge-piece-tree

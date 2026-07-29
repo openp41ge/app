@@ -7,7 +7,6 @@ export default defineConfig({
       entry: {
         index: path.resolve(__dirname, "src/index.ts"),
         theme: path.resolve(__dirname, "src/theme/index.ts"),
-        "git-repository": path.resolve(__dirname, "src/git-repository/index.ts"),
         "file-editor": path.resolve(__dirname, "src/file-editor/index.ts"),
       },
       formats: ["es"],

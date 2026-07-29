@@ -1,25 +1,33 @@
 /**
  * GitRepositoryController — pane controller that renders the git repo browser.
  *
- * Uses the GitBrowserRenderer from openp41ge-git-repository to render the
- * accordion-style UI (branches, commits, files) inside a pane tab.
- *
- * Data flow:
- *   mount() → reads window.__pendingGitRepo → fetches git data → renders
- *   onSelectBranch → re-fetches commits + diff stat → re-renders
- *   onSelectCommit → fetches commit-specific diff stat → re-renders
- *   onRefresh* → fetches from remote → replaces single section
- *   onLoadMoreCommits → reveals more or fetches from backend
- *   onClose → dispatches removeColumnTab to close the pane
+ * Uses the <git-repository-panel> Lit web component from openp41ge-uikit.
+ * Data flow (events-up / data-down):
+ *   1. Fetches git data via window.openp41ge.workspaceController
+ *   2. Sets data on the component's `data` property
+ *   3. Listens for events from the component
+ *   4. On each event, performs the action via workspaceController, fetches
+ *      updated data, and pushes it back to the component
  */
 
 import { BaseController } from "../../controllers/base-controller";
 import type { TabController } from "../../controllers/types";
 import {
-  gitBrowserRenderer,
+  GitRepositoryPanel,
   type GitBrowserData,
-  type GitBrowserCallbacks,
+  GIT_SELECT_BRANCH,
+  GIT_SELECT_COMMIT,
+  GIT_REFRESH_BRANCHES,
+  GIT_REFRESH_COMMITS,
+  GIT_REFRESH_FILES,
+  GIT_LOAD_MORE_COMMITS,
+  GIT_CLOSE,
+  GIT_CHECKOUT_WORKTREE,
+  GIT_BRANCH_CONTEXT_MENU,
+  GIT_FILE_ROW_CLICK,
+  type GitBranchContextMenuDetail,
 } from "openp41ge-uikit";
+import { gitBrowserRenderer } from "openp41ge-git";
 import { toastService } from "../../components/openp41ge-toast";
 import { createOpenp41geContextMenu } from "../../interfaces/element-guards";
 
@@ -27,8 +35,14 @@ export class GitRepositoryController extends BaseController implements TabContro
   /** The repo name being displayed. */
   repoName: string = "";
 
+  /** The git repository panel component instance. */
+  private _panel: GitRepositoryPanel | null = null;
+
   /** Current git data (maintained between renders). */
   private _data: GitBrowserData | null = null;
+
+  /** Bound event handlers — stored so we can remove them on unmount. */
+  private _boundHandlers: Array<{ type: string; handler: EventListener }> = [];
 
   constructor(tabId: string, appType: string) {
     super(tabId, appType);
@@ -47,22 +61,39 @@ export class GitRepositoryController extends BaseController implements TabContro
 
     container.style.cssText = "width:100%;height:100%;overflow:hidden;background:#121212;";
 
-    if (this.repoName) {
-      this._fetchAndRender(container);
-
-      // Cross-window refresh is handled by workspace state updates
-    } else {
+    if (!this.repoName) {
       // No repo — show a placeholder
       container.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:12px;">
           Select a repository to view git information
         </div>
       `;
+      return;
     }
+
+    // Create the panel component
+    const panel = document.createElement("git-repository-panel") as GitRepositoryPanel;
+    this._panel = panel;
+    container.appendChild(panel);
+
+    // Wire events
+    this._wireEvents(panel);
+
+    // Kick off initial data fetch
+    this._fetchAndSetData();
   }
 
   unmount(): void {
-    // Unsubscribe from store reload events
+    // Remove event listeners
+    if (this._panel) {
+      for (const { type, handler } of this._boundHandlers) {
+        this._panel.removeEventListener(type, handler);
+      }
+    }
+    this._boundHandlers = [];
+    this._panel = null;
+    this._data = null;
+
     if (this._storeUnsub) {
       this._storeUnsub();
       this._storeUnsub = null;
@@ -79,41 +110,69 @@ export class GitRepositoryController extends BaseController implements TabContro
   }
 
   restore(state: Record<string, unknown>): void {
-    // repoName is set by snapshot(); filePath is the tab config key
-    // used by actionOpenFile/openTabInCell (passed from the drag-drop flow).
     const name = state.repoName || state.filePath;
     if (name && typeof name === "string") {
       this.repoName = name;
     }
   }
 
-  private async _fetchAndRender(container: HTMLElement): Promise<void> {
+  // ─── Event wiring ──────────────────────────────────────────────────────
+
+  private _wireEvents(panel: GitRepositoryPanel): void {
+    const add = (type: string, handler: EventListener) => {
+      panel.addEventListener(type, handler);
+      this._boundHandlers.push({ type, handler });
+    };
+
+    add(GIT_SELECT_BRANCH, this._onSelectBranch as EventListener);
+    add(GIT_SELECT_COMMIT, this._onSelectCommit as EventListener);
+    add(GIT_REFRESH_BRANCHES, this._onRefreshBranches as EventListener);
+    add(GIT_REFRESH_COMMITS, this._onRefreshCommits as EventListener);
+    add(GIT_REFRESH_FILES, this._onRefreshFiles as EventListener);
+    add(GIT_LOAD_MORE_COMMITS, this._onLoadMoreCommits as EventListener);
+    add(GIT_CLOSE, this._onClose as EventListener);
+    add(GIT_CHECKOUT_WORKTREE, this._onCheckoutWorktree as EventListener);
+    add(GIT_BRANCH_CONTEXT_MENU, this._onBranchContextMenu as EventListener);
+    add(GIT_FILE_ROW_CLICK, this._onFileRowClick as EventListener);
+  }
+
+  /** Push current _data to the panel component. */
+  private _pushData(): void {
+    if (this._panel && this._data) {
+      this._panel.data = this._data;
+    }
+  }
+
+  // ─── Data fetching ────────────────────────────────────────────────────
+
+  private async _fetchAndSetData(): Promise<void> {
     const repoName = this.repoName;
     if (!repoName) return;
 
-    // Show loading indicator
-    gitBrowserRenderer.renderLoading(container);
+    // Set loading state
+    if (this._panel) {
+      this._panel.data = null;
+    }
 
-    // Fetch latest from remote first so remote-tracking refs are fresh
+    // Fetch latest from remote first
     try {
       await window.openp41ge.workspaceController.fetch(repoName);
     } catch {
-      // Non-fatal — show stale data if fetch fails
+      // Non-fatal
     }
     if (repoName !== this.repoName) return;
 
     try {
-      // Fetch branches and diff stat in parallel
       const [branches, diffStat] = await Promise.all([
         window.openp41ge.workspaceController.getBranches(repoName),
         window.openp41ge.workspaceController.getDiffStat(repoName),
       ]);
 
-      if (repoName !== this.repoName) return; // stale
+      if (repoName !== this.repoName) return;
 
       const selectedBranch = branches.length > 0 ? branches[0].name : "";
 
-      let commits: CommitEntry[] = [];
+      let commits: import("openp41ge-git").CommitEntry[] = [];
       let hasMoreCommits = false;
       if (selectedBranch) {
         const commitLog = await window.openp41ge.workspaceController.getCommitLog(
@@ -141,390 +200,345 @@ export class GitRepositoryController extends BaseController implements TabContro
         selectedCommit: null,
       };
 
-      const callbacks = this._createCallbacks();
-      container.innerHTML = "";
-      const rendered = gitBrowserRenderer.renderGitPanel(this._data, callbacks);
-      container.appendChild(rendered);
+      this._pushData();
     } catch (err: unknown) {
       if (repoName !== this.repoName) return;
       const msg = err instanceof Error ? err.message : String(err);
-      container.innerHTML = "";
-      gitBrowserRenderer.renderError(container, msg, () => {
-        this._fetchAndRender(container);
-      });
+      this._data = {
+        repoName,
+        branches: [],
+        selectedBranch: "",
+        commits: [],
+        filesChanged: [],
+        loadingBranches: false,
+        loadingCommits: false,
+        loadingFiles: false,
+        commitSkipCount: 0,
+        hasMoreCommits: false,
+        visibleCommitCount: 0,
+        selectedCommit: null,
+        error: msg,
+      };
+      this._pushData();
       toastService.show("Failed to load git data: " + msg, "error", 5000);
     }
   }
 
-  /** Re-render the full panel with current _data and new callbacks. */
-  private _reRender(): void {
-    if (!this.container || !this._data) return;
-    const callbacks = this._createCallbacks();
-    this.container.innerHTML = "";
-    const rendered = gitBrowserRenderer.renderGitPanel(this._data, callbacks);
-    this.container.appendChild(rendered);
-  }
-
   /**
-   * Map a local branch name to its remote-tracking counterpart so we show the
-   * latest fetched data (fetch only updates refs/remotes/origin/*).
+   * Map a local branch name to its remote-tracking counterpart.
    */
   private _resolveBranchRef(branchName: string): string {
-    const data = this._data;
-    if (!data) return branchName;
-    // If the branch has a remote variant, show commits from the remote ref
+    if (!this._data) return branchName;
     const remoteRef = `origin/${branchName}`;
-    if (data.branches.some((b) => b.name === remoteRef)) {
+    if (this._data.branches.some((b) => b.name === remoteRef)) {
       return remoteRef;
     }
     return branchName;
   }
 
-  private _createCallbacks(): GitBrowserCallbacks {
-    return {
-      onSelectBranch: async (branchName: string) => {
-        if (!this._data || !this.container || !this.repoName) return;
-        // Show commits from the remote-tracking ref when available (fetch
-        // only updates refs/remotes/origin/*, not refs/heads/*).
-        const commitRef = this._resolveBranchRef(branchName);
+  /** Re-fetch branches, commits, and diff stat for the current state. */
+  private async _refreshAll(): Promise<void> {
+    if (!this._data || !this.repoName) return;
+    const repoName = this.repoName;
+
+    try {
+      await window.openp41ge.workspaceController.fetch(repoName);
+    } catch {
+      // Ignore
+    }
+    if (repoName !== this.repoName || !this._data) return;
+
+    const commitRef = this._resolveBranchRef(this._data.selectedBranch);
+    try {
+      const [branches, commitLog] = await Promise.all([
+        window.openp41ge.workspaceController.getBranches(repoName),
+        commitRef
+          ? window.openp41ge.workspaceController.getCommitLog(repoName, commitRef, { maxCount: 50 })
+          : [],
+      ]);
+      if (repoName !== this.repoName || !this._data) return;
+
+      const diffStat = await window.openp41ge.workspaceController.getDiffStat(
+        repoName,
+        this._data.selectedCommit ?? undefined,
+      );
+      if (repoName !== this.repoName || !this._data) return;
+
+      this._data = {
+        ...this._data,
+        branches,
+        commits: commitLog,
+        filesChanged: diffStat,
+        loadingBranches: false,
+        loadingCommits: false,
+        loadingFiles: false,
+        commitSkipCount: 0,
+        hasMoreCommits: commitLog.length >= 50,
+        visibleCommitCount: 10,
+      };
+      this._pushData();
+    } catch {
+      if (this._data) {
         this._data = {
           ...this._data,
-          selectedBranch: commitRef,
-          loadingCommits: true,
-          commits: [],
-          commitSkipCount: 0,
-          hasMoreCommits: false,
-          visibleCommitCount: 10,
-          selectedCommit: null,
+          loadingBranches: false,
+          loadingCommits: false,
+          loadingFiles: false,
         };
-        this._reRender();
-
-        try {
-          const repoName = this.repoName;
-          const commits = await window.openp41ge.workspaceController.getCommitLog(
-            repoName,
-            commitRef,
-            { maxCount: 50 },
-          );
-          if (repoName !== this.repoName || !this._data) return;
-          this._data = {
-            ...this._data,
-            loadingCommits: false,
-            commits,
-            commitSkipCount: 0,
-            hasMoreCommits: commits.length >= 50,
-            loadingFiles: true,
-          };
-
-          const diffStat = await window.openp41ge.workspaceController.getDiffStat(repoName);
-          if (repoName !== this.repoName || !this._data) return;
-          this._data = {
-            ...this._data,
-            loadingFiles: false,
-            filesChanged: diffStat,
-          };
-          this._reRender();
-        } catch {
-          if (!this._data) return;
-          this._data = { ...this._data, loadingCommits: false, loadingFiles: false };
-          this._reRender();
-        }
-      },
-
-      onSelectCommit: async (commitHash: string | null) => {
-        if (!this._data || !this.container || !this.repoName) return;
-        this._data = {
-          ...this._data,
-          selectedCommit: commitHash,
-          loadingFiles: !!commitHash,
-        };
-        this._reRender();
-
-        if (commitHash) {
-          try {
-            const repoName = this.repoName;
-            const diffStat = await window.openp41ge.workspaceController.getDiffStat(
-              repoName,
-              commitHash,
-            );
-            if (repoName !== this.repoName || !this._data) return;
-            this._data = { ...this._data, loadingFiles: false, filesChanged: diffStat };
-            this._reRender();
-          } catch {
-            if (!this._data) return;
-            this._data = { ...this._data, loadingFiles: false };
-            this._reRender();
-          }
-        } else {
-          // Restore working tree diff
-          try {
-            const repoName = this.repoName;
-            const diffStat = await window.openp41ge.workspaceController.getDiffStat(repoName);
-            if (repoName !== this.repoName || !this._data) return;
-            this._data = { ...this._data, filesChanged: diffStat };
-            this._reRender();
-          } catch {
-            // Ignore
-          }
-        }
-      },
-
-      onRefreshBranches: async () => {
-        const repoName = this.repoName;
-        if (!repoName || !this._data || !this.container) return;
-
-        try {
-          await window.openp41ge.workspaceController.fetch(repoName);
-        } catch {
-          // Ignore fetch errors
-        }
-        if (repoName !== this.repoName) return;
-
-        this._data = { ...this._data, loadingBranches: true };
-        const panel = this.container.querySelector("div") as HTMLElement | null;
-        if (panel) {
-          gitBrowserRenderer.replaceSection(panel, "branches", this._data, this._createCallbacks());
-        }
-
-        try {
-          const branches = await window.openp41ge.workspaceController.getBranches(repoName);
-          if (repoName !== this.repoName || !this._data) return;
-          this._data = { ...this._data, branches, loadingBranches: false };
-          if (panel) {
-            gitBrowserRenderer.replaceSection(
-              panel,
-              "branches",
-              this._data,
-              this._createCallbacks(),
-            );
-          }
-        } catch {
-          if (this._data) {
-            this._data = { ...this._data, loadingBranches: false };
-          }
-        }
-      },
-
-      onRefreshCommits: async () => {
-        const repoName = this.repoName;
-        if (!repoName || !this._data || !this.container) return;
-
-        try {
-          await window.openp41ge.workspaceController.fetch(repoName);
-        } catch {
-          // Ignore
-        }
-        if (repoName !== this.repoName) return;
-
-        this._data = { ...this._data, loadingCommits: true };
-        const panel = this.container.querySelector("div") as HTMLElement | null;
-        if (panel) {
-          gitBrowserRenderer.replaceSection(panel, "commits", this._data, this._createCallbacks());
-        }
-
-        try {
-          const selectedBranch = this._data.selectedBranch;
-          if (!selectedBranch) return;
-          const commitLog = await window.openp41ge.workspaceController.getCommitLog(
-            repoName,
-            selectedBranch,
-            { maxCount: 50 },
-          );
-          if (repoName !== this.repoName || !this._data) return;
-          this._data = {
-            ...this._data,
-            loadingCommits: false,
-            commits: commitLog,
-            commitSkipCount: 0,
-            hasMoreCommits: commitLog.length >= 50,
-            visibleCommitCount: 10,
-          };
-          if (panel) {
-            gitBrowserRenderer.replaceSection(
-              panel,
-              "commits",
-              this._data,
-              this._createCallbacks(),
-            );
-          }
-        } catch {
-          if (this._data) {
-            this._data = { ...this._data, loadingCommits: false };
-          }
-        }
-      },
-
-      onRefreshFiles: async () => {
-        const repoName = this.repoName;
-        if (!repoName || !this._data || !this.container) return;
-
-        try {
-          await window.openp41ge.workspaceController.fetch(repoName);
-        } catch {
-          // Ignore
-        }
-        if (repoName !== this.repoName) return;
-
-        this._data = { ...this._data, loadingFiles: true };
-        const panel = this.container.querySelector("div") as HTMLElement | null;
-        if (panel) {
-          gitBrowserRenderer.replaceSection(panel, "files", this._data, this._createCallbacks());
-        }
-
-        try {
-          const diffStat = await window.openp41ge.workspaceController.getDiffStat(
-            repoName,
-            this._data.selectedCommit ?? undefined,
-          );
-          if (repoName !== this.repoName || !this._data) return;
-          this._data = { ...this._data, loadingFiles: false, filesChanged: diffStat };
-          if (panel) {
-            gitBrowserRenderer.replaceSection(panel, "files", this._data, this._createCallbacks());
-          }
-        } catch {
-          if (this._data) {
-            this._data = { ...this._data, loadingFiles: false };
-          }
-        }
-      },
-
-      onLoadMoreCommits: async () => {
-        if (!this._data || !this.repoName || !this.container) return;
-
-        const panel = this.container.querySelector("div") as HTMLElement | null;
-        if (!panel) return;
-        const callbacks = this._createCallbacks();
-
-        // If more commits are loaded than visible, reveal more
-        if (this._data.visibleCommitCount < this._data.commits.length) {
-          this._data = {
-            ...this._data,
-            visibleCommitCount: Math.min(
-              this._data.visibleCommitCount + 10,
-              this._data.commits.length,
-            ),
-          };
-          gitBrowserRenderer.replaceSection(panel, "commits", this._data, callbacks);
-          return;
-        }
-
-        const skip = this._data.commitSkipCount + this._data.commits.length;
-        if (!this._data.hasMoreCommits) return;
-
-        this._data = { ...this._data, loadingCommits: true };
-        gitBrowserRenderer.replaceSection(panel, "commits", this._data, callbacks);
-
-        try {
-          const repoName = this.repoName;
-          const moreCommits = await window.openp41ge.workspaceController.getCommitLog(
-            repoName,
-            this._data.selectedBranch,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            { maxCount: 50, skip } as any,
-          );
-          if (repoName !== this.repoName || !this._data) return;
-          this._data = {
-            ...this._data,
-            loadingCommits: false,
-            commits: [...this._data.commits, ...moreCommits],
-            commitSkipCount: skip,
-            hasMoreCommits: moreCommits.length >= 50,
-          };
-          gitBrowserRenderer.replaceSection(panel, "commits", this._data, callbacks);
-        } catch {
-          if (this._data) {
-            this._data = { ...this._data, loadingCommits: false };
-          }
-          gitBrowserRenderer.replaceSection(panel, "commits", this._data, callbacks);
-        }
-      },
-
-      onClose: () => {
-        // Close the pane
-        const ws = window.openp41ge.workspace;
-        if (ws && typeof ws.dispatch === "function") {
-          ws.dispatch("removeColumnTab", this.tabId);
-        }
-      },
-
-      onCheckoutWorktree: async (branchName: string) => {
-        const repoName = this.repoName;
-        if (!repoName) return;
-        try {
-          await window.openp41ge.workspaceController.checkoutWorktree(repoName, branchName);
-          toastService.show(`Worktree "${branchName}" created`, "success");
-        } catch {
-          toastService.show(`Failed to create worktree for "${branchName}"`, "error", 5000);
-        }
-      },
-
-      onBranchContextMenu: (branchName: string, x: number, y: number) => {
-        // Remove any existing context menus
-        document.querySelectorAll("openp41ge-contextmenu").forEach((el) => el.remove());
-
-        const ctx = createOpenp41geContextMenu({
-          x,
-          y,
-          items: [
-            {
-              label: "Checkout as worktree",
-              action: async () => {
-                const repoName = this.repoName;
-                if (!repoName) return;
-                try {
-                  await window.openp41ge.workspaceController.checkoutWorktree(repoName, branchName);
-                  toastService.show(`Worktree "${branchName}" created`, "success");
-                  // Refresh the worktree tree so the new worktree appears
-                  const wt = document.querySelector("openp41ge-worktree-tree") as Element & {
-                    _loadRepos?: () => Promise<void>;
-                  };
-                  if (wt && typeof wt._loadRepos === "function") {
-                    wt._loadRepos();
-                  }
-                } catch {
-                  toastService.show(`Failed to create worktree for "${branchName}"`, "error", 5000);
-                }
-              },
-            },
-            {
-              label: "Fetch",
-              action: async () => {
-                const repoName = this.repoName;
-                if (!repoName) return;
-                try {
-                  await window.openp41ge.workspaceController.fetch(repoName);
-                  toastService.show(`Fetched "${branchName}"`, "success");
-                } catch {
-                  toastService.show(`Failed to fetch "${branchName}"`, "error", 5000);
-                }
-              },
-            },
-            {
-              label: "Show commits",
-              action: () => {
-                // Select the branch, which triggers commits section to load for it
-                if (this._data && this.container) {
-                  this._createCallbacks().onSelectBranch(branchName);
-                }
-              },
-            },
-            {
-              label: "Copy branch name",
-              action: () => {
-                navigator.clipboard.writeText(branchName);
-                toastService.show("Branch name copied", "info", 2000);
-              },
-            },
-          ],
-          onclose: () => {},
-        });
-
-        document.body.appendChild(ctx);
-      },
-
-      onFileRowClick: (_filePath: string) => {
-        // File selection/highlight only — no navigation (deferred)
-      },
-    };
+        this._pushData();
+      }
+    }
   }
+
+  // ─── Event handlers ───────────────────────────────────────────────────
+
+  private _onSelectBranch = async (e: Event): Promise<void> => {
+    if (!this._data || !this.repoName) return;
+    const { branchName } = (e as CustomEvent).detail as { branchName: string };
+    const commitRef = this._resolveBranchRef(branchName);
+
+    this._data = {
+      ...this._data,
+      selectedBranch: commitRef,
+      loadingCommits: true,
+      commits: [],
+      commitSkipCount: 0,
+      hasMoreCommits: false,
+      visibleCommitCount: 10,
+      selectedCommit: null,
+      loadingFiles: true,
+    };
+    this._pushData();
+
+    try {
+      const repoName = this.repoName;
+      const commits = await window.openp41ge.workspaceController.getCommitLog(
+        repoName,
+        commitRef,
+        { maxCount: 50 },
+      );
+      if (repoName !== this.repoName || !this._data) return;
+
+      const diffStat = await window.openp41ge.workspaceController.getDiffStat(repoName);
+      if (repoName !== this.repoName || !this._data) return;
+
+      this._data = {
+        ...this._data,
+        loadingCommits: false,
+        commits,
+        commitSkipCount: 0,
+        hasMoreCommits: commits.length >= 50,
+        loadingFiles: false,
+        filesChanged: diffStat,
+      };
+      this._pushData();
+    } catch {
+      if (this._data) {
+        this._data = { ...this._data, loadingCommits: false, loadingFiles: false };
+        this._pushData();
+      }
+    }
+  };
+
+  private _onSelectCommit = async (e: Event): Promise<void> => {
+    if (!this._data || !this.repoName) return;
+    const { commitHash } = (e as CustomEvent).detail as { commitHash: string | null };
+
+    this._data = { ...this._data, selectedCommit: commitHash, loadingFiles: !!commitHash };
+    this._pushData();
+
+    try {
+      const repoName = this.repoName;
+      const diffStat = await window.openp41ge.workspaceController.getDiffStat(
+        repoName,
+        commitHash ?? undefined,
+      );
+      if (repoName !== this.repoName || !this._data) return;
+      this._data = { ...this._data, loadingFiles: false, filesChanged: diffStat };
+      this._pushData();
+    } catch {
+      if (this._data) {
+        this._data = { ...this._data, loadingFiles: false };
+        this._pushData();
+      }
+    }
+  };
+
+  private _onRefreshBranches = async (): Promise<void> => {
+    if (!this._data || !this.repoName) return;
+    this._data = { ...this._data, loadingBranches: true };
+    this._pushData();
+
+    try {
+      await this._refreshAll();
+    } catch {
+      if (this._data) {
+        this._data = { ...this._data, loadingBranches: false };
+        this._pushData();
+      }
+    }
+  };
+
+  private _onRefreshCommits = async (): Promise<void> => {
+    if (!this._data || !this.repoName) return;
+    this._data = { ...this._data, loadingCommits: true };
+    this._pushData();
+
+    try {
+      await this._refreshAll();
+    } catch {
+      if (this._data) {
+        this._data = { ...this._data, loadingCommits: false };
+        this._pushData();
+      }
+    }
+  };
+
+  private _onRefreshFiles = async (): Promise<void> => {
+    if (!this._data || !this.repoName) return;
+    this._data = { ...this._data, loadingFiles: true };
+    this._pushData();
+
+    try {
+      await this._refreshAll();
+    } catch {
+      if (this._data) {
+        this._data = { ...this._data, loadingFiles: false };
+        this._pushData();
+      }
+    }
+  };
+
+  private _onLoadMoreCommits = async (): Promise<void> => {
+    if (!this._data || !this.repoName) return;
+
+    // If more commits are loaded than visible, reveal more
+    if (this._data.visibleCommitCount < this._data.commits.length) {
+      this._data = {
+        ...this._data,
+        visibleCommitCount: Math.min(
+          this._data.visibleCommitCount + 10,
+          this._data.commits.length,
+        ),
+      };
+      this._pushData();
+      return;
+    }
+
+    const skip = this._data.commitSkipCount + this._data.commits.length;
+    if (!this._data.hasMoreCommits) return;
+
+    this._data = { ...this._data, loadingCommits: true };
+    this._pushData();
+
+    try {
+      const repoName = this.repoName;
+      const moreCommits = await window.openp41ge.workspaceController.getCommitLog(
+        repoName,
+        this._data.selectedBranch,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { maxCount: 50, skip } as any,
+      );
+      if (repoName !== this.repoName || !this._data) return;
+      this._data = {
+        ...this._data,
+        loadingCommits: false,
+        commits: [...this._data.commits, ...moreCommits],
+        commitSkipCount: skip,
+        hasMoreCommits: moreCommits.length >= 50,
+      };
+      this._pushData();
+    } catch {
+      if (this._data) {
+        this._data = { ...this._data, loadingCommits: false };
+        this._pushData();
+      }
+    }
+  };
+
+  private _onClose = (): void => {
+    const ws = window.openp41ge.workspace;
+    if (ws && typeof ws.dispatch === "function") {
+      ws.dispatch("removeColumnTab", this.tabId);
+    }
+  };
+
+  private _onCheckoutWorktree = async (e: Event): Promise<void> => {
+    const { branchName } = (e as CustomEvent).detail as { branchName: string };
+    const repoName = this.repoName;
+    if (!repoName) return;
+    try {
+      await window.openp41ge.workspaceController.checkoutWorktree(repoName, branchName);
+      toastService.show(`Worktree "${branchName}" created`, "success");
+    } catch {
+      toastService.show(`Failed to create worktree for "${branchName}"`, "error", 5000);
+    }
+  };
+
+  private _onBranchContextMenu = (e: Event): void => {
+    const { branchName, x, y } = (e as CustomEvent<GitBranchContextMenuDetail>).detail;
+    const repoName = this.repoName;
+    if (!repoName) return;
+
+    document.querySelectorAll("openp41ge-contextmenu").forEach((el) => el.remove());
+
+    const ctx = createOpenp41geContextMenu({
+      x,
+      y,
+      items: [
+        {
+          label: "Checkout as worktree",
+          action: async () => {
+            try {
+              await window.openp41ge.workspaceController.checkoutWorktree(repoName, branchName);
+              toastService.show(`Worktree "${branchName}" created`, "success");
+              const wt = document.querySelector("openp41ge-worktree-tree") as Element & {
+                _loadRepos?: () => Promise<void>;
+              };
+              if (wt && typeof wt._loadRepos === "function") {
+                wt._loadRepos();
+              }
+            } catch {
+              toastService.show(`Failed to create worktree for "${branchName}"`, "error", 5000);
+            }
+          },
+        },
+        {
+          label: "Fetch",
+          action: async () => {
+            try {
+              await window.openp41ge.workspaceController.fetch(repoName);
+              toastService.show(`Fetched "${branchName}"`, "success");
+            } catch {
+              toastService.show(`Failed to fetch "${branchName}"`, "error", 5000);
+            }
+          },
+        },
+        {
+          label: "Show commits",
+          action: () => {
+            if (this._data) {
+              this._onSelectBranch(
+                new CustomEvent(GIT_SELECT_BRANCH, { detail: { branchName } }),
+              );
+            }
+          },
+        },
+        {
+          label: "Copy branch name",
+          action: () => {
+            navigator.clipboard.writeText(branchName);
+            toastService.show("Branch name copied", "info", 2000);
+          },
+        },
+      ],
+      onclose: () => {},
+    });
+
+    document.body.appendChild(ctx);
+  };
+
+  private _onFileRowClick = (e: Event): void => {
+    // File selection/highlight only — no navigation (deferred)
+  };
 }

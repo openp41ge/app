@@ -16,10 +16,6 @@
       "types": "./dist/file-editor/index.d.ts",
       "import": "./dist/file-editor/index.js"
     },
-    "./git-repository": {
-      "types": "./dist/git-repository/types.d.ts",
-      "import": "./dist/git-repository/index.js"
-    },
     "./styles.css": "./dist/styles.css"
   },
   "main": "dist/index.js",
@@ -39,7 +35,7 @@
     "openp41ge-syntax-highlighting": "workspace:*",
     "openp41ge-tabs": "workspace:*",
     "openp41ge-editor-engine": "workspace:*",
-    "openp41ge-git-repository": "workspace:*",
+    "openp41ge-git": "workspace:*",
     "vscode-textmate": "^9.3.2",
     "vscode-oniguruma": "^2.0.1"
   },

@@ -228,7 +228,7 @@ class GitBrowserRenderer {
     // Group branches by shortName (e.g., "master" groups local master + origin/master)
     const groups = new Map<string, BranchEntry[]>();
     for (const branch of data.branches) {
-      const key = branch.shortName;
+      const key = branch.shortName || branch.name;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(branch);
     }
@@ -496,7 +496,7 @@ class GitBrowserRenderer {
 
     for (const file of data.filesChanged) {
       const row = this.renderFileRow(file);
-      row.addEventListener("click", () => callbacks.onFileRowClick(file.filePath));
+      row.addEventListener("click", () => callbacks.onFileRowClick(file.filePath || file.file || ''));
       wrapper.appendChild(row);
     }
 
@@ -571,7 +571,7 @@ class GitBrowserRenderer {
         `;
 
         const hash = document.createElement("span");
-        hash.textContent = commit.shortHash;
+        hash.textContent = commit.shortHash || commit.hash;
         hash.style.cssText = "color:#666;flex-shrink:0;margin-right:4px;";
         commitLine.appendChild(hash);
 
@@ -611,7 +611,7 @@ class GitBrowserRenderer {
 
   private _addBranchName(container: HTMLElement, branch: BranchEntry): void {
     const name = document.createElement("span");
-    name.textContent = branch.shortName;
+    name.textContent = branch.shortName || branch.name;
     name.style.cssText =
       "margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;";
     container.appendChild(name);
@@ -659,7 +659,7 @@ class GitBrowserRenderer {
 
     // First line: hash
     const hashLine = document.createElement("div");
-    hashLine.textContent = commit.shortHash;
+    hashLine.textContent = commit.shortHash || commit.hash;
     hashLine.style.cssText =
       "color:#ccc;font-family:monospace;font-size:13px;line-height:1.6;font-weight:500;";
     row.appendChild(hashLine);
@@ -676,12 +676,12 @@ class GitBrowserRenderer {
     metaLine.style.cssText = "display:flex;align-items:center;margin-top:1px;";
 
     const author = document.createElement("span");
-    author.textContent = commit.authorName;
+    author.textContent = commit.authorName || commit.author || '';
     author.style.cssText = "color:#666;font-size:10px;";
     metaLine.appendChild(author);
 
     const date = document.createElement("span");
-    date.textContent = " \u00B7 " + commit.relativeDate;
+    date.textContent = " \u00B7 " + (commit.relativeDate || commit.date);
     date.style.cssText = "color:#555;font-size:10px;margin-left:4px;";
     metaLine.appendChild(date);
 
@@ -710,7 +710,7 @@ class GitBrowserRenderer {
     const statusIcon = document.createElement("span");
     statusIcon.style.cssText =
       "width:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
-    switch (file.status) {
+    switch (file.status || 'modified') {
       case "added":
         statusIcon.innerHTML = fileAddedSvg(12);
         break;
@@ -727,7 +727,7 @@ class GitBrowserRenderer {
 
     // Filename
     const name = document.createElement("span");
-    name.textContent = file.filePath;
+    name.textContent = file.filePath || file.file || '';
     name.style.cssText =
       "margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;";
     row.appendChild(name);
