@@ -3,7 +3,7 @@
  */
 
 import { html, LitElement, type TemplateResult } from "lit";
-import { customElement, property, query } from "lit/decorators.js";
+import { customElement, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Meta, StoryObj } from "@storybook/web-components";
 import "openp41ge-uikit";
@@ -413,6 +413,197 @@ class TabsDemoApp extends LitElement {
   }
 }
 
+// ─── Single grid demo ──────────────────────────────────────────────────
+
+@customElement("single-grid-demo")
+class SingleGridDemo extends LitElement {
+  override createRenderRoot(): HTMLElement | ShadowRoot {
+    return this;
+  }
+
+  private _state = GridState.from("editor", [
+    { id: createTabId(), title: "README.md", content: '<div class="content-placeholder"><h3>README.md</h3><p>A single grid. Drag tabs to column edges to split.</p></div>' },
+    { id: createTabId(), title: "index.js", content: '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const x = 1;</pre></div>' },
+    { id: createTabId(), title: "style.css", content: '<div class="content-placeholder"><h3>style.css</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">body { background: #1e1e1e; }</pre></div>' },
+  ]);
+
+  // ── Drag state ─────────────────────────────────────────────────
+
+  private _currentDragSource: IDragSource | null = null;
+  private _ghostShownGrid: HTMLElement | null = null;
+  private _ghostManager = new GhostManager();
+  private _orchestrator!: DragOrchestrator;
+
+  private _targetResolver = (clientX: number, clientY: number) => {
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el || !(el instanceof HTMLElement)) return null;
+    const tabBar = el.closest("tab-bar") as any;
+    if (tabBar && tabBar.dropTarget) return tabBar.dropTarget;
+    const grid = el.closest("tab-grid") as any;
+    if (grid && grid.dropTarget) return grid.dropTarget;
+    return null;
+  };
+
+  @query("#single-grid")
+  private _gridEl!: any;
+
+  override firstUpdated(): void {
+    this._orchestrator = new DragOrchestrator(this._targetResolver);
+    this._state.applyTo(this._gridEl);
+
+    // ── Tab drag start ───────────────────────────────────────────
+    document.addEventListener("mousedown", (e: Event) => {
+      const tabBtn = (e.target as HTMLElement).closest("[role='tab']");
+      if (!tabBtn) return;
+      if ((e.target as HTMLElement).closest(".tab-close")) return;
+      const tabBar = tabBtn.closest("tab-bar") as any;
+      if (!tabBar) return;
+      const tabId = tabBtn.getAttribute("data-tab-id");
+      if (!tabId) return;
+      e.preventDefault();
+      this._currentDragSource = new TabDragSource(tabBtn as HTMLElement, tabId, tabBar.winId, "workset-1");
+      this._orchestrator.startDrag(this._currentDragSource, (e as MouseEvent).clientX, (e as MouseEvent).clientY);
+    });
+
+    // ── Ghost overlay ────────────────────────────────────────────
+    document.addEventListener("mousemove", (e: Event) => {
+      if (!this._orchestrator.isDragging) return;
+      const me = e as MouseEvent;
+      if (this._ghostShownGrid) {
+        this._ghostManager.hideGhost(this._ghostShownGrid);
+        this._ghostShownGrid = null;
+      }
+      const target = this._targetResolver(me.clientX, me.clientY);
+      if (!target || target.type !== "grid" || !this._currentDragSource) return;
+      const feedback = target.onHover(this._currentDragSource, me.clientX, me.clientY);
+      if (!feedback || !feedback.showGhost || !feedback.ghostConfig) return;
+      const cfg = feedback.ghostConfig;
+      this._ghostManager.showGhost(target.element, {
+        cols: cfg.cols,
+        boundaryIndex: cfg.boundaryIndex,
+        splitCol: cfg.splitCol,
+        splitLeft: cfg.splitLeft,
+        activeCol: cfg.mouseCol ?? cfg.col,
+      });
+      this._ghostShownGrid = target.element;
+    });
+
+    // ── Clear ghost ──────────────────────────────────────────────
+    document.addEventListener("mouseup", () => {
+      if (this._ghostShownGrid) {
+        this._ghostManager.hideGhost(this._ghostShownGrid);
+        this._ghostShownGrid = null;
+      }
+    });
+
+    // ── Grid events ────────────────────────────────────────────
+    document.addEventListener("grid-split", (e: any) => {
+      const { sourceWinId, winId, tabId, splitCol, splitLeft } = e.detail;
+      if (sourceWinId !== "editor") return;
+      const removed = this._state.removeTab(tabId);
+      if (!removed) return;
+      this._state.insertTabInSplit({ id: tabId, title: removed.title, content: removed.content }, splitCol, splitLeft);
+      this._render();
+    });
+
+    document.addEventListener("grid-move", (e: any) => {
+      const { sourceWinId, tabId, targetCol } = e.detail;
+      if (sourceWinId !== "editor") return;
+      const removed = this._state.removeTab(tabId);
+      if (!removed) return;
+      this._state.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, -1);
+      this._render();
+    });
+
+    // ── Add tab ──────────────────────────────────────────────────
+    this.querySelector("#single-add-tab")?.addEventListener("click", () => {
+      let col = 0;
+      const lastIdx = this._state.placements.length - 1;
+      if (lastIdx >= 0) col = this._state.placements[lastIdx].position.col;
+      this._state.addTab(col, "New Tab", '<div class="content-placeholder"><h3>New Tab</h3></div>');
+      this._render();
+    });
+
+    // ── Tab close ────────────────────────────────────────────────
+    document.addEventListener("click", (e: Event) => {
+      const closeBtn = (e.target as HTMLElement).closest(".tab-close");
+      if (!closeBtn) return;
+      const tabBar = closeBtn.closest("tab-bar") as any;
+      if (!tabBar) return;
+      const tabId = closeBtn.getAttribute("data-close-tab-id");
+      if (!tabId || tabBar.winId !== "editor") return;
+      this._state.removeTab(tabId);
+      this._render();
+    });
+
+    // ── Reset ────────────────────────────────────────────────────
+    this.querySelector("#single-reset")?.addEventListener("click", () => {
+      _tabCounter = 0;
+      this._state = GridState.from("editor", [
+        { id: createTabId(), title: "README.md", content: '<div class="content-placeholder"><h3>README.md</h3><p>A single grid. Drag tabs to column edges to split.</p></div>' },
+        { id: createTabId(), title: "index.js", content: '<div class="content-placeholder"><h3>index.js</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">const x = 1;</pre></div>' },
+        { id: createTabId(), title: "style.css", content: '<div class="content-placeholder"><h3>style.css</h3><pre style="background:#252526;padding:12px;border-radius:4px;color:#7ecb8e;">body { background: #1e1e1e; }</pre></div>' },
+      ]);
+      this._render();
+    });
+  }
+
+  private _render(): void {
+    this._state.applyTo(this._gridEl);
+  }
+
+  override render(): TemplateResult {
+    return html`
+      <style>
+        .single-demo {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          background: #1e1e1e;
+          color: #ccc;
+          padding: 16px;
+          height: 100vh;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+        }
+        .single-demo h2 {
+          font-size: 14px;
+          margin: 0 0 8px;
+          color: #aaa;
+        }
+        .single-demo tab-grid {
+          flex: 1;
+          min-height: 200px;
+        }
+        .single-toolbar {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+        .single-toolbar button {
+          padding: 4px 12px;
+          background: #2a2a2a;
+          border: 1px solid #3a3a3a;
+          border-radius: 4px;
+          color: #ccc;
+          cursor: pointer;
+          font-size: 11px;
+        }
+        .single-toolbar button:hover {
+          border-color: #4a9eff;
+        }
+      </style>
+
+      <div class="single-demo">
+        <div class="single-toolbar">
+          <button id="single-add-tab">+ Add Tab</button>
+          <button id="single-reset">Reset</button>
+        </div>
+        <tab-grid id="single-grid"></tab-grid>
+      </div>
+    `;
+  }
+}
+
 // ─── Storybook stories ────────────────────────────────────────────────
 
 const meta: Meta = {
@@ -426,4 +617,8 @@ type Story = StoryObj;
 
 export const MultiGridDemo: Story = {
   render: () => html`<tabs-demo-app></tabs-demo-app>`,
+};
+
+export const SingleGridDemo: Story = {
+  render: () => html`<single-grid-demo></single-grid-demo>`,
 };
