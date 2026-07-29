@@ -63,17 +63,17 @@ export class Openp41geAddWorktreeDialog extends LitElement {
 
   render() {
     return html`
-      <div id="wt-addwt-row" style="display:flex;flex-direction:column;gap:4px;padding:6px 12px;">
-        <div style="font-size:10px;color:var(--text-secondary);margin-bottom:2px;">
+      <div id="wt-addwt-row" class="flex flex-col gap-1 px-3 py-1.5">
+        <div class="text-2xs text-secondary mb-0.5">
           Add worktree to ${this.repoName}
         </div>
-        ${this._loading ? html`<div style="color:var(--text-secondary);font-size:11px;">Loading branches...</div>` : ""}
-        ${this._error ? html`<div style="color:#e06c75;font-size:11px;">${this._error}</div>` : ""}
+        ${this._loading ? html`<div class="text-secondary text-xs">Loading branches...</div>` : ""}
+        ${this._error ? html`<div class="text-[#e06c75] text-xs">${this._error}</div>` : ""}
         ${
           !this._loading && this._branches.length > 0
             ? html`
                 <select
-                  style="width:100%;height:24px;background:var(--bg-tertiary);border:1px solid #3a3a3a;border-radius:3px;color:#e0e0e0;font-size:11px;padding:0 4px;outline:none;font-family:inherit;"
+                  class="w-full h-6 bg-bg-tertiary border border-[#3a3a3a] rounded text-[#e0e0e0] text-xs px-1 outline-none font-inherit"
                   @change=${(e: Event) => {
                     this._selectedBranch = (e.target as HTMLSelectElement).value;
                     this._customBranch = "";
@@ -85,12 +85,12 @@ export class Openp41geAddWorktreeDialog extends LitElement {
               `
             : ""
         }
-        <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+        <div class="flex items-center gap-1.5 mt-0.5">
           <input
             id="wt-addwt-input"
             type="text"
             placeholder="Or type a branch name"
-            style="flex:1;min-width:0;height:24px;background:var(--bg-tertiary);border:1px solid #3a3a3a;border-radius:3px;color:#e0e0e0;font-size:11px;padding:0 6px;outline:none;font-family:inherit;"
+            class="flex-1 min-w-0 h-6 bg-bg-tertiary border border-[#3a3a3a] rounded text-[#e0e0e0] text-xs px-1.5 outline-none font-inherit"
             @input=${(e: InputEvent) => {
               this._customBranch = (e.target as HTMLInputElement).value;
               this._selectedBranch = "";
@@ -102,13 +102,13 @@ export class Openp41geAddWorktreeDialog extends LitElement {
             }}
           />
           <button
-            style="height:22px;padding:0 8px;background:var(--accent);border:none;border-radius:3px;color:#fff;font-size:11px;cursor:pointer;white-space:nowrap;"
+            class="h-[22px] px-2 bg-accent border-none rounded text-white text-xs cursor-pointer whitespace-nowrap"
             @click=${this._confirm}
           >
             Add
           </button>
           <button
-            style="height:22px;padding:0 6px;background:transparent;border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;"
+            class="h-[22px] px-1.5 bg-transparent border-none text-secondary text-sm cursor-pointer"
             @click=${() => this.dispatchEvent(new CustomEvent("add-wt-close", { bubbles: true }))}
           >
             ×
