@@ -43,20 +43,7 @@
         "type": true
       }
     },
-    "packages/openp41ge-file-editor": {
-      "project": ["src/**/*.ts"],
-      "entry": ["src/file-editor.ts"],
-      "ignoreExportsUsedInFile": {
-        "interface": true,
-        "type": true
-      },
-      "ignoreDependencies": ["electron"]
-    },
-    "packages/openp41ge-syntax-highlighting": {
-      "project": ["src/**/*.ts"],
-      "ignore": ["src/services/index.ts"]
-    },
-    "packages/openp41ge-tabs": {
+    "packages/openp41ge-uikit": {
       "project": ["src/**/*.ts"]
     },
     "packages/openp41ge-terminal": {
@@ -64,13 +51,6 @@
     },
     "packages/openp41ge-agent-chat": {
       "project": ["src/**/*.ts"]
-    },
-    "packages/openp41ge-git-repository": {
-      "project": ["src/**/*.ts"],
-      "ignoreExportsUsedInFile": {
-        "interface": true,
-        "type": true
-      }
     },
     "packages/openp41ge-logger": {
       "project": ["src/**/*.ts"],
@@ -80,7 +60,7 @@
       }
     },
     "demos/openp41ge-tabs-demo": {
-      "ignoreDependencies": ["openp41ge-tabs"]
+      "ignoreDependencies": ["openp41ge-uikit"]
     }
   }
 }

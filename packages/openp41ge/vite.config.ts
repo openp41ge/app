@@ -18,20 +18,14 @@ export default defineConfig({
       // used by nx run-many -t build for production builds.
       { find: "openp41ge-git", replacement: path.resolve(__dirname, "../openp41ge-git/src") },
       { find: "openp41ge-logger", replacement: path.resolve(__dirname, "../openp41ge-logger/src") },
-      { find: "openp41ge-tabs", replacement: path.resolve(__dirname, "../openp41ge-tabs/src") },
-      {
-        find: "openp41ge-syntax-highlighting",
-        replacement: path.resolve(__dirname, "../openp41ge-syntax-highlighting/src"),
-      },
-      { find: "openp41ge-themes", replacement: path.resolve(__dirname, "../openp41ge-themes/src") },
+      { find: "openp41ge-uikit", replacement: path.resolve(__dirname, "../openp41ge-uikit/src") },
+      { find: "openp41ge-uikit/theme", replacement: path.resolve(__dirname, "../openp41ge-uikit/src/theme") },
+      { find: "openp41ge-uikit/syntax-highlighting", replacement: path.resolve(__dirname, "../openp41ge-uikit/src/syntax-highlighting") },
       {
         find: "openp41ge-file-editor",
-        replacement: path.resolve(__dirname, "../openp41ge-file-editor/src"),
+        replacement: path.resolve(__dirname, "../openp41ge-uikit/src/file-editor"),
       },
-      {
-        find: "openp41ge-git-repository",
-        replacement: path.resolve(__dirname, "../openp41ge-git-repository/src"),
-      },
+      { find: "openp41ge-uikit/git-repository", replacement: path.resolve(__dirname, "../openp41ge-uikit/src/git-repository") },
       {
         find: "openp41ge-terminal",
         replacement: path.resolve(__dirname, "../openp41ge-terminal/src"),
@@ -39,10 +33,6 @@ export default defineConfig({
       {
         find: "openp41ge-agent-chat",
         replacement: path.resolve(__dirname, "../openp41ge-agent-chat/src"),
-      },
-      {
-        find: "openp41ge-components",
-        replacement: path.resolve(__dirname, "../openp41ge-components/src"),
       },
     ],
   },

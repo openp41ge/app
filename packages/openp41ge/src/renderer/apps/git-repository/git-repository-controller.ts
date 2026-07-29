@@ -19,7 +19,7 @@ import {
   gitBrowserRenderer,
   type GitBrowserData,
   type GitBrowserCallbacks,
-} from "openp41ge-git-repository";
+} from "openp41ge-uikit";
 import { toastService } from "../../components/openp41ge-toast";
 import { createOpenp41geContextMenu } from "../../interfaces/element-guards";
 

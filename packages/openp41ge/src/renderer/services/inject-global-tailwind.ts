@@ -3,11 +3,11 @@
  * as a global stylesheet so any element in the app can use Tailwind classes
  * (e.g. class="text-primary text-sm").
  *
- * The CSS is compiled by openp41ge-components' build:css step and exported
+ * The CSS is compiled by openp41ge-uikit' build:css step and exported
  * as a JS string. We inject it once into the document <head>.
  */
 
-import { tailwindCSS } from "openp41ge-components";
+import { tailwindCSS } from "openp41ge-uikit";
 
 let injected = false;
 

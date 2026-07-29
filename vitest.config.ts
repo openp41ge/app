@@ -63,13 +63,13 @@ export default defineConfig({
       provider: "istanbul",
       include: [
         "./packages/openp41ge/src/**/*.ts",
-        "./packages/openp41ge-file-editor/src/**/*.ts",
+        "./packages/openp41ge-uikit/src/file-editor/**/*.ts",
         "./packages/openp41ge-logger/src/**/*.ts",
         "./packages/openp41ge-terminal/src/**/*.ts",
         "./packages/openp41ge-agent-chat/src/**/*.ts",
-        "./packages/openp41ge-git-repository/src/**/*.ts",
-        "./packages/openp41ge-syntax-highlighting/src/**/*.ts",
-        "./packages/openp41ge-themes/src/**/*.ts",
+        "./packages/openp41ge-uikit/src/git-repository/**/*.ts",
+        "./packages/openp41ge-uikit/src/syntax-highlighting/**/*.ts",
+        "./packages/openp41ge-uikit/src/theme/**/*.ts",
       ],
       exclude: [
         "**/node_modules/**",
@@ -82,7 +82,7 @@ export default defineConfig({
         // Per-package exclusions
         "./packages/openp41ge/src/renderer/**",
         "./packages/openp41ge/src/main/**",
-        "./packages/openp41ge-file-editor/src/interfaces/**",
+        "./packages/openp41ge-uikit/src/file-editor/interfaces/**",
         "./packages/openp41ge-logger/src/viewer.ts",
         "./packages/openp41ge-terminal/src/shell/index.ts",
         "./packages/openp41ge-terminal/src/shell/shell-connector.ts",
@@ -98,14 +98,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@openp41ge": path.resolve(__dirname, "./packages/openp41ge/src"),
-      "@openp41ge-file-editor": path.resolve(__dirname, "./packages/openp41ge-file-editor/src"),
+      "@openp41ge-file-editor": path.resolve(__dirname, "./packages/openp41ge-uikit/src/file-editor"),
       "@openp41ge-logger": path.resolve(__dirname, "./packages/openp41ge-logger/src"),
       "@openp41ge-terminal": path.resolve(__dirname, "./packages/openp41ge-terminal/src"),
       "@openp41ge-agent-chat": path.resolve(__dirname, "./packages/openp41ge-agent-chat/src"),
-      "@openp41ge-git-repository": path.resolve(
-        __dirname,
-        "./packages/openp41ge-git-repository/src",
-      ),
     },
   },
 });

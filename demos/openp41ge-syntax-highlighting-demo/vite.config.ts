@@ -4,11 +4,8 @@ import path from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      "openp41ge-syntax-highlighting": path.resolve(
-        __dirname,
-        "../../packages/openp41ge-syntax-highlighting/src",
-      ),
-      "openp41ge-themes": path.resolve(__dirname, "../../packages/openp41ge-themes/src"),
+      "openp41ge-uikit": path.resolve(__dirname, "../../packages/openp41ge-uikit/src"),
+      "openp41ge-uikit": path.resolve(__dirname, "../../packages/openp41ge-uikit/src"),
     },
   },
 });

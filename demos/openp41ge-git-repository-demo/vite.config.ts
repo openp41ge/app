@@ -4,7 +4,7 @@ import path from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      "openp41ge-git-repository": path.resolve(__dirname, "../../packages/openp41ge-git-repository/src"),
+      "openp41ge-uikit": path.resolve(__dirname, "../../packages/openp41ge-uikit/src"),
     },
   },
 });

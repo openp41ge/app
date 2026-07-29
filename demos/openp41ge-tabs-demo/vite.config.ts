@@ -4,7 +4,7 @@ import path from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      "openp41ge-tabs": path.resolve(__dirname, "../../packages/openp41ge-tabs/src"),
+      "openp41ge-uikit": path.resolve(__dirname, "../../packages/openp41ge-uikit/src"),
     },
   },
 });

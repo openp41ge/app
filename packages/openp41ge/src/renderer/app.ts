@@ -29,8 +29,8 @@ import "./components/openp41ge-activity-bar";
 import "./components/openp41ge-sidebar";
 import "./components/focus-section";
 
-// Import openp41ge-tabs components (registers <tab-grid>, <tab-bar>, <tab-content>)
-import "openp41ge-tabs";
+// Import openp41ge-uikit (registers <tab-grid>, <tab-bar>, <tab-content>, etc.)
+import "openp41ge-uikit";
 
 // ─── Theme CSS variables (bundled by Vite) ────────────────────────────────
 import "../styles/themes.css";

@@ -10,7 +10,7 @@
  */
 
 // ─── Components ────────────────────────────────────────────────────────────
-export { TabGrid, TabBar, TabView, TabContent } from "openp41ge-tabs";
+export { TabGrid, TabBar, TabView, TabContent } from "openp41ge-uikit";
 
 // ─── Drag & Drop Infrastructure ───────────────────────────────────────────
 export {
@@ -21,7 +21,7 @@ export {
   TabBarDropTarget,
   GridDropTarget,
   defaultTargetResolver,
-} from "openp41ge-tabs";
+} from "openp41ge-uikit";
 
 // ─── Pure Functions — Boundary Detection, Ghost Layout ────────────────────
 export {
@@ -32,7 +32,7 @@ export {
   classifyGridPosition,
   INSERT_BOUNDARY_THRESHOLD,
   DRAG_EVENTS,
-} from "openp41ge-tabs";
+} from "openp41ge-uikit";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export type {
@@ -45,7 +45,7 @@ export type {
   TargetResolver,
   WorkspaceLike,
   GridElementLike,
-} from "openp41ge-tabs";
+} from "openp41ge-uikit";
 
 // ─── Event Names ──────────────────────────────────────────────────────────
 export const TAB_BAR_EVENTS = {

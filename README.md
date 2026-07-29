@@ -53,7 +53,7 @@ packages/
 ├── openp41ge-agent-chat/  # AI chat panel
 ├── openp41ge-tabs/        # Tab/drag-and-drop components
 ├── openp41ge-logger/      # Structured logging
-├── openp41ge-themes/      # Theme system
+├── openp41ge-uikit/       # Shared UI toolkit (components, themes, tabs, etc.)
 ├── openp41ge-syntax-highlighting/ # Syntax highlighting
 └── ...demo/               # Demo apps for each library
 ```

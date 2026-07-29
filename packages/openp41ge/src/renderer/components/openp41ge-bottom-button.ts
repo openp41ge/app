@@ -8,7 +8,7 @@
 
 import { LitElement, html, unsafeCSS } from "lit";
 import { property } from "lit/decorators.js";
-import { tailwindCSS } from "openp41ge-components";
+import { tailwindCSS } from "openp41ge-uikit";
 
 export class Openp41geBottomButton extends LitElement {
   static styles = unsafeCSS(tailwindCSS);

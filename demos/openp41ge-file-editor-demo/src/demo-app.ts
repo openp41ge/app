@@ -10,14 +10,14 @@
  * File contents persist in sessionStorage so edits survive page reloads.
  */
 
-import "openp41ge-file-editor"; // registers <file-editor> and <fe-status-bar>
-import type { FileEditorElement } from "openp41ge-file-editor/file-editor";
-import { PieceTreeTextContentModel } from "openp41ge-file-editor/model/piece-tree-text-content-model";
-import type { DirtyChangedDetail } from "openp41ge-file-editor/events";
+import "openp41ge-uikit"; // registers <file-editor>, <tab-grid>, <tab-bar>, etc.
+import type { FileEditorElement } from "openp41ge-uikit/file-editor";
+import { PieceTreeTextContentModel } from "openp41ge-uikit/file-editor";
+import type { DirtyChangedDetail } from "openp41ge-uikit/file-editor";
 
-import { initTextMate } from "openp41ge-file-editor/tokenization/textmate-init";
-import { TokenRegistry } from "openp41ge-file-editor/tokenization/token-registry";
-import { darkPlusTheme } from "openp41ge-file-editor/themes";
+import { initTextMate } from "openp41ge-uikit";
+import { TokenRegistry } from "openp41ge-uikit";
+import { darkPlusTheme } from "openp41ge-uikit/theme";
 
 import samples from "./samples";
 import type { SampleEntry } from "./samples";

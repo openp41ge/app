@@ -6,8 +6,8 @@
  * and logs callbacks to a console output panel.
  */
 
-import { gitBrowserRenderer } from "openp41ge-git-repository/services/git-browser-renderer";
-import type { GitBrowserData, GitBrowserCallbacks } from "openp41ge-git-repository/services/types";
+import { gitBrowserRenderer } from "openp41ge-uikit";
+import type { GitBrowserData, GitBrowserCallbacks } from "openp41ge-uikit";
 import { createMockRepository, createCommitsForBranch, createMoreCommits } from "./mock-data";
 
 // ---------------------------------------------------------------------------

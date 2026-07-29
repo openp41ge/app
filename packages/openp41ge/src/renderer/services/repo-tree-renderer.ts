@@ -2,7 +2,7 @@
  * RepoTreeRenderer — pure DOM tree rendering for worktree explorer.
  *
  * Single Responsibility: turn workspace data into DOM elements using
- * Tailwind utility classes (injected globally from openp41ge-components).
+ * Tailwind utility classes (injected globally from openp41ge-uikit).
  * No IPC, no state management, no event wiring beyond what's passed in.
  *
  * Colour/font tokens reference CSS custom properties set by themes.css,

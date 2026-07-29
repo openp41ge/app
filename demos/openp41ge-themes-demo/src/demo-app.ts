@@ -5,8 +5,8 @@
  * and a preview code sample rendered with the theme's colors.
  */
 
-import { getThemeById, BUILTIN_THEMES } from "openp41ge-themes/index";
-import type { SyntaxTheme, SyntaxScopeColors } from "openp41ge-themes/index";
+import { getThemeById, BUILTIN_THEMES } from "openp41ge-uikit/theme";
+import type { SyntaxTheme, SyntaxScopeColors } from "openp41ge-uikit/theme";
 
 // ---------------------------------------------------------------------------
 // Color catalog

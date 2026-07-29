@@ -10,7 +10,7 @@ import type {
   CommitEntry,
   DiffStatEntry,
   GitBrowserData,
-} from "openp41ge-git-repository/services/types";
+} from "openp41ge-uikit";
 
 // ---------------------------------------------------------------------------
 // Helpers

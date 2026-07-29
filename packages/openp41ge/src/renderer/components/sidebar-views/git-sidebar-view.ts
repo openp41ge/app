@@ -1,5 +1,5 @@
 /**
- * GitSidebarView — wraps repo/worktree list using openp41ge-components.
+ * GitSidebarView — wraps repo/worktree list using openp41ge-uikit.
  *
  * Shows repositories and their worktrees, similar to the explorer but
  * without the file-tree. Uses repo-row and worktree-row from the
@@ -9,7 +9,7 @@
  */
 
 import type { SidebarView } from "./sidebar-view";
-import { RepoRow, WorktreeRow, SideHeader } from "openp41ge-components";
+import { RepoRow, WorktreeRow, SideHeader } from "openp41ge-uikit";
 
 interface RepoEntry {
   name: string;

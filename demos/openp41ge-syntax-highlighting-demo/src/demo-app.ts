@@ -5,9 +5,9 @@
  * grammars, and highlights code samples with theme-aware CSS.
  */
 
-import { initTextMate, TokenRegistry, highlightCode } from "openp41ge-syntax-highlighting/index";
+import { initTextMate, TokenRegistry, highlightCode } from "openp41ge-uikit";
 
-import { getThemeById, generateThemeCSS } from "openp41ge-themes";
+import { getThemeById, generateThemeCSS } from "openp41ge-uikit/theme";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -353,7 +353,7 @@ The \`openp41ge-syntax-highlighting\` package provides a **TextMate-based** synt
 ### Usage Example
 
 \`\`\`typescript
-import { initTextMate, TokenRegistry, highlightCode } from "openp41ge-syntax-highlighting";
+
 
 const { registry } = await initTextMate();
 const tokenRegistry = new TokenRegistry(registry);

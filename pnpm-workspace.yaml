@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "demos/*"
+  - "storybook"
 allowBuilds:
   "@google/genai": true
   "@scarf/scarf": true

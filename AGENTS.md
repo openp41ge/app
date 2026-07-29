@@ -18,13 +18,13 @@ openp41ge/
 │   ├── openp41ge-agent-chat/             # AI chat panel
 │   ├── openp41ge-logger/                 # Logging utility
 │   ├── openp41ge-syntax-highlighting/    # Syntax highlighting engine
-│   ├── openp41ge-themes/                 # Theme system
+│   ├── openp41ge-uikit/                  # Shared UI toolkit (Lit components, themes,
+│   │                                     #   tabs, syntax highlighting, file editor UI)
 │   ├── openp41ge-tabs/                   # Tab/drag-and-drop components
-│   ├── openp41ge-components/             # Shared UI components (Storybook)
 │   └── openp41ge-git/                    # Git integration utilities
 ├── demos/
 │   ├── openp41ge-agent-chat-demo/        # Demo app for the chat panel
-│   ├── openp41ge-components-demo/        # Storybook-based shared component demos
+│   ├── openp41ge-storybook/              # Storybook instance showing all uikit components
 │   ├── openp41ge-file-editor-demo/       # Demo app for the file editor
 │   ├── openp41ge-git-demo/               # Demo app for git utilities
 │   ├── openp41ge-git-repository-demo/    # Demo app for the git browser

@@ -24,18 +24,18 @@ export default defineConfig({
   resolve: {
     alias: {
       "@openp41ge": path.resolve(__dirname, "./src"),
-      "openp41ge-file-editor": path.resolve(__dirname, "../openp41ge-file-editor/src"),
+      "openp41ge-file-editor": path.resolve(__dirname, "../openp41ge-uikit/src/file-editor"),
       "openp41ge-git": path.resolve(__dirname, "../openp41ge-git/src"),
       "openp41ge-logger": path.resolve(__dirname, "../openp41ge-logger/src"),
       "@openp41ge-terminal": path.resolve(__dirname, "../openp41ge-terminal/src"),
       "@openp41ge-agent-chat": path.resolve(__dirname, "../openp41ge-agent-chat/src"),
-      "openp41ge-git-repository": path.resolve(__dirname, "../openp41ge-git-repository/src"),
-      "openp41ge-tabs": path.resolve(__dirname, "../openp41ge-tabs/src/index.ts"),
+      "openp41ge-uikit": path.resolve(__dirname, "../openp41ge-uikit/src"),
+      ,
       "openp41ge-syntax-highlighting": path.resolve(
         __dirname,
         "../openp41ge-syntax-highlighting/src/index.ts",
       ),
-      "openp41ge-themes": path.resolve(__dirname, "../openp41ge-themes/src/index.ts"),
+      "openp41ge-uikit/theme": path.resolve(__dirname, "../openp41ge-uikit/src/theme/index.ts"),
     },
   },
 });
