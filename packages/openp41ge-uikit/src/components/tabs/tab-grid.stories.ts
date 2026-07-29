@@ -455,7 +455,7 @@ class TabsDemoApp extends LitElement {
         tab-grid { flex: 1; }
       </style>
 
-      <div class="tabs-demo" style="display:flex;flex-direction:column;height:100vh;">
+      <div class="tabs-demo" style="display:flex;flex-direction:column;height:100vh;overflow-y:auto;">
         <h1>Openp41ge <span>Tabs</span></h1>
         <p>VS Code-style editor groups. Drag tabs to column edges to split, across columns to rearrange, or between grids to move between groups.</p>
 
