@@ -5,7 +5,11 @@ export { Openp41geTree } from "./tree";
 export type {
   TreeNode,
   TreeNodeAction,
+  TreeNodeDblClickEventDetail,
+  TreeContextMenuEventDetail,
+  TreeToggleErrorEventDetail,
   DropPosition,
+  IconRenderer,
   TreeNodeClickEventDetail,
   TreeNodeToggleEventDetail,
   TreeNodeActionEventDetail,

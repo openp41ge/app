@@ -23,25 +23,10 @@ import {
   type WorktreeData,
   type FileEntry,
 } from "openp41ge-filesystem";
+import type { TreeNode, IconRenderer } from "openp41ge-uikit";
+import "openp41ge-uikit";
 
 export type { WorktreeData, FileEntry };
-
-// Injected CSS for custom property driven dynamic styles
-(function injectRepTreeItemStyles(): void {
-  if (document.getElementById("openp41ge-repo-tree-item-styles")) return;
-  const s = document.createElement("style");
-  s.id = "openp41ge-repo-tree-item-styles";
-  s.textContent = [
-    ".rti-dir-row { padding:0 12px 0 var(--dp); color:var(--fg); }",
-    ".rti-dir-row.untracked { opacity:0.6; }",
-    ".rti-file-row { padding:0 12px 0 var(--dp); color:var(--fg); }",
-    ".rti-file-row.untracked { opacity:0.6; }",
-    ".rti-loading { padding:2px 0 2px var(--dp-l); }",
-    ".rti-icon.untracked { opacity:0.5; }",
-    ".rti-label.untracked { opacity:0.5; }",
-  ].join("\n");
-  document.head.appendChild(s);
-})();
 
 export class Openp41geRepoTreeItem extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -328,109 +313,117 @@ export class Openp41geRepoTreeItem extends LitElement {
     `;
   }
 
-  private _renderWorktreeFiles(
-    branch: string,
-    depth: number,
-    parentPath?: string,
-  ): TemplateResult[] {
+  // ─── Uikit tree integration ──────────────────────────────────────
+
+  /** Build TreeNode[] for all files under a worktree branch. */
+  private _buildFileTreeNodes(branch: string, parentPath?: string): TreeNode[] {
     const entries = this._fileLoader.getEntries(branch, parentPath);
     if (entries.length === 0) return [];
-
     const expandedDirs = this._expandedDirs.get(branch) ?? new Set();
-
     return entries.map((entry) => {
       const isUntracked = this._fileLoader.isUntracked(branch, entry.path);
       if (entry.isDirectory) {
         const isExpanded = expandedDirs.has(entry.path);
         const isLoading = this._fileLoader.isLoadingDir(entry.path);
-        const isRefreshing = this._fileLoader.isRefreshingDir(entry.path);
-        const hasCache = this._fileLoader.dirContents.has(entry.path);
-        // Show cached children immediately, even during refresh
-        const children =
-          isExpanded && hasCache ? this._fileLoader.dirContents.get(entry.path) : undefined;
-        return html`
-          <div
-            class="rti-dir-row flex items-center h-6 cursor-pointer text-xs gap-1 transition-[background] duration-100${isUntracked ? " untracked" : ""}"
-            style="--dp:${28 + depth * 14}px;--fg:${isUntracked ? "#666" : "#999"}"
-            @mouseenter=${(e: MouseEvent) => {
-              (e.currentTarget as HTMLElement).classList.add("bg-[rgba(255,255,255,0.03)]");
-            }}
-            @mouseleave=${(e: MouseEvent) => {
-              (e.currentTarget as HTMLElement).classList.remove("bg-[rgba(255,255,255,0.03)]");
-            }}
-            @click=${() => this._toggleDir(branch, entry.path)}
-          >
-            <span
-              class="inline-flex items-center justify-center w-4 h-4 shrink-0 text-[#8a8a8a] text-2xs"
-              >${isExpanded ? "\u25BC" : "\u25B6"}</span
-            >
-            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-              >${entry.name}</span
-            >
-            ${
-              (isLoading || isRefreshing) && isExpanded
-                ? html`<div
-                    class="wt-spinner w-[10px] h-[10px] shrink-0 border-[1.5px] border-[#444] border-t-accent-hover rounded-full animate-[wt-spin_0.8s_linear_infinite]"
-                  ></div>`
-                : ""
-            }
-          </div>
-          ${children ? this._renderWorktreeFiles(branch, depth + 1, entry.path) : ""}
-          ${
-            isExpanded && !hasCache && isLoading
-              ? html`<div
-                  class="rti-loading text-2xs text-muted"
-                  style="--dp-l:${28 + (depth + 1) * 14}px"
-                >
-                  <div
-                    class="wt-spinner w-[10px] h-[10px] inline-block border-[1.5px] border-[#444] border-t-accent-hover rounded-full animate-[wt-spin_0.8s_linear_infinite] mr-1 align-middle"
-                  ></div>
-                  Loading...
-                </div>`
-              : ""
-          }
-        `;
+        return {
+          id: entry.path,
+          label: entry.name,
+          icon: "folder",
+          expanded: isExpanded,
+          status: isUntracked ? ("untracked" as const) : undefined,
+          children: isExpanded && this._fileLoader.dirContents.has(entry.path)
+            ? this._buildFileTreeNodes(branch, entry.path)
+            : [],
+          meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
+        };
       }
-      return html`
-        <div
-          data-file-path="${entry.path}"
-          class="rti-file-row flex items-center h-6 cursor-pointer text-xs gap-1 transition-[background] duration-100${isUntracked ? " untracked" : ""}"
-          style="--dp:${28 + depth * 14}px;--fg:${isUntracked ? "#666" : "#aaa"}"
-          @mouseenter=${(e: MouseEvent) => {
-            (e.currentTarget as HTMLElement).classList.add("bg-[rgba(255,255,255,0.03)]");
-          }}
-          @mouseleave=${(e: MouseEvent) => {
-            (e.currentTarget as HTMLElement).classList.remove("bg-[rgba(255,255,255,0.03)]");
-          }}
-          @click=${(e: MouseEvent) => {
-            const name = entry.path.split("/").pop() ?? entry.path;
-            if (e.detail === 2) {
-              document.dispatchEvent(
-                new CustomEvent("openp41ge:open-file", {
-                  detail: { path: entry.path, name, pinned: true },
-                }),
-              );
-              return;
-            }
-            document.dispatchEvent(
-              new CustomEvent("openp41ge:open-file", {
-                detail: { path: entry.path, name, pinned: false },
-              }),
-            );
-          }}
-        >
-          <span
-            class="rti-icon inline-flex items-center shrink-0 w-4 h-4${isUntracked ? " untracked" : ""}"
-            ><file-extension-svg filename=${entry.name} size="14"></file-extension-svg></span
-          >
-          <span
-            class="rti-label overflow-hidden text-ellipsis whitespace-nowrap${isUntracked ? " untracked" : ""}"
-            >${entry.name}</span
-          >
-        </div>
-      `;
+      return {
+        id: entry.path,
+        label: entry.name,
+        icon: entry.name,
+        draggable: true,
+        status: isUntracked ? ("untracked" as const) : undefined,
+        meta: { branch, filePath: entry.path },
+      };
     });
   }
+
+  /** Icon renderer for file nodes — renders <file-extension-svg> for files, folder icon otherwise. */
+  private _renderIcon: IconRenderer = (name: string, size: number) => {
+    if (name === "folder") {
+      return html`<openp41ge-icon name="folder" size=${size}></openp41ge-icon>`;
+    }
+    // name is the filename — render file extension icon
+    return html`<file-extension-svg filename=${name} size=${size}></file-extension-svg>`;
+  };
+
+  /** Build an onToggle handler for a given branch — expands/collapses directories asynchronously. */
+  private _makeDirToggle(branch: string): (node: TreeNode) => Promise<void> {
+    return async (node: TreeNode) => {
+      const meta = node.meta as { filePath: string; isDirectory?: boolean } | undefined;
+      if (!meta?.isDirectory) return;
+
+      const dirPath = meta.filePath;
+      const dirs = this._expandedDirs.get(branch) ?? new Set();
+      dirs.add(dirPath);
+      this._expandedDirs.set(branch, dirs);
+
+      // Let the tree render with the spinner while loading
+      this.requestUpdate();
+
+      await this._fileLoader.expandDir(branch, dirPath, () => {
+        if (!this.isConnected) return;
+        this.requestUpdate();
+      });
+
+      this.dispatchEvent(
+        new CustomEvent("dir-toggle-expand", {
+          bubbles: true,
+          detail: { branch, path: dirPath, expanded: true },
+        }),
+      );
+      this.requestUpdate();
+    };
+  }
+
+  /** Handlers for uikit tree events on a given branch. */
+  private _onFileClick = (e: CustomEvent): void => {
+    const meta = e.detail?.meta as { branch?: string; filePath?: string } | undefined;
+    if (!meta?.filePath) return;
+    const name = meta.filePath.split("/").pop() ?? meta.filePath;
+    document.dispatchEvent(
+      new CustomEvent("openp41ge:open-file", {
+        detail: { path: meta.filePath, name, pinned: false },
+      }),
+    );
+  };
+
+  private _onFileDblClick = (e: CustomEvent): void => {
+    const meta = e.detail?.meta as { branch?: string; filePath?: string } | undefined;
+    if (!meta?.filePath) return;
+    const name = meta.filePath.split("/").pop() ?? meta.filePath;
+    document.dispatchEvent(
+      new CustomEvent("openp41ge:open-file", {
+        detail: { path: meta.filePath, name, pinned: true },
+      }),
+    );
+  };
+
+  private _onFileContextMenu = (e: CustomEvent): void => {
+    const meta = e.detail?.meta as { branch?: string; filePath?: string } | undefined;
+    if (!meta) return;
+    this.dispatchEvent(
+      new CustomEvent("worktree-contextmenu", {
+        bubbles: true,
+        detail: {
+          repoName: this.repoName,
+          branch: meta.branch,
+          x: e.detail.clientX,
+          y: e.detail.clientY,
+        },
+      }),
+    );
+  };
 
   render() {
     return html`
@@ -532,12 +525,20 @@ export class Openp41geRepoTreeItem extends LitElement {
                 ${
                   this.worktrees.length > 0
                     ? this.worktrees.map(
-                        (wt, _idx) => html`
+                        (wt) => html`
                           ${this._renderWorktree(wt)}
                           ${
                             this._expandedWorktrees.has(wt.branch) &&
                             this._fileLoader.isWorktreeLoaded(wt.branch)
-                              ? this._renderWorktreeFiles(wt.branch, 1)
+                              ? html`<openp41ge-tree
+                                  .nodes=${this._buildFileTreeNodes(wt.branch)}
+                                  .renderIcon=${this._renderIcon}
+                                  .onToggle=${this._makeDirToggle(wt.branch)}
+                                  depth="0"
+                                  @tree-node-click=${this._onFileClick}
+                                  @tree-node-dblclick=${this._onFileDblClick}
+                                  @tree-node-contextmenu=${this._onFileContextMenu}
+                                ></openp41ge-tree>`
                               : ""
                           }
                         `,

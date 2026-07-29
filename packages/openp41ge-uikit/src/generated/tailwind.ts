@@ -320,10 +320,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 2.25rem
 }
 
-.h-\\[10px\\] {
-  height: 10px
-}
-
 .h-\\[14px\\] {
   height: 14px
 }
@@ -715,10 +711,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   border-width: 2px
 }
 
-.border-\\[1\\.5px\\] {
-  border-width: 1.5px
-}
-
 .border-b {
   border-bottom-width: 1px
 }
@@ -827,10 +819,6 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .bg-\\[rgba\\(255\\2c 255\\2c 255\\2c \\.1\\)\\] {
   background-color: rgba(255,255,255,.1)
-}
-
-.bg-\\[rgba\\(255\\2c 255\\2c 255\\2c 0\\.03\\)\\] {
-  background-color: rgba(255,255,255,0.03)
 }
 
 .bg-\\[rgba\\(255\\2c 255\\2c 255\\2c 0\\.06\\)\\] {
