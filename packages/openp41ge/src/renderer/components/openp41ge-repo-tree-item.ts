@@ -366,6 +366,23 @@ export class Openp41geRepoTreeItem extends LitElement {
 
       const dirPath = meta.filePath;
       const dirs = this._expandedDirs.get(branch) ?? new Set();
+
+      if (dirs.has(dirPath)) {
+        // Collapse
+        dirs.delete(dirPath);
+        if (dirs.size === 0) this._expandedDirs.delete(branch);
+        this._fileLoader.collapseDir(branch, dirPath);
+        this.dispatchEvent(
+          new CustomEvent("dir-toggle-expand", {
+            bubbles: true,
+            detail: { branch, path: dirPath, expanded: false },
+          }),
+        );
+        this.requestUpdate();
+        return;
+      }
+
+      // Expand
       dirs.add(dirPath);
       this._expandedDirs.set(branch, dirs);
 
@@ -384,6 +401,24 @@ export class Openp41geRepoTreeItem extends LitElement {
         }),
       );
       this.requestUpdate();
+    };
+  }
+
+  /** Sync _expandedDirs when user collapses a dir node (via the uikit tree's internal toggle). */
+  private _makeDirExpandedChange(branch: string): (nodeId: string, expanded: boolean) => void {
+    return (nodeId: string, expanded: boolean) => {
+      if (expanded) return; // Expansion is handled by onToggle
+      const dirs = this._expandedDirs.get(branch);
+      if (!dirs || !dirs.has(nodeId)) return;
+      dirs.delete(nodeId);
+      if (dirs.size === 0) this._expandedDirs.delete(branch);
+      this._fileLoader.collapseDir(branch, nodeId);
+      this.dispatchEvent(
+        new CustomEvent("dir-toggle-expand", {
+          bubbles: true,
+          detail: { branch, path: nodeId, expanded: false },
+        }),
+      );
     };
   }
 
@@ -535,6 +570,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                                   .nodes=${this._buildFileTreeNodes(wt.branch)}
                                   .renderIcon=${this._renderIcon}
                                   .onToggle=${this._makeDirToggle(wt.branch)}
+                                  .onExpandedChange=${this._makeDirExpandedChange(wt.branch)}
                                   depth="0"
                                   @tree-node-click=${this._onFileClick}
                                   @tree-node-dblclick=${this._onFileDblClick}
