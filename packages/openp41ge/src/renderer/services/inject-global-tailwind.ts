@@ -19,6 +19,15 @@ export function injectGlobalTailwind(): void {
   tailwindStyle.textContent = tailwindCSS;
   document.head.appendChild(tailwindStyle);
 
+  // Border style baseline — Tailwind's @tailwind base layer normally sets
+  // border-style:solid as the default, but we only compile @tailwind utilities.
+  // Without this, directional border classes (border-b, border-l, etc.) only
+  // set border-*-width:1px — the style defaults to none, so no border renders.
+  const baseStyle = document.createElement("style");
+  baseStyle.id = "openp41ge-border-base";
+  baseStyle.textContent = "*, ::before, ::after { border-width: 0px; border-style: solid; border-color: currentColor; }";
+  document.head.appendChild(baseStyle);
+
   // Layout CSS custom property utilities — dynamic values from inline style="--var:val"
   const layoutStyle = document.createElement("style");
   layoutStyle.id = "openp41ge-layout-vars";
