@@ -96,7 +96,7 @@ class Openp41geActivityBar extends LitElement {
                 ${
                   this.activeViewId === activity.id
                     ? html`<div
-                        class="absolute -left-px top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-sm"
+                        class="absolute -left-px top-[8px] w-0.5 h-5 bg-accent rounded-sm"
                       ></div>`
                     : nothing
                 }
