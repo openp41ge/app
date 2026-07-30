@@ -11,8 +11,6 @@
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
-import { showProjectPicker } from "../../services/project-switch-service";
-
 const log = createLogger("bootstrap:register-event-listeners");
 
 export class RegisterEventListenersStep implements IStartupStep {
@@ -56,23 +54,6 @@ export class RegisterEventListenersStep implements IStartupStep {
         }
       }
     }) as EventListener);
-
-    // Empty-state events: open project picker
-    document.addEventListener("windowview:open-project", () => {
-      showProjectPicker();
-    });
-
-    // Empty-state events: clone repository
-    document.addEventListener("windowview:clone-repo", () => {
-      // Dynamically import and show the clone dialog
-      import("../../components/openp41ge-clone-dialog").then(() => {
-        const dialog = document.querySelector("openp41ge-clone-dialog");
-        if (!dialog) {
-          const el = document.createElement("openp41ge-clone-dialog");
-          document.body.appendChild(el);
-        }
-      });
-    });
 
     // Catch unhandled promise rejections from Lit for debugging
     window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => {

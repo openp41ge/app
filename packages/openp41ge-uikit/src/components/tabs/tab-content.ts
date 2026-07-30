@@ -16,7 +16,6 @@
 import { LitElement, html } from "lit";
 import { property } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import "./openp41ge-empty-state";
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -24,7 +23,6 @@ export class TabContent extends LitElement {
   @property({ type: Array }) tabIds: string[] = [];
   @property({ type: String }) activeTabId: string = "";
   @property({ type: Object }) tabs: Record<string, { content: string }> = {};
-  @property({ type: Array }) recents: Array<{ name: string; openedAt: string }> = [];
 
   createRenderRoot() {
     return this;
@@ -35,7 +33,29 @@ export class TabContent extends LitElement {
   render() {
     if (this.tabIds.length === 0) {
       return html`
-        <openp41ge-empty-state .recents=${this.recents}></openp41ge-empty-state>
+        <div
+          class="tab-content-empty"
+          style="
+            height:100%;
+            background:var(--bg-primary, #1e1e1e);
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            padding:40px;
+            box-sizing:border-box;
+            overflow:hidden;
+            user-select:none;
+          "
+        >
+          <p
+            style="
+              font-size:13px;
+              color:var(--text-muted, #666);
+              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+            "
+          >No tabs</p>
+        </div>
       `;
     }
     return html`

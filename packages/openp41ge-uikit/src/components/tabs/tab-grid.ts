@@ -38,7 +38,6 @@ export class TabGrid extends LitElement {
     { title: string; content: string; pinned?: boolean }
   > = {};
   @property({ type: Object }) activeTabIds: Record<string, string> = {};
-  @property({ type: Array }) recents: Array<{ name: string; openedAt: string }> = [];
   @property({ type: Function }) ghostFactory: GhostFactory | undefined = undefined;
 
   set gridState(state: GridState | null) {
@@ -717,7 +716,6 @@ export class TabGrid extends LitElement {
           .tabIds=${tabIds}
           .activeTabId=${activeTabId}
           .tabs=${this.tabData}
-          .recents=${this.recents}
           col=${colIndex}
           style="flex:1;display:flex;flex-direction:column;overflow:hidden;"
         ></tab-content>

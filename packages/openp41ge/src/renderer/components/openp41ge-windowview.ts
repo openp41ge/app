@@ -31,21 +31,13 @@ class Openp41geWindowView extends LitElement {
   @property({ attribute: false })
   layouts: Map<string, Map<string, Rect>> = new Map();
 
-  @property({ type: Array })
-  recents: Array<{ name: string; openedAt: string }> = [];
-
   private _contextMenu: { x: number; y: number; paneId?: string } | null = null;
   private _skeletonInitialized = false;
 
   connectedCallback(): void {
     super.connectedCallback();
     this._ensureSkeleton();
-    this._loadRecents();
-    this.addEventListener("empty-state:open-project", () => this._onOpenProject());
-    this.addEventListener("empty-state:clone-repo", () => this._onCloneRepo());
-    this.addEventListener("empty-state:open-recent", ((e: CustomEvent) => this._onOpenRecent(e.detail.name)).bind(this) as EventListener);
-    this.addEventListener("empty-state:remove-recent", ((e: CustomEvent) => this._onRemoveRecent(e.detail.name)).bind(this) as EventListener);
-    document.addEventListener("project:changed", () => this._loadRecents());
+
   }
 
   private _ensureSkeleton(): void {
@@ -68,12 +60,6 @@ class Openp41geWindowView extends LitElement {
     });
 
 
-  }
-
-  private _loadRecents(): void {
-    window.openp41ge.recentProjects.list().then((recents) => {
-      this.recents = recents;
-    });
   }
 
   private _onOpenProject(): void {
@@ -143,7 +129,6 @@ class Openp41geWindowView extends LitElement {
               .placements=${placements}
               .tabData=${tabData}
               .activeTabIds=${activeTabIds}
-              .recents=${this.recents}
             ></tab-grid>
           </div>
           <openp41ge-sidebar
