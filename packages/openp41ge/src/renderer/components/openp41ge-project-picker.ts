@@ -1099,7 +1099,7 @@ export class Openp41geProjectPicker extends LitElement {
       <!-- Top bar -->
       <div class="topbar">
         <div class="flex-1"></div>
-        <button class="close-btn" @click=${this._dismiss} title="Close (Esc)">✕</button>
+        <button class="close-btn" style="margin-left:auto;" @click=${this._dismiss} title="Close (Esc)">✕</button>
       </div>
 
       <!-- Body -->
