@@ -5,20 +5,25 @@
  * titlebar click, or File > Open Project), this service:
  *   1. Calls project:switchTo on the main process
  *   2. The main process broadcasts the updated workspace state
+ *      (the picker is re-added as an ephemeral tab in the broadcast)
  *   3. Dispatches a DOM event so the titlebar and other components refresh
  *
- * The old modal project picker is replaced by the Projects sidebar view.
+ * The project picker is opened as an ephemeral tab instead of a modal.
+ * After a project switch the main process re-adds the picker tab directly
+ * to the workspace state before broadcasting, so there is no timing gap.
  */
 
 import { createLogger } from "openp41ge-logger";
 import { clearCapturedErrors } from "./error-capture-service";
+import { dispatch } from "../app";
+import { Openp41geTabsEventHandler } from "./openp41ge-tabs-event-handler";
 
 const log = createLogger("project-switch-service");
 
 /**
  * Switch the current project to the given name.
- * Relies on the main process broadcasting the updated workspace state
- * via the existing openp41ge:state-update IPC channel.
+ * The main process re-opens the project picker ephemeral tab in the
+ * broadcast, so the renderer does not need to re-add it here.
  */
 export async function switchToProject(name: string): Promise<boolean> {
   log.info(`Switching to project: ${name}`);
@@ -44,27 +49,20 @@ export async function switchToProject(name: string): Promise<boolean> {
 }
 
 /**
- * Show the project picker and wire up selection/dismissal handlers.
- * Handles the full lifecycle: mount, wait for selection, switch, cleanup.
+ * Show the project picker as an ephemeral tab in the current active cell.
+ * If no cells exist, a new cell is created.
  */
 export function showProjectPicker(): void {
-  if (document.querySelector("openp41ge-project-picker")) return;
+  // Prevent duplicate ephemeral picker tabs
+  if (document.querySelector("openp41ge-project-picker[inline]")) return;
 
-  const picker = document.createElement("openp41ge-project-picker");
-  document.body.appendChild(picker);
+  const winId = window.openp41ge?.workspace?.getWindowId?.();
+  if (!winId) return;
 
-  const onSelected = async (e: Event) => {
-    const detail = (e as CustomEvent).detail;
-    if (detail?.name) {
-      picker.remove();
-      await switchToProject(detail.name);
-    }
-  };
+  log.info("Opening project picker as ephemeral tab");
 
-  const onDismissed = () => {
-    picker.remove();
-  };
+  // Open in the last focused column, or column 0 if none
+  const targetCol = Openp41geTabsEventHandler.getLastFocusedCol(winId);
 
-  picker.addEventListener("project:selected", onSelected as EventListener);
-  picker.addEventListener("project:dismissed", onDismissed as EventListener);
+  dispatch("addColumnTabAt", winId, "project-picker", "Project Switcher", "", targetCol, true);
 }

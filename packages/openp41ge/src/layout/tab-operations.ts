@@ -486,6 +486,7 @@ export function addColumnTabAt(
   title?: string,
   filePath?: string,
   targetCol?: number,
+  isEphemeral: boolean = false,
 ): Workspace {
   if (targetCol === undefined || targetCol < 0) {
     return addColumnTab(workspace, windowId, appType, title, filePath);
@@ -507,6 +508,8 @@ export function addColumnTabAt(
     appType ?? "terminal",
     title || (appType?.replace("-", " ") ?? "Terminal"),
     config,
+    false,
+    isEphemeral,
   );
   result = registerTab(result, tab);
   return addTabToCell(result, windowId, tab, 0, targetCol);

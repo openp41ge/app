@@ -23,7 +23,7 @@
  */
 
 import { LitElement, html, css, type TemplateResult } from "lit";
-import { state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
 import { GitService, IpcGitAdapter } from "openp41ge-git";
 import { appServices } from "../app";
@@ -38,11 +38,11 @@ interface ProjectInfo {
 }
 
 export class Openp41geProjectPicker extends LitElement {
+  @property({ type: Boolean, reflect: true })
+  inline: boolean = false;
+
   static styles = css`
     :host {
-      position: fixed;
-      inset: 0;
-      z-index: 10000;
       display: flex;
       flex-direction: column;
       background: var(--openp41ge-bg-color, #1e1e1e);
@@ -55,6 +55,18 @@ export class Openp41geProjectPicker extends LitElement {
         sans-serif
       );
       color: var(--openp41ge-text-color, #e0e0e0);
+    }
+
+    :host(:not([inline])) {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+    }
+
+    :host([inline]) {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
     }
 
     /* ── Top bar ────────────────────────────────── */
@@ -586,7 +598,9 @@ export class Openp41geProjectPicker extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    appServices.keyboardManager.pushModal();
+    if (!this.inline) {
+      appServices.keyboardManager.pushModal();
+    }
     this._loadProjects();
     this.addEventListener("keydown", this._onKeyDown);
     document.addEventListener("project:changed", this._onProjectChanged);
@@ -602,7 +616,9 @@ export class Openp41geProjectPicker extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    appServices.keyboardManager.popModal();
+    if (!this.inline) {
+      appServices.keyboardManager.popModal();
+    }
     this._disconnected = true;
     this.removeEventListener("keydown", this._onKeyDown);
     document.removeEventListener("project:changed", this._onProjectChanged);

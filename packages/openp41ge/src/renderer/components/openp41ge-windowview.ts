@@ -92,15 +92,34 @@ class Openp41geWindowView extends LitElement {
     if (!win) return nothing;
 
     // Build tab-data and active-tab-ids for <tab-grid>
-    const tabData: Record<string, { title: string; content: string; pinned: boolean }> = {};
+    const tabData: Record<
+      string,
+      {
+        title: string;
+        content: string;
+        pinned: boolean;
+        ephemeral?: boolean;
+        ephemeralPinned?: boolean;
+      }
+    > = {};
     const activeTabIds: Record<string, string> = {};
     for (const p of win.grid.placements) {
       const col = String(p.position.col);
       activeTabIds[col] = p.activeTabId ?? p.tabIds[0] ?? "";
       for (const tabId of p.tabIds) {
-        const tab = ws?.tabs?.[tabId as string];
-        const pinned = tab ? !(tab as { isPreview?: boolean }).isPreview : true;
-        tabData[tabId as string] = { title: tab?.title ?? "untitled", content: "", pinned };
+        const tidStr = String(tabId);
+        const tab = ws?.tabs?.[tabId];
+        const isEphemeral = tab ? tab.isEphemeral ?? false : false;
+        const ephemeralPinned = tab ? tab.ephemeralPinned ?? false : false;
+        // Ephemeral tabs are not pinned; regular tabs are pinned if not a preview
+        const pinned = tab ? !tab.isPreview && !isEphemeral : true;
+        tabData[tidStr] = {
+          title: tab?.title ?? "untitled",
+          content: "",
+          pinned,
+          ephemeral: isEphemeral,
+          ephemeralPinned,
+        };
       }
     }
 

@@ -45,6 +45,8 @@ export const TabSchema = z.object({
   title: z.string(),
   config: TabConfigSchema.optional().default({}),
   isPreview: z.boolean().default(false),
+  isEphemeral: z.boolean().default(false),
+  ephemeralPinned: z.boolean().default(false),
 });
 export type Tab = z.infer<typeof TabSchema>;
 
@@ -54,8 +56,10 @@ export function createTab(
   title: string,
   config?: Record<string, unknown>,
   isPreview: boolean = false,
+  isEphemeral: boolean = false,
+  ephemeralPinned: boolean = false,
 ): Tab {
-  return TabSchema.parse({ id, appType, title, config: config ?? {}, isPreview });
+  return TabSchema.parse({ id, appType, title, config: config ?? {}, isPreview, isEphemeral, ephemeralPinned });
 }
 
 // ─── Grid ──────────────────────────────────────────────────────────────────

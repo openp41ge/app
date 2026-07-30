@@ -19,6 +19,7 @@ import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
 import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { projectManagerAppRegistration } from "../../apps/project-manager/index";
+import { projectPickerAppRegistration } from "../../apps/project-picker/index";
 
 // ─── Log viewer component (auto-registers <openp41ge-log-viewer>) ──────────
 import "openp41ge-logger/viewer";
@@ -33,6 +34,7 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(logViewerAppRegistration);
     registerAppType(gitRepositoryAppRegistration);
     registerAppType(projectManagerAppRegistration);
+    registerAppType(projectPickerAppRegistration);
     log.info("app types registered");
   }
 }

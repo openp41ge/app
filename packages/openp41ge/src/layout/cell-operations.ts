@@ -23,6 +23,7 @@ import { createTab } from "./types.js";
  * @param pinned - If true, the tab is added as a regular tab (preview slot untouched).
  *                 If false, the tab replaces the existing preview slot occupant (if any),
  *                 or becomes the new preview slot occupant.
+ * @param isEphemeral - If true, the tab is marked as ephemeral (closed on defocus).
  * @returns The workspace with the tab opened.
  */
 export function openTabInCell(
@@ -34,11 +35,12 @@ export function openTabInCell(
   targetCol?: number,
   pinned: boolean = true,
   config?: Record<string, unknown>,
+  isEphemeral: boolean = false,
 ): Workspace {
   const tabId = makeTabId();
   const mergedConfig: Record<string, unknown> = { ...config };
   if (filePath) mergedConfig.filePath = filePath;
-  const tab = createTab(tabId, appType, title, mergedConfig, !pinned);
+  const tab = createTab(tabId, appType, title, mergedConfig, !pinned, isEphemeral);
   let result = registerTab(workspace, tab);
 
   // Determine target column
@@ -76,6 +78,21 @@ export function pinTabInCell(
   tabId: string,
 ): Workspace {
   return updateTabInCell(workspace, windowId, cellCol, tabId, { isPreview: false });
+}
+
+/**
+ * Toggle the ephemeral pin state on an ephemeral tab.
+ * When pinned, the ephemeral tab survives defocus (won't auto-close).
+ * When unpinned, it closes on defocus.
+ */
+export function toggleEphemeralPin(
+  workspace: Workspace,
+  windowId: string,
+  cellCol: number,
+  tabId: string,
+  pinned: boolean,
+): Workspace {
+  return updateTabInCell(workspace, windowId, cellCol, tabId, { ephemeralPinned: pinned });
 }
 
 /**
@@ -153,7 +170,7 @@ function replaceTabInCell(
 function updateTabInPlace(
   workspace: Workspace,
   tabId: string,
-  updates: Partial<Pick<Tab, "isPreview" | "title" | "config">>,
+  updates: Partial<Pick<Tab, "isPreview" | "title" | "config" | "isEphemeral" | "ephemeralPinned">>,
 ): Workspace {
   const existing = workspace.tabs[tabId as TabId];
   if (!existing) return workspace;
@@ -174,7 +191,7 @@ function updateTabInCell(
   windowId: string,
   cellCol: number,
   tabId: string,
-  updates: Partial<Pick<Tab, "isPreview" | "title" | "config">>,
+  updates: Partial<Pick<Tab, "isPreview" | "title" | "config" | "isEphemeral" | "ephemeralPinned">>,
 ): Workspace {
   return updateTabInPlace(workspace, tabId, updates);
 }

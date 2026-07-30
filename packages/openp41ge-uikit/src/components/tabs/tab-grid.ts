@@ -22,7 +22,16 @@ export interface GridState {
     position: { row: number; col: number };
     tabIds: string[];
   }>;
-  tabData: Record<string, { title: string; content: string; pinned?: boolean }>;
+  tabData: Record<
+    string,
+    {
+      title: string;
+      content: string;
+      pinned?: boolean;
+      ephemeral?: boolean;
+      ephemeralPinned?: boolean;
+    }
+  >;
   activeTabIds: Record<string, string>;
 }
 
@@ -35,7 +44,13 @@ export class TabGrid extends LitElement {
   }> = [];
   @property({ type: Object }) tabData: Record<
     string,
-    { title: string; content: string; pinned?: boolean }
+    {
+      title: string;
+      content: string;
+      pinned?: boolean;
+      ephemeral?: boolean;
+      ephemeralPinned?: boolean;
+    }
   > = {};
   @property({ type: Object }) activeTabIds: Record<string, string> = {};
   @property({ type: Function }) ghostFactory: GhostFactory | undefined = undefined;
@@ -187,10 +202,18 @@ export class TabGrid extends LitElement {
 
   // ── Pin state management ─────────────────────────────────────────────
 
-  private _setPinned(tabId: string, pinned: boolean): void {
+  private _setPinned(tabId: string, pinned: boolean, ephemeral?: boolean): void {
     const current = this.tabData[tabId];
-    if (current && (current.pinned ?? true) === pinned) return;
-    if (current) {
+    if (!current) return;
+    if (ephemeral) {
+      // Ephemeral pin toggle — keep isEphemeral, just toggle ephemeralPinned
+      if ((current.ephemeralPinned ?? false) === pinned) return;
+      this.tabData = {
+        ...this.tabData,
+        [tabId]: { ...current, ephemeralPinned: pinned },
+      };
+    } else {
+      if ((current.pinned ?? true) === pinned) return;
       this.tabData = {
         ...this.tabData,
         [tabId]: { ...current, pinned },
@@ -324,11 +347,12 @@ export class TabGrid extends LitElement {
     this._boundOnGridSplit = (e: Event) => {
       const { tabId, winId } = (e as CustomEvent).detail || {};
       if (tabId) {
-        this._setPinned(tabId, true);
+        const isEphemeral = !!this.tabData[tabId]?.ephemeral;
+        this._setPinned(tabId, true, isEphemeral || undefined);
         this.dispatchEvent(
           new CustomEvent("grid-pin", {
             bubbles: true,
-            detail: { winId, tabId, pinned: true },
+            detail: { winId, tabId, pinned: true, ephemeral: isEphemeral || undefined },
           }),
         );
       }
@@ -338,11 +362,12 @@ export class TabGrid extends LitElement {
     this._boundOnGridMove = (e: Event) => {
       const { tabId, sourceWinId } = (e as CustomEvent).detail || {};
       if (tabId) {
-        this._setPinned(tabId, true);
+        const isEphemeral = !!this.tabData[tabId]?.ephemeral;
+        this._setPinned(tabId, true, isEphemeral || undefined);
         this.dispatchEvent(
           new CustomEvent("grid-pin", {
             bubbles: true,
-            detail: { winId: sourceWinId, tabId, pinned: true },
+            detail: { winId: sourceWinId, tabId, pinned: true, ephemeral: isEphemeral || undefined },
           }),
         );
       }
@@ -352,11 +377,12 @@ export class TabGrid extends LitElement {
     this._boundOnTabBarMoveCell = (e: Event) => {
       const { tabId, targetWinId } = (e as CustomEvent).detail || {};
       if (tabId) {
-        this._setPinned(tabId, true);
+        const isEphemeral = !!this.tabData[tabId]?.ephemeral;
+        this._setPinned(tabId, true, isEphemeral || undefined);
         this.dispatchEvent(
           new CustomEvent("grid-pin", {
             bubbles: true,
-            detail: { winId: targetWinId, tabId, pinned: true },
+            detail: { winId: targetWinId, tabId, pinned: true, ephemeral: isEphemeral || undefined },
           }),
         );
       }
@@ -366,11 +392,12 @@ export class TabGrid extends LitElement {
     this._boundOnTabBarReorder = (e: Event) => {
       const { tabId, winId } = (e as CustomEvent).detail || {};
       if (tabId) {
-        this._setPinned(tabId, true);
+        const isEphemeral = !!this.tabData[tabId]?.ephemeral;
+        this._setPinned(tabId, true, isEphemeral || undefined);
         this.dispatchEvent(
           new CustomEvent("grid-pin", {
             bubbles: true,
-            detail: { winId, tabId, pinned: true },
+            detail: { winId, tabId, pinned: true, ephemeral: isEphemeral || undefined },
           }),
         );
       }
@@ -379,9 +406,9 @@ export class TabGrid extends LitElement {
 
     // ── Handle grid-pin from external systems ───────────────
     this._boundOnGridPin = (e: Event) => {
-      const { tabId, pinned } = (e as CustomEvent).detail || {};
+      const { tabId, pinned, ephemeral: isEphemeralPin } = (e as CustomEvent).detail || {};
       if (tabId !== undefined) {
-        this._setPinned(tabId, pinned ?? true);
+        this._setPinned(tabId, pinned ?? true, isEphemeralPin);
       }
     };
     this.addEventListener("grid-pin", this._boundOnGridPin);

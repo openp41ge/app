@@ -25,6 +25,7 @@ import type { NodeGitService } from "../../src/main/services/node-git-service";
 import type { NodeGitCommitService } from "../../src/main/services/node-git-commit-service";
 import { createWorkspace } from "../../src/layout/types.js";
 import { setSidebarViewOp } from "../../src/layout/window-operations.js";
+import { addColumnTabAt } from "../../src/layout/tab-operations.js";
 
 export function registerProjectHandlers(
   projectStore: ProjectStore,
@@ -245,6 +246,16 @@ export function registerProjectHandlers(
       const fresh = createWorkspace("ws1");
       const withExplorer = setSidebarViewOp(fresh, fresh.windows[0].id, "explorer");
       dispatcher.setWorkspace(withExplorer);
+    }
+
+    // Re-add the project picker as an ephemeral tab in column 0 of
+    // the first window — included directly in the broadcast so there is
+    // no timing gap on the renderer side.
+    const ws = dispatcher.getWorkspace();
+    if (ws.windows.length > 0) {
+      const firstWinId = ws.windows[0].id;
+      const withPicker = addColumnTabAt(ws, firstWinId, "project-picker", "Project Switcher", "", 0, true);
+      dispatcher.setWorkspace(withPicker);
     }
 
     // Broadcast the updated state to all windows

@@ -66,24 +66,24 @@ function migrateWorkspace(obj: Record<string, unknown>): Record<string, unknown>
 }
 
 /**
- * Strip all preview tabs from the workspace before serialization.
- * Preview tabs (isPreview: true) are ephemeral — they should not survive
- * app restarts. Only pinned tabs should persist.
+ * Strip all preview and ephemeral tabs from the workspace before serialization.
+ * Preview tabs (isPreview: true) and ephemeral tabs (isEphemeral: true)
+ * should not survive app restarts. Only pinned tabs should persist.
  *
  * Returns a new Workspace object (does not mutate the original).
  * If a placement loses all its tabs, it becomes an empty cell.
  */
 export function stripPreviewTabs(workspace: Workspace): Workspace {
-  // Collect preview tab IDs
-  const previewTabIds = new Set<string>();
-  const tabsRecord = workspace.tabs as Record<string, { isPreview?: boolean }>;
+  // Collect preview and ephemeral tab IDs
+  const idsToStrip = new Set<string>();
+  const tabsRecord = workspace.tabs as Record<string, { isPreview?: boolean; isEphemeral?: boolean }>;
   for (const [tabId, tab] of Object.entries(tabsRecord)) {
-    if (tab.isPreview) {
-      previewTabIds.add(tabId);
+    if (tab.isPreview || tab.isEphemeral) {
+      idsToStrip.add(tabId);
     }
   }
 
-  if (previewTabIds.size === 0) {
+  if (idsToStrip.size === 0) {
     return workspace;
   }
 
@@ -94,9 +94,9 @@ export function stripPreviewTabs(workspace: Workspace): Workspace {
       const grid = {
         ...win.grid,
         placements: win.grid.placements.map((pl) => {
-          const remainingTabIds = pl.tabIds.filter((id) => !previewTabIds.has(id));
+          const remainingTabIds = pl.tabIds.filter((id) => !idsToStrip.has(id));
 
-          // If all tabs were preview tabs, the placement becomes empty
+          // If all tabs were stripped, the placement becomes empty
           if (remainingTabIds.length === 0) {
             return {
               ...pl,
@@ -105,9 +105,9 @@ export function stripPreviewTabs(workspace: Workspace): Workspace {
             };
           }
 
-          // If the active tab was a preview, activate the first remaining tab
+          // If the active tab was stripped, activate the first remaining tab
           const newActiveTabId =
-            pl.activeTabId && previewTabIds.has(pl.activeTabId)
+            pl.activeTabId && idsToStrip.has(pl.activeTabId)
               ? remainingTabIds[0]
               : pl.activeTabId;
 
@@ -121,7 +121,7 @@ export function stripPreviewTabs(workspace: Workspace): Workspace {
       return { ...win, grid: removeEmptyPlacements(grid) };
     }),
     tabs: Object.fromEntries(
-      Object.entries(workspace.tabs).filter(([id]) => !previewTabIds.has(id)),
+      Object.entries(workspace.tabs).filter(([id]) => !idsToStrip.has(id)),
     ),
   };
 

@@ -77,12 +77,12 @@ export const tailwindCSS: string = `.pointer-events-none {
   top: 0.375rem
 }
 
-.top-1\\/2 {
-  top: 50%
-}
-
 .top-\\[30px\\] {
   top: 30px
+}
+
+.top-\\[8px\\] {
+  top: 8px
 }
 
 .z-10 {
@@ -507,11 +507,6 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .-translate-y-1 {
   --tw-translate-y: -0.25rem;
-  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
-}
-
-.-translate-y-1\\/2 {
-  --tw-translate-y: -50%;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))
 }
 
