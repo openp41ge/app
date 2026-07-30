@@ -188,6 +188,7 @@ export class Openp41geApplication {
 
   private _initServices(): void {
     this.projectStore = new ProjectStore(this.openp41geDir);
+    this.recentProjects = new RecentProjectsModel(this.openp41geDir);
 
     // Garbage-collect expired drafts on every startup
     this.projectStore.gcDrafts();
@@ -211,7 +212,6 @@ export class Openp41geApplication {
     this.fileSystem = new ElectronFileSystem();
     this.workspaceService = new WorkspaceService(this.gitService, this.fileSystem, reposDir);
     this.workspaceStateStore = new WorkspaceStateStore(this.openp41geDir);
-    this.recentProjects = new RecentProjectsModel(this.openp41geDir);
   }
 
   // ── Step 5: Wire cross-service dependencies ───────────────────────────
@@ -278,9 +278,9 @@ export class Openp41geApplication {
       this.gitService,
       this.gitCommitService,
       () => this.projectName,
-      (name) => {
+      (name: string | null) => {
         this.projectName = name;
-        this.recentProjects.add(name);
+        if (name) this.recentProjects.add(name);
       },
     );
     registerRecentProjectsHandlers(this.recentProjects);

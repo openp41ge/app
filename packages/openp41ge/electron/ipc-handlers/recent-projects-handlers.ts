@@ -20,4 +20,8 @@ export function registerRecentProjectsHandlers(
   ipcMain.handle("recentProjects:add", (_event, name: string) => {
     recentProjects.add(name);
   });
+
+  ipcMain.handle("recentProjects:remove", (_event, name: string) => {
+    recentProjects.remove(name);
+  });
 }

@@ -44,6 +44,7 @@ class Openp41geWindowView extends LitElement {
     this.addEventListener("empty-state:open-project", () => this._onOpenProject());
     this.addEventListener("empty-state:clone-repo", () => this._onCloneRepo());
     this.addEventListener("empty-state:open-recent", ((e: CustomEvent) => this._onOpenRecent(e.detail.name)).bind(this) as EventListener);
+    this.addEventListener("empty-state:remove-recent", ((e: CustomEvent) => this._onRemoveRecent(e.detail.name)).bind(this) as EventListener);
     document.addEventListener("project:changed", () => this._loadRecents());
   }
 
@@ -93,6 +94,10 @@ class Openp41geWindowView extends LitElement {
         window.__openp41geProjectName = name;
       }
     });
+  }
+
+  private _onRemoveRecent(name: string): void {
+    window.openp41ge.recentProjects.remove(name).then(() => this._loadRecents());
   }
 
   render(): TemplateResult | typeof nothing {

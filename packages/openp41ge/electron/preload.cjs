@@ -484,6 +484,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
   recentProjects: {
     list: () => ipcRenderer.invoke("recentProjects:list"),
     add: (name) => ipcRenderer.invoke("recentProjects:add", name),
+    remove: (name) => ipcRenderer.invoke("recentProjects:remove", name),
   },
 
   project: {

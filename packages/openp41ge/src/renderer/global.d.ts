@@ -160,6 +160,7 @@ declare global {
       recentProjects: {
         list: () => Promise<Array<{ name: string; openedAt: string }>>;
         add: (name: string) => Promise<void>;
+        remove: (name: string) => Promise<void>;
       };
 
       project: {

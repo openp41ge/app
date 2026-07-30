@@ -27,11 +27,11 @@ export class Openp41geEmptyState extends LitElement {
     :host {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      align-items: flex-start;
+      justify-content: flex-start;
       height: 100%;
       background: var(--bg-primary, #1e1e1e);
-      padding: 40px;
+      padding: 40px 32px;
       box-sizing: border-box;
       overflow: hidden;
       user-select: none;
@@ -42,7 +42,6 @@ export class Openp41geEmptyState extends LitElement {
     .container {
       max-width: 400px;
       width: 100%;
-      text-align: center;
     }
 
     .title {
@@ -127,11 +126,6 @@ export class Openp41geEmptyState extends LitElement {
       background: var(--bg-hover, #333);
     }
 
-    .recent-item .icon {
-      flex-shrink: 0;
-      color: var(--text-secondary, #888);
-    }
-
     .recent-item .name {
       flex: 1;
       min-width: 0;
@@ -144,6 +138,34 @@ export class Openp41geEmptyState extends LitElement {
       flex-shrink: 0;
       font-size: 11px;
       color: var(--text-secondary, #666);
+    }
+
+    .recent-item .remove-btn {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--text-secondary, #555);
+      font-size: 14px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.1s, color 0.1s, background 0.1s;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .recent-item:hover .remove-btn {
+      opacity: 1;
+    }
+
+    .recent-item .remove-btn:hover {
+      color: #e06c75;
+      background: rgba(224, 108, 117, 0.15);
     }
 
     .no-recents {
@@ -176,6 +198,17 @@ export class Openp41geEmptyState extends LitElement {
   private _openRecent(name: string): void {
     this.dispatchEvent(
       new CustomEvent("empty-state:open-recent", {
+        bubbles: true,
+        composed: true,
+        detail: { name },
+      }),
+    );
+  }
+
+  private _removeRecent(name: string, e: Event): void {
+    e.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent("empty-state:remove-recent", {
         bubbles: true,
         composed: true,
         detail: { name },
@@ -220,23 +253,23 @@ export class Openp41geEmptyState extends LitElement {
           Clone Repository
         </button>
 
-        ${showRecents ? html`
-          <div class="divider"></div>
+        <div class="divider"></div>
           <p class="recents-title">Recent projects</p>
+          ${showRecents ? html`
           <ul class="recents-list">
             ${this.recents.map((r) => html`
               <li class="recent-item" @click=${() => this._openRecent(r.name)}>
-                <span class="icon">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v9.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-9.5C0 1.784.784 1 1.75 1zM1.75 2.5a.75.75 0 0 0-.75.75v9.5c0 .414.336.75.75.75h12.5a.75.75 0 0 0 .75-.75v-9.5a.75.75 0 0 0-.75-.75H1.75z"/>
-                  </svg>
-                </span>
                 <span class="name">${r.name}</span>
                 <span class="date">${this._formatDate(r.openedAt)}</span>
+                <button
+                  class="remove-btn"
+                  title="Remove from recent projects"
+                  @click=${(e: MouseEvent) => this._removeRecent(r.name, e)}
+                >×</button>
               </li>
             `)}
           </ul>
-        ` : ""}
+          ` : html`<p class="no-recents">No recent projects</p>`}
       </div>
     `;
   }

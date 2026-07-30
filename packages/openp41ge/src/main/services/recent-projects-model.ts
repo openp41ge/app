@@ -38,6 +38,14 @@ export class RecentProjectsModel {
   }
 
   /**
+   * Remove a project from the recent list.
+   */
+  remove(name: string): void {
+    this._entries = this._entries.filter((e) => e.name !== name);
+    this._save();
+  }
+
+  /**
    * Record that a project was just opened.
    * Moves it to the top of the list (or adds it).
    */
