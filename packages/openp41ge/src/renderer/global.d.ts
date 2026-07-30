@@ -157,6 +157,11 @@ declare global {
         getAll: () => Promise<Record<string, any>>;
       };
 
+      recentProjects: {
+        list: () => Promise<Array<{ name: string; openedAt: string }>>;
+        add: (name: string) => Promise<void>;
+      };
+
       project: {
         list: () => Promise<string[]>;
         listWithInfo: () => Promise<Array<{ name: string; config: { name: string; createdAt: string; updatedAt: string; draft?: boolean } | null }>>;

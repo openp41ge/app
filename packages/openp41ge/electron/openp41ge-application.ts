@@ -23,6 +23,7 @@ import {
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
 import { ConfigService } from "../src/main/services/config-service.js";
+import { RecentProjectsModel } from "../src/main/services/recent-projects-model.js";
 
 // ─── Window manager ──────────────────────────────────────────────────────
 import {
@@ -44,6 +45,7 @@ import { registerGitHandlers } from "./ipc-handlers/git-handlers.js";
 import { registerRepoRefHandlers } from "./ipc-handlers/repo-ref-handlers.js";
 import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
 import { registerProjectHandlers } from "./ipc-handlers/project-handlers.js";
+import { registerRecentProjectsHandlers } from "./ipc-handlers/recent-projects-handlers.js";
 import { ProjectStore } from "../src/main/services/project-store.js";
 
 // ─── Lifecycle manager ──────────────────────────────────────────────────
@@ -69,6 +71,7 @@ export class Openp41geApplication {
   private workspaceService!: WorkspaceService;
   private workspaceStateStore!: WorkspaceStateStore;
   private projectStore!: ProjectStore;
+  private recentProjects!: RecentProjectsModel;
   private openp41geDir!: string;
   private projectName: string | null = null;
 
@@ -194,6 +197,7 @@ export class Openp41geApplication {
     // the app opens directly into a draft that can be saved later.
     if (!this.projectName) {
       this.projectName = this.projectStore.createDraft();
+      this.recentProjects.add(this.projectName);
     }
 
     const reposDir = this.projectStore.reposDir(this.projectName);
@@ -207,6 +211,7 @@ export class Openp41geApplication {
     this.fileSystem = new ElectronFileSystem();
     this.workspaceService = new WorkspaceService(this.gitService, this.fileSystem, reposDir);
     this.workspaceStateStore = new WorkspaceStateStore(this.openp41geDir);
+    this.recentProjects = new RecentProjectsModel(this.openp41geDir);
   }
 
   // ── Step 5: Wire cross-service dependencies ───────────────────────────
@@ -275,8 +280,10 @@ export class Openp41geApplication {
       () => this.projectName,
       (name) => {
         this.projectName = name;
+        this.recentProjects.add(name);
       },
     );
+    registerRecentProjectsHandlers(this.recentProjects);
     registerLifecycleHandlers(this.lifecycle);
   }
 

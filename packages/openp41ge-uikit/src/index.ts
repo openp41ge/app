@@ -73,6 +73,10 @@ export {
   GIT_FILE_ROW_CLICK,
 } from "./components/git-repository-panel";
 
+// ─── Empty State ────────────────────────────────────────────────────────
+export { Openp41geEmptyState } from "./components/tabs/openp41ge-empty-state";
+export type { RecentProject } from "./components/tabs/openp41ge-empty-state";
+
 // ─── Demo Grid Carousel ─────────────────────────────────────────────────
 export { DemoOpenp41ge } from "./components/demo/demo-openp41ge";
 export type { TabDef, ColumnPlacement } from "./components/demo/demo-openp41ge";

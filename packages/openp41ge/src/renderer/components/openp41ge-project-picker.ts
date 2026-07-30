@@ -972,7 +972,7 @@ export class Openp41geProjectPicker extends LitElement {
 
   private _startRename(): void {
     if (!this._detailProject) return;
-    this._renameValue = this._detailProject.name;
+    this._renameValue = this._displayName(this._detailProject);
     this._renaming = true;
     // Focus the input after render
     requestAnimationFrame(() => {
