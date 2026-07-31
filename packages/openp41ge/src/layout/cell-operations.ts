@@ -23,7 +23,6 @@ import { createTab } from "./types.js";
  * @param pinned - If true, the tab is added as a regular tab (preview slot untouched).
  *                 If false, the tab replaces the existing preview slot occupant (if any),
  *                 or becomes the new preview slot occupant.
- * @param isEphemeral - If true, the tab is marked as ephemeral (closed on defocus).
  * @returns The workspace with the tab opened.
  */
 export function openTabInCell(
@@ -35,12 +34,11 @@ export function openTabInCell(
   targetCol?: number,
   pinned: boolean = true,
   config?: Record<string, unknown>,
-  isEphemeral: boolean = false,
 ): Workspace {
   const tabId = makeTabId();
   const mergedConfig: Record<string, unknown> = { ...config };
   if (filePath) mergedConfig.filePath = filePath;
-  const tab = createTab(tabId, appType, title, mergedConfig, !pinned, isEphemeral);
+  const tab = createTab(tabId, appType, title, mergedConfig, !pinned);
   let result = registerTab(workspace, tab);
 
   // Determine target column
@@ -85,16 +83,6 @@ export function pinTabInCell(
  * When pinned, the ephemeral tab survives defocus (won't auto-close).
  * When unpinned, it closes on defocus.
  */
-export function toggleEphemeralPin(
-  workspace: Workspace,
-  windowId: string,
-  cellCol: number,
-  tabId: string,
-  pinned: boolean,
-): Workspace {
-  return updateTabInCell(workspace, windowId, cellCol, tabId, { ephemeralPinned: pinned });
-}
-
 /**
  * Find the preview tab in a specific cell, or null if none.
  */
@@ -110,7 +98,7 @@ export function findPreviewTabInCell(
   if (!pl) return null;
 
   for (const tabId of pl.tabIds) {
-    const tab = workspace.tabs[tabId as TabId];
+    const tab = workspace.editorTabs[tabId as TabId];
     if (tab && tab.isPreview) {
       return tabId as string;
     }
@@ -133,7 +121,7 @@ function replaceTabInCell(
 ): Workspace {
   // Register the new tab
   let result = workspace;
-  if (!result.tabs[newTab.id as TabId]) {
+  if (!result.editorTabs[newTab.id as TabId]) {
     result = registerTab(result, newTab);
   }
 
@@ -156,9 +144,9 @@ function replaceTabInCell(
 
   // Remove the old tab from workspace registry
   const oldTid = oldTabId as TabId;
-  if (result.tabs[oldTid]) {
-    const { [oldTid]: _removed, ...remainingTabs } = result.tabs;
-    result = { ...result, tabs: remainingTabs };
+  if (result.editorTabs[oldTid]) {
+    const { [oldTid]: _removed, ...remainingTabs } = result.editorTabs;
+    result = { ...result, editorTabs: remainingTabs };
   }
 
   return result;
@@ -170,14 +158,14 @@ function replaceTabInCell(
 function updateTabInPlace(
   workspace: Workspace,
   tabId: string,
-  updates: Partial<Pick<Tab, "isPreview" | "title" | "config" | "isEphemeral" | "ephemeralPinned">>,
+  updates: Partial<Pick<Tab, "isPreview" | "title" | "config">>,
 ): Workspace {
-  const existing = workspace.tabs[tabId as TabId];
+  const existing = workspace.editorTabs[tabId as TabId];
   if (!existing) return workspace;
   return {
     ...workspace,
-    tabs: {
-      ...workspace.tabs,
+    editorTabs: {
+      ...workspace.editorTabs,
       [tabId as TabId]: { ...existing, ...updates },
     },
   };
@@ -191,7 +179,7 @@ function updateTabInCell(
   windowId: string,
   cellCol: number,
   tabId: string,
-  updates: Partial<Pick<Tab, "isPreview" | "title" | "config" | "isEphemeral" | "ephemeralPinned">>,
+  updates: Partial<Pick<Tab, "isPreview" | "title" | "config">>,
 ): Workspace {
   return updateTabInPlace(workspace, tabId, updates);
 }

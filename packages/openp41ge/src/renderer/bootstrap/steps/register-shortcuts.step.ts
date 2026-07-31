@@ -12,7 +12,6 @@ import { createLogger } from "openp41ge-logger";
 const log = createLogger("bootstrap:register-shortcuts");
 
 import { showCloneDialog } from "../../components/openp41ge-worktree-controller";
-import { showProjectPicker } from "../../services/project-switch-service";
 import { Openp41geTabsEventHandler } from "../../services/openp41ge-tabs-event-handler";
 
 export class RegisterShortcutsStep implements IStartupStep {
@@ -69,21 +68,6 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "Tab",
     });
 
-    km.register({
-      modifiers: 12, // Meta + Shift
-      key: "p",
-      code: "KeyP",
-      handler: () => {
-        try {
-          showProjectPicker();
-        } catch (err) {
-          log.warn("Project picker handler error:", err);
-        }
-      },
-      description: "Open Project Switcher",
-      category: "Project",
-    });
-
     // ── Pane ────────────────────────────────────────────────────────
     km.register({
       modifiers: 8,
@@ -106,25 +90,116 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "Pane",
     });
 
-    // ── File ────────────────────────────────────────────────────────
+    // ── View: Sidebar toggles ───────────────────────────────────────
+    // Cmd+B toggles the primary (right) sidebar
     km.register({
       modifiers: 8,
       key: "b",
       code: "KeyB",
       handler: () => {
         try {
-          const ws = context.workspaceState.getWorkspace();
-          if (!ws) return;
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          const win = ws.windows.find((w) => w.id === myWindowId);
-          if (!win) return;
-          context.commandBus.dispatch("toggleSidebarViewOp", myWindowId, "explorer");
+          context.commandBus.dispatch("toggleSidebar", myWindowId, "right");
         } catch (_err) {
           // ignore
         }
       },
-      description: "Toggle Projects Secondary Sidebar",
+      description: "Toggle Right Sidebar",
+      category: "View",
+    });
+
+    // Cmd+Option+B toggles the secondary (left) sidebar
+    km.register({
+      modifiers: 10,
+      key: "b",
+      code: "KeyB",
+      handler: () => {
+        try {
+          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+          if (!myWindowId) return;
+          context.commandBus.dispatch("toggleSidebar", myWindowId, "left");
+        } catch (_err) {
+          // ignore
+        }
+      },
+      description: "Toggle Left Sidebar",
+      category: "View",
+    });
+
+    // Cmd+Shift+E opens Explorer in the right sidebar
+    km.register({
+      modifiers: 12,
+      key: "e",
+      code: "KeyE",
+      handler: () => {
+        try {
+          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+          if (!myWindowId) return;
+          context.commandBus.dispatch("openSidebar", myWindowId, "right", "");
+          context.commandBus.dispatch("openSystemTab", myWindowId, "right", "explorer", "Explorer");
+        } catch (_err) {
+          // ignore
+        }
+      },
+      description: "Open Explorer",
+      category: "View",
+    });
+
+    // Cmd+Shift+G opens Git in the right sidebar
+    km.register({
+      modifiers: 12,
+      key: "g",
+      code: "KeyG",
+      handler: () => {
+        try {
+          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+          if (!myWindowId) return;
+          context.commandBus.dispatch("openSidebar", myWindowId, "right", "");
+          context.commandBus.dispatch("openSystemTab", myWindowId, "right", "git", "Git");
+        } catch (_err) {
+          // ignore
+        }
+      },
+      description: "Open Git",
+      category: "View",
+    });
+
+    // Cmd+Shift+F opens Search in the right sidebar
+    km.register({
+      modifiers: 12,
+      key: "f",
+      code: "KeyF",
+      handler: () => {
+        try {
+          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+          if (!myWindowId) return;
+          context.commandBus.dispatch("openSidebar", myWindowId, "right", "");
+          context.commandBus.dispatch("openSystemTab", myWindowId, "right", "search", "Search");
+        } catch (_err) {
+          // ignore
+        }
+      },
+      description: "Open Search",
+      category: "View",
+    });
+
+    // Cmd+Shift+P opens Project Picker in the right sidebar
+    km.register({
+      modifiers: 12,
+      key: "p",
+      code: "KeyP",
+      handler: () => {
+        try {
+          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+          if (!myWindowId) return;
+          context.commandBus.dispatch("openSidebar", myWindowId, "right", "");
+          context.commandBus.dispatch("openSystemTab", myWindowId, "right", "projects", "Projects");
+        } catch (_err) {
+          // ignore
+        }
+      },
+      description: "Open Project Picker",
       category: "View",
     });
 

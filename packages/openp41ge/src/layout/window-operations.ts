@@ -47,7 +47,7 @@ export function detachTabToWindow(
   if (!source) return workspace;
 
   let result = removeTabFromCell(workspace, source.windowId, tabId);
-  const tab = result.tabs[tabId as TabId];
+  const tab = result.editorTabs[tabId as TabId];
   if (!tab) return workspace;
 
   const newWinId = `win-${tabId}`;
@@ -61,44 +61,6 @@ export function newWindow(workspace: Workspace): Workspace {
   return addWindow(workspace, newWinId);
 }
 
-// ─── Sidebar operations ────────────────────────────────────────────────────
-
-export function setSidebarViewOp(
-  workspace: Workspace,
-  windowId: string,
-  activeViewId: string | null,
-): Workspace {
-  return mapWindow(workspace, windowId, (win) => ({
-    ...win,
-    sidebar: { ...win.sidebar, activeViewId },
-  }));
-}
-
-export function toggleSidebarViewOp(
-  workspace: Workspace,
-  windowId: string,
-  viewId: string,
-): Workspace {
-  return mapWindow(workspace, windowId, (win) => {
-    const current = win.sidebar?.activeViewId;
-    if (current === viewId) {
-      return { ...win, sidebar: { ...win.sidebar, activeViewId: null } };
-    }
-    return { ...win, sidebar: { ...win.sidebar, activeViewId: viewId } };
-  });
-}
-
-export function setSidebarWidthOp(
-  workspace: Workspace,
-  windowId: string,
-  width: number,
-): Workspace {
-  return mapWindow(workspace, windowId, (win) => ({
-    ...win,
-    sidebar: { ...win.sidebar, width: Math.max(180, Math.min(600, width)) },
-  }));
-}
-
 // ─── Overlay operations ───────────────────────────────────────────────────
 
 export function createOverlay(
@@ -108,7 +70,7 @@ export function createOverlay(
   position: OverlayPosition = "bottom-right",
 ): Workspace {
   let result = workspace;
-  if (!result.tabs[tab.id]) {
+  if (!result.editorTabs[tab.id]) {
     result = registerTab(result, tab);
   }
 

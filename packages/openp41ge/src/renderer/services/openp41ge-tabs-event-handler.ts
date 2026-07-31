@@ -257,13 +257,8 @@ export class Openp41geTabsEventHandler {
       const pl = win.grid.placements.find((p) => (p.tabIds as string[]).includes(tabId));
       if (!pl) return;
 
-      // Check if this is an ephemeral tab being pinned (toggle)
-      const tab = ws.tabs[tabId as string];
-      if (tab?.isEphemeral) {
-        // Toggle the ephemeral pin state
-        this._dispatch("toggleEphemeralPin", winId, pl.position.col, tabId, isPinned);
-      } else if (isPinned) {
-        // Regular tab pin (from preview double-click)
+      // Pin a preview tab (from preview double-click)
+      if (isPinned) {
         this._dispatch("pinTabInCell", winId, pl.position.col, tabId);
       }
     });
@@ -279,8 +274,6 @@ export class Openp41geTabsEventHandler {
       this._dispatch("removeTabFromCell", winId, tabId);
     });
 
-    // ── Ephemeral tab dismissal: any click outside its cell ──────
-    this._registerEphemeralDismissal();
   }
 
   /**
@@ -309,59 +302,7 @@ export class Openp41geTabsEventHandler {
     this._cleanups.push(() => document.removeEventListener("click", listener));
   }
 
-  /**
-   * Register a capture-phase mousedown listener that closes ephemeral tabs
-   * when the click lands outside the ephemeral tab's grid cell.
-   *
-   * Uses capture phase so it fires before any other handlers. We dispatch
-   * synchronously — the command bus queues operations so the close will be
-   * applied before any follow-up `activateTabInCell` from bubble handlers.
-   */
-  private _registerEphemeralDismissal(): void {
-    const listener = (e: MouseEvent) => {
-      const ws = this._workspaceState?.getWorkspace();
-      if (!ws) return;
 
-      for (const win of ws.windows) {
-        let ephemeralCol: number | null = null;
-        let ephemeralTabId: string | null = null;
-
-        for (const pl of win.grid.placements) {
-          for (const tid of pl.tabIds) {
-            const tab = ws.tabs[tid];
-            if (tab?.isEphemeral && !tab.ephemeralPinned) {
-              ephemeralCol = pl.position.col;
-              ephemeralTabId = tid as string;
-              break;
-            }
-          }
-          if (ephemeralTabId) break;
-        }
-
-        if (!ephemeralTabId || ephemeralCol === null) continue;
-
-        // Only close the ephemeral tab if the click is entirely outside
-        // its grid cell (both tab-bar *and* content area).  Clicking inside
-        // the cell — on the tab button, the pane body, or any widget within
-        // the pane — should let the user interact without dismissal.
-        const target = e.target as HTMLElement;
-        const cell = target.closest?.('[data-cell-col]');
-        if (cell instanceof HTMLElement) {
-          const cellCol = cell.getAttribute("data-cell-col");
-          if (cellCol !== null && parseInt(cellCol, 10) === ephemeralCol) continue; // Inside the ephemeral cell — stay open
-        }
-
-        // Dispatch synchronously — capture phase runs before bubble handlers
-        this._dispatch("removeTabFromCell", win.id, ephemeralTabId);
-        return;
-      }
-    };
-
-    document.addEventListener("mousedown", listener, { capture: true });
-    this._cleanups.push(() =>
-      document.removeEventListener("mousedown", listener, { capture: true }),
-    );
-  }
 
   private _dispatch(fn: string, ...args: unknown[]): void {
     this._commandBus?.dispatch(fn, ...args);

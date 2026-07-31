@@ -36,8 +36,8 @@ describe("registerTab", () => {
     const tab = types.createTab("p1", "terminal", "Test");
 
     const result = ops.registerTab(ws, tab);
-    expect(result.tabs["p1"]).toBeDefined();
-    expect(result.tabs["p1"].title).toBe("Test");
+    expect(result.editorTabs["p1"]).toBeDefined();
+    expect(result.editorTabs["p1"].title).toBe("Test");
   });
 
   test("preserves existing tabs when adding a new one", () => {
@@ -47,8 +47,8 @@ describe("registerTab", () => {
     const t2 = types.createTab("p2", "markdown", "New");
 
     r = ops.registerTab(r, t2);
-    expect(r.tabs["p1"]).toBeDefined();
-    expect(r.tabs["p2"]).toBeDefined();
+    expect(r.editorTabs["p1"]).toBeDefined();
+    expect(r.editorTabs["p2"]).toBeDefined();
   });
 });
 
@@ -72,7 +72,7 @@ describe("addTabToCell", () => {
 
     const result = ops.addTabToCell(ws, winId, tab, 0, 0);
 
-    expect(result.tabs["unregistered"]).toBeDefined();
+    expect(result.editorTabs["unregistered"]).toBeDefined();
   });
 
   test("adds tab to occupied cell (multiple tabs in one cell)", () => {
@@ -224,7 +224,7 @@ describe("renameTabOp", () => {
     const tabId = r.windows[0].grid.placements[0].tabIds[0];
 
     const result = ops.renameTabOp(r, tabId, "New Title");
-    expect(result.tabs[tabId].title).toBe("New Title");
+    expect(result.editorTabs[tabId].title).toBe("New Title");
   });
 
   test("does nothing when tab does not exist", () => {
@@ -243,7 +243,7 @@ describe("updateTabConfig", () => {
     const r = ops.registerTab(ws, tab);
 
     const result = ops.updateTabConfig(r, "t1", "cwd", "/new-home");
-    expect(result.tabs["t1"].config?.cwd).toBe("/new-home");
+    expect(result.editorTabs["t1"].config?.cwd).toBe("/new-home");
   });
 });
 
@@ -325,7 +325,7 @@ describe("createOverlay", () => {
     const tab = types.createTab("p_new", "video", "New");
 
     const result = ops.createOverlay(ws, winId, tab);
-    expect(result.tabs["p_new"]).toBeDefined();
+    expect(result.editorTabs["p_new"]).toBeDefined();
   });
 
   test("accepts a custom position", () => {
@@ -495,18 +495,18 @@ describe("stripPreviewTabs", () => {
     const winId = ws.windows[0].id;
 
     // Add all three tabs to the same cell
-    ws = ops.addTabToCell(ws, winId, ws.tabs["pinned-1"], 0, 0);
-    ws = ops.addTabToCell(ws, winId, ws.tabs["preview-1"], 0, 0);
-    ws = ops.addTabToCell(ws, winId, ws.tabs["pinned-2"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["pinned-1"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["preview-1"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["pinned-2"], 0, 0);
 
     const cleaned = ops.stripPreviewTabs(ws);
 
     // Preview tab should be removed from tabs registry
-    expect(cleaned.tabs["preview-1"]).toBeUndefined();
+    expect(cleaned.editorTabs["preview-1"]).toBeUndefined();
 
     // Pinned tabs should survive
-    expect(cleaned.tabs["pinned-1"]).toBeDefined();
-    expect(cleaned.tabs["pinned-2"]).toBeDefined();
+    expect(cleaned.editorTabs["pinned-1"]).toBeDefined();
+    expect(cleaned.editorTabs["pinned-2"]).toBeDefined();
 
     // Placement should only have pinned tabs
     const pl = cleaned.windows[0].grid.placements[0];
@@ -519,25 +519,25 @@ describe("stripPreviewTabs", () => {
   test("does not remove pinned tabs", () => {
     let ws = makeWsWithTabs({ id: "t1", isPreview: false }, { id: "t2", isPreview: false });
     const winId = ws.windows[0].id;
-    ws = ops.addTabToCell(ws, winId, ws.tabs["t1"], 0, 0);
-    ws = ops.addTabToCell(ws, winId, ws.tabs["t2"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["t1"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["t2"], 0, 0);
 
-    const originalTabCount = Object.keys(ws.tabs).length;
+    const originalTabCount = Object.keys(ws.editorTabs).length;
     const cleaned = ops.stripPreviewTabs(ws);
 
-    expect(Object.keys(cleaned.tabs)).toHaveLength(originalTabCount);
+    expect(Object.keys(cleaned.editorTabs)).toHaveLength(originalTabCount);
     expect(cleaned.windows[0].grid.placements[0].tabIds).toHaveLength(2);
   });
 
   test("empties a cell when its only tab is a preview", () => {
     let ws = makeWsWithTabs({ id: "only-preview", isPreview: true });
     const winId = ws.windows[0].id;
-    ws = ops.addTabToCell(ws, winId, ws.tabs["only-preview"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["only-preview"], 0, 0);
 
     const cleaned = ops.stripPreviewTabs(ws);
 
     // Tab should be removed
-    expect(cleaned.tabs["only-preview"]).toBeUndefined();
+    expect(cleaned.editorTabs["only-preview"]).toBeUndefined();
 
     // Cell should be empty (tabIds = []), it will render with quote placeholder.
     // If the only placement was removed by compactGrid, placements is empty.
@@ -551,8 +551,8 @@ describe("stripPreviewTabs", () => {
       { id: "preview-active", isPreview: true },
     );
     const winId = ws.windows[0].id;
-    ws = ops.addTabToCell(ws, winId, ws.tabs["pinned-tab"], 0, 0);
-    ws = ops.addTabToCell(ws, winId, ws.tabs["preview-active"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["pinned-tab"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["preview-active"], 0, 0);
 
     // Make preview the active tab
     ws = ops.activateTabInCell(ws, winId, "preview-active");
@@ -567,15 +567,15 @@ describe("stripPreviewTabs", () => {
   test("serialize() strips preview tabs before serializing", () => {
     let ws = makeWsWithTabs({ id: "pinned", isPreview: false }, { id: "preview", isPreview: true });
     const winId = ws.windows[0].id;
-    ws = ops.addTabToCell(ws, winId, ws.tabs["pinned"], 0, 0);
-    ws = ops.addTabToCell(ws, winId, ws.tabs["preview"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["pinned"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["preview"], 0, 0);
 
     const json = ops.serialize(ws);
     const parsed = JSON.parse(json);
 
     // Preview tab should not appear in serialized output
-    expect(parsed.tabs["preview"]).toBeUndefined();
-    expect(parsed.tabs["pinned"]).toBeDefined();
+    expect(parsed.editorTabs["preview"]).toBeUndefined();
+    expect(parsed.editorTabs["pinned"]).toBeDefined();
 
     // Placement should only have pinned tab
     expect(parsed.windows[0].grid.placements[0].tabIds).toEqual(["pinned"]);
@@ -584,14 +584,14 @@ describe("stripPreviewTabs", () => {
   test("does not mutate the original workspace", () => {
     let ws = makeWsWithTabs({ id: "pinned", isPreview: false }, { id: "preview", isPreview: true });
     const winId = ws.windows[0].id;
-    ws = ops.addTabToCell(ws, winId, ws.tabs["pinned"], 0, 0);
-    ws = ops.addTabToCell(ws, winId, ws.tabs["preview"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["pinned"], 0, 0);
+    ws = ops.addTabToCell(ws, winId, ws.editorTabs["preview"], 0, 0);
 
-    const originalTabs = { ...ws.tabs };
+    const originalTabs = { ...ws.editorTabs };
     ops.stripPreviewTabs(ws);
 
     // Original workspace should be unchanged
-    expect(ws.tabs["preview"]).toBeDefined();
+    expect(ws.editorTabs["preview"]).toBeDefined();
     expect(ws.windows[0].grid.placements[0].tabIds).toContain("preview");
   });
 });
@@ -626,7 +626,7 @@ describe("addColumnTab", () => {
     const result = ops.addColumnTab(ws, winId);
 
     const tabId = result.windows[0].grid.placements[0].tabIds[0];
-    expect(result.tabs[tabId].appType).toBe("terminal");
+    expect(result.editorTabs[tabId].appType).toBe("terminal");
   });
 });
 
@@ -683,7 +683,7 @@ describe("actionAddTab", () => {
 
     const result = ops.actionAddTab(ws, winId, "p1", "terminal");
 
-    expect(result.tabs["p1"]).toBeDefined();
+    expect(result.editorTabs["p1"]).toBeDefined();
     expect(result.windows[0].grid.placements).toHaveLength(1);
     expect(result.windows[0].grid.placements[0].tabIds.includes("p1")).toBe(true);
   });
@@ -711,8 +711,8 @@ describe("addColumnTabAt", () => {
     expect(result.windows[0].grid.placements).toHaveLength(1);
     expect(result.windows[0].grid.placements[0].position.col).toBe(1);
     const tabId = result.windows[0].grid.placements[0].tabIds[0];
-    expect(result.tabs[tabId].appType).toBe("git-repository");
-    expect(result.tabs[tabId].config?.filePath).toBe("my-repo");
+    expect(result.editorTabs[tabId].appType).toBe("git-repository");
+    expect(result.editorTabs[tabId].config?.filePath).toBe("my-repo");
   });
 
   test("expands grid when target column is beyond current grid", () => {
@@ -765,7 +765,7 @@ describe("updateTabTitle", () => {
     let r = ops.registerTab(ws, tab);
 
     const result = ops.updateTabTitle(r, "t1", "New Title");
-    expect(result.tabs["t1"].title).toBe("New Title");
+    expect(result.editorTabs["t1"].title).toBe("New Title");
   });
 });
 
@@ -810,35 +810,104 @@ describe("openTabInCell", () => {
     expect(placement).toBeDefined();
     expect(placement.tabIds).toHaveLength(1);
     const tabId = placement.tabIds[0];
-    expect(result.tabs[tabId].appType).toBe("file-viewer");
+    expect(result.editorTabs[tabId].appType).toBe("file-viewer");
   });
 });
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────
+// ─── System Tab Operations ───────────────────────────────────────────────
 
-describe("sidebar operations", () => {
-  test("setSidebarViewOp sets the active view", () => {
+describe("system tab operations", () => {
+  test("openSystemTab creates and activates a tab in the right sidebar", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    const result = ops.setSidebarViewOp(ws, winId, "worktree");
-    expect(result.windows[0].sidebar.activeViewId).toBe("worktree");
+    const result = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
+    const win = result.windows[0];
+    expect(win.sidebar?.rightSidebarTabs).toHaveLength(1);
+    expect(win.sidebar?.activeRightTab).toBe(win.sidebar?.rightSidebarTabs[0]);
   });
 
-  test("toggleSidebarViewOp toggles a view", () => {
+  test("openSystemTab prevents duplicates (same appType in same sidebar)", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    const result = ops.toggleSidebarViewOp(ws, winId, "worktree");
-    expect(result.windows[0].sidebar.activeViewId).toBe("worktree");
+    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
+    const r2 = ops.openSystemTab(r1, winId, "right", "explorer", "Explorer");
+    const win = r2.windows[0];
+    expect(win.sidebar?.rightSidebarTabs).toHaveLength(1);
   });
 
-  test("setSidebarWidthOp sets the width", () => {
+  test("toggleSidebar toggles the sidebar open state", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    const result = ops.setSidebarWidthOp(ws, winId, 400);
-    expect(result.windows[0].sidebar.width).toBe(400);
+    // Open sidebar first
+    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
+    expect(r1.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+
+    // Toggle closed
+    const r2 = ops.toggleSidebar(r1, winId, "right");
+    expect(r2.windows[0].sidebar?.rightSidebarOpen).toBe(false);
+
+    // Toggle open again
+    const r3 = ops.toggleSidebar(r2, winId, "right");
+    expect(r3.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+  });
+
+  test("openSidebar opens sidebar and activates first tab", () => {
+    const ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+
+    // Add a system tab first
+    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
+    const tabId = r1.windows[0].sidebar?.rightSidebarTabs[0];
+
+    // Close sidebar
+    const r2 = ops.closeSidebar(r1, winId, "right");
+    expect(r2.windows[0].sidebar?.rightSidebarOpen).toBe(false);
+
+    // Open sidebar (should open without tab param)
+    const r3 = ops.openSidebar(r2, winId, "right");
+    expect(r3.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+  });
+
+  test("closeSystemTab removes tab from sidebar and registry", () => {
+    const ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+
+    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer", false);
+    const tabId = r1.windows[0].sidebar?.rightSidebarTabs[0]!;
+    expect(r1.systemTabs[tabId]).toBeDefined();
+
+    const r2 = ops.closeSystemTab(r1, winId, "right", tabId);
+    expect(r2.windows[0].sidebar?.rightSidebarTabs).toHaveLength(0);
+    expect(r2.systemTabs[tabId]).toBeUndefined();
+  });
+
+  test("pinned system tabs propagate to all windows", () => {
+    const ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+    const ws2 = ops.addWindow(ws, "win-2");
+
+    const r1 = ops.openSystemTab(ws2, winId, "right", "explorer", "Explorer", true);
+    const tabId = r1.windows[0].sidebar?.rightSidebarTabs[0]!;
+    const win2 = r1.windows.find((w) => w.id === "win-2");
+    expect(win2?.sidebar?.rightSidebarTabs).toContain(tabId);
+  });
+
+  test("reorderSystemTab changes tab order in sidebar", () => {
+    const ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+
+    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
+    const r2 = ops.openSystemTab(r1, winId, "right", "git", "Git");
+    const tabs = r2.windows[0].sidebar?.rightSidebarTabs!;
+    expect(tabs).toHaveLength(2);
+
+    // Reorder: move last tab to front
+    const r3 = ops.reorderSystemTab(r2, winId, "right", tabs[1], 0);
+    expect(r3.windows[0].sidebar?.rightSidebarTabs[0]).toBe(tabs[1]);
+    expect(r3.windows[0].sidebar?.rightSidebarTabs[1]).toBe(tabs[0]);
   });
 });
 

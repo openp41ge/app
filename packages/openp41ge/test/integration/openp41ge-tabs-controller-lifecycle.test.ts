@@ -76,7 +76,7 @@ function addTabToWorkspace(
   title?: string,
 ): Workspace {
   const tab = { id: tabId, appType, title: title ?? appType, config: {}, isPreview: false } as any;
-  (ws.tabs as any)[tabId] = tab;
+  (ws.editorTabs as any)[tabId] = tab;
 
   while (ws.windows[0].grid.cols <= col) {
     ws.windows[0].grid.cols++;
@@ -288,7 +288,7 @@ describe("TabMountManager", () => {
 
     // Remove t1 from workspace
     ws.windows[0].grid.placements[0].tabIds = [];
-    delete (ws.tabs as any)["t1"];
+    delete (ws.editorTabs as any)["t1"];
     syncGridPlacements(winId, ws);
 
     manager.sync(ws, winId);

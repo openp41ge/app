@@ -28,8 +28,8 @@ describe("File open flow — preview vs edit", () => {
       );
 
       const tabId = result.windows[0].grid.placements[0].tabIds[0];
-      expect(result.tabs[tabId].config?.filePath).toBe("/project/readme.md");
-      expect(result.tabs[tabId].isPreview).toBe(false);
+      expect(result.editorTabs[tabId].config?.filePath).toBe("/project/readme.md");
+      expect(result.editorTabs[tabId].isPreview).toBe(false);
     });
 
     it("opens an unpinned (preview) file with isPreview=true", () => {
@@ -47,7 +47,7 @@ describe("File open flow — preview vs edit", () => {
       );
 
       const tabId = result.windows[0].grid.placements[0].tabIds[0];
-      expect(result.tabs[tabId].isPreview).toBe(true);
+      expect(result.editorTabs[tabId].isPreview).toBe(true);
     });
 
     it("replaces an existing preview tab with a new unpinned file", () => {
@@ -93,11 +93,11 @@ describe("File open flow — preview vs edit", () => {
       let r = ops.openTabInCell(ws, winId, "file-viewer", "preview.md", "/preview.md", 0, false);
 
       const tabId = r.windows[0].grid.placements[0].tabIds[0];
-      expect(r.tabs[tabId].isPreview).toBe(true);
+      expect(r.editorTabs[tabId].isPreview).toBe(true);
 
       // Pin it
       r = ops.pinTabInCell(r, winId, 0, tabId);
-      expect(r.tabs[tabId].isPreview).toBe(false);
+      expect(r.editorTabs[tabId].isPreview).toBe(false);
     });
 
     it("pinned preview tab is no longer replaced by new preview tab", () => {
@@ -124,8 +124,8 @@ describe("File open flow — preview vs edit", () => {
       const winId = ws.windows[0].id;
 
       const result = ops.actionAddTab(ws, winId, "t1", "file-viewer");
-      expect(result.tabs["t1"].title).toBe("file viewer");
-      expect(result.tabs["t1"].appType).toBe("file-viewer");
+      expect(result.editorTabs["t1"].title).toBe("file viewer");
+      expect(result.editorTabs["t1"].appType).toBe("file-viewer");
     });
 
     it("places tab in empty cell when grid has space", () => {

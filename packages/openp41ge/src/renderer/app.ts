@@ -25,7 +25,6 @@ import "./components/openp41ge-topbar";
 import "./components/openp41ge-contextmenu";
 import "./components/openp41ge-pane-picker";
 import "./components/openp41ge-worktree-tree";
-import "./components/openp41ge-activity-bar";
 import "./components/openp41ge-sidebar";
 import "./components/focus-section";
 

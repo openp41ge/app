@@ -71,7 +71,7 @@ export class TabMountManager {
 
       for (const tabId of placement.tabIds) {
         allCurrentTabIds.add(tabId);
-        const tab = workspace.tabs[tabId as keyof typeof workspace.tabs] as Tab | undefined;
+        const tab = workspace.editorTabs[tabId as keyof typeof workspace.editorTabs] as Tab | undefined;
         if (!tab) continue;
 
         const entry = this._getOrCreateEntry(tab, workspace, grid, tabId);

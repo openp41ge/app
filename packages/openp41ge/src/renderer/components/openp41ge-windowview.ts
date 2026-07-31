@@ -2,19 +2,21 @@
  * <openp41ge-windowview> — top-level component for a Openp41ge window (Lit).
  *
  * Provides workspace context to children. Renders the grid, titlebar,
- * worktree tree, bottom bar, and overlays.
+ * left sidebar, right sidebar, bottom bar, and overlays.
  *
- * Each window has its own grid, sidebar, and repo refs — no worksets.
+ * Each window has its own grid, sidebars, and repo refs — no worksets.
+ *
+ * Updated for system tabs: sidebars use system tab data from the workspace
+ * instead of the activity bar + single sidebar pattern.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
-import type { Window, Workspace, Rect } from "../../layout/types";
+import type { Window, Workspace, Rect, SystemTab } from "../../layout/types";
 import { dispatch } from "../app";
 
 import { setContextMenuActive } from "../services/drag-context";
 import "./openp41ge-bottom-button";
-import "./openp41ge-activity-bar";
 import "./openp41ge-sidebar";
 
 class Openp41geWindowView extends LitElement {
@@ -37,7 +39,6 @@ class Openp41geWindowView extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._ensureSkeleton();
-
   }
 
   private _ensureSkeleton(): void {
@@ -58,8 +59,6 @@ class Openp41geWindowView extends LitElement {
       }
       this._updateContextMenu();
     });
-
-
   }
 
   private _onOpenProject(): void {
@@ -86,6 +85,20 @@ class Openp41geWindowView extends LitElement {
     window.openp41ge.recentProjects.remove(name).then(() => this._loadRecents());
   }
 
+  // ═══ Helpers to resolve system tab data from workspace state ────────
+
+  /** Get the display title for a system tab ID. */
+  private _getSystemTabTitle(tabId: string): string {
+    const sysTab = this.workspaceData?.systemTabs?.[tabId];
+    return sysTab?.title ?? tabId;
+  }
+
+  /** Get the appType for a system tab ID. */
+  private _getSystemTabAppType(tabId: string): string {
+    const sysTab = this.workspaceData?.systemTabs?.[tabId];
+    return sysTab?.appType ?? "unknown";
+  }
+
   render(): TemplateResult | typeof nothing {
     const win = this.windowData;
     const ws = this.workspaceData;
@@ -98,8 +111,6 @@ class Openp41geWindowView extends LitElement {
         title: string;
         content: string;
         pinned: boolean;
-        ephemeral?: boolean;
-        ephemeralPinned?: boolean;
       }
     > = {};
     const activeTabIds: Record<string, string> = {};
@@ -108,17 +119,13 @@ class Openp41geWindowView extends LitElement {
       activeTabIds[col] = p.activeTabId ?? p.tabIds[0] ?? "";
       for (const tabId of p.tabIds) {
         const tidStr = String(tabId);
-        const tab = ws?.tabs?.[tabId];
-        const isEphemeral = tab ? tab.isEphemeral ?? false : false;
-        const ephemeralPinned = tab ? tab.ephemeralPinned ?? false : false;
-        // Ephemeral tabs are not pinned; regular tabs are pinned if not a preview
-        const pinned = tab ? !tab.isPreview && !isEphemeral : true;
+        const tab = ws?.editorTabs?.[tabId];
+        // Regular tabs are pinned if not a preview
+        const pinned = tab ? !tab.isPreview : true;
         tabData[tidStr] = {
           title: tab?.title ?? "untitled",
           content: "",
           pinned,
-          ephemeral: isEphemeral,
-          ephemeralPinned,
         };
       }
     }
@@ -130,16 +137,49 @@ class Openp41geWindowView extends LitElement {
         ? win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))
         : [{ position: { row: 0, col: 0 }, tabIds: [] as string[] }];
 
+    // ── Resolve system tab data for sidebars ──────────────────────────
+    const leftSysTabs = (win.sidebar?.leftSidebarTabs ?? []).map((id) => ({
+      id,
+      title: this._getSystemTabTitle(id),
+      appType: this._getSystemTabAppType(id),
+    }));
+    const rightSysTabs = (win.sidebar?.rightSidebarTabs ?? []).map((id) => ({
+      id,
+      title: this._getSystemTabTitle(id),
+      appType: this._getSystemTabAppType(id),
+    }));
+
     return html`
+      <style>
+        /* Parent-controlled sidebar visibility — avoids Lit marker corruption
+           from conditional rendering inside the sidebar component. */
+        .sidebar-element-hidden { display: none !important; }
+      </style>
       <div
         class="flex flex-col w-full h-full bg-surface relative"
       >
-        <openp41ge-titlebar .windowData=${win}></openp41ge-titlebar>
+        <openp41ge-titlebar
+          .windowData=${win}
+          .leftSidebarVisible=${win.sidebar?.leftSidebarOpen ?? false}
+          .rightSidebarVisible=${win.sidebar?.rightSidebarOpen ?? false}
+        ></openp41ge-titlebar>
         <div
           class="openp41ge-main-area flex flex-1 overflow-hidden min-h-0 relative"
         >
+          <!-- Left sidebar -->
+          <openp41ge-sidebar
+            side="left"
+            .windowId=${win.id}
+            .workspaceData=${ws}
+            .systemTabs=${leftSysTabs}
+            .activeTabId=${win.sidebar?.activeLeftTab ?? null}
+            .isOpen=${win.sidebar?.leftSidebarOpen ?? false}
+            class="sidebar-element ${win.sidebar?.leftSidebarOpen ? '' : 'sidebar-element-hidden'}"
+          ></openp41ge-sidebar>
+
+          <!-- Editor grid area -->
           <div
-            class="wv-code openp41ge-grid-area relative overflow-hidden"
+            class="wv-code openp41ge-grid-area relative overflow-hidden flex-1"
             style="--wv-code-min:200px"
           >
             <tab-grid
@@ -150,13 +190,17 @@ class Openp41geWindowView extends LitElement {
               .activeTabIds=${activeTabIds}
             ></tab-grid>
           </div>
+
+          <!-- Right sidebar -->
           <openp41ge-sidebar
+            side="right"
             .windowId=${win.id}
-            .activeViewId=${win.sidebar?.activeViewId ?? null}
+            .workspaceData=${ws}
+            .systemTabs=${rightSysTabs}
+            .activeTabId=${win.sidebar?.activeRightTab ?? null}
+            .isOpen=${win.sidebar?.rightSidebarOpen ?? false}
+            class="sidebar-element ${win.sidebar?.rightSidebarOpen ? '' : 'sidebar-element-hidden'}"
           ></openp41ge-sidebar>
-          <openp41ge-activity-bar
-            .activeViewId=${win.sidebar?.activeViewId ?? null}
-          ></openp41ge-activity-bar>
         </div>
         <div
           class="openp41ge-bottom-bar flex items-center h-7 bg-bg-primary border-t border-divider shrink-0"
@@ -269,8 +313,6 @@ class Openp41geWindowView extends LitElement {
     }
     this._contextMenu = null;
   }
-
-
 }
 
 customElements.define("openp41ge-windowview", Openp41geWindowView);

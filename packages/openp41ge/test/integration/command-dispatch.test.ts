@@ -29,8 +29,8 @@ describe("Command dispatch — OperationDispatcher", () => {
       expect(result).toBe(true);
       const state = dispatcher.getWorkspace();
       expect(state.windows[0].grid.placements).toHaveLength(1);
-      expect(state.tabs["t1"]).toBeDefined();
-      expect(state.tabs["t1"].title).toBe("Terminal");
+      expect(state.editorTabs["t1"]).toBeDefined();
+      expect(state.editorTabs["t1"].title).toBe("Terminal");
     });
 
     it("applies multiple operations in sequence", () => {
@@ -57,8 +57,8 @@ describe("Command dispatch — OperationDispatcher", () => {
 
       const state = dispatcher.getWorkspace();
       expect(state.windows[0].grid.placements).toHaveLength(2);
-      expect(state.tabs["t1"]).toBeDefined();
-      expect(state.tabs["t2"]).toBeDefined();
+      expect(state.editorTabs["t1"]).toBeDefined();
+      expect(state.editorTabs["t2"]).toBeDefined();
     });
 
     it("returns false for unknown operation name", () => {
@@ -123,11 +123,14 @@ describe("Command dispatch — OperationDispatcher", () => {
       const ws = dispatcher.getWorkspace();
       const winId = ws.windows[0].id;
 
-      dispatcher.apply("setSidebarViewOp", [winId, "worktree"]);
-      expect(dispatcher.getWorkspace().windows[0].sidebar.activeViewId).toBe("worktree");
+      dispatcher.apply("openSystemTab", [winId, "right", "explorer", "Explorer"]);
+      const state = dispatcher.getWorkspace();
+      const tabId = state.windows[0].sidebar?.rightSidebarTabs[0];
+      expect(tabId).toBeDefined();
+      expect(state.windows[0].sidebar?.rightSidebarOpen).toBe(true);
 
-      dispatcher.apply("toggleSidebarViewOp", [winId, "worktree"]);
-      expect(dispatcher.getWorkspace().windows[0].sidebar.activeViewId).toBeNull();
+      dispatcher.apply("closeSidebar", [winId, "right"]);
+      expect(dispatcher.getWorkspace().windows[0].sidebar?.rightSidebarOpen).toBe(false);
     });
 
     it("applies moveWindow to update bounds", () => {

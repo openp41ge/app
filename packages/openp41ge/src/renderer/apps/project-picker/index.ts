@@ -1,12 +1,13 @@
 /**
- * Project picker app type registration.
+ * Project picker app type registrations.
  *
- * Registers the project picker as an app type so it can be opened
- * as an ephemeral tab in the grid instead of a full-screen modal.
+ * Registers the project picker (full modal) and project detail
+ * (inline card) app types so they can be opened as editor tabs.
  */
 
 import type { AppTypeRegistration } from "../../controllers/types";
 import { ProjectPickerController } from "./project-picker-controller";
+import { ProjectDetailController } from "./project-detail-controller";
 
 export const projectPickerAppRegistration: AppTypeRegistration = {
   id: "project-picker",
@@ -14,4 +15,12 @@ export const projectPickerAppRegistration: AppTypeRegistration = {
   icon: "\u2302",
   description: "Search and switch between projects",
   createController: (tabId: string) => new ProjectPickerController(tabId, "project-picker"),
+};
+
+export const projectDetailAppRegistration: AppTypeRegistration = {
+  id: "project-detail",
+  label: "Project Details",
+  icon: "\u2699",
+  description: "Project settings and activation",
+  createController: (tabId: string) => new ProjectDetailController(tabId, "project-detail"),
 };

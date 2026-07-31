@@ -69,50 +69,6 @@ export class Openp41geProjectPicker extends LitElement {
       overflow: hidden;
     }
 
-    /* ── Top bar ────────────────────────────────── */
-    .topbar {
-      display: flex;
-      align-items: center;
-      height: 35px;
-      background: var(--bg-gutter, #252526);
-      border-bottom: 1px solid var(--border-divider, #333);
-      flex-shrink: 0;
-      padding: 0 16px;
-      -webkit-app-region: drag;
-    }
-
-    .close-btn {
-      width: 24px;
-      height: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: none;
-      border: none;
-      color: var(--openp41ge-muted-text, #888);
-      font-size: 14px;
-      cursor: pointer;
-      border-radius: 4px;
-      -webkit-app-region: no-drag;
-      transition:
-        background 0.1s,
-        color 0.1s;
-    }
-
-    .close-btn:focus {
-      outline: none;
-    }
-
-    .close-btn:focus-visible {
-      outline: 2px solid var(--openp41ge-accent-color, #4a9eff);
-      outline-offset: 2px;
-    }
-
-    .close-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--openp41ge-text-color, #e0e0e0);
-    }
-
     /* ── Body: two columns ──────────────────────── */
     .body {
       flex: 1;
@@ -1112,12 +1068,6 @@ export class Openp41geProjectPicker extends LitElement {
     const listItems = this._filteredProjects;
 
     return html`
-      <!-- Top bar -->
-      <div class="topbar">
-        <div class="flex-1"></div>
-        <button class="close-btn" style="margin-left:auto;" @click=${this._dismiss} title="Close (Esc)">✕</button>
-      </div>
-
       <!-- Body -->
       <div class="body">
         <!-- Left panel -->

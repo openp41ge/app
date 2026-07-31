@@ -100,8 +100,8 @@ describe("Tab placement invariants", () => {
       expect(placement).toBeDefined();
       expect(placement.tabIds).toHaveLength(1);
       const tabId = placement.tabIds[0];
-      expect(result.tabs[tabId].isPreview).toBe(false);
-      expect(result.tabs[tabId].appType).toBe("file-viewer");
+      expect(result.editorTabs[tabId].isPreview).toBe(false);
+      expect(result.editorTabs[tabId].appType).toBe("file-viewer");
     });
 
     it("opens an unpinned (preview) tab and marks it as preview", () => {
@@ -120,7 +120,7 @@ describe("Tab placement invariants", () => {
 
       const placement = result.windows[0].grid.placements[0];
       const tabId = placement.tabIds[0];
-      expect(result.tabs[tabId].isPreview).toBe(true);
+      expect(result.editorTabs[tabId].isPreview).toBe(true);
     });
 
     it("replaces an existing preview tab when opening a new unpinned tab", () => {
@@ -131,7 +131,7 @@ describe("Tab placement invariants", () => {
       let r = ops.openTabInCell(ws, winId, "file-viewer", "first.ts", "/first.ts", 0, false);
 
       const firstTabId = r.windows[0].grid.placements[0].tabIds[0];
-      expect(r.tabs[firstTabId].isPreview).toBe(true);
+      expect(r.editorTabs[firstTabId].isPreview).toBe(true);
 
       // Open second preview tab — should replace the first
       r = ops.openTabInCell(r, winId, "file-viewer", "second.ts", "/second.ts", 0, false);
@@ -140,11 +140,11 @@ describe("Tab placement invariants", () => {
       // The new tab replaces the old preview tab
       const currentTabId = placement.tabIds[0];
       expect(currentTabId).not.toBe(firstTabId);
-      expect(r.tabs[currentTabId].isPreview).toBe(true);
-      expect(r.tabs[currentTabId].config?.filePath).toBe("/second.ts");
+      expect(r.editorTabs[currentTabId].isPreview).toBe(true);
+      expect(r.editorTabs[currentTabId].config?.filePath).toBe("/second.ts");
 
       // The old preview tab should no longer be in the workspace tabs
-      expect(r.tabs[currentTabId]).toBeDefined();
+      expect(r.editorTabs[currentTabId]).toBeDefined();
     });
 
     it("does not replace preview tab when opening a pinned (edit) tab", () => {

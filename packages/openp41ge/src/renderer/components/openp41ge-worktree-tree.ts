@@ -1567,7 +1567,8 @@ class Openp41geWorktreeTree extends LitElement {
     if (!_isOpen) {
       const myWindowId = window.openp41ge?.workspace?.getWindowId?.() ?? "";
       if (myWindowId) {
-        window.openp41ge?.workspace?.dispatch?.("setSidebarViewOp", myWindowId, "explorer");
+        window.openp41ge?.workspace?.dispatch?.("openSidebar", myWindowId, "right");
+        window.openp41ge?.workspace?.dispatch?.("openSystemTab", myWindowId, "right", "explorer", "Explorer");
       }
       _isOpen = true;
       updateDrawerVisibility();
@@ -2108,14 +2109,15 @@ class Openp41geWorktreeTree extends LitElement {
   }
 
   /**
-   * Dispatch setSidebarViewOp to persist the open state,
+   * Dispatch openSidebar to persist the open state,
    * then immediately update the DOM for responsiveness.
    */
   open(): void {
     // Dispatch operation to persist
     const myWindowId = window.openp41ge?.workspace?.getWindowId?.() ?? "";
     if (myWindowId) {
-      window.openp41ge?.workspace?.dispatch?.("setSidebarViewOp", myWindowId, "explorer");
+      window.openp41ge?.workspace?.dispatch?.("openSidebar", myWindowId, "right");
+      window.openp41ge?.workspace?.dispatch?.("openSystemTab", myWindowId, "right", "explorer", "Explorer");
     }
     _isOpen = true;
     updateDrawerVisibility();
@@ -2128,7 +2130,7 @@ class Openp41geWorktreeTree extends LitElement {
     // Dispatch operation to persist
     const myWindowId = window.openp41ge?.workspace?.getWindowId?.() ?? "";
     if (myWindowId) {
-      window.openp41ge?.workspace?.dispatch?.("setSidebarViewOp", myWindowId, null);
+      window.openp41ge?.workspace?.dispatch?.("closeSidebar", myWindowId, "right");
     }
     _isOpen = false;
     updateDrawerVisibility();
@@ -2176,7 +2178,7 @@ class Openp41geWorktreeTree extends LitElement {
     targetCol: number,
     ws: Workspace,
   ): boolean {
-    const tabs = ws.tabs as Record<string, Tab | undefined>;
+    const tabs = ws.editorTabs as Record<string, Tab | undefined>;
     const win = ws.windows.find((w) => w.id === winId);
     if (!win) return false;
     const placement = win.grid.placements.find(

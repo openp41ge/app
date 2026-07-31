@@ -62,7 +62,7 @@ export function actionOpenFile(
     const win = result.windows.find((w) => w.id === windowId);
     if (win) {
       for (const pl of win.grid.placements) {
-        const hasFileViewer = pl.tabIds.some((tid) => result.tabs[tid]?.appType === "file-viewer");
+        const hasFileViewer = pl.tabIds.some((tid) => result.editorTabs[tid]?.appType === "file-viewer");
         if (hasFileViewer) {
           targetCol = pl.position.col;
           break;

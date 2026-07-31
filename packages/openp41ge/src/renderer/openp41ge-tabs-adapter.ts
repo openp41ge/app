@@ -76,7 +76,7 @@ export function windowToTabGridState(win: Window, workspace?: Workspace) {
     activeTabIds[colStr] = (pl.activeTabId ?? pl.tabIds[0] ?? "") as string;
 
     for (const tabId of pl.tabIds) {
-      const tabsRecord = workspace?.tabs as Record<string, Tab | undefined> | undefined;
+      const tabsRecord = workspace?.editorTabs as Record<string, Tab | undefined> | undefined;
       const tab = tabsRecord?.[tabId as string];
       tabs[tabId as string] = {
         title: tab?.title ?? "Untitled",

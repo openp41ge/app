@@ -144,7 +144,7 @@ describe("createWorkspace (unit)", () => {
     expect(ws.windows).toHaveLength(1);
     expect(ws.windows[0].grid).toBeDefined();
     expect(ws.windows[0].sidebar).toBeDefined();
-    expect(ws.tabs).toEqual({});
+    expect(ws.editorTabs).toEqual({});
   });
 
   test("workspace ID follows pattern", () => {

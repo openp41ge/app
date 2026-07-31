@@ -13,3 +13,4 @@ export * from "./file-operations.js";
 export * from "./cell-operations.js";
 export * from "./repo-operations.js";
 export * from "./serialization.js";
+export * from "./system-tab-operations.js";

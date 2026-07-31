@@ -207,7 +207,7 @@ describe("updateTabTitle", () => {
     const r = ops.addTabToCell(ws, winId, t1, 0, 0);
 
     const result = ops.updateTabTitle(r, "t1", "New Title");
-    expect(result.tabs["t1" as types.TabId]?.title).toBe("New Title");
+    expect(result.editorTabs["t1" as types.TabId]?.title).toBe("New Title");
   });
 
   test("does nothing for unknown tab", () => {

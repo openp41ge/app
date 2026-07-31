@@ -25,9 +25,9 @@ describe("Serialization round-trip", () => {
 
       expect(deserialized.id).toBe(r.id);
       expect(deserialized.windows).toHaveLength(r.windows.length);
-      expect(deserialized.tabs["t1"]).toBeDefined();
-      expect(deserialized.tabs["t1"]?.title).toBe("Terminal");
-      expect(deserialized.tabs["t1"]?.config).toEqual({});
+      expect(deserialized.editorTabs["t1"]).toBeDefined();
+      expect(deserialized.editorTabs["t1"]?.title).toBe("Terminal");
+      expect(deserialized.editorTabs["t1"]?.config).toEqual({});
     });
 
     it("preserves tab config after round-trip", () => {
@@ -40,7 +40,7 @@ describe("Serialization round-trip", () => {
       const json = ops.serialize(r);
       const deserialized = ops.deserialize(json);
 
-      expect(deserialized.tabs["t1"]?.config?.cwd).toBe("/home/user");
+      expect(deserialized.editorTabs["t1"]?.config?.cwd).toBe("/home/user");
     });
 
     it("preserves complex multi-window state", () => {
@@ -64,16 +64,15 @@ describe("Serialization round-trip", () => {
       const oTab = types.createTab("o1", "notes", "Notes");
       r = ops.createOverlay(r, "w2", oTab, "top-right");
 
-      // Set sidebar state
-      r = ops.setSidebarViewOp(r, winId1, "explorer");
-      r = ops.setSidebarWidthOp(r, winId1, 300);
+      // Set sidebar state (open explorer system tab — pinned so it survives serialization)
+      r = ops.openSystemTab(r, winId1, "right", "explorer", "Explorer", true);
 
       const json = ops.serialize(r);
       const deserialized = ops.deserialize(json);
 
       // Verify structure
       expect(deserialized.windows).toHaveLength(2);
-      expect(Object.keys(deserialized.tabs)).toHaveLength(4); // t1, t2, t3, o1
+      expect(Object.keys(deserialized.editorTabs)).toHaveLength(4); // t1, t2, t3, o1
 
       // Verify tabs in win1
       const dWin1 = deserialized.windows[0];
@@ -89,9 +88,10 @@ describe("Serialization round-trip", () => {
       expect(dWin2.overlays[0].tab.id).toBe("o1");
       expect(dWin2.overlays[0].position).toBe("top-right");
 
-      // Verify sidebar
-      expect(dWin1.sidebar.activeViewId).toBe("explorer");
-      expect(dWin1.sidebar.width).toBe(300);
+      // Verify sidebar — system tab was opened
+      expect(dWin1.sidebar?.rightSidebarTabs).toHaveLength(1);
+      expect(dWin1.sidebar?.rightSidebarOpen).toBe(true);
+      expect(dWin1.sidebar?.activeRightTab).toBeDefined();
     });
 
     it("serialize returns valid JSON string", () => {
@@ -220,7 +220,7 @@ describe("Serialization round-trip", () => {
       let r = ops.addTabToCell(ws, winId, t1, 0, 0);
 
       // Add sidebar
-      r = ops.setSidebarViewOp(r, winId, "worktree");
+      r = ops.openSystemTab(r, winId, "right", "explorer", "Explorer");
 
       // First round-trip
       const json1 = ops.serialize(r);
@@ -238,11 +238,11 @@ describe("Serialization round-trip", () => {
       const w2 = r2.windows[0];
       expect(w2.grid.placements).toHaveLength(w1.grid.placements.length);
       expect(w2.grid.cols).toBe(w1.grid.cols);
-      expect(w2.sidebar.activeViewId).toBe(w1.sidebar.activeViewId);
+      expect(w2.sidebar?.rightSidebarOpen).toBe(w1.sidebar?.rightSidebarOpen);
 
       // Tab properties
-      const t1_1 = r1.tabs["t1"];
-      const t1_2 = r2.tabs["t1"];
+      const t1_1 = r1.editorTabs["t1"];
+      const t1_2 = r2.editorTabs["t1"];
       expect(t1_2?.appType).toBe(t1_1?.appType);
       expect(t1_2?.title).toBe(t1_1?.title);
     });

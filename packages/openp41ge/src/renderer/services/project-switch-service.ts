@@ -1,29 +1,24 @@
 /**
  * ProjectSwitchService — handles project switching in the renderer.
  *
- * When the user selects a project from the sidebar (activity bar icon,
+ * When the user selects a project from the sidebar (system tab click,
  * titlebar click, or File > Open Project), this service:
  *   1. Calls project:switchTo on the main process
  *   2. The main process broadcasts the updated workspace state
- *      (the picker is re-added as an ephemeral tab in the broadcast)
  *   3. Dispatches a DOM event so the titlebar and other components refresh
  *
- * The project picker is opened as an ephemeral tab instead of a modal.
- * After a project switch the main process re-adds the picker tab directly
- * to the workspace state before broadcasting, so there is no timing gap.
+ * The project picker is opened as a system tab in the sidebar instead of
+ * an ephemeral tab in the editor grid.
  */
 
 import { createLogger } from "openp41ge-logger";
 import { clearCapturedErrors } from "./error-capture-service";
 import { dispatch } from "../app";
-import { Openp41geTabsEventHandler } from "./openp41ge-tabs-event-handler";
 
 const log = createLogger("project-switch-service");
 
 /**
  * Switch the current project to the given name.
- * The main process re-opens the project picker ephemeral tab in the
- * broadcast, so the renderer does not need to re-add it here.
  */
 export async function switchToProject(name: string): Promise<boolean> {
   log.info(`Switching to project: ${name}`);
@@ -49,20 +44,16 @@ export async function switchToProject(name: string): Promise<boolean> {
 }
 
 /**
- * Show the project picker as an ephemeral tab in the current active cell.
- * If no cells exist, a new cell is created.
+ * Show the project picker as a system tab in the right sidebar.
+ * If the project picker system tab is already open, it activates it.
+ * Otherwise, creates a new system tab.
  */
 export function showProjectPicker(): void {
-  // Prevent duplicate ephemeral picker tabs
-  if (document.querySelector("openp41ge-project-picker[inline]")) return;
-
   const winId = window.openp41ge?.workspace?.getWindowId?.();
   if (!winId) return;
 
-  log.info("Opening project picker as ephemeral tab");
+  log.info("Opening project picker as system tab in right sidebar");
 
-  // Open in the last focused column, or column 0 if none
-  const targetCol = Openp41geTabsEventHandler.getLastFocusedCol(winId);
-
-  dispatch("addColumnTabAt", winId, "project-picker", "Project Switcher", "", targetCol, true);
+  // Open (or activate) the "projects" system tab in the right sidebar
+  dispatch("openSystemTab", winId, "right", "projects", "Projects");
 }

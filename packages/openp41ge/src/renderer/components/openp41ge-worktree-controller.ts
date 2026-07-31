@@ -4,16 +4,16 @@
  * Separate from <openp41ge-worktree-tree> so that keyboard shortcuts and imports
  * can reference the controller without importing the web component.
  *
- * The sidebar open/closed state is stored on the Window model (sidebar.activeViewId).
- * Worksets have been removed — each window has its own sidebar state.
+ * Sidebar state is stored on the Window model using the new system tab fields
+ * (rightSidebarOpen, activeRightTab, rightSidebarTabs).
  */
 
 import type { Openp41geWorktreeTreeElement } from "../interfaces/element-guards";
 import { getWorkspace, dispatch } from "../app";
 
 /**
- * Get the sidebar open state for the current window.
- * Returns false if no workspace or no active window.
+ * Get whether the explorer sidebar is open for the current window.
+ * Checks the new system tab sidebar state (right sidebar open + explorer tab active).
  */
 /** @public */
 export function isWorktreeOpen(): boolean {
@@ -23,12 +23,12 @@ export function isWorktreeOpen(): boolean {
   if (!myWindowId) return false;
   const win = ws.windows.find((w) => w.id === myWindowId);
   if (!win) return false;
-  return win.sidebar?.activeViewId === "explorer";
+  return (win.sidebar?.rightSidebarOpen ?? false) && win.sidebar?.activeRightTab != null;
 }
 
 /**
- * Toggle the explorer sidebar open/closed for the current window.
- * Dispatches toggleSidebarViewOp to persist the state change.
+ * Toggle the right sidebar open/closed.
+ * Uses the new toggleSidebar operation.
  */
 export function toggleWorktree(): void {
   const ws = getWorkspace();
@@ -38,7 +38,7 @@ export function toggleWorktree(): void {
   const win = ws.windows.find((w) => w.id === myWindowId);
   if (!win) return;
 
-  dispatch("toggleSidebarViewOp", win.id, "explorer");
+  dispatch("toggleSidebar", win.id, "right");
 }
 
 interface WorktreeTreeWithDialog extends Openp41geWorktreeTreeElement {
@@ -54,8 +54,9 @@ export function showCloneDialog(): void {
       const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
       if (myWindowId) {
         const win = ws.windows.find((w) => w.id === myWindowId);
-        if (win && win.sidebar?.activeViewId !== "explorer") {
-          dispatch("setSidebarViewOp", win.id, "explorer");
+        if (win && !(win.sidebar?.rightSidebarOpen ?? false)) {
+          // Open the right sidebar with explorer tab
+          dispatch("openSystemTab", win.id, "right", "explorer", "Explorer");
         }
       }
     }

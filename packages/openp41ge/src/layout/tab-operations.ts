@@ -25,7 +25,7 @@ import {
 export function registerTab(workspace: Workspace, tab: Tab): Workspace {
   return {
     ...workspace,
-    tabs: { ...workspace.tabs, [tab.id]: tab },
+    editorTabs: { ...workspace.editorTabs, [tab.id]: tab },
   };
 }
 
@@ -38,7 +38,7 @@ export function addTabToCell(
   insertAt?: number,
 ): Workspace {
   let result = workspace;
-  if (!result.tabs[tab.id]) {
+  if (!result.editorTabs[tab.id]) {
     result = registerTab(result, tab);
   }
 
@@ -187,8 +187,8 @@ export function renameTabOp(workspace: Workspace, tabId: string, newTitle: strin
   if (!tab) return workspace;
   return {
     ...workspace,
-    tabs: {
-      ...workspace.tabs,
+    editorTabs: {
+      ...workspace.editorTabs,
       [tabId as TabId]: { ...tab, title: newTitle },
     },
   };
@@ -205,7 +205,7 @@ export function moveTabBetweenCells(
   focusTabId?: string,
 ): Workspace {
   let result = removeTabFromCell(workspace, sourceWindowId, tabId, focusTabId);
-  const tab = result.tabs[tabId as TabId];
+  const tab = result.editorTabs[tabId as TabId];
   if (!tab) return workspace;
 
   // If the source cell was the last tab in its column AND was removed,
@@ -250,7 +250,7 @@ export function splitTabFromCell(
     actualSourceCol = sourcePl.position.col;
   }
 
-  const tab = workspace.tabs[tabId as TabId];
+  const tab = workspace.editorTabs[tabId as TabId];
   if (!tab) return workspace;
 
   const remainingTabIds = (sourcePl.tabIds as TabId[]).filter((id) => id !== tabId);
@@ -406,12 +406,12 @@ export function activateTabInCell(
 
 export function updateTabTitle(workspace: Workspace, tabId: string, title: string): Workspace {
   const tid = tabId as TabId;
-  if (!workspace.tabs[tid]) return workspace;
+  if (!workspace.editorTabs[tid]) return workspace;
   return {
     ...workspace,
-    tabs: {
-      ...workspace.tabs,
-      [tid]: { ...workspace.tabs[tid], title },
+    editorTabs: {
+      ...workspace.editorTabs,
+      [tid]: { ...workspace.editorTabs[tid], title },
     },
   };
 }
@@ -423,12 +423,12 @@ export function updateTabConfig(
   value: unknown,
 ): Workspace {
   const tid = tabId as TabId;
-  const tab = workspace.tabs[tid];
+  const tab = workspace.editorTabs[tid];
   if (!tab) return workspace;
   return {
     ...workspace,
-    tabs: {
-      ...workspace.tabs,
+    editorTabs: {
+      ...workspace.editorTabs,
       [tid]: { ...tab, config: { ...(tab.config || {}), [key]: value } },
     },
   };
@@ -486,7 +486,6 @@ export function addColumnTabAt(
   title?: string,
   filePath?: string,
   targetCol?: number,
-  isEphemeral: boolean = false,
 ): Workspace {
   if (targetCol === undefined || targetCol < 0) {
     return addColumnTab(workspace, windowId, appType, title, filePath);
@@ -509,7 +508,6 @@ export function addColumnTabAt(
     title || (appType?.replace("-", " ") ?? "Terminal"),
     config,
     false,
-    isEphemeral,
   );
   result = registerTab(result, tab);
   return addTabToCell(result, windowId, tab, 0, targetCol);

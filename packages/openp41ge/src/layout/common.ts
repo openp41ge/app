@@ -49,7 +49,7 @@ export function findTabLocation(workspace: Workspace, tabId: string): { windowId
 }
 
 export function getTabById(workspace: Workspace, tabId: string): Tab | null {
-  const tab = (workspace.tabs as Record<string, Tab | undefined>)[tabId];
+  const tab = (workspace.editorTabs as Record<string, Tab | undefined>)[tabId];
   if (tab) return tab;
   for (const win of workspace.windows) {
     for (const overlay of win.overlays) {

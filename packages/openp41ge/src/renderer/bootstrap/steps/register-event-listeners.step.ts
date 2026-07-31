@@ -39,7 +39,7 @@ export class RegisterEventListenersStep implements IStartupStep {
         for (const placement of win.grid.placements) {
           const toRemove: string[] = [];
           for (const tabId of placement.tabIds) {
-            const tab = ws.tabs[tabId as keyof typeof ws.tabs];
+            const tab = ws.editorTabs[tabId as keyof typeof ws.editorTabs];
             if (
               tab &&
               typeof tab.config?.filePath === "string" &&

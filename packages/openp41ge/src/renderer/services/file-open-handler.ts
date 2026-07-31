@@ -163,7 +163,7 @@ export class FileOpenHandler implements IFileOpenHandler {
     const pl = win.grid.placements.find((p) => p.position.row === 0 && p.position.col === col);
     if (!pl) return null;
 
-    const tabs = ws.tabs as Record<string, Tab | undefined>;
+    const tabs = ws.editorTabs as Record<string, Tab | undefined>;
     for (const tabId of pl.tabIds) {
       const tab = tabs[tabId];
       if (tab && tab.appType === "file-viewer" && tab.config?.filePath === filePath) {
@@ -183,7 +183,7 @@ export class FileOpenHandler implements IFileOpenHandler {
     const pl = win.grid.placements.find((p) => p.position.row === 0 && p.position.col === col);
     if (!pl) return null;
 
-    const tabs = ws.tabs as Record<string, Tab | undefined>;
+    const tabs = ws.editorTabs as Record<string, Tab | undefined>;
     for (const tabId of pl.tabIds) {
       const tab = tabs[tabId];
       if (tab && tab.appType === "file-viewer" && tab.isPreview) {
@@ -196,7 +196,7 @@ export class FileOpenHandler implements IFileOpenHandler {
   private _getTab(tabId: string): Tab | null {
     const ws = this._workspaceState!.getWorkspace();
     if (!ws) return null;
-    const tabs = ws.tabs as Record<string, Tab | undefined>;
+    const tabs = ws.editorTabs as Record<string, Tab | undefined>;
     return tabs[tabId] ?? null;
   }
 }

@@ -61,7 +61,7 @@ describe("IPC wiring simulation", () => {
       expect(broadcastFn).toHaveBeenCalledTimes(1);
 
       const state = dispatcher.getWorkspace();
-      expect(state.tabs["t1"]).toBeDefined();
+      expect(state.editorTabs["t1"]).toBeDefined();
     });
 
     it("does not broadcast on failed operation", () => {
@@ -185,14 +185,12 @@ describe("IPC wiring simulation", () => {
       const ws = dispatcher.getWorkspace();
       const winId = ws.windows[0].id;
 
-      dispatcher.apply("setSidebarViewOp", [winId, "explorer"]);
-      expect(dispatcher.getWorkspace().windows[0].sidebar.activeViewId).toBe("explorer");
+      dispatcher.apply("openSystemTab", [winId, "right", "explorer", "Explorer"]);
+      const state = dispatcher.getWorkspace();
+      expect(state.windows[0].sidebar?.activeRightTab).toBeDefined();
 
-      dispatcher.apply("toggleSidebarViewOp", [winId, "explorer"]);
-      expect(dispatcher.getWorkspace().windows[0].sidebar.activeViewId).toBeNull();
-
-      dispatcher.apply("setSidebarWidthOp", [winId, 350]);
-      expect(dispatcher.getWorkspace().windows[0].sidebar.width).toBe(350);
+      dispatcher.apply("closeSidebar", [winId, "right"]);
+      expect(dispatcher.getWorkspace().windows[0].sidebar?.rightSidebarOpen).toBe(false);
     });
   });
 

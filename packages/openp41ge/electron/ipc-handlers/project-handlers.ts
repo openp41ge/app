@@ -24,8 +24,7 @@ import type { WorkspaceService } from "../../src/main/services/workspace-service
 import type { NodeGitService } from "../../src/main/services/node-git-service";
 import type { NodeGitCommitService } from "../../src/main/services/node-git-commit-service";
 import { createWorkspace } from "../../src/layout/types.js";
-import { setSidebarViewOp } from "../../src/layout/window-operations.js";
-import { addColumnTabAt } from "../../src/layout/tab-operations.js";
+import { openSidebar, openSystemTab } from "../../src/layout/system-tab-operations.js";
 
 export function registerProjectHandlers(
   projectStore: ProjectStore,
@@ -202,7 +201,7 @@ export function registerProjectHandlers(
       dispatcher.setWorkspace(saved);
     } else {
       const fresh = createWorkspace("ws1");
-      const withExplorer = setSidebarViewOp(fresh, fresh.windows[0].id, "explorer");
+      const withExplorer = openSystemTab(openSidebar(fresh, fresh.windows[0].id, "right"), fresh.windows[0].id, "right", "explorer", "Explorer");
       dispatcher.setWorkspace(withExplorer);
     }
     dispatcher.broadcast();
@@ -244,18 +243,16 @@ export function registerProjectHandlers(
       // No saved state for this project — start with a fresh empty workspace
       // and open the explorer sidebar by default (like VS Code).
       const fresh = createWorkspace("ws1");
-      const withExplorer = setSidebarViewOp(fresh, fresh.windows[0].id, "explorer");
+      const withExplorer = openSystemTab(openSidebar(fresh, fresh.windows[0].id, "right"), fresh.windows[0].id, "right", "explorer", "Explorer");
       dispatcher.setWorkspace(withExplorer);
     }
 
-    // Re-add the project picker as an ephemeral tab in column 0 of
-    // the first window — included directly in the broadcast so there is
-    // no timing gap on the renderer side.
+    // Open the projects system tab in the right sidebar after switching.
     const ws = dispatcher.getWorkspace();
     if (ws.windows.length > 0) {
       const firstWinId = ws.windows[0].id;
-      const withPicker = addColumnTabAt(ws, firstWinId, "project-picker", "Project Switcher", "", 0, true);
-      dispatcher.setWorkspace(withPicker);
+      const withProjects = openSystemTab(ws, firstWinId, "right", "projects", "Projects");
+      dispatcher.setWorkspace(withProjects);
     }
 
     // Broadcast the updated state to all windows

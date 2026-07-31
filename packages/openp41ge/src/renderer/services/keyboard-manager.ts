@@ -51,9 +51,14 @@ export class KeyboardManager implements IKeyboardManager {
       (e.ctrlKey ? 1 : 0) | (e.altKey ? 2 : 0) | (e.shiftKey ? 4 : 0) | (e.metaKey ? 8 : 0);
 
     for (const binding of this._bindings) {
-      // Match key case-insensitively when shift is held (Shift+o → key="O", binding.key="o")
+      // Match key by value, with fallbacks for modifier-affected characters:
+      //   Shift: case-insensitive comparison (Shift+o → key="O", binding.key="o")
+      //   Alt/Option: macOS produces alternate Unicode characters, so match by
+      //     physical code instead (Alt+b → key="∫", code="KeyB", binding.key="b")
       const keyMatch =
-        binding.key === e.key || (mask & 4 && binding.key.toLowerCase() === e.key.toLowerCase());
+        binding.key === e.key ||
+        (mask & 4 && binding.key.toLowerCase() === e.key.toLowerCase()) ||
+        (mask & 2 && binding.code === e.code);
       if (binding.modifiers === mask && keyMatch && binding.code === e.code) {
         e.preventDefault();
         binding.handler();

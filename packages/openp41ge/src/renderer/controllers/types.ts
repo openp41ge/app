@@ -64,3 +64,34 @@ export interface AppTypeRegistration {
   description: string;
   createController: (tabId: string) => TabController;
 }
+
+// ─── System Tab Registration ──────────────────────────────────────────────
+
+/**
+ * SystemTabController — interface for system tab content in the sidebar.
+ *
+ * Simpler lifecycle than TabController since system tabs don't support
+ * preview slots, pinning in the same way, or cross-cell dragging.
+ * They mount/unmount with the sidebar's active tab.
+ */
+export interface SystemTabController {
+  readonly tabId: string;
+  readonly appType: string;
+  mount(container: HTMLElement): void | Promise<void>;
+  unmount(): void;
+}
+
+/**
+ * Registration record for a system tab type.
+ *
+ * System tabs are sidebar-based app panels (Explorer, Git, Search, Projects).
+ * They are separate from editor tab types and use a simpler lifecycle.
+ */
+export interface SystemTabRegistration {
+  id: string;
+  label: string;
+  icon: string;
+  description: string;
+  /** Factory function to create the system tab content controller. */
+  createController: (tabId: string, config?: Record<string, unknown>) => SystemTabController;
+}

@@ -58,8 +58,8 @@ describe("Layout operations — integration", () => {
       r = ops.removeTabFromCell(r, winId, "t1");
 
       // Tab should still exist in workspace.tabs even after removal from grid
-      expect(r.tabs["t1"]).toBeDefined();
-      expect(r.tabs["t1"].title).toBe("Terminal");
+      expect(r.editorTabs["t1"]).toBeDefined();
+      expect(r.editorTabs["t1"].title).toBe("Terminal");
     });
 
     it("handles multiple tabs in a single cell (stacked tabs)", () => {
@@ -380,9 +380,10 @@ describe("Layout operations — integration", () => {
       const ws = types.createWorkspace("ws-sidebar");
       const winId = ws.windows[0].id;
 
-      // Set sidebar to worktree view
-      let r = ops.setSidebarViewOp(ws, winId, "worktree");
-      expect(r.windows[0].sidebar.activeViewId).toBe("worktree");
+      // Open explorer system tab in right sidebar
+      let r = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
+      expect(r.windows[0].sidebar?.rightSidebarTabs).toHaveLength(1);
+      expect(r.windows[0].sidebar?.rightSidebarOpen).toBe(true);
 
       // Add a tab
       const t1 = types.createTab("t1", "terminal", "Terminal");
@@ -390,15 +391,15 @@ describe("Layout operations — integration", () => {
       expect(r.windows[0].grid.placements).toHaveLength(1);
 
       // Toggle sidebar off
-      r = ops.toggleSidebarViewOp(r, winId, "worktree");
-      expect(r.windows[0].sidebar.activeViewId).toBeNull();
+      r = ops.toggleSidebar(r, winId, "right");
+      expect(r.windows[0].sidebar?.rightSidebarOpen).toBe(false);
 
       // Tab should still be there
       expect(r.windows[0].grid.placements).toHaveLength(1);
 
-      // Resize sidebar
-      r = ops.setSidebarWidthOp(r, winId, 350);
-      expect(r.windows[0].sidebar.width).toBe(350);
+      // Reopen sidebar
+      r = ops.openSidebar(r, winId, "right");
+      expect(r.windows[0].sidebar?.rightSidebarOpen).toBe(true);
     });
   });
 
@@ -433,7 +434,7 @@ describe("Layout operations — integration", () => {
 
       const result = ops.addColumnTab(ws, winId);
       const tabId = result.windows[0].grid.placements[0].tabIds[0];
-      expect(result.tabs[tabId].appType).toBe("terminal");
+      expect(result.editorTabs[tabId].appType).toBe("terminal");
     });
   });
 });

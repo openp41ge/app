@@ -57,6 +57,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   left: 0px
 }
 
+.right-0 {
+  right: 0px
+}
+
 .right-1 {
   right: 0.25rem
 }
@@ -79,10 +83,6 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .top-\\[30px\\] {
   top: 30px
-}
-
-.top-\\[8px\\] {
-  top: 8px
 }
 
 .z-10 {
@@ -296,6 +296,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 0.75rem
 }
 
+.h-3\\.5 {
+  height: 0.875rem
+}
+
 .h-4 {
   height: 1rem
 }
@@ -372,16 +376,16 @@ export const tailwindCSS: string = `.pointer-events-none {
   width: 0px
 }
 
-.w-0\\.5 {
-  width: 0.125rem
-}
-
 .w-1 {
   width: 0.25rem
 }
 
 .w-3 {
   width: 0.75rem
+}
+
+.w-3\\.5 {
+  width: 0.875rem
 }
 
 .w-4 {
@@ -626,6 +630,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   justify-content: space-between
 }
 
+.gap-0 {
+  gap: 0px
+}
+
 .gap-1 {
   gap: 0.25rem
 }
@@ -642,12 +650,20 @@ export const tailwindCSS: string = `.pointer-events-none {
   gap: 0.625rem
 }
 
+.gap-3 {
+  gap: 0.75rem
+}
+
 .self-stretch {
   align-self: stretch
 }
 
 .overflow-hidden {
   overflow: hidden
+}
+
+.overflow-x-auto {
+  overflow-x: auto
 }
 
 .overflow-y-auto {
@@ -1116,10 +1132,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   font-size: 14px
 }
 
-.text-\\[20px\\] {
-  font-size: 20px
-}
-
 .text-base {
   font-size: 1rem;
   line-height: 1.5rem
@@ -1484,6 +1496,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   transition-duration: 500ms
 }
 
+.duration-75 {
+  transition-duration: 75ms
+}
+
 .ease-\\[ease\\] {
   transition-timing-function: ease
 }
@@ -1494,5 +1510,17 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .ease-out {
   transition-timing-function: cubic-bezier(0, 0, 0.2, 1)
+}
+
+.hover\\:bg-hover:hover {
+  background-color: var(--bg-hover, #2a2d2e)
+}
+
+.hover\\:text-primary:hover {
+  color: var(--text-primary, #d4d4d4)
+}
+
+.focus\\:border-accent:focus {
+  border-color: var(--text-accent, #569cd6)
 }
 `;

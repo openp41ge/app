@@ -58,9 +58,9 @@ describe("Window operations — integration", () => {
       expect(r.windows).toHaveLength(1);
       expect(r.windows[0].id).toBe(winId1);
       // Tab t1 should still exist in workspace tabs
-      expect(r.tabs["t1"]).toBeDefined();
+      expect(r.editorTabs["t1"]).toBeDefined();
       // Tab t2 should still exist in workspace tabs (just not visible)
-      expect(r.tabs["t2"]).toBeDefined();
+      expect(r.editorTabs["t2"]).toBeDefined();
     });
 
     it("closing all windows still preserves workspace", () => {
@@ -162,8 +162,8 @@ describe("Window operations — integration", () => {
       r = ops.closeWindow(r, newWin.id);
 
       // Tab should still exist in the workspace registry
-      expect(r.tabs["t1"]).toBeDefined();
-      expect(r.tabs["t1"].title).toBe("T1");
+      expect(r.editorTabs["t1"]).toBeDefined();
+      expect(r.editorTabs["t1"].title).toBe("T1");
     });
   });
 });

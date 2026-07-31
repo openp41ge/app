@@ -71,9 +71,9 @@ describe("FileOpenHandler wiring — integration", () => {
       expect(win.grid.placements).toHaveLength(1);
 
       const tabId = win.grid.placements[0].tabIds[0];
-      expect(ws.tabs[tabId].appType).toBe("file-viewer");
-      expect(ws.tabs[tabId].config?.filePath).toBe("/project/file.ts");
-      expect(ws.tabs[tabId].isPreview).toBe(false); // pinned
+      expect(ws.editorTabs[tabId].appType).toBe("file-viewer");
+      expect(ws.editorTabs[tabId].config?.filePath).toBe("/project/file.ts");
+      expect(ws.editorTabs[tabId].isPreview).toBe(false); // pinned
     });
 
     it("opens multiple pinned files — both land in the same column", () => {
@@ -86,8 +86,8 @@ describe("FileOpenHandler wiring — integration", () => {
       expect(win.grid.placements).toHaveLength(1);
       expect(win.grid.placements[0].tabIds).toHaveLength(2);
 
-      const tabA = ws.tabs[win.grid.placements[0].tabIds[0]];
-      const tabB = ws.tabs[win.grid.placements[0].tabIds[1]];
+      const tabA = ws.editorTabs[win.grid.placements[0].tabIds[0]];
+      const tabB = ws.editorTabs[win.grid.placements[0].tabIds[1]];
       expect(tabA.config?.filePath).toBe("/project/a.ts");
       expect(tabB.config?.filePath).toBe("/project/b.ts");
     });
@@ -99,7 +99,7 @@ describe("FileOpenHandler wiring — integration", () => {
 
       const ws = dispatcher.getWorkspace();
       const tabId = ws.windows[0].grid.placements[0].tabIds[0];
-      expect(ws.tabs[tabId].isPreview).toBe(true);
+      expect(ws.editorTabs[tabId].isPreview).toBe(true);
     });
 
     it("replaces existing preview tab when opening a new preview", () => {
@@ -113,7 +113,7 @@ describe("FileOpenHandler wiring — integration", () => {
       // Second preview replaces the first
       const currentTabId = ws2.windows[0].grid.placements[0].tabIds[0];
       expect(currentTabId).not.toBe(firstTabId);
-      expect(ws2.tabs[currentTabId].config?.filePath).toBe("/project/second.ts");
+      expect(ws2.editorTabs[currentTabId].config?.filePath).toBe("/project/second.ts");
     });
   });
 
@@ -127,7 +127,7 @@ describe("FileOpenHandler wiring — integration", () => {
 
       const ws1 = dispatcher.getWorkspace();
       const firstTabId = ws1.windows[0].grid.placements[0].tabIds[0];
-      expect(ws1.tabs[firstTabId].isPreview).toBe(true);
+      expect(ws1.editorTabs[firstTabId].isPreview).toBe(true);
 
       // "Second click" — handleOpenFile again with pinned=true
       // Note: handleOpenFile reads workspaceState.getWorkspace() which
@@ -141,15 +141,15 @@ describe("FileOpenHandler wiring — integration", () => {
 
       const ws2 = dispatcher.getWorkspace();
       // First tab still exists with isPreview=true
-      expect(ws2.tabs[firstTabId]).toBeDefined();
-      expect(ws2.tabs[firstTabId].isPreview).toBe(true);
+      expect(ws2.editorTabs[firstTabId]).toBeDefined();
+      expect(ws2.editorTabs[firstTabId].isPreview).toBe(true);
 
       // A new pinned tab was created (actionOpenFile pinned=true)
       const placements = ws2.windows[0].grid.placements[0].tabIds;
       const secondTabId = placements.find((id: string) => id !== firstTabId)!;
       expect(secondTabId).toBeDefined();
-      expect(ws2.tabs[secondTabId].isPreview).toBe(false);
-      expect(ws2.tabs[secondTabId].config?.filePath).toBe("/project/readme.md");
+      expect(ws2.editorTabs[secondTabId].isPreview).toBe(false);
+      expect(ws2.editorTabs[secondTabId].config?.filePath).toBe("/project/readme.md");
     });
   });
 
@@ -188,7 +188,7 @@ describe("FileOpenHandler wiring — integration", () => {
       const ws = dispatcher.getWorkspace();
       const tabId = ws.windows[0].grid.placements[0].tabIds[0];
       // Default mode (no pinned) → preview
-      expect(ws.tabs[tabId].isPreview).toBe(true);
+      expect(ws.editorTabs[tabId].isPreview).toBe(true);
     });
   });
 

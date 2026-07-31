@@ -1,51 +1,73 @@
 /**
- * <openp41ge-sidebar> — sidebar panel between the grid and activity bar.
+ * <openp41ge-sidebar> — sidebar panel with system tab bar and content area.
  *
- * Renders the currently active sidebar view panel. Contains a header
- * (view title + close button), a content area for the view, and a
- * left-edge drag handle for resizing.
+ * Renders a horizontal tab bar at the top and a content area below for the
+ * active system tab's controller.
  *
- * Architecture (SOLID):
- *   - Single Responsibility: manages the sidebar container, resize,
- *     and view lifecycle
- *   - Communication: listens for "openp41ge:activity-click" events and
- *     dispatches workspace operations to persist state
- *   - Width is stored in the layout data model (per-workset)
+ * KEY DESIGN:
+ * - render() ALWAYS returns the same template structure — no conditional
+ *   rendering based on visibility. This keeps Lit's marker comment nodes
+ *   stable in the DOM across all updates.
+ * - Visibility is controlled externally via the CSS class
+ *   "sidebar-element-hidden" applied by the parent windowview.
+ * - `isOpen` IS a Lit property: it triggers updated() so view lifecycle
+ *   (mount/unmount) can run. But render() ignores it.
+ * - shouldUpdate() prevents re-renders from properties that don't affect
+ *   the template output (e.g. workspaceData changes from parent re-render).
+ *   Only activeTabId, systemTabs, side, and width trigger actual DOM updates.
+ *
+ * Two instances per window: left sidebar and right sidebar.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
-import type { SidebarView } from "./sidebar-views/sidebar-view";
+import type { Workspace } from "../../layout/types";
 import { dispatch } from "../app";
-import { ExplorerSidebarView } from "./sidebar-views/explorer-view";
-import { GitSidebarView } from "./sidebar-views/git-sidebar-view";
+import { getSystemTabRegistration } from "../apps/app-registry";
+import type { SystemTabController } from "../controllers/types";
 
 const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 600;
-const GRID_MIN_WIDTH = 200;
-const ACTIVITY_BAR_WIDTH = 48;
-const BORDER_WIDTH = 3;
+const SIDEBAR_WIDTH_KEY_PREFIX = "openp41ge:sidebar-width-";
 
-const SIDEBAR_WIDTH_KEY = "openp41ge:sidebar-width";
+export interface SystemTabEntry {
+  id: string;
+  title: string;
+  appType: string;
+}
 
 class Openp41geSidebar extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
 
+  @property({})
+  side: "left" | "right" = "right";
+
   @property({ attribute: false })
   windowId: string = "";
 
   @property({ attribute: false })
-  worksetId: string = "";
+  workspaceData: Workspace | null = null;
 
   @property({ attribute: false })
-  activeViewId: string | null = null;
+  systemTabs: SystemTabEntry[] = [];
 
-  /** Override width default with persisted value BEFORE first Lit render. */
+  @property({ attribute: false })
+  activeTabId: string | null = null;
+
+  /**
+   * Used for view lifecycle (mount/unmount in updated()).
+   * render() ignores this — the template is always the same.
+   * Parent windowview also mirrors this via CSS class for actual visibility.
+   */
+  @property({ attribute: false })
+  isOpen: boolean = false;
+
+  /** Sidebar width, persisted per side. */
   @property({ attribute: false })
   width: number = (() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY_PREFIX + "right");
     if (saved) {
       const w = parseInt(saved, 10);
       if (!isNaN(w) && w >= 180 && w <= 600) return w;
@@ -54,98 +76,102 @@ class Openp41geSidebar extends LitElement {
   })();
 
   @state()
-  private _view: SidebarView | null = null;
+  private _view: SystemTabController | null = null;
 
   private _isResizing = false;
   private _resizeStartX = 0;
   private _resizeStartWidth = 0;
+  private _widthKey = SIDEBAR_WIDTH_KEY_PREFIX + "right";
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    document.addEventListener("openp41ge:activity-click", this._onActivityClick as EventListener);
-    // Set the element's own flex-basis so the parent flex container uses
-    // the persisted width, not the content's intrinsic size (which is
-    // just min-width 200px). Only do this when the sidebar is visible.
-    if (this.activeViewId) {
-      this.style.flex = `0 1 ${this.width}px`;
-    }
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    document.removeEventListener(
-      "openp41ge:activity-click",
-      this._onActivityClick as EventListener,
-    );
-    document.removeEventListener("mousemove", this._onResizeMove);
-    document.removeEventListener("mouseup", this._onResizeEnd);
-    this._unmountView();
+  /**
+   * Skip re-renders for property changes that don't affect the template.
+   * workspaceData and windowId changes from parent re-renders should NOT
+   * trigger Lit DOM updates — they'd only increase the chance of marker
+   * corruption from view DOM mounted inside .sidebar-content.
+   */
+  shouldUpdate(changed: Map<string | number | symbol, unknown>): boolean {
+    // Only allow updates when meaningful display properties change
+    if (changed.has("activeTabId")) return true;
+    if (changed.has("systemTabs")) return true;
+    if (changed.has("side")) return true;
+    if (changed.has("width")) return true;
+    if (changed.has("isOpen")) return true;
+    return false;
   }
 
   willUpdate(changed: Map<string | number | symbol, unknown>): void {
-    if (changed.has("worksetId") && this.worksetId) {
-      // Recreate the view with the new worksetId
-      if (this._view) {
-        const view = this._view as HTMLElement & { setWorksetId?(id: string): void };
-        if (typeof view.setWorksetId === "function") {
-          view.setWorksetId(this.worksetId);
-        }
+    if (changed.has("side")) {
+      this._widthKey = SIDEBAR_WIDTH_KEY_PREFIX + (this.side || "right");
+      const saved = localStorage.getItem(this._widthKey);
+      if (saved) {
+        const w = parseInt(saved, 10);
+        if (!isNaN(w) && w >= 180 && w <= 600) this.width = w;
       }
     }
   }
 
   updated(changed: Map<string | number | symbol, unknown>): void {
-    if (changed.has("activeViewId")) {
-      // View ID changed — unmount old, mount new if non-null
+    if (changed.has("activeTabId")) {
       this._unmountView();
-      if (this.activeViewId) {
+      if (this.activeTabId && this.isOpen) {
         this._mountView();
-        // Restore the element's flex-basis now that the sidebar is visible
-        this.style.flex = `0 1 ${this.width}px`;
-      } else {
-        // Sidebar closed — collapse the element so the grid fills the space
-        this.style.flex = "";
       }
-    } else if (this.activeViewId && !this._view) {
-      // Initial mount
-      this._mountView();
-    } else if (!this.activeViewId && this._view) {
-      // Sidebar closed
-      this._unmountView();
-      this.style.flex = "";
+    } else if (changed.has("isOpen")) {
+      if (this.isOpen && this.activeTabId && !this._view) {
+        this._mountView();
+      } else if (!this.isOpen && this._view) {
+        this._unmountView();
+      }
     }
   }
 
-  // ═══ Activity click handler ───────────────────────────────────────
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._unmountView();
+    document.removeEventListener("mousemove", this._onResizeMove);
+    document.removeEventListener("mouseup", this._onResizeEnd);
+  }
 
-  private _onActivityClick = (e: Event): void => {
-    const detail = (e as CustomEvent).detail;
-    if (!detail || !detail.viewId) return;
-    if (!this.windowId) return;
+  // ═══ Tab click handler ─────────────────────────────────────────────
 
-    const viewId = detail.viewId;
-    dispatch("toggleSidebarViewOp", this.windowId, viewId);
-  };
+  private _onTabClick(tabId: string): void {
+    dispatch("activateSystemTab", this.windowId, this.side, tabId);
+  }
+
+  private _onTabClose(tabId: string, e: Event): void {
+    e.stopPropagation();
+    dispatch("closeSystemTab", this.windowId, this.side, tabId);
+  }
+
+  private _onToggleSidebar(): void {
+    dispatch("toggleSidebar", this.windowId, this.side);
+  }
 
   // ═══ View lifecycle ───────────────────────────────────────────────
+  //
+  // Mount target is `.sidebar-content`, a <div> rendered by Lit in the
+  // template. We never set innerHTML on it — only removeChild in a loop —
+  // so Lit's marker comment nodes are preserved.
 
   private _mountView(): void {
-    if (!this.activeViewId) return;
+    if (!this.activeTabId || !this.isOpen) return;
     this._unmountView();
 
-    const container = this.querySelector(".sidebar-content") as HTMLElement;
+    const tab = this.systemTabs.find((t) => t.id === this.activeTabId);
+    if (!tab) return;
+
+    const container = this.querySelector<HTMLElement>(".sidebar-content");
     if (!container) return;
 
-    let view: SidebarView | null = null;
-
-    if (this.activeViewId === "explorer") {
-      view = new ExplorerSidebarView(this.worksetId);
-    } else if (this.activeViewId === "git") {
-      view = new GitSidebarView(this.worksetId);
-    }
-
-    if (view) {
-      view.mount(container);
+    const reg = getSystemTabRegistration(tab.appType);
+    if (reg) {
+      const view = reg.createController(this.activeTabId);
+      const mountResult = view.mount(container);
+      if (mountResult instanceof Promise) {
+        mountResult.catch((err) => {
+          console.error(`Failed to mount system tab ${tab.appType}:`, err);
+        });
+      }
       this._view = view;
     }
   }
@@ -155,6 +181,14 @@ class Openp41geSidebar extends LitElement {
       this._view.unmount();
       this._view = null;
     }
+    // Clear mount target using removeChild (never innerHTML) so Lit
+    // marker comment nodes inside this element are preserved.
+    const container = this.querySelector<HTMLElement>(".sidebar-content");
+    if (container) {
+      while (container.lastChild) {
+        container.removeChild(container.lastChild);
+      }
+    }
   }
 
   // ═══ Resize ───────────────────────────────────────────────────────
@@ -163,38 +197,27 @@ class Openp41geSidebar extends LitElement {
     e.preventDefault();
     this._isResizing = true;
     this._resizeStartX = e.clientX;
-    // Sync this.width to match the actual rendered width — the flex
-    // container may have constrained the element below localStorage's
-    // saved value. Otherwise the drag starts from an inflated value
-    // and the sidebar jumps.
     this.width = this.clientWidth;
     this._resizeStartWidth = this.clientWidth;
 
     document.addEventListener("mousemove", this._onResizeMove);
     document.addEventListener("mouseup", this._onResizeEnd);
 
-    // Add dragging class to the resize notch
-    const notch = this.querySelector(".sidebar-resize-notch") as HTMLElement;
+    const notch = this.querySelector<HTMLElement>(".sidebar-resize-notch");
     if (notch) notch.classList.add("dragging");
-  }
-
-  private _getMaxSidebarWidth(): number {
-    const available = window.innerWidth - GRID_MIN_WIDTH - ACTIVITY_BAR_WIDTH - BORDER_WIDTH;
-    return Math.min(MAX_SIDEBAR_WIDTH, available);
   }
 
   private _onResizeMove = (e: MouseEvent): void => {
     if (!this._isResizing) return;
-    // The grid is to the left, sidebar to the right.
-    // Resizing the sidebar left edge means: moving left = wider, moving right = narrower.
-    const dx = this._resizeStartX - e.clientX;
+    const dx = this.side === "left"
+      ? e.clientX - this._resizeStartX
+      : this._resizeStartX - e.clientX;
     const newWidth = Math.max(
       MIN_SIDEBAR_WIDTH,
       Math.min(this._getMaxSidebarWidth(), this._resizeStartWidth + dx),
     );
     this.width = newWidth;
-    this.style.flex = `0 1 ${newWidth}px`;
-    this.requestUpdate();
+    this.style.flex = `0 0 ${newWidth}px`;
   };
 
   private _onResizeEnd = (): void => {
@@ -202,36 +225,43 @@ class Openp41geSidebar extends LitElement {
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
 
-    const notch = this.querySelector(".sidebar-resize-notch") as HTMLElement;
+    const notch = this.querySelector<HTMLElement>(".sidebar-resize-notch");
     if (notch) notch.classList.remove("dragging");
 
-    // Persist the new width
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(this.width));
-    if (this.windowId && this.worksetId) {
-      dispatch("setSidebarWidthOp", this.windowId, this.worksetId, this.width);
-    }
+    localStorage.setItem(this._widthKey, String(this.width));
   };
 
-  // ═══ Render ───────────────────────────────────────────────────────
+  private _getMaxSidebarWidth(): number {
+    return Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth - 400);
+  }
 
-  render(): TemplateResult | typeof nothing {
-    if (!this.activeViewId) return nothing;
+  // ═══ Render ───────────────────────────────────────────────────────
+  //
+  // Always returns the same template structure. Never conditional.
+  // Visibility is controlled by the parent via CSS class.
+
+  render(): TemplateResult {
+    const borderClass = this.side === "left"
+      ? "border-r border-divider"
+      : "border-l border-divider";
+
+    const resizeNotchSideClass = this.side === "left" ? "right-0" : "left-0";
 
     return html`
       <div
-        class="flex flex-col bg-gutter border-l border-divider overflow-hidden relative"
-        style="flex:0 1 ${this.width}px;min-width:${MIN_SIDEBAR_WIDTH}px;height:100%;"
+        class="flex flex-col bg-gutter ${borderClass} overflow-hidden"
+        style="flex:0 0 ${this.width}px;min-width:${MIN_SIDEBAR_WIDTH}px;height:100%;"
       >
-        <!-- Resize notch on the left edge -->
+        <!-- Resize notch -->
         <div
-          class="sidebar-resize-notch absolute left-0 top-0 w-1 h-full cursor-col-resize z-10 pointer-events-auto touch-none bg-transparent"
+          class="sidebar-resize-notch absolute top-0 w-1 h-full cursor-col-resize z-10 pointer-events-auto touch-none bg-transparent ${resizeNotchSideClass}"
           @mousedown=${this._startResize}
         ></div>
+
         <style>
           .sidebar-resize-notch::before {
             content: "";
             position: absolute;
-            left: 0;
             top: 0;
             width: 3px;
             height: 100%;
@@ -244,12 +274,38 @@ class Openp41geSidebar extends LitElement {
           .sidebar-resize-notch.dragging::before {
             opacity: 1;
           }
+          .sidebar-resize-notch.right-0::before { right: 0; }
+          .sidebar-resize-notch.left-0::before { left: 0; }
         </style>
 
-        <!-- View content area -->
-        <div
-          class="sidebar-content flex-1 min-h-0 overflow-hidden flex flex-col"
-        ></div>
+        <!-- System tab bar -->
+        <div class="sidebar-tab-bar flex items-center gap-0 px-1 py-1 border-b border-divider shrink-0 overflow-x-auto">
+          ${this.systemTabs.map((tab) => {
+            const isActive = tab.id === this.activeTabId;
+            return html`
+              <div
+                class="sidebar-tab flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-xs whitespace-nowrap select-none transition-colors duration-75"
+                style="${isActive
+                  ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #e0e0e0)"
+                  : "color:var(--text-secondary, #888)"}"
+                @click=${() => this._onTabClick(tab.id)}
+              >
+                <span class="sidebar-tab-title">${tab.title}</span>
+                <span
+                  class="sidebar-tab-close flex items-center justify-center w-3.5 h-3.5 rounded hover:bg-hover cursor-pointer text-muted hover:text-primary ml-1"
+                  @click=${(e: Event) => this._onTabClose(tab.id, e)}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  </svg>
+                </span>
+              </div>
+            `;
+          })}
+        </div>
+
+        <!-- Content area -->
+        <div class="sidebar-content flex-1 min-h-0 overflow-hidden flex flex-col"></div>
       </div>
     `;
   }
@@ -257,4 +313,4 @@ class Openp41geSidebar extends LitElement {
 
 customElements.define("openp41ge-sidebar", Openp41geSidebar);
 
-export { Openp41geSidebar };
+export { Openp41geSidebar, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH };

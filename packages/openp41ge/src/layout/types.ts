@@ -11,6 +11,9 @@ export type WindowId = z.infer<typeof WindowId>;
 export const TabId = z.string().brand("TabId");
 export type TabId = z.infer<typeof TabId>;
 
+export const SystemTabId = z.string().brand("SystemTabId");
+export type SystemTabId = z.infer<typeof SystemTabId>;
+
 export const OverlayId = z.string().brand("OverlayId");
 export type OverlayId = z.infer<typeof OverlayId>;
 
@@ -45,8 +48,6 @@ export const TabSchema = z.object({
   title: z.string(),
   config: TabConfigSchema.optional().default({}),
   isPreview: z.boolean().default(false),
-  isEphemeral: z.boolean().default(false),
-  ephemeralPinned: z.boolean().default(false),
 });
 export type Tab = z.infer<typeof TabSchema>;
 
@@ -56,10 +57,8 @@ export function createTab(
   title: string,
   config?: Record<string, unknown>,
   isPreview: boolean = false,
-  isEphemeral: boolean = false,
-  ephemeralPinned: boolean = false,
 ): Tab {
-  return TabSchema.parse({ id, appType, title, config: config ?? {}, isPreview, isEphemeral, ephemeralPinned });
+  return TabSchema.parse({ id, appType, title, config: config ?? {}, isPreview });
 }
 
 // ─── Grid ──────────────────────────────────────────────────────────────────
@@ -158,11 +157,38 @@ export function createOverlayData(
   return OverlaySchema.parse({ id, tab, position });
 }
 
+// ─── SystemTab ─────────────────────────────────────────────────────────────
+
+/** System tabs are sidebar-based app panels (Explorer, Git, Search, Projects). */
+export const SystemTabSchema = z.object({
+  id: SystemTabId,
+  appType: z.string(),
+  title: z.string(),
+  pinned: z.boolean().default(false),
+});
+export type SystemTab = z.infer<typeof SystemTabSchema>;
+
+export function createSystemTab(id: string, appType: string, title: string, pinned: boolean = false): SystemTab {
+  return SystemTabSchema.parse({ id, appType, title, pinned });
+}
+
 // ─── SidebarState ───────────────────────────────────────────────────────────────
 
 export const SidebarStateSchema = z.object({
   activeViewId: z.string().nullable().default(null),
   width: z.number().positive().default(280),
+  /** Ordered system tab IDs for the left sidebar. */
+  leftSidebarTabs: z.array(SystemTabId).default([]),
+  /** Ordered system tab IDs for the right sidebar. */
+  rightSidebarTabs: z.array(SystemTabId).default([]),
+  /** Active left sidebar system tab ID. */
+  activeLeftTab: SystemTabId.nullable().default(null),
+  /** Active right sidebar system tab ID. */
+  activeRightTab: SystemTabId.nullable().default(null),
+  /** Whether the left sidebar is open. */
+  leftSidebarOpen: z.boolean().default(false),
+  /** Whether the right sidebar is open. */
+  rightSidebarOpen: z.boolean().default(true),
 });
 export type SidebarState = z.infer<typeof SidebarStateSchema>;
 
@@ -206,7 +232,9 @@ export function createWindow(id: string, bounds?: Bounds, monitor?: number): Win
 export const WorkspaceSchema = z.object({
   id: WorkspaceId,
   windows: z.array(WindowSchema),
-  tabs: z.record(TabId, TabSchema).default({}),
+  editorTabs: z.record(TabId, TabSchema).default({}),
+  /** System tabs (sidebar panels), keyed by system tab ID. */
+  systemTabs: z.record(SystemTabId, SystemTabSchema).default({}),
   scopedFolders: z.array(z.string()).default([]),
 });
 export type Workspace = z.infer<typeof WorkspaceSchema>;
@@ -216,7 +244,8 @@ export function createWorkspace(id: string): Workspace {
   return WorkspaceSchema.parse({
     id,
     windows: [window0],
-    tabs: {},
+    editorTabs: {},
+    systemTabs: {},
   });
 }
 

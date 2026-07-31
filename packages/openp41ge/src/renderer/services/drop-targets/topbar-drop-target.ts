@@ -246,7 +246,7 @@ export class TopBarDropTarget implements IDropTarget {
     const ws = getWorkspace();
     if (!ws) return true;
 
-    const tab = ws.tabs[draggedTabId as keyof typeof ws.tabs];
+    const tab = ws.editorTabs[draggedTabId as keyof typeof ws.editorTabs];
     if (!tab) return true;
 
     const referencedPaths = resolveFileReferences(tab);
