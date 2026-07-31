@@ -184,7 +184,7 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "View",
     });
 
-    // Cmd+Shift+P opens Workspace Manager as an editor system tab
+    // Cmd+Shift+P opens Workspaces as an editor system tab
     km.register({
       modifiers: 12,
       key: "p",
@@ -198,7 +198,7 @@ export class RegisterShortcutsStep implements IStartupStep {
           // ignore
         }
       },
-      description: "Open Workspace Manager",
+      description: "Open Workspaces",
       category: "View",
     });
 

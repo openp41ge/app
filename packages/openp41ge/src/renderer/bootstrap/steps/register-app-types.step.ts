@@ -19,7 +19,7 @@ import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
 import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
-import { WorkspaceManagerSystemTab } from "../../apps/system-tabs/workspace-manager-system-tab";
+import { WorkspacesSystemTab } from "../../apps/system-tabs/workspace-manager-system-tab";
 
 // ─── Log viewer component (auto-registers <openp41ge-log-viewer>) ──────────
 import "openp41ge-logger/viewer";
@@ -42,8 +42,8 @@ export class RegisterAppTypesStep implements IStartupStep {
     // Register editor system tab types (override the grid)
     registerEditorSystemTabType({
       appType: "workspace-manager",
-      title: "Workspace Manager",
-      createController: (tabId: string) => new WorkspaceManagerSystemTab(tabId),
+      title: "Workspaces",
+      createController: (tabId: string) => new WorkspacesSystemTab(tabId),
     });
 
     log.info("app types and system tab types registered");

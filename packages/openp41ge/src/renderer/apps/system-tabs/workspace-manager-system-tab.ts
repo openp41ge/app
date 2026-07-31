@@ -1,17 +1,16 @@
 /**
- * WorkspaceManagerSystemTab — editor-area system tab for managing workspaces.
+ * WorkspacesSystemTab — editor-area system tab for managing workspaces.
  *
- * Replaces the old Projects modal + sidebar tab. Opens as a system tab
- * in the editor area, overriding the grid.
+ * Opens as a system tab in the editor area, overriding the grid.
  */
 
 import { html, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 
-export class WorkspaceManagerSystemTab implements EditorSystemTabController {
+export class WorkspacesSystemTab implements EditorSystemTabController {
   readonly id: string;
   readonly appType = "workspace-manager";
-  readonly title = "Workspace Manager";
+  readonly title = "Workspaces";
 
   constructor(tabId: string) {
     this.id = tabId;
@@ -78,7 +77,7 @@ export class WorkspaceManagerSystemTab implements EditorSystemTabController {
         }
       </style>
       <div class="workspace-manager">
-        <h1>Workspace Manager</h1>
+        <h1>Workspaces</h1>
         <p>Manage your repositories and workspaces.</p>
         <div class="actions">
           <button @click=${this._onOpenProject}>Open Project</button>

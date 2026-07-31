@@ -3,7 +3,7 @@
  *
  * The main process auto-creates a draft project on startup, so this step
  * usually resolves immediately. No UI is shown — project management is
- * done through the Workspace Manager system tab.
+ * done through the Workspaces system tab.
  */
 
 import type { IStartupStep } from "../startup-step";

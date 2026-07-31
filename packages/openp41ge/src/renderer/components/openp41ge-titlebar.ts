@@ -47,7 +47,7 @@ class Openp41geTitleBar extends LitElement {
     emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
   }
 
-  private _openWorkspaceManager(): void {
+  private _openWorkspaces(): void {
     const win = this.windowData;
     if (!win) return;
     emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
@@ -98,12 +98,12 @@ class Openp41geTitleBar extends LitElement {
         <!-- Spacer to push content to the right -->
         <div class="flex-1 min-w-0"></div>
 
-        <!-- Workspace Manager button -->
+        <!-- Workspaces button -->
         <div
           class="tb-btn flex items-center justify-center w-7 h-7 rounded cursor-pointer text-secondary hover:text-primary shrink-0 mr-0.5"
           style="-webkit-app-region:no-drag"
           title="Workspaces"
-          @click=${() => this._openWorkspaceManager()}
+          @click=${() => this._openWorkspaces()}
         >
           <svg width="18" height="18" viewBox="0 -960 960 960" fill="currentColor">
             <path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/>
