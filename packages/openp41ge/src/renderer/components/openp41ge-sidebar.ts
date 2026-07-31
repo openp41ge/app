@@ -137,10 +137,14 @@ class Openp41geSidebar extends LitElement {
       this._unmountView();
       if (this.activeTabId && this.isOpen) {
         this._mountView();
+        // Focus this sidebar when a tab is activated (programmatic or click)
+        Openp41geSidebar._setFocusedSide(this.side);
       }
     } else if (changed.has("isOpen")) {
       if (this.isOpen && this.activeTabId && !this._view) {
         this._mountView();
+        // Focus this sidebar when opened programmatically
+        Openp41geSidebar._setFocusedSide(this.side);
       } else if (!this.isOpen && this._view) {
         this._unmountView();
       }
