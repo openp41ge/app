@@ -53,14 +53,9 @@ class Openp41geTitleBar extends LitElement {
     const win = this.windowData;
     if (!win) return;
 
-    // If no workspace file is active, open the file picker instead
+    // Ensure a workspace exists (creates a draft if none is active)
     if (!appState.activeWorkspaceFilePath) {
-      const loaded = await workspaceFileService.openDialog();
-      if (loaded) {
-        // A file was loaded — open the system tab to show settings
-        emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
-      }
-      return;
+      await workspaceFileService.ensureDraftExists();
     }
 
     emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
