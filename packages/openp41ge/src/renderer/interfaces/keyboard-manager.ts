@@ -50,4 +50,10 @@ export interface IKeyboardManager {
 
   /** True when one or more modals are active. */
   readonly isModalActive: boolean;
+
+  /**
+   * Timestamp before which keyboard shortcuts should be suppressed.
+   * Set by the event controller's keyboard/suppress handler on window focus.
+   */
+  suppressUntil: number;
 }

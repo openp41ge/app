@@ -51,8 +51,10 @@ import {
   SignalReadyStep,
 } from "./bootstrap/index";
 import { CheckProjectStep } from "./bootstrap/steps/check-project.step";
+import { InitEventControllerStep } from "./bootstrap/steps/init-event-controller.step";
 
 import type { Workspace } from "../layout/types";
+import type { EventRouter } from "./services/event-router";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Bootstrap pipeline
@@ -64,7 +66,8 @@ const context = new StartupContext();
 
 const steps = [
   new ExposeTestModelsStep(), // 1: Expose test models for test injection
-  new RegisterAppTypesStep(), // 2: Register app types
+  new InitEventControllerStep(), // 2: Initialize event controller (graph + router)
+  new RegisterAppTypesStep(), // 3: Register app types
   new InitServicesStep(), // 3: Wire cross-service dependencies
   new SubscribeStateUpdatesStep(), // 4: ** Register render subscriber BEFORE any async **
   new CheckProjectStep(), // 5: Check for active project; show picker if needed
@@ -91,6 +94,24 @@ export function getWorkspace(): Workspace | null {
 /** @deprecated Use context.commandBus.dispatch() instead. */
 export function dispatch(fn: string, ...args: unknown[]) {
   context.commandBus.dispatch(fn, ...args);
+}
+
+// ─── Event Router ────────────────────────────────────────────────────
+
+let _eventRouter: EventRouter | null = null;
+
+/** Set the event router instance (called during bootstrap). */
+export function setEventRouter(router: EventRouter): void {
+  _eventRouter = router;
+}
+
+/**
+ * Emit an event through the event router.
+ * Components should use this instead of dispatch() for user interactions.
+ * The router handles routing to handlers, which may call IPC dispatch.
+ */
+export function emitEvent(eventType: string, payload?: any): void {
+  _eventRouter?.emit(eventType, payload ?? {});
 }
 
 /**
@@ -195,7 +216,7 @@ function _showSaveDraftDialog(draftName?: string): void {
 
   // Check for existing project-manager tab
   try {
-    dispatch("addColumnTabAt", winId, "project-manager", name, name, 0);
+    emitEvent("tab-add-column-at", { windowId: winId, appType: "project-manager", title: name, label: name, col: 0 });
   } catch {
     // Tab already open, just switch
   }
