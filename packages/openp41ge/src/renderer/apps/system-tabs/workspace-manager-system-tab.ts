@@ -8,7 +8,6 @@
 import { html, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 import { workspaceFileService } from "../../services/workspace-file-service";
-import { showToast } from "../../services/toast";
 
 export class WorkspacesSystemTab implements EditorSystemTabController {
   readonly id: string;
@@ -50,13 +49,45 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private async _onCopy(path: string): Promise<void> {
+  private async _onCopy(e: MouseEvent, path: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(path);
-      showToast("Copied");
+      this._showButtonToast(e.target as HTMLElement, "Copied");
     } catch {
       // ignore
     }
+  }
+
+  /** Show a small toast element anchored to a button, auto-fades after 1.5s. */
+  private _showButtonToast(anchor: HTMLElement, text: string): void {
+    const rect = anchor.getBoundingClientRect();
+    const el = document.createElement("div");
+    el.textContent = text;
+    el.style.cssText = `
+      position:fixed;
+      left:${rect.left + rect.width / 2}px;
+      top:${rect.top - 4}px;
+      transform:translate(-50%,-100%);
+      z-index:2147483646;
+      padding:3px 10px;
+      border-radius:4px;
+      background:var(--bg-secondary,#1e1e1e);
+      color:var(--text-primary,#ccc);
+      font-size:12px;
+      border:1px solid var(--divider,#333);
+      white-space:nowrap;
+      opacity:0;
+      transition:opacity .15s ease;
+      pointer-events:none;
+    `;
+    document.body.appendChild(el);
+
+    requestAnimationFrame(() => { el.style.opacity = "1"; });
+
+    setTimeout(() => {
+      el.style.opacity = "0";
+      setTimeout(() => el.remove(), 150);
+    }, 1500);
   }
 
   render(): TemplateResult {
@@ -120,7 +151,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
               <span class="ws-actions">
                 <button class="ws-act-btn" @click=${() => this._onSaveAs()}>Edit</button>
                 <button class="ws-act-btn ${this._revealedPaths.has('file') ? 'revealed' : ''}" @click=${() => this._toggleReveal('file')}>Reveal</button>
-                <button class="ws-act-btn" @click=${() => this._onCopy(filePath ?? '')}>Copy</button>
+                <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, filePath ?? '')}>Copy</button>
               </span>
             </div>
           </div>
@@ -133,7 +164,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
               <span class="ws-actions">
                 <button class="ws-act-btn" @click=${() => this._onChangeDataDir()}>Edit</button>
                 <button class="ws-act-btn ${this._revealedPaths.has('dataDir') ? 'revealed' : ''}" @click=${() => this._toggleReveal('dataDir')}>Reveal</button>
-                <button class="ws-act-btn" @click=${() => this._onCopy(data.dataDir)}>Copy</button>
+                <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, data.dataDir)}>Copy</button>
               </span>
             </div>
           </div>
