@@ -66,8 +66,22 @@ export function openSystemTab(
   // Look up default side from type
   const resolvedSide = actualSide ?? DEFAULT_SYSTEM_TAB_SIDES[actualAppType] ?? "right";
 
-  const win = workspace.windows.find((w) => w.id === winId);
+  let win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
+
+  // Close any unpinned active tab on the target sidebar before opening a new one
+  const prevActiveTabId = resolvedSide === "left"
+    ? win.sidebar?.activeLeftTab
+    : win.sidebar?.activeRightTab;
+  if (prevActiveTabId) {
+    const prevTab = workspace.systemTabs[prevActiveTabId as SystemTabId];
+    if (prevTab && !prevTab.pinned) {
+      workspace = closeSystemTab(workspace, winId, resolvedSide, prevActiveTabId);
+      const w = workspace.windows.find((w) => w.id === winId);
+      if (!w) return workspace;
+      win = w;
+    }
+  }
 
   // Check if appType already exists in ANY sidebar of this window
   const leftSidebarTabs = win.sidebar?.leftSidebarTabs ?? [];
