@@ -39,6 +39,22 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     this._emitUpdate();
   }
 
+  /** Render a path with middle truncation — shows directory start and filename end. */
+  private _renderMiddleTrunc(path: string): TemplateResult {
+    const lastSlash = path.lastIndexOf("/");
+    if (lastSlash === -1 || lastSlash === path.length - 1) {
+      return html`<span class="trunc-path trunc-end" title="${path}">${path}</span>`;
+    }
+    const start = path.slice(0, lastSlash + 1);
+    const end = path.slice(lastSlash + 1);
+    return html`
+      <span class="trunc-path" title="${path}">
+        <span class="trunc-start">${start}</span>
+        <span class="trunc-end">${end}</span>
+      </span>
+    `;
+  }
+
   render(): TemplateResult {
     const data = workspaceFileService.activeData;
     const filePath = workspaceFileService.activeFilePath;
@@ -81,7 +97,15 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         }
         .ws-clickable:hover { background:var(--bg-hover,rgba(128,128,128,.15)); }
         .ws-clickable .trunc-path {
-          overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+          display:flex; overflow:hidden; max-width:100%; min-width:0;
+        }
+        .ws-clickable .trunc-start {
+          overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+          flex-shrink:2; min-width:0;
+        }
+        .ws-clickable .trunc-end {
+          overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+          flex-shrink:1; min-width:0;
         }
         .ws-repo-item { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:13px; color:var(--text-primary,#ccc); }
         .ws-repo-item::before { content:"•"; color:var(--text-secondary,#999); }
@@ -97,14 +121,14 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           <div class="ws-label">File</div>
           <div class="ws-clickable ws-value mono" @click=${() => this._onSaveAs()} title="${filePath ?? "(not saved)"}">
             ${pencil}
-            <span class="trunc-path">${filePath ?? "(not saved)"}</span>
+            ${filePath ? this._renderMiddleTrunc(filePath) : html`<span class="trunc-path">(not saved)</span>`}
           </div>
         </div>
         <div class="ws-section">
           <div class="ws-label">Data Dir</div>
           <div class="ws-clickable ws-value mono" @click=${() => this._onChangeDataDir()} title="${data.dataDir}">
             ${pencil}
-            <span class="trunc-path">${data.dataDir}</span>
+            ${this._renderMiddleTrunc(data.dataDir)}
           </div>
         </div>
         <div class="ws-section">
