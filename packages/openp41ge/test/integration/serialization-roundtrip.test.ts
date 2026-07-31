@@ -88,8 +88,8 @@ describe("Serialization round-trip", () => {
       expect(dWin2.overlays[0].tab.id).toBe("o1");
       expect(dWin2.overlays[0].position).toBe("top-right");
 
-      // Verify sidebar — system tab was opened
-      expect(dWin1.sidebar?.rightSidebarTabs).toHaveLength(1);
+      // Verify sidebar — system tab was opened (plus 2 defaults)
+      expect(dWin1.sidebar?.rightSidebarTabs).toHaveLength(2);
       expect(dWin1.sidebar?.rightSidebarOpen).toBe(true);
       expect(dWin1.sidebar?.activeRightTab).toBeDefined();
     });

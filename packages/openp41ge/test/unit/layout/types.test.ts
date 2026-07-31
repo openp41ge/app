@@ -138,13 +138,31 @@ describe("createWindow (unit)", () => {
 // ─── Workspace ────────────────────────────────────────────────────────────
 
 describe("createWorkspace (unit)", () => {
-  test("creates a workspace with one window and no tabs", () => {
+  test("creates a workspace with one window and no editor tabs", () => {
     const ws = createWorkspace("ws1");
     expect(ws.id).toBe("ws1");
     expect(ws.windows).toHaveLength(1);
     expect(ws.windows[0].grid).toBeDefined();
     expect(ws.windows[0].sidebar).toBeDefined();
     expect(ws.editorTabs).toEqual({});
+  });
+
+  test("default workspace includes pinned explorer and git system tabs", () => {
+    const ws = createWorkspace("ws1");
+
+    // System tabs registry
+    expect(ws.systemTabs).toHaveProperty("sys-explorer");
+    expect(ws.systemTabs).toHaveProperty("sys-git");
+    expect(ws.systemTabs["sys-explorer"].appType).toBe("explorer");
+    expect(ws.systemTabs["sys-git"].appType).toBe("git");
+    expect(ws.systemTabs["sys-explorer"].pinned).toBe(true);
+    expect(ws.systemTabs["sys-git"].pinned).toBe(true);
+
+    // Right sidebar configuration
+    const sidebar = ws.windows[0].sidebar!;
+    expect(sidebar.rightSidebarTabs).toEqual(["sys-explorer", "sys-git"]);
+    expect(sidebar.activeRightTab).toBe("sys-explorer");
+    expect(sidebar.rightSidebarOpen).toBe(true);
   });
 
   test("workspace ID follows pattern", () => {
