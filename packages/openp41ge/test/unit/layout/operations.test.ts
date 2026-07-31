@@ -997,3 +997,92 @@ describe("findSrcColumn", () => {
     expect(ops.findSrcColumn(ws, "w1", "no-such-page", "t1")).toBe(-1);
   });
 });
+
+// ─── System Tab Operations ────────────────────────────────────────────────
+
+describe("moveSystemTabToSidebar", () => {
+  test("moves a tab from right to left sidebar and inserts at dropIndex", () => {
+    let ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+
+    // Default workspace: explorer and git on the RIGHT sidebar
+    expect((ws.windows[0].sidebar?.rightSidebarTabs ?? []).length).toBe(2);
+    expect((ws.windows[0].sidebar?.leftSidebarTabs ?? []).length).toBe(0);
+
+    // Create a new system tab on the right
+    ws = ops.openSystemTab(ws, winId, "right", "search", "Search", false);
+    const rightTabs = ws.windows[0].sidebar?.rightSidebarTabs ?? [];
+    const searchTabId = rightTabs[rightTabs.length - 1];
+
+    // Move it to the left sidebar
+    ws = ops.moveSystemTabToSidebar(ws, winId, searchTabId, "left", 0);
+
+    // Verify it's removed from right
+    expect(ws.windows[0].sidebar?.rightSidebarTabs ?? []).not.toContain(searchTabId);
+    // Verify it's added to left
+    expect(ws.windows[0].sidebar?.leftSidebarTabs ?? []).toContain(searchTabId);
+    // Verify it's the active tab on left
+    expect(ws.windows[0].sidebar?.activeLeftTab).toBe(searchTabId);
+    // Verify left sidebar is open
+    expect(ws.windows[0].sidebar?.leftSidebarOpen).toBe(true);
+  });
+
+  test("inserts at the correct position", () => {
+    let ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+
+    // Default right sidebar: explorer, git
+    // Add a search tab to right
+    ws = ops.openSystemTab(ws, winId, "right", "search", "Search", false);
+
+    // Move the git tab (index 1 on right) to the left sidebar at position 0
+    const rightTabs = ws.windows[0].sidebar?.rightSidebarTabs ?? [];
+    const gitTabId = rightTabs[1]; // sys-git
+    ws = ops.moveSystemTabToSidebar(ws, winId, gitTabId, "left", 0);
+
+    // Verify left sidebar has the git tab at index 0
+    const leftTabs = ws.windows[0].sidebar?.leftSidebarTabs ?? [];
+    expect(leftTabs[0]).toBe(gitTabId);
+    // Verify right no longer has git
+    expect(ws.windows[0].sidebar?.rightSidebarTabs ?? []).not.toContain(gitTabId);
+  });
+
+  test("reorders within the same sidebar when sourceSide equals targetSide", () => {
+    let ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+
+    const rightTabs = ws.windows[0].sidebar?.rightSidebarTabs ?? [];
+    // Right tabs: [explorer, git]
+    const explorerId = rightTabs[0];
+    const gitId = rightTabs[1];
+
+    // Move explorer to index 1 (after git)
+    ws = ops.moveSystemTabToSidebar(ws, winId, explorerId, "right", 1);
+
+    const newRightTabs = ws.windows[0].sidebar?.rightSidebarTabs ?? [];
+    expect(newRightTabs[0]).toBe(gitId);
+    expect(newRightTabs[1]).toBe(explorerId);
+  });
+
+  test("does nothing for non-existent tab", () => {
+    const ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+    const result = ops.moveSystemTabToSidebar(ws, winId, "non-existent", "left", 0);
+    expect(result).toBe(ws);
+  });
+
+  test("activates the moved tab on the target sidebar", () => {
+    let ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+
+    const rightTabs = ws.windows[0].sidebar?.rightSidebarTabs ?? [];
+    const explorerTabId = rightTabs[0];
+
+    ws = ops.moveSystemTabToSidebar(ws, winId, explorerTabId, "left", 0);
+
+    // The moved tab should be the active tab on the left
+    expect(ws.windows[0].sidebar?.activeLeftTab).toBe(explorerTabId);
+    // The right sidebar should have no active tab if explorer was active
+    expect(ws.windows[0].sidebar?.activeRightTab).toBeNull();
+  });
+});

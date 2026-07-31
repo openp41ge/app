@@ -18,9 +18,93 @@ import {
   computeDropTarget,
   type IDragSource,
   type IDropTarget,
+  type DragResult,
 } from "../openp41ge-tabs-adapter";
 
 import { FileDragSource } from "./drag-sources/file-drag-source";
+import { SidebarDropTarget, SIDEBAR_DROP_EVENT } from "./drop-targets/sidebar-drop-target";
+
+// ─── SidebarTabDragSource — drag source for sidebar system tabs ──────────
+
+class SidebarTabDragSource implements IDragSource {
+  readonly type = "sidebar-tab";
+
+  private _el: HTMLElement;
+  private _tabId: string;
+  private _side: string;
+  private _winId: string;
+  private _title: string;
+  private _ghost: HTMLElement | null = null;
+
+  constructor(el: HTMLElement, tabId: string, side: string, winId: string, title: string) {
+    this._el = el;
+    this._tabId = tabId;
+    this._side = side;
+    this._winId = winId;
+    this._title = title;
+  }
+
+  createGhost(): HTMLElement {
+    const ghost = document.createElement("div");
+    ghost.classList.add("openp41ge-drag-ghost");
+    const label = document.createElement("span");
+    label.textContent = this._title;
+    ghost.appendChild(label);
+
+    const w = this._el.offsetWidth || 120;
+    const h = this._el.offsetHeight || 28;
+
+    ghost.style.cssText = [
+      "position:fixed",
+      `height:${h}px`,
+      `width:${w}px`,
+      "padding:4px 14px",
+      "display:block",
+      "line-height:14px",
+      "font-size:12px",
+      "color:#e0e0e0",
+      "background:#2a2a2a",
+      "border-radius:4px",
+      "outline:2px solid rgba(74,158,255,0.60)",
+      "outline-offset:2px",
+      "box-shadow:0 4px 12px rgba(0,0,0,0.3)",
+      "z-index:99999",
+      "pointer-events:none",
+      "opacity:0.85",
+      "overflow:hidden",
+      "white-space:nowrap",
+      "text-overflow:ellipsis",
+      "box-sizing:border-box",
+    ].join(";");
+
+    ghost.dataset.dragGhostWidth = String(w);
+    ghost.dataset.dragGhostHeight = String(h);
+    this._ghost = ghost;
+    return ghost;
+  }
+
+  getDragData(): any {
+    return {
+      type: "system-tab",
+      tabId: this._tabId,
+      side: this._side,
+      winId: this._winId,
+      title: this._title,
+    };
+  }
+
+  onDragStart(): void {
+    this._el.style.opacity = "0.4";
+  }
+
+  onDragEnd(_result: DragResult): void {
+    this._el.style.opacity = "1";
+    if (this._ghost && this._ghost.parentNode) {
+      this._ghost.parentNode.removeChild(this._ghost);
+    }
+    this._ghost = null;
+  }
+}
 
 let _orchestrator: DragOrchestrator | null = null;
 let _currentSource: IDragSource | null = null;
@@ -202,6 +286,33 @@ export function initDragSystem(): () => void {
   document.addEventListener("mousedown", onFileMouseDown);
   cleanups.push(() => document.removeEventListener("mousedown", onFileMouseDown));
 
+  // ── Mousedown: initiate sidebar tab drags ────────────────────────────
+  const onSidebarTabMouseDown = (e: MouseEvent) => {
+    const sidebarTab = (e.target as HTMLElement).closest?.("[data-sidebar-tab-id]");
+    if (!sidebarTab || !(sidebarTab instanceof HTMLElement)) return;
+
+    // Don't initiate drag on close/pin button clicks
+    if ((e.target as HTMLElement).closest?.(".sidebar-tab-close")) return;
+    if ((e.target as HTMLElement).closest?.(".sidebar-tab-pin")) return;
+
+    e.preventDefault();
+
+    const tabId = sidebarTab.getAttribute("data-sidebar-tab-id") || "";
+    const side = sidebarTab.getAttribute("data-sidebar-side") || "";
+    const title = sidebarTab.getAttribute("data-tab-title") || sidebarTab.textContent?.trim() || "Tab";
+    const winId = _resolveMyWinId();
+
+    const sidebarEl = sidebarTab.closest?.("openp41ge-sidebar");
+    if (!sidebarEl) return;
+
+    const dragSource = new SidebarTabDragSource(sidebarTab, tabId, side, winId, title);
+    _currentSource = dragSource;
+    _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
+  };
+
+  document.addEventListener("mousedown", onSidebarTabMouseDown);
+  cleanups.push(() => document.removeEventListener("mousedown", onSidebarTabMouseDown));
+
   // ── Click: activate tab (short clicks that don't become drags) ────────
   const onClick = (e: MouseEvent) => {
     const tabBtn = (e.target as HTMLElement).closest?.("[data-tab-id]");
@@ -359,6 +470,7 @@ export function initDragSystem(): () => void {
     _lastScreenPos = { screenX: 0, screenY: 0 };
     window.openp41ge.drag.end();
     clearGridGhost();
+    _clearSidebarDropTargetCache();
     _localDragActive = false;
     _localFileDragActive = false;
     _pendingFileDetachPath = null;
@@ -427,6 +539,28 @@ export function initDragSystem(): () => void {
   };
   document.addEventListener(DRAG_EVENTS.CROSS, onCross);
   cleanups.push(() => document.removeEventListener(DRAG_EVENTS.CROSS, onCross));
+
+  // ── Sidebar tab drop → dispatch workspace operation ────────────────
+  const onSidebarTabDrop = (e: Event) => {
+    const detail = (e as CustomEvent).detail as {
+      tabId: string;
+      sourceSide: string;
+      targetSide: string;
+      dropIndex: number;
+      winId: string;
+    };
+    if (!detail) return;
+
+    window.openp41ge.workspace.dispatch(
+      "moveSystemTabToSidebar",
+      detail.winId,
+      detail.tabId,
+      detail.targetSide,
+      detail.dropIndex,
+    );
+  };
+  document.addEventListener(SIDEBAR_DROP_EVENT, onSidebarTabDrop);
+  cleanups.push(() => document.removeEventListener(SIDEBAR_DROP_EVENT, onSidebarTabDrop));
 
   // ── Listen for grid-open-tab to mark file drop handled ──────────────
   // When a file is dropped on a valid grid target (same-window), the
@@ -516,6 +650,7 @@ export function initDragSystem(): () => void {
 
   return () => {
     _ghostManager.dispose();
+    _clearSidebarDropTargetCache();
     for (const fn of cleanups) fn();
   };
 }
@@ -888,10 +1023,64 @@ function _hideCrossWindowGhost(): void {
 // Target resolver
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Cache sidebar drop targets by side to avoid creating new instances on every mousemove
+let _sidebarDropTargetLeft: SidebarDropTarget | null = null;
+let _sidebarDropTargetRight: SidebarDropTarget | null = null;
+
+function _getSidebarDropTarget(side: "left" | "right"): SidebarDropTarget | null {
+  if (side === "left" && _sidebarDropTargetLeft) return _sidebarDropTargetLeft;
+  if (side === "right" && _sidebarDropTargetRight) return _sidebarDropTargetRight;
+
+  const barEl = document.querySelector(`[data-sidebar-tab-bar="${side}"]`);
+  if (!(barEl instanceof HTMLElement)) return null;
+
+  const winId = _resolveMyWinId();
+  const target = new SidebarDropTarget(barEl, winId, side);
+  if (side === "left") _sidebarDropTargetLeft = target;
+  else _sidebarDropTargetRight = target;
+  return target;
+}
+
+function _clearSidebarDropTargetCache(): void {
+  _sidebarDropTargetLeft = null;
+  _sidebarDropTargetRight = null;
+}
+
+/**
+ * Check if the current drag source is a sidebar tab (system tab).
+ * Sidebar tabs should only be droppable on sidebar tab bars, not on
+ * editor grid cells or grid tab bars.
+ */
+function _isDraggingSidebarTab(): boolean {
+  return _currentSource?.type === "sidebar-tab";
+}
+
 export function openp41geTargetResolver(clientX: number, clientY: number): IDropTarget | null {
   const el = document.elementFromPoint(clientX, clientY);
   if (!el || !(el instanceof HTMLElement)) return null;
 
+  // When dragging a sidebar tab, only sidebar tab bars are valid targets.
+  // Skip grid tab bars and grid cells entirely.
+  if (_isDraggingSidebarTab()) {
+    const sidebarBarEl = el.closest?.("[data-sidebar-tab-bar]");
+    if (sidebarBarEl instanceof HTMLElement) {
+      const side = sidebarBarEl.getAttribute("data-sidebar-tab-bar") as "left" | "right";
+      if (side === "left" || side === "right") {
+        return _getSidebarDropTarget(side);
+      }
+    }
+    // Also allow drop on sidebar content area (appends to end of tab bar)
+    const sidebarContentEl = el.closest?.("[data-sidebar-content]");
+    if (sidebarContentEl instanceof HTMLElement) {
+      const side = sidebarContentEl.getAttribute("data-sidebar-content") as "left" | "right";
+      if (side === "left" || side === "right") {
+        return _getSidebarDropTarget(side);
+      }
+    }
+    return null;
+  }
+
+  // Normal (non-sidebar) drag: check grid tab bars and grid cells
   const tabBarEl = el.closest?.("tab-bar");
   if (tabBarEl instanceof HTMLElement) {
     const dropTarget = (tabBarEl as HTMLElement & { dropTarget?: IDropTarget }).dropTarget;
@@ -902,6 +1091,24 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
   if (tabGridEl instanceof HTMLElement) {
     const dropTarget = (tabGridEl as HTMLElement & { dropTarget?: IDropTarget }).dropTarget;
     if (dropTarget) return dropTarget;
+  }
+
+  // Check for sidebar tab bar (for non-sidebar drag sources like files)
+  const sidebarBarEl = el.closest?.("[data-sidebar-tab-bar]");
+  if (sidebarBarEl instanceof HTMLElement) {
+    const side = sidebarBarEl.getAttribute("data-sidebar-tab-bar") as "left" | "right";
+    if (side === "left" || side === "right") {
+      return _getSidebarDropTarget(side);
+    }
+  }
+
+  // Check for sidebar content area
+  const sidebarContentEl = el.closest?.("[data-sidebar-content]");
+  if (sidebarContentEl instanceof HTMLElement) {
+    const side = sidebarContentEl.getAttribute("data-sidebar-content") as "left" | "right";
+    if (side === "left" || side === "right") {
+      return _getSidebarDropTarget(side);
+    }
   }
 
   return null;

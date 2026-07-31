@@ -390,3 +390,76 @@ export function closeSidebar(
     },
   }));
 }
+
+// ─── Move system tab between sidebars ────────────────────────────────────
+
+/**
+ * Move a system tab from one sidebar to the other (or reorder within the same
+ * sidebar). Removes the tab from the source sidebar's tab list, inserts it at
+ * `dropIndex` in the target sidebar's tab list, activates it, and ensures the
+ * target sidebar is open.
+ */
+export function moveSystemTabToSidebar(
+  workspace: Workspace,
+  winId: string,
+  tabId: string,
+  targetSide: "left" | "right",
+  dropIndex: number,
+): Workspace {
+  const sid = tabId as SystemTabId;
+
+  // Determine which side the tab is currently on
+  const win = workspace.windows.find((w) => w.id === winId);
+  if (!win) return workspace;
+
+  const leftTabs = (win.sidebar?.leftSidebarTabs ?? []) as SystemTabId[];
+  const rightTabs = (win.sidebar?.rightSidebarTabs ?? []) as SystemTabId[];
+
+  const onLeft = leftTabs.includes(sid);
+  const onRight = rightTabs.includes(sid);
+
+  if (!onLeft && !onRight) return workspace;
+
+  const sourceSide: "left" | "right" = onLeft ? "left" : "right";
+
+  // Build the new sidebar state in one pass using mapWindow
+  return mapWindow(workspace, winId, (w) => {
+    const sidebar = w.sidebar ?? { activeViewId: null, width: 280 };
+
+    // Clone and remove from source list
+    const newLeftTabs = [...(sidebar.leftSidebarTabs ?? [])] as SystemTabId[];
+    const newRightTabs = [...(sidebar.rightSidebarTabs ?? [])] as SystemTabId[];
+
+    if (sourceSide === "left") {
+      const idx = newLeftTabs.indexOf(sid);
+      if (idx !== -1) newLeftTabs.splice(idx, 1);
+    } else {
+      const idx = newRightTabs.indexOf(sid);
+      if (idx !== -1) newRightTabs.splice(idx, 1);
+    }
+
+    // Insert into target list at dropIndex
+    const targetList = targetSide === "left" ? newLeftTabs : newRightTabs;
+    const clampedIndex = Math.max(0, Math.min(dropIndex, targetList.length));
+    targetList.splice(clampedIndex, 0, sid);
+
+    return {
+      ...w,
+      sidebar: {
+        ...sidebar,
+        leftSidebarTabs: newLeftTabs,
+        rightSidebarTabs: newRightTabs,
+        // Clear active tab on source side if it was the moved tab
+        ...(sourceSide === "left" && sidebar.activeLeftTab === sid
+          ? { activeLeftTab: null }
+          : {}),
+        ...(sourceSide === "right" && sidebar.activeRightTab === sid
+          ? { activeRightTab: null }
+          : {}),
+        // Set active tab on target side and ensure it's open
+        [targetSide === "left" ? "activeLeftTab" : "activeRightTab"]: sid,
+        [targetSide === "left" ? "leftSidebarOpen" : "rightSidebarOpen"]: true,
+      },
+    };
+  });
+}

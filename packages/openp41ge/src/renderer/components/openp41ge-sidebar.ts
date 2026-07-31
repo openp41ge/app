@@ -387,9 +387,9 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
         </style>
 
-        <!-- System tab bar (only when there are tabs to show) -->
-        ${this.systemTabs.length > 0 ? html`
-          <div class="sidebar-tab-bar relative shrink-0 border-b border-divider">
+        <!-- System tab bar — always rendered (even when empty) so drops are detected -->
+        <div class="sidebar-tab-bar relative shrink-0 border-b border-divider" data-sidebar-tab-bar="${this.side}">
+          ${this.systemTabs.length > 0 ? html`
             <!-- Scrollable tab container (scrollbar hidden) -->
             <div class="sidebar-tab-scroll flex items-stretch overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;" @scroll=${this._onTabBarScroll}>
               ${this.systemTabs.map((tab, idx) => {
@@ -400,6 +400,9 @@ class Openp41geSidebar extends LitElement {
                 return html`
                   <div
                     class="sidebar-tab flex items-center gap-1 px-2 py-1.5 cursor-pointer text-xs whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
+                    data-sidebar-tab-id=${tab.id}
+                    data-sidebar-side=${this.side}
+                    data-tab-title=${tab.title}
                     style="width:120px;${isActive
                       ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #e0e0e0)"
                       : "color:var(--text-secondary, #888)"}"
@@ -436,15 +439,15 @@ class Openp41geSidebar extends LitElement {
                 <div class="absolute h-0.5 pointer-events-none" style="width:120px;left:${activeIdx * 120 - this._scrollLeft}px;bottom:-1px;z-index:3;background:var(--accent, #4a9eff);"></div>
               `;
             })()}
-          </div>
-        ` : nothing}
+          ` : nothing}
+        </div>
         <!-- Left scroll shadow (positioned relative to outer container) -->
         <div class="absolute pointer-events-none transition-opacity duration-150" style="left:0;top:0;width:24px;height:${Math.max(this._tabBarHeight, 30)}px;z-index:4;opacity:${this._showLeftShadow ? 1 : 0};background:linear-gradient(to right, var(--bg-gutter, #1a1a1a), transparent);"></div>
         <!-- Right scroll shadow (positioned relative to outer container) -->
         <div class="absolute pointer-events-none transition-opacity duration-150" style="right:0;top:0;width:24px;height:${Math.max(this._tabBarHeight, 30)}px;z-index:4;opacity:${this._showRightShadow ? 1 : 0};background:linear-gradient(to left, var(--bg-gutter, #1a1a1a), transparent);"></div>
 
         <!-- Content area -->
-        <div class="sidebar-content flex-1 min-h-0 overflow-hidden flex flex-col"></div>
+        <div class="sidebar-content flex-1 min-h-0 overflow-hidden flex flex-col" data-sidebar-content="${this.side}"></div>
       </div>
     `;
   }
