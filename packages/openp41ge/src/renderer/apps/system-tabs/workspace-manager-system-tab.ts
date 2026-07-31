@@ -154,9 +154,11 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           display: flex;
           align-items: center;
           justify-content: center;
+          border-radius: 3px;
         }
         .accordion-actions button.delete-btn:hover {
           color: #e81123;
+          background: rgba(232, 17, 35, 0.1);
         }
         .accordion-body {
           padding: 0 12px 12px;
