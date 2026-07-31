@@ -5,7 +5,6 @@
 import type { SystemTabRegistration } from "../../controllers/types";
 import { ExplorerSystemTabController } from "./explorer-system-tab";
 import { GitSystemTabController } from "./git-system-tab";
-import { ProjectsSystemTabController } from "./projects-system-tab";
 import { SearchSystemTabController } from "./search-system-tab";
 
 export const explorerSystemTabRegistration: SystemTabRegistration = {
@@ -26,15 +25,6 @@ export const gitSystemTabRegistration: SystemTabRegistration = {
   createController: (tabId: string) => new GitSystemTabController(tabId),
 };
 
-export const projectsSystemTabRegistration: SystemTabRegistration = {
-  id: "projects",
-  label: "Projects",
-  icon: "\u2302",
-  description: "Switch between projects",
-  defaultSide: "left",
-  createController: (tabId: string) => new ProjectsSystemTabController(tabId),
-};
-
 export const searchSystemTabRegistration: SystemTabRegistration = {
   id: "search",
   label: "Search",
@@ -48,6 +38,5 @@ export const searchSystemTabRegistration: SystemTabRegistration = {
 export const allSystemTabRegistrations: SystemTabRegistration[] = [
   explorerSystemTabRegistration,
   gitSystemTabRegistration,
-  projectsSystemTabRegistration,
   searchSystemTabRegistration,
 ];

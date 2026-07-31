@@ -364,27 +364,6 @@ export class Openp41geApplication {
           },
           { type: "separator" },
           {
-            label: "Open Project...",
-            accelerator: "CmdOrCtrl+O",
-            click: () => {
-              const focused = BrowserWindow.getFocusedWindow();
-              if (focused && !focused.isDestroyed()) {
-                focused.webContents.send("menu:open-project");
-              }
-            },
-          },
-          {
-            label: "Save Project As...",
-            accelerator: "CmdOrCtrl+Shift+S",
-            click: () => {
-              const focused = BrowserWindow.getFocusedWindow();
-              if (focused && !focused.isDestroyed()) {
-                focused.webContents.send("menu:save-draft");
-              }
-            },
-          },
-          { type: "separator" },
-          {
             label: "Quit",
             accelerator: "CmdOrCtrl+Q",
             click: () => promptQuit(BrowserWindow.getFocusedWindow() ?? undefined),

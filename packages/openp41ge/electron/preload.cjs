@@ -505,17 +505,5 @@ contextBridge.exposeInMainWorld("openp41ge", {
     createDraft: () => ipcRenderer.invoke("project:createDraft"),
     setRepoOrder: (name, order) => ipcRenderer.invoke("project:setRepoOrder", name, order),
     rename: (oldName, newName) => ipcRenderer.invoke("project:rename", oldName, newName),
-    /** Register callback for when the File > "Save Project As..." menu item is clicked. */
-    onShowSaveDraftDialog: (callback) => {
-      const handler = () => callback();
-      ipcRenderer.on("menu:save-draft", handler);
-      return () => ipcRenderer.removeListener("menu:save-draft", handler);
-    },
-    /** Register callback for when the File > "Open Project..." menu item is clicked. */
-    onShowOpenProject: (callback) => {
-      const handler = () => callback();
-      ipcRenderer.on("menu:open-project", handler);
-      return () => ipcRenderer.removeListener("menu:open-project", handler);
-    },
   },
 });

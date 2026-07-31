@@ -180,10 +180,6 @@ declare global {
         createDraft: () => Promise<string>;
         setRepoOrder: (name: string, order: string[]) => Promise<boolean>;
         rename: (oldName: string, newName: string) => Promise<boolean>;
-        /** Register callback for File > Save Project As... menu item. Returns unsubscribe. */
-        onShowSaveDraftDialog: (callback: () => void) => () => void;
-        /** Register callback for File > Open Project... menu item. Returns unsubscribe. */
-        onShowOpenProject: (callback: () => void) => () => void;
       };
     };
 

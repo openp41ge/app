@@ -19,7 +19,6 @@ const log = createLogger("app");
 
 // ─── Component registration (side-effect imports — must be at module level) ──
 import "./components/openp41ge-windowview";
-import "./components/openp41ge-project-picker";
 import "./components/openp41ge-titlebar";
 import "./components/openp41ge-topbar";
 import "./components/openp41ge-contextmenu";
@@ -59,8 +58,6 @@ import type { EventRouter } from "./services/event-router";
 // ═══════════════════════════════════════════════════════════════════════════
 // Bootstrap pipeline
 // ═══════════════════════════════════════════════════════════════════════════
-
-import { showProjectPicker } from "./services/project-switch-service";
 
 const context = new StartupContext();
 
@@ -198,49 +195,6 @@ export function wireResetListener(): void {
 // ═══════════════════════════════════════════════════════════════════════════
 // Singleton renderer
 // ═══════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Draft save dialog wiring
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Show the save draft dialog by creating and appending the element.
- */
-function _showSaveDraftDialog(draftName?: string): void {
-  // If we have a project-manager tab, activate it; otherwise open one
-  const winId = window.openp41ge?.workspace?.getWindowId?.();
-  if (!winId) return;
-
-  const name = draftName ?? window.__openp41geProjectName;
-  if (!name) return;
-
-  // Check for existing project-manager tab
-  try {
-    emitEvent("tab-add-column-at", { windowId: winId, appType: "project-manager", title: name, label: name, col: 0 });
-  } catch {
-    // Tab already open, just switch
-  }
-}
-
-// Listen for IPC from the main process File menu "Save Project As..."
-// Guarded because the preload mock in tests may not have this method.
-if (window.openp41ge?.project?.onShowSaveDraftDialog) {
-  window.openp41ge.project.onShowSaveDraftDialog(() => {
-    // Fetch current project name and show dialog
-    window.openp41ge.project.current().then((name) => {
-      if (name) {
-        _showSaveDraftDialog(name);
-      }
-    });
-  });
-}
-
-// Listen for IPC from the main process File menu "Open Project..."
-if (window.openp41ge?.project?.onShowOpenProject) {
-  window.openp41ge.project.onShowOpenProject(() => {
-    showProjectPicker();
-  });
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Singleton renderer

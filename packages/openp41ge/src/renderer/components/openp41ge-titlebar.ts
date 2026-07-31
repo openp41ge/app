@@ -7,10 +7,9 @@
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
-import { property, state } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
 import { emitEvent } from "../app";
-import { showProjectPicker } from "../services/project-switch-service";
 
 const isMac = (() => {
   try {
@@ -36,38 +35,6 @@ class Openp41geTitleBar extends LitElement {
   @property({ attribute: false })
   rightSidebarVisible: boolean = false;
 
-  @state()
-  private _projectName: string | null = null;
-
-  @state()
-  private _isDraft = false;
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    this._loadProjectName();
-    // Refresh when project changes (switched or saved)
-    document.addEventListener("project:changed", this._onProjectChanged);
-    this.addEventListener("draft:saved", this._onDraftSaved as EventListener);
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    document.removeEventListener("project:changed", this._onProjectChanged);
-    this.removeEventListener("draft:saved", this._onDraftSaved as EventListener);
-  }
-
-  private _onProjectChanged = (): void => {
-    this._loadProjectName();
-  };
-
-  private _onDraftSaved = (): void => {
-    this._loadProjectName();
-  };
-
-  private _openProjectPicker(): void {
-    showProjectPicker();
-  }
-
   private _toggleLeft(): void {
     const win = this.windowData;
     if (!win) return;
@@ -78,18 +45,6 @@ class Openp41geTitleBar extends LitElement {
     const win = this.windowData;
     if (!win) return;
     emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
-  }
-
-  private async _loadProjectName(): Promise<void> {
-    try {
-      const name = await window.openp41ge.project.current();
-      this._projectName = name;
-      if (name) {
-        this._isDraft = await window.openp41ge.project.isDraft(name);
-      }
-    } catch {
-      // preload might not be ready yet — ignore
-    }
   }
 
   render(): TemplateResult | typeof nothing {
@@ -121,22 +76,11 @@ class Openp41geTitleBar extends LitElement {
           </svg>
         </div>
 
-        <!-- Title (clickable to open project picker) -->
+        <!-- Title -->
         <span
-          title="Switch project"
-          class="inline-block px-1.5 py-0.5 text-sm text-muted whitespace-nowrap cursor-pointer rounded mr-12 transition-[color,background] duration-100"
-          style="-webkit-app-region:no-drag"
-          @mouseenter=${(e: MouseEvent) => {
-            const el = e.currentTarget as HTMLElement;
-            el.classList.add("text-primary", "bg-hover");
-          }}
-          @mouseleave=${(e: MouseEvent) => {
-            const el = e.currentTarget as HTMLElement;
-            el.classList.remove("text-primary", "bg-hover");
-          }}
-          @click=${() => this._openProjectPicker()}
+          class="inline-block px-1.5 py-0.5 text-sm text-muted whitespace-nowrap mr-12"
         >
-          ${this._projectName ? (this._isDraft ? "draft" : this._projectName) : "Openp41ge"}
+          Openp41ge
         </span>
 
         <!-- Spacer to push content to the right -->
