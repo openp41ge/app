@@ -241,11 +241,29 @@ export type Workspace = z.infer<typeof WorkspaceSchema>;
 
 export function createWorkspace(id: string): Workspace {
   const window0 = createWindow(`win-${id}-0`);
+
+  // Create default system tabs: explorer + git, pinned, on the left sidebar
+  const explorerTab = createSystemTab(`sys-explorer`, "explorer", "Explorer", true);
+  const gitTab = createSystemTab(`sys-git`, "git", "Git", true);
+
   return WorkspaceSchema.parse({
     id,
-    windows: [window0],
+    windows: [
+      {
+        ...window0,
+        sidebar: {
+          ...window0.sidebar!,
+          rightSidebarTabs: [explorerTab.id, gitTab.id],
+          activeRightTab: explorerTab.id,
+          rightSidebarOpen: true,
+        },
+      },
+    ],
     editorTabs: {},
-    systemTabs: {},
+    systemTabs: {
+      [explorerTab.id]: explorerTab,
+      [gitTab.id]: gitTab,
+    },
   });
 }
 

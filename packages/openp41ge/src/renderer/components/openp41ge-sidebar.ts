@@ -5,9 +5,9 @@
  * active system tab's controller.
  *
  * KEY DESIGN:
- * - render() ALWAYS returns the same template structure — no conditional
- *   rendering based on visibility. This keeps Lit's marker comment nodes
- *   stable in the DOM across all updates.
+ * - render() returns a stable outer template structure (wrapper div, resize
+ *   notch, content area div) so Lit's marker comment nodes remain stable.
+ *   The system tab bar is only rendered when there are tabs to show.
  * - Visibility is controlled externally via the CSS class
  *   "sidebar-element-hidden" applied by the parent windowview.
  * - `isOpen` IS a Lit property: it triggers updated() so view lifecycle
@@ -34,6 +34,7 @@ export interface SystemTabEntry {
   id: string;
   title: string;
   appType: string;
+  pinned: boolean;
 }
 
 class Openp41geSidebar extends LitElement {
@@ -78,6 +79,15 @@ class Openp41geSidebar extends LitElement {
   @state()
   private _view: SystemTabController | null = null;
 
+  @state()
+  private _scrollLeft: number = 0;
+
+  @state()
+  private _tabBarHeight: number = 0;
+
+  @state()
+  private _hasOverflow: boolean = false;
+
   private _isResizing = false;
   private _resizeStartX = 0;
   private _resizeStartWidth = 0;
@@ -96,6 +106,9 @@ class Openp41geSidebar extends LitElement {
     if (changed.has("side")) return true;
     if (changed.has("width")) return true;
     if (changed.has("isOpen")) return true;
+    if (changed.has("_scrollLeft")) return true;
+    if (changed.has("_tabBarHeight")) return true;
+    if (changed.has("_hasOverflow")) return true;
     return false;
   }
 
@@ -127,11 +140,37 @@ class Openp41geSidebar extends LitElement {
     if (changed.has("width")) {
       this._syncHostStyles();
     }
+    // Re-check scroll state on width/activeTabId changes (sidebar resize may affect overflow)
+    if (changed.has("width") || changed.has("activeTabId")) {
+      const el = this.querySelector(".sidebar-tab-scroll");
+      if (el) {
+        this._scrollLeft = el.scrollLeft;
+        this._hasOverflow = el.scrollWidth - el.clientWidth > 2;
+      }
+      const bar = this.querySelector(".sidebar-tab-bar");
+      if (bar) {
+        this._tabBarHeight = bar.getBoundingClientRect().height;
+      }
+    }
   }
 
   connectedCallback(): void {
     super.connectedCallback();
     this._syncHostStyles();
+    document.addEventListener("mousedown", this._onDocumentMouseDown);
+  }
+
+  firstUpdated(): void {
+    // Initialize scroll shadow state after the DOM is rendered
+    const el = this.querySelector(".sidebar-tab-scroll");
+    if (el) {
+      this._scrollLeft = el.scrollLeft;
+      this._hasOverflow = el.scrollWidth - el.clientWidth > 2;
+    }
+    const bar = this.querySelector(".sidebar-tab-bar");
+    if (bar) {
+      this._tabBarHeight = bar.getBoundingClientRect().height;
+    }
   }
 
   disconnectedCallback(): void {
@@ -139,6 +178,7 @@ class Openp41geSidebar extends LitElement {
     this._unmountView();
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
+    document.removeEventListener("mousedown", this._onDocumentMouseDown);
   }
 
   /**
@@ -154,12 +194,24 @@ class Openp41geSidebar extends LitElement {
   // ═══ Tab click handler ─────────────────────────────────────────────
 
   private _onTabClick(tabId: string): void {
+    // If switching away from an unpinned tab, close it first
+    if (tabId !== this.activeTabId && this.activeTabId) {
+      const currentTab = this.systemTabs.find((t) => t.id === this.activeTabId);
+      if (currentTab && !currentTab.pinned) {
+        dispatch("closeSystemTab", this.windowId, this.side, this.activeTabId);
+      }
+    }
     dispatch("activateSystemTab", this.windowId, this.side, tabId);
   }
 
   private _onTabClose(tabId: string, e: Event): void {
     e.stopPropagation();
     dispatch("closeSystemTab", this.windowId, this.side, tabId);
+  }
+
+  private _onPinToggle(tabId: string, pinned: boolean, e: Event): void {
+    e.stopPropagation();
+    dispatch("pinSystemTab", tabId, !pinned);
   }
 
   private _onToggleSidebar(): void {
@@ -236,6 +288,11 @@ class Openp41geSidebar extends LitElement {
       Math.min(this._getMaxSidebarWidth(), this._resizeStartWidth + dx),
     );
     this.width = newWidth;
+    // Update tab bar height for shadow sizing
+    const bar = this.querySelector(".sidebar-tab-bar");
+    if (bar) {
+      this._tabBarHeight = bar.getBoundingClientRect().height;
+    }
   };
 
   private _onResizeEnd = (): void => {
@@ -253,6 +310,38 @@ class Openp41geSidebar extends LitElement {
     // Reserve space for the other sidebar at minimum width + grid minimum width
     return Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth - MIN_SIDEBAR_WIDTH - 200);
   }
+
+  private _onTabBarScroll(e: Event): void {
+    const target = e.target as HTMLElement;
+    this._scrollLeft = target.scrollLeft;
+    this._hasOverflow = target.scrollWidth - target.clientWidth > 2;
+  }
+
+  private get _showLeftShadow(): boolean {
+    const el = this.querySelector(".sidebar-tab-scroll");
+    if (!el) return false;
+    return el.scrollLeft > 2;
+  }
+
+  private get _showRightShadow(): boolean {
+    const el = this.querySelector(".sidebar-tab-scroll");
+    if (!el) return false;
+    return el.scrollWidth - el.clientWidth - el.scrollLeft > 2;
+  }
+
+  private _onDocumentMouseDown = (e: MouseEvent): void => {
+    // Close unpinned active tab when clicking outside the sidebar
+    // Also check that the sidebar is actually visible (CSS-visible, not just isOpen)
+    if (!this.activeTabId) return;
+    if (this.classList.contains("sidebar-element-hidden")) return;
+    const activeTab = this.systemTabs.find((t) => t.id === this.activeTabId);
+    if (!activeTab || activeTab.pinned) return;
+    // Check if click is outside this sidebar element
+    const target = e.target as Node;
+    if (!this.contains(target)) {
+      dispatch("closeSystemTab", this.windowId, this.side, this.activeTabId);
+    }
+  };
 
   // ═══ Render ───────────────────────────────────────────────────────
   //
@@ -295,33 +384,64 @@ class Openp41geSidebar extends LitElement {
           }
           .sidebar-resize-notch.right-0::before { right: 0; }
           .sidebar-resize-notch.left-0::before { left: 0; }
+          .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
         </style>
 
-        <!-- System tab bar -->
-        <div class="sidebar-tab-bar flex items-center gap-0 px-1 py-1 border-b border-divider shrink-0 overflow-x-auto">
-          ${this.systemTabs.map((tab) => {
-            const isActive = tab.id === this.activeTabId;
-            return html`
-              <div
-                class="sidebar-tab flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-xs whitespace-nowrap select-none transition-colors duration-75"
-                style="${isActive
-                  ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #e0e0e0)"
-                  : "color:var(--text-secondary, #888)"}"
-                @click=${() => this._onTabClick(tab.id)}
-              >
-                <span class="sidebar-tab-title">${tab.title}</span>
-                <span
-                  class="sidebar-tab-close flex items-center justify-center w-3.5 h-3.5 rounded hover:bg-hover cursor-pointer text-muted hover:text-primary ml-1"
-                  @click=${(e: Event) => this._onTabClose(tab.id, e)}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                  </svg>
-                </span>
-              </div>
-            `;
-          })}
-        </div>
+        <!-- System tab bar (only when there are tabs to show) -->
+        ${this.systemTabs.length > 0 ? html`
+          <div class="sidebar-tab-bar relative shrink-0 border-b border-divider">
+            <!-- Scrollable tab container (scrollbar hidden) -->
+            <div class="sidebar-tab-scroll flex items-stretch overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;" @scroll=${this._onTabBarScroll}>
+              ${this.systemTabs.map((tab, idx) => {
+                const isActive = tab.id === this.activeTabId;
+                const isLast = idx === this.systemTabs.length - 1;
+                let sideBorder = idx === 0 ? "border-l" : "";
+                if (!isLast || !this._hasOverflow) sideBorder += " border-r";
+                return html`
+                  <div
+                    class="sidebar-tab flex items-center gap-1 px-2 py-1.5 cursor-pointer text-xs whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
+                    style="width:120px;${isActive
+                      ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #e0e0e0)"
+                      : "color:var(--text-secondary, #888)"}"
+                    @click=${() => this._onTabClick(tab.id)}
+                  >
+                    <span class="sidebar-tab-title truncate">${tab.title}</span>
+                    <!-- Pin button -->
+                    <span
+                      class="sidebar-tab-pin flex items-center justify-center w-5 h-5 rounded hover:bg-hover cursor-pointer text-muted hover:text-primary shrink-0 ml-auto"
+                      title="${tab.pinned ? "Pinned" : "Unpinned"}"
+                      @click=${(e: Event) => this._onPinToggle(tab.id, tab.pinned, e)}
+                    >
+                      ${tab.pinned ? html`
+                        <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></svg>
+                      ` : html`
+                        <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M680-840v80h-40v327l-80-80v-247H400v87l-87-87-33-33v-47h400ZM480-40l-40-40v-240H240v-80l80-80v-46L56-792l56-56 736 736-58 56-264-264h-6v240l-40 40ZM354-400h92l-44-44-2-2-46 46Zm126-193Zm-78 149Z"/></svg>
+                      `}
+                    </span>
+                    <!-- Close button -->
+                    <span
+                      class="sidebar-tab-close flex items-center justify-center w-5 h-5 rounded hover:bg-hover cursor-pointer text-muted hover:text-primary shrink-0"
+                      @click=${(e: Event) => this._onTabClose(tab.id, e)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                    </span>
+                  </div>
+                `;
+              })}
+            </div>
+            ${(() => {
+              const activeIdx = this.systemTabs.findIndex((t) => t.id === this.activeTabId);
+              if (activeIdx === -1) return nothing;
+              return html`
+                <div class="absolute h-0.5 pointer-events-none" style="width:120px;left:${activeIdx * 120 - this._scrollLeft}px;bottom:-1px;z-index:3;background:var(--accent, #4a9eff);"></div>
+              `;
+            })()}
+          </div>
+        ` : nothing}
+        <!-- Left scroll shadow (positioned relative to outer container) -->
+        <div class="absolute pointer-events-none transition-opacity duration-150" style="left:0;top:0;width:24px;height:${Math.max(this._tabBarHeight, 30)}px;z-index:4;opacity:${this._showLeftShadow ? 1 : 0};background:linear-gradient(to right, var(--bg-gutter, #1a1a1a), transparent);"></div>
+        <!-- Right scroll shadow (positioned relative to outer container) -->
+        <div class="absolute pointer-events-none transition-opacity duration-150" style="right:0;top:0;width:24px;height:${Math.max(this._tabBarHeight, 30)}px;z-index:4;opacity:${this._showRightShadow ? 1 : 0};background:linear-gradient(to left, var(--bg-gutter, #1a1a1a), transparent);"></div>
 
         <!-- Content area -->
         <div class="sidebar-content flex-1 min-h-0 overflow-hidden flex flex-col"></div>
