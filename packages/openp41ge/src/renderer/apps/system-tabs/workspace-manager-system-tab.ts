@@ -87,7 +87,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           border-bottom: 1px solid var(--divider, #333);
         }
         .workspaces-accordion {
-          padding: 4px 12px;
           flex: 1;
         }
         .accordion-item {
@@ -161,7 +160,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           background: rgba(232, 17, 35, 0.1);
         }
         .accordion-body {
-          padding: 0 12px 12px;
+          padding: 0 12px 12px 34px;
           font-size: 13px;
           color: var(--text-secondary, #999);
           display: none;
