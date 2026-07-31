@@ -79,16 +79,6 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  demos/openp41ge-drag-demo:
-    dependencies:
-      lit:
-        specifier: ^3.0.0
-        version: 3.3.3
-    devDependencies:
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
   demos/openp41ge-file-editor-demo:
     dependencies:
       openp41ge-uikit:
