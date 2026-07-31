@@ -184,7 +184,7 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "View",
     });
 
-    // Cmd+Shift+P opens Project Picker in the right sidebar
+    // Cmd+Shift+P opens Workspace Manager as an editor system tab
     km.register({
       modifiers: 12,
       key: "p",
@@ -193,12 +193,12 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          emitEvent("tab-open-system", { windowId: myWindowId, side: "right", appType: "projects", title: "Projects" });
+          emitEvent("system-tab-open", { windowId: myWindowId, appType: "workspace-manager" });
         } catch (_err) {
           // ignore
         }
       },
-      description: "Open Project Picker",
+      description: "Open Workspace Manager",
       category: "View",
     });
 

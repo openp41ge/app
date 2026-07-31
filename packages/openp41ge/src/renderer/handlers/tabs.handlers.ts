@@ -54,5 +54,27 @@ export function createTabHandlers(commandBus: ICommandBus): Record<string, Handl
       const { windowId, paneWinId, cols } = payload;
       commandBus.dispatch("resizeGrid", windowId, paneWinId, 1, cols);
     },
+
+    // ── Editor System Tab Handlers ──────────────────────────────────
+
+    "system-tabs/open-tab": async (payload) => {
+      const { windowId, appType } = payload;
+      commandBus.dispatch("openEditorSystemTab", windowId, appType);
+    },
+
+    "system-tabs/close-tab": async (payload) => {
+      const { windowId, tabId } = payload;
+      commandBus.dispatch("closeEditorSystemTab", windowId, tabId);
+    },
+
+    "system-tabs/activate-tab": async (payload) => {
+      const { windowId, tabId } = payload;
+      commandBus.dispatch("activateEditorSystemTab", windowId, tabId);
+    },
+
+    "system-tabs/reorder-tabs": async (payload) => {
+      const { windowId, tabId, targetIndex } = payload;
+      commandBus.dispatch("reorderEditorSystemTabs", windowId, tabId, targetIndex);
+    },
   };
 }

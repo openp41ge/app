@@ -16,7 +16,10 @@ import type { Window, Workspace, Rect, SystemTab, SystemTabId } from "../../layo
 import { emitEvent } from "../app";
 
 import { setContextMenuActive } from "../services/drag-context";
+import { getEditorSystemTabRegistration } from "../apps/app-registry";
+import type { EditorSystemTabController } from "../controllers/types";
 import "./openp41ge-sidebar";
+import "./openp41ge-system-tab-bar";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -104,10 +107,58 @@ class Openp41geWindowView extends LitElement {
     return sysTab?.pinned ?? false;
   }
 
+  /** Cache of editor system tab controller instances, keyed by tabId. */
+  private _editorSystemTabControllers: Map<string, EditorSystemTabController> = new Map();
+
+  /**
+   * Get or create an EditorSystemTabController for the given tabId and appType.
+   */
+  private _getEditorSystemTabController(tabId: string, appType: string): EditorSystemTabController | null {
+    const cached = this._editorSystemTabControllers.get(tabId);
+    if (cached) return cached;
+
+    const reg = getEditorSystemTabRegistration(appType);
+    if (!reg) return null;
+
+    const ctrl = reg.createController(tabId);
+    this._editorSystemTabControllers.set(tabId, ctrl);
+    return ctrl;
+  }
+
+  /** Build the system tab info list for the system tab bar. */
+  private _getSystemTabInfos(win: Window): Array<{ id: string; title: string; active: boolean }> {
+    return win.editorSystemTabIds.map((id) => {
+      const appType = id.replace(/^editor-sys-/, "").replace(/-\d+$/, "");
+      const ctrl = this._getEditorSystemTabController(id, appType);
+      return {
+        id,
+        title: ctrl?.title ?? appType,
+        active: id === win.editorSystemActiveTabId,
+      };
+    });
+  }
+
   render(): TemplateResult | typeof nothing {
     const win = this.windowData;
     const ws = this.workspaceData;
     if (!win) return nothing;
+
+    const hasSysTabs = win.editorSystemTabIds.length > 0;
+    const sysTabInfos = hasSysTabs ? this._getSystemTabInfos(win) : [];
+
+    // Render active system tab content
+    let systemTabContent: TemplateResult | typeof nothing = nothing;
+    if (hasSysTabs && win.editorSystemActiveTabId) {
+      const appType = win.editorSystemActiveTabId.replace(/^editor-sys-/, "").replace(/-\d+$/, "");
+      const ctrl = this._getEditorSystemTabController(win.editorSystemActiveTabId, appType);
+      if (ctrl) {
+        systemTabContent = html`
+          <div class="system-tab-content flex-1 overflow-auto">
+            ${ctrl.render()}
+          </div>
+        `;
+      }
+    }
 
     // Build tab-data and active-tab-ids for <tab-grid>
     const tabData: Record<
@@ -125,7 +176,6 @@ class Openp41geWindowView extends LitElement {
       for (const tabId of p.tabIds) {
         const tidStr = String(tabId);
         const tab = ws?.editorTabs?.[tabId];
-        // Regular tabs are pinned if not a preview
         const pinned = tab ? !tab.isPreview : true;
         tabData[tidStr] = {
           title: tab?.title ?? "untitled",
@@ -135,14 +185,13 @@ class Openp41geWindowView extends LitElement {
       }
     }
 
-    // Ensure at least 1 column for an empty grid so the tab-grid renders
     const effectiveCols = Math.max(1, win.grid.cols);
     const placements =
       win.grid.placements.length > 0
         ? win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))
         : [{ position: { row: 0, col: 0 }, tabIds: [] as string[] }];
 
-    // ── Resolve system tab data for sidebars ──────────────────────────
+    // Resolve system tab data for sidebars
     const leftSysTabs = (win.sidebar?.leftSidebarTabs ?? []).map((id) => ({
       id,
       title: this._getSystemTabTitle(id),
@@ -158,8 +207,6 @@ class Openp41geWindowView extends LitElement {
 
     return html`
       <style>
-        /* Parent-controlled sidebar visibility — avoids Lit marker corruption
-           from conditional rendering inside the sidebar component. */
         .sidebar-element-hidden { display: none !important; }
       </style>
       <div
@@ -184,18 +231,28 @@ class Openp41geWindowView extends LitElement {
             class="sidebar-element ${win.sidebar?.leftSidebarOpen ? '' : 'sidebar-element-hidden'}"
           ></openp41ge-sidebar>
 
-          <!-- Editor grid area -->
-          <div
-            class="wv-code openp41ge-grid-area relative overflow-hidden flex-1"
-            style="--wv-code-min:200px"
-          >
-            <tab-grid
-              winId=${win.id}
-              .cols=${effectiveCols}
-              .placements=${placements}
-              .tabData=${tabData}
-              .activeTabIds=${activeTabIds}
-            ></tab-grid>
+          <!-- Central area: system tabs override the grid -->
+          <div class="flex flex-col flex-1 overflow-hidden min-w-0">
+            ${hasSysTabs ? html`
+              <openp41ge-system-tab-bar
+                .windowData=${win}
+                .tabs=${sysTabInfos}
+              ></openp41ge-system-tab-bar>
+              ${systemTabContent}
+            ` : html`
+              <div
+                class="wv-code openp41ge-grid-area relative overflow-hidden flex-1"
+                style="--wv-code-min:200px"
+              >
+                <tab-grid
+                  winId=${win.id}
+                  .cols=${effectiveCols}
+                  .placements=${placements}
+                  .tabData=${tabData}
+                  .activeTabIds=${activeTabIds}
+                ></tab-grid>
+              </div>
+            `}
           </div>
 
           <!-- Right sidebar -->
@@ -214,7 +271,6 @@ class Openp41geWindowView extends LitElement {
         >
           <div class="flex-1"></div>
         </div>
-
       </div>
     `;
   }

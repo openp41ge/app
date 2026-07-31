@@ -97,3 +97,25 @@ export interface SystemTabRegistration {
   /** Factory function to create the system tab content controller. */
   createController: (tabId: string, config?: Record<string, unknown>) => SystemTabController;
 }
+
+// ─── Editor System Tab Registration ─────────────────────────────────────
+
+/**
+ * EditorSystemTabController — interface for editor-area system tab content.
+ *
+ * Editor system tabs override the grid. They use a simple render() pattern
+ * rather than the mount/unmount lifecycle since they don't need persistence
+ * across tab switches in the same way.
+ */
+export interface EditorSystemTabController {
+  readonly id: string;
+  readonly appType: string;
+  readonly title: string;
+  render(): unknown;
+}
+
+export interface EditorSystemTabRegistration {
+  appType: string;
+  title: string;
+  createController(tabId: string): EditorSystemTabController;
+}

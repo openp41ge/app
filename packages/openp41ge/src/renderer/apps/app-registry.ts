@@ -10,7 +10,7 @@
  * If no registration exists, PlaceholderController is used as fallback.
  */
 
-import type { AppTypeRegistration, SystemTabRegistration } from "../controllers/types";
+import type { AppTypeRegistration, SystemTabRegistration, EditorSystemTabRegistration } from "../controllers/types";
 
 // ─── Editor App Type Registry ─────────────────────────────────────────────
 
@@ -38,4 +38,20 @@ export function getSystemTabRegistration(id: string): SystemTabRegistration | un
 
 export function getAllSystemTabRegistrations(): SystemTabRegistration[] {
   return Array.from(_systemTabRegistry.values());
+}
+
+// ─── Editor System Tab Registry ────────────────────────────────────────────
+
+const _editorSystemTabRegistry = new Map<string, EditorSystemTabRegistration>();
+
+export function registerEditorSystemTabType(reg: EditorSystemTabRegistration): void {
+  _editorSystemTabRegistry.set(reg.appType, reg);
+}
+
+export function getEditorSystemTabRegistration(appType: string): EditorSystemTabRegistration | undefined {
+  return _editorSystemTabRegistry.get(appType);
+}
+
+export function getAllEditorSystemTabRegistrations(): EditorSystemTabRegistration[] {
+  return Array.from(_editorSystemTabRegistry.values());
 }

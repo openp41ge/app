@@ -12,7 +12,7 @@ import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("bootstrap:register-app-types");
 
-import { registerAppType, registerSystemTabType } from "../../apps/app-registry";
+import { registerAppType, registerSystemTabType, registerEditorSystemTabType } from "../../apps/app-registry";
 import { terminalAppRegistration } from "../../apps/terminal/index";
 import { videoAppRegistration } from "../../apps/video/index";
 import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
@@ -21,6 +21,7 @@ import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { projectManagerAppRegistration } from "../../apps/project-manager/index";
 import { projectDetailAppRegistration } from "../../apps/project-picker/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
+import { WorkspaceManagerSystemTab } from "../../apps/system-tabs/workspace-manager-system-tab";
 
 // ─── Log viewer component (auto-registers <openp41ge-log-viewer>) ──────────
 import "openp41ge-logger/viewer";
@@ -41,6 +42,13 @@ export class RegisterAppTypesStep implements IStartupStep {
     for (const reg of allSystemTabRegistrations) {
       registerSystemTabType(reg);
     }
+
+    // Register editor system tab types (override the grid)
+    registerEditorSystemTabType({
+      appType: "workspace-manager",
+      title: "Workspace Manager",
+      createController: (tabId: string) => new WorkspaceManagerSystemTab(tabId),
+    });
 
     log.info("app types and system tab types registered");
   }

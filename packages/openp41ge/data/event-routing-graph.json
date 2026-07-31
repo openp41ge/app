@@ -19,7 +19,11 @@
     { "id": "layout/set-sidebar-width" },
     { "id": "tabs/remove-column-tab" },
     { "id": "tabs/add-column-tab-at" },
-    { "id": "layout/resize-grid" }
+    { "id": "layout/resize-grid" },
+    { "id": "system-tabs/open-tab" },
+    { "id": "system-tabs/close-tab" },
+    { "id": "system-tabs/activate-tab" },
+    { "id": "system-tabs/reorder-tabs" }
   ],
   "edges": [
     {
@@ -129,6 +133,26 @@
       "id": "e021",
       "from": "layout-resize-grid",
       "to": ["layout/resize-grid"]
+    },
+    {
+      "id": "e022",
+      "from": "system-tab-open",
+      "to": ["system-tabs/open-tab"]
+    },
+    {
+      "id": "e023",
+      "from": "system-tab-close",
+      "to": ["system-tabs/close-tab"]
+    },
+    {
+      "id": "e024",
+      "from": "system-tab-activate",
+      "to": ["system-tabs/activate-tab"]
+    },
+    {
+      "id": "e025",
+      "from": "system-tab-reorder",
+      "to": ["system-tabs/reorder-tabs"]
     }
   ]
 }

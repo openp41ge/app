@@ -14,6 +14,9 @@ export type TabId = z.infer<typeof TabId>;
 export const SystemTabId = z.string().brand("SystemTabId");
 export type SystemTabId = z.infer<typeof SystemTabId>;
 
+export const EditorSystemTabId = z.string().brand("EditorSystemTabId");
+export type EditorSystemTabId = z.infer<typeof EditorSystemTabId>;
+
 export const OverlayId = z.string().brand("OverlayId");
 export type OverlayId = z.infer<typeof OverlayId>;
 
@@ -160,19 +163,38 @@ export function createOverlayData(
   return OverlaySchema.parse({ id, tab, position });
 }
 
-// ─── SystemTab ─────────────────────────────────────────────────────────────
+// ─── SidebarTab (formerly SystemTab) ────────────────────────────────────────
 
-/** System tabs are sidebar-based app panels (Explorer, Git, Search, Projects). */
-export const SystemTabSchema = z.object({
+/** Sidebar tabs are sidebar-based app panels (Explorer, Git, Search, etc.). */
+export const SidebarTabSchema = z.object({
   id: SystemTabId,
   appType: z.string(),
   title: z.string(),
   pinned: z.boolean().default(false),
 });
-export type SystemTab = z.infer<typeof SystemTabSchema>;
+export type SidebarTab = z.infer<typeof SidebarTabSchema>;
 
-export function createSystemTab(id: string, appType: string, title: string, pinned: boolean = false): SystemTab {
-  return SystemTabSchema.parse({ id, appType, title, pinned });
+export function createSidebarTab(id: string, appType: string, title: string, pinned: boolean = false): SidebarTab {
+  return SidebarTabSchema.parse({ id, appType, title, pinned });
+}
+
+// Backward-compat aliases
+export const SystemTabSchema = SidebarTabSchema;
+export type SystemTab = SidebarTab;
+export const createSystemTab = createSidebarTab;
+
+// ─── EditorSystemTab ────────────────────────────────────────────────────
+
+/** Editor-area system tabs override the grid (workspace manager, settings, etc.). */
+export const EditorSystemTabSchema = z.object({
+  id: EditorSystemTabId,
+  appType: z.string(),
+  title: z.string(),
+});
+export type EditorSystemTab = z.infer<typeof EditorSystemTabSchema>;
+
+export function createEditorSystemTab(id: string, appType: string, title: string): EditorSystemTab {
+  return EditorSystemTabSchema.parse({ id, appType, title });
 }
 
 // ─── SidebarState ───────────────────────────────────────────────────────────────
@@ -214,6 +236,10 @@ export const WindowSchema = z.object({
   repoRefs: z.array(RepoRefSchema).default([]),
   sidebar: SidebarStateSchema.optional().default({ activeViewId: null, width: 280 }),
   overlays: z.array(OverlaySchema).default([]),
+  /** Editor-area system tabs (override the grid when open). */
+  editorSystemTabIds: z.array(EditorSystemTabId).default([]),
+  /** Active editor-area system tab ID. */
+  editorSystemActiveTabId: EditorSystemTabId.nullable().default(null),
 });
 export type Window = z.infer<typeof WindowSchema>;
 
