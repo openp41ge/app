@@ -364,6 +364,7 @@ export class Openp41geApplication {
               }
             },
           },
+          { type: "separator" },
           {
             label: "New Workspace...",
             accelerator: "CmdOrCtrl+Shift+N",
@@ -371,7 +372,6 @@ export class Openp41geApplication {
               BrowserWindow.getFocusedWindow()?.webContents.send("menu:new-workspace");
             },
           },
-          { type: "separator" },
           {
             label: "Open Workspace...",
             accelerator: "CmdOrCtrl+Shift+O",
