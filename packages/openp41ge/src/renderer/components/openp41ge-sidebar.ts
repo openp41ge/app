@@ -19,7 +19,7 @@ import { getSystemTabRegistration } from "../apps/app-registry";
 import type { SystemTabController } from "../controllers/types";
 import { appState } from "../services/app-state";
 
-const MIN_SIDEBAR_WIDTH = 200;
+const MIN_SIDEBAR_WIDTH = 160;
 const MAX_SIDEBAR_WIDTH = 600;
 const SIDEBAR_WIDTH_KEY_PREFIX = "openp41ge:sidebar-width-";
 
@@ -58,7 +58,7 @@ class Openp41geSidebar extends LitElement {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY_PREFIX + "right");
     if (saved) {
       const w = parseInt(saved, 10);
-      if (!isNaN(w) && w >= 180 && w <= 600) return w;
+      if (!isNaN(w) && w >= MIN_SIDEBAR_WIDTH && w <= MAX_SIDEBAR_WIDTH) return w;
     }
     return 280;
   })();
@@ -99,7 +99,7 @@ class Openp41geSidebar extends LitElement {
       const saved = localStorage.getItem(this._widthKey);
       if (saved) {
         const w = parseInt(saved, 10);
-        if (!isNaN(w) && w >= 180 && w <= 600) this.width = w;
+        if (!isNaN(w) && w >= MIN_SIDEBAR_WIDTH && w <= MAX_SIDEBAR_WIDTH) this.width = w;
       }
     }
   }
@@ -163,6 +163,7 @@ class Openp41geSidebar extends LitElement {
   private _syncHostStyles(): void {
     this.style.flex = `0 1 ${this.width}px`;
     this.style.minWidth = `${MIN_SIDEBAR_WIDTH}px`;
+    this.style.maxWidth = `min(${this.width}px, 35vw)`;
   }
 
   // ═══ Tab click handler ─────────────────────────────────────────────

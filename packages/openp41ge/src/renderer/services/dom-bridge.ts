@@ -4,9 +4,9 @@ import type { EventRouter } from "./event-router";
  * DOM Bridge — intercepts browser-native DOM events and routes them
  * through the EventRouter.
  *
- * Captured on the document in capture phase. Native propagation is
- * suppressed via stopImmediatePropagation to prevent ad-hoc listeners
- * from also reacting.
+ * Captured on the document in capture phase. Events are observed but not
+ * suppressed — components retain their own DOM event handlers (resize
+ * notches, tab clicks, etc.).
  */
 export class DOMBridge {
   private _router: EventRouter;
@@ -21,11 +21,13 @@ export class DOMBridge {
     if (this._attached) return;
     this._attached = true;
 
-    // Mousedown — determine which zone was clicked
+    // Mousedown — determine which zone was clicked.
+    // Does NOT stopImmediatePropagation — sidebars need their own mousedown
+    // handlers (resize notch, tab clicks) to still fire. The zone event is
+    // emitted as a fire-and-forget observation for focus tracking.
     document.addEventListener(
       "mousedown",
       (e: MouseEvent) => {
-        e.stopImmediatePropagation();
         const target = e.target as HTMLElement;
         const eventType = this._determineMousedownEvent(target, e.clientX);
         if (eventType) {
