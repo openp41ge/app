@@ -97,22 +97,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     const data = workspaceFileService.activeData;
     const filePath = workspaceFileService.activeFilePath;
 
-    if (!data) {
-      return html`
-        <div class="ws-wrap">
-          <style>
-            .ws-wrap { display:flex; flex-direction:column; height:100%; align-items:center; justify-content:center; gap:16px; padding:40px; }
-            .ws-title { font-size:16px; font-weight:600; color:var(--text-primary,#ccc); }
-            .ws-btn { padding:8px 20px; font-size:13px; border:1px solid var(--divider,#333); border-radius:4px; cursor:pointer; background:var(--bg-secondary,#1e1e1e); color:var(--text-primary,#ccc); }
-            .ws-btn:hover { background:var(--bg-hover,#2a2a2a); }
-            .ws-btn.primary { border-color:var(--accent,#007acc); color:var(--accent,#007acc); }
-            .ws-btn.primary:hover { background:var(--accent,#007acc); color:#fff; }
-          </style>
-          <div class="ws-title">No workspace loaded</div>
-          <button class="ws-btn primary" @click=${() => this._onSaveAs()}>New Workspace</button>
-        </div>
-      `;
-    }
+    if (!data) return html`<div class="ws-wrap"></div>`;
 
     return html`
       <style>
