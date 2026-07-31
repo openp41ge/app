@@ -394,6 +394,10 @@ class Openp41geSidebar extends LitElement {
     if (Openp41geSidebar._focusedSide === side) return;
     Openp41geSidebar._focusedSide = side;
     Openp41geSidebar._notifyAll();
+    // Notify grid components about sidebar focus change
+    document.dispatchEvent(new CustomEvent("sidebar-focus-change", {
+      detail: { sidebarFocused: side !== null },
+    }));
   }
 
   /**
@@ -403,6 +407,9 @@ class Openp41geSidebar extends LitElement {
     if (Openp41geSidebar._windowFocused === focused) return;
     Openp41geSidebar._windowFocused = focused;
     Openp41geSidebar._notifyAll();
+    document.dispatchEvent(new CustomEvent("sidebar-focus-change", {
+      detail: { sidebarFocused: focused && Openp41geSidebar._focusedSide !== null },
+    }));
   }
 
   private _onSidebarClick = (): void => {
@@ -414,6 +421,9 @@ class Openp41geSidebar extends LitElement {
   };
 
   private _onWindowFocus = (): void => {
+    // Clear focused side so the previous sidebar isn't automatically restored.
+    // The subsequent mousedown event will set the correct focused side.
+    Openp41geSidebar._focusedSide = null;
     Openp41geSidebar._setWindowFocused(true);
   };
 

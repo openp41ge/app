@@ -91,6 +91,7 @@ export class TabGrid extends LitElement {
   private _boundOnTabBarMoveCell: ((e: Event) => void) | null = null;
   private _boundOnTabBarReorder: ((e: Event) => void) | null = null;
   private _boundOnGridPin: ((e: Event) => void) | null = null;
+  private _boundOnSidebarFocus: ((e: Event) => void) | null = null;
 
   get dropTarget(): GridDropTarget | null {
     return this._dropTarget;
@@ -413,6 +414,16 @@ export class TabGrid extends LitElement {
     };
     this.addEventListener("grid-pin", this._boundOnGridPin);
 
+    // ── Listen for sidebar focus changes ───────────────────
+    this._boundOnSidebarFocus = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { sidebarFocused: boolean };
+      if (detail.sidebarFocused && this._focusedCol !== -1) {
+        this._focusedCol = -1;
+        this.requestUpdate();
+      }
+    };
+    document.addEventListener("sidebar-focus-change", this._boundOnSidebarFocus);
+
     // ── Native file / repo drop support ──────────────────────
     this._boundOnDragOver = (e: DragEvent) => {
       if (!e.dataTransfer) return;
@@ -697,6 +708,10 @@ export class TabGrid extends LitElement {
     if (this._boundOnGridPin) {
       this.removeEventListener("grid-pin", this._boundOnGridPin);
       this._boundOnGridPin = null;
+    }
+    if (this._boundOnSidebarFocus) {
+      document.removeEventListener("sidebar-focus-change", this._boundOnSidebarFocus);
+      this._boundOnSidebarFocus = null;
     }
     if (this._boundOnDragOver) {
       this.removeEventListener("dragover", this._boundOnDragOver);
