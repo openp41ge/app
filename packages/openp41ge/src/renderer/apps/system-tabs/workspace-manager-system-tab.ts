@@ -69,8 +69,8 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     return html`
       <style>
         .ws-wrap { display:flex; flex-direction:column; height:100%; overflow-y:auto; }
-        .ws-section { padding:10px 14px; }
-        .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); margin-bottom:4px; }
+        .ws-section { display:flex; align-items:center; gap:12px; padding:8px 14px; min-height:32px; }
+        .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); flex-shrink:0; width:110px; }
         .ws-value { font-size:13px; color:var(--text-primary,#ccc); word-break:break-all; }
         .ws-value.mono { font-family:monospace; font-size:12px; }
         .ws-clickable {
@@ -81,7 +81,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         .ws-repo-item { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:13px; color:var(--text-primary,#ccc); }
         .ws-repo-item::before { content:"•"; color:var(--text-secondary,#999); }
         .ws-worktrees { font-size:12px; color:var(--text-secondary,#999); }
-        .ws-empty { padding:20px 14px; text-align:center; color:var(--text-secondary,#999); font-size:13px; }
+        .ws-empty { color:var(--text-secondary,#999); font-size:13px; }
       </style>
       <div class="ws-wrap">
         <div class="ws-section">
@@ -96,7 +96,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           </div>
         </div>
         <div class="ws-section">
-          <div class="ws-label">Data Directory</div>
+          <div class="ws-label">Data Dir</div>
           <div class="ws-clickable ws-value mono" @click=${() => this._onChangeDataDir()} title="Choose a new data directory">
             ${data.dataDir}
             ${pencil}
@@ -104,18 +104,20 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         </div>
         <div class="ws-section">
           <div class="ws-label">Repos (${data.repos.length})</div>
-          ${data.repos.length === 0
-            ? html`<div class="ws-empty">No repos configured.</div>`
-            : data.repos.map(
-                (r) => html`
-                  <div class="ws-repo-item">
-                    <span>${r.url}</span>
-                    ${r.worktrees.length > 0
-                      ? html`<span class="ws-worktrees">(${r.worktrees.join(", ")})</span>`
-                      : ""}
-                  </div>
-                `,
-              )}
+          <div class="ws-value">
+            ${data.repos.length === 0
+              ? html`<span class="ws-empty">None</span>`
+              : data.repos.map(
+                  (r) => html`
+                    <div class="ws-repo-item">
+                      <span>${r.url}</span>
+                      ${r.worktrees.length > 0
+                        ? html`<span class="ws-worktrees">(${r.worktrees.join(", ")})</span>`
+                        : ""}
+                    </div>
+                  `,
+                )}
+          </div>
         </div>
       </div>
     `;
