@@ -71,7 +71,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         .ws-wrap { display:flex; flex-direction:column; height:100%; overflow-y:auto; }
         .ws-section { display:flex; align-items:center; gap:12px; padding:8px 14px; min-height:32px; }
         .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); flex-shrink:0; width:110px; }
-        .ws-value { flex:1; font-size:13px; color:var(--text-primary,#ccc); word-break:break-all; text-align:right; }
+        .ws-value { font-size:13px; color:var(--text-primary,#ccc); word-break:break-all; margin-left:auto; text-align:right; }
         .ws-value.mono { font-family:monospace; font-size:12px; }
         .ws-clickable {
           display:inline-flex; align-items:center; gap:6px; padding:2px 6px; border-radius:4px;
