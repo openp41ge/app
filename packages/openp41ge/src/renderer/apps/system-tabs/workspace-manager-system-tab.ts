@@ -66,27 +66,30 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     el.style.cssText = `
       position:fixed;
       left:${rect.left + rect.width / 2}px;
-      top:${rect.top - 4}px;
-      transform:translate(-50%,-100%);
+      top:${rect.top}px;
+      transform:translate(-50%,0);
       z-index:2147483646;
-      padding:3px 10px;
+      padding:2px 8px;
       border-radius:4px;
       background:var(--bg-secondary,#1e1e1e);
       color:var(--text-primary,#ccc);
-      font-size:12px;
-      border:1px solid var(--divider,#333);
+      font-size:11px;
       white-space:nowrap;
       opacity:0;
-      transition:opacity .15s ease;
+      transition:opacity .2s ease, transform .2s ease;
       pointer-events:none;
     `;
     document.body.appendChild(el);
 
-    requestAnimationFrame(() => { el.style.opacity = "1"; });
+    requestAnimationFrame(() => {
+      el.style.opacity = "1";
+      el.style.transform = "translate(-50%,-28px)";
+    });
 
     setTimeout(() => {
       el.style.opacity = "0";
-      setTimeout(() => el.remove(), 150);
+      el.style.transform = "translate(-50%,-20px)";
+      setTimeout(() => el.remove(), 200);
     }, 1500);
   }
 
