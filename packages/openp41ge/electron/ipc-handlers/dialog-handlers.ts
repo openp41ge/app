@@ -81,7 +81,7 @@ export function registerDialogHandlers(): void {
   // ── Pick folder (for data dir) ───────────────────────────────────────
 
   ipcMain.handle("dialog:pickFolder", async () => {
-    const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    const result = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
   });
