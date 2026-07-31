@@ -24,6 +24,8 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
   private _workspaces: WorkspaceInfo[] = [];
   private _expanded: Set<string> = new Set();
   private _loaded = false;
+  private _showNewInput = false;
+  private _newName = "";
 
   constructor(tabId: string) {
     this.id = tabId;
@@ -78,6 +80,75 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           flex-direction: column;
           height: 100%;
           overflow-y: auto;
+        }
+        .workspaces-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 12px;
+          border-bottom: 1px solid var(--divider, #333);
+          flex-shrink: 0;
+        }
+        .workspaces-header h2 {
+          margin: 0;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-primary, #ccc);
+        }
+        .workspaces-header button {
+          padding: 3px 8px;
+          font-size: 12px;
+          border: 1px solid var(--divider, #333);
+          border-radius: 3px;
+          cursor: pointer;
+          background: var(--bg-secondary, #1e1e1e);
+          color: var(--text-primary, #ccc);
+          white-space: nowrap;
+        }
+        .workspaces-header button:hover {
+          background: var(--bg-hover, #2a2a2a);
+        }
+        .new-input-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-bottom: 1px solid var(--divider, #333);
+          flex-shrink: 0;
+        }
+        .new-input-row input {
+          flex: 1;
+          padding: 4px 8px;
+          font-size: 13px;
+          border: 1px solid var(--divider, #333);
+          border-radius: 3px;
+          background: var(--bg-primary, #252526);
+          color: var(--text-primary, #ccc);
+          outline: none;
+        }
+        .new-input-row input:focus {
+          border-color: var(--accent, #007acc);
+        }
+        .new-input-row button {
+          padding: 4px 10px;
+          font-size: 12px;
+          border: 1px solid var(--divider, #333);
+          border-radius: 3px;
+          cursor: pointer;
+          background: var(--bg-secondary, #1e1e1e);
+          color: var(--text-primary, #ccc);
+          white-space: nowrap;
+        }
+        .new-input-row button:hover {
+          background: var(--bg-hover, #2a2a2a);
+        }
+        .new-input-row button.primary {
+          border-color: var(--accent, #007acc);
+          color: var(--accent, #007acc);
+        }
+        .new-input-row button.primary:hover {
+          background: var(--accent, #007acc);
+          color: #fff;
         }
         .workspaces-accordion {
           flex: 1;
@@ -200,16 +271,35 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         }
       </style>
       <div class="workspaces-wrap">
-        ${this._workspaces.length === 0
-          ? html`<div class="empty-state">No workspaces yet. Create one to get started.</div>`
+        <!-- Header bar -->
+        <div class="workspaces-header">
+          <h2>Workspaces</h2>
+          <button @click=${this._showCreateInput}>+ New</button>
+        </div>
+        <!-- Inline create input -->
+        ${this._showNewInput ? html`
+          <div class="new-input-row">
+            <input
+              type="text"
+              placeholder="Workspace name..."
+              .value=${this._newName}
+              @input=${(e: InputEvent) => { this._newName = (e.target as HTMLInputElement).value; }}
+              @keydown=${(e: KeyboardEvent) => {
+                if (e.key === "Enter") this._confirmCreate();
+                if (e.key === "Escape") this._cancelCreate();
+              }}
+            />
+            <button class="primary" @click=${this._confirmCreate}>Create</button>
+            <button @click=${this._cancelCreate}>Cancel</button>
+          </div>
+        ` : ''}
+        ${this._workspaces.length === 0 && !this._showNewInput
+          ? html`<div class="empty-state">No workspaces yet.</div>`
           : html`
               <div class="workspaces-accordion">
                 ${this._workspaces.map((ws) => this._renderAccordionItem(ws, activeName))}
               </div>
             `}
-        <div class="create-btn-wrap">
-          <button @click=${this._onCreateWorkspace}>+ New Workspace</button>
-        </div>
       </div>
     `;
   }
@@ -271,9 +361,28 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     }
   }
 
-  private async _onCreateWorkspace(): Promise<void> {
-    const name = prompt("Workspace name:");
+  private _showCreateInput(): void {
+    this._showNewInput = true;
+    this._newName = "";
+    this._requestUpdate();
+    // Focus the input after render
+    requestAnimationFrame(() => {
+      const input = document.querySelector(".new-input-row input") as HTMLInputElement | null;
+      input?.focus();
+    });
+  }
+
+  private _cancelCreate(): void {
+    this._showNewInput = false;
+    this._newName = "";
+    this._requestUpdate();
+  }
+
+  private async _confirmCreate(): Promise<void> {
+    const name = this._newName.trim();
     if (!name) return;
+    this._showNewInput = false;
+    this._newName = "";
     try {
       const created = await window.openp41ge.project.create(name);
       if (created) {
