@@ -66,6 +66,14 @@ export class Openp41geProjectDetail extends LitElement {
     window.openp41ge.project.switchTo(this.projectName);
   }
 
+  private _delete(): void {
+    if (this._disconnected) return;
+    if (!confirm(`Delete project "${this.projectName}"?`)) return;
+    window.openp41ge.project.delete(this.projectName).catch((err: Error) => {
+      log.error("Failed to delete project:", err);
+    });
+  }
+
   // ── Swap reorder (up/down arrows) ─────────────────────────────────
 
   private _swap(idx: number, direction: -1 | 1): void {
@@ -153,7 +161,7 @@ export class Openp41geProjectDetail extends LitElement {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 16px 20px 8px 20px;
+          padding: 12px 20px;
           border-bottom: 1px solid var(--border-divider, #333);
         }
         .project-name {
@@ -172,8 +180,10 @@ export class Openp41geProjectDetail extends LitElement {
           border-radius: 4px;
           border: none;
           font-size: 12px;
+          line-height: 1;
           font-weight: 500;
           cursor: pointer;
+          background: transparent;
           transition: background 0.1s;
           outline: none;
           flex-shrink: 0;
@@ -182,28 +192,40 @@ export class Openp41geProjectDetail extends LitElement {
           outline: 2px solid var(--accent-color, #4a9eff);
           outline-offset: 2px;
         }
-        .btn-activate.active {
-          background: transparent;
-          color: var(--text-muted, #888);
-          border: 1px solid var(--border-divider, #333);
-          cursor: default;
-        }
         .btn-activate.inactive {
-          background: var(--accent-color, #4a9eff);
-          color: #fff;
+          color: var(--accent-color, #4a9eff);
         }
         .btn-activate.inactive:hover {
-          background: #3a8aee;
+          background: rgba(74, 158, 255, 0.12);
         }
         .btn-activate.active-project {
-          background: rgba(74, 158, 255, 0.12);
-          color: var(--accent-color, #4a9eff);
-          border: 1px solid rgba(74, 158, 255, 0.3);
+          color: var(--text-muted, #888);
           cursor: default;
+        }
+        .btn-delete {
+          padding: 4px;
+          border-radius: 4px;
+          border: none;
+          cursor: pointer;
+          background: transparent;
+          color: var(--text-muted, #888);
+          transition: color 0.1s, background 0.1s;
+          outline: none;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .btn-delete svg {
+          fill: currentColor;
+        }
+        .btn-delete:hover {
+          color: #e06c75;
+          background: rgba(224, 108, 117, 0.12);
         }
         /* ── Metadata rows ──────────────────────────── */
         .meta-section {
-          padding: 8px 20px 4px 20px;
+          padding: 6px 20px;
           display: flex;
           gap: 24px;
           font-size: 12px;
@@ -365,6 +387,13 @@ export class Openp41geProjectDetail extends LitElement {
             @click=${this._activate}
           >
             ${this._isActive ? "Active" : "Activate"}
+          </button>
+          <button
+            class="btn-delete"
+            title="Delete project"
+            @click=${this._delete}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
           </button>
         </div>
 
