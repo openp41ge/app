@@ -296,10 +296,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 0.75rem
 }
 
-.h-3\\.5 {
-  height: 0.875rem
-}
-
 .h-4 {
   height: 1rem
 }
@@ -382,10 +378,6 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .w-3 {
   width: 0.75rem
-}
-
-.w-3\\.5 {
-  width: 0.875rem
 }
 
 .w-4 {
@@ -672,6 +664,12 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .overflow-x-hidden {
   overflow-x: hidden
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
 }
 
 .text-ellipsis {

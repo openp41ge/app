@@ -146,12 +146,8 @@ export function createOpenp41geWindow(
     win.loadURL("http://localhost:7392");
   }
 
-  // Auto-open DevTools when OPENP41GE_DEVTOOLS=1
-  if (isDev && process.env.OPENP41GE_DEVTOOLS) {
-    win.webContents.openDevTools({ mode: "detach" });
-  }
-  // Always open devtools if OPENP41GE_DEVTOOLS is set, regardless of mode
-  if (process.env.OPENP41GE_DEVTOOLS) {
+  // Auto-open DevTools in dev mode
+  if (isDev) {
     win.webContents.openDevTools({ mode: "detach" });
   }
 }
