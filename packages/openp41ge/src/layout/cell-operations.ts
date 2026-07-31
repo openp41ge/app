@@ -16,6 +16,7 @@ import { makeTabId, mapGridInWindow } from "./common.js";
 import { registerTab, addTabToCell } from "./tab-operations.js";
 import { resizeGrid } from "./grid-operations.js";
 import { createTab } from "./types.js";
+import { addChildToParentTab } from "./system-tab-operations.js";
 
 /**
  * Open a tab in a cell, respecting the preview slot.
@@ -50,20 +51,29 @@ export function openTabInCell(
     result = resizeGrid(result, windowId, 1, col + 1);
   }
 
+  let result2: Workspace;
   if (pinned) {
     // Pinned: add as regular tab, don't touch preview slot
-    return addTabToCell(result, windowId, tab, 0, col);
+    result2 = addTabToCell(result, windowId, tab, 0, col);
+  } else {
+    // Unpinned: interact with preview slot
+    const existingPreviewTabId = findPreviewTabInCell(result, windowId, col);
+    if (existingPreviewTabId) {
+      // Replace existing preview tab
+      result2 = replaceTabInCell(result, windowId, col, existingPreviewTabId, tab);
+    } else {
+      // No preview in this cell — create new tab and mark as preview
+      result2 = addTabToCell(result, windowId, tab, 0, col);
+    }
   }
 
-  // Unpinned: interact with preview slot
-  const existingPreviewTabId = findPreviewTabInCell(result, windowId, col);
-  if (existingPreviewTabId) {
-    // Replace existing preview tab
-    return replaceTabInCell(result, windowId, col, existingPreviewTabId, tab);
+  // Add to tab group if config specifies a host tab (parent tab ID)
+  const hostTabId = config?.hostTabId as string | undefined;
+  if (hostTabId) {
+    result2 = addChildToParentTab(result2, hostTabId, tabId);
   }
 
-  // No preview in this cell — create new tab and mark as preview
-  return addTabToCell(result, windowId, tab, 0, col);
+  return result2;
 }
 
 /**

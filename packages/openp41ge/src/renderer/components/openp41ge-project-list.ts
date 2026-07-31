@@ -86,7 +86,7 @@ export class Openp41geProjectList extends LitElement {
     if (winId) {
       const config: Record<string, unknown> = { projectName };
       if (this.systemTabId) {
-        config.sourceSystemTabId = this.systemTabId;
+        config.hostTabId = this.systemTabId;
       }
       dispatch("openTabInCell", winId, "project-detail", projectName, undefined, 0, false, config);
     }

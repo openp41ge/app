@@ -9,7 +9,7 @@
  * Unpinned system tabs are per-window (only exist in the originating window).
  */
 
-import type { Workspace, SystemTab, SystemTabId, TabId } from "./types.js";
+import type { Workspace, SystemTab, SystemTabId, TabId, TabGroupId } from "./types.js";
 import { createSystemTab as makeSystemTab } from "./types.js";
 import { mapWindow } from "./common.js";
 import { removeTabFromCell } from "./tab-operations.js";
@@ -77,7 +77,7 @@ export function openSystemTab(
     const activeTabId = s === "left" ? win.sidebar?.activeLeftTab : win.sidebar?.activeRightTab;
     if (activeTabId) {
       const prevTab = workspace.systemTabs[activeTabId as SystemTabId];
-      if (prevTab && !prevTab.pinned && !_hasAssociatedEditorTabs(workspace, activeTabId)) {
+      if (prevTab && !prevTab.pinned && !_hasOpenChildren(workspace, activeTabId)) {
         workspace = closeSystemTab(workspace, winId, s, activeTabId);
         const w = workspace.windows.find((w) => w.id === winId);
         if (!w) return workspace;
@@ -98,7 +98,7 @@ export function openSystemTab(
       const existingSide = leftSidebarTabs.includes(tabId as SystemTabId) ? "left" : "right";
       const activeKey = existingSide === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
       const openKey = existingSide === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
-      return mapWindow(workspace, winId, (w) => ({
+      let result = mapWindow(workspace, winId, (w) => ({
         ...w,
         sidebar: {
           ...w.sidebar!,
@@ -106,6 +106,14 @@ export function openSystemTab(
           [openKey]: true,
         },
       }));
+      // Ensure a tab group exists for this system tab (backwards compat)
+      if (!_getTabGroupIdByParent(result, tabId)) {
+        result = (() => {
+          const { workspace: r } = createTabGroup(result, tabId);
+          return r;
+        })();
+      }
+      return result;
     }
   }
 
@@ -137,43 +145,148 @@ export function openSystemTab(
     }));
   }
 
+  // Create a tab group for the new system tab (children can be added later)
+  result = (() => {
+    const { workspace: w, groupId: _gid } = createTabGroup(result, tabId);
+    return w;
+  })();
+
   return result;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────
+// ─── Tab Groups ─────────────────────────────────────────────────────────
 
 /**
- * Check if a system tab has any associated editor tabs still open.
- * Editor tabs store `sourceSystemTabId` in their config.
+ * Create a TabGroup for a parent tab and add it to the workspace.
+ * The group starts with no children.
  */
-function _hasAssociatedEditorTabs(workspace: Workspace, systemTabId: string): boolean {
-  const tabs = workspace.editorTabs as Record<string, { config?: Record<string, unknown> }>;
-  for (const tab of Object.values(tabs)) {
-    if (tab.config?.sourceSystemTabId === systemTabId) {
-      return true;
+export function createTabGroup(workspace: Workspace, parentTabId: string): { workspace: Workspace; groupId: TabGroupId } {
+  const groupId = `tg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` as TabGroupId;
+  return {
+    workspace: {
+      ...workspace,
+      tabGroups: {
+        ...workspace.tabGroups,
+        [groupId]: { id: groupId, parentTabId, childTabIds: [] },
+      },
+    },
+    groupId,
+  };
+}
+
+/**
+ * Add a child tab ID to an existing tab group.
+ */
+export function addToTabGroup(workspace: Workspace, groupId: string, childTabId: string): Workspace {
+  const gid = groupId as TabGroupId;
+  const group = workspace.tabGroups[gid];
+  if (!group) return workspace;
+  if (group.childTabIds.includes(childTabId)) return workspace;
+  return {
+    ...workspace,
+    tabGroups: {
+      ...workspace.tabGroups,
+      [gid]: { ...group, childTabIds: [...group.childTabIds, childTabId] },
+    },
+  };
+}
+
+/**
+ * Find the TabGroup ID that contains the given tab (either as parent or child).
+ */
+/**
+ * Add a child tab to the group whose parent tab matches hostTabId.
+ * If no group exists, creates one. Returns the updated workspace.
+ */
+export function addChildToParentTab(workspace: Workspace, hostTabId: string, childTabId: string): Workspace {
+  let result = workspace;
+  const gid = _getTabGroupIdByParent(result, hostTabId);
+  if (gid) {
+    result = addToTabGroup(result, gid, childTabId);
+  } else {
+    // No group yet — create one (e.g. if openSystemTab wasn't the path used)
+    const { workspace: w } = createTabGroup(result, hostTabId);
+    result = w;
+    const newGid = _getTabGroupIdByParent(result, hostTabId);
+    if (newGid) {
+      result = addToTabGroup(result, newGid, childTabId);
+    }
+  }
+  return result;
+}
+
+/**
+ * Find the TabGroup ID that contains the given tab (either as parent or child).
+ */
+export function getTabGroupIdByTab(workspace: Workspace, tabId: string): TabGroupId | null {
+  for (const group of Object.values(workspace.tabGroups)) {
+    if (!group) continue;
+    if (group.parentTabId === tabId || group.childTabIds.includes(tabId)) {
+      return group.id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find the TabGroup ID whose parent tab matches the given ID.
+ */
+function _getTabGroupIdByParent(workspace: Workspace, parentTabId: string): TabGroupId | null {
+  for (const group of Object.values(workspace.tabGroups)) {
+    if (!group) continue;
+    if (group.parentTabId === parentTabId) {
+      return group.id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Check if a tab's group has any open children (children that still exist
+ * in editorTabs). Used to prevent closing an unpinned parent tab on defocus.
+ */
+export function _hasOpenChildren(workspace: Workspace, tabId: string): boolean {
+  for (const group of Object.values(workspace.tabGroups)) {
+    if (!group) continue;
+    if (group.parentTabId === tabId || group.childTabIds.includes(tabId)) {
+      // Check if any children still exist in editorTabs
+      for (const childId of group.childTabIds) {
+        if (workspace.editorTabs[childId as unknown as TabId]) {
+          return true;
+        }
+      }
+      return false;
     }
   }
   return false;
 }
 
 /**
- * Close all editor tabs associated with a system tab.
+ * Close a tab group: remove all child tabs from their grid cells and delete
+ * the group from the workspace.
  */
-function _closeAssociatedEditorTabs(workspace: Workspace, systemTabId: string): Workspace {
+export function closeTabGroup(workspace: Workspace, groupId: string): Workspace {
+  const gid = groupId as TabGroupId;
+  const group = workspace.tabGroups[gid];
+  if (!group) return workspace;
+
   let result = workspace;
-  const tabs = result.editorTabs as Record<string, { config?: Record<string, unknown> }>;
-  for (const [tabId, tab] of Object.entries(tabs)) {
-    if (tab.config?.sourceSystemTabId === systemTabId) {
-      // Remove from every window that has this tab
-      for (const win of result.windows) {
-        const tabIdBranded = tabId as unknown as TabId;
-        const placement = win.grid.placements.find((p) => p.tabIds.includes(tabIdBranded));
-        if (placement) {
-          result = removeTabFromCell(result, win.id, tabIdBranded);
-        }
+
+  // Remove each child tab from its cell
+  for (const childId of group.childTabIds) {
+    for (const win of result.windows) {
+      const branded = childId as unknown as TabId;
+      const placement = win.grid.placements.find((p) => p.tabIds.includes(branded));
+      if (placement) {
+        result = removeTabFromCell(result, win.id, branded);
       }
     }
   }
+
+  // Delete the group
+  const { [gid]: _removed, ...remainingGroups } = result.tabGroups;
+  result = { ...result, tabGroups: remainingGroups };
+
   return result;
 }
 
@@ -256,8 +369,11 @@ export function closeSystemTab(
     }
   }
 
-  // Close any editor tabs associated with this system tab
-  result = _closeAssociatedEditorTabs(result, tabId);
+  // Close any child tabs in this system tab's group
+  const groupId = _getTabGroupIdByParent(result, tabId);
+  if (groupId) {
+    result = closeTabGroup(result, groupId);
+  }
 
   return result;
 }

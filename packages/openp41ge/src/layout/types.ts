@@ -17,6 +17,9 @@ export type SystemTabId = z.infer<typeof SystemTabId>;
 export const OverlayId = z.string().brand("OverlayId");
 export type OverlayId = z.infer<typeof OverlayId>;
 
+export const TabGroupId = z.string().brand("TabGroupId");
+export type TabGroupId = z.infer<typeof TabGroupId>;
+
 // ─── Rect / Bounds ─────────────────────────────────────────────────────────
 
 export const RectSchema = z.object({
@@ -235,6 +238,11 @@ export const WorkspaceSchema = z.object({
   editorTabs: z.record(TabId, TabSchema).default({}),
   /** System tabs (sidebar panels), keyed by system tab ID. */
   systemTabs: z.record(SystemTabId, SystemTabSchema).default({}),
+  tabGroups: z.record(TabGroupId, z.object({
+    id: TabGroupId,
+    parentTabId: z.string(),
+    childTabIds: z.array(z.string()),
+  })).default({}),
   scopedFolders: z.array(z.string()).default([]),
 });
 export type Workspace = z.infer<typeof WorkspaceSchema>;
