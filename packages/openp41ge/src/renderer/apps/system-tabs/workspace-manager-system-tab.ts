@@ -84,16 +84,10 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         .workspaces-header {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          padding: 8px 12px;
+          justify-content: flex-end;
+          padding: 6px 12px;
           border-bottom: 1px solid var(--divider, #333);
           flex-shrink: 0;
-        }
-        .workspaces-header h2 {
-          margin: 0;
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--text-primary, #ccc);
         }
         .workspaces-header button {
           padding: 3px 8px;
@@ -273,7 +267,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       <div class="workspaces-wrap">
         <!-- Header bar -->
         <div class="workspaces-header">
-          <h2>Workspaces</h2>
           <button @click=${this._showCreateInput}>+ New</button>
         </div>
         <!-- Inline create input -->
