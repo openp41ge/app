@@ -66,7 +66,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
 
   render(): TemplateResult {
     if (!this._loaded) {
-      return html`<div class="workspaces-wrap"><div class="workspaces-header">Workspaces</div><div class="empty-state">Loading...</div></div>`;
+      return html`<div class="workspaces-wrap"><div class="empty-state">Loading...</div></div>`;
     }
 
     const activeName = this._workspaces.find((w) => w.isActive)?.name;
@@ -78,13 +78,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           flex-direction: column;
           height: 100%;
           overflow-y: auto;
-        }
-        .workspaces-header {
-          padding: 20px 24px 12px;
-          font-size: 22px;
-          font-weight: 300;
-          color: var(--text-primary, #ccc);
-          border-bottom: 1px solid var(--divider, #333);
         }
         .workspaces-accordion {
           flex: 1;
@@ -207,7 +200,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         }
       </style>
       <div class="workspaces-wrap">
-        <div class="workspaces-header">Workspaces</div>
         ${this._workspaces.length === 0
           ? html`<div class="empty-state">No workspaces yet. Create one to get started.</div>`
           : html`
