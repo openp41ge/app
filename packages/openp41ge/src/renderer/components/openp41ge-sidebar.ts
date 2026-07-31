@@ -349,6 +349,8 @@ class Openp41geSidebar extends LitElement {
   }
 
   private _onDocumentMouseDown = (e: MouseEvent): void => {
+    // Ensure window is marked as focused (in case _onWindowFocus didn't notify)
+    Openp41geSidebar._windowFocused = true;
     // When clicking inside this sidebar, mark it as focused
     const target = e.target as Node;
     if (this.contains(target)) {
@@ -413,6 +415,7 @@ class Openp41geSidebar extends LitElement {
   }
 
   private _onSidebarClick = (): void => {
+    Openp41geSidebar._windowFocused = true;
     Openp41geSidebar._setFocusedSide(this.side);
   };
 
@@ -421,7 +424,10 @@ class Openp41geSidebar extends LitElement {
   };
 
   private _onWindowFocus = (): void => {
-    Openp41geSidebar._setWindowFocused(true);
+    // Update the internal state without re-rendering so the old
+    // _focusedSide isn't visually restored before the user clicks.
+    // The mousedown/click handlers will trigger the re-render.
+    Openp41geSidebar._windowFocused = true;
   };
 
   /** True when this sidebar is the focused sidebar and the window is active. */
