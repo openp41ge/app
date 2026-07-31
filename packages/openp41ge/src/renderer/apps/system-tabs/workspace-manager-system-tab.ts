@@ -101,9 +101,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           user-select: none;
           gap: 8px;
         }
-        .accordion-header:hover {
-          background: var(--bg-hover, #2a2a2a);
-        }
         .accordion-name {
           flex: 1;
           font-size: 14px;
