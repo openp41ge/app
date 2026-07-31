@@ -267,7 +267,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       <div class="workspaces-wrap">
         <!-- Header bar -->
         <div class="workspaces-header">
-          <button @click=${this._showCreateInput}>+ New</button>
+          <button @click=${() => this._showCreateInput()}>+ New</button>
         </div>
         <!-- Inline create input -->
         ${this._showNewInput ? html`
@@ -282,8 +282,8 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
                 if (e.key === "Escape") this._cancelCreate();
               }}
             />
-            <button class="primary" @click=${this._confirmCreate}>Create</button>
-            <button @click=${this._cancelCreate}>Cancel</button>
+            <button class="primary" @click=${() => this._confirmCreate()}>Create</button>
+            <button @click=${() => this._cancelCreate()}>Cancel</button>
           </div>
         ` : ''}
         ${this._workspaces.length === 0 && !this._showNewInput
