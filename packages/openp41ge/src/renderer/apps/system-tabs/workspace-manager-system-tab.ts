@@ -101,8 +101,8 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
 
     return html`
       <style>
-        .ws-wrap { display:flex; flex-direction:column; height:100%; overflow-y:auto; }
-        .ws-section { padding:7px 14px; }
+        .ws-wrap { display:flex; flex-direction:column; height:100%; overflow-y:auto; padding:8px 0; }
+        .ws-section { padding:6px 10px; margin:4px 8px; border-radius:6px; background:var(--bg-secondary,rgba(255,255,255,.04)); }
         .ws-row { display:flex; align-items:center; gap:12px; min-height:28px; }
         .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); flex-shrink:0; width:110px; }
         .ws-value { font-size:13px; color:var(--text-primary,#ccc); flex:1 1 auto; min-width:0; text-align:right; }
