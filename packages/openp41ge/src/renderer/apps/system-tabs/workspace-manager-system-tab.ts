@@ -86,7 +86,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           align-items: center;
           gap: 6px;
           padding: 6px 12px;
-          border-bottom: 1px solid var(--divider, #333);
+          border-top: 1px solid var(--divider, #333);
           flex-shrink: 0;
         }
         .new-input-row input {
@@ -237,6 +237,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           border-style: solid;
         }
         .empty-state {
+          flex: 1;
           padding: 40px 24px;
           text-align: center;
           color: var(--text-secondary, #999);
@@ -244,7 +245,13 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         }
       </style>
       <div class="workspaces-wrap">
-        <!-- Always-visible create row -->
+        ${this._workspaces.length === 0
+          ? html`<div class="empty-state">No workspaces yet.</div>`
+          : html`
+              <div class="workspaces-accordion">
+                ${this._workspaces.map((ws) => this._renderAccordionItem(ws, activeName))}
+              </div>
+            `}
         <div class="new-input-row">
           <input
             type="text"
@@ -259,13 +266,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           <button class="primary" @click=${() => this._confirmCreate()}>Create</button>
           <button @click=${() => this._cancelCreate()}>Cancel</button>
         </div>
-        ${this._workspaces.length === 0
-          ? html`<div class="empty-state">No workspaces yet.</div>`
-          : html`
-              <div class="workspaces-accordion">
-                ${this._workspaces.map((ws) => this._renderAccordionItem(ws, activeName))}
-              </div>
-            `}
       </div>
     `;
   }
