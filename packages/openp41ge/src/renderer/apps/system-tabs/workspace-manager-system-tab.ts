@@ -66,13 +66,21 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       </svg>
     `;
 
+    /** Truncate a string in the middle, showing the start and end. */
+    function truncMiddle(s: string, maxLen: number): string {
+      if (s.length <= maxLen) return s;
+      const half = Math.floor((maxLen - 3) / 2);
+      return s.slice(0, half) + "..." + s.slice(s.length - half);
+    }
+
     return html`
       <style>
         .ws-wrap { display:flex; flex-direction:column; height:100%; overflow-y:auto; }
         .ws-section { display:flex; align-items:center; gap:12px; padding:8px 14px; min-height:32px; }
         .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); flex-shrink:0; width:110px; }
-        .ws-value { font-size:13px; color:var(--text-primary,#ccc); word-break:break-all; margin-left:auto; text-align:right; }
+        .ws-value { font-size:13px; color:var(--text-primary,#ccc); margin-left:auto; text-align:right; }
         .ws-value.mono { font-family:monospace; font-size:12px; }
+        .ws-value.trunc { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
         .ws-clickable {
           display:inline-flex; align-items:center; gap:6px; padding:2px 6px; border-radius:4px;
           cursor:pointer; transition:background .1s;
@@ -86,20 +94,20 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       <div class="ws-wrap">
         <div class="ws-section">
           <div class="ws-label">Workspace ID</div>
-          <div class="ws-value mono">${data.id}</div>
+          <div class="ws-value mono trunc" title="${data.id}">${data.id}</div>
         </div>
         <div class="ws-section">
           <div class="ws-label">File</div>
-          <div class="ws-clickable ws-value mono" @click=${() => this._onSaveAs()} title="Save to a new location">
+          <div class="ws-clickable ws-value mono" @click=${() => this._onSaveAs()} title="${filePath ?? "(not saved)"}">
             ${pencil}
-            ${filePath ?? "(not saved)"}
+            ${filePath ? truncMiddle(filePath, 60) : "(not saved)"}
           </div>
         </div>
         <div class="ws-section">
           <div class="ws-label">Data Dir</div>
-          <div class="ws-clickable ws-value mono" @click=${() => this._onChangeDataDir()} title="Choose a new data directory">
+          <div class="ws-clickable ws-value mono" @click=${() => this._onChangeDataDir()} title="${data.dataDir}">
             ${pencil}
-            ${data.dataDir}
+            ${truncMiddle(data.dataDir, 60)}
           </div>
         </div>
         <div class="ws-section">
