@@ -22,36 +22,65 @@ export function registerSystemTab(workspace: Workspace, tab: SystemTab): Workspa
   };
 }
 
+// ─── Default sidebar for system tab types ───────────────────────────────
+
+/**
+ * Map of system tab appType → default sidebar side.
+ * Used when `openSystemTab` is called without an explicit side.
+ */
+const DEFAULT_SYSTEM_TAB_SIDES: Record<string, "left" | "right"> = {
+  explorer: "right",
+  git: "right",
+  projects: "left",
+  search: "left",
+};
+
 // ─── Open ─────────────────────────────────────────────────────────────────
 
 /**
- * Open a system tab in a sidebar. If the `appType` already exists in the
- * sidebar's tab list, it activates the existing tab instead of creating a duplicate.
+ * Open a system tab. If `side` is not provided, the default side for the
+ * appType is used. If a tab with the same `appType` already exists in ANY
+ * sidebar (left or right) of the current window, it activates the existing
+ * tab and opens that sidebar instead of creating a duplicate.
  *
- * When pinned, the tab propagates to all windows' same-sidebar tab lists.
+ * The tab is always added to ALL windows (sidebar layout is shared across
+ * all windows in a project).
  */
 export function openSystemTab(
   workspace: Workspace,
   winId: string,
-  side: "left" | "right",
-  appType: string,
-  title: string,
+  side: "left" | "right" | null = null,
+  appType?: string,
+  title?: string,
   pinned: boolean = false,
 ): Workspace {
-  // Check if appType already exists in this sidebar
+  // Support both old (5-arg) and new (optional-side) calling conventions.
+  // When called via dispatch, JS doesn't have overloading — the function
+  // receives the raw positional args. If `side` looks like an appType
+  // (not a known side), treat it as the appType.
+  const actualSide = (side === "left" || side === "right") ? side : null;
+  const actualAppType = actualSide ? (appType ?? "") : (side ?? "");
+  const actualTitle = actualSide ? (title ?? "") : (appType ?? "");
+  const actualPinned = actualSide ? pinned : (typeof appType === "boolean" ? appType : false);
+
+  // Look up default side from type
+  const resolvedSide = actualSide ?? DEFAULT_SYSTEM_TAB_SIDES[actualAppType] ?? "right";
+
   const win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
 
-  const sidebarTabs = side === "left" ? (win.sidebar?.leftSidebarTabs ?? []) : (win.sidebar?.rightSidebarTabs ?? []);
-  const activeKey = side === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
-  const tabsKey = side === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
-  const openKey = side === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
+  // Check if appType already exists in ANY sidebar of this window
+  const leftSidebarTabs = win.sidebar?.leftSidebarTabs ?? [];
+  const rightSidebarTabs = win.sidebar?.rightSidebarTabs ?? [];
+  const allTabIds = [...leftSidebarTabs, ...rightSidebarTabs];
 
-  // Search for existing tab with same appType
-  for (const tabId of sidebarTabs) {
+  for (const tabId of allTabIds) {
     const existingTab = workspace.systemTabs[tabId as SystemTabId];
-    if (existingTab && existingTab.appType === appType) {
-      // Already exists — just activate it and ensure sidebar is open
+    if (existingTab && existingTab.appType === actualAppType) {
+      // Already exists — activate its current sidebar
+      const existingSide = leftSidebarTabs.includes(tabId as SystemTabId) ? "left" : "right";
+      const activeKey = existingSide === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
+      const openKey = existingSide === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
       return mapWindow(workspace, winId, (w) => ({
         ...w,
         sidebar: {
@@ -65,38 +94,30 @@ export function openSystemTab(
 
   // Create new system tab
   const tabId = `sys-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` as SystemTabId;
-  const tab = makeSystemTab(tabId, appType, title, pinned);
+  const tab = makeSystemTab(tabId, actualAppType, actualTitle, actualPinned);
   let result = registerSystemTab(workspace, tab);
 
-  // Add to this window's sidebar tab list
-  const newTabs = [...sidebarTabs, tabId];
-  const sidebarUpdate = {
-    [tabsKey]: newTabs,
-    [activeKey]: tabId,
-    [openKey]: true,
-  };
+  // Add to ALL windows' sidebar tab lists on the resolved side
+  const tabsKey = resolvedSide === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
+  const activeKey = resolvedSide === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
+  const openKey = resolvedSide === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
 
-  result = mapWindow(result, winId, (w) => ({
-    ...w,
-    sidebar: { ...w.sidebar!, ...sidebarUpdate },
-  }));
+  for (const w of result.windows) {
+    const currentTabs = resolvedSide === "left"
+      ? (w.sidebar?.leftSidebarTabs ?? [])
+      : (w.sidebar?.rightSidebarTabs ?? []);
 
-  // Propagate pinned tabs to all windows' same-sidebar tab lists
-  if (pinned) {
-    for (const otherWin of result.windows) {
-      if (otherWin.id === winId) continue;
-      const otherSidebarTabs = side === "left" ? (otherWin.sidebar?.leftSidebarTabs ?? []) : (otherWin.sidebar?.rightSidebarTabs ?? []);
-      if (!otherSidebarTabs.includes(tabId)) {
-        const updatedSidebar = {
-          ...otherWin.sidebar,
-          [tabsKey]: [...otherSidebarTabs, tabId],
-        };
-        result = mapWindow(result, otherWin.id, (w) => ({
-          ...w,
-          sidebar: updatedSidebar,
-        }));
-      }
-    }
+    const updatedSidebar = {
+      ...w.sidebar,
+      [tabsKey]: [...currentTabs, tabId],
+      [activeKey]: tabId,
+      [openKey]: true,
+    };
+
+    result = mapWindow(result, w.id, (win) => ({
+      ...win,
+      sidebar: updatedSidebar,
+    }));
   }
 
   return result;
@@ -395,41 +416,41 @@ export function closeSidebar(
 
 /**
  * Move a system tab from one sidebar to the other (or reorder within the same
- * sidebar). Removes the tab from the source sidebar's tab list, inserts it at
- * `dropIndex` in the target sidebar's tab list, activates it, and ensures the
- * target sidebar is open.
+ * sidebar). Sidebar layout is shared across ALL windows, so the change is
+ * applied to every window. Removes the tab from the source sidebar's tab list,
+ * inserts it at `dropIndex` in the target sidebar's tab list, activates it,
+ * and ensures the target sidebar is open.
  */
 export function moveSystemTabToSidebar(
   workspace: Workspace,
-  winId: string,
+  _winId: string,
   tabId: string,
   targetSide: "left" | "right",
   dropIndex: number,
 ): Workspace {
   const sid = tabId as SystemTabId;
+  if (!workspace.systemTabs[sid]) return workspace;
 
-  // Determine which side the tab is currently on
-  const win = workspace.windows.find((w) => w.id === winId);
-  if (!win) return workspace;
+  // Determine which side the tab is on — check each window to handle edge
+  // cases where a window might be out of sync. Use the first window found.
+  let sourceSide: "left" | "right" | null = null;
+  for (const win of workspace.windows) {
+    const leftTabs = win.sidebar?.leftSidebarTabs ?? [];
+    const rightTabs = win.sidebar?.rightSidebarTabs ?? [];
+    if (leftTabs.includes(sid)) { sourceSide = "left"; break; }
+    if (rightTabs.includes(sid)) { sourceSide = "right"; break; }
+  }
+  if (!sourceSide) return workspace;
 
-  const leftTabs = (win.sidebar?.leftSidebarTabs ?? []) as SystemTabId[];
-  const rightTabs = (win.sidebar?.rightSidebarTabs ?? []) as SystemTabId[];
+  // Apply the move to ALL windows
+  let result: Workspace = workspace;
+  for (const win of result.windows) {
+    const sidebar = win.sidebar ?? { activeViewId: null, width: 280 };
 
-  const onLeft = leftTabs.includes(sid);
-  const onRight = rightTabs.includes(sid);
-
-  if (!onLeft && !onRight) return workspace;
-
-  const sourceSide: "left" | "right" = onLeft ? "left" : "right";
-
-  // Build the new sidebar state in one pass using mapWindow
-  return mapWindow(workspace, winId, (w) => {
-    const sidebar = w.sidebar ?? { activeViewId: null, width: 280 };
-
-    // Clone and remove from source list
     const newLeftTabs = [...(sidebar.leftSidebarTabs ?? [])] as SystemTabId[];
     const newRightTabs = [...(sidebar.rightSidebarTabs ?? [])] as SystemTabId[];
 
+    // Remove from source side
     if (sourceSide === "left") {
       const idx = newLeftTabs.indexOf(sid);
       if (idx !== -1) newLeftTabs.splice(idx, 1);
@@ -438,28 +459,30 @@ export function moveSystemTabToSidebar(
       if (idx !== -1) newRightTabs.splice(idx, 1);
     }
 
-    // Insert into target list at dropIndex
+    // Insert into target side at dropIndex
     const targetList = targetSide === "left" ? newLeftTabs : newRightTabs;
     const clampedIndex = Math.max(0, Math.min(dropIndex, targetList.length));
     targetList.splice(clampedIndex, 0, sid);
 
-    return {
+    result = mapWindow(result, win.id, (w) => ({
       ...w,
       sidebar: {
-        ...sidebar,
+        ...w.sidebar!,
         leftSidebarTabs: newLeftTabs,
         rightSidebarTabs: newRightTabs,
         // Clear active tab on source side if it was the moved tab
-        ...(sourceSide === "left" && sidebar.activeLeftTab === sid
+        ...(sourceSide === "left" && w.sidebar?.activeLeftTab === sid
           ? { activeLeftTab: null }
           : {}),
-        ...(sourceSide === "right" && sidebar.activeRightTab === sid
+        ...(sourceSide === "right" && w.sidebar?.activeRightTab === sid
           ? { activeRightTab: null }
           : {}),
         // Set active tab on target side and ensure it's open
         [targetSide === "left" ? "activeLeftTab" : "activeRightTab"]: sid,
         [targetSide === "left" ? "leftSidebarOpen" : "rightSidebarOpen"]: true,
       },
-    };
-  });
+    }));
+  }
+
+  return result;
 }

@@ -174,8 +174,7 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          context.commandBus.dispatch("openSidebar", myWindowId, "right", "");
-          context.commandBus.dispatch("openSystemTab", myWindowId, "right", "search", "Search");
+          context.commandBus.dispatch("openSystemTab", myWindowId, "search", "Search");
         } catch (_err) {
           // ignore
         }
@@ -193,8 +192,7 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          context.commandBus.dispatch("openSidebar", myWindowId, "right", "");
-          context.commandBus.dispatch("openSystemTab", myWindowId, "right", "projects", "Projects");
+          context.commandBus.dispatch("openSystemTab", myWindowId, "projects", "Projects");
         } catch (_err) {
           // ignore
         }

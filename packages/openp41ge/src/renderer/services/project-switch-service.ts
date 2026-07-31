@@ -55,5 +55,5 @@ export function showProjectPicker(): void {
   log.info("Opening project picker as system tab in right sidebar");
 
   // Open (or activate) the "projects" system tab in the right sidebar
-  dispatch("openSystemTab", winId, "right", "projects", "Projects");
+  dispatch("openSystemTab", winId, "projects", "Projects");
 }

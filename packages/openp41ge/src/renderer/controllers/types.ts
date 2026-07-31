@@ -92,6 +92,8 @@ export interface SystemTabRegistration {
   label: string;
   icon: string;
   description: string;
+  /** Default sidebar where this tab type opens when first created. */
+  defaultSide: "left" | "right";
   /** Factory function to create the system tab content controller. */
   createController: (tabId: string, config?: Record<string, unknown>) => SystemTabController;
 }

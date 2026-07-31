@@ -13,6 +13,7 @@ export const explorerSystemTabRegistration: SystemTabRegistration = {
   label: "Explorer",
   icon: "\uD83D\uDCC1",
   description: "Browse project files and folders",
+  defaultSide: "right",
   createController: (tabId: string) => new ExplorerSystemTabController(tabId),
 };
 
@@ -21,6 +22,7 @@ export const gitSystemTabRegistration: SystemTabRegistration = {
   label: "Git",
   icon: "\u2387",
   description: "View Git status, branches, and history",
+  defaultSide: "right",
   createController: (tabId: string) => new GitSystemTabController(tabId),
 };
 
@@ -29,6 +31,7 @@ export const projectsSystemTabRegistration: SystemTabRegistration = {
   label: "Projects",
   icon: "\u2302",
   description: "Switch between projects",
+  defaultSide: "left",
   createController: (tabId: string) => new ProjectsSystemTabController(tabId),
 };
 
@@ -37,6 +40,7 @@ export const searchSystemTabRegistration: SystemTabRegistration = {
   label: "Search",
   icon: "\uD83D\uDD0D",
   description: "Full-text search across files",
+  defaultSide: "left",
   createController: (tabId: string) => new SearchSystemTabController(tabId),
 };
 
