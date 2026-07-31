@@ -355,11 +355,11 @@ class Openp41geSidebar extends LitElement {
                 if ((!isLast || !this._hasOverflow) && !(isLast && this.side === "left")) sideBorder += " border-r";
                 return html`
                   <div
-                    class="sidebar-tab flex items-center gap-1 px-2 py-1.5 cursor-pointer text-xs whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
+                    class="sidebar-tab flex items-center gap-1 px-2 cursor-pointer text-xs whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
                     data-sidebar-tab-id=${tab.id}
                     data-sidebar-side=${this.side}
                     data-tab-title=${tab.title}
-                    style="width:120px;${isActive
+                    style="width:120px;height:34px;${isActive
                       ? this._isFocused
                         ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #e0e0e0)"
                         : "background:rgba(255,255,255,0.05);color:var(--text-primary, #e0e0e0)"
