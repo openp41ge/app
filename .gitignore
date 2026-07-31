@@ -19,4 +19,4 @@ playwright-report/
 .tmp/
 
 .claude/worktrees
-pi.json
+pi.json*.openp41ge-workspace
