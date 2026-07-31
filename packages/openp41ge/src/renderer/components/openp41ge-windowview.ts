@@ -242,7 +242,7 @@ class Openp41geWindowView extends LitElement {
           ></openp41ge-sidebar>
 
           <!-- Central area: system tabs override the grid -->
-          <div class="flex flex-col flex-1 overflow-hidden min-w-0">
+          <div class="flex flex-col flex-1 overflow-hidden" style="min-width:280px">
             ${hasSysTabs ? html`
               <openp41ge-system-tab-bar
                 .windowData=${win}
