@@ -141,12 +141,12 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           background: var(--bg-hover, #2a2a2a);
         }
         .accordion-actions button.activate-btn {
-          border-color: var(--accent, #007acc);
+          border: none;
+          background: transparent;
           color: var(--accent, #007acc);
         }
         .accordion-actions button.activate-btn:hover {
-          background: var(--accent, #007acc);
-          color: #fff;
+          background: rgba(128, 128, 128, 0.1);
         }
         .accordion-actions button.delete-btn {
           padding: 4px;
