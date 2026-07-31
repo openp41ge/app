@@ -41,7 +41,17 @@ class Openp41geWindowView extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._ensureSkeleton();
+    document.addEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
   }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
+  }
+
+  private _onWorkspacesUpdate = (): void => {
+    this.requestUpdate();
+  };
 
   private _ensureSkeleton(): void {
     if (this._skeletonInitialized) return;
