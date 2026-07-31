@@ -2,8 +2,7 @@
  * WorkspacesSystemTab — editor-area system tab that shows the active
  * .openp41ge-workspace file settings.
  *
- * Shows the workspace ID, file path (clickable to save as), data directory
- * (clickable to pick a new folder), and repos list.
+ * Shows the workspace ID, file/data dir action buttons, and repos list.
  */
 
 import { html, type TemplateResult } from "lit";
@@ -24,7 +23,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
   }
 
   private async _onSaveAs(): Promise<void> {
-    // Ensure draft exists before Save As
     if (!workspaceFileService.activeData) {
       await workspaceFileService.ensureDraftExists();
     }
@@ -39,20 +37,16 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  /** Render a path with middle truncation — shows directory start and filename end. */
-  private _renderMiddleTrunc(path: string): TemplateResult {
-    const lastSlash = path.lastIndexOf("/");
-    if (lastSlash === -1 || lastSlash === path.length - 1) {
-      return html`<span class="trunc-path trunc-end" title="${path}">${path}</span>`;
+  private async _onReveal(path: string): Promise<void> {
+    await window.openp41ge.dialog.revealInFinder(path);
+  }
+
+  private async _onCopy(path: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(path);
+    } catch {
+      // ignore
     }
-    const start = path.slice(0, lastSlash + 1);
-    const end = path.slice(lastSlash + 1);
-    return html`
-      <span class="trunc-path" title="${path}">
-        <span class="trunc-start">${start}</span>
-        <span class="trunc-end">${end}</span>
-      </span>
-    `;
   }
 
   render(): TemplateResult {
@@ -76,12 +70,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       `;
     }
 
-    const pencil = html`
-      <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;opacity:.5;">
-        <path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t27 18l55 56q12 12 17.5 26.5T792-600q0 15-5.5 29.5T769-544L242-17H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/>
-      </svg>
-    `;
-
     return html`
       <style>
         .ws-wrap { display:flex; flex-direction:column; height:100%; overflow-y:auto; }
@@ -89,24 +77,13 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); flex-shrink:0; width:110px; }
         .ws-value { font-size:13px; color:var(--text-primary,#ccc); flex:1 1 auto; min-width:0; text-align:right; }
         .ws-value.mono { font-family:monospace; font-size:12px; }
-        .ws-value.trunc { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
-        .ws-clickable {
-          display:inline-flex; align-items:center; gap:6px; padding:2px 6px; border-radius:4px;
-          cursor:pointer; transition:background .1s;
-          max-width:100%; overflow:hidden;
+        .ws-actions { display:flex; gap:2px; justify-content:flex-end; }
+        .ws-act-btn {
+          padding:2px 6px; font-size:12px; border:none; border-radius:3px;
+          cursor:pointer; background:transparent; color:var(--text-secondary,#999);
+          transition:background .1s;
         }
-        .ws-clickable:hover { background:var(--bg-hover,rgba(128,128,128,.15)); }
-        .ws-clickable .trunc-path {
-          display:flex; overflow:hidden; max-width:100%; min-width:0;
-        }
-        .ws-clickable .trunc-start {
-          overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-          flex-shrink:2; min-width:0;
-        }
-        .ws-clickable .trunc-end {
-          overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-          flex-shrink:1; min-width:0;
-        }
+        .ws-act-btn:hover { background:var(--bg-hover,rgba(128,128,128,.15)); color:var(--text-primary,#ccc); }
         .ws-repo-item { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:13px; color:var(--text-primary,#ccc); }
         .ws-repo-item::before { content:"•"; color:var(--text-secondary,#999); }
         .ws-worktrees { font-size:12px; color:var(--text-secondary,#999); }
@@ -115,20 +92,22 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       <div class="ws-wrap">
         <div class="ws-section">
           <div class="ws-label">Workspace ID</div>
-          <div class="ws-value mono trunc" title="${data.id}">${data.id}</div>
+          <div class="ws-value mono">${data.id}</div>
         </div>
         <div class="ws-section">
           <div class="ws-label">File</div>
-          <div class="ws-clickable ws-value mono" @click=${() => this._onSaveAs()} title="${filePath ?? "(not saved)"}">
-            ${pencil}
-            ${filePath ? this._renderMiddleTrunc(filePath) : html`<span class="trunc-path">(not saved)</span>`}
+          <div class="ws-value mono ws-actions">
+            <button class="ws-act-btn" @click=${() => this._onSaveAs()} title="Save to a new location">Edit</button>
+            ${filePath ? html`<button class="ws-act-btn" @click=${() => this._onReveal(filePath!)}>Reveal</button>` : ''}
+            ${filePath ? html`<button class="ws-act-btn" @click=${() => this._onCopy(filePath!)}>Copy</button>` : ''}
           </div>
         </div>
         <div class="ws-section">
           <div class="ws-label">Data Dir</div>
-          <div class="ws-clickable ws-value mono" @click=${() => this._onChangeDataDir()} title="${data.dataDir}">
-            ${pencil}
-            ${this._renderMiddleTrunc(data.dataDir)}
+          <div class="ws-value mono ws-actions">
+            <button class="ws-act-btn" @click=${() => this._onChangeDataDir()}>Edit</button>
+            <button class="ws-act-btn" @click=${() => this._onReveal(data.dataDir)}>Reveal</button>
+            <button class="ws-act-btn" @click=${() => this._onCopy(data.dataDir)}>Copy</button>
           </div>
         </div>
         <div class="ws-section">

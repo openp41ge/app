@@ -2,12 +2,20 @@
  * Dialog IPC handlers — native file dialogs for workspace file management.
  */
 
-import { ipcMain, dialog } from "electron";
+import { ipcMain, dialog, shell } from "electron";
 import fs from "fs";
 import path from "path";
 import os from "os";
 
 const WORKSPACE_EXT = "openp41ge-workspace";
+
+/** Resolve a path starting with ~/ to the user's home directory. */
+function resolveTilde(filePath: string): string {
+  if (filePath.startsWith("~")) {
+    return path.join(os.homedir(), filePath.slice(1));
+  }
+  return filePath;
+}
 
 /** Read and parse a .openp41ge-workspace file, return its data. */
 function readWorkspaceFile(filePath: string): WorkspaceFileData {
@@ -82,7 +90,8 @@ export function registerDialogHandlers(): void {
 
   ipcMain.handle("dialog:readWorkspaceFile", async (_event, filePath: string) => {
     try {
-      const data = readWorkspaceFile(filePath);
+      const resolved = resolveTilde(filePath);
+      const data = readWorkspaceFile(resolved);
       return { filePath, data };
     } catch (err) {
       console.error("Failed to read workspace file:", err);
@@ -94,8 +103,9 @@ export function registerDialogHandlers(): void {
 
   ipcMain.handle("dialog:writeWorkspaceFile", async (_event, filePath: string, data: WorkspaceFileData) => {
     try {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+      const resolved = resolveTilde(filePath);
+      fs.mkdirSync(path.dirname(resolved), { recursive: true });
+      fs.writeFileSync(resolved, JSON.stringify(data, null, 2), "utf-8");
       return true;
     } catch (err) {
       console.error("Failed to write workspace file:", err);
@@ -107,7 +117,20 @@ export function registerDialogHandlers(): void {
 
   ipcMain.handle("dialog:ensureDir", async (_event, dirPath: string) => {
     try {
-      fs.mkdirSync(dirPath, { recursive: true });
+      const resolved = resolveTilde(dirPath);
+      fs.mkdirSync(resolved, { recursive: true });
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  // ── Reveal in Finder ────────────────────────────────────────────────
+
+  ipcMain.handle("dialog:revealInFinder", async (_event, filePath: string) => {
+    try {
+      const resolved = filePath.startsWith("~") ? path.join(os.homedir(), filePath.slice(1)) : filePath;
+      shell.showItemInFolder(resolved);
       return true;
     } catch {
       return false;

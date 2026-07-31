@@ -139,6 +139,9 @@ declare global {
 
         /** Ensure a directory exists. */
         ensureDir: (dirPath: string) => Promise<boolean>;
+
+        /** Reveal a file/folder in the native file manager (Finder). */
+        revealInFinder: (filePath: string) => Promise<boolean>;
       };
 
       lifecycle: {

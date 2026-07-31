@@ -525,6 +525,9 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
     /** Ensure a directory exists (create it recursively). Returns boolean success. */
     ensureDir: (dirPath) => ipcRenderer.invoke("dialog:ensureDir", dirPath),
+
+    /** Reveal a file/folder in the native file manager (Finder). */
+    revealInFinder: (filePath) => ipcRenderer.invoke("dialog:revealInFinder", filePath),
   },
 
   project: {
