@@ -148,8 +148,17 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           background: var(--accent, #007acc);
           color: #fff;
         }
+        .accordion-actions button.delete-btn {
+          padding: 4px;
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
         .accordion-actions button.delete-btn:hover {
-          border-color: #e81123;
           color: #e81123;
         }
         .accordion-body {
@@ -233,7 +242,11 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
             ${ws.name !== activeName
               ? html`<button class="activate-btn" @click=${() => this._activate(ws.name)}>Activate</button>`
               : ''}
-            <button class="delete-btn" @click=${() => this._delete(ws.name)}>Delete</button>
+            <button class="delete-btn" @click=${() => this._delete(ws.name)} title="Delete">
+              <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor">
+                <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/>
+              </svg>
+            </button>
           </div>
         </div>
         <div class="accordion-body ${isExpanded ? 'open' : ''}">
