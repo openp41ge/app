@@ -7,7 +7,7 @@
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
-import { state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
 import { dispatch } from "../app";
 
@@ -22,6 +22,9 @@ export class Openp41geProjectList extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
+
+  @property({ attribute: false })
+  systemTabId: string = "";
 
   @state() private _projects: ProjectInfo[] = [];
   @state() private _filteredProjects: ProjectInfo[] = [];
@@ -81,9 +84,11 @@ export class Openp41geProjectList extends LitElement {
     // Open a detail tab in the editor grid as an unpinned (preview) tab
     const winId = window.openp41ge.workspace.getWindowId();
     if (winId) {
-      dispatch("openTabInCell", winId, "project-detail", projectName, undefined, 0, false, {
-        projectName,
-      });
+      const config: Record<string, unknown> = { projectName };
+      if (this.systemTabId) {
+        config.sourceSystemTabId = this.systemTabId;
+      }
+      dispatch("openTabInCell", winId, "project-detail", projectName, undefined, 0, false, config);
     }
   }
 

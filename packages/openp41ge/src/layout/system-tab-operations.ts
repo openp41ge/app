@@ -9,9 +9,10 @@
  * Unpinned system tabs are per-window (only exist in the originating window).
  */
 
-import type { Workspace, SystemTab, SystemTabId } from "./types.js";
+import type { Workspace, SystemTab, SystemTabId, TabId } from "./types.js";
 import { createSystemTab as makeSystemTab } from "./types.js";
 import { mapWindow } from "./common.js";
+import { removeTabFromCell } from "./tab-operations.js";
 
 // ─── System Tab Registry ─────────────────────────────────────────────────
 
@@ -69,14 +70,14 @@ export function openSystemTab(
   let win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
 
-  // Close any unpinned active tab across ALL sidebars before opening a new one.
-  // When a user opens a system tab via shortcut, any previously active unpinned
-  // tab (on any sidebar) should close — it was a preview-like session.
+  // Close any unpinned active tab across ALL sidebars before opening a new one,
+  // unless the unpinned tab has associated editor tabs still open (e.g. a
+  // project-detail tab opened from the Projects sidebar).
   for (const s of ["left" as const, "right" as const]) {
     const activeTabId = s === "left" ? win.sidebar?.activeLeftTab : win.sidebar?.activeRightTab;
     if (activeTabId) {
       const prevTab = workspace.systemTabs[activeTabId as SystemTabId];
-      if (prevTab && !prevTab.pinned) {
+      if (prevTab && !prevTab.pinned && !_hasAssociatedEditorTabs(workspace, activeTabId)) {
         workspace = closeSystemTab(workspace, winId, s, activeTabId);
         const w = workspace.windows.find((w) => w.id === winId);
         if (!w) return workspace;
@@ -139,12 +140,50 @@ export function openSystemTab(
   return result;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Check if a system tab has any associated editor tabs still open.
+ * Editor tabs store `sourceSystemTabId` in their config.
+ */
+function _hasAssociatedEditorTabs(workspace: Workspace, systemTabId: string): boolean {
+  const tabs = workspace.editorTabs as Record<string, { config?: Record<string, unknown> }>;
+  for (const tab of Object.values(tabs)) {
+    if (tab.config?.sourceSystemTabId === systemTabId) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Close all editor tabs associated with a system tab.
+ */
+function _closeAssociatedEditorTabs(workspace: Workspace, systemTabId: string): Workspace {
+  let result = workspace;
+  const tabs = result.editorTabs as Record<string, { config?: Record<string, unknown> }>;
+  for (const [tabId, tab] of Object.entries(tabs)) {
+    if (tab.config?.sourceSystemTabId === systemTabId) {
+      // Remove from every window that has this tab
+      for (const win of result.windows) {
+        const tabIdBranded = tabId as unknown as TabId;
+        const placement = win.grid.placements.find((p) => p.tabIds.includes(tabIdBranded));
+        if (placement) {
+          result = removeTabFromCell(result, win.id, tabIdBranded);
+        }
+      }
+    }
+  }
+  return result;
+}
+
 // ─── Close ────────────────────────────────────────────────────────────────
 
 /**
  * Close a system tab. If pinned, removes from ALL windows' sidebar tab lists.
  * If unpinned, removes only from the originating window. Deletes the system tab
- * from registry if no window references it.
+ * from registry if no window references it. Also closes any associated editor
+ * tabs that were opened from this system tab.
  */
 export function closeSystemTab(
   workspace: Workspace,
@@ -216,6 +255,9 @@ export function closeSystemTab(
       result = { ...result, systemTabs: remainingSysTabs };
     }
   }
+
+  // Close any editor tabs associated with this system tab
+  result = _closeAssociatedEditorTabs(result, tabId);
 
   return result;
 }
