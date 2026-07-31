@@ -37,18 +37,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private async _onReveal(path: string): Promise<void> {
-    await window.openp41ge.dialog.revealInFinder(path);
-  }
-
-  private async _onCopy(path: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(path);
-    } catch {
-      // ignore
-    }
-  }
-
   render(): TemplateResult {
     const data = workspaceFileService.activeData;
     const filePath = workspaceFileService.activeFilePath;
@@ -73,11 +61,15 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     return html`
       <style>
         .ws-wrap { display:flex; flex-direction:column; height:100%; overflow-y:auto; }
-        .ws-section { display:flex; align-items:center; gap:12px; padding:8px 14px; min-height:32px; }
+        .ws-section { display:flex; flex-direction:column; padding:6px 14px; }
+        .ws-row { display:flex; align-items:center; gap:12px; min-height:28px; }
         .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); flex-shrink:0; width:110px; }
         .ws-value { font-size:13px; color:var(--text-primary,#ccc); flex:1 1 auto; min-width:0; text-align:right; }
         .ws-value.mono { font-family:monospace; font-size:12px; }
-        .ws-actions { display:flex; gap:2px; justify-content:flex-end; }
+        .ws-path {
+          font-family:monospace; font-size:12px; color:var(--text-secondary,#999);
+          text-align:right; word-break:break-all; padding:0 0 2px 122px;
+        }
         .ws-act-btn {
           padding:2px 6px; font-size:12px; border:none; border-radius:3px;
           cursor:pointer; background:transparent; color:var(--text-secondary,#999);
@@ -91,24 +83,28 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       </style>
       <div class="ws-wrap">
         <div class="ws-section">
-          <div class="ws-label">Workspace ID</div>
-          <div class="ws-value mono">${data.id}</div>
-        </div>
-        <div class="ws-section">
-          <div class="ws-label">File</div>
-          <div class="ws-value mono ws-actions">
-            <button class="ws-act-btn" @click=${() => this._onSaveAs()} title="Save to a new location">Edit</button>
-            ${filePath ? html`<button class="ws-act-btn" @click=${() => this._onReveal(filePath!)}>Reveal</button>` : ''}
-            ${filePath ? html`<button class="ws-act-btn" @click=${() => this._onCopy(filePath!)}>Copy</button>` : ''}
+          <div class="ws-row">
+            <div class="ws-label">Workspace ID</div>
+            <div class="ws-value mono">${data.id}</div>
           </div>
         </div>
         <div class="ws-section">
-          <div class="ws-label">Data Dir</div>
-          <div class="ws-value mono ws-actions">
-            <button class="ws-act-btn" @click=${() => this._onChangeDataDir()}>Edit</button>
-            <button class="ws-act-btn" @click=${() => this._onReveal(data.dataDir)}>Reveal</button>
-            <button class="ws-act-btn" @click=${() => this._onCopy(data.dataDir)}>Copy</button>
+          <div class="ws-row">
+            <div class="ws-label">File</div>
+            <div class="ws-value">
+              <button class="ws-act-btn" @click=${() => this._onSaveAs()}>Edit</button>
+            </div>
           </div>
+          <div class="ws-path">${filePath ?? "(not saved)"}</div>
+        </div>
+        <div class="ws-section">
+          <div class="ws-row">
+            <div class="ws-label">Data Dir</div>
+            <div class="ws-value">
+              <button class="ws-act-btn" @click=${() => this._onChangeDataDir()}>Edit</button>
+            </div>
+          </div>
+          <div class="ws-path">${data.dataDir}</div>
         </div>
         <div class="ws-section">
           <div class="ws-label">Repos (${data.repos.length})</div>
