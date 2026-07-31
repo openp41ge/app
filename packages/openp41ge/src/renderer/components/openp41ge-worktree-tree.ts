@@ -515,11 +515,11 @@ class Openp41geWorktreeTree extends LitElement {
               }
               ${
                 (() => {
-                  const _wtOpen = _expandedRepos.has(repo.name) && worktrees.length > 0;
+                  const _anyExpanded = this._repos.some(r => _expandedRepos.has(r.name) && (this._worktreesByRepo.get(r.name) ?? []).length > 0);
                   return _showingAddRepo
                     ? html`<div
                         id="wt-addrepo-row"
-                        class="flex items-center h-[30px] pl-3 pr-2 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100${_wtOpen ? " border-t border-divider" : ""}"
+                        class="flex items-center h-[30px] pl-3 pr-2 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100${_anyExpanded ? " border-t border-divider" : ""}"
                     >
                       <span class="hidden">${unsafeHTML(plusIconThick(16))}</span
                       ><input
