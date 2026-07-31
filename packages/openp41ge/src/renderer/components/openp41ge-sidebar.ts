@@ -123,6 +123,15 @@ class Openp41geSidebar extends LitElement {
         this._unmountView();
       }
     }
+    // Sync host sizing whenever width changes
+    if (changed.has("width")) {
+      this._syncHostStyles();
+    }
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this._syncHostStyles();
   }
 
   disconnectedCallback(): void {
@@ -130,6 +139,16 @@ class Openp41geSidebar extends LitElement {
     this._unmountView();
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
+  }
+
+  /**
+   * Sync flex and min-width onto the host element itself.
+   * The host is the flex item in the parent's flex layout, so these
+   * properties must live on the host, not on a child div.
+   */
+  private _syncHostStyles(): void {
+    this.style.flex = `0 1 ${this.width}px`;
+    this.style.minWidth = `${MIN_SIDEBAR_WIDTH}px`;
   }
 
   // ═══ Tab click handler ─────────────────────────────────────────────
@@ -217,7 +236,6 @@ class Openp41geSidebar extends LitElement {
       Math.min(this._getMaxSidebarWidth(), this._resizeStartWidth + dx),
     );
     this.width = newWidth;
-    this.style.flex = `0 0 ${newWidth}px`;
   };
 
   private _onResizeEnd = (): void => {
@@ -232,7 +250,8 @@ class Openp41geSidebar extends LitElement {
   };
 
   private _getMaxSidebarWidth(): number {
-    return Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth - 400);
+    // Reserve space for the other sidebar at minimum width + grid minimum width
+    return Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth - MIN_SIDEBAR_WIDTH - 200);
   }
 
   // ═══ Render ───────────────────────────────────────────────────────
@@ -249,8 +268,8 @@ class Openp41geSidebar extends LitElement {
 
     return html`
       <div
-        class="flex flex-col bg-gutter ${borderClass} overflow-hidden"
-        style="flex:0 0 ${this.width}px;min-width:${MIN_SIDEBAR_WIDTH}px;height:100%;"
+        class="flex flex-col bg-gutter ${borderClass} overflow-hidden relative"
+        style="height:100%;"
       >
         <!-- Resize notch -->
         <div
