@@ -184,24 +184,6 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "View",
     });
 
-    // Cmd+Shift+P opens Workspaces as an editor system tab
-    km.register({
-      modifiers: 12,
-      key: "p",
-      code: "KeyP",
-      handler: () => {
-        try {
-          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
-          if (!myWindowId) return;
-          emitEvent("system-tab-open", { windowId: myWindowId, appType: "workspace-manager" });
-        } catch (_err) {
-          // ignore
-        }
-      },
-      description: "Open Workspaces",
-      category: "View",
-    });
-
     km.register({
       modifiers: 12, // Meta + Shift
       key: "o",
