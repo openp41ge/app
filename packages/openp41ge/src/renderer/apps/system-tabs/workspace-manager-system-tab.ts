@@ -110,7 +110,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         .ws-actions { display:inline-flex; gap:2px; }
         .ws-path {
           font-family:monospace; font-size:12px; color:var(--text-secondary,#999);
-          text-align:right; word-break:break-all; padding:2px 0 0 122px;
+          text-align:left; word-break:break-all; padding:2px 0 0 122px;
         }
         .ws-path.hidden { display:none; }
         .ws-act-btn {
