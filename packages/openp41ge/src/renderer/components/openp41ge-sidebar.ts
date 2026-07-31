@@ -421,9 +421,6 @@ class Openp41geSidebar extends LitElement {
   };
 
   private _onWindowFocus = (): void => {
-    // Clear focused side so the previous sidebar isn't automatically restored.
-    // The subsequent mousedown event will set the correct focused side.
-    Openp41geSidebar._focusedSide = null;
     Openp41geSidebar._setWindowFocused(true);
   };
 
