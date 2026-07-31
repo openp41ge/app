@@ -170,8 +170,10 @@ class Openp41geSidebar extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._syncHostStyles();
-    document.addEventListener("mousedown", this._onDocumentMouseDown);
+    this.setAttribute("tabindex", "-1");
+    this.addEventListener("focus", this._onSidebarFocus);
     this.addEventListener("click", this._onSidebarClick);
+    document.addEventListener("mousedown", this._onDocumentMouseDown);
     window.addEventListener("blur", this._onWindowBlur);
     window.addEventListener("focus", this._onWindowFocus);
   }
@@ -195,6 +197,7 @@ class Openp41geSidebar extends LitElement {
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
     document.removeEventListener("mousedown", this._onDocumentMouseDown);
+    this.removeEventListener("focus", this._onSidebarFocus);
     this.removeEventListener("click", this._onSidebarClick);
     window.removeEventListener("blur", this._onWindowBlur);
     window.removeEventListener("focus", this._onWindowFocus);
@@ -349,16 +352,9 @@ class Openp41geSidebar extends LitElement {
   }
 
   private _onDocumentMouseDown = (e: MouseEvent): void => {
-    // Ensure window is marked as focused (in case _onWindowFocus didn't notify)
-    Openp41geSidebar._windowFocused = true;
-    // When clicking inside this sidebar, mark it as focused
     const target = e.target as Node;
-    if (this.contains(target)) {
-      Openp41geSidebar._setFocusedSide(this.side);
-    } else {
-      // If click lands outside this sidebar and inside the other sidebar,
-      // the other sidebar's _onSidebarClick will handle focus. If click
-      // is outside all sidebars, clear focus.
+    // When clicking outside all sidebars, clear the focused sidebar
+    if (!this.contains(target)) {
       const inAnySidebar = target instanceof HTMLElement &&
         target.closest?.("openp41ge-sidebar");
       if (!inAnySidebar) {
@@ -414,19 +410,29 @@ class Openp41geSidebar extends LitElement {
     }));
   }
 
-  private _onSidebarClick = (): void => {
-    Openp41geSidebar._windowFocused = true;
-    Openp41geSidebar._setFocusedSide(this.side);
-  };
-
   private _onWindowBlur = (): void => {
     Openp41geSidebar._setWindowFocused(false);
   };
 
+  private _onSidebarFocus = (): void => {
+    // This sidebar received DOM focus (user clicked/tabbed into it)
+    Openp41geSidebar._windowFocused = true;
+    Openp41geSidebar._setFocusedSide(this.side);
+  };
+
+  private _onSidebarClick = (): void => {
+    // Safety net: ensure this sidebar is marked as focused on click.
+    // The focus event should already have handled this, but in case
+    // the sidebar didn't receive DOM focus (e.g. click on non-focusable
+    // child that consumed the event), the click still sets the focus.
+    Openp41geSidebar._windowFocused = true;
+    Openp41geSidebar._setFocusedSide(this.side);
+  };
+
   private _onWindowFocus = (): void => {
-    // Update the internal state without re-rendering so the old
-    // _focusedSide isn't visually restored before the user clicks.
-    // The mousedown/click handlers will trigger the re-render.
+    // Window regained focus. Don't re-render — the real focus target
+    // will be determined by the focus event on whichever element
+    // the user actually clicked (sidebar, grid, etc.).
     Openp41geSidebar._windowFocused = true;
   };
 
