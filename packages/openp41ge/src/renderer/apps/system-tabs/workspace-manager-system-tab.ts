@@ -97,8 +97,8 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       </style>
       <div class="ws-wrap">
         <div class="ws-section">
-          <div class="ws-label">Workspace</div>
-          <div class="ws-value">${data.name}</div>
+          <div class="ws-label">Workspace ID</div>
+          <div class="ws-value mono">${data.id}</div>
         </div>
         <div class="ws-section">
           <div class="ws-label">File</div>

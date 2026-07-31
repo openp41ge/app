@@ -14,7 +14,7 @@ function readWorkspaceFile(filePath: string): WorkspaceFileData {
   const raw = fs.readFileSync(filePath, "utf-8");
   const data = JSON.parse(raw);
   return {
-    name: String(data.name ?? "unnamed"),
+    id: String(data.id ?? ""),
     version: Number(data.version ?? 1),
     createdAt: String(data.createdAt ?? new Date().toISOString()),
     dataDir: String(data.dataDir ?? ""),
@@ -23,7 +23,7 @@ function readWorkspaceFile(filePath: string): WorkspaceFileData {
 }
 
 export interface WorkspaceFileData {
-  name: string;
+  id: string;
   version: number;
   createdAt: string;
   dataDir: string;

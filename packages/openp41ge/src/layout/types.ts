@@ -29,7 +29,7 @@ export type TabGroupId = z.infer<typeof TabGroupId>;
  * Contents of a .openp41ge-workspace file.
  */
 export interface WorkspaceFileData {
-  name: string;
+  id: string;
   version: number;
   createdAt: string;
   dataDir: string;

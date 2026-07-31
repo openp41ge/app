@@ -88,7 +88,7 @@ export class WorkspaceFileService {
     const uuid = crypto.randomUUID();
     const now = new Date().toISOString();
     const data: WorkspaceFileData = {
-      name: `draft-${uuid}`,
+      id: uuid,
       version: 1,
       createdAt: now,
       dataDir: `~/.openp41ge/workspaces-data/${uuid}`,
