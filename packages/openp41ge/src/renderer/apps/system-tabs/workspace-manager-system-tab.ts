@@ -8,6 +8,7 @@
 import { html, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 import { workspaceFileService } from "../../services/workspace-file-service";
+import { showToast } from "../../services/toast";
 
 export class WorkspacesSystemTab implements EditorSystemTabController {
   readonly id: string;
@@ -52,6 +53,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
   private async _onCopy(path: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(path);
+      showToast("Copied");
     } catch {
       // ignore
     }
