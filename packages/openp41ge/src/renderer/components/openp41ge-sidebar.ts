@@ -225,7 +225,7 @@ class Openp41geSidebar extends LitElement {
 
   private _onTabClose(tabId: string, e: Event): void {
     e.stopPropagation();
-    dispatch("closeSystemTab", this.windowId, this.side, tabId);
+    dispatch("closeSystemTab", this.windowId, this.side, tabId, true);
   }
 
   private _onPinToggle(tabId: string, pinned: boolean, e: Event): void {

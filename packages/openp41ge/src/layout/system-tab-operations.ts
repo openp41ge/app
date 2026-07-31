@@ -303,6 +303,7 @@ export function closeSystemTab(
   winId: string,
   side: "left" | "right",
   tabId: string,
+  force: boolean = false,
 ): Workspace {
   const sid = tabId as SystemTabId;
   const tabsKey = side === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
@@ -366,6 +367,19 @@ export function closeSystemTab(
     if (refCount === 0) {
       const { [sid]: _removed, ...remainingSysTabs } = result.systemTabs;
       result = { ...result, systemTabs: remainingSysTabs };
+    }
+  }
+
+  // Guard: refuse to close an unpinned system tab if it has open children
+  // in its tab group, unless force=true (explicit X button close).
+  if (!force && !systemTab.pinned) {
+    const gid = _getTabGroupIdByParent(result, tabId);
+    if (gid) {
+      const group = result.tabGroups[gid];
+      const hasChildren = group && group.childTabIds.some((cid) => result.editorTabs[cid as unknown as TabId]);
+      if (hasChildren) {
+        return workspace;
+      }
     }
   }
 
