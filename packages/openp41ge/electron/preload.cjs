@@ -457,6 +457,19 @@ contextBridge.exposeInMainWorld("openp41ge", {
     return () => ipcRenderer.removeListener("zoom:reset", handler);
   },
 
+  /** Listen for File > Open Workspace... menu action. */
+  onOpenWorkspace: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu:open-workspace", handler);
+    return () => ipcRenderer.removeListener("menu:open-workspace", handler);
+  },
+  /** Listen for File > Save Workspace As... menu action. */
+  onSaveWorkspaceAs: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu:save-workspace-as", handler);
+    return () => ipcRenderer.removeListener("menu:save-workspace-as", handler);
+  },
+
   lifecycle: {
     /** Notify the main process that the renderer's first render is complete. */
     notifyReady: () => ipcRenderer.send("lifecycle:renderer-ready"),
@@ -485,6 +498,26 @@ contextBridge.exposeInMainWorld("openp41ge", {
     list: () => ipcRenderer.invoke("recentProjects:list"),
     add: (name) => ipcRenderer.invoke("recentProjects:add", name),
     remove: (name) => ipcRenderer.invoke("recentProjects:remove", name),
+  },
+
+  dialog: {
+    /** Open native file picker for .openp41ge-workspace files. Returns { filePath, data } or null. */
+    openWorkspaceFile: () => ipcRenderer.invoke("dialog:openWorkspaceFile"),
+
+    /** Open native save dialog for .openp41ge-workspace files. Returns path or null. */
+    saveWorkspaceFile: (data, defaultPath) => ipcRenderer.invoke("dialog:saveWorkspaceFile", data, defaultPath),
+
+    /** Open native folder picker. Returns path or null. */
+    pickFolder: () => ipcRenderer.invoke("dialog:pickFolder"),
+
+    /** Read a .openp41ge-workspace file at a known path (no dialog). Returns { filePath, data } or null. */
+    readWorkspaceFile: (filePath) => ipcRenderer.invoke("dialog:readWorkspaceFile", filePath),
+
+    /** Write a .openp41ge-workspace file to a known path (no dialog). Returns boolean success. */
+    writeWorkspaceFile: (filePath, data) => ipcRenderer.invoke("dialog:writeWorkspaceFile", filePath, data),
+
+    /** Ensure a directory exists (create it recursively). Returns boolean success. */
+    ensureDir: (dirPath) => ipcRenderer.invoke("dialog:ensureDir", dirPath),
   },
 
   project: {

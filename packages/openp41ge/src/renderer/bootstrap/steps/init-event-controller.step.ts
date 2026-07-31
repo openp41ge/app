@@ -11,6 +11,7 @@ import { createFocusHandlers } from "../../handlers/focus-state.handlers";
 import { createTabHandlers } from "../../handlers/tabs.handlers";
 import { createLayoutHandlers } from "../../handlers/layout.handlers";
 import { initDebugAPI } from "../../debug-api";
+import { workspaceFileService } from "../../services/workspace-file-service";
 import { setEventRouter } from "../../app";
 
 /**
@@ -89,7 +90,7 @@ export class InitEventControllerStep implements IStartupStep {
     domBridge.attach();
 
     // 9. Wire debug API
-    initDebugAPI(appState, workspaceData, graph, logBuffer, pluginRegistry);
+    initDebugAPI(appState, workspaceData, graph, logBuffer, pluginRegistry, workspaceFileService);
 
     // Store references on the context for other steps/services to use
     (context as any).__eventController = {

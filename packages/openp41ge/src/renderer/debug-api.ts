@@ -3,6 +3,7 @@ import type { EventLogBuffer, LogEntry, LogFilter } from "./services/event-log-b
 import type { AppState } from "./services/app-state";
 import type { WorkspaceData } from "./services/workspace-data";
 import type { PluginRegistry, PluginRegistration } from "./services/plugin-registry";
+import type { WorkspaceFileService } from "./services/workspace-file-service";
 
 export interface DebugAPI {
   state: AppState;
@@ -18,6 +19,7 @@ export interface DebugAPI {
     edges(): { id: string; from: string; when: any; to: string[] }[];
   };
   plugins: PluginRegistration[];
+  workspaceFile: WorkspaceFileService;
 }
 
 /**
@@ -29,6 +31,7 @@ export function initDebugAPI(
   graph: EventGraph,
   logBuffer: EventLogBuffer,
   pluginRegistry: PluginRegistry,
+  workspaceFile: WorkspaceFileService,
 ): void {
   const api: DebugAPI = {
     state: appState,
@@ -44,6 +47,7 @@ export function initDebugAPI(
       edges: () => graph.edges,
     },
     plugins: pluginRegistry.getAll(),
+    workspaceFile,
   };
 
   (window as any).__openp41ge_debug = api;

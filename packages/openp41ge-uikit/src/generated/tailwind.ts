@@ -650,6 +650,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   align-self: stretch
 }
 
+.overflow-auto {
+  overflow: auto
+}
+
 .overflow-hidden {
   overflow: hidden
 }

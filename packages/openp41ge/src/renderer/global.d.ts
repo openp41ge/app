@@ -121,6 +121,26 @@ declare global {
         onWorksetRepoRefsChanged: (callback: () => void) => () => void;
       };
 
+      dialog: {
+        /** Open native file picker for .openp41ge-workspace files. Returns { filePath, data } or null. */
+        openWorkspaceFile: () => Promise<{ filePath: string; data: import("../../layout/types").WorkspaceFileData } | null>;
+
+        /** Open native save dialog for .openp41ge-workspace files. Returns path or null. */
+        saveWorkspaceFile: (data: import("../../layout/types").WorkspaceFileData, defaultPath?: string) => Promise<string | null>;
+
+        /** Open native folder picker. Returns path or null. */
+        pickFolder: () => Promise<string | null>;
+
+        /** Read a .openp41ge-workspace file at a known path (no dialog). */
+        readWorkspaceFile: (filePath: string) => Promise<{ filePath: string; data: import("../../layout/types").WorkspaceFileData } | null>;
+
+        /** Write a .openp41ge-workspace file to a known path (no dialog). */
+        writeWorkspaceFile: (filePath: string, data: import("../../layout/types").WorkspaceFileData) => Promise<boolean>;
+
+        /** Ensure a directory exists. */
+        ensureDir: (dirPath: string) => Promise<boolean>;
+      };
+
       lifecycle: {
         /** Notify the main process that the renderer's first render completed. */
         notifyReady: () => void;
@@ -150,6 +170,11 @@ declare global {
       onZoomIn: (callback: () => void) => () => void;
       onZoomOut: (callback: () => void) => () => void;
       onZoomReset: (callback: () => void) => () => void;
+
+      /** Listen for File > Open Workspace... menu action. */
+      onOpenWorkspace: (callback: () => void) => () => void;
+      /** Listen for File > Save Workspace As... menu action. */
+      onSaveWorkspaceAs: (callback: () => void) => () => void;
 
       config: {
         get: (key?: string) => Promise<any>;

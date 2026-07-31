@@ -10,6 +10,8 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
 import { emitEvent } from "../app";
+import { appState } from "../services/app-state";
+import { workspaceFileService } from "../services/workspace-file-service";
 
 const isMac = (() => {
   try {
@@ -47,9 +49,20 @@ class Openp41geTitleBar extends LitElement {
     emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
   }
 
-  private _openWorkspaces(): void {
+  private async _openWorkspaces(): Promise<void> {
     const win = this.windowData;
     if (!win) return;
+
+    // If no workspace file is active, open the file picker instead
+    if (!appState.activeWorkspaceFilePath) {
+      const loaded = await workspaceFileService.openDialog();
+      if (loaded) {
+        // A file was loaded — open the system tab to show settings
+        emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
+      }
+      return;
+    }
+
     emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
   }
 

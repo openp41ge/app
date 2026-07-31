@@ -15,6 +15,7 @@ export class AppState {
 
   // ── Workspace ────────────────────────────────────────
   activeRepoId: string | null = null;
+  activeWorkspaceFilePath: string | null = null;
 
   // ── Shortcuts ────────────────────────────────────────
   shortcutsSuppressedUntil = 0;
@@ -44,6 +45,7 @@ export class AppState {
       focusedSide: this.focusedSide,
       sidebarWidths: { ...this.sidebarWidths },
       activeRepoId: this.activeRepoId,
+      activeWorkspaceFilePath: this.activeWorkspaceFilePath,
       shortcutsSuppressedUntil: this.shortcutsSuppressedUntil,
     };
   }
@@ -57,5 +59,6 @@ export interface AppStateSnapshot {
   focusedSide: "left" | "right" | null;
   sidebarWidths: Record<string, number>;
   activeRepoId: string | null;
+  activeWorkspaceFilePath: string | null;
   shortcutsSuppressedUntil: number;
 }

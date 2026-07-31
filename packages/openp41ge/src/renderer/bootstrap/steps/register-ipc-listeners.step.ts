@@ -14,6 +14,8 @@ const log = createLogger("bootstrap:register-ipc-listeners");
 
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { wireResetListener } from "../../app";
+import { workspaceFileService } from "../../services/workspace-file-service";
+import { emitEvent } from "../../app";
 
 export class RegisterIpcListenersStep implements IStartupStep {
   readonly name = "register-ipc-listeners";
@@ -36,6 +38,23 @@ export class RegisterIpcListenersStep implements IStartupStep {
 
     // Wire the app reset listener so window.openp41ge.workspace.reset() works
     wireResetListener();
+
+    // ── Menu: Open Workspace ────────────────────────────────────────────
+    window.openp41ge.onOpenWorkspace(() => {
+      workspaceFileService.openDialog().then((loaded) => {
+        if (loaded) {
+          const winId = window.openp41ge?.workspace?.getWindowId?.();
+          if (winId) {
+            emitEvent("system-tab-open", { windowId: winId, appType: "workspace-manager" });
+          }
+        }
+      });
+    });
+
+    // ── Menu: Save Workspace As... ──────────────────────────────────────
+    window.openp41ge.onSaveWorkspaceAs(() => {
+      workspaceFileService.saveAs();
+    });
 
     log.info("IPC listeners registered");
   }

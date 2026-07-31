@@ -37,6 +37,7 @@ import {
 // ─── IPC handler registrations ──────────────────────────────────────────
 import { registerDispatchHandlers } from "./ipc-handlers/dispatch-handler.js";
 import { registerFileHandlers } from "./ipc-handlers/file-handlers.js";
+import { registerDialogHandlers } from "./ipc-handlers/dialog-handlers.js";
 import { registerWindowHandlers } from "./ipc-handlers/window-handlers.js";
 import { registerDragHandlers } from "./ipc-handlers/drag-handlers.js";
 import { registerTerminalHandlers } from "./ipc-handlers/terminal-handlers.js";
@@ -285,6 +286,7 @@ export class Openp41geApplication {
     );
     registerRecentProjectsHandlers(this.recentProjects);
     registerLifecycleHandlers(this.lifecycle);
+    registerDialogHandlers();
   }
 
   private _registerContextMenuHandler(): void {
@@ -360,6 +362,21 @@ export class Openp41geApplication {
                 const src = BrowserWindow.getFocusedWindow() ?? undefined;
                 createOpenp41geWindow(newWin.id, false, src);
               }
+            },
+          },
+          { type: "separator" },
+          {
+            label: "Open Workspace...",
+            accelerator: "CmdOrCtrl+Shift+O",
+            click: () => {
+              BrowserWindow.getFocusedWindow()?.webContents.send("menu:open-workspace");
+            },
+          },
+          {
+            label: "Save Workspace As...",
+            accelerator: "CmdOrCtrl+Shift+S",
+            click: () => {
+              BrowserWindow.getFocusedWindow()?.webContents.send("menu:save-workspace-as");
             },
           },
           { type: "separator" },

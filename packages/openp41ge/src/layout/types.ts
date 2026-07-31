@@ -23,6 +23,19 @@ export type OverlayId = z.infer<typeof OverlayId>;
 export const TabGroupId = z.string().brand("TabGroupId");
 export type TabGroupId = z.infer<typeof TabGroupId>;
 
+// ─── Workspace File Data ───────────────────────────────────────────────────
+
+/**
+ * Contents of a .openp41ge-workspace file.
+ */
+export interface WorkspaceFileData {
+  name: string;
+  version: number;
+  createdAt: string;
+  dataDir: string;
+  repos: Array<{ url: string; worktrees: string[] }>;
+}
+
 // ─── Rect / Bounds ─────────────────────────────────────────────────────────
 
 export const RectSchema = z.object({
