@@ -10,10 +10,20 @@ import type { IKeyboardManager, IKeyboardBinding } from "../interfaces/keyboard-
  * handleKeyDown() returns early, suppressing ALL registered shortcuts.
  * The modal's own document-level keydown listener handles Enter,
  * Escape, and Tab focus trapping.
+ *
+ * Shortcut suppression after window refocus: the event controller's
+ * keyboard/suppress handler sets suppressUntil. handleKeyDown checks
+ * it and ignores shortcuts within the suppression window.
  */
 export class KeyboardManager implements IKeyboardManager {
   private readonly _bindings: IKeyboardBinding[] = [];
   private _modalCount = 0;
+
+  /**
+   * Timestamp before which keyboard shortcuts should be suppressed.
+   * Set by the event controller's keyboard/suppress handler on window focus.
+   */
+  suppressUntil: number = 0;
 
   get isModalActive(): boolean {
     return this._modalCount > 0;
@@ -40,9 +50,14 @@ export class KeyboardManager implements IKeyboardManager {
 
   handleKeyDown(e: KeyboardEvent): boolean {
     // When a modal is active, suppress ALL registered shortcuts.
-    // The modal's own document-level keydown listener handles
-    // Enter, Escape, and Tab focus trapping.
     if (this._modalCount > 0) {
+      return false;
+    }
+
+    // Suppress shortcuts for a brief period after window refocus.
+    // Prevents phantom Alt+Tab/Cmd+Tab key releases from being
+    // interpreted as Meta+Shift+P (openProject) or other shortcuts.
+    if (this.suppressUntil > 0 && Date.now() < this.suppressUntil) {
       return false;
     }
 
@@ -51,10 +66,6 @@ export class KeyboardManager implements IKeyboardManager {
       (e.ctrlKey ? 1 : 0) | (e.altKey ? 2 : 0) | (e.shiftKey ? 4 : 0) | (e.metaKey ? 8 : 0);
 
     for (const binding of this._bindings) {
-      // Match key by value, with fallbacks for modifier-affected characters:
-      //   Shift: case-insensitive comparison (Shift+o → key="O", binding.key="o")
-      //   Alt/Option: macOS produces alternate Unicode characters, so match by
-      //     physical code instead (Alt+b → key="∫", code="KeyB", binding.key="b")
       const keyMatch =
         binding.key === e.key ||
         (mask & 4 && binding.key.toLowerCase() === e.key.toLowerCase()) ||

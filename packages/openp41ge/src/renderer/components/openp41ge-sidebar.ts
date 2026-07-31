@@ -4,17 +4,9 @@
  * Renders a horizontal tab bar at the top and a content area below for the
  * active system tab's controller.
  *
- * KEY DESIGN:
- * - render() returns a stable outer template structure (wrapper div, resize
- *   notch, content area div) so Lit's marker comment nodes remain stable.
- *   The system tab bar is only rendered when there are tabs to show.
- * - Visibility is controlled externally via the CSS class
- *   "sidebar-element-hidden" applied by the parent windowview.
- * - `isOpen` IS a Lit property: it triggers updated() so view lifecycle
- *   (mount/unmount) can run. But render() ignores it.
- * - shouldUpdate() prevents re-renders from properties that don't affect
- *   the template output (e.g. workspaceData changes from parent re-render).
- *   Only activeTabId, systemTabs, side, and width trigger actual DOM updates.
+ * Focus state is read from AppState (set by the event controller). The sidebar
+ * no longer manages its own focus tracking, DOM event listeners, or static
+ * focus properties.
  *
  * Two instances per window: left sidebar and right sidebar.
  */
@@ -22,9 +14,10 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Workspace } from "../../layout/types";
-import { dispatch } from "../app";
+import { emitEvent } from "../app";
 import { getSystemTabRegistration } from "../apps/app-registry";
 import type { SystemTabController } from "../controllers/types";
+import { appState } from "../services/app-state";
 
 const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 600;
@@ -38,11 +31,6 @@ export interface SystemTabEntry {
 }
 
 class Openp41geSidebar extends LitElement {
-  /** Globally tracks which sidebar is the focused/interacted sidebar. */
-  static _focusedSide: "left" | "right" | null = null;
-  /** Whether the window currently has focus. */
-  static _windowFocused: boolean = true;
-
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
@@ -62,15 +50,9 @@ class Openp41geSidebar extends LitElement {
   @property({ attribute: false })
   activeTabId: string | null = null;
 
-  /**
-   * Used for view lifecycle (mount/unmount in updated()).
-   * render() ignores this — the template is always the same.
-   * Parent windowview also mirrors this via CSS class for actual visibility.
-   */
   @property({ attribute: false })
   isOpen: boolean = false;
 
-  /** Sidebar width, persisted per side. */
   @property({ attribute: false })
   width: number = (() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY_PREFIX + "right");
@@ -93,22 +75,13 @@ class Openp41geSidebar extends LitElement {
   @state()
   private _hasOverflow: boolean = false;
 
-  @state()
-  private _focusVersion: number = 0;
-
   private _isResizing = false;
   private _resizeStartX = 0;
   private _resizeStartWidth = 0;
   private _widthKey = SIDEBAR_WIDTH_KEY_PREFIX + "right";
+  private _unsubscribe?: () => void;
 
-  /**
-   * Skip re-renders for property changes that don't affect the template.
-   * workspaceData and windowId changes from parent re-renders should NOT
-   * trigger Lit DOM updates — they'd only increase the chance of marker
-   * corruption from view DOM mounted inside .sidebar-content.
-   */
   shouldUpdate(changed: Map<string | number | symbol, unknown>): boolean {
-    // Only allow updates when meaningful display properties change
     if (changed.has("activeTabId")) return true;
     if (changed.has("systemTabs")) return true;
     if (changed.has("side")) return true;
@@ -117,7 +90,6 @@ class Openp41geSidebar extends LitElement {
     if (changed.has("_scrollLeft")) return true;
     if (changed.has("_tabBarHeight")) return true;
     if (changed.has("_hasOverflow")) return true;
-    if (changed.has("_focusVersion")) return true;
     return false;
   }
 
@@ -137,23 +109,17 @@ class Openp41geSidebar extends LitElement {
       this._unmountView();
       if (this.activeTabId && this.isOpen) {
         this._mountView();
-        // Focus this sidebar when a tab is activated (programmatic or click)
-        Openp41geSidebar._setFocusedSide(this.side);
       }
     } else if (changed.has("isOpen")) {
       if (this.isOpen && this.activeTabId && !this._view) {
         this._mountView();
-        // Focus this sidebar when opened programmatically
-        Openp41geSidebar._setFocusedSide(this.side);
       } else if (!this.isOpen && this._view) {
         this._unmountView();
       }
     }
-    // Sync host sizing whenever width changes
     if (changed.has("width")) {
       this._syncHostStyles();
     }
-    // Re-check scroll state on width/activeTabId changes (sidebar resize may affect overflow)
     if (changed.has("width") || changed.has("activeTabId")) {
       const el = this.querySelector(".sidebar-tab-scroll");
       if (el) {
@@ -170,16 +136,11 @@ class Openp41geSidebar extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._syncHostStyles();
-    this.setAttribute("tabindex", "-1");
-    this.addEventListener("focus", this._onSidebarFocus);
-    this.addEventListener("click", this._onSidebarClick);
-    document.addEventListener("mousedown", this._onDocumentMouseDown);
-    window.addEventListener("blur", this._onWindowBlur);
-    window.addEventListener("focus", this._onWindowFocus);
+    // Observe AppState for focus changes — triggers re-render for indicator styling
+    this._unsubscribe = appState.observe(() => this.requestUpdate());
   }
 
   firstUpdated(): void {
-    // Initialize scroll shadow state after the DOM is rendered
     const el = this.querySelector(".sidebar-tab-scroll");
     if (el) {
       this._scrollLeft = el.scrollLeft;
@@ -193,21 +154,12 @@ class Openp41geSidebar extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._unsubscribe?.();
     this._unmountView();
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
-    document.removeEventListener("mousedown", this._onDocumentMouseDown);
-    this.removeEventListener("focus", this._onSidebarFocus);
-    this.removeEventListener("click", this._onSidebarClick);
-    window.removeEventListener("blur", this._onWindowBlur);
-    window.removeEventListener("focus", this._onWindowFocus);
   }
 
-  /**
-   * Sync flex and min-width onto the host element itself.
-   * The host is the flex item in the parent's flex layout, so these
-   * properties must live on the host, not on a child div.
-   */
   private _syncHostStyles(): void {
     this.style.flex = `0 1 ${this.width}px`;
     this.style.minWidth = `${MIN_SIDEBAR_WIDTH}px`;
@@ -216,35 +168,30 @@ class Openp41geSidebar extends LitElement {
   // ═══ Tab click handler ─────────────────────────────────────────────
 
   private _onTabClick(tabId: string): void {
-    // If switching away from an unpinned tab, close it first
     if (tabId !== this.activeTabId && this.activeTabId) {
       const currentTab = this.systemTabs.find((t) => t.id === this.activeTabId);
       if (currentTab && !currentTab.pinned) {
-        dispatch("closeSystemTab", this.windowId, this.side, this.activeTabId);
+        emitEvent("tab-close", { windowId: this.windowId, side: this.side, tabId: this.activeTabId });
       }
     }
-    dispatch("activateSystemTab", this.windowId, this.side, tabId);
+    emitEvent("tab-activate", { windowId: this.windowId, side: this.side, tabId });
   }
 
   private _onTabClose(tabId: string, e: Event): void {
     e.stopPropagation();
-    dispatch("closeSystemTab", this.windowId, this.side, tabId, true);
+    emitEvent("tab-close", { windowId: this.windowId, side: this.side, tabId, force: true });
   }
 
   private _onPinToggle(tabId: string, pinned: boolean, e: Event): void {
     e.stopPropagation();
-    dispatch("pinSystemTab", tabId, !pinned);
+    emitEvent("tab-pin", { tabId, pinned: !pinned });
   }
 
   private _onToggleSidebar(): void {
-    dispatch("toggleSidebar", this.windowId, this.side);
+    emitEvent("sidebar-toggle", { windowId: this.windowId, side: this.side });
   }
 
   // ═══ View lifecycle ───────────────────────────────────────────────
-  //
-  // Mount target is `.sidebar-content`, a <div> rendered by Lit in the
-  // template. We never set innerHTML on it — only removeChild in a loop —
-  // so Lit's marker comment nodes are preserved.
 
   private _mountView(): void {
     if (!this.activeTabId || !this.isOpen) return;
@@ -274,8 +221,6 @@ class Openp41geSidebar extends LitElement {
       this._view.unmount();
       this._view = null;
     }
-    // Clear mount target using removeChild (never innerHTML) so Lit
-    // marker comment nodes inside this element are preserved.
     const container = this.querySelector<HTMLElement>(".sidebar-content");
     if (container) {
       while (container.lastChild) {
@@ -310,7 +255,6 @@ class Openp41geSidebar extends LitElement {
       Math.min(this._getMaxSidebarWidth(), this._resizeStartWidth + dx),
     );
     this.width = newWidth;
-    // Update tab bar height for shadow sizing
     const bar = this.querySelector(".sidebar-tab-bar");
     if (bar) {
       this._tabBarHeight = bar.getBoundingClientRect().height;
@@ -329,7 +273,6 @@ class Openp41geSidebar extends LitElement {
   };
 
   private _getMaxSidebarWidth(): number {
-    // Reserve space for the other sidebar at minimum width + grid minimum width
     return Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth - MIN_SIDEBAR_WIDTH - 200);
   }
 
@@ -351,103 +294,12 @@ class Openp41geSidebar extends LitElement {
     return el.scrollWidth - el.clientWidth - el.scrollLeft > 2;
   }
 
-  private _onDocumentMouseDown = (e: MouseEvent): void => {
-    const target = e.target as Node;
-    // When clicking outside all sidebars, clear the focused sidebar
-    if (!this.contains(target)) {
-      const inAnySidebar = target instanceof HTMLElement &&
-        target.closest?.("openp41ge-sidebar");
-      if (!inAnySidebar) {
-        Openp41geSidebar._setFocusedSide(null);
-      }
-    }
-
-    // Close unpinned active tab when clicking outside the sidebar
-    if (!this.activeTabId) return;
-    if (this.classList.contains("sidebar-element-hidden")) return;
-    const activeTab = this.systemTabs.find((t) => t.id === this.activeTabId);
-    if (!activeTab || activeTab.pinned) return;
-    if (!this.contains(target)) {
-      dispatch("closeSystemTab", this.windowId, this.side, this.activeTabId);
-    }
-  };
-
-  /**
-   * Notify all sidebar instances to re-render (e.g. when focus changes).
-   * Increments _focusVersion on each instance so shouldUpdate allows the
-   * re-render even though focus is tracked via static properties.
-   */
-  private static _notifyAll(): void {
-    document.querySelectorAll("openp41ge-sidebar").forEach((el) => {
-      const sidebar = el as Openp41geSidebar;
-      sidebar._focusVersion++;
-      sidebar.requestUpdate();
-    });
-  }
-
-  /**
-   * Set the focused sidebar side and notify all instances.
-   */
-  private static _setFocusedSide(side: "left" | "right" | null): void {
-    if (Openp41geSidebar._focusedSide === side) return;
-    Openp41geSidebar._focusedSide = side;
-    Openp41geSidebar._notifyAll();
-    // Notify grid components about sidebar focus change
-    document.dispatchEvent(new CustomEvent("sidebar-focus-change", {
-      detail: { sidebarFocused: side !== null },
-    }));
-  }
-
-  /**
-   * Set the window focus state and notify all instances.
-   */
-  private static _setWindowFocused(focused: boolean): void {
-    if (Openp41geSidebar._windowFocused === focused) return;
-    Openp41geSidebar._windowFocused = focused;
-    Openp41geSidebar._notifyAll();
-    document.dispatchEvent(new CustomEvent("sidebar-focus-change", {
-      detail: { sidebarFocused: focused && Openp41geSidebar._focusedSide !== null },
-    }));
-  }
-
-  private _onWindowBlur = (): void => {
-    Openp41geSidebar._setWindowFocused(false);
-  };
-
-  private _onSidebarFocus = (): void => {
-    // This sidebar received DOM focus (user clicked/tabbed into it)
-    Openp41geSidebar._windowFocused = true;
-    Openp41geSidebar._setFocusedSide(this.side);
-  };
-
-  private _onSidebarClick = (): void => {
-    // Safety net: ensure this sidebar is marked as focused on click.
-    // The focus event should already have handled this, but in case
-    // the sidebar didn't receive DOM focus (e.g. click on non-focusable
-    // child that consumed the event), the click still sets the focus.
-    Openp41geSidebar._windowFocused = true;
-    Openp41geSidebar._setFocusedSide(this.side);
-  };
-
-  private _onWindowFocus = (): void => {
-    // Window regained focus. Don't re-render — the real focus target
-    // will be determined by the focus event on whichever element
-    // the user actually clicked (sidebar, grid, etc.).
-    Openp41geSidebar._windowFocused = true;
-  };
-
   /** True when this sidebar is the focused sidebar and the window is active. */
   private get _isFocused(): boolean {
-    return (
-      Openp41geSidebar._focusedSide === this.side &&
-      Openp41geSidebar._windowFocused
-    );
+    return appState.focusedSide === this.side && appState.windowFocused;
   }
 
   // ═══ Render ───────────────────────────────────────────────────────
-  //
-  // Always returns the same template structure. Never conditional.
-  // Visibility is controlled by the parent via CSS class.
 
   render(): TemplateResult {
     const borderClass = this.side === "left"
@@ -488,10 +340,9 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
         </style>
 
-        <!-- System tab bar — always rendered (even when empty) so drops are detected -->
+        <!-- System tab bar -->
         <div class="sidebar-tab-bar relative shrink-0 border-b border-divider" data-sidebar-tab-bar="${this.side}">
           ${this.systemTabs.length > 0 ? html`
-            <!-- Scrollable tab container (scrollbar hidden) -->
             <div class="sidebar-tab-scroll flex items-stretch overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;" @scroll=${this._onTabBarScroll}>
               ${this.systemTabs.map((tab, idx) => {
                 const isActive = tab.id === this.activeTabId;
@@ -547,9 +398,9 @@ class Openp41geSidebar extends LitElement {
             })()}
           ` : nothing}
         </div>
-        <!-- Left scroll shadow (positioned relative to outer container) -->
+        <!-- Left scroll shadow -->
         <div class="absolute pointer-events-none transition-opacity duration-150" style="left:0;top:0;width:24px;height:${Math.max(this._tabBarHeight, 30)}px;z-index:4;opacity:${this._showLeftShadow ? 1 : 0};background:linear-gradient(to right, var(--bg-gutter, #1a1a1a), transparent);"></div>
-        <!-- Right scroll shadow (positioned relative to outer container) -->
+        <!-- Right scroll shadow -->
         <div class="absolute pointer-events-none transition-opacity duration-150" style="right:0;top:0;width:24px;height:${Math.max(this._tabBarHeight, 30)}px;z-index:4;opacity:${this._showRightShadow ? 1 : 0};background:linear-gradient(to left, var(--bg-gutter, #1a1a1a), transparent);"></div>
 
         <!-- Content area -->
