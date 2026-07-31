@@ -93,6 +93,9 @@ class Openp41geSidebar extends LitElement {
   @state()
   private _hasOverflow: boolean = false;
 
+  @state()
+  private _focusVersion: number = 0;
+
   private _isResizing = false;
   private _resizeStartX = 0;
   private _resizeStartWidth = 0;
@@ -114,6 +117,7 @@ class Openp41geSidebar extends LitElement {
     if (changed.has("_scrollLeft")) return true;
     if (changed.has("_tabBarHeight")) return true;
     if (changed.has("_hasOverflow")) return true;
+    if (changed.has("_focusVersion")) return true;
     return false;
   }
 
@@ -368,10 +372,14 @@ class Openp41geSidebar extends LitElement {
 
   /**
    * Notify all sidebar instances to re-render (e.g. when focus changes).
+   * Increments _focusVersion on each instance so shouldUpdate allows the
+   * re-render even though focus is tracked via static properties.
    */
   private static _notifyAll(): void {
     document.querySelectorAll("openp41ge-sidebar").forEach((el) => {
-      (el as Openp41geSidebar).requestUpdate();
+      const sidebar = el as Openp41geSidebar;
+      sidebar._focusVersion++;
+      sidebar.requestUpdate();
     });
   }
 
