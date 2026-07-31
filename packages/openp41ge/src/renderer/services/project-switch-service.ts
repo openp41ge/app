@@ -13,7 +13,7 @@
 
 import { createLogger } from "openp41ge-logger";
 import { clearCapturedErrors } from "./error-capture-service";
-import { dispatch } from "../app";
+import { emitEvent } from "../app";
 
 const log = createLogger("project-switch-service");
 
@@ -55,5 +55,5 @@ export function showProjectPicker(): void {
   log.info("Opening project picker as system tab in right sidebar");
 
   // Open (or activate) the "projects" system tab in the right sidebar
-  dispatch("openSystemTab", winId, "projects", "Projects");
+  emitEvent("tab-open-system", { windowId: winId, side: "right", appType: "projects", title: "Projects" });
 }

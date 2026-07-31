@@ -7,6 +7,7 @@
 
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
+import { emitEvent } from "../../app";
 import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("bootstrap:register-shortcuts");
@@ -59,7 +60,7 @@ export class RegisterShortcutsStep implements IStartupStep {
           const activeTabId = placement.activeTabId ?? placement.tabIds[0];
           if (!activeTabId) return;
 
-          context.commandBus.dispatch("removeTabFromCell", myWindowId, activeTabId);
+          emitEvent("tab-remove-from-cell", { windowId: myWindowId, paneId: activeTabId });
         } catch (err) {
           log.warn("Cmd+W handler error:", err);
         }
@@ -100,7 +101,7 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          context.commandBus.dispatch("toggleSidebar", myWindowId, "right");
+          emitEvent("sidebar-toggle", { windowId: myWindowId, side: "right" });
         } catch (_err) {
           // ignore
         }
@@ -118,7 +119,7 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          context.commandBus.dispatch("toggleSidebar", myWindowId, "left");
+          emitEvent("sidebar-toggle", { windowId: myWindowId, side: "left" });
         } catch (_err) {
           // ignore
         }
@@ -136,8 +137,8 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          context.commandBus.dispatch("openSidebar", myWindowId, "right", "");
-          context.commandBus.dispatch("openSystemTab", myWindowId, "right", "explorer", "Explorer");
+          emitEvent("sidebar-open", { windowId: myWindowId, side: "right", appType: "" });
+          emitEvent("tab-open-system", { windowId: myWindowId, side: "right", appType: "explorer", title: "Explorer" });
         } catch (_err) {
           // ignore
         }
@@ -155,8 +156,8 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          context.commandBus.dispatch("openSidebar", myWindowId, "right", "");
-          context.commandBus.dispatch("openSystemTab", myWindowId, "right", "git", "Git");
+          emitEvent("sidebar-open", { windowId: myWindowId, side: "right", appType: "" });
+          emitEvent("tab-open-system", { windowId: myWindowId, side: "right", appType: "git", title: "Git" });
         } catch (_err) {
           // ignore
         }
@@ -174,7 +175,7 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          context.commandBus.dispatch("openSystemTab", myWindowId, "search", "Search");
+          emitEvent("tab-open-system", { windowId: myWindowId, side: "right", appType: "search", title: "Search" });
         } catch (_err) {
           // ignore
         }
@@ -192,7 +193,7 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          context.commandBus.dispatch("openSystemTab", myWindowId, "projects", "Projects");
+          emitEvent("tab-open-system", { windowId: myWindowId, side: "right", appType: "projects", title: "Projects" });
         } catch (_err) {
           // ignore
         }
@@ -274,7 +275,7 @@ export class RegisterShortcutsStep implements IStartupStep {
     const handleSave = () => {
       try {
         // handleCmdS — save file (dispatches via command bus)
-        context.commandBus.dispatch("saveActiveFile");
+        emitEvent("file-save-active", {});
       } catch (err) {
         log.warn("Save handler error:", err);
       }

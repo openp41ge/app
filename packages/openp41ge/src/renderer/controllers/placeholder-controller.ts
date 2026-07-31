@@ -16,7 +16,7 @@
 import { BaseController } from "./base-controller";
 import { paneHeaderButton } from "../components/pane-header-button";
 import { APP_TYPES } from "../app-types";
-import { getWorkspace, dispatch } from "../app";
+import { getWorkspace, emitEvent } from "../app";
 import type { TabId } from "../../layout/types";
 
 export class PlaceholderController extends BaseController {
@@ -50,7 +50,7 @@ export class PlaceholderController extends BaseController {
           for (const win of ws.windows) {
             for (const p of win.grid.placements) {
               if (p.tabIds.includes(this.tabId as TabId)) {
-                dispatch("removeColumnTab", win.id, this.tabId);
+                emitEvent("tab-remove-column", { windowId: win.id, tabId: this.tabId });
                 return;
               }
             }

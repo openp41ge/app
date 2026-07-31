@@ -1,5 +1,5 @@
 /**
- * Worktree controller — sidebar state derived from workspace, toggling via dispatch.
+ * Worktree controller — sidebar state derived from workspace, toggling via event router.
  *
  * Separate from <openp41ge-worktree-tree> so that keyboard shortcuts and imports
  * can reference the controller without importing the web component.
@@ -9,7 +9,7 @@
  */
 
 import type { Openp41geWorktreeTreeElement } from "../interfaces/element-guards";
-import { getWorkspace, dispatch } from "../app";
+import { getWorkspace, emitEvent } from "../app";
 
 /**
  * Get whether the explorer sidebar is open for the current window.
@@ -38,7 +38,7 @@ export function toggleWorktree(): void {
   const win = ws.windows.find((w) => w.id === myWindowId);
   if (!win) return;
 
-  dispatch("toggleSidebar", win.id, "right");
+  emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
 }
 
 interface WorktreeTreeWithDialog extends Openp41geWorktreeTreeElement {
@@ -56,7 +56,7 @@ export function showCloneDialog(): void {
         const win = ws.windows.find((w) => w.id === myWindowId);
         if (win && !(win.sidebar?.rightSidebarOpen ?? false)) {
           // Open the right sidebar with explorer tab
-          dispatch("openSystemTab", win.id, "right", "explorer", "Explorer");
+          emitEvent("tab-open-system", { windowId: win.id, side: "right", appType: "explorer", title: "Explorer" });
         }
       }
     }

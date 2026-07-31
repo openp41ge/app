@@ -10,7 +10,7 @@
 import { BaseController } from "../../controllers/base-controller";
 import type { TabController } from "../../controllers/types";
 import { createLogger } from "openp41ge-logger";
-import { dispatch } from "../../app";
+import { emitEvent } from "../../app";
 
 const log = createLogger("project-picker-controller");
 
@@ -103,7 +103,7 @@ export class ProjectPickerController extends BaseController implements TabContro
     if (this._disconnected) return;
     const winId = window.openp41ge.workspace.getWindowId();
     if (winId) {
-      dispatch("removeColumnTab", winId, this.tabId);
+      emitEvent("tab-remove-column", { windowId: winId, tabId: this.tabId });
     }
   }
 

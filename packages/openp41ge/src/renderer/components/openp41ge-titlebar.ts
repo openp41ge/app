@@ -9,7 +9,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
-import { dispatch } from "../app";
+import { emitEvent } from "../app";
 import { showProjectPicker } from "../services/project-switch-service";
 
 const isMac = (() => {
@@ -71,13 +71,13 @@ class Openp41geTitleBar extends LitElement {
   private _toggleLeft(): void {
     const win = this.windowData;
     if (!win) return;
-    dispatch("toggleSidebar", win.id, "left");
+    emitEvent("sidebar-toggle", { windowId: win.id, side: "left" });
   }
 
   private _toggleRight(): void {
     const win = this.windowData;
     if (!win) return;
-    dispatch("toggleSidebar", win.id, "right");
+    emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
   }
 
   private async _loadProjectName(): Promise<void> {

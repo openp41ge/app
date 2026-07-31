@@ -13,7 +13,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import type { Window, Workspace, Rect, SystemTab, SystemTabId } from "../../layout/types";
-import { dispatch } from "../app";
+import { emitEvent } from "../app";
 
 import { setContextMenuActive } from "../services/drag-context";
 import "./openp41ge-sidebar";
@@ -268,7 +268,7 @@ class Openp41geWindowView extends LitElement {
         break;
       case "close-tab":
         if (this._contextMenu?.paneId) {
-          dispatch("removeTabFromCell", w.id, this._contextMenu.paneId);
+          emitEvent("tab-remove-from-cell", { windowId: w.id, paneId: this._contextMenu.paneId });
         }
         break;
     }

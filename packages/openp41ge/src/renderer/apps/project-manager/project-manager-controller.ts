@@ -20,7 +20,7 @@ import { GitService, IpcGitAdapter } from "openp41ge-git";
 import { createLogger } from "openp41ge-logger";
 import { toastService } from "../../components/openp41ge-toast";
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
-import { dispatch } from "../../app";
+import { emitEvent } from "../../app";
 
 const log = createLogger("project-manager-controller");
 
@@ -527,7 +527,7 @@ export class ProjectManagerController extends BaseController implements TabContr
       // Close this tab
       const winId = window.openp41ge.workspace.getWindowId();
       if (winId) {
-        dispatch("removeColumnTab", winId, this.tabId);
+        emitEvent("tab-remove-column", { windowId: winId, tabId: this.tabId });
       }
     } catch (err) {
       log.error("Delete project failed:", err);

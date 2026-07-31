@@ -9,7 +9,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
-import { dispatch } from "../app";
+import { emitEvent } from "../app";
 
 const log = createLogger("openp41ge-project-list");
 
@@ -88,7 +88,7 @@ export class Openp41geProjectList extends LitElement {
       if (this.systemTabId) {
         config.hostTabId = this.systemTabId;
       }
-      dispatch("openTabInCell", winId, "project-detail", projectName, undefined, 0, false, config);
+      emitEvent("tab-open-in-cell", { windowId: winId, appType: "project-detail", title: projectName, config, col: 0, insertBefore: false, replaceExisting: false });
     }
   }
 

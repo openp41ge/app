@@ -22,7 +22,7 @@
 import { BaseController } from "../../controllers/base-controller";
 import type { TabController } from "../../controllers/types";
 import { paneHeaderButton } from "../../components/pane-header-button";
-import { getWorkspace, dispatch } from "../../app";
+import { getWorkspace, emitEvent } from "../../app";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -64,7 +64,7 @@ export class TerminalController extends BaseController implements TabController 
         for (const win of ws.windows) {
           for (const p of win.grid.placements) {
             if (p.tabIds.includes(this.tabId as TabId)) {
-              dispatch("removeColumnTab", win.id, this.tabId);
+              emitEvent("tab-remove-column", { windowId: win.id, tabId: this.tabId });
               return;
             }
           }

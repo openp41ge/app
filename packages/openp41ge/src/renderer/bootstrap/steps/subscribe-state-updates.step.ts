@@ -23,12 +23,23 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
 
   async run(context: StartupContext): Promise<void> {
     // Subscribe to state updates from main process
+    let stateUpdateCount = 0;
     window.openp41ge.workspace.onStateUpdate((stateJson: string) => {
-      context.workspaceState.setState(JSON.parse(stateJson));
+      stateUpdateCount++;
+      const ws = JSON.parse(stateJson);
+      const leftTabs = ws?.windows?.[0]?.sidebar?.leftSidebarTabs;
+      const leftActive = ws?.windows?.[0]?.sidebar?.activeLeftTab;
+      const rightTabs = ws?.windows?.[0]?.sidebar?.rightSidebarTabs;
+      const rightActive = ws?.windows?.[0]?.sidebar?.activeRightTab;
+
+      context.workspaceState.setState(ws);
     });
 
     // Subscribe to state changes → render
+    let renderCount = 0;
     context.workspaceState.subscribe((_ws) => {
+      renderCount++;
+
       this._render(context);
     });
 
