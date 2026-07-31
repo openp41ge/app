@@ -482,7 +482,9 @@ class Openp41geSidebar extends LitElement {
                     data-sidebar-side=${this.side}
                     data-tab-title=${tab.title}
                     style="width:120px;${isActive
-                      ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #e0e0e0)"
+                      ? this._isFocused
+                        ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #e0e0e0)"
+                        : "background:rgba(255,255,255,0.05);color:var(--text-primary, #e0e0e0)"
                       : "color:var(--text-secondary, #888)"}"
                     @click=${() => this._onTabClick(tab.id)}
                   >
