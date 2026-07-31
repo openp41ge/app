@@ -38,6 +38,11 @@ export interface SystemTabEntry {
 }
 
 class Openp41geSidebar extends LitElement {
+  /** Globally tracks which sidebar is the focused/interacted sidebar. */
+  static _focusedSide: "left" | "right" | null = null;
+  /** Whether the window currently has focus. */
+  static _windowFocused: boolean = true;
+
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
   }
@@ -158,6 +163,9 @@ class Openp41geSidebar extends LitElement {
     super.connectedCallback();
     this._syncHostStyles();
     document.addEventListener("mousedown", this._onDocumentMouseDown);
+    this.addEventListener("click", this._onSidebarClick);
+    window.addEventListener("blur", this._onWindowBlur);
+    window.addEventListener("focus", this._onWindowFocus);
   }
 
   firstUpdated(): void {
@@ -179,6 +187,9 @@ class Openp41geSidebar extends LitElement {
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
     document.removeEventListener("mousedown", this._onDocumentMouseDown);
+    this.removeEventListener("click", this._onSidebarClick);
+    window.removeEventListener("blur", this._onWindowBlur);
+    window.removeEventListener("focus", this._onWindowFocus);
   }
 
   /**
@@ -330,18 +341,77 @@ class Openp41geSidebar extends LitElement {
   }
 
   private _onDocumentMouseDown = (e: MouseEvent): void => {
+    // When clicking inside this sidebar, mark it as focused
+    const target = e.target as Node;
+    if (this.contains(target)) {
+      Openp41geSidebar._setFocusedSide(this.side);
+    } else {
+      // If click lands outside this sidebar and inside the other sidebar,
+      // the other sidebar's _onSidebarClick will handle focus. If click
+      // is outside all sidebars, clear focus.
+      const inAnySidebar = target instanceof HTMLElement &&
+        target.closest?.("openp41ge-sidebar");
+      if (!inAnySidebar) {
+        Openp41geSidebar._setFocusedSide(null);
+      }
+    }
+
     // Close unpinned active tab when clicking outside the sidebar
-    // Also check that the sidebar is actually visible (CSS-visible, not just isOpen)
     if (!this.activeTabId) return;
     if (this.classList.contains("sidebar-element-hidden")) return;
     const activeTab = this.systemTabs.find((t) => t.id === this.activeTabId);
     if (!activeTab || activeTab.pinned) return;
-    // Check if click is outside this sidebar element
-    const target = e.target as Node;
     if (!this.contains(target)) {
       dispatch("closeSystemTab", this.windowId, this.side, this.activeTabId);
     }
   };
+
+  /**
+   * Notify all sidebar instances to re-render (e.g. when focus changes).
+   */
+  private static _notifyAll(): void {
+    document.querySelectorAll("openp41ge-sidebar").forEach((el) => {
+      (el as Openp41geSidebar).requestUpdate();
+    });
+  }
+
+  /**
+   * Set the focused sidebar side and notify all instances.
+   */
+  private static _setFocusedSide(side: "left" | "right" | null): void {
+    if (Openp41geSidebar._focusedSide === side) return;
+    Openp41geSidebar._focusedSide = side;
+    Openp41geSidebar._notifyAll();
+  }
+
+  /**
+   * Set the window focus state and notify all instances.
+   */
+  private static _setWindowFocused(focused: boolean): void {
+    if (Openp41geSidebar._windowFocused === focused) return;
+    Openp41geSidebar._windowFocused = focused;
+    Openp41geSidebar._notifyAll();
+  }
+
+  private _onSidebarClick = (): void => {
+    Openp41geSidebar._setFocusedSide(this.side);
+  };
+
+  private _onWindowBlur = (): void => {
+    Openp41geSidebar._setWindowFocused(false);
+  };
+
+  private _onWindowFocus = (): void => {
+    Openp41geSidebar._setWindowFocused(true);
+  };
+
+  /** True when this sidebar is the focused sidebar and the window is active. */
+  private get _isFocused(): boolean {
+    return (
+      Openp41geSidebar._focusedSide === this.side &&
+      Openp41geSidebar._windowFocused
+    );
+  }
 
   // ═══ Render ───────────────────────────────────────────────────────
   //
@@ -435,8 +505,11 @@ class Openp41geSidebar extends LitElement {
             ${(() => {
               const activeIdx = this.systemTabs.findIndex((t) => t.id === this.activeTabId);
               if (activeIdx === -1) return nothing;
+              const indicatorColor = this._isFocused
+                ? "var(--accent, #4a9eff)"
+                : "#555";
               return html`
-                <div class="absolute h-0.5 pointer-events-none" style="width:120px;left:${activeIdx * 120 - this._scrollLeft}px;bottom:-1px;z-index:3;background:var(--accent, #4a9eff);"></div>
+                <div class="absolute h-0.5 pointer-events-none transition-colors duration-150" style="width:120px;left:${activeIdx * 120 - this._scrollLeft}px;bottom:-1px;z-index:3;background:${indicatorColor};"></div>
               `;
             })()}
           ` : nothing}
