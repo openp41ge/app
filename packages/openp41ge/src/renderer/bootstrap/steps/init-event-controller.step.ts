@@ -55,7 +55,25 @@ export class InitEventControllerStep implements IStartupStep {
     // Expose router globally so components can emit events
     setEventRouter(router);
 
-    // 7. Register core keyboard handlers
+    // 7. Register workspace refresh handler
+    router.registerHandler("workspace/refresh-data", async () => {
+      // Refresh workspace data when workspace changes (repo opened, etc.)
+      try {
+        const repos = await window.openp41ge.workspaceController.listRepos();
+        workspaceData.repos = [];
+        for (const repo of repos) {
+          workspaceData.addRepo({
+            id: `repo-${repo.name}`,
+            path: repo.path,
+            name: repo.name,
+          });
+        }
+      } catch {
+        // ignore — controller may not be ready
+      }
+    });
+
+    // 8. Register core keyboard handlers
     router.registerHandler("keyboard/suppress", async () => {
       const t = Date.now() + 500;
       appState.shortcutsSuppressedUntil = t;
