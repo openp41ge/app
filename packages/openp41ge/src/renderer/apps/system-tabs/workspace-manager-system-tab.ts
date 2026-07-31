@@ -129,9 +129,13 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         <div class="ws-section">
           <div class="ws-row">
             <div class="ws-label">Workspace ID</div>
-            <div class="ws-value mono">${data.id}</div>
+            <div class="ws-value">
+              <span class="ws-actions">
+                <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, data.id)}>Copy</button>
+              </span>
+            </div>
           </div>
-        </div>
+          <div class="ws-path">${data.id}</div>
         <div class="ws-section">
           <div class="ws-row">
             <div class="ws-label">File</div>
