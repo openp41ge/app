@@ -348,8 +348,11 @@ class Openp41geSidebar extends LitElement {
               ${this.systemTabs.map((tab, idx) => {
                 const isActive = tab.id === this.activeTabId;
                 const isLast = idx === this.systemTabs.length - 1;
-                let sideBorder = idx === 0 ? "border-l" : "";
-                if (!isLast || !this._hasOverflow) sideBorder += " border-r";
+                // First tab: skip left border on right sidebar (sidebar's own
+                // border-l already provides it). Last tab: skip right border on
+                // left sidebar (sidebar's own border-r already provides it).
+                let sideBorder = idx === 0 && this.side !== "right" ? "border-l" : "";
+                if ((!isLast || !this._hasOverflow) && !(isLast && this.side === "left")) sideBorder += " border-r";
                 return html`
                   <div
                     class="sidebar-tab flex items-center gap-1 px-2 py-1.5 cursor-pointer text-xs whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
