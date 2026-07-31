@@ -457,6 +457,13 @@ contextBridge.exposeInMainWorld("openp41ge", {
     return () => ipcRenderer.removeListener("zoom:reset", handler);
   },
 
+  /** Listen for File > New Workspace... menu action. */
+  onNewWorkspace: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu:new-workspace", handler);
+    return () => ipcRenderer.removeListener("menu:new-workspace", handler);
+  },
+
   /** Listen for File > Open Workspace... menu action. */
   onOpenWorkspace: (callback) => {
     const handler = () => callback();

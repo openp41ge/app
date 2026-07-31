@@ -171,6 +171,8 @@ declare global {
       onZoomOut: (callback: () => void) => () => void;
       onZoomReset: (callback: () => void) => () => void;
 
+      /** Listen for File > New Workspace... menu action. */
+      onNewWorkspace: (callback: () => void) => () => void;
       /** Listen for File > Open Workspace... menu action. */
       onOpenWorkspace: (callback: () => void) => () => void;
       /** Listen for File > Save Workspace As... menu action. */

@@ -364,6 +364,13 @@ export class Openp41geApplication {
               }
             },
           },
+          {
+            label: "New Workspace...",
+            accelerator: "CmdOrCtrl+Shift+N",
+            click: () => {
+              BrowserWindow.getFocusedWindow()?.webContents.send("menu:new-workspace");
+            },
+          },
           { type: "separator" },
           {
             label: "Open Workspace...",

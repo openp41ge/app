@@ -39,6 +39,15 @@ export class RegisterIpcListenersStep implements IStartupStep {
     // Wire the app reset listener so window.openp41ge.workspace.reset() works
     wireResetListener();
 
+    // ── Menu: New Workspace ─────────────────────────────────────────────
+    window.openp41ge.onNewWorkspace(async () => {
+      await workspaceFileService.ensureDraftExists();
+      const winId = window.openp41ge?.workspace?.getWindowId?.();
+      if (winId) {
+        emitEvent("system-tab-open", { windowId: winId, appType: "workspace-manager" });
+      }
+    });
+
     // ── Menu: Open Workspace ────────────────────────────────────────────
     window.openp41ge.onOpenWorkspace(() => {
       workspaceFileService.openDialog().then((loaded) => {
