@@ -52,8 +52,12 @@ export class RegisterIpcListenersStep implements IStartupStep {
     });
 
     // ── Menu: Save Workspace As... ──────────────────────────────────────
-    window.openp41ge.onSaveWorkspaceAs(() => {
-      workspaceFileService.saveAs();
+    window.openp41ge.onSaveWorkspaceAs(async () => {
+      // Ensure a draft exists before showing Save As dialog
+      if (!workspaceFileService.activeData) {
+        await workspaceFileService.ensureDraftExists();
+      }
+      await workspaceFileService.saveAs();
     });
 
     log.info("IPC listeners registered");
