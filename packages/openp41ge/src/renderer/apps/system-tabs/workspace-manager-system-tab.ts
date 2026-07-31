@@ -24,7 +24,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
   private _workspaces: WorkspaceInfo[] = [];
   private _expanded: Set<string> = new Set();
   private _loaded = false;
-  private _showNewInput = false;
   private _newName = "";
 
   constructor(tabId: string) {
@@ -51,6 +50,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       this._loaded = true;
     }
     this._requestUpdate();
+    this._focusInput();
   }
 
   private _toggleExpanded(name: string): void {
@@ -80,27 +80,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           flex-direction: column;
           height: 100%;
           overflow-y: auto;
-        }
-        .workspaces-header {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          padding: 6px 12px;
-          border-bottom: 1px solid var(--divider, #333);
-          flex-shrink: 0;
-        }
-        .workspaces-header button {
-          padding: 3px 8px;
-          font-size: 12px;
-          border: 1px solid var(--divider, #333);
-          border-radius: 3px;
-          cursor: pointer;
-          background: var(--bg-secondary, #1e1e1e);
-          color: var(--text-primary, #ccc);
-          white-space: nowrap;
-        }
-        .workspaces-header button:hover {
-          background: var(--bg-hover, #2a2a2a);
         }
         .new-input-row {
           display: flex;
@@ -265,28 +244,22 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         }
       </style>
       <div class="workspaces-wrap">
-        <!-- Header bar -->
-        <div class="workspaces-header">
-          <button @click=${() => this._showCreateInput()}>+ New</button>
+        <!-- Always-visible create row -->
+        <div class="new-input-row">
+          <input
+            type="text"
+            placeholder="Workspace name..."
+            .value=${this._newName}
+            @input=${(e: InputEvent) => { this._newName = (e.target as HTMLInputElement).value; }}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter") this._confirmCreate();
+              if (e.key === "Escape") this._cancelCreate();
+            }}
+          />
+          <button class="primary" @click=${() => this._confirmCreate()}>Create</button>
+          <button @click=${() => this._cancelCreate()}>Cancel</button>
         </div>
-        <!-- Inline create input -->
-        ${this._showNewInput ? html`
-          <div class="new-input-row">
-            <input
-              type="text"
-              placeholder="Workspace name..."
-              .value=${this._newName}
-              @input=${(e: InputEvent) => { this._newName = (e.target as HTMLInputElement).value; }}
-              @keydown=${(e: KeyboardEvent) => {
-                if (e.key === "Enter") this._confirmCreate();
-                if (e.key === "Escape") this._cancelCreate();
-              }}
-            />
-            <button class="primary" @click=${() => this._confirmCreate()}>Create</button>
-            <button @click=${() => this._cancelCreate()}>Cancel</button>
-          </div>
-        ` : ''}
-        ${this._workspaces.length === 0 && !this._showNewInput
+        ${this._workspaces.length === 0
           ? html`<div class="empty-state">No workspaces yet.</div>`
           : html`
               <div class="workspaces-accordion">
@@ -354,11 +327,8 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     }
   }
 
-  private _showCreateInput(): void {
-    this._showNewInput = true;
-    this._newName = "";
-    this._requestUpdate();
-    // Focus the input after render
+  /** Focus the input field on next render. */
+  private _focusInput(): void {
     requestAnimationFrame(() => {
       const input = document.querySelector(".new-input-row input") as HTMLInputElement | null;
       input?.focus();
@@ -366,15 +336,14 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
   }
 
   private _cancelCreate(): void {
-    this._showNewInput = false;
     this._newName = "";
     this._requestUpdate();
+    this._focusInput();
   }
 
   private async _confirmCreate(): Promise<void> {
     const name = this._newName.trim();
     if (!name) return;
-    this._showNewInput = false;
     this._newName = "";
     try {
       const created = await window.openp41ge.project.create(name);
