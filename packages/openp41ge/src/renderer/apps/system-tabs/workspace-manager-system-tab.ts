@@ -66,26 +66,23 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       </svg>
     `;
 
-    /** Truncate a string in the middle, showing the start and end. */
-    function truncMiddle(s: string, maxLen: number): string {
-      if (s.length <= maxLen) return s;
-      const half = Math.floor((maxLen - 3) / 2);
-      return s.slice(0, half) + "..." + s.slice(s.length - half);
-    }
-
     return html`
       <style>
         .ws-wrap { display:flex; flex-direction:column; height:100%; overflow-y:auto; }
         .ws-section { display:flex; align-items:center; gap:12px; padding:8px 14px; min-height:32px; }
         .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); flex-shrink:0; width:110px; }
-        .ws-value { font-size:13px; color:var(--text-primary,#ccc); margin-left:auto; text-align:right; }
+        .ws-value { font-size:13px; color:var(--text-primary,#ccc); flex:1 1 auto; min-width:0; text-align:right; }
         .ws-value.mono { font-family:monospace; font-size:12px; }
         .ws-value.trunc { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
         .ws-clickable {
           display:inline-flex; align-items:center; gap:6px; padding:2px 6px; border-radius:4px;
           cursor:pointer; transition:background .1s;
+          max-width:100%; overflow:hidden;
         }
         .ws-clickable:hover { background:var(--bg-hover,rgba(128,128,128,.15)); }
+        .ws-clickable .trunc-path {
+          overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+        }
         .ws-repo-item { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:13px; color:var(--text-primary,#ccc); }
         .ws-repo-item::before { content:"•"; color:var(--text-secondary,#999); }
         .ws-worktrees { font-size:12px; color:var(--text-secondary,#999); }
@@ -100,14 +97,14 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           <div class="ws-label">File</div>
           <div class="ws-clickable ws-value mono" @click=${() => this._onSaveAs()} title="${filePath ?? "(not saved)"}">
             ${pencil}
-            ${filePath ? truncMiddle(filePath, 60) : "(not saved)"}
+            <span class="trunc-path">${filePath ?? "(not saved)"}</span>
           </div>
         </div>
         <div class="ws-section">
           <div class="ws-label">Data Dir</div>
           <div class="ws-clickable ws-value mono" @click=${() => this._onChangeDataDir()} title="${data.dataDir}">
             ${pencil}
-            ${truncMiddle(data.dataDir, 60)}
+            <span class="trunc-path">${data.dataDir}</span>
           </div>
         </div>
         <div class="ws-section">
