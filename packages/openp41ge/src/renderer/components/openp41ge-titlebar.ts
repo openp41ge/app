@@ -102,7 +102,7 @@ class Openp41geTitleBar extends LitElement {
         <div
           class="tb-btn flex items-center justify-center w-7 h-7 rounded cursor-pointer text-secondary hover:text-primary shrink-0 mr-0.5"
           style="-webkit-app-region:no-drag"
-          title="Workspace Manager"
+          title="Workspaces"
           @click=${() => this._openWorkspaceManager()}
         >
           <svg width="18" height="18" viewBox="0 -960 960 960" fill="currentColor">
