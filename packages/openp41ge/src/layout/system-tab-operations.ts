@@ -69,17 +69,19 @@ export function openSystemTab(
   let win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
 
-  // Close any unpinned active tab on the target sidebar before opening a new one
-  const prevActiveTabId = resolvedSide === "left"
-    ? win.sidebar?.activeLeftTab
-    : win.sidebar?.activeRightTab;
-  if (prevActiveTabId) {
-    const prevTab = workspace.systemTabs[prevActiveTabId as SystemTabId];
-    if (prevTab && !prevTab.pinned) {
-      workspace = closeSystemTab(workspace, winId, resolvedSide, prevActiveTabId);
-      const w = workspace.windows.find((w) => w.id === winId);
-      if (!w) return workspace;
-      win = w;
+  // Close any unpinned active tab across ALL sidebars before opening a new one.
+  // When a user opens a system tab via shortcut, any previously active unpinned
+  // tab (on any sidebar) should close — it was a preview-like session.
+  for (const s of ["left" as const, "right" as const]) {
+    const activeTabId = s === "left" ? win.sidebar?.activeLeftTab : win.sidebar?.activeRightTab;
+    if (activeTabId) {
+      const prevTab = workspace.systemTabs[activeTabId as SystemTabId];
+      if (prevTab && !prevTab.pinned) {
+        workspace = closeSystemTab(workspace, winId, s, activeTabId);
+        const w = workspace.windows.find((w) => w.id === winId);
+        if (!w) return workspace;
+        win = w;
+      }
     }
   }
 
