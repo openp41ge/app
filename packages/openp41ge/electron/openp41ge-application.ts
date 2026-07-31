@@ -332,7 +332,7 @@ export class Openp41geApplication {
   }
 
   private _setupMenu(): void {
-    const menu = Menu.buildFromTemplate([
+    const template: Electron.MenuItemConstructorOptions[] = [
       {
         label: "Edit",
         submenu: [
@@ -411,7 +411,37 @@ export class Openp41geApplication {
           },
         ],
       },
-    ]);
+    ];
+
+    // Window menu — includes dev items (Reload, Devtools) only in dev mode
+    template.push({
+      label: "Window",
+      submenu: [
+        ...(!app.isPackaged
+          ? [
+              {
+                label: "Reload",
+                accelerator: "CmdOrCtrl+R",
+                click: () => {
+                  BrowserWindow.getFocusedWindow()?.webContents.reload();
+                },
+              },
+              {
+                label: "Devtools",
+                accelerator: "Alt+CmdOrCtrl+I",
+                click: () => {
+                  BrowserWindow.getFocusedWindow()?.webContents.openDevTools({ mode: "detach" });
+                },
+              },
+              { type: "separator" as const },
+            ]
+          : []),
+        { role: "minimize" as const },
+        { role: "close" as const },
+      ],
+    });
+
+    const menu = Menu.buildFromTemplate(template);
     Menu.setApplicationMenu(menu);
   }
 

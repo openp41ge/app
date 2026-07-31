@@ -136,7 +136,7 @@ class Openp41geTitleBar extends LitElement {
           }}
           @click=${() => this._openProjectPicker()}
         >
-          ${this._projectName ? (this._isDraft ? "Draft" : this._projectName) : "Openp41ge"}
+          ${this._projectName ? (this._isDraft ? "draft" : this._projectName) : "Openp41ge"}
         </span>
 
         <!-- Spacer to push content to the right -->
