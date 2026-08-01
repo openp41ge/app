@@ -283,7 +283,7 @@ class Openp41geWindowView extends LitElement {
           class="openp41ge-bottom-bar flex items-center h-6 bg-bg-primary border-t border-divider shrink-0 px-2"
         >
           <div class="flex-1"></div>
-          <div class="text-xs text-muted">
+          <div class="text-xs text-muted" style="padding-right:12px">
             ${workspaceFileService.activeData
               ? html`<span style="font-family:monospace">${workspaceFileService.activeData.id.slice(0, 8)}</span>`
               : html`<span>no workspace loaded</span>`}
