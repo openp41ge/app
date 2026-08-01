@@ -292,21 +292,26 @@ class Openp41geWindowView extends LitElement {
           ></openp41ge-sidebar>
         </div>
         <div
-          class="openp41ge-bottom-bar flex items-center h-6 bg-bg-primary border-t border-divider shrink-0" style="padding-left:8px"
+          class="openp41ge-bottom-bar flex items-center h-6 border-t border-divider shrink-0"
+          style="padding-left:8px;background:${workspaceFileService.activeData ? 'rgba(86,156,214,0.18)' : 'var(--bg-primary)'};transition:background .15s"
+          @mouseenter=${(e: MouseEvent) => {
+            if (workspaceFileService.activeData) {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(86,156,214,0.28)';
+            }
+          }}
+          @mouseleave=${(e: MouseEvent) => {
+            if (workspaceFileService.activeData) {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(86,156,214,0.18)';
+            } else {
+              (e.currentTarget as HTMLElement).style.background = 'var(--bg-primary)';
+            }
+          }}
         >
           <div class="flex-1"></div>
           <div
-            class="text-xs text-muted"
-            style="display:flex;align-items:center;height:100%;padding:0 20px 0 8px;cursor:pointer;transition:background .1s;background:${workspaceFileService.activeData ? 'rgba(74,158,255,0.1)' : 'transparent'}"
+            class="text-xs"
+            style="display:flex;align-items:center;height:100%;padding:0 20px 0 8px;cursor:pointer;color:${workspaceFileService.activeData ? 'var(--accent)' : 'var(--text-muted)'};"
             @click=${() => this._onWorkspaceClick()}
-            @mouseenter=${(e: MouseEvent) => {
-              const el = e.currentTarget as HTMLElement;
-              el.style.background = workspaceFileService.activeData ? 'rgba(74,158,255,0.2)' : 'var(--bg-hover,rgba(128,128,128,.15))';
-            }}
-            @mouseleave=${(e: MouseEvent) => {
-              const el = e.currentTarget as HTMLElement;
-              el.style.background = workspaceFileService.activeData ? 'rgba(74,158,255,0.1)' : 'transparent';
-            }}
             title="Open workspace settings"
           >
             ${workspaceFileService.activeData
