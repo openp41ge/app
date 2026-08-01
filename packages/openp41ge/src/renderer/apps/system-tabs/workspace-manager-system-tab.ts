@@ -126,7 +126,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         </div>
         <div class="ws-section">
           <div class="ws-row">
-            <div class="ws-label">File</div>
+            <div class="ws-label">Workspace File</div>
             <div class="ws-value">
               <span class="ws-actions">
                 <button class="ws-act-btn" @click=${() => this._onSaveAs()}>Edit</button>
