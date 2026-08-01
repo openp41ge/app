@@ -2,9 +2,11 @@
  * <openp41ge-bottom-pane> — system tab bottom pane.
  *
  * A `position: fixed` panel that overlays the full viewport width below the
- * titlebar. Contains a tab bar (always visible at the bottom) with system
- * tab buttons and the workspace indicator. The content area appears above
- * the tab bar when the pane is expanded via the drag handle.
+ * titlebar. Always visible at the bottom of the window.
+ *
+ * At minimum height (30px), shows only a drag bar with grip indicator.
+ * When expanded, the drag bar sits at the top, followed by the system tab
+ * bar, then content.
  *
  * The grid and sidebars continue rendering underneath — never hidden.
  */
@@ -24,6 +26,8 @@ export interface SystemTabInfo {
 }
 
 const TAB_BAR_HEIGHT = 30;
+const DRAG_BAR_HEIGHT = 4;
+const MIN_PANE_HEIGHT = TAB_BAR_HEIGHT;
 const TITLEBAR_HEIGHT = 38;
 
 class Openp41geBottomPane extends LitElement {
@@ -40,13 +44,13 @@ class Openp41geBottomPane extends LitElement {
   @property({ type: String })
   activeTabId: string | null = null;
 
-  /** Height of the pane in pixels. Starts collapsed (tab bar only). */
+  /** Height of the pane in pixels. Starts at minimum (drag bar only). */
   @state()
-  private _paneHeight = TAB_BAR_HEIGHT;
+  private _paneHeight = MIN_PANE_HEIGHT;
 
   private _isDragging = false;
   private _dragStartY = 0;
-  private _dragStartHeight = TAB_BAR_HEIGHT;
+  private _dragStartHeight = MIN_PANE_HEIGHT;
 
   /** Cache of editor system tab controller instances, keyed by tabId. */
   private _controllers: Map<string, EditorSystemTabController> = new Map();
@@ -64,15 +68,14 @@ class Openp41geBottomPane extends LitElement {
     return ctrl;
   }
 
-  private _activeContent: TemplateResult | typeof nothing = nothing;
+  /** True when the pane shows more than just the drag bar. */
+  private get _isExpanded(): boolean {
+    return this._paneHeight > MIN_PANE_HEIGHT;
+  }
 
   // ═══ Drag resize ─────────────────────────────────────────────────────
 
   private _onDragStart(e: MouseEvent): void {
-    // Ignore if the target is a tab button or workspace indicator
-    const target = e.target as HTMLElement;
-    if (target.closest("[data-tab-button]") || target.closest("[data-workspace-indicator]")) return;
-
     this._isDragging = true;
     this._dragStartY = e.clientY;
     this._dragStartHeight = this._paneHeight;
@@ -87,9 +90,11 @@ class Openp41geBottomPane extends LitElement {
 
     const delta = this._dragStartY - e.clientY; // positive = drag up = expand
     const maxHeight = window.innerHeight - TITLEBAR_HEIGHT;
-    const newHeight = Math.max(TAB_BAR_HEIGHT, Math.min(maxHeight, this._dragStartHeight + delta));
+    const newHeight = Math.max(MIN_PANE_HEIGHT, Math.min(maxHeight, this._dragStartHeight + delta));
 
     this._paneHeight = newHeight;
+    // Force Lit to update synchronously during drag for smooth feedback
+    (this as unknown as { _$didUpdate?: boolean })._$didUpdate = true;
   };
 
   private _onDragEnd = (): void => {
@@ -111,15 +116,15 @@ class Openp41geBottomPane extends LitElement {
     // Left-click only beyond this point
     if (e.button !== 0) return;
 
-    // If clicking the active tab, toggle collapse/expand
-    if (tabId === this.activeTabId) {
-      if (this._paneHeight > TAB_BAR_HEIGHT) {
-        this._paneHeight = TAB_BAR_HEIGHT;
+    const hasTabs = this.tabs.length > 0;
+
+    if (tabId === this.activeTabId && hasTabs) {
+      // Clicking the active tab toggles collapse/expand
+      if (this._isExpanded) {
+        this._paneHeight = MIN_PANE_HEIGHT;
       } else {
-        this._paneHeight = Math.max(TAB_BAR_HEIGHT + 100, this._paneHeight);
-        if (this._paneHeight === TAB_BAR_HEIGHT) {
-          this._paneHeight = 300; // default expanded height
-        }
+        this._paneHeight = Math.max(MIN_PANE_HEIGHT + 100, this._paneHeight);
+        if (!this._isExpanded) this._paneHeight = 300;
       }
       return;
     }
@@ -127,8 +132,8 @@ class Openp41geBottomPane extends LitElement {
     // Activate a different tab — expand if collapsed
     emitEvent("system-tab-activate", { windowId: this.windowId, tabId });
 
-    if (this._paneHeight <= TAB_BAR_HEIGHT) {
-      this._paneHeight = 300; // default expanded height
+    if (!this._isExpanded) {
+      this._paneHeight = 300;
     }
   }
 
@@ -142,32 +147,30 @@ class Openp41geBottomPane extends LitElement {
       await workspaceFileService.openDialog();
       return;
     }
-    // Open workspace manager tab in the bottom pane
     emitEvent("system-tab-open", { windowId: this.windowId, appType: "workspace-manager" });
   }
 
   // ═══ Render ──────────────────────────────────────────────────────────
 
-  render(): TemplateResult | typeof nothing {
-    if (!this.tabs || this.tabs.length === 0) return nothing;
-
-    const isExpanded = this._paneHeight > TAB_BAR_HEIGHT;
+  render(): TemplateResult {
+    const hasTabs = this.tabs.length > 0;
+    const isExpanded = this._isExpanded && hasTabs;
     const activeTab = this.tabs.find((t) => t.id === this.activeTabId);
 
     // Get content for active tab
     let content: TemplateResult | typeof nothing = nothing;
-    if (activeTab) {
+    if (activeTab && hasTabs) {
       const ctrl = this._getController(activeTab);
       if (ctrl) {
         content = ctrl.render() as TemplateResult;
       }
     }
 
-    const contentHeight = this._paneHeight - TAB_BAR_HEIGHT;
+    const tabBarAndContentHeight = this._paneHeight - DRAG_BAR_HEIGHT;
 
     return html`
       <style>
-        .bottom-pane-container {
+        .bp-container {
           position: fixed;
           bottom: 0;
           left: 0;
@@ -176,18 +179,39 @@ class Openp41geBottomPane extends LitElement {
           display: flex;
           flex-direction: column;
           background: var(--bg-primary, #1e1e1e);
-          border-top: 1px solid var(--divider, #333);
           overflow: hidden;
           user-select: none;
         }
+        /* ── Drag bar (always visible) ──────────────────────────────── */
+        .bp-drag-bar {
+          height: ${DRAG_BAR_HEIGHT}px;
+          flex-shrink: 0;
+          cursor: ns-resize;
+          background: var(--bg-secondary, #252526);
+          border-top: 1px solid var(--divider, #333);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .bp-drag-bar-grip {
+          width: 32px;
+          height: 2px;
+          border-radius: 1px;
+          background: var(--text-muted, #555);
+          opacity: 0.5;
+        }
+        .bp-drag-bar:hover .bp-drag-bar-grip {
+          opacity: 0.8;
+        }
+        /* ── Tab bar ─────────────────────────────────────────────────── */
         .bp-tab-bar {
           display: flex;
           align-items: center;
           height: ${TAB_BAR_HEIGHT}px;
           flex-shrink: 0;
-          cursor: ns-resize;
           overflow-x: auto;
           background: var(--bg-secondary, #252526);
+          border-top: 1px solid var(--divider, #333);
         }
         .bp-tab {
           display: flex;
@@ -232,6 +256,7 @@ class Openp41geBottomPane extends LitElement {
           background: var(--bg-hover-strong, #444);
           color: var(--text-primary, #ccc);
         }
+        /* ── Workspace indicator ─────────────────────────────────────── */
         .bp-workspace-indicator {
           display: flex;
           align-items: center;
@@ -247,6 +272,7 @@ class Openp41geBottomPane extends LitElement {
         .bp-workspace-indicator:hover {
           color: var(--accent, #569cd6);
         }
+        /* ── Content area ────────────────────────────────────────────── */
         .bp-content {
           flex: 1;
           overflow: auto;
@@ -255,64 +281,65 @@ class Openp41geBottomPane extends LitElement {
         }
       </style>
       <div
-        class="bottom-pane-container"
+        class="bp-container"
         style="height:${this._paneHeight}px"
       >
-        <!-- Content area (visible when expanded) -->
+        <!-- Drag bar at the top -->
+        <div class="bp-drag-bar" @mousedown=${this._onDragStart}>
+          <div class="bp-drag-bar-grip"></div>
+        </div>
+
         ${isExpanded ? html`
-          <div class="bp-content" style="height:${contentHeight}px">
+          <!-- Tab bar below drag bar -->
+          <div class="bp-tab-bar">
+            ${this.tabs.map(
+              (tab) => html`
+                <div
+                  class="bp-tab ${tab.id === this.activeTabId ? 'active' : ''}"
+                  data-tab-button
+                  @mousedown=${(e: MouseEvent) => this._onTabClick(tab.id, e)}
+                >
+                  <span>${tab.title}</span>
+                  <span
+                    class="bp-tab-close"
+                    data-tab-close
+                    @click=${(e: MouseEvent) => this._onTabClose(e, tab.id)}
+                    title="Close"
+                  >✕</span>
+                </div>
+              `,
+            )}
+
+            <!-- Workspace indicator (in tab bar only when expanded) -->
+            <div
+              class="bp-workspace-indicator"
+              data-workspace-indicator
+              @click=${this._onWorkspaceClick}
+              title="${workspaceFileService.activeData ? 'Open workspace settings' : 'Open workspace'}"
+            >
+              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="margin-top:-1px">
+                <path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/>
+              </svg>
+              ${workspaceFileService.activeData
+                ? html`<span style="font-family:monospace">${workspaceFileService.activeData.id.slice(0, 8)}</span>`
+                : html`<span>open workspace</span>`}
+            </div>
+          </div>
+
+          <!-- Content area -->
+          <div class="bp-content" style="height:${tabBarAndContentHeight - TAB_BAR_HEIGHT}px">
             ${content}
           </div>
         ` : nothing}
-
-        <!-- Tab bar — always visible, acts as drag handle -->
-        <div class="bp-tab-bar" @mousedown=${this._onDragStart}>
-          ${this.tabs.map(
-            (tab) => html`
-              <div
-                class="bp-tab ${tab.id === this.activeTabId ? 'active' : ''}"
-                data-tab-button
-                @mousedown=${(e: MouseEvent) => this._onTabClick(tab.id, e)}
-              >
-                <span>${tab.title}</span>
-                <span
-                  class="bp-tab-close"
-                  data-tab-close
-                  @click=${(e: MouseEvent) => this._onTabClose(e, tab.id)}
-                  title="Close"
-                >✕</span>
-              </div>
-            `,
-          )}
-
-          <div style="flex:1;min-width:0"></div>
-
-          <!-- Workspace indicator -->
-          <div
-            class="bp-workspace-indicator"
-            data-workspace-indicator
-            @click=${this._onWorkspaceClick}
-            title="${workspaceFileService.activeData ? 'Open workspace settings' : 'Open workspace'}"
-          >
-            <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="margin-top:-1px">
-              <path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/>
-            </svg>
-            ${workspaceFileService.activeData
-              ? html`<span style="font-family:monospace">${workspaceFileService.activeData.id.slice(0, 8)}</span>`
-              : html`<span>open workspace</span>`}
-          </div>
-        </div>
       </div>
     `;
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    // Clean up drag listeners if unmounted mid-drag
     document.removeEventListener("mousemove", this._onDragMove);
     document.removeEventListener("mouseup", this._onDragEnd);
 
-    // Destroy all controllers
     for (const ctrl of this._controllers.values()) {
       const maybe = ctrl as unknown as { destroy?: () => void };
       maybe.destroy?.();
