@@ -311,16 +311,25 @@ class Openp41geSidebar extends LitElement {
 
     return html`
       <div
-        class="flex flex-col bg-gutter ${borderClass} overflow-hidden relative"
+        class="flex flex-col bg-gutter ${borderClass} relative"
         style="height:100%;"
       >
-        <!-- Resize notch -->
+        <!-- Resize notch (centered over border) -->
         <div
           class="sidebar-resize-notch absolute top-0 w-1 h-full cursor-col-resize z-10 pointer-events-auto touch-none bg-transparent ${resizeNotchSideClass}"
           @mousedown=${this._startResize}
         ></div>
 
         <style>
+          .sidebar-resize-notch {
+            width: 7px;
+          }
+          .sidebar-resize-notch.right-0 {
+            right: -3px;
+          }
+          .sidebar-resize-notch.left-0 {
+            left: -3px;
+          }
           .sidebar-resize-notch::before {
             content: "";
             position: absolute;
@@ -336,8 +345,8 @@ class Openp41geSidebar extends LitElement {
           .sidebar-resize-notch.dragging::before {
             opacity: 1;
           }
-          .sidebar-resize-notch.right-0::before { right: 0; }
-          .sidebar-resize-notch.left-0::before { left: 0; }
+          .sidebar-resize-notch.right-0::before { right: 2px; }
+          .sidebar-resize-notch.left-0::before { left: 2px; }
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
         </style>
 
