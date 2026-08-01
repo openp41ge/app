@@ -152,7 +152,6 @@ class Openp41geBottomPane extends LitElement {
         .bp-tab.active {
           color: var(--text-primary, #ccc);
           background: var(--bg-primary, #1e1e1e);
-          border-top: 1px solid var(--accent, #007acc);
         }
         .bp-tab-close {
           display: flex;
