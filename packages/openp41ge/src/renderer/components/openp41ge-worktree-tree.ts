@@ -183,6 +183,8 @@ class Openp41geWorktreeTree extends LitElement {
   private _errorRetry: (() => void) | null = null;
   private _loadingRepos = false;
   private _pendingLoadAfterTreeReady = false;
+  /** Guards against re-entering _loadRepos() from updated() on every Lit cycle. */
+  private _hasLoadedOnce = false;
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
   @state() private _dropIndex: number = -1;
   @state() private _explorerDragIdx: number = -1;
@@ -661,7 +663,9 @@ class Openp41geWorktreeTree extends LitElement {
       } else {
         _restoreGridFocus();
       }
-      this.requestUpdate();
+      // Note: _syncExplorerState should NOT call this.requestUpdate() —
+      // it would re-enter the Lit update cycle from within willUpdate/updated,
+      // creating an infinite loop. Lit's reactive properties handle re-renders.
     }
   }
 
@@ -685,9 +689,6 @@ class Openp41geWorktreeTree extends LitElement {
     this._treeEl = this.querySelector(".wt-tree-scroll");
 
     // Sync drawer visibility now that the drawer DOM is available.
-    // _syncExplorerState() may have set _isOpen before the first render,
-    // but updateDrawerVisibility() couldn't run because .wt-drawer didn't
-    // exist yet. Run it here so the drawer width reflects the correct state.
     if (this._drawerEl) {
       updateDrawerVisibility();
     }
@@ -695,16 +696,19 @@ class Openp41geWorktreeTree extends LitElement {
     // Sync custom overlay scrollbar thumb position and bind scroll listener.
     // Use requestAnimationFrame so the browser has performed layout after
     // Lit's DOM update — otherwise scrollHeight may still reflect old
-    // content (e.g., expanded worktrees) and the scrollbar won't be hidden
-    // when content shrinks.
+    // content and the scrollbar won't be hidden when content shrinks.
     requestAnimationFrame(() => this._syncScrollbar());
     if (this._treeEl) {
       this._treeEl.removeEventListener("scroll", this._boundScroll);
       this._treeEl.addEventListener("scroll", this._boundScroll, { passive: true });
     }
 
-    // Trigger data load if not yet loaded
-    if (this._repos.length === 0 && !this._loadingRepos) {
+    // Trigger initial data load once. The _hasLoadedOnce guard prevents
+    // re-entry on subsequent Lit update cycles — without it _loadRepos()
+    // calls _renderTree() which calls requestUpdate(), causing an
+    // infinite Lit update loop.
+    if (!this._hasLoadedOnce) {
+      this._hasLoadedOnce = true;
       this._loadRepos();
     }
 
@@ -1583,9 +1587,9 @@ class Openp41geWorktreeTree extends LitElement {
   private _renderChain: Promise<void> = Promise.resolve();
 
   private async _renderTree(): Promise<void> {
-    // Data is now rendered by Lit template via @state repos/worktrees.
-    // This method is kept for backward compatibility - triggers re-render.
-    this.requestUpdate();
+    // Data is rendered by Lit template via @state repos/worktrees.
+    // Removed this.requestUpdate() — it caused an infinite Lit update loop
+    // when _loadRepos() called _renderTree() from within updated().
   }
   private async _toggleRepo(name: string): Promise<void> {
     if (_expandedRepos.has(name)) {
