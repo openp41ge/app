@@ -187,14 +187,14 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
             ${
               this._showAddInput
                 ? html`
-                  <div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:4px;background:rgba(255,255,255,.06)">
+                  <div style="display:flex;align-items:center;gap:4px;margin-left:-6px;padding:4px 6px;border-radius:4px;background:rgba(255,255,255,.06)">
                     <input
                       type="text"
                       placeholder="Enter repo URL"
                       .value=${this._addInputValue}
                       @input=${(e: Event) => { this._addInputValue = (e.target as HTMLInputElement).value; }}
                       @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._onAddConfirm(); if (e.key === 'Escape') this._onAddCancel(); }}
-                      style="flex:1;background:transparent;color:var(--text-primary,#ccc);border:none;border-radius:3px;padding:3px 6px;font-size:12px;outline:none"
+                      style="flex:1;background:transparent;color:var(--text-primary,#ccc);border:none;border-radius:3px;padding:3px 0 3px 0;font-size:12px;outline:none"
                     >
                     <span
                       style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc)"
