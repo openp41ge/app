@@ -37,13 +37,30 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private async _onAddRepo(): Promise<void> {
-    const url = window.prompt("Enter repository URL");
+  private _showAddInput = false;
+  private _addInputValue = "";
+
+  private _onAddRepo(): void {
+    this._showAddInput = true;
+    this._addInputValue = "";
+    this._emitUpdate();
+  }
+
+  private _onAddConfirm(): void {
+    const url = this._addInputValue.trim();
     if (!url) return;
     const data = workspaceFileService.activeData;
     if (!data) return;
     data.repos.push({ url, worktrees: [] });
-    await workspaceFileService.save();
+    workspaceFileService.save();
+    this._showAddInput = false;
+    this._addInputValue = "";
+    this._emitUpdate();
+  }
+
+  private _onAddCancel(): void {
+    this._showAddInput = false;
+    this._addInputValue = "";
     this._emitUpdate();
   }
 
@@ -161,12 +178,30 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         <div class="ws-section">
           <div class="ws-row">
             <div class="ws-label">Repositories (${data.repos.length})</div>
-            <div class="ws-value">
-              <span class="ws-actions">
-                <button class="ws-act-btn" @click=${() => this._onAddRepo()}>Add</button>
-              </span>
+              <div class="ws-value">
+                <span class="ws-actions">
+                  <button class="ws-act-btn" @click=${() => this._onAddRepo()}>Add</button>
+                </span>
+              </div>
             </div>
-          </div>
+            ${
+              this._showAddInput
+                ? html`
+                  <div class="ws-add-input-row" style="display:flex;align-items:center;gap:6px;padding:4px 0 4px 10px">
+                    <input
+                      type="text"
+                      placeholder="Enter repo URL"
+                      .value=${this._addInputValue}
+                      @input=${(e: Event) => { this._addInputValue = (e.target as HTMLInputElement).value; }}
+                      @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._onAddConfirm(); if (e.key === 'Escape') this._onAddCancel(); }}
+                      style="flex:1;background:var(--bg-primary,#1e1e1e);color:var(--text-primary,#ccc);border:1px solid var(--divider,#333);border-radius:3px;padding:3px 6px;font-size:12px;outline:none"
+                    >
+                    <button class="ws-act-btn" @click=${() => this._onAddConfirm()} style="color:var(--accent,#007acc)">OK</button>
+                    <button class="ws-act-btn" @click=${() => this._onAddCancel()}>Cancel</button>
+                  </div>
+                `
+                : ``
+            }
           <div class="ws-path">
             ${data.repos.length > 0
               ? data.repos.map(
@@ -180,7 +215,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
                   `,
                 )
               : html`<span class="ws-empty">No repositories added yet</span>`}
-          </div>
           </div>
         </div>
       </div>
