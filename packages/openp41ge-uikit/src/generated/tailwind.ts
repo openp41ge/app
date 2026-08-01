@@ -336,10 +336,6 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 30px
 }
 
-.h-\\[34px\\] {
-  height: 34px
-}
-
 .h-\\[6px\\] {
   height: 6px
 }
@@ -1524,10 +1520,6 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .hover\\:text-primary:hover {
   color: var(--text-primary, #d4d4d4)
-}
-
-.hover\\:opacity-100:hover {
-  opacity: 1
 }
 
 .focus\\:border-accent:focus {

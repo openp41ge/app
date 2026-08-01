@@ -136,6 +136,12 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           text-align:left; word-break:break-all; padding:2px 0 0;
         }
 
+        .ws-name-input {
+          background:transparent; border:none; border-bottom:1px solid var(--divider,#555);
+          color:var(--text-primary,#ccc); font-size:13px; padding:0 0 2px; outline:none; width:100%;
+        }
+        .ws-name-input:focus { border-bottom-color:var(--accent,#007acc); }
+
         .ws-act-btn {
           padding:2px 6px; font-size:12px; border:none; border-radius:3px;
           cursor:pointer; background:transparent; color:var(--text-secondary,#999);
@@ -148,7 +154,22 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
       <div class="ws-wrap">
         <div class="ws-section">
           <div class="ws-row">
-            <div class="ws-label">Workspace ID</div>
+            <div class="ws-label">Name</div>
+            <div class="ws-value">
+              <input
+                class="ws-name-input"
+                type="text"
+                .value=${data.name ?? ''}
+                placeholder="Unnamed workspace"
+                @input=${(e: Event) => {
+                  const val = (e.target as HTMLInputElement).value;
+                  data.name = val || undefined;
+                  workspaceFileService.save();
+                }}
+              />
+            </div>
+          </div>
+        </div>
             <div class="ws-value">
               <span class="ws-actions">
                 <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, data.id)}>Copy</button>

@@ -30,6 +30,7 @@ export type TabGroupId = z.infer<typeof TabGroupId>;
  */
 export interface WorkspaceFileData {
   id: string;
+  name?: string;
   version: number;
   createdAt: string;
   dataDir: string;
