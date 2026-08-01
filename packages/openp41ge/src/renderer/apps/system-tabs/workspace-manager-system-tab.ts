@@ -187,17 +187,27 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
             ${
               this._showAddInput
                 ? html`
-                  <div class="ws-add-input-row" style="display:flex;align-items:center;gap:6px;padding:4px 0 4px 10px">
+                  <div style="display:flex;align-items:center;gap:4px;margin:0 -10px;padding:4px 10px;background:var(--bg-primary,#252526)">
                     <input
                       type="text"
                       placeholder="Enter repo URL"
                       .value=${this._addInputValue}
                       @input=${(e: Event) => { this._addInputValue = (e.target as HTMLInputElement).value; }}
                       @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._onAddConfirm(); if (e.key === 'Escape') this._onAddCancel(); }}
-                      style="flex:1;background:var(--bg-primary,#1e1e1e);color:var(--text-primary,#ccc);border:1px solid var(--divider,#333);border-radius:3px;padding:3px 6px;font-size:12px;outline:none"
+                      style="flex:1;background:var(--bg-secondary,#1e1e1e);color:var(--text-primary,#ccc);border:none;border-radius:3px;padding:3px 6px;font-size:12px;outline:none"
                     >
-                    <button class="ws-act-btn" @click=${() => this._onAddConfirm()} style="color:var(--accent,#007acc)">OK</button>
-                    <button class="ws-act-btn" @click=${() => this._onAddCancel()}>Cancel</button>
+                    <span
+                      style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc)"
+                      @click=${() => this._onAddConfirm()}
+                    >
+                      <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>
+                    </span>
+                    <span
+                      style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999)"
+                      @click=${() => this._onAddCancel()}
+                    >
+                      <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                    </span>
                   </div>
                 `
                 : ``
