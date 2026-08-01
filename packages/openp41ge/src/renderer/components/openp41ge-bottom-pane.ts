@@ -194,6 +194,7 @@ class Openp41geBottomPane extends LitElement {
                 <span
                   class="bp-tab-close"
                   data-tab-close
+                  @mousedown=${(e: MouseEvent) => e.stopPropagation()}
                   @click=${(e: MouseEvent) => this._onTabClose(e, tab.id)}
                   title="Close"
                 >✕</span>
