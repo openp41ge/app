@@ -185,29 +185,29 @@ class Openp41geBottomPane extends LitElement {
         class="bp-container"
         style="height:${this.paneHeight}px"
       >
-        ${isExpanded ? html`
-          <!-- Tab bar -->
-          <div class="bp-tab-bar">
-            ${this.tabs.map(
-              (tab) => html`
-                <div
-                  class="bp-tab ${tab.id === this.activeTabId ? 'active' : ''}"
-                  data-tab-button
-                  @mousedown=${(e: MouseEvent) => this._onTabClick(tab.id, e)}
-                >
-                  <span>${tab.title}</span>
-                  <span
-                    class="bp-tab-close"
-                    data-tab-close
-                    @click=${(e: MouseEvent) => this._onTabClose(e, tab.id)}
-                    title="Close"
-                  >✕</span>
-                </div>
-              `,
-            )}
-          </div>
+        <!-- Tab bar — always visible -->
+        <div class="bp-tab-bar">
+          ${this.tabs.map(
+            (tab) => html`
+              <div
+                class="bp-tab ${tab.id === this.activeTabId ? 'active' : ''}"
+                data-tab-button
+                @mousedown=${(e: MouseEvent) => this._onTabClick(tab.id, e)}
+              >
+                <span>${tab.title}</span>
+                <span
+                  class="bp-tab-close"
+                  data-tab-close
+                  @click=${(e: MouseEvent) => this._onTabClose(e, tab.id)}
+                  title="Close"
+                >✕</span>
+              </div>
+            `,
+          )}
+        </div>
 
-          <!-- Content area -->
+        <!-- Content area — only when expanded -->
+        ${isExpanded ? html`
           <div class="bp-content" style="height:${contentHeight}px">
             ${content}
           </div>
