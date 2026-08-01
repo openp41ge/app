@@ -120,7 +120,7 @@ describe("App type registration — integration", () => {
 
       const innerDiv = container.firstElementChild as HTMLElement;
       expect(innerDiv).toBeDefined();
-      expect(innerDiv.style.display).toBe("flex");
+      expect(innerDiv.classList.contains("flex")).toBe(true);
 
       ctrl.unmount();
     });

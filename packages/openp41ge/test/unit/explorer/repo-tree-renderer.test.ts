@@ -48,9 +48,9 @@ describe("RepoTreeRenderer", () => {
       repoTreeRenderer.renderEmpty(container, onClone);
       const btn = container.querySelector("#wt-clone-btn") as HTMLElement;
       btn.dispatchEvent(new MouseEvent("mouseenter"));
-      expect(btn.style.background).toBe("rgb(30, 91, 181)");
+      expect(btn.classList.contains("bg-hover")).toBe(true);
       btn.dispatchEvent(new MouseEvent("mouseleave"));
-      expect(btn.style.background).toBe("rgb(42, 111, 209)");
+      expect(btn.classList.contains("bg-hover")).toBe(false);
     });
   });
 
@@ -167,9 +167,9 @@ describe("RepoTreeRenderer", () => {
       const onToggle = vi.fn();
       const header = repoTreeRenderer.renderRepoHeader("r", "u", false, onToggle);
       header.dispatchEvent(new MouseEvent("mouseenter"));
-      expect(header.style.background).toBe("rgb(37, 37, 37)");
+      expect(header.classList.contains("bg-hover")).toBe(true);
       header.dispatchEvent(new MouseEvent("mouseleave"));
-      expect(header.style.background).toBe("rgb(30, 30, 30)");
+      expect(header.classList.contains("bg-hover")).toBe(false);
     });
   });
 
@@ -187,7 +187,7 @@ describe("RepoTreeRenderer", () => {
       const cbs = makeCallbacks();
       const row = repoTreeRenderer.renderWorktreeRow("main", [], false, 0, "main", cbs);
       const header = row.firstElementChild as HTMLElement;
-      expect(header.style.background).toContain("rgba(74, 158, 255, 0.12)");
+      expect(header.classList.contains("bg-[rgba(74,158,255,0.12)]")).toBe(true);
     });
 
     test("click on header triggers toggleDir callback", () => {
@@ -247,9 +247,9 @@ describe("RepoTreeRenderer", () => {
       const row = repoTreeRenderer.renderWorktreeRow("main", [], false, 0, "", cbs);
       const header = row.firstElementChild as HTMLElement;
       header.dispatchEvent(new MouseEvent("mouseenter"));
-      expect(header.style.background).toBe("rgb(37, 37, 37)");
+      expect(header.classList.contains("bg-hover")).toBe(true);
       header.dispatchEvent(new MouseEvent("mouseleave"));
-      expect(header.style.background).toBe("rgba(42, 111, 209, 0.08)");
+      expect(header.classList.contains("bg-hover")).toBe(false);
     });
 
     test("hover on selected header keeps selected background on leave", () => {
@@ -257,7 +257,7 @@ describe("RepoTreeRenderer", () => {
       const row = repoTreeRenderer.renderWorktreeRow("main", [], false, 0, "main", cbs);
       const header = row.firstElementChild as HTMLElement;
       header.dispatchEvent(new MouseEvent("mouseleave"));
-      expect(header.style.background).toContain("rgba(74, 158, 255, 0.12)");
+      expect(header.classList.contains("bg-[rgba(74,158,255,0.12)]")).toBe(true);
     });
   });
 
@@ -331,7 +331,7 @@ describe("RepoTreeRenderer", () => {
         modifiedAt: 0,
       };
       const row = repoTreeRenderer.renderFileRow(file, 0, "/a.ts", cbs);
-      expect(row.style.background).toContain("rgba(74, 158, 255, 0.12)");
+      expect(row.classList.contains("bg-[rgba(74,158,255,0.12)]")).toBe(true);
     });
 
     test("hover on file changes background", () => {
@@ -345,9 +345,9 @@ describe("RepoTreeRenderer", () => {
       };
       const row = repoTreeRenderer.renderFileRow(file, 0, "", cbs);
       row.dispatchEvent(new MouseEvent("mouseenter"));
-      expect(row.style.background).toBe("rgb(37, 37, 37)");
+      expect(row.classList.contains("bg-hover")).toBe(true);
       row.dispatchEvent(new MouseEvent("mouseleave"));
-      expect(row.style.background).toBe("transparent");
+      expect(row.classList.contains("bg-hover")).toBe(false);
     });
   });
 
@@ -446,7 +446,7 @@ describe("RepoTreeRenderer", () => {
       // The add worktree row is the last child of the child wrapper
       const childWrapper = container.lastElementChild as HTMLElement;
       expect(childWrapper).toBeTruthy();
-      expect(childWrapper.style.cssText).toContain("flex-direction");
+      expect(childWrapper.classList.contains("flex-col")).toBe(true);
       const addRow = childWrapper.lastElementChild as HTMLElement;
       expect(addRow).toBeTruthy();
       expect(addRow.textContent).toContain("add worktree");

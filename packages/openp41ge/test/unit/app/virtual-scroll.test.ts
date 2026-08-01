@@ -185,7 +185,7 @@ describe("VirtualScroll", () => {
       // No line divs, but a single spacer fills the viewport height
       const innerDivs = viewport.querySelectorAll(":scope > div");
       expect(innerDivs.length).toBe(1);
-      expect((innerDivs[0] as HTMLElement).style.height).toBeTruthy();
+      expect((innerDivs[0] as HTMLElement).style.getPropertyValue("--h")).toBeTruthy();
 
       vs.unmount();
     });
@@ -1134,8 +1134,8 @@ describe("VirtualScroll", () => {
       const contentSpans = viewport.querySelectorAll("[data-line] + span");
       expect(contentSpans.length).toBeGreaterThan(0);
       const lastSpan = contentSpans[contentSpans.length - 1] as HTMLElement;
-      expect(lastSpan.style.whiteSpace).toBe("pre");
-      expect(lastSpan.style.cursor).toBe("text");
+      expect(lastSpan.classList.contains("vs-content")).toBe(true);
+      expect(lastSpan.textContent).toContain("indented");
 
       vs.unmount();
     });
@@ -1149,8 +1149,8 @@ describe("VirtualScroll", () => {
       const innerDivs = viewport.querySelectorAll(":scope > div");
       expect(innerDivs.length).toBeGreaterThan(0);
       const lineDiv = innerDivs[0] as HTMLElement;
-      expect(lineDiv.style.whiteSpace).toBe("pre");
-      expect(lineDiv.style.cursor).toBe("text");
+      expect(lineDiv.classList.contains("vs-row-noln")).toBe(true);
+      expect(lineDiv.textContent).toContain("indented");
 
       vs.unmount();
     });
