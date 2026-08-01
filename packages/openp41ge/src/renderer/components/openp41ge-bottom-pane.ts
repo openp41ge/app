@@ -142,7 +142,7 @@ class Openp41geBottomPane extends LitElement {
           cursor: pointer;
           white-space: nowrap;
           user-select: none;
-          gap: 4px;
+          gap: 10px;
           flex-shrink: 0;
         }
         .bp-tab:hover {
