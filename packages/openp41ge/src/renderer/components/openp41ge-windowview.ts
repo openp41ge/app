@@ -299,6 +299,14 @@ class Openp41geWindowView extends LitElement {
             class="text-xs text-muted"
             style="display:flex;align-items:center;height:100%;padding:0 20px 0 8px;cursor:pointer;transition:background .1s;background:${workspaceFileService.activeData ? 'rgba(74,158,255,0.1)' : 'transparent'}"
             @click=${() => this._onWorkspaceClick()}
+            @mouseenter=${(e: MouseEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background = workspaceFileService.activeData ? 'rgba(74,158,255,0.2)' : 'var(--bg-hover,rgba(128,128,128,.15))';
+            }}
+            @mouseleave=${(e: MouseEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background = workspaceFileService.activeData ? 'rgba(74,158,255,0.1)' : 'transparent';
+            }}
             title="Open workspace settings"
           >
             ${workspaceFileService.activeData
