@@ -4,15 +4,14 @@
  * A `position: fixed` panel that overlays the full viewport width below the
  * titlebar. Always visible at the bottom of the window.
  *
- * At minimum height (30px), shows only a drag bar with grip indicator.
- * When expanded, the drag bar sits at the top, followed by the system tab
- * bar, then content.
+ * Height is controlled by parent <openp41ge-windowview> via the `paneHeight`
+ * property. The drag handle is rendered by windowview — not by this component.
  *
  * The grid and sidebars continue rendering underneath — never hidden.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
-import { property, state } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 import { emitEvent } from "../app";
 import { workspaceFileService } from "../services/workspace-file-service";
 import { getEditorSystemTabRegistration } from "../apps/app-registry";
@@ -25,9 +24,7 @@ export interface SystemTabInfo {
   appType: string;
 }
 
-const TAB_BAR_HEIGHT = 30;
-const MIN_PANE_HEIGHT = TAB_BAR_HEIGHT;
-const TITLEBAR_HEIGHT = 38;
+export const TAB_BAR_HEIGHT = 30;
 
 class Openp41geBottomPane extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -43,13 +40,9 @@ class Openp41geBottomPane extends LitElement {
   @property({ type: String })
   activeTabId: string | null = null;
 
-  /** Height of the pane in pixels. Starts at minimum (drag bar only). */
-  @state()
-  private _paneHeight = MIN_PANE_HEIGHT;
-
-  private _isDragging = false;
-  private _dragStartY = 0;
-  private _dragStartHeight = MIN_PANE_HEIGHT;
+  /** Pane height in pixels, set by parent <openp41ge-windowview>. */
+  @property({ type: Number })
+  paneHeight: number = TAB_BAR_HEIGHT;
 
   /** Cache of editor system tab controller instances, keyed by tabId. */
   private _controllers: Map<string, EditorSystemTabController> = new Map();
@@ -67,71 +60,29 @@ class Openp41geBottomPane extends LitElement {
     return ctrl;
   }
 
-  /** True when the pane shows more than just the drag bar. */
+  /** True when the pane shows more than just the minimum. */
   private get _isExpanded(): boolean {
-    return this._paneHeight > MIN_PANE_HEIGHT;
+    return this.paneHeight > TAB_BAR_HEIGHT && this.tabs.length > 0;
   }
-
-  // ═══ Drag resize ─────────────────────────────────────────────────────
-
-  private _onDragStart(e: MouseEvent): void {
-    this._isDragging = true;
-    this._dragStartY = e.clientY;
-    this._dragStartHeight = this._paneHeight;
-
-    document.addEventListener("mousemove", this._onDragMove);
-    document.addEventListener("mouseup", this._onDragEnd);
-    e.preventDefault();
-  }
-
-  private _onDragMove = (e: MouseEvent): void => {
-    if (!this._isDragging) return;
-
-    const delta = this._dragStartY - e.clientY; // positive = drag up = expand
-    const maxHeight = window.innerHeight - TITLEBAR_HEIGHT;
-    const newHeight = Math.max(MIN_PANE_HEIGHT, Math.min(maxHeight, this._dragStartHeight + delta));
-
-    this._paneHeight = newHeight;
-  };
-
-  private _onDragEnd = (): void => {
-    this._isDragging = false;
-    document.removeEventListener("mousemove", this._onDragMove);
-    document.removeEventListener("mouseup", this._onDragEnd);
-  };
 
   // ═══ Tab interactions ────────────────────────────────────────────────
 
   private _onTabClick(tabId: string, e: MouseEvent): void {
-    // Middle-click to close
     if (e.button === 1) {
       e.preventDefault();
       emitEvent("system-tab-close", { windowId: this.windowId, tabId });
       return;
     }
-
-    // Left-click only beyond this point
     if (e.button !== 0) return;
 
-    const hasTabs = this.tabs.length > 0;
-
-    if (tabId === this.activeTabId && hasTabs) {
-      // Clicking the active tab toggles collapse/expand
-      if (this._isExpanded) {
-        this._paneHeight = MIN_PANE_HEIGHT;
-      } else {
-        this._paneHeight = Math.max(MIN_PANE_HEIGHT + 100, this._paneHeight);
-        if (!this._isExpanded) this._paneHeight = 300;
-      }
+    if (tabId === this.activeTabId && this.tabs.length > 0) {
+      // Toggle collapse/expand via DOM event so parent windowview can catch it
+      this.dispatchEvent(new CustomEvent("bp-toggle", { bubbles: true, composed: true }));
       return;
     }
 
-    // Activate a different tab — expand if collapsed
     emitEvent("system-tab-activate", { windowId: this.windowId, tabId });
-
-    if (!this._isExpanded) {
-      this._paneHeight = 300;
-    }
+    // If collapsed, parent windowview expands on activate
   }
 
   private _onTabClose(e: MouseEvent, tabId: string): void {
@@ -150,20 +101,18 @@ class Openp41geBottomPane extends LitElement {
   // ═══ Render ──────────────────────────────────────────────────────────
 
   render(): TemplateResult {
-    const hasTabs = this.tabs.length > 0;
-    const isExpanded = this._isExpanded && hasTabs;
+    const isExpanded = this._isExpanded;
     const activeTab = this.tabs.find((t) => t.id === this.activeTabId);
 
-    // Get content for active tab
     let content: TemplateResult | typeof nothing = nothing;
-    if (activeTab && hasTabs) {
+    if (activeTab && isExpanded) {
       const ctrl = this._getController(activeTab);
       if (ctrl) {
         content = ctrl.render() as TemplateResult;
       }
     }
 
-    const contentHeight = this._paneHeight - TAB_BAR_HEIGHT;
+    const contentHeight = this.paneHeight - TAB_BAR_HEIGHT;
 
     return html`
       <style>
@@ -179,42 +128,6 @@ class Openp41geBottomPane extends LitElement {
           user-select: none;
           border-top: 1px solid var(--divider, #333);
         }
-        /* ── Drag bar (invisible until hovered, centered over the top border) ── */
-        .bp-drag-bar {
-          position: absolute;
-          top: -4px;
-          left: 0;
-          right: 0;
-          height: 8px;
-          cursor: ns-resize;
-          z-index: 10;
-          pointer-events: auto;
-          touch-action: none;
-          background: transparent;
-        }
-        .bp-drag-bar::before {
-          content: "";
-          position: absolute;
-          top: 3px;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background: rgba(74, 158, 255, 0.7);
-          opacity: 0;
-          transition: opacity 0.12s ease;
-          pointer-events: none;
-        }
-        .bp-drag-bar:hover::before,
-        .bp-drag-bar.dragging::before {
-          opacity: 1;
-        }
-        .bp-tab-bar {
-          overflow-x: auto;
-        }
-        .bp-content {
-          overflow: auto;
-        }
-        /* ── Tab bar ─────────────────────────────────────────────────── */
         .bp-tab-bar {
           display: flex;
           align-items: center;
@@ -267,7 +180,6 @@ class Openp41geBottomPane extends LitElement {
           background: var(--bg-hover-strong, #444);
           color: var(--text-primary, #ccc);
         }
-        /* ── Workspace indicator ─────────────────────────────────────── */
         .bp-workspace-indicator {
           display: flex;
           align-items: center;
@@ -283,7 +195,6 @@ class Openp41geBottomPane extends LitElement {
         .bp-workspace-indicator:hover {
           color: var(--accent, #569cd6);
         }
-        /* ── Content area ────────────────────────────────────────────── */
         .bp-content {
           flex: 1;
           overflow: auto;
@@ -293,16 +204,10 @@ class Openp41geBottomPane extends LitElement {
       </style>
       <div
         class="bp-container"
-        style="height:${this._paneHeight}px"
+        style="height:${this.paneHeight}px"
       >
-        <!-- Drag bar (invisible until hovered, over the top border) -->
-        <div
-          class="bp-drag-bar"
-          @mousedown=${this._onDragStart}
-        ></div>
-
         ${isExpanded ? html`
-          <!-- Tab bar below drag bar -->
+          <!-- Tab bar -->
           <div class="bp-tab-bar">
             ${this.tabs.map(
               (tab) => html`
@@ -322,7 +227,7 @@ class Openp41geBottomPane extends LitElement {
               `,
             )}
 
-            <!-- Workspace indicator (in tab bar only when expanded) -->
+            <!-- Workspace indicator -->
             <div
               class="bp-workspace-indicator"
               data-workspace-indicator
@@ -349,9 +254,6 @@ class Openp41geBottomPane extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener("mousemove", this._onDragMove);
-    document.removeEventListener("mouseup", this._onDragEnd);
-
     for (const ctrl of this._controllers.values()) {
       const maybe = ctrl as unknown as { destroy?: () => void };
       maybe.destroy?.();

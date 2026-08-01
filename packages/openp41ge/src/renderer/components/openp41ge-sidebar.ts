@@ -1,34 +1,18 @@
 /**
- * <openp41ge-sidebar> — sidebar panel with system tab bar and content area.
+ * <openp41ge-sidebar> — sidebar container.
  *
- * Renders a horizontal tab bar at the top and a content area below for the
- * active system tab's controller.
- *
- * Focus state is read from AppState (set by the event controller). The sidebar
- * no longer manages its own focus tracking, DOM event listeners, or static
- * focus properties.
- *
- * Two instances per window: left sidebar and right sidebar.
+ * Receives width via inline style from parent. No longer manages its own
+ * resize — that's handled by <openp41ge-windowview>.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
-import type { Workspace } from "../../layout/types";
 import { emitEvent } from "../app";
-import { getSystemTabRegistration } from "../apps/app-registry";
-import type { SystemTabController } from "../controllers/types";
 import { appState } from "../services/app-state";
+import type { SystemTabRegistration } from "../controllers/types";
 
+// Keep in sync with openp41ge-windowview if changed
 const MIN_SIDEBAR_WIDTH = 160;
-const MAX_SIDEBAR_WIDTH = 600;
-const SIDEBAR_WIDTH_KEY_PREFIX = "openp41ge:sidebar-width-";
-
-export interface SystemTabEntry {
-  id: string;
-  title: string;
-  appType: string;
-  pinned: boolean;
-}
 
 class Openp41geSidebar extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -36,16 +20,16 @@ class Openp41geSidebar extends LitElement {
   }
 
   @property({})
-  side: "left" | "right" = "right";
+  side: "left" | "right" = "left";
 
   @property({ attribute: false })
   windowId: string = "";
 
   @property({ attribute: false })
-  workspaceData: Workspace | null = null;
+  workspaceData: unknown = null;
 
   @property({ attribute: false })
-  systemTabs: SystemTabEntry[] = [];
+  systemTabs: Array<{ id: string; title: string; appType: string; pinned: boolean }> = [];
 
   @property({ attribute: false })
   activeTabId: string | null = null;
@@ -53,53 +37,93 @@ class Openp41geSidebar extends LitElement {
   @property({ attribute: false })
   isOpen: boolean = false;
 
-  @property({ attribute: false })
-  width: number = (() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY_PREFIX + "right");
-    if (saved) {
-      const w = parseInt(saved, 10);
-      if (!isNaN(w) && w >= MIN_SIDEBAR_WIDTH && w <= MAX_SIDEBAR_WIDTH) return w;
-    }
-    return 280;
-  })();
+  // ═══ Tab scroll ──────────────────────────────────────────────────────
 
   @state()
-  private _view: SystemTabController | null = null;
+  private _scrollLeft = 0;
 
   @state()
-  private _scrollLeft: number = 0;
+  private _hasOverflow = false;
 
   @state()
-  private _tabBarHeight: number = 0;
+  private _tabBarHeight = 34;
 
-  @state()
-  private _hasOverflow: boolean = false;
-
-  private _isResizing = false;
-  private _resizeStartX = 0;
-  private _resizeStartWidth = 0;
-  private _widthKey = SIDEBAR_WIDTH_KEY_PREFIX + "right";
-  private _unsubscribe?: () => void;
-
-  shouldUpdate(changed: Map<string | number | symbol, unknown>): boolean {
-    if (changed.has("activeTabId")) return true;
-    if (changed.has("systemTabs")) return true;
-    if (changed.has("side")) return true;
-    if (changed.has("width")) return true;
-    if (changed.has("isOpen")) return true;
-    if (changed.has("_scrollLeft")) return true;
-    if (changed.has("_tabBarHeight")) return true;
-    if (changed.has("_hasOverflow")) return true;
-    return false;
+  private get _showLeftShadow(): boolean {
+    const el = this.querySelector(".sidebar-tab-scroll");
+    if (!el) return false;
+    return el.scrollLeft > 2;
   }
 
-  willUpdate(changed: Map<string | number | symbol, unknown>): void {
-    if (changed.has("side")) {
-      this._widthKey = SIDEBAR_WIDTH_KEY_PREFIX + (this.side || "right");
-      const saved = localStorage.getItem(this._widthKey);
-      if (saved) {
-        const w = parseInt(saved, 10);
-        if (!isNaN(w) && w >= MIN_SIDEBAR_WIDTH && w <= MAX_SIDEBAR_WIDTH) this.width = w;
+  private get _showRightShadow(): boolean {
+    const el = this.querySelector(".sidebar-tab-scroll");
+    if (!el) return false;
+    return el.scrollWidth - el.clientWidth - el.scrollLeft > 2;
+  }
+
+  private _onTabClick(tabId: string): void {
+    const side = this.side;
+    emitEvent("tab-activate", { windowId: this.windowId, side, tabId });
+  }
+
+  private _onTabClose(e: Event, tabId: string): void {
+    e.stopPropagation();
+    emitEvent("tab-close", { windowId: this.windowId, side: this.side, tabId, force: true });
+  }
+
+  private _onTabMiddleClick(e: MouseEvent, tabId: string): void {
+    if (e.button === 1) {
+      e.preventDefault();
+      emitEvent("tab-close", { windowId: this.windowId, side: this.side, tabId, force: true });
+    }
+  }
+
+  private _onTabPin(tabId: string, pinned: boolean): void {
+    emitEvent("tab-pin", { tabId, pinned: !pinned });
+  }
+
+  private _onSidebarToggle(): void {
+    emitEvent("sidebar-toggle", { windowId: this.windowId, side: this.side });
+  }
+
+  private _onTabBarScroll(e: Event): void {
+    const target = e.target as HTMLElement;
+    this._scrollLeft = target.scrollLeft;
+    this._hasOverflow = target.scrollWidth - target.clientWidth > 2;
+  }
+
+  /** True when this sidebar is the focused sidebar and the window is active. */
+  private get _isFocused(): boolean {
+    return appState.focusedSide === this.side && appState.windowFocused;
+  }
+
+  // ═══ Mount / unmount view ────────────────────────────────────────────
+
+  private _view: { mount: (container: HTMLElement) => void; unmount: () => void } | null = null;
+
+  private _mountView(): void {
+    if (this._view || !this.activeTabId || !this.isOpen) return;
+    const reg = (window as unknown as Record<string, unknown>).__openp41geApp as
+      | { getSystemTabRegistration: (id: string) => SystemTabRegistration | undefined }
+      | undefined;
+    if (!reg) return;
+    const registration = reg.getSystemTabRegistration(this.activeTabId);
+    if (!registration) return;
+    const controller = registration.createController(this.activeTabId);
+    const container = this.querySelector<HTMLElement>(".sidebar-content");
+    if (!container) return;
+    controller.mount(container);
+    this._view = controller;
+  }
+
+  private _unmountView(): void {
+    if (this._view) {
+      this._view.unmount();
+      this._view = null;
+    }
+    const container = this.querySelector<HTMLElement>(".sidebar-content");
+    if (container) {
+      while (container.lastChild) {
+        container.removeChild(container.lastChild);
       }
     }
   }
@@ -117,9 +141,6 @@ class Openp41geSidebar extends LitElement {
         this._unmountView();
       }
     }
-    if (changed.has("width")) {
-      this._syncHostStyles();
-    }
     if (changed.has("width") || changed.has("activeTabId")) {
       const el = this.querySelector(".sidebar-tab-scroll");
       if (el) {
@@ -133,220 +154,19 @@ class Openp41geSidebar extends LitElement {
     }
   }
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    this._syncHostStyles();
-    // Observe AppState for focus changes — triggers re-render for indicator styling
-    this._unsubscribe = appState.observe(() => this.requestUpdate());
-  }
-
-  firstUpdated(): void {
-    const el = this.querySelector(".sidebar-tab-scroll");
-    if (el) {
-      this._scrollLeft = el.scrollLeft;
-      this._hasOverflow = el.scrollWidth - el.clientWidth > 2;
-    }
-    const bar = this.querySelector(".sidebar-tab-bar");
-    if (bar) {
-      this._tabBarHeight = bar.getBoundingClientRect().height;
-    }
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._unsubscribe?.();
-    this._unmountView();
-    document.removeEventListener("mousemove", this._onResizeMove);
-    document.removeEventListener("mouseup", this._onResizeEnd);
-  }
-
-  private _syncHostStyles(): void {
-    this.style.flex = `0 1 ${this.width}px`;
-    this.style.minWidth = `${MIN_SIDEBAR_WIDTH}px`;
-    this.style.maxWidth = `min(${this.width}px, 35vw)`;
-  }
-
-  // ═══ Tab click handler ─────────────────────────────────────────────
-
-  private _onTabClick(tabId: string): void {
-    if (tabId !== this.activeTabId && this.activeTabId) {
-      const currentTab = this.systemTabs.find((t) => t.id === this.activeTabId);
-      if (currentTab && !currentTab.pinned) {
-        emitEvent("tab-close", { windowId: this.windowId, side: this.side, tabId: this.activeTabId });
-      }
-    }
-    emitEvent("tab-activate", { windowId: this.windowId, side: this.side, tabId });
-  }
-
-  private _onTabClose(tabId: string, e: Event): void {
-    e.stopPropagation();
-    emitEvent("tab-close", { windowId: this.windowId, side: this.side, tabId, force: true });
-  }
-
-  private _onPinToggle(tabId: string, pinned: boolean, e: Event): void {
-    e.stopPropagation();
-    emitEvent("tab-pin", { tabId, pinned: !pinned });
-  }
-
-  private _onToggleSidebar(): void {
-    emitEvent("sidebar-toggle", { windowId: this.windowId, side: this.side });
-  }
-
-  // ═══ View lifecycle ───────────────────────────────────────────────
-
-  private _mountView(): void {
-    if (!this.activeTabId || !this.isOpen) return;
-    this._unmountView();
-
-    const tab = this.systemTabs.find((t) => t.id === this.activeTabId);
-    if (!tab) return;
-
-    const container = this.querySelector<HTMLElement>(".sidebar-content");
-    if (!container) return;
-
-    const reg = getSystemTabRegistration(tab.appType);
-    if (reg) {
-      const view = reg.createController(this.activeTabId);
-      const mountResult = view.mount(container);
-      if (mountResult instanceof Promise) {
-        mountResult.catch((err) => {
-          console.error(`Failed to mount system tab ${tab.appType}:`, err);
-        });
-      }
-      this._view = view;
-    }
-  }
-
-  private _unmountView(): void {
-    if (this._view) {
-      this._view.unmount();
-      this._view = null;
-    }
-    const container = this.querySelector<HTMLElement>(".sidebar-content");
-    if (container) {
-      while (container.lastChild) {
-        container.removeChild(container.lastChild);
-      }
-    }
-  }
-
-  // ═══ Resize ───────────────────────────────────────────────────────
-
-  private _startResize(e: MouseEvent): void {
-    e.preventDefault();
-    this._isResizing = true;
-    this._resizeStartX = e.clientX;
-    this.width = this.clientWidth;
-    this._resizeStartWidth = this.clientWidth;
-
-    document.addEventListener("mousemove", this._onResizeMove);
-    document.addEventListener("mouseup", this._onResizeEnd);
-
-    const notch = this.querySelector<HTMLElement>(".sidebar-resize-notch");
-    if (notch) notch.classList.add("dragging");
-  }
-
-  private _onResizeMove = (e: MouseEvent): void => {
-    if (!this._isResizing) return;
-    const dx = this.side === "left"
-      ? e.clientX - this._resizeStartX
-      : this._resizeStartX - e.clientX;
-    const newWidth = Math.max(
-      MIN_SIDEBAR_WIDTH,
-      Math.min(this._getMaxSidebarWidth(), this._resizeStartWidth + dx),
-    );
-    this.width = newWidth;
-    const bar = this.querySelector(".sidebar-tab-bar");
-    if (bar) {
-      this._tabBarHeight = bar.getBoundingClientRect().height;
-    }
-  };
-
-  private _onResizeEnd = (): void => {
-    this._isResizing = false;
-    document.removeEventListener("mousemove", this._onResizeMove);
-    document.removeEventListener("mouseup", this._onResizeEnd);
-
-    const notch = this.querySelector<HTMLElement>(".sidebar-resize-notch");
-    if (notch) notch.classList.remove("dragging");
-
-    localStorage.setItem(this._widthKey, String(this.width));
-  };
-
-  private _getMaxSidebarWidth(): number {
-    return Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth - MIN_SIDEBAR_WIDTH - 200);
-  }
-
-  private _onTabBarScroll(e: Event): void {
-    const target = e.target as HTMLElement;
-    this._scrollLeft = target.scrollLeft;
-    this._hasOverflow = target.scrollWidth - target.clientWidth > 2;
-  }
-
-  private get _showLeftShadow(): boolean {
-    const el = this.querySelector(".sidebar-tab-scroll");
-    if (!el) return false;
-    return el.scrollLeft > 2;
-  }
-
-  private get _showRightShadow(): boolean {
-    const el = this.querySelector(".sidebar-tab-scroll");
-    if (!el) return false;
-    return el.scrollWidth - el.clientWidth - el.scrollLeft > 2;
-  }
-
-  /** True when this sidebar is the focused sidebar and the window is active. */
-  private get _isFocused(): boolean {
-    return appState.focusedSide === this.side && appState.windowFocused;
-  }
-
-  // ═══ Render ───────────────────────────────────────────────────────
+  // ═══ Render ──────────────────────────────────────────────────────────
 
   render(): TemplateResult {
     const borderClass = this.side === "left"
       ? "border-r border-divider"
       : "border-l border-divider";
 
-    const resizeNotchSideClass = this.side === "left" ? "right-0" : "left-0";
-
     return html`
       <div
         class="flex flex-col bg-gutter ${borderClass} relative"
-        style="height:100%;"
+        style="height:100%;min-width:${MIN_SIDEBAR_WIDTH}px"
       >
-        <!-- Resize notch (centered over border) -->
-        <div
-          class="sidebar-resize-notch absolute top-0 w-1 h-full cursor-col-resize z-10 pointer-events-auto touch-none bg-transparent ${resizeNotchSideClass}"
-          @mousedown=${this._startResize}
-        ></div>
-
         <style>
-          .sidebar-resize-notch {
-            width: 7px;
-          }
-          .sidebar-resize-notch.right-0 {
-            right: -3px;
-          }
-          .sidebar-resize-notch.left-0 {
-            left: -3px;
-          }
-          .sidebar-resize-notch::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            width: 3px;
-            height: 100%;
-            background: rgba(74, 158, 255, 0.7);
-            opacity: 0;
-            transition: opacity 0.12s ease;
-            pointer-events: none;
-          }
-          .sidebar-resize-notch:hover::before,
-          .sidebar-resize-notch.dragging::before {
-            opacity: 1;
-          }
-          .sidebar-resize-notch.right-0::before { right: 2px; }
-          .sidebar-resize-notch.left-0::before { left: 2px; }
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
         </style>
 
@@ -357,9 +177,6 @@ class Openp41geSidebar extends LitElement {
               ${this.systemTabs.map((tab, idx) => {
                 const isActive = tab.id === this.activeTabId;
                 const isLast = idx === this.systemTabs.length - 1;
-                // First tab: skip left border on right sidebar (sidebar's own
-                // border-l already provides it). Last tab: skip right border on
-                // left sidebar (sidebar's own border-r already provides it).
                 let sideBorder = idx === 0 && this.side !== "right" ? "border-l" : "";
                 if ((!isLast || !this._hasOverflow) && !(isLast && this.side === "left")) sideBorder += " border-r";
                 return html`
@@ -374,55 +191,36 @@ class Openp41geSidebar extends LitElement {
                         : "background:rgba(255,255,255,0.05);color:var(--text-primary, #e0e0e0)"
                       : "color:var(--text-secondary, #888)"}"
                     @click=${() => this._onTabClick(tab.id)}
+                    @mouseup=${(e: MouseEvent) => this._onTabMiddleClick(e, tab.id)}
                   >
-                    <span class="sidebar-tab-title truncate">${tab.title}</span>
-                    <!-- Pin button -->
-                    <span
-                      class="sidebar-tab-pin flex items-center justify-center w-5 h-5 rounded hover:bg-hover cursor-pointer text-muted hover:text-primary shrink-0 ml-auto"
-                      title="${tab.pinned ? "Pinned" : "Unpinned"}"
-                      @click=${(e: Event) => this._onPinToggle(tab.id, tab.pinned, e)}
-                    >
-                      ${tab.pinned ? html`
-                        <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></svg>
-                      ` : html`
-                        <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M680-840v80h-40v327l-80-80v-247H400v87l-87-87-33-33v-47h400ZM480-40l-40-40v-240H240v-80l80-80v-46L56-792l56-56 736 736-58 56-264-264h-6v240l-40 40ZM354-400h92l-44-44-2-2-46 46Zm126-193Zm-78 149Z"/></svg>
-                      `}
-                    </span>
-                    <!-- Close button -->
-                    <span
-                      class="sidebar-tab-close flex items-center justify-center w-5 h-5 rounded hover:bg-hover cursor-pointer text-muted hover:text-primary shrink-0"
-                      @click=${(e: Event) => this._onTabClose(tab.id, e)}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                    </span>
-                  </div>
-                `;
+                    <span class="truncate flex-1">${tab.title}</span>
+                    ${tab.pinned
+                      ? html`<span class="text-muted text-2xs" style="font-size:10px">●</span>`
+                      : html`<span
+                          class="sidebar-tab-close flex items-center justify-center w-4 h-4 rounded-sm text-xs leading-none opacity-0 hover:opacity-100 hover:bg-hover-strong"
+                          @click=${(e: Event) => this._onTabClose(e, tab.id)}
+                        >✕</span>`}
+                  </div>`;
               })}
             </div>
-            ${(() => {
-              const activeIdx = this.systemTabs.findIndex((t) => t.id === this.activeTabId);
-              if (activeIdx === -1) return nothing;
-              const indicatorColor = this._isFocused
-                ? "var(--accent, #4a9eff)"
-                : "#555";
-              return html`
-                <div class="absolute h-0.5 pointer-events-none transition-colors duration-150" style="width:120px;left:${activeIdx * 120 - this._scrollLeft}px;bottom:-1px;z-index:3;background:${indicatorColor};"></div>
-              `;
-            })()}
-          ` : nothing}
+          ` : html`
+            <div
+              class="flex items-center justify-center h-[34px] px-2 text-xs text-muted cursor-pointer select-none"
+              @click=${this._onSidebarToggle}
+            >
+              ${this.side === "left" ? "Explorer" : "Git"}
+            </div>
+          `}
+          ${this._showLeftShadow ? html`<div class="absolute top-0 left-0 w-4 h-full pointer-events-none" style="background:linear-gradient(to right, rgba(0,0,0,0.3), transparent)"></div>` : nothing}
+          ${this._showRightShadow ? html`<div class="absolute top-0 right-0 w-4 h-full pointer-events-none" style="background:linear-gradient(to left, rgba(0,0,0,0.3), transparent)"></div>` : nothing}
         </div>
-        <!-- Left scroll shadow -->
-        <div class="absolute pointer-events-none transition-opacity duration-150" style="left:0;top:0;width:24px;height:${Math.max(this._tabBarHeight, 30)}px;z-index:4;opacity:${this._showLeftShadow ? 1 : 0};background:linear-gradient(to right, var(--bg-gutter, #1a1a1a), transparent);"></div>
-        <!-- Right scroll shadow -->
-        <div class="absolute pointer-events-none transition-opacity duration-150" style="right:0;top:0;width:24px;height:${Math.max(this._tabBarHeight, 30)}px;z-index:4;opacity:${this._showRightShadow ? 1 : 0};background:linear-gradient(to left, var(--bg-gutter, #1a1a1a), transparent);"></div>
 
         <!-- Content area -->
-        <div class="sidebar-content flex-1 min-h-0 overflow-hidden flex flex-col" data-sidebar-content="${this.side}"></div>
+        <div class="sidebar-content flex-1 overflow-y-auto overflow-x-hidden"></div>
       </div>
     `;
   }
 }
 
 customElements.define("openp41ge-sidebar", Openp41geSidebar);
-
-export { Openp41geSidebar, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH };
+export { Openp41geSidebar };
