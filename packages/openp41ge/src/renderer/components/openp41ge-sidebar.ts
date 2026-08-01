@@ -196,7 +196,8 @@ class Openp41geSidebar extends LitElement {
                   >
                     <span class="truncate flex-1">${tab.title}</span>
                     <span
-                      class="sidebar-tab-close flex items-center justify-center w-4 h-4 rounded-sm text-xs leading-none"
+                      class="sidebar-tab-close flex items-center justify-center"
+                      style="width:16px;height:16px;border-radius:3px;font-size:12px;line-height:1"
                       @click=${(e: Event) => this._onTabClose(e, tab.id)}
                     >✕</span>
                   </div>`;
