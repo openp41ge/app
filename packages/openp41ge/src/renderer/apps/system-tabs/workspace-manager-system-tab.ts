@@ -37,6 +37,16 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     this._emitUpdate();
   }
 
+  private async _onAddRepo(): Promise<void> {
+    const folder = await window.openp41ge.dialog.pickFolder();
+    if (!folder) return;
+    const data = workspaceFileService.activeData;
+    if (!data) return;
+    data.repos.push({ url: folder, worktrees: [] });
+    await workspaceFileService.save();
+    this._emitUpdate();
+  }
+
   private async _onCopy(e: MouseEvent, path: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(path);
@@ -150,21 +160,27 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
         </div>
         <div class="ws-section">
           <div class="ws-row">
-            <div class="ws-label">Repos (${data.repos.length})</div>
+            <div class="ws-label">Repositories (${data.repos.length})</div>
             <div class="ws-value">
-              ${data.repos.length === 0
-                ? html`<span class="ws-empty">None</span>`
-                : data.repos.map(
-                    (r) => html`
-                      <div class="ws-repo-item">
-                        <span>${r.url}</span>
-                        ${r.worktrees.length > 0
-                          ? html`<span class="ws-worktrees">(${r.worktrees.join(", ")})</span>`
-                          : ""}
-                      </div>
-                    `,
-                  )}
+              <span class="ws-actions">
+                <button class="ws-act-btn" @click=${() => this._onAddRepo()}>Add</button>
+              </span>
             </div>
+          </div>
+          <div class="ws-path">
+            ${data.repos.length > 0
+              ? data.repos.map(
+                  (r) => html`
+                    <div class="ws-repo-item">
+                      <span>${r.url}</span>
+                      ${r.worktrees.length > 0
+                        ? html`<span class="ws-worktrees">(${r.worktrees.join(", ")})</span>`
+                        : ""}
+                    </div>
+                  `,
+                )
+              : html`<span class="ws-empty">No repositories added yet</span>`}
+          </div>
           </div>
         </div>
       </div>
