@@ -62,6 +62,8 @@ class Openp41geTitleBar extends LitElement {
       return;
     }
     emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
+    // Tell the windowview to expand the bottom pane
+    this.dispatchEvent(new CustomEvent("bp-expand", { bubbles: true, composed: true }));
   }
 
   render(): TemplateResult | typeof nothing {
