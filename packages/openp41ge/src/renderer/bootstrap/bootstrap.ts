@@ -53,9 +53,25 @@ export class RendererBootstrap {
 
     log.info("bootstrap start");
 
+    // DEBUG: check preload bridge
+    try {
+      if (typeof window.openp41ge === 'undefined') {
+        log.error("PRELOAD BRIDGE window.openp41ge is UNDEFINED");
+      } else {
+        log.info("PRELOAD BRIDGE window.openp41ge is available");
+      }
+    } catch (e) {
+      log.error("PRELOAD BRIDGE check error:", e);
+    }
+
     // ── Phase 1: Fire all IPC calls immediately (no await) ────────
     // Both run in the background while sync steps execute below.
-    this.context.initialStatePromise = window.openp41ge.workspace.getState();
+    try {
+      this.context.initialStatePromise = window.openp41ge?.workspace?.getState() ?? Promise.resolve(null);
+    } catch (e) {
+      log.error("Failed to get initial state:", e);
+      this.context.initialStatePromise = Promise.resolve(null);
+    }
     this.context.configService.load(); // idempotent — starts loading once
 
     // ── Phase 2: Mount UI shell immediately (no await) ────────────
