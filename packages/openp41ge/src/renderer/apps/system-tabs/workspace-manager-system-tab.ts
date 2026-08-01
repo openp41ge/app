@@ -187,7 +187,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
             ${
               this._showAddInput
                 ? html`
-                  <div style="display:flex;align-items:center;gap:4px;margin:0 -10px;padding:4px 10px;background:var(--bg-secondary,rgba(255,255,255,.04))">
+                  <div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:4px;background:rgba(255,255,255,.06)">
                     <input
                       type="text"
                       placeholder="Enter repo URL"
