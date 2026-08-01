@@ -336,6 +336,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   height: 30px
 }
 
+.h-\\[34px\\] {
+  height: 34px
+}
+
 .h-\\[6px\\] {
   height: 6px
 }
@@ -1338,6 +1342,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   text-decoration-line: overline
 }
 
+.opacity-0 {
+  opacity: 0
+}
+
 .opacity-100 {
   opacity: 1
 }
@@ -1514,12 +1522,12 @@ export const tailwindCSS: string = `.pointer-events-none {
   transition-timing-function: cubic-bezier(0, 0, 0.2, 1)
 }
 
-.hover\\:bg-hover:hover {
-  background-color: var(--bg-hover, #2a2d2e)
-}
-
 .hover\\:text-primary:hover {
   color: var(--text-primary, #d4d4d4)
+}
+
+.hover\\:opacity-100:hover {
+  opacity: 1
 }
 
 .focus\\:border-accent:focus {

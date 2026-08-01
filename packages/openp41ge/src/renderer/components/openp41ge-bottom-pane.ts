@@ -82,7 +82,10 @@ class Openp41geBottomPane extends LitElement {
     }
 
     emitEvent("system-tab-activate", { windowId: this.windowId, tabId });
-    // If collapsed, parent windowview expands on activate
+    // If collapsed, request expand so content becomes visible
+    if (!this._isExpanded) {
+      this.dispatchEvent(new CustomEvent("bp-expand", { bubbles: true, composed: true }));
+    }
   }
 
   private _onTabClose(e: MouseEvent, tabId: string): void {
@@ -96,6 +99,10 @@ class Openp41geBottomPane extends LitElement {
       return;
     }
     emitEvent("system-tab-open", { windowId: this.windowId, appType: "workspace-manager" });
+    // Expand the bottom pane so the workspace tab content is visible
+    if (!this._isExpanded) {
+      this.dispatchEvent(new CustomEvent("bp-expand", { bubbles: true, composed: true }));
+    }
   }
 
   // ═══ Render ──────────────────────────────────────────────────────────

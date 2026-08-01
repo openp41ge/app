@@ -15,3 +15,4 @@ export * from "./repo-operations.js";
 export * from "./serialization.js";
 export * from "./system-tab-operations.js";
 export * from "./editor-system-tab-operations.js";
+export * from "./editor-system-tab-operations.js";

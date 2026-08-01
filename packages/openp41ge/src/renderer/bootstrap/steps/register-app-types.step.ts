@@ -20,6 +20,7 @@ import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
 import { WorkspacesSystemTab } from "../../apps/system-tabs/workspace-manager-system-tab";
+import { SettingsSystemTab } from "../../apps/system-tabs/settings-system-tab";
 import { explorerPlugin } from "../../apps/system-tabs/explorer-plugin";
 import { gitPlugin } from "../../apps/system-tabs/git-plugin";
 import { workspaceData } from "../../services/workspace-data";
@@ -47,6 +48,12 @@ export class RegisterAppTypesStep implements IStartupStep {
       appType: "workspace-manager",
       title: "Workspaces",
       createController: (tabId: string) => new WorkspacesSystemTab(tabId),
+    });
+
+    registerEditorSystemTabType({
+      appType: "settings",
+      title: "Settings",
+      createController: (tabId: string) => new SettingsSystemTab(tabId),
     });
 
     // ── Register built-in plugins through PluginRegistry ──────────────

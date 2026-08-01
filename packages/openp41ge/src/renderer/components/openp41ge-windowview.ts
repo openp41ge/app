@@ -191,6 +191,12 @@ class Openp41geWindowView extends LitElement {
     }
   }
 
+  private _onBottomPaneExpand(): void {
+    if (this._paneHeight <= TAB_BAR_HEIGHT) {
+      this._paneHeight = 300;
+    }
+  }
+
   /** Highlight both the sidebar notch and bottom drag bar when hovering a corner. */
   private _highlightCorners(corner: "bottom-left" | "bottom-right", show: boolean): void {
     const side = corner === "bottom-left" ? "left" : "right";
@@ -373,6 +379,7 @@ class Openp41geWindowView extends LitElement {
           .activeTabId=${win.editorSystemActiveTabId}
           .paneHeight=${this._paneHeight}
           @bp-toggle=${this._onBottomPaneToggle}
+          @bp-expand=${this._onBottomPaneExpand}
         ></openp41ge-bottom-pane>
 
         <!-- Bottom pane drag bar (invisible until hovered, centered over bottom pane's top border) -->
