@@ -22,6 +22,12 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
   readonly name = "subscribe-state-updates";
 
   async run(context: StartupContext): Promise<void> {
+    // If preload bridge is missing, skip IPC subscription
+    if (typeof window.openp41ge === "undefined") {
+      log.warn("preload bridge not available, skipping state subscription");
+      return;
+    }
+
     // Subscribe to state updates from main process
     let stateUpdateCount = 0;
     window.openp41ge.workspace.onStateUpdate((stateJson: string) => {
@@ -56,7 +62,7 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
     // to polling the preload bridge (which gets set via the openp41ge:init IPC
     // message on did-finish-load).
     let windowId = context.windowId;
-    if (!windowId) {
+    if (!windowId && typeof window.openp41ge !== "undefined") {
       windowId = window.openp41ge.workspace.getWindowId();
     }
 

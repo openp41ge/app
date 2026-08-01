@@ -16,6 +16,10 @@ export class CheckProjectStep implements IStartupStep {
   readonly name = "check-project";
 
   async run(_context: StartupContext): Promise<void> {
+    if (typeof window.openp41ge === "undefined") {
+      log.warn("preload bridge not available, skipping project check");
+      return;
+    }
     try {
       const currentProject = await window.openp41ge.project.current();
       if (currentProject) {
@@ -25,7 +29,7 @@ export class CheckProjectStep implements IStartupStep {
         log.info("No active project — continuing with default");
       }
     } catch (err) {
-      log.error("Error in project check:", err);
+      log.warn("Project check failed (expected without preload):", err);
     }
   }
 }

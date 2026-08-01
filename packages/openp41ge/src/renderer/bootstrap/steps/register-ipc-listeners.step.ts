@@ -21,6 +21,12 @@ export class RegisterIpcListenersStep implements IStartupStep {
   readonly name = "register-ipc-listeners";
 
   async run(context: StartupContext): Promise<void> {
+    // If preload bridge is missing, skip IPC listener registration
+    if (typeof window.openp41ge === "undefined") {
+      log.warn("preload bridge not available, skipping IPC listeners");
+      return;
+    }
+
     window.openp41ge.onZoomIn(() => context.zoomService.zoomIn());
     window.openp41ge.onZoomOut(() => context.zoomService.zoomOut());
     window.openp41ge.onZoomReset(() => context.zoomService.zoomReset());

@@ -70,7 +70,7 @@ export class RendererBootstrap {
       this.context.initialStatePromise = window.openp41ge?.workspace?.getState() ?? Promise.resolve(null);
     } catch (e) {
       log.error("Failed to get initial state:", e);
-      this.context.initialStatePromise = Promise.resolve(null);
+      this.context.initialStatePromise = Promise.resolve("") as Promise<string>;
     }
     this.context.configService.load(); // idempotent — starts loading once
 
@@ -83,7 +83,7 @@ export class RendererBootstrap {
         await step.run(this.context);
         log.info(`step "${step.name}" completed`);
       } catch (err) {
-        log.error(`step "${step.name}" FAILED:`, err);
+        log.warn(`step "${step.name}" FAILED (continuing):`, err);
         // Continue to the next step — never stop the pipeline
       }
     }

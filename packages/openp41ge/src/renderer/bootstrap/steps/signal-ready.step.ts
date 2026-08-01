@@ -20,7 +20,9 @@ export class SignalReadyStep implements IStartupStep {
 
   async run(_context: StartupContext): Promise<void> {
     window.__openp41geReady = true;
-    window.openp41ge.lifecycle.notifyReady();
+    if (typeof window.openp41ge !== "undefined") {
+      window.openp41ge.lifecycle.notifyReady();
+    }
     document.dispatchEvent(new CustomEvent("openp41ge:ready"));
     log.info("ready signal sent");
   }

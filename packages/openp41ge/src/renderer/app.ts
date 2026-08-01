@@ -187,6 +187,7 @@ export function resetApp(): void {
  * Called during the register-ipc-listeners bootstrap step.
  */
 export function wireResetListener(): void {
+  if (typeof window.openp41ge === "undefined") return;
   window.openp41ge.workspace.onReset(() => {
     resetApp();
   });

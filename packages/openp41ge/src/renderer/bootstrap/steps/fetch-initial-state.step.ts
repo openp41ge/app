@@ -29,6 +29,12 @@ export class FetchInitialStateStep implements IStartupStep {
   readonly name = "fetch-initial-state";
 
   async run(context: StartupContext): Promise<void> {
+    // If preload bridge is missing, skip this step silently
+    if (typeof window.openp41ge === "undefined") {
+      log.warn("preload bridge not available, skipping state fetch");
+      return;
+    }
+
     // If a project was selected via the CheckProjectStep, the main process
     // already switched state via project:switch. We need a fresh fetch to get
     // the updated state, not the pre-started promise (which fired before
