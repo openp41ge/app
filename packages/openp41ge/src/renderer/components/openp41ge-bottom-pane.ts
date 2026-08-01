@@ -144,6 +144,9 @@ class Openp41geBottomPane extends LitElement {
           gap: 10px;
           flex-shrink: 0;
         }
+        .bp-tab:first-child {
+          padding-left: 18px;
+        }
         .bp-tab:hover {
           background: var(--bg-hover, #2a2a2a);
           color: var(--text-primary, #ccc);
