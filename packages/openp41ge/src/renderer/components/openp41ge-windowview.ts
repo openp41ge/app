@@ -179,6 +179,16 @@ class Openp41geWindowView extends LitElement {
     }
   }
 
+  /** Highlight both the sidebar notch and bottom drag bar when hovering a corner. */
+  private _highlightCorners(corner: "bottom-left" | "bottom-right", show: boolean): void {
+    const side = corner === "bottom-left" ? "left" : "right";
+    const notch = this.querySelector(`.wv-notch-v.${side}-notch`);
+    const dragBar = this.querySelector(".bp-drag-bar");
+    if (!notch || !dragBar) return;
+    notch.classList.toggle("dragging", show);
+    dragBar.classList.toggle("dragging", show);
+  }
+
   // ═══ Helpers ─────────────────────────────────────────────────────────
 
   private _getSystemTabTitle(tabId: string): string {
@@ -363,10 +373,14 @@ class Openp41geWindowView extends LitElement {
         <div
           class="wv-corner bottom-left"
           @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "bottom-left")}
+          @mouseenter=${() => this._highlightCorners("bottom-left", true)}
+          @mouseleave=${() => this._highlightCorners("bottom-left", false)}
         ></div>
         <div
           class="wv-corner bottom-right"
           @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "bottom-right")}
+          @mouseenter=${() => this._highlightCorners("bottom-right", true)}
+          @mouseleave=${() => this._highlightCorners("bottom-right", false)}
         ></div>
       </div>
 
@@ -408,8 +422,8 @@ class Openp41geWindowView extends LitElement {
           pointer-events: auto;
           background: transparent;
         }
-        .wv-corner.bottom-left { left: ${this._leftWidth - 6}px; cursor: nw-resize; }
-        .wv-corner.bottom-right { right: ${this._rightWidth - 6}px; cursor: ne-resize; }
+        .wv-corner.bottom-left { left: ${this._leftWidth - 6}px; cursor: nesw-resize; }
+        .wv-corner.bottom-right { right: ${this._rightWidth - 6}px; cursor: nwse-resize; }
       </style>
     `;
   }
