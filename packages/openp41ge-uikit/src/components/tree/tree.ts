@@ -49,9 +49,9 @@ export {
 } from "./types";
 
 const INDENT = 16; // pixels per depth level
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// @ts-expect-error unused constant, kept for documentation
 const CHEVRON_WIDTH = 16; // chevron column width
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// @ts-expect-error unused constant, kept for documentation
 const ICON_WIDTH = 16; // icon column width
 const SECTION_EXTRA = 8; // extra indent for section headers
 
@@ -101,8 +101,10 @@ export class Openp41geTree extends LitElement {
   @state()
   private _loadingNodeIds: Set<string> = new Set();
 
+  // @ts-expect-error unused - kept for potential future use
   private _rootEl: HTMLElement | null = null;
 
+  // @ts-expect-error unused - kept for potential future use
   private _isInternalUpdate = false;
 
   // ─── Lifecycle ───────────────────────────────────────────────────
@@ -169,6 +171,7 @@ export class Openp41geTree extends LitElement {
     return false;
   }
 
+  // @ts-expect-error unused - kept for persistence API
   private _getExpandedNodes(): Set<string> {
     const set = new Set<string>();
     this._collectExpanded(this.nodes, set);

@@ -168,7 +168,8 @@ export function showConfirmModal(opts: {
   confirmLabel?: string;
   cancelLabel?: string;
 }): Promise<boolean> {
-  const modal = document.createElement("openp41ge-confirm-modal");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const modal = document.createElement("openp41ge-confirm-modal") as any;
   modal.message = opts.message;
   if (opts.detail) modal.detail = opts.detail;
   if (opts.confirmLabel) modal.confirmLabel = opts.confirmLabel;

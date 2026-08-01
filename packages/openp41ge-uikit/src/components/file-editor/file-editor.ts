@@ -6,24 +6,22 @@
  * See AGENTS.md for architecture details.
  */
 
-import { LitElement, html, type PropertyValues } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import {
   EVENT_TITLE_CHANGED,
   EVENT_DIRTY_CHANGED,
   EVENT_FILE_SAVED,
-  EVENT_REQUEST_CLOSE,
 } from "openp41ge-editor-engine/events";
 import type {
   TitleChangedDetail,
   DirtyChangedDetail,
   FileSavedDetail,
-  RequestCloseDetail,
 } from "openp41ge-editor-engine/events";
 
 import type { PieceTreeTextContentModel } from "openp41ge-editor-engine/model/piece-tree-text-content-model";
-import type { TextContentChangeEvent, TextPosition, TextSelection } from "openp41ge-editor-engine/model";
+import type { TextContentChangeEvent, TextSelection } from "openp41ge-editor-engine/model";
 import { ViewModel } from "openp41ge-editor-engine/model/view-model";
 import type { ViewModelEvent } from "openp41ge-editor-engine/model/view-model";
 import { ViewLines } from "openp41ge-editor-engine/view/view-lines";
@@ -51,7 +49,6 @@ import { TokenRegistry } from "openp41ge-syntax-highlighting/token-registry";
 let _tokenRegistryInstance: TokenRegistry | null = null;
 import { getThemeById, generateThemeCSS, generateGlobalEditorCSS } from "openp41ge-editor-engine/themes";
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
-import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
 import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
@@ -140,8 +137,10 @@ export class FileEditorElement extends LitElement {
   private _fontSize: number = 14;
   private _wordWrapEnabled: boolean = false;
   private _wrapCalculator: IWrapColumnCalculator = new ViewportWrapColumnCalculator();
-  private _mouseDownLine: number = 0;
-  private _mouseDownCol: number = 0;
+  // @ts-expect-error unused
+  private _mouseDownLine = 0;
+  // @ts-expect-error unused
+  private _mouseDownCol = 0;
   private _isMouseDown: boolean = false;
   private _onDocumentMouseMove: ((e: MouseEvent) => void) | null = null;
   private _onDocumentMouseUp: (() => void) | null = null;
@@ -994,7 +993,7 @@ export class FileEditorElement extends LitElement {
     }
   }
 
-  private _onViewModelChange(event: ViewModelEvent): void {
+  private _onViewModelChange(_event: ViewModelEvent): void {
     if (!this._viewLines || !this._viewModel) return;
 
     // Update line count (this also updates scroll height)
@@ -1067,7 +1066,7 @@ export class FileEditorElement extends LitElement {
     this._scrollToRevealCursor();
   }
 
-  private _onModelContentChange(event: TextContentChangeEvent): void {
+  private _onModelContentChange(_event: TextContentChangeEvent): void {
     // Track dirty state by comparing current content against last saved content.
     // This handles edits, undo, and redo — any operation that restores the
     // document to the saved state is correctly detected as clean.
@@ -1152,8 +1151,8 @@ export class FileEditorElement extends LitElement {
     this._currentLineHighlight?.setLine(pos.lineNumber);
 
     // Bracket matching — based on primary cursor
-    const bracketMatch = findMatchingBracket(this._viewModel.model, pos);
-    // In a full implementation, bracketMatch highlights are added as decorations
+    const _bracketMatch = findMatchingBracket(this._viewModel.model, pos);
+    void _bracketMatch; // Future: bracket-match highlight decorations
     // For now, this just computes the match for future rendering
 
     // Indentation guides — based on primary cursor
@@ -1284,7 +1283,7 @@ export class FileEditorElement extends LitElement {
       viewStartLine,
       viewEndLine,
       this._lineHeight,
-      (line, column) => {
+      (_line, column) => {
         const lx = leftOffset + (column - 1) * cw;
         return { x: lx, width: cw };
       },
