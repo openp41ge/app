@@ -70,12 +70,14 @@ class Openp41geWindowView extends LitElement {
     this._ensureSkeleton();
     document.addEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
     document.addEventListener("workspace-file-changed", this._onWorkspacesUpdate);
+    this.addEventListener("bp-expand", this._onBottomPaneExpand);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
     document.removeEventListener("workspace-file-changed", this._onWorkspacesUpdate);
+    this.removeEventListener("bp-expand", this._onBottomPaneExpand);
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
   }
