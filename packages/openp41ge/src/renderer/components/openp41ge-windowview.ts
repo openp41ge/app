@@ -128,6 +128,15 @@ class Openp41geWindowView extends LitElement {
     const maxPaneHeight = window.innerHeight - TITLEBAR_HEIGHT;
     const minPaneHeight = TAB_BAR_HEIGHT;
 
+    // Set cursor during drag for corner handles
+    if (this._activeHandle === "bottom-left" || this._activeHandle === "bottom-right") {
+      document.body.style.cursor = "move";
+    } else if (this._activeHandle === "bottom") {
+      document.body.style.cursor = "ns-resize";
+    } else {
+      document.body.style.cursor = "col-resize";
+    }
+
     switch (this._activeHandle) {
       case "left": {
         const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, this._dragStartLeftWidth + dx));
@@ -165,6 +174,9 @@ class Openp41geWindowView extends LitElement {
     this._activeHandle = null;
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
+
+    // Reset cursor
+    document.body.style.cursor = "";
 
     // Persist widths
     localStorage.setItem("openp41ge:sidebar-width-left", String(this._leftWidth));
@@ -422,8 +434,8 @@ class Openp41geWindowView extends LitElement {
           pointer-events: auto;
           background: transparent;
         }
-        .wv-corner.bottom-left { left: ${this._leftWidth - 6}px; cursor: nesw-resize; }
-        .wv-corner.bottom-right { right: ${this._rightWidth - 6}px; cursor: nwse-resize; }
+        .wv-corner.bottom-left { left: ${this._leftWidth - 6}px; cursor: move; }
+        .wv-corner.bottom-right { right: ${this._rightWidth - 6}px; cursor: move; }
       </style>
     `;
   }
