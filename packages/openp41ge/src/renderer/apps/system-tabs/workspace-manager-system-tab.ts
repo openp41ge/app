@@ -64,6 +64,14 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     this._emitUpdate();
   }
 
+  private async _onRemoveRepo(index: number): Promise<void> {
+    const data = workspaceFileService.activeData;
+    if (!data) return;
+    data.repos.splice(index, 1);
+    await workspaceFileService.save();
+    this._emitUpdate();
+  }
+
   private async _onCopy(e: MouseEvent, path: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(path);
@@ -134,9 +142,7 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           transition:background .1s;
         }
         .ws-act-btn:hover { background:var(--bg-hover,rgba(128,128,128,.15)); color:var(--text-primary,#ccc); }
-        .ws-repo-item { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:13px; color:var(--text-primary,#ccc); }
-        .ws-repo-item::before { content:"•"; color:var(--text-secondary,#999); }
-        .ws-worktrees { font-size:12px; color:var(--text-secondary,#999); }
+
         .ws-empty { color:var(--text-secondary,#999); font-size:13px; }
       </style>
       <div class="ws-wrap">
@@ -215,12 +221,18 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           <div class="ws-path">
             ${data.repos.length > 0
               ? data.repos.map(
-                  (r) => html`
-                    <div class="ws-repo-item">
-                      <span>${r.url}</span>
-                      ${r.worktrees.length > 0
-                        ? html`<span class="ws-worktrees">(${r.worktrees.join(", ")})</span>`
-                        : ""}
+                  (r, i) => html`
+                    <div style="display:flex;align-items:center;gap:6px;margin:6px 0;padding:6px 10px;border-radius:6px;background:var(--bg-secondary,rgba(255,255,255,.04))">
+                      <span style="flex:1;font-size:13px;color:var(--text-primary,#ccc);word-break:break-all">${r.url}</span>
+                      <span
+                        style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);transition:color .1s;flex-shrink:0"
+                        title="Remove repository"
+                        @click=${() => this._onRemoveRepo(i)}
+                        @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+                        @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'}
+                      >
+                        <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
+                      </span>
                     </div>
                   `,
                 )
