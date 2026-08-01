@@ -168,6 +168,7 @@ class Openp41geSidebar extends LitElement {
       >
         <style>
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
+          .sidebar-tab-close:hover { background: var(--bg-hover-strong, #444); }
         </style>
 
         <!-- System tab bar -->
@@ -195,7 +196,7 @@ class Openp41geSidebar extends LitElement {
                   >
                     <span class="truncate flex-1">${tab.title}</span>
                     <span
-                      class="sidebar-tab-close flex items-center justify-center w-4 h-4 rounded-sm text-xs leading-none hover:bg-hover-strong"
+                      class="sidebar-tab-close flex items-center justify-center w-4 h-4 rounded-sm text-xs leading-none"
                       @click=${(e: Event) => this._onTabClose(e, tab.id)}
                     >✕</span>
                   </div>`;
