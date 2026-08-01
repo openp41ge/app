@@ -171,7 +171,7 @@ class Openp41geSidebar extends LitElement {
         </style>
 
         <!-- System tab bar -->
-        <div class="sidebar-tab-bar relative shrink-0 border-b border-divider" data-sidebar-tab-bar="${this.side}">
+        <div class="sidebar-tab-bar relative shrink-0${this.systemTabs.length > 0 ? ' border-b border-divider' : ''}" data-sidebar-tab-bar="${this.side}">
           ${this.systemTabs.length > 0 ? html`
             <div class="sidebar-tab-scroll flex items-stretch overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;" @scroll=${this._onTabBarScroll}>
               ${this.systemTabs.map((tab, idx) => {
@@ -201,9 +201,7 @@ class Openp41geSidebar extends LitElement {
                   </div>`;
               })}
             </div>
-          ` : html`
-            <div style="height:34px"></div>
-          `}
+          ` : nothing}
           ${this._showLeftShadow ? html`<div class="absolute top-0 left-0 w-4 h-full pointer-events-none" style="background:linear-gradient(to right, rgba(0,0,0,0.3), transparent)"></div>` : nothing}
           ${this._showRightShadow ? html`<div class="absolute top-0 right-0 w-4 h-full pointer-events-none" style="background:linear-gradient(to left, rgba(0,0,0,0.3), transparent)"></div>` : nothing}
         </div>
