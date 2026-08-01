@@ -10,8 +10,6 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
 import { emitEvent } from "../app";
-import { appState } from "../services/app-state";
-import { workspaceFileService } from "../services/workspace-file-service";
 
 const isMac = (() => {
   try {
@@ -47,18 +45,6 @@ class Openp41geTitleBar extends LitElement {
     const win = this.windowData;
     if (!win) return;
     emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
-  }
-
-  private async _openWorkspaces(): Promise<void> {
-    const win = this.windowData;
-    if (!win) return;
-
-    // Ensure a workspace exists (creates a draft if none is active)
-    if (!appState.activeWorkspaceFilePath) {
-      await workspaceFileService.ensureDraftExists();
-    }
-
-    emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
   }
 
   private _openSettings(): void {
@@ -105,18 +91,6 @@ class Openp41geTitleBar extends LitElement {
 
         <!-- Spacer to push content to the right -->
         <div class="flex-1 min-w-0"></div>
-
-        <!-- Workspaces button -->
-        <div
-          class="tb-btn flex items-center justify-center w-7 h-7 rounded cursor-pointer text-secondary hover:text-primary shrink-0 mr-0.5"
-          style="-webkit-app-region:no-drag"
-          title="Workspaces"
-          @click=${() => this._openWorkspaces()}
-        >
-          <svg width="18" height="18" viewBox="0 -960 960 960" fill="currentColor">
-            <path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/>
-          </svg>
-        </div>
 
         <!-- Settings button -->
         <div

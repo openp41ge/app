@@ -56,6 +56,18 @@ class Openp41geWindowView extends LitElement {
     this.requestUpdate();
   };
 
+  private async _onWorkspaceClick(): Promise<void> {
+    const win = this.windowData;
+    if (!win) return;
+
+    if (!workspaceFileService.activeData) {
+      await workspaceFileService.openDialog();
+      return;
+    }
+
+    emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
+  }
+
   private _ensureSkeleton(): void {
     if (this._skeletonInitialized) return;
     this._skeletonInitialized = true;
@@ -283,10 +295,17 @@ class Openp41geWindowView extends LitElement {
           class="openp41ge-bottom-bar flex items-center h-6 bg-bg-primary border-t border-divider shrink-0 px-2"
         >
           <div class="flex-1"></div>
-          <div class="text-xs text-muted" style="padding-right:12px">
+          <div
+            class="text-xs text-muted"
+            style="padding-right:12px;cursor:pointer;border-radius:3px;transition:background .1s"
+            @click=${() => this._onWorkspaceClick()}
+            @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover,rgba(128,128,128,.15))'}
+            @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+            title="Open workspace settings"
+          >
             ${workspaceFileService.activeData
               ? html`<span style="font-family:monospace">${workspaceFileService.activeData.id.slice(0, 8)}</span>`
-              : html`<span>no workspace loaded</span>`}
+              : html`<span>open workspace</span>`}
           </div>
         </div>
       </div>
