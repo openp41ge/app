@@ -93,8 +93,6 @@ class Openp41geBottomPane extends LitElement {
     const newHeight = Math.max(MIN_PANE_HEIGHT, Math.min(maxHeight, this._dragStartHeight + delta));
 
     this._paneHeight = newHeight;
-    // Force Lit to update synchronously during drag for smooth feedback
-    (this as unknown as { _$didUpdate?: boolean })._$didUpdate = true;
   };
 
   private _onDragEnd = (): void => {
