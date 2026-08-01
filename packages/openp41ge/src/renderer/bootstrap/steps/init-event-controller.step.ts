@@ -1,7 +1,8 @@
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
-import { EventGraph } from "../../services/event-graph";
-import { EventRouter } from "../../services/event-router";
+import { createLogger } from "openp41ge-logger";
+import type { HandlerFn } from "../../services/event-router";
+import { EventGraph, EventRouter } from "../../services/event-router";
 import { EventLogBuffer } from "../../services/event-log-buffer";
 import { appState } from "../../services/app-state";
 import { workspaceData } from "../../services/workspace-data";
@@ -26,12 +27,14 @@ export class InitEventControllerStep implements IStartupStep {
   readonly name = "init-event-controller";
 
   async run(context: StartupContext): Promise<void> {
+    const log = createLogger("init-event-controller");
+
     // 1. Load base graph
     const graph = new EventGraph();
     const graphData = await this._loadGraphData();
     const errors = graph.load(graphData);
     if (errors.length > 0) {
-      console.warn("[event-controller] Graph validation errors:", errors);
+      log.warn("Graph validation errors:", errors);
     }
 
     // 2. Create log buffer
@@ -41,7 +44,7 @@ export class InitEventControllerStep implements IStartupStep {
     const pluginRegistry = new PluginRegistry();
 
     // 4. Build core handlers
-    const handlers: Record<string, any> = {
+    const handlers: Record<string, HandlerFn> = {
       ...createFocusHandlers(appState),
       ...createTabHandlers(context.commandBus),
       ...createLayoutHandlers(context.commandBus),
@@ -93,7 +96,8 @@ export class InitEventControllerStep implements IStartupStep {
     initDebugAPI(appState, workspaceData, graph, logBuffer, pluginRegistry, workspaceFileService);
 
     // Store references on the context for other steps/services to use
-    (context as any).__eventController = {
+    const ctx = context as StartupContext & Record<string, unknown>;
+    ctx.__eventController = {
       graph,
       router,
       logBuffer,
@@ -102,12 +106,12 @@ export class InitEventControllerStep implements IStartupStep {
     };
   }
 
-  private async _loadGraphData(): Promise<any> {
+  private async _loadGraphData(): Promise<Record<string, unknown>> {
     try {
       const module = await import("../../../../data/event-routing-graph.json");
-      return module.default ?? module;
+      return (module.default ?? module) as Record<string, unknown>;
     } catch (err) {
-      console.warn("[event-controller] Could not load graph JSON, using empty graph.");
+      log.warn("Could not load graph JSON, using empty graph.");
       return { version: 1, nodes: [], edges: [] };
     }
   }

@@ -12,7 +12,7 @@ import type { TabController } from "../../controllers/types";
 import { createLogger } from "openp41ge-logger";
 import { emitEvent } from "../../app";
 
-const log = createLogger("project-picker-controller");
+const _log = createLogger("project-picker-controller");
 
 export class ProjectPickerController extends BaseController implements TabController {
   private _pickerEl: HTMLElement | null = null;

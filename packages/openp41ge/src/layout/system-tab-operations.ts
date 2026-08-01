@@ -520,7 +520,6 @@ export function toggleSidebar(
 ): Workspace {
   const openKey = side === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
   const activeKey = side === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
-  const tabsKey = side === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
 
   const win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
@@ -559,7 +558,6 @@ export function openSidebar(
 ): Workspace {
   const openKey = side === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
   const activeKey = side === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
-  const tabsKey = side === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
 
   const win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;

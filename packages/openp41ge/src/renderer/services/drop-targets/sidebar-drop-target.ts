@@ -80,7 +80,7 @@ export class SidebarDropTarget implements IDropTarget {
   async onDrop(source: IDragSource, clientX: number, _clientY: number): Promise<DragResult> {
     this._hideOverlay();
 
-    const data = source.getDragData() as any;
+    const data = source.getDragData() as Record<string, unknown>;
     if (data.type !== "system-tab") {
       return { success: false, reason: "only system tabs can be dropped on sidebar tab bars" };
     }

@@ -2,11 +2,11 @@ export interface LogEntry {
   eventId: string;
   timestamp: number;
   eventType: string;
-  payload: any;
+  payload: Record<string, unknown>;
   matchedEdge: {
     id: string;
     from: string;
-    when: Record<string, any> | null;
+    when: Record<string, unknown> | null;
     to: string[];
   } | null;
   handlerResults: {
@@ -15,7 +15,7 @@ export interface LogEntry {
     error?: string;
   }[];
   totalDuration: number;
-  stateSnapshot: Record<string, any>;
+  stateSnapshot: Record<string, unknown>;
   sourceFile: string;
 }
 

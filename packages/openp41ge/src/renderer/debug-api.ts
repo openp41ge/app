@@ -16,7 +16,7 @@ export interface DebugAPI {
   graph: {
     hash(): string;
     nodes(): { id: string }[];
-    edges(): { id: string; from: string; when: any; to: string[] }[];
+    edges(): { id: string; from: string; when: Record<string, unknown> | null; to: string[] }[];
   };
   plugins: PluginRegistration[];
   workspaceFile: WorkspaceFileService;
@@ -50,5 +50,6 @@ export function initDebugAPI(
     workspaceFile,
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__openp41ge_debug = api;
 }

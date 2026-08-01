@@ -5,7 +5,7 @@ export interface GraphNode {
 export interface GraphEdge {
   id: string;
   from: string;
-  when: Record<string, any> | null;
+  when: Record<string, unknown> | null;
   to: string[];
 }
 

@@ -12,9 +12,8 @@
 
 import { BaseController } from "../../controllers/base-controller";
 import type { TabController } from "../../controllers/types";
+import type { GitRepositoryPanel, GitBrowserData, GitBranchContextMenuDetail } from "openp41ge-uikit";
 import {
-  GitRepositoryPanel,
-  type GitBrowserData,
   GIT_SELECT_BRANCH,
   GIT_SELECT_COMMIT,
   GIT_REFRESH_BRANCHES,
@@ -25,11 +24,10 @@ import {
   GIT_CHECKOUT_WORKTREE,
   GIT_BRANCH_CONTEXT_MENU,
   GIT_FILE_ROW_CLICK,
-  type GitBranchContextMenuDetail,
 } from "openp41ge-uikit";
-import { gitBrowserRenderer } from "openp41ge-git";
 import { toastService } from "../../components/openp41ge-toast";
 import { createOpenp41geContextMenu } from "../../interfaces/element-guards";
+import type { CommitEntry } from "openp41ge-git";
 
 export class GitRepositoryController extends BaseController implements TabController {
   /** The repo name being displayed. */
@@ -172,7 +170,7 @@ export class GitRepositoryController extends BaseController implements TabContro
 
       const selectedBranch = branches.length > 0 ? branches[0].name : "";
 
-      let commits: import("openp41ge-git").CommitEntry[] = [];
+      let commits: CommitEntry[] = [];
       let hasMoreCommits = false;
       if (selectedBranch) {
         const commitLog = await window.openp41ge.workspaceController.getCommitLog(
@@ -538,7 +536,7 @@ export class GitRepositoryController extends BaseController implements TabContro
     document.body.appendChild(ctx);
   };
 
-  private _onFileRowClick = (e: Event): void => {
+  private _onFileRowClick = (_e: Event): void => {
     // File selection/highlight only — no navigation (deferred)
   };
 }

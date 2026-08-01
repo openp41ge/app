@@ -1,3 +1,5 @@
+/* eslint-disable max-classes-per-file */
+
 /**
  * ProjectDetailController — tab controller that renders a project detail card
  * inside the editor grid. Shows project metadata and an "Activate" button.

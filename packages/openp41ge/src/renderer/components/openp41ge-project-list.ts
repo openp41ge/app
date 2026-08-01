@@ -6,7 +6,7 @@
  * panel as an editor tab.
  */
 
-import { LitElement, html, nothing, type TemplateResult } from "lit";
+import { LitElement, html, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-logger";
 import { emitEvent } from "../app";

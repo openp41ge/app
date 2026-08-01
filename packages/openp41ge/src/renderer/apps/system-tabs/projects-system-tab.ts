@@ -20,7 +20,7 @@ export class ProjectsSystemTabController implements SystemTabController {
     await import("../../components/openp41ge-project-list");
 
     const list = document.createElement("openp41ge-project-list") as HTMLElement;
-    (list as any).systemTabId = this.tabId;
+    (list as Record<string, unknown>).systemTabId = this.tabId;
     container.appendChild(list);
     this._element = list;
   }

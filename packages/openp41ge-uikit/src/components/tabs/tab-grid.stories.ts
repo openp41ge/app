@@ -1,3 +1,5 @@
+/* eslint-disable max-classes-per-file, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+
 /**
  * TabGrid stories — demonstrates <tab-grid> with multi-grid drag-and-drop.
  */

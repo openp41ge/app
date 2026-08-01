@@ -49,7 +49,9 @@ export {
 } from "./types";
 
 const INDENT = 16; // pixels per depth level
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const CHEVRON_WIDTH = 16; // chevron column width
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ICON_WIDTH = 16; // icon column width
 const SECTION_EXTRA = 8; // extra indent for section headers
 

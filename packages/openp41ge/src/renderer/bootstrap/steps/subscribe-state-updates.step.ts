@@ -29,22 +29,22 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
     }
 
     // Subscribe to state updates from main process
-    let stateUpdateCount = 0;
+    let _stateUpdateCount = 0;
     window.openp41ge.workspace.onStateUpdate((stateJson: string) => {
-      stateUpdateCount++;
+      _stateUpdateCount++;
       const ws = JSON.parse(stateJson);
-      const leftTabs = ws?.windows?.[0]?.sidebar?.leftSidebarTabs;
-      const leftActive = ws?.windows?.[0]?.sidebar?.activeLeftTab;
-      const rightTabs = ws?.windows?.[0]?.sidebar?.rightSidebarTabs;
-      const rightActive = ws?.windows?.[0]?.sidebar?.activeRightTab;
+      const _leftTabs = ws?.windows?.[0]?.sidebar?.leftSidebarTabs;
+      const _leftActive = ws?.windows?.[0]?.sidebar?.activeLeftTab;
+      const _rightTabs = ws?.windows?.[0]?.sidebar?.rightSidebarTabs;
+      const _rightActive = ws?.windows?.[0]?.sidebar?.activeRightTab;
 
       context.workspaceState.setState(ws);
     });
 
     // Subscribe to state changes → render
-    let renderCount = 0;
+    let _renderCount = 0;
     context.workspaceState.subscribe((_ws) => {
-      renderCount++;
+      _renderCount++;
 
       this._render(context);
     });

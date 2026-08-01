@@ -107,7 +107,7 @@ export function setEventRouter(router: EventRouter): void {
  * Components should use this instead of dispatch() for user interactions.
  * The router handles routing to handlers, which may call IPC dispatch.
  */
-export function emitEvent(eventType: string, payload?: any): void {
+export function emitEvent(eventType: string, payload?: Record<string, unknown>): void {
   _eventRouter?.emit(eventType, payload ?? {});
 }
 

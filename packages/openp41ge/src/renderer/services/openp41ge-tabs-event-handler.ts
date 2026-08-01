@@ -241,7 +241,7 @@ export class Openp41geTabsEventHandler {
         winId,
         tabId,
         pinned: isPinned,
-        ephemeral,
+        ephemeral: _ephemeral,
       } = detail as {
         winId: string;
         tabId: string;

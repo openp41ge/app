@@ -2,7 +2,11 @@ import type { EventGraph, GraphEdge } from "./event-graph";
 import type { AppState } from "./app-state";
 import type { EventLogBuffer } from "./event-log-buffer";
 
-export type HandlerFn = (payload: any) => Promise<void>;
+import { createLogger } from "openp41ge-logger";
+
+const log = createLogger("event-router");
+
+export type HandlerFn = (payload: Record<string, unknown>) => Promise<void>;
 
 export interface RouterConfig {
   graph: EventGraph;
@@ -36,7 +40,7 @@ export class EventRouter {
   /** Register a handler (called at bootstrap by core and plugins). */
   registerHandler(id: string, fn: HandlerFn): void {
     if (this._handlers[id]) {
-      console.warn(`[EventRouter] Overwriting existing handler "${id}".`);
+      log.warn(`Overwriting existing handler "${id}".`);
     }
     this._handlers[id] = fn;
   }
@@ -50,7 +54,7 @@ export class EventRouter {
    * 4. Dispatches to each target handler in order
    * 5. Logs the dispatch with state snapshot and timing
    */
-  async emit(eventType: string, payload: any): Promise<void> {
+  async emit(eventType: string, payload: Record<string, unknown>): Promise<void> {
     const sourceFile = this._captureSourceFile();
     const stateBefore = this._state.snapshot();
     const edges = this._graph.findEdges(eventType);
@@ -73,8 +77,8 @@ export class EventRouter {
         try {
           await handler(payload);
           handlerResults.push({ handlerId, duration: performance.now() - handlerStart });
-        } catch (err: any) {
-          handlerResults.push({ handlerId, duration: performance.now() - handlerStart, error: err.message ?? String(err) });
+        } catch (err: unknown) {
+          handlerResults.push({ handlerId, duration: performance.now() - handlerStart, error: (err as Error)?.message ?? String(err) });
         }
       }
     }
@@ -110,9 +114,9 @@ export class EventRouter {
     return undefined;
   }
 
-  private _matchesPredicate(when: Record<string, any>): boolean {
+  private _matchesPredicate(when: Record<string, unknown>): boolean {
     for (const [key, value] of Object.entries(when)) {
-      const stateValue = (this._state as any)[key];
+      const stateValue = (this._state as unknown as Record<string, unknown>)[key];
       if (stateValue !== value) return false;
     }
     return true;

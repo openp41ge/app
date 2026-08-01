@@ -57,7 +57,7 @@ export class RegisterAppTypesStep implements IStartupStep {
     });
 
     // ── Register built-in plugins through PluginRegistry ──────────────
-    const ec = (context as any).__eventController;
+    const ec = (context as StartupContext & Record<string, unknown>).__eventController;
     if (ec?.pluginRegistry) {
       const pr = ec.pluginRegistry;
 

@@ -83,7 +83,7 @@ class SidebarTabDragSource implements IDragSource {
     return ghost;
   }
 
-  getDragData(): any {
+  getDragData(): Record<string, unknown> {
     return {
       type: "system-tab",
       tabId: this._tabId,

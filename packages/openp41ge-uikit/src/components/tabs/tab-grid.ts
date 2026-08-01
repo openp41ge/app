@@ -524,9 +524,11 @@ export class TabGrid extends LitElement {
 
       // Fallback: tree drag data stored by story's tree-drag-start handler
       if (filePaths.length === 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const treePath = (window as any).__treeDragFilePath;
         if (treePath) {
           filePaths.push(treePath);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__treeDragFilePath = null;
         }
       }
@@ -538,7 +540,7 @@ export class TabGrid extends LitElement {
         // If drop is on a tab bar, add to that cell without splitting
         if (this._isOverTabBar(e)) {
           const tabBarEl = document.elementFromPoint(e.clientX, e.clientY)
-            ?.closest?.("tab-bar") as any;
+            ?.closest?.("tab-bar") as unknown as { col?: number; getInsertionIndex?: (x: number) => number };
           const col = tabBarEl?.col ?? 0;
           const insertAt = tabBarEl?.getInsertionIndex
             ? tabBarEl.getInsertionIndex(e.clientX)
@@ -619,6 +621,7 @@ export class TabGrid extends LitElement {
     // the grid host, hiding tab-bar elements inside shadow DOM).
     const root = this.renderRoot;
     if (root && "elementFromPoint" in root) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const el = (root as any).elementFromPoint(e.clientX, e.clientY);
       if (el instanceof HTMLElement && el.closest("tab-bar")) return true;
     }
@@ -630,6 +633,7 @@ export class TabGrid extends LitElement {
 
   private _hideBarIndicators(): void {
     this.querySelectorAll("tab-bar").forEach((bar) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tb = bar as any;
       if (tb.hideDropIndicator) tb.hideDropIndicator();
     });
@@ -640,7 +644,7 @@ export class TabGrid extends LitElement {
     if (this._isOverTabBar(e)) {
       this._ghostManager.hideGhost(this);
       const tabBar = document.elementFromPoint(e.clientX, e.clientY)
-        ?.closest?.("tab-bar") as any;
+        ?.closest?.("tab-bar") as unknown as { showDropIndicator?: (x: number) => void };
       if (tabBar?.showDropIndicator) {
         tabBar.showDropIndicator(e.clientX);
       }
