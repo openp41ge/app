@@ -172,6 +172,7 @@ export class Openp41geApplication {
   private _initChromeFlags(): void {
     app.setName("openp41ge");
     app.commandLine.appendSwitch("disable-features", "FontationsFontBackend");
+    app.commandLine.appendSwitch("enable-gpu-rasterization");
     if (!process.env.OPENP41GE_E2E_TEST) {
       app.commandLine.appendSwitch("remote-debugging-port", "9222");
     }
