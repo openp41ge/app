@@ -14,9 +14,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
   readonly appType = "workspace-manager";
   readonly title = "Workspaces";
 
-  /** Tracks which paths have been revealed by the user. */
-  private _revealedPaths = new Set<string>();
-
   constructor(tabId: string) {
     this.id = tabId;
   }
@@ -37,15 +34,6 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
     const folder = await window.openp41ge.dialog.pickFolder();
     if (!folder) return;
     workspaceFileService.changeDataDir(folder);
-    this._emitUpdate();
-  }
-
-  private _toggleReveal(key: string): void {
-    if (this._revealedPaths.has(key)) {
-      this._revealedPaths.delete(key);
-    } else {
-      this._revealedPaths.add(key);
-    }
     this._emitUpdate();
   }
 
@@ -112,14 +100,13 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
           font-family:monospace; font-size:12px; color:var(--text-secondary,#999);
           text-align:left; word-break:break-all; padding:2px 0 0;
         }
-        .ws-path.hidden { display:none; }
+
         .ws-act-btn {
           padding:2px 6px; font-size:12px; border:none; border-radius:3px;
           cursor:pointer; background:transparent; color:var(--text-secondary,#999);
           transition:background .1s;
         }
         .ws-act-btn:hover { background:var(--bg-hover,rgba(128,128,128,.15)); color:var(--text-primary,#ccc); }
-        .ws-act-btn.revealed { color:var(--accent,#007acc); }
         .ws-repo-item { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:13px; color:var(--text-primary,#ccc); }
         .ws-repo-item::before { content:"•"; color:var(--text-secondary,#999); }
         .ws-worktrees { font-size:12px; color:var(--text-secondary,#999); }
@@ -143,12 +130,11 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
             <div class="ws-value">
               <span class="ws-actions">
                 <button class="ws-act-btn" @click=${() => this._onSaveAs()}>Edit</button>
-                <button class="ws-act-btn ${this._revealedPaths.has('file') ? 'revealed' : ''}" @click=${() => this._toggleReveal('file')}>Reveal</button>
                 <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, filePath ?? '')}>Copy</button>
               </span>
             </div>
           </div>
-          <div class="ws-path ${this._revealedPaths.has('file') ? '' : 'hidden'}">${filePath ?? "(not saved)"}</div>
+          <div class="ws-path">${filePath ?? "(not saved)"}</div>
         </div>
         <div class="ws-section">
           <div class="ws-row">
@@ -156,12 +142,11 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
             <div class="ws-value">
               <span class="ws-actions">
                 <button class="ws-act-btn" @click=${() => this._onChangeDataDir()}>Edit</button>
-                <button class="ws-act-btn ${this._revealedPaths.has('dataDir') ? 'revealed' : ''}" @click=${() => this._toggleReveal('dataDir')}>Reveal</button>
                 <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, data.dataDir)}>Copy</button>
               </span>
             </div>
           </div>
-          <div class="ws-path ${this._revealedPaths.has('dataDir') ? '' : 'hidden'}">${data.dataDir}</div>
+          <div class="ws-path">${data.dataDir}</div>
         </div>
         <div class="ws-section">
           <div class="ws-row">
