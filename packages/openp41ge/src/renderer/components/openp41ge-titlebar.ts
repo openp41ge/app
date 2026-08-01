@@ -36,6 +36,20 @@ class Openp41geTitleBar extends LitElement {
   @property({ attribute: false })
   rightSidebarVisible: boolean = false;
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    document.addEventListener("workspace-file-changed", this._requestUpdate);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener("workspace-file-changed", this._requestUpdate);
+  }
+
+  private _requestUpdate = (): void => {
+    this.requestUpdate();
+  };
+
   private _toggleLeft(): void {
     const win = this.windowData;
     if (!win) return;
@@ -97,7 +111,7 @@ class Openp41geTitleBar extends LitElement {
 
         <!-- Workspace button (replaces the static title) -->
         <div
-          class="tb-btn flex items-center gap-1.5 px-2 h-7 rounded cursor-pointer shrink-0 mr-1 text-secondary hover:text-primary"
+          class="tb-btn flex items-center gap-1.5 px-1 h-7 rounded cursor-pointer shrink-0 mr-1 text-secondary hover:text-primary"
           style="-webkit-app-region:no-drag"
           title="${workspaceFileService.activeData ? 'Open workspace settings' : 'Open workspace file…'}"
           @click=${() => this._openWorkspace()}
