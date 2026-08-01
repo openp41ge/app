@@ -38,11 +38,11 @@ export class WorkspacesSystemTab implements EditorSystemTabController {
   }
 
   private async _onAddRepo(): Promise<void> {
-    const folder = await window.openp41ge.dialog.pickFolder();
-    if (!folder) return;
+    const url = window.prompt("Enter repository URL");
+    if (!url) return;
     const data = workspaceFileService.activeData;
     if (!data) return;
-    data.repos.push({ url: folder, worktrees: [] });
+    data.repos.push({ url, worktrees: [] });
     await workspaceFileService.save();
     this._emitUpdate();
   }
