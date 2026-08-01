@@ -162,12 +162,7 @@ class Openp41geBottomPane extends LitElement {
           border-radius: 3px;
           font-size: 12px;
           line-height: 1;
-          opacity: 0;
-          transition: opacity 0.1s;
           color: var(--text-secondary, #999);
-        }
-        .bp-tab:hover .bp-tab-close {
-          opacity: 1;
         }
         .bp-tab-close:hover {
           background: var(--bg-hover-strong, #444);
