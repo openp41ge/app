@@ -211,12 +211,28 @@ class Openp41geWindowView extends LitElement {
 
   private _getSystemTabTitle(tabId: string): string {
     const sysTab = this.workspaceData?.systemTabs?.[tabId as SystemTabId];
-    return sysTab?.title ?? tabId;
+    if (sysTab?.title) return sysTab.title;
+    // Editor system tabs don't store metadata in systemTabs — extract from ID
+    const appType = this._getSystemTabAppType(tabId);
+    if (appType !== "unknown") {
+      const names: Record<string, string> = {
+        "workspace-manager": "Workspaces",
+        settings: "Settings",
+        explorer: "Explorer",
+        git: "Git",
+        search: "Search",
+      };
+      return names[appType] ?? appType;
+    }
+    return tabId;
   }
 
   private _getSystemTabAppType(tabId: string): string {
     const sysTab = this.workspaceData?.systemTabs?.[tabId as SystemTabId];
-    return sysTab?.appType ?? "unknown";
+    if (sysTab?.appType) return sysTab.appType;
+    // Editor system tabs embed appType in the ID: editor-sys-{appType}-{timestamp}
+    const match = tabId.match(/^editor-sys-([a-z-]+)-\d+$/);
+    return match?.[1] ?? "unknown";
   }
 
   private _getSystemTabPinned(tabId: string): boolean {
