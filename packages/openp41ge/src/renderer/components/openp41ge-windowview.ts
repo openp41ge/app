@@ -297,7 +297,7 @@ class Openp41geWindowView extends LitElement {
           <div class="flex-1"></div>
           <div
             class="text-xs text-muted"
-            style="padding:0 4px 0 8px;cursor:pointer;transition:background .1s"
+            style="display:flex;align-items:center;height:100%;padding:0 20px 0 8px;cursor:pointer;transition:background .1s"
             @click=${() => this._onWorkspaceClick()}
             @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover,rgba(128,128,128,.15))'}
             @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
