@@ -182,15 +182,15 @@ class Openp41geSidebar extends LitElement {
                 if ((!isLast || !this._hasOverflow) && !(isLast && this.side === "left")) sideBorder += " border-r";
                 return html`
                   <div
-                    class="sidebar-tab flex items-center gap-2.5 px-2.5 cursor-pointer text-xs whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
+                    class="sidebar-tab flex items-center gap-2.5 px-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
                     data-sidebar-tab-id=${tab.id}
                     data-sidebar-side=${this.side}
                     data-tab-title=${tab.title}
-                    style="width:120px;height:34px;${isActive
+                    style="width:120px;height:34px;font-size:13px;${isActive
                       ? this._isFocused
-                        ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #e0e0e0)"
-                        : "background:rgba(255,255,255,0.05);color:var(--text-primary, #e0e0e0)"
-                      : "color:var(--text-secondary, #888)"}"
+                        ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #ccc)"
+                        : "background:rgba(255,255,255,0.05);color:var(--text-primary, #ccc)"
+                      : "color:var(--text-secondary, #999)"}"
                     @click=${() => this._onTabClick(tab.id)}
                     @mouseup=${(e: MouseEvent) => this._onTabMiddleClick(e, tab.id)}
                   >
