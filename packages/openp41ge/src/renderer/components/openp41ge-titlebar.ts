@@ -10,6 +10,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
 import { emitEvent } from "../app";
+import { workspaceFileService } from "../services/workspace-file-service";
 
 const isMac = (() => {
   try {
@@ -53,6 +54,16 @@ class Openp41geTitleBar extends LitElement {
     emitEvent("system-tab-open", { windowId: win.id, appType: "settings" });
   }
 
+  private async _openWorkspace(): Promise<void> {
+    const win = this.windowData;
+    if (!win) return;
+    if (!workspaceFileService.activeData) {
+      await workspaceFileService.openDialog();
+      return;
+    }
+    emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
+  }
+
   render(): TemplateResult | typeof nothing {
     const win = this.windowData;
     if (!win) return nothing;
@@ -88,6 +99,21 @@ class Openp41geTitleBar extends LitElement {
         >
           Openp41ge
         </span>
+
+        <!-- Workspace button (moved from bottom pane tab bar) -->
+        <div
+          class="tb-btn flex items-center gap-1.5 px-2 h-7 rounded cursor-pointer shrink-0 mr-1"
+          style="-webkit-app-region:no-drag;font-size:12px;color:var(--text-muted,#777)"
+          title="${workspaceFileService.activeData ? 'Open workspace settings' : 'Open workspace file…'}"
+          @click=${() => this._openWorkspace()}
+        >
+          <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" style="margin-top:-1px">
+            <path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/>
+          </svg>
+          ${workspaceFileService.activeData
+            ? html`<span style="font-family:monospace">${workspaceFileService.activeData.id.slice(0, 8)}</span>`
+            : html`<span>open workspace</span>`}
+        </div>
 
         <!-- Spacer to push content to the right -->
         <div class="flex-1 min-w-0"></div>

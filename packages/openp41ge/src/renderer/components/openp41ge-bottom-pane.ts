@@ -13,7 +13,6 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { emitEvent } from "../app";
-import { workspaceFileService } from "../services/workspace-file-service";
 import { getEditorSystemTabRegistration } from "../apps/app-registry";
 import type { EditorSystemTabController } from "../controllers/types";
 
@@ -91,18 +90,6 @@ class Openp41geBottomPane extends LitElement {
   private _onTabClose(e: MouseEvent, tabId: string): void {
     e.stopPropagation();
     emitEvent("system-tab-close", { windowId: this.windowId, tabId });
-  }
-
-  private async _onWorkspaceClick(): Promise<void> {
-    if (!workspaceFileService.activeData) {
-      await workspaceFileService.openDialog();
-      return;
-    }
-    emitEvent("system-tab-open", { windowId: this.windowId, appType: "workspace-manager" });
-    // Expand the bottom pane so the workspace tab content is visible
-    if (!this._isExpanded) {
-      this.dispatchEvent(new CustomEvent("bp-expand", { bubbles: true, composed: true }));
-    }
   }
 
   // ═══ Render ──────────────────────────────────────────────────────────
@@ -187,21 +174,6 @@ class Openp41geBottomPane extends LitElement {
           background: var(--bg-hover-strong, #444);
           color: var(--text-primary, #ccc);
         }
-        .bp-workspace-indicator {
-          display: flex;
-          align-items: center;
-          height: 100%;
-          padding: 0 12px;
-          font-size: 11px;
-          cursor: pointer;
-          color: var(--text-muted, #777);
-          flex-shrink: 0;
-          margin-left: auto;
-          gap: 4px;
-        }
-        .bp-workspace-indicator:hover {
-          color: var(--accent, #569cd6);
-        }
         .bp-content {
           flex: 1;
           overflow: auto;
@@ -233,21 +205,6 @@ class Openp41geBottomPane extends LitElement {
                 </div>
               `,
             )}
-
-            <!-- Workspace indicator -->
-            <div
-              class="bp-workspace-indicator"
-              data-workspace-indicator
-              @click=${this._onWorkspaceClick}
-              title="${workspaceFileService.activeData ? 'Open workspace settings' : 'Open workspace'}"
-            >
-              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="margin-top:-1px">
-                <path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/>
-              </svg>
-              ${workspaceFileService.activeData
-                ? html`<span style="font-family:monospace">${workspaceFileService.activeData.id.slice(0, 8)}</span>`
-                : html`<span>open workspace</span>`}
-            </div>
           </div>
 
           <!-- Content area -->
