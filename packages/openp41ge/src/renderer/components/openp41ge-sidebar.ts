@@ -194,22 +194,15 @@ class Openp41geSidebar extends LitElement {
                     @mouseup=${(e: MouseEvent) => this._onTabMiddleClick(e, tab.id)}
                   >
                     <span class="truncate flex-1">${tab.title}</span>
-                    ${tab.pinned
-                      ? html`<span class="text-muted text-2xs" style="font-size:10px">●</span>`
-                      : html`<span
-                          class="sidebar-tab-close flex items-center justify-center w-4 h-4 rounded-sm text-xs leading-none opacity-0 hover:opacity-100 hover:bg-hover-strong"
-                          @click=${(e: Event) => this._onTabClose(e, tab.id)}
-                        >✕</span>`}
+                    <span
+                      class="sidebar-tab-close flex items-center justify-center w-4 h-4 rounded-sm text-xs leading-none hover:bg-hover-strong"
+                      @click=${(e: Event) => this._onTabClose(e, tab.id)}
+                    >✕</span>
                   </div>`;
               })}
             </div>
           ` : html`
-            <div
-              class="flex items-center justify-center h-[34px] px-2 text-xs text-muted cursor-pointer select-none"
-              @click=${this._onSidebarToggle}
-            >
-              ${this.side === "left" ? "Explorer" : "Git"}
-            </div>
+            <div style="height:34px"></div>
           `}
           ${this._showLeftShadow ? html`<div class="absolute top-0 left-0 w-4 h-full pointer-events-none" style="background:linear-gradient(to right, rgba(0,0,0,0.3), transparent)"></div>` : nothing}
           ${this._showRightShadow ? html`<div class="absolute top-0 right-0 w-4 h-full pointer-events-none" style="background:linear-gradient(to left, rgba(0,0,0,0.3), transparent)"></div>` : nothing}
