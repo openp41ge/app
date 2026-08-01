@@ -821,66 +821,62 @@ describe("system tab operations", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    const result = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
+    const result = ops.openSystemTab(ws, winId, "right", "search", "Search");
     const win = result.windows[0];
-    expect(win.sidebar?.rightSidebarTabs).toHaveLength(1);
-    expect(win.sidebar?.activeRightTab).toBe(win.sidebar?.rightSidebarTabs[0]);
+    expect(win.sidebar?.rightSidebarTabs).toHaveLength(3);
+    expect(win.sidebar?.activeRightTab).toBe(win.sidebar?.rightSidebarTabs[2]);
   });
 
   test("openSystemTab prevents duplicates (same appType in same sidebar)", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
-    const r2 = ops.openSystemTab(r1, winId, "right", "explorer", "Explorer");
+    const r1 = ops.openSystemTab(ws, winId, "right", "search", "Search");
+    const r2 = ops.openSystemTab(r1, winId, "right", "search", "Search");
     const win = r2.windows[0];
-    expect(win.sidebar?.rightSidebarTabs).toHaveLength(1);
+    expect(win.sidebar?.rightSidebarTabs).toHaveLength(3);
   });
 
   test("toggleSidebar toggles the sidebar open state", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    // Open sidebar first
-    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
-    expect(r1.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+    // Sidebar already open with default tabs
+    expect(ws.windows[0].sidebar?.rightSidebarOpen).toBe(true);
 
     // Toggle closed
-    const r2 = ops.toggleSidebar(r1, winId, "right");
-    expect(r2.windows[0].sidebar?.rightSidebarOpen).toBe(false);
+    const r1 = ops.toggleSidebar(ws, winId, "right");
+    expect(r1.windows[0].sidebar?.rightSidebarOpen).toBe(false);
 
     // Toggle open again
-    const r3 = ops.toggleSidebar(r2, winId, "right");
-    expect(r3.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+    const r2 = ops.toggleSidebar(r1, winId, "right");
+    expect(r2.windows[0].sidebar?.rightSidebarOpen).toBe(true);
   });
 
   test("openSidebar opens sidebar and activates first tab", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    // Add a system tab first
-    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
-    const tabId = r1.windows[0].sidebar?.rightSidebarTabs[0];
+    // Sidebar already open with default tabs; close it first
+    const r0 = ops.closeSidebar(ws, winId, "right");
+    expect(r0.windows[0].sidebar?.rightSidebarOpen).toBe(false);
 
-    // Close sidebar
-    const r2 = ops.closeSidebar(r1, winId, "right");
-    expect(r2.windows[0].sidebar?.rightSidebarOpen).toBe(false);
-
-    // Open sidebar (should open without tab param)
-    const r3 = ops.openSidebar(r2, winId, "right");
-    expect(r3.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+    // Open sidebar (should open and activate first tab)
+    const r1 = ops.openSidebar(r0, winId, "right");
+    expect(r1.windows[0].sidebar?.rightSidebarOpen).toBe(true);
   });
 
   test("closeSystemTab removes tab from sidebar and registry", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer", false);
-    const tabId = r1.windows[0].sidebar?.rightSidebarTabs[0]!;
+    // Use a non-default appType to avoid conflict
+    const r1 = ops.openSystemTab(ws, winId, "right", "search", "Search", false);
+    const tabId = r1.windows[0].sidebar?.rightSidebarTabs[2]!;
     expect(r1.systemTabs[tabId]).toBeDefined();
 
     const r2 = ops.closeSystemTab(r1, winId, "right", tabId);
-    expect(r2.windows[0].sidebar?.rightSidebarTabs).toHaveLength(0);
+    expect(r2.windows[0].sidebar?.rightSidebarTabs).toHaveLength(2);
     expect(r2.systemTabs[tabId]).toBeUndefined();
   });
 
@@ -889,8 +885,8 @@ describe("system tab operations", () => {
     const winId = ws.windows[0].id;
     const ws2 = ops.addWindow(ws, "win-2");
 
-    const r1 = ops.openSystemTab(ws2, winId, "right", "explorer", "Explorer", true);
-    const tabId = r1.windows[0].sidebar?.rightSidebarTabs[0]!;
+    const r1 = ops.openSystemTab(ws2, winId, "right", "search", "Search", true);
+    const tabId = r1.windows[0].sidebar?.rightSidebarTabs[2]!;
     const win2 = r1.windows.find((w) => w.id === "win-2");
     expect(win2?.sidebar?.rightSidebarTabs).toContain(tabId);
   });
