@@ -176,17 +176,16 @@ class Openp41geBottomPane extends LitElement {
           display: flex;
           flex-direction: column;
           background: var(--bg-primary, #1e1e1e);
-          overflow: hidden;
           user-select: none;
           border-top: 1px solid var(--divider, #333);
         }
-        /* ── Drag bar (invisible until hovered, like sidebar resize notch) ── */
+        /* ── Drag bar (invisible until hovered, centered over the top border) ── */
         .bp-drag-bar {
           position: absolute;
-          top: -2px;
+          top: -4px;
           left: 0;
           right: 0;
-          height: 6px;
+          height: 8px;
           cursor: ns-resize;
           z-index: 10;
           pointer-events: auto;
@@ -196,7 +195,7 @@ class Openp41geBottomPane extends LitElement {
         .bp-drag-bar::before {
           content: "";
           position: absolute;
-          top: 2px;
+          top: 3px;
           left: 0;
           right: 0;
           height: 2px;
@@ -208,6 +207,12 @@ class Openp41geBottomPane extends LitElement {
         .bp-drag-bar:hover::before,
         .bp-drag-bar.dragging::before {
           opacity: 1;
+        }
+        .bp-tab-bar {
+          overflow-x: auto;
+        }
+        .bp-content {
+          overflow: auto;
         }
         /* ── Tab bar ─────────────────────────────────────────────────── */
         .bp-tab-bar {
