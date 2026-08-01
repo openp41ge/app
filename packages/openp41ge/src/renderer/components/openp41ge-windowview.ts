@@ -14,6 +14,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import type { Window, Workspace, Rect, SystemTab, SystemTabId } from "../../layout/types";
 import { emitEvent } from "../app";
+import { workspaceFileService } from "../services/workspace-file-service";
 
 import { setContextMenuActive } from "../services/drag-context";
 import { getEditorSystemTabRegistration } from "../apps/app-registry";
@@ -42,11 +43,13 @@ class Openp41geWindowView extends LitElement {
     super.connectedCallback();
     this._ensureSkeleton();
     document.addEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
+    document.addEventListener("workspace-file-changed", this._onWorkspacesUpdate);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
+    document.removeEventListener("workspace-file-changed", this._onWorkspacesUpdate);
   }
 
   private _onWorkspacesUpdate = (): void => {
@@ -277,9 +280,14 @@ class Openp41geWindowView extends LitElement {
           ></openp41ge-sidebar>
         </div>
         <div
-          class="openp41ge-bottom-bar flex items-center h-7 bg-bg-primary border-t border-divider shrink-0"
+          class="openp41ge-bottom-bar flex items-center h-6 bg-bg-primary border-t border-divider shrink-0 px-2"
         >
           <div class="flex-1"></div>
+          <div class="text-xs text-muted">
+            ${workspaceFileService.activeData
+              ? html`<span style="font-family:monospace">${workspaceFileService.activeData.id.slice(0, 8)}</span>`
+              : html`<span>no workspace loaded</span>`}
+          </div>
         </div>
       </div>
     `;
