@@ -7,7 +7,7 @@
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
-import type { Window, Workspace, Rect, SystemTab, SystemTabId } from "../../layout/types";
+import type { Window, Workspace, Rect, SystemTabId } from "../../layout/types";
 import { emitEvent } from "../app";
 import { workspaceFileService } from "../services/workspace-file-service";
 
