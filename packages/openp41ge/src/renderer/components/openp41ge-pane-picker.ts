@@ -13,10 +13,12 @@ import { APP_TYPES } from "../app-types";
 import type { AppTypeInfo } from "../app-types";
 import { Openp41geScrollbar } from "./openp41ge-scrollbar";
 
-const ITEM_HEIGHT = 36;
+
 const SEARCH_DEBOUNCE_MS = 150;
 
 const APPS_FOR_PICKER = APP_TYPES.filter((t) => t.id !== "file-viewer");
+
+import { ITEM_HEIGHT } from "openp41ge-constants";
 
 interface PickerResult {
   type: "app" | "file";

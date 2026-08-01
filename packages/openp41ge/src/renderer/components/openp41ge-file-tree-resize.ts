@@ -5,16 +5,18 @@
  */
 
 /** Minimum width for the preview panel. */
-export const MIN_PREVIEW = 200;
+
 
 /** Minimum width for the drawer/explorer panel. */
-export const MIN_DRAWER = 200;
+
 
 /** Minimum total wrapper width when no preview is open. */
-export const MIN_WRAPPER = 280;
+
 
 /** Fraction of window width used as the maximum combined (preview + drawer) width. */
-export const MAX_COMBINED_RATIO = 1.0;
+
+
+import { MIN_PREVIEW, MIN_DRAWER, MIN_WRAPPER, MAX_COMBINED_RATIO } from "openp41ge-constants";
 
 export interface WrapperResizeResult {
   previewWidth: number;

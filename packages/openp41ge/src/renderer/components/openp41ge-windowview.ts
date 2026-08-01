@@ -12,16 +12,11 @@ import { emitEvent } from "../app";
 import { workspaceFileService } from "../services/workspace-file-service";
 
 import { setContextMenuActive } from "../services/drag-context";
+import { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, TAB_BAR_HEIGHT, NOTCH_WIDTH, NOTCH_OVERFLOW, BOTTOM_PANE_DEFAULT_HEIGHT, BP_EXPAND_EVENT, BP_TOGGLE_EVENT, BP_FULLSIZE_EVENT, BP_SHRINK_EVENT, TITLEBAR_HEIGHT, BP_CLOSE_EVENT } from "openp41ge-constants";
+
 import "./openp41ge-sidebar";
 import "./openp41ge-bottom-pane";
 import type { SystemTabInfo } from "./openp41ge-bottom-pane";
-
-const MIN_SIDEBAR_WIDTH = 160;
-const MAX_SIDEBAR_WIDTH = 600;
-const TAB_BAR_HEIGHT = 30;
-const TITLEBAR_HEIGHT = 38;
-const NOTCH_WIDTH = 7;
-const NOTCH_OVERFLOW = 3; // how far the notch extends beyond the sidebar edge
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -70,14 +65,22 @@ class Openp41geWindowView extends LitElement {
     this._ensureSkeleton();
     document.addEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
     document.addEventListener("workspace-file-changed", this._onWorkspacesUpdate);
-    this.addEventListener("bp-expand", this._onBottomPaneExpand);
+    this.addEventListener(BP_EXPAND_EVENT, this._onBottomPaneExpand);
+    this.addEventListener(BP_FULLSIZE_EVENT, this._onBottomPaneFullsize);
+    this.addEventListener(BP_SHRINK_EVENT, this._onBottomPaneShrink);
+    this.addEventListener(BP_CLOSE_EVENT, this._onBottomPaneClose);
+    this.addEventListener(BP_TOGGLE_EVENT, this._onBottomPaneToggle);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
     document.removeEventListener("workspace-file-changed", this._onWorkspacesUpdate);
-    this.removeEventListener("bp-expand", this._onBottomPaneExpand);
+    this.removeEventListener(BP_EXPAND_EVENT, this._onBottomPaneExpand);
+    this.removeEventListener(BP_FULLSIZE_EVENT, this._onBottomPaneFullsize);
+    this.removeEventListener(BP_SHRINK_EVENT, this._onBottomPaneShrink);
+    this.removeEventListener(BP_CLOSE_EVENT, this._onBottomPaneClose);
+    this.removeEventListener(BP_TOGGLE_EVENT, this._onBottomPaneToggle);
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
   }
@@ -189,14 +192,26 @@ class Openp41geWindowView extends LitElement {
     if (this._paneHeight > TAB_BAR_HEIGHT) {
       this._paneHeight = TAB_BAR_HEIGHT;
     } else {
-      this._paneHeight = 300;
+      this._paneHeight = BOTTOM_PANE_DEFAULT_HEIGHT;
     }
   }
 
   private _onBottomPaneExpand(): void {
     if (this._paneHeight <= TAB_BAR_HEIGHT) {
-      this._paneHeight = 300;
+      this._paneHeight = BOTTOM_PANE_DEFAULT_HEIGHT;
     }
+  }
+
+  private _onBottomPaneFullsize(): void {
+    this._paneHeight = window.innerHeight - TITLEBAR_HEIGHT;
+  }
+
+  private _onBottomPaneShrink(): void {
+    this._paneHeight = BOTTOM_PANE_DEFAULT_HEIGHT;
+  }
+
+  private _onBottomPaneClose(): void {
+    this._paneHeight = TAB_BAR_HEIGHT;
   }
 
   /** Highlight both the sidebar notch and bottom drag bar when hovering a corner. */
@@ -398,6 +413,9 @@ class Openp41geWindowView extends LitElement {
           .paneHeight=${this._paneHeight}
           @bp-toggle=${this._onBottomPaneToggle}
           @bp-expand=${this._onBottomPaneExpand}
+          @bp-fullsize=${this._onBottomPaneFullsize}
+          @bp-shrink=${this._onBottomPaneShrink}
+          @bp-close=${this._onBottomPaneClose}
         ></openp41ge-bottom-pane>
 
         <!-- Bottom pane drag bar (invisible until hovered, centered over bottom pane's top border) -->

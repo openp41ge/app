@@ -160,6 +160,9 @@ importers:
       lit:
         specifier: ^3.3.3
         version: 3.3.3
+      openp41ge-constants:
+        specifier: workspace:*
+        version: link:../openp41ge-constants
       openp41ge-filesystem:
         specifier: workspace:*
         version: link:../openp41ge-filesystem
@@ -203,6 +206,15 @@ importers:
       lit:
         specifier: ^3.3.3
         version: 3.3.3
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/openp41ge-constants:
     devDependencies:
       typescript:
         specifier: ^5.7.0

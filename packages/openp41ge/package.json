@@ -26,6 +26,7 @@
     "openp41ge-piece-tree": "workspace:*",
     "openp41ge-git": "workspace:*",
     "openp41ge-logger": "workspace:*",
+    "openp41ge-constants": "workspace:*",
     "openp41ge-filesystem": "workspace:*",
     "zod": "^3.24.0"
   },

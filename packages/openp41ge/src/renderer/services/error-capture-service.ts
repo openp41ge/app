@@ -15,7 +15,9 @@
  */
 
 const STORAGE_KEY = "openp41ge:captured-errors";
-const MAX_ERRORS = 100;
+
+
+import { MAX_ERRORS } from "openp41ge-constants";
 
 interface CapturedError {
   message: string;

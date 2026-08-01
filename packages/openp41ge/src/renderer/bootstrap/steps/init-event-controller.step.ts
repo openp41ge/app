@@ -2,7 +2,8 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 import type { HandlerFn } from "../../services/event-router";
-import { EventGraph, EventRouter } from "../../services/event-router";
+import { EventRouter } from "../../services/event-router";
+import { EventGraph, type GraphData } from "../../services/event-graph";
 import { EventLogBuffer } from "../../services/event-log-buffer";
 import { appState } from "../../services/app-state";
 import { workspaceData } from "../../services/workspace-data";
@@ -25,9 +26,10 @@ import { setEventRouter } from "../../app";
  */
 export class InitEventControllerStep implements IStartupStep {
   readonly name = "init-event-controller";
+  private readonly _log = createLogger("init-event-controller");
 
   async run(context: StartupContext): Promise<void> {
-    const log = createLogger("init-event-controller");
+    const log = this._log;
 
     // 1. Load base graph
     const graph = new EventGraph();
@@ -106,12 +108,12 @@ export class InitEventControllerStep implements IStartupStep {
     };
   }
 
-  private async _loadGraphData(): Promise<Record<string, unknown>> {
+  private async _loadGraphData(): Promise<GraphData> {
     try {
       const module = await import("../../../../data/event-routing-graph.json");
-      return (module.default ?? module) as Record<string, unknown>;
+      return (module.default ?? module) as GraphData;
     } catch (err) {
-      log.warn("Could not load graph JSON, using empty graph.");
+      this._log.warn("Could not load graph JSON, using empty graph.");
       return { version: 1, nodes: [], edges: [] };
     }
   }

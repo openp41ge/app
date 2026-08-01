@@ -25,6 +25,8 @@
  *   sb.destroy();
  */
 
+import { SCROLLBAR_SIZE } from "openp41ge-constants";
+
 export interface ScrollbarOptions {
   /** Scroll axes.  Default: "vertical". */
   axis?: "vertical" | "horizontal" | "both";
@@ -36,7 +38,7 @@ export interface ScrollbarOptions {
 }
 
 const AUTO_HIDE_IDLE = 600;
-const SCROLLBAR_SIZE = 8;
+
 
 // ── Global style injection ──
 

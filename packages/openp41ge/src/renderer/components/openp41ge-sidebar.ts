@@ -12,7 +12,9 @@ import { appState } from "../services/app-state";
 import type { SystemTabRegistration } from "../controllers/types";
 
 // Keep in sync with openp41ge-windowview if changed
-const MIN_SIDEBAR_WIDTH = 160;
+
+
+import { MIN_SIDEBAR_WIDTH } from "openp41ge-constants";
 
 class Openp41geSidebar extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {

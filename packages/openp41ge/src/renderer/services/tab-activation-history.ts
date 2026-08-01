@@ -13,7 +13,9 @@
  *   canGoForward(windowId) → boolean
  */
 
-const MAX_HISTORY = 50;
+
+
+import { MAX_HISTORY } from "openp41ge-constants";
 
 interface WindowHistory {
   backStack: string[];

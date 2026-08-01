@@ -15,6 +15,7 @@ import { property } from "lit/decorators.js";
 import { emitEvent } from "../app";
 import { getEditorSystemTabRegistration } from "../apps/app-registry";
 import type { EditorSystemTabController } from "../controllers/types";
+import { TAB_BAR_HEIGHT, TITLEBAR_HEIGHT, BP_EXPAND_EVENT, BP_TOGGLE_EVENT, BP_FULLSIZE_EVENT, BP_SHRINK_EVENT, BP_CLOSE_EVENT } from "openp41ge-constants";
 
 export interface SystemTabInfo {
   id: string;
@@ -22,8 +23,6 @@ export interface SystemTabInfo {
   active: boolean;
   appType: string;
 }
-
-export const TAB_BAR_HEIGHT = 30;
 
 class Openp41geBottomPane extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -76,14 +75,14 @@ class Openp41geBottomPane extends LitElement {
 
     if (tabId === this.activeTabId && this.tabs.length > 0) {
       // Toggle collapse/expand via DOM event so parent windowview can catch it
-      this.dispatchEvent(new CustomEvent("bp-toggle", { bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent(BP_TOGGLE_EVENT, { bubbles: true, composed: true }));
       return;
     }
 
     emitEvent("system-tab-activate", { windowId: this.windowId, tabId });
     // If collapsed, request expand so content becomes visible
     if (!this._isExpanded) {
-      this.dispatchEvent(new CustomEvent("bp-expand", { bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent(BP_EXPAND_EVENT, { bubbles: true, composed: true }));
     }
   }
 
@@ -176,6 +175,30 @@ class Openp41geBottomPane extends LitElement {
           min-height: 0;
           background: var(--bg-primary, #1e1e1e);
         }
+        .bp-actions {
+          margin-left: auto;
+          display: flex;
+          align-items: center;
+          height: 100%;
+          padding: 0 4px;
+          gap: 2px;
+          flex-shrink: 0;
+        }
+        .bp-action-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          border-radius: 4px;
+          cursor: pointer;
+          color: var(--text-secondary, #999);
+          flex-shrink: 0;
+        }
+        .bp-action-btn:hover {
+          background: var(--bg-hover, #2a2a2a);
+          color: var(--text-primary, #ccc);
+        }
       </style>
       <div
         class="bp-container"
@@ -201,8 +224,39 @@ class Openp41geBottomPane extends LitElement {
               </div>
             `,
           )}
+          <div class="bp-actions">
+            ${this.paneHeight >= window.innerHeight - TITLEBAR_HEIGHT ? html`
+              <div
+                class="bp-action-btn"
+                title="Shrink to default"
+                @click=${() => this.dispatchEvent(new CustomEvent(BP_SHRINK_EVENT, { bubbles: true, composed: true }))}
+              >
+                <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor">
+                  <path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/>
+                </svg>
+              </div>
+            ` : html`
+              <div
+                class="bp-action-btn"
+                title="Full size"
+                @click=${() => this.dispatchEvent(new CustomEvent(BP_FULLSIZE_EVENT, { bubbles: true, composed: true }))}
+              >
+                <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor">
+                  <path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/>
+                </svg>
+              </div>
+            `}
+            <div
+              class="bp-action-btn"
+              title="Close pane"
+              @click=${() => this.dispatchEvent(new CustomEvent(BP_CLOSE_EVENT, { bubbles: true, composed: true }))}
+            >
+              <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor">
+                <path d="m480-500 160-160H320l160 160Zm280-340q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560ZM200-320v120h560v-120H200Zm560-80v-360H200v360h560Zm-560 80v120-120Z"/>
+              </svg>
+            </div>
+          </div>
         </div>
-
         <!-- Content area — only when expanded -->
         ${isExpanded ? html`
           <div class="bp-content" style="height:${contentHeight}px">

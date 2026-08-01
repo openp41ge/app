@@ -20,7 +20,9 @@ const log = createLogger("project-store");
 const DRAFT_NAME_RE = /^draft-[a-f0-9-]+\.draft$/;
 
 /** Default draft expiry: 7 days in milliseconds. */
-export const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+
+import { DRAFT_MAX_AGE_MS } from "openp41ge-constants";
 
 export interface ProjectConfig {
   name: string;

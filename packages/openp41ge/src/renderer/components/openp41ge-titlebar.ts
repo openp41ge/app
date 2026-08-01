@@ -11,6 +11,7 @@ import { property } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
 import { emitEvent } from "../app";
 import { workspaceFileService } from "../services/workspace-file-service";
+import { TITLEBAR_HEIGHT } from "openp41ge-constants";
 
 const isMac = (() => {
   try {
@@ -20,7 +21,7 @@ const isMac = (() => {
   }
 })();
 
-const HEIGHT = 35;
+
 
 class Openp41geTitleBar extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -66,6 +67,7 @@ class Openp41geTitleBar extends LitElement {
     const win = this.windowData;
     if (!win) return;
     emitEvent("system-tab-open", { windowId: win.id, appType: "settings" });
+    this.dispatchEvent(new CustomEvent("bp-expand", { bubbles: true, composed: true }));
   }
 
   private async _openWorkspace(): Promise<void> {
@@ -90,7 +92,7 @@ class Openp41geTitleBar extends LitElement {
       </style>
       <div
         class="tb-row flex items-center bg-gutter border-b border-divider shrink-0 select-none relative"
-        style="--tb-h:${HEIGHT}px;-webkit-app-region:drag;"
+        style="--tb-h:${TITLEBAR_HEIGHT}px;-webkit-app-region:drag;"
       >
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
         <div class="tb-mw shrink-0" style="--tb-mw:${isMac ? 85 : 12}px"></div>

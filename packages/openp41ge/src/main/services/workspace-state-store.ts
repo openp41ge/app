@@ -17,7 +17,9 @@ import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("WorkspaceStateStore");
 
-export const WORKSPACE_STATE_FILENAME = "workspace-state.json";
+
+
+import { WORKSPACE_STATE_FILENAME } from "openp41ge-constants";
 
 export class WorkspaceStateStore {
   private readonly _filePath: string;
