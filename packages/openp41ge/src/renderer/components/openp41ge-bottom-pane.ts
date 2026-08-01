@@ -26,7 +26,6 @@ export interface SystemTabInfo {
 }
 
 const TAB_BAR_HEIGHT = 30;
-const DRAG_BAR_HEIGHT = 4;
 const MIN_PANE_HEIGHT = TAB_BAR_HEIGHT;
 const TITLEBAR_HEIGHT = 38;
 
@@ -164,7 +163,7 @@ class Openp41geBottomPane extends LitElement {
       }
     }
 
-    const tabBarAndContentHeight = this._paneHeight - DRAG_BAR_HEIGHT;
+    const contentHeight = this._paneHeight - TAB_BAR_HEIGHT;
 
     return html`
       <style>
@@ -179,27 +178,36 @@ class Openp41geBottomPane extends LitElement {
           background: var(--bg-primary, #1e1e1e);
           overflow: hidden;
           user-select: none;
-        }
-        /* ── Drag bar (always visible) ──────────────────────────────── */
-        .bp-drag-bar {
-          height: ${DRAG_BAR_HEIGHT}px;
-          flex-shrink: 0;
-          cursor: ns-resize;
-          background: var(--bg-secondary, #252526);
           border-top: 1px solid var(--divider, #333);
-          display: flex;
-          align-items: center;
-          justify-content: center;
         }
-        .bp-drag-bar-grip {
-          width: 32px;
+        /* ── Drag bar (invisible until hovered, like sidebar resize notch) ── */
+        .bp-drag-bar {
+          position: absolute;
+          top: -2px;
+          left: 0;
+          right: 0;
+          height: 6px;
+          cursor: ns-resize;
+          z-index: 10;
+          pointer-events: auto;
+          touch-action: none;
+          background: transparent;
+        }
+        .bp-drag-bar::before {
+          content: "";
+          position: absolute;
+          top: 2px;
+          left: 0;
+          right: 0;
           height: 2px;
-          border-radius: 1px;
-          background: var(--text-muted, #555);
-          opacity: 0.5;
+          background: rgba(74, 158, 255, 0.7);
+          opacity: 0;
+          transition: opacity 0.12s ease;
+          pointer-events: none;
         }
-        .bp-drag-bar:hover .bp-drag-bar-grip {
-          opacity: 0.8;
+        .bp-drag-bar:hover::before,
+        .bp-drag-bar.dragging::before {
+          opacity: 1;
         }
         /* ── Tab bar ─────────────────────────────────────────────────── */
         .bp-tab-bar {
@@ -282,10 +290,11 @@ class Openp41geBottomPane extends LitElement {
         class="bp-container"
         style="height:${this._paneHeight}px"
       >
-        <!-- Drag bar at the top -->
-        <div class="bp-drag-bar" @mousedown=${this._onDragStart}>
-          <div class="bp-drag-bar-grip"></div>
-        </div>
+        <!-- Drag bar (invisible until hovered, over the top border) -->
+        <div
+          class="bp-drag-bar"
+          @mousedown=${this._onDragStart}
+        ></div>
 
         ${isExpanded ? html`
           <!-- Tab bar below drag bar -->
@@ -325,7 +334,7 @@ class Openp41geBottomPane extends LitElement {
           </div>
 
           <!-- Content area -->
-          <div class="bp-content" style="height:${tabBarAndContentHeight - TAB_BAR_HEIGHT}px">
+          <div class="bp-content" style="height:${contentHeight}px">
             ${content}
           </div>
         ` : nothing}
