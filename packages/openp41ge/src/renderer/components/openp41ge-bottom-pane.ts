@@ -129,7 +129,6 @@ class Openp41geBottomPane extends LitElement {
           flex-shrink: 0;
           overflow-x: auto;
           background: var(--bg-secondary, #252526);
-          border-top: 1px solid var(--divider, #333);
         }
         .bp-tab {
           display: flex;
