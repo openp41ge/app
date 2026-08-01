@@ -17,10 +17,9 @@ import { emitEvent } from "../app";
 import { workspaceFileService } from "../services/workspace-file-service";
 
 import { setContextMenuActive } from "../services/drag-context";
-import { getEditorSystemTabRegistration } from "../apps/app-registry";
-import type { EditorSystemTabController } from "../controllers/types";
 import "./openp41ge-sidebar";
-import "./openp41ge-system-tab-bar";
+import "./openp41ge-bottom-pane";
+import type { SystemTabInfo } from "./openp41ge-bottom-pane";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -109,10 +108,10 @@ class Openp41geWindowView extends LitElement {
   }
 
   private _onRemoveRecent(name: string): void {
-    window.openp41ge.recentProjects.remove(name).then(() => this._loadRecents());
+    window.openp41ge.recentProjects.remove(name);
   }
 
-  // ═══ Helpers to resolve system tab data from workspace state ────────
+  // ═══ Helpers to resolve system tab data ────────────────────────────
 
   /** Get the display title for a system tab ID. */
   private _getSystemTabTitle(tabId: string): string {
@@ -132,32 +131,14 @@ class Openp41geWindowView extends LitElement {
     return sysTab?.pinned ?? false;
   }
 
-  /** Cache of editor system tab controller instances, keyed by tabId. */
-  private _editorSystemTabControllers: Map<string, EditorSystemTabController> = new Map();
-
-  /**
-   * Get or create an EditorSystemTabController for the given tabId and appType.
-   */
-  private _getEditorSystemTabController(tabId: string, appType: string): EditorSystemTabController | null {
-    const cached = this._editorSystemTabControllers.get(tabId);
-    if (cached) return cached;
-
-    const reg = getEditorSystemTabRegistration(appType);
-    if (!reg) return null;
-
-    const ctrl = reg.createController(tabId);
-    this._editorSystemTabControllers.set(tabId, ctrl);
-    return ctrl;
-  }
-
-  /** Build the system tab info list for the system tab bar. */
-  private _getSystemTabInfos(win: Window): Array<{ id: string; title: string; active: boolean }> {
+  /** Build the system tab info list for the bottom pane tab bar. */
+  private _getSystemTabInfos(win: Window): SystemTabInfo[] {
     return win.editorSystemTabIds.map((id) => {
       const appType = id.replace(/^editor-sys-/, "").replace(/-\d+$/, "");
-      const ctrl = this._getEditorSystemTabController(id, appType);
       return {
         id,
-        title: ctrl?.title ?? appType,
+        title: this._getSystemTabTitle(id) || appType,
+        appType,
         active: id === win.editorSystemActiveTabId,
       };
     });
@@ -167,23 +148,6 @@ class Openp41geWindowView extends LitElement {
     const win = this.windowData;
     const ws = this.workspaceData;
     if (!win) return nothing;
-
-    const hasSysTabs = win.editorSystemTabIds.length > 0;
-    const sysTabInfos = hasSysTabs ? this._getSystemTabInfos(win) : [];
-
-    // Render active system tab content
-    let systemTabContent: TemplateResult | typeof nothing = nothing;
-    if (hasSysTabs && win.editorSystemActiveTabId) {
-      const appType = win.editorSystemActiveTabId.replace(/^editor-sys-/, "").replace(/-\d+$/, "");
-      const ctrl = this._getEditorSystemTabController(win.editorSystemActiveTabId, appType);
-      if (ctrl) {
-        systemTabContent = html`
-          <div class="system-tab-content flex-1 overflow-auto">
-            ${ctrl.render()}
-          </div>
-        `;
-      }
-    }
 
     // Build tab-data and active-tab-ids for <tab-grid>
     const tabData: Record<
@@ -230,6 +194,11 @@ class Openp41geWindowView extends LitElement {
       pinned: this._getSystemTabPinned(id),
     }));
 
+    // Resolve system tab info for the bottom pane
+    const sysTabInfos = win.editorSystemTabIds.length > 0
+      ? this._getSystemTabInfos(win)
+      : [];
+
     return html`
       <style>
         .sidebar-element-hidden { display: none !important; }
@@ -256,28 +225,20 @@ class Openp41geWindowView extends LitElement {
             class="sidebar-element ${win.sidebar?.leftSidebarOpen ? '' : 'sidebar-element-hidden'}"
           ></openp41ge-sidebar>
 
-          <!-- Central area: system tabs override the grid -->
+          <!-- Central area: grid always renders -->
           <div class="flex flex-col flex-1 overflow-hidden" style="min-width:280px">
-            ${hasSysTabs ? html`
-              <openp41ge-system-tab-bar
-                .windowData=${win}
-                .tabs=${sysTabInfos}
-              ></openp41ge-system-tab-bar>
-              ${systemTabContent}
-            ` : html`
-              <div
-                class="wv-code openp41ge-grid-area relative overflow-hidden flex-1"
-                style="--wv-code-min:200px"
-              >
-                <tab-grid
-                  winId=${win.id}
-                  .cols=${effectiveCols}
-                  .placements=${placements}
-                  .tabData=${tabData}
-                  .activeTabIds=${activeTabIds}
-                ></tab-grid>
-              </div>
-            `}
+            <div
+              class="wv-code openp41ge-grid-area relative overflow-hidden flex-1"
+              style="--wv-code-min:200px"
+            >
+              <tab-grid
+                winId=${win.id}
+                .cols=${effectiveCols}
+                .placements=${placements}
+                .tabData=${tabData}
+                .activeTabIds=${activeTabIds}
+              ></tab-grid>
+            </div>
           </div>
 
           <!-- Right sidebar -->
@@ -291,34 +252,13 @@ class Openp41geWindowView extends LitElement {
             class="sidebar-element ${win.sidebar?.rightSidebarOpen ? '' : 'sidebar-element-hidden'}"
           ></openp41ge-sidebar>
         </div>
-        <div
-          class="openp41ge-bottom-bar flex items-center h-6 border-t border-divider shrink-0"
-          style="padding-left:8px;background:${workspaceFileService.activeData ? 'rgba(86,156,214,0.18)' : 'var(--bg-primary)'};transition:background .15s"
-          @mouseenter=${(e: MouseEvent) => {
-            if (workspaceFileService.activeData) {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(86,156,214,0.28)';
-            }
-          }}
-          @mouseleave=${(e: MouseEvent) => {
-            if (workspaceFileService.activeData) {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(86,156,214,0.18)';
-            } else {
-              (e.currentTarget as HTMLElement).style.background = 'var(--bg-primary)';
-            }
-          }}
-        >
-          <div class="flex-1"></div>
-          <div
-            class="text-xs"
-            style="display:flex;align-items:center;height:100%;padding:0 20px 0 8px;cursor:pointer;color:${workspaceFileService.activeData ? 'var(--accent)' : 'var(--text-muted)'};"
-            @click=${() => this._onWorkspaceClick()}
-            title="Open workspace settings"
-          >
-            ${workspaceFileService.activeData
-              ? html`<svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" style="margin-right:4px;margin-top:-1px"><path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/></svg><span style="font-family:monospace">${workspaceFileService.activeData.id.slice(0, 8)}</span>`
-              : html`<span>open workspace</span>`}
-          </div>
-        </div>
+
+        <!-- Bottom pane for system tabs (position: fixed, overlays everything) -->
+        <openp41ge-bottom-pane
+          .windowId=${win.id}
+          .tabs=${sysTabInfos}
+          .activeTabId=${win.editorSystemActiveTabId}
+        ></openp41ge-bottom-pane>
       </div>
     `;
   }
