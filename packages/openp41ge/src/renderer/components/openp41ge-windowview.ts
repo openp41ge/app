@@ -1,22 +1,20 @@
 /**
  * <openp41ge-windowview> — top-level component for a Openp41ge window (Lit).
  *
- * Owns all three resize handles (left sidebar, right sidebar, bottom pane)
- * so corner drag works naturally without cross-component events.
+ * Owns the sidebar resize handles. Bottom area uses a thin bottom bar
+ * with a workspace indicator. System tabs replaced by a service modal.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window, Workspace, Rect, SystemTabId } from "../../layout/types";
 import { emitEvent } from "../app";
-import { workspaceFileService } from "../services/workspace-file-service";
+import { serviceModalService } from "../services/service-modal-service";
 
 import { setContextMenuActive } from "../services/drag-context";
-import { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, TAB_BAR_HEIGHT, NOTCH_WIDTH, NOTCH_OVERFLOW, BOTTOM_PANE_DEFAULT_HEIGHT, BP_EXPAND_EVENT, BP_TOGGLE_EVENT, BP_FULLSIZE_EVENT, BP_SHRINK_EVENT, TITLEBAR_HEIGHT, BP_CLOSE_EVENT } from "openp41ge-constants";
+import { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, NOTCH_WIDTH, NOTCH_OVERFLOW, TITLEBAR_HEIGHT } from "openp41ge-constants";
 
 import "./openp41ge-sidebar";
-import "./openp41ge-bottom-pane";
-import type { SystemTabInfo } from "./openp41ge-bottom-pane";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -42,18 +40,13 @@ class Openp41geWindowView extends LitElement {
   @state()
   private _rightWidth = parseInt(localStorage.getItem("openp41ge:sidebar-width-right") ?? "280", 10);
 
-  /** Bottom pane height in pixels. Starts collapsed (tab bar only). */
-  @state()
-  private _paneHeight = TAB_BAR_HEIGHT;
-
   // ── Drag state ────────────────────────────────────────────────────────
 
-  private _activeHandle: "left" | "right" | "bottom" | "bottom-left" | "bottom-right" | null = null;
+  private _activeHandle: "left" | "right" | null = null;
   private _dragStartX = 0;
   private _dragStartY = 0;
   private _dragStartLeftWidth = 280;
   private _dragStartRightWidth = 280;
-  private _dragStartPaneHeight = TAB_BAR_HEIGHT;
 
   // ── Context menu ─────────────────────────────────────────────────────
 
@@ -63,24 +56,10 @@ class Openp41geWindowView extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._ensureSkeleton();
-    document.addEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
-    document.addEventListener("workspace-file-changed", this._onWorkspacesUpdate);
-    this.addEventListener(BP_EXPAND_EVENT, this._onBottomPaneExpand);
-    this.addEventListener(BP_FULLSIZE_EVENT, this._onBottomPaneFullsize);
-    this.addEventListener(BP_SHRINK_EVENT, this._onBottomPaneShrink);
-    this.addEventListener(BP_CLOSE_EVENT, this._onBottomPaneClose);
-    this.addEventListener(BP_TOGGLE_EVENT, this._onBottomPaneToggle);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener("workspaces-tab:update", this._onWorkspacesUpdate);
-    document.removeEventListener("workspace-file-changed", this._onWorkspacesUpdate);
-    this.removeEventListener(BP_EXPAND_EVENT, this._onBottomPaneExpand);
-    this.removeEventListener(BP_FULLSIZE_EVENT, this._onBottomPaneFullsize);
-    this.removeEventListener(BP_SHRINK_EVENT, this._onBottomPaneShrink);
-    this.removeEventListener(BP_CLOSE_EVENT, this._onBottomPaneClose);
-    this.removeEventListener(BP_TOGGLE_EVENT, this._onBottomPaneToggle);
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
   }
@@ -111,14 +90,13 @@ class Openp41geWindowView extends LitElement {
 
   // ═══ Resize handlers ──────────────────────────────────────────────────
 
-  private _onResizeStart(e: MouseEvent, handle: "left" | "right" | "bottom" | "bottom-left" | "bottom-right"): void {
+  private _onResizeStart(e: MouseEvent, handle: "left" | "right"): void {
     e.preventDefault();
     this._activeHandle = handle;
     this._dragStartX = e.clientX;
     this._dragStartY = e.clientY;
     this._dragStartLeftWidth = this._leftWidth;
     this._dragStartRightWidth = this._rightWidth;
-    this._dragStartPaneHeight = this._paneHeight;
 
     document.addEventListener("mousemove", this._onResizeMove);
     document.addEventListener("mouseup", this._onResizeEnd);
@@ -128,19 +106,8 @@ class Openp41geWindowView extends LitElement {
     if (!this._activeHandle) return;
 
     const dx = e.clientX - this._dragStartX;
-    const dy = this._dragStartY - e.clientY; // positive = drag up
 
-    const maxPaneHeight = window.innerHeight - TITLEBAR_HEIGHT;
-    const minPaneHeight = TAB_BAR_HEIGHT;
-
-    // Set cursor during drag for corner handles
-    if (this._activeHandle === "bottom-left" || this._activeHandle === "bottom-right") {
-      document.body.style.cursor = "move";
-    } else if (this._activeHandle === "bottom") {
-      document.body.style.cursor = "ns-resize";
-    } else {
-      document.body.style.cursor = "col-resize";
-    }
+    document.body.style.cursor = "col-resize";
 
     switch (this._activeHandle) {
       case "left": {
@@ -151,25 +118,6 @@ class Openp41geWindowView extends LitElement {
       case "right": {
         const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, this._dragStartRightWidth - dx));
         this._rightWidth = newWidth;
-        break;
-      }
-      case "bottom": {
-        const newHeight = Math.max(minPaneHeight, Math.min(maxPaneHeight, this._dragStartPaneHeight + dy));
-        this._paneHeight = newHeight;
-        break;
-      }
-      case "bottom-left": {
-        const lw = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, this._dragStartLeftWidth + dx));
-        this._leftWidth = lw;
-        const ph = Math.max(minPaneHeight, Math.min(maxPaneHeight, this._dragStartPaneHeight + dy));
-        this._paneHeight = ph;
-        break;
-      }
-      case "bottom-right": {
-        const rw = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, this._dragStartRightWidth - dx));
-        this._rightWidth = rw;
-        const ph = Math.max(minPaneHeight, Math.min(maxPaneHeight, this._dragStartPaneHeight + dy));
-        this._paneHeight = ph;
         break;
       }
     }
@@ -188,40 +136,14 @@ class Openp41geWindowView extends LitElement {
     localStorage.setItem("openp41ge:sidebar-width-right", String(this._rightWidth));
   };
 
-  private _onBottomPaneToggle(): void {
-    if (this._paneHeight > TAB_BAR_HEIGHT) {
-      this._paneHeight = TAB_BAR_HEIGHT;
-    } else {
-      this._paneHeight = BOTTOM_PANE_DEFAULT_HEIGHT;
-    }
+  // ═══ Bottom bar handlers ──────────────────────────────────────────────
+
+  private _onBarWorkspaceClick(): void {
+    serviceModalService.openModal("workspace-manager");
   }
 
-  private _onBottomPaneExpand(): void {
-    if (this._paneHeight <= TAB_BAR_HEIGHT) {
-      this._paneHeight = BOTTOM_PANE_DEFAULT_HEIGHT;
-    }
-  }
-
-  private _onBottomPaneFullsize(): void {
-    this._paneHeight = window.innerHeight - TITLEBAR_HEIGHT;
-  }
-
-  private _onBottomPaneShrink(): void {
-    this._paneHeight = BOTTOM_PANE_DEFAULT_HEIGHT;
-  }
-
-  private _onBottomPaneClose(): void {
-    this._paneHeight = TAB_BAR_HEIGHT;
-  }
-
-  /** Highlight both the sidebar notch and bottom drag bar when hovering a corner. */
-  private _highlightCorners(corner: "bottom-left" | "bottom-right", show: boolean): void {
-    const side = corner === "bottom-left" ? "left" : "right";
-    const notch = this.querySelector(`.wv-notch-v.${side}-notch`);
-    const dragBar = this.querySelector(".bp-drag-bar");
-    if (!notch || !dragBar) return;
-    notch.classList.toggle("dragging", show);
-    dragBar.classList.toggle("dragging", show);
+  private _openSettings(): void {
+    serviceModalService.openModal("settings");
   }
 
   // ═══ Helpers ─────────────────────────────────────────────────────────
@@ -229,7 +151,7 @@ class Openp41geWindowView extends LitElement {
   private _getSystemTabTitle(tabId: string): string {
     const sysTab = this.workspaceData?.systemTabs?.[tabId as SystemTabId];
     if (sysTab?.title) return sysTab.title;
-    // Editor system tabs don't store metadata in systemTabs — extract from ID
+    // Sidebar tabs embed appType in the ID
     const appType = this._getSystemTabAppType(tabId);
     if (appType !== "unknown") {
       const names: Record<string, string> = {
@@ -247,7 +169,6 @@ class Openp41geWindowView extends LitElement {
   private _getSystemTabAppType(tabId: string): string {
     const sysTab = this.workspaceData?.systemTabs?.[tabId as SystemTabId];
     if (sysTab?.appType) return sysTab.appType;
-    // Editor system tabs embed appType in the ID: editor-sys-{appType}-{timestamp}
     const match = tabId.match(/^editor-sys-([a-z-]+)-\d+$/);
     return match?.[1] ?? "unknown";
   }
@@ -255,29 +176,6 @@ class Openp41geWindowView extends LitElement {
   private _getSystemTabPinned(tabId: string): boolean {
     const sysTab = this.workspaceData?.systemTabs?.[tabId as SystemTabId];
     return sysTab?.pinned ?? false;
-  }
-
-  /** Build the system tab info list for the bottom pane tab bar. */
-  private _getSystemTabInfos(win: Window): SystemTabInfo[] {
-    return win.editorSystemTabIds.map((id) => {
-      const appType = id.replace(/^editor-sys-/, "").replace(/-\d+$/, "");
-      return {
-        id,
-        title: this._getSystemTabTitle(id) || appType,
-        appType,
-        active: id === win.editorSystemActiveTabId,
-      };
-    });
-  }
-
-  private async _onWorkspaceClick(): Promise<void> {
-    const win = this.windowData;
-    if (!win) return;
-    if (!workspaceFileService.activeData) {
-      await workspaceFileService.openDialog();
-      return;
-    }
-    emitEvent("system-tab-open", { windowId: win.id, appType: "workspace-manager" });
   }
 
   // ═══ Render ──────────────────────────────────────────────────────────
@@ -314,8 +212,6 @@ class Openp41geWindowView extends LitElement {
       id, title: this._getSystemTabTitle(id), appType: this._getSystemTabAppType(id), pinned: this._getSystemTabPinned(id),
     }));
 
-    const sysTabInfos = win.editorSystemTabIds.length > 0 ? this._getSystemTabInfos(win) : [];
-
     return html`
       <style>
         .sidebar-element-hidden { display: none !important; }
@@ -346,6 +242,8 @@ class Openp41geWindowView extends LitElement {
         .wv-notch-v.dragging::before { opacity: 1; }
         .wv-notch-v.left-notch::before { left: 2px; }
         .wv-notch-v.right-notch::before { right: 2px; }
+
+        /* ── Bottom bar icon hover ── */
       </style>
       <div class="flex flex-col w-full h-full bg-surface relative">
         <openp41ge-titlebar
@@ -369,7 +267,7 @@ class Openp41geWindowView extends LitElement {
 
           <!-- Left resize notch (between left sidebar and grid) -->
           <div
-            class="wv-notch-v left-notch"
+            class="wv-notch-v left-notch ${win.sidebar?.leftSidebarOpen ? '' : 'sidebar-element-hidden'}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "left")}
           ></div>
 
@@ -388,7 +286,7 @@ class Openp41geWindowView extends LitElement {
 
           <!-- Right resize notch (between grid and right sidebar) -->
           <div
-            class="wv-notch-v right-notch"
+            class="wv-notch-v right-notch ${win.sidebar?.rightSidebarOpen ? '' : 'sidebar-element-hidden'}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "right")}
           ></div>
 
@@ -405,81 +303,33 @@ class Openp41geWindowView extends LitElement {
           ></openp41ge-sidebar>
         </div>
 
-        <!-- Bottom pane (position: fixed, overlays everything) -->
-        <openp41ge-bottom-pane
-          .windowId=${win.id}
-          .tabs=${sysTabInfos}
-          .activeTabId=${win.editorSystemActiveTabId}
-          .paneHeight=${this._paneHeight}
-          @bp-toggle=${this._onBottomPaneToggle}
-          @bp-expand=${this._onBottomPaneExpand}
-          @bp-fullsize=${this._onBottomPaneFullsize}
-          @bp-shrink=${this._onBottomPaneShrink}
-          @bp-close=${this._onBottomPaneClose}
-        ></openp41ge-bottom-pane>
+        <!-- Service modal (fixed overlay, renders above grid) -->
+        <openp41ge-service-modal></openp41ge-service-modal>
 
-        <!-- Bottom pane drag bar (invisible until hovered, centered over bottom pane's top border) -->
+        <!-- Bottom bar: workspace indicator + settings, right-aligned -->
         <div
-          class="bp-drag-bar"
-          @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "bottom")}
-        ></div>
-
-        <!-- Corner zones: combine bottom drag with sidebar notches -->
-        <div
-          class="wv-corner bottom-left"
-          @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "bottom-left")}
-          @mouseenter=${() => this._highlightCorners("bottom-left", true)}
-          @mouseleave=${() => this._highlightCorners("bottom-left", false)}
-        ></div>
-        <div
-          class="wv-corner bottom-right"
-          @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "bottom-right")}
-          @mouseenter=${() => this._highlightCorners("bottom-right", true)}
-          @mouseleave=${() => this._highlightCorners("bottom-right", false)}
-        ></div>
+          class="wv-bottom-bar"
+          style="border-top:1px solid var(--divider,#333);height:24px;flex-shrink:0;display:flex;align-items:center;padding:0 4px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary,#252526);"
+        >
+          <span style="flex:1"></span>
+          <openp41ge-bottom-bar-btn
+            title="Open workspaces"
+            @click=${() => this._onBarWorkspaceClick()}
+          >
+            <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
+              <path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/>
+            </svg>
+          </openp41ge-bottom-bar-btn>
+          <openp41ge-bottom-bar-btn
+            title="Settings"
+            @click=${() => this._openSettings()}
+          >
+            <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
+              <path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/>
+            </svg>
+          </openp41ge-bottom-bar-btn>
+        </div>
       </div>
-
-      <style>
-        .bp-drag-bar {
-          position: fixed;
-          bottom: ${this._paneHeight}px;
-          left: 0;
-          right: 0;
-          height: 8px;
-          margin-bottom: -4px;
-          cursor: ns-resize;
-          z-index: 101;
-          pointer-events: auto;
-          background: transparent;
-        }
-        .bp-drag-bar::before {
-          content: "";
-          position: absolute;
-          top: 3px;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background: rgba(74, 158, 255, 0.7);
-          opacity: 0;
-          transition: opacity 0.12s ease;
-          pointer-events: none;
-        }
-        .bp-drag-bar:hover::before,
-        .bp-drag-bar.dragging::before { opacity: 1; }
-
-        .wv-corner {
-          position: fixed;
-          bottom: ${this._paneHeight}px;
-          width: 12px;
-          height: 12px;
-          margin-bottom: -6px;
-          z-index: 102;
-          pointer-events: auto;
-          background: transparent;
-        }
-        .wv-corner.bottom-left { left: ${this._leftWidth - 6}px; cursor: move; }
-        .wv-corner.bottom-right { right: ${this._rightWidth - 6}px; cursor: move; }
-      </style>
     `;
   }
 

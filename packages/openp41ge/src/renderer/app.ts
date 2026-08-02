@@ -26,6 +26,8 @@ import "./components/openp41ge-pane-picker";
 import "./components/openp41ge-worktree-tree";
 import "./components/openp41ge-sidebar";
 import "./components/focus-section";
+import "./components/openp41ge-service-modal";
+import "./components/openp41ge-bottom-bar-btn";
 
 // Import openp41ge-uikit (registers <tab-grid>, <tab-bar>, <tab-content>, etc.)
 import "openp41ge-uikit";

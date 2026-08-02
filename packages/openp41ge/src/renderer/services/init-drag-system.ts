@@ -22,7 +22,8 @@ import {
 } from "../openp41ge-tabs-adapter";
 
 import { FileDragSource } from "./drag-sources/file-drag-source";
-import { SidebarDropTarget, SIDEBAR_DROP_EVENT } from "./drop-targets/sidebar-drop-target";
+import { SidebarDropTarget } from "./drop-targets/sidebar-drop-target";
+import { SIDEBAR_DROP_EVENT } from "openp41ge-constants";
 
 // ─── SidebarTabDragSource — drag source for sidebar system tabs ──────────
 
