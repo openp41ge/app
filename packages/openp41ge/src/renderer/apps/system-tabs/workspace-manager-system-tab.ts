@@ -874,8 +874,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                         .value=${entry.newWorktreeValue}
                                         @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
                                         @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._addWorktree(i); }}
-                                        style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;"
-                                        autofocus
+                                        style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;font-family:inherit;"
+                                        class="wt-input" autofocus
                                       />
                                       <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${() => this._addWorktree(i)}></openp41ge-inline-icon>
                                     </div>
@@ -883,7 +883,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                 </div>
                                 <div
                                   style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
-                                  @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); }}
+                                  @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                                   @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                                   @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                                 >
@@ -1040,8 +1040,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                               .value=${entry.newWorktreeValue}
                               @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
                               @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); } } }}
-                              style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;"
-                              autofocus
+                              style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;font-family:inherit;"
+                              class="wt-input" autofocus
                             />
                             <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${async () => { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); await this._syncDetailReposToFile(); } }}></openp41ge-inline-icon>
                           </div>
@@ -1049,7 +1049,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       </div>
                       <div
                         style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
-                        @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); }}
+                        @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                         @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                         @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                       >
