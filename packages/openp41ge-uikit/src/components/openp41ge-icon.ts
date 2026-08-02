@@ -30,7 +30,19 @@ export class Openp41geIcon extends LitElement {
   render() {
     const renderFn = iconRegistry[this.name];
     const svg = renderFn ? renderFn(this.size) : "";
-    return html`${unsafeHTML(svg)}`;
+    return html`
+      <style>
+        :host {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        svg {
+          display: block;
+        }
+      </style>
+      ${unsafeHTML(svg)}
+    `;
   }
 }
 
