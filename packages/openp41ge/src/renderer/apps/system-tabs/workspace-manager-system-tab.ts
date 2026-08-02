@@ -6,17 +6,23 @@
  * view with its settings. "New Workspace" creates a new workspace file.
  */
 
-import { html, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 import type { WorkspaceFileData } from "../../../layout/types";
 import { workspaceFileService } from "../../services/workspace-file-service";
+
+interface WorktreeEntry {
+  name: string;
+  status: "unverified" | "validating" | "success" | "failure" | "diverged" | "needs-sync";
+  errorMessage?: string;
+}
 
 interface CreateRepoEntry {
   url: string;
   status: "unverified" | "validating" | "success" | "failure";
   errorMessage?: string;
   expanded: boolean;
-  worktrees: string[];
+  worktrees: WorktreeEntry[];
   newWorktreeValue: string;
   showNewWorktreeInput: boolean;
 }
@@ -157,6 +163,37 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _renderDeleteAction(onRemove: (e: Event) => void): TemplateResult {
     return html`
       <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
+    `;
+  }
+
+  /** Render a worktree row with verification status and sync/retry actions */
+  private _renderWorktreeRow(
+    repoIndex: number,
+    wtIndex: number,
+    wt: WorktreeEntry,
+    onRemove: () => void,
+    onRetry: () => void,
+    onSync: () => void,
+  ): TemplateResult {
+    const statusIcon = wt.status === 'unverified' ? nothing
+      : wt.status === 'validating' ? html`<openp41ge-inline-icon name="spinner" size="12" no-hover icon-color="var(--text-secondary,#999)"></openp41ge-inline-icon>`
+      : wt.status === 'success' ? html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover></openp41ge-inline-icon>`
+      : wt.status === 'failure' ? html`<openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" @click=${onRetry}></openp41ge-inline-icon>`
+      : wt.status === 'diverged' ? html`<openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" @click=${onRetry}></openp41ge-inline-icon>`
+      : wt.status === 'needs-sync' ? html`<openp41ge-inline-icon name="sync" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${onSync}></openp41ge-inline-icon>`
+      : nothing;
+    return html`
+      <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+        <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
+        <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt.name}</span>
+        <span style="display:flex;align-items:center;visibility:${wt.status === 'unverified' ? 'hidden' : 'visible'};">${statusIcon}</span>
+        <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
+      </div>
+      ${wt.errorMessage && (wt.status === 'failure' || wt.status === 'diverged') ? html`
+        <div style="font-size:12px;color:var(--error,#e53e3e);padding:2px 10px 6px 28px;">${wt.errorMessage}</div>
+      ` : wt.errorMessage && wt.status === 'needs-sync' ? html`
+        <div style="font-size:12px;color:var(--accent,#007acc);padding:2px 10px 6px 28px;">${wt.errorMessage}</div>
+      ` : ''}
     `;
   }
 
@@ -375,7 +412,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       url: r.url,
       status: "success" as const,
       expanded: false,
-      worktrees: [...r.worktrees],
+      worktrees: r.worktrees.map(w => typeof w === 'string' ? { name: w, status: 'success' as const } : { name: w.name, status: w.status || 'success' }),
       newWorktreeValue: "",
       showNewWorktreeInput: false,
     }));
@@ -462,10 +499,49 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     if (!repo) return;
     const name = repo.newWorktreeValue.trim();
     if (!name) return;
-    repo.worktrees.push(name);
+    const entry: WorktreeEntry = { name, status: "unverified" };
+    repo.worktrees.push(entry);
     repo.newWorktreeValue = "";
     this._emitUpdate();
     setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0);
+    // Trigger verification
+    this._verifyWorktree(repoIndex, repo.worktrees.length - 1);
+  }
+
+  private _verifyWorktree(repoIndex: number, wtIndex: number): void {
+    const repo = this._createRepos[repoIndex];
+    if (!repo) return;
+    const wt = repo.worktrees[wtIndex];
+    if (!wt || wt.status === "success" || wt.status === "validating") return;
+    wt.status = "validating";
+    this._emitUpdate();
+    setTimeout(() => {
+      const outcomes = [
+        { status: "success" as const },
+        { status: "success" as const },
+        { status: "failure" as const, errorMessage: "No local or remote branch found with this name" },
+        { status: "diverged" as const, errorMessage: "Local and remote branches have diverged. Resolve divergence before checking out." },
+        { status: "needs-sync" as const, errorMessage: "Branch is ahead/behind remote. Sync to continue." },
+      ];
+      const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
+      wt.status = outcome.status;
+      if (outcome.errorMessage) wt.errorMessage = outcome.errorMessage;
+      this._emitUpdate();
+    }, 1500);
+  }
+
+  private _syncWorktree(repoIndex: number, wtIndex: number): void {
+    const repo = this._createRepos[repoIndex];
+    if (!repo) return;
+    const wt = repo.worktrees[wtIndex];
+    if (!wt || wt.status !== "needs-sync") return;
+    wt.status = "validating";
+    wt.errorMessage = undefined;
+    this._emitUpdate();
+    setTimeout(() => {
+      wt.status = "success";
+      this._emitUpdate();
+    }, 1000);
   }
 
   private _removeWorktree(repoIndex: number, wtIndex: number): void {
@@ -491,7 +567,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       // Persist verified repos with their worktrees
       for (const entry of this._createRepos) {
         if (entry.status === "success") {
-          data.repos.push({ url: entry.url, worktrees: entry.worktrees });
+          data.repos.push({ url: entry.url, worktrees: entry.worktrees.map(w => w.name) });
         }
       }
       if (this._createRepos.length > 0) {
@@ -640,9 +716,47 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     }, 1500);
   }
 
+  private _detailVerifyWorktree(repoIndex: number, wtIndex: number): void {
+    const repo = this._detailRepos[repoIndex];
+    if (!repo) return;
+    const wt = repo.worktrees[wtIndex];
+    if (!wt || wt.status === "success" || wt.status === "validating") return;
+    wt.status = "validating";
+    this._emitUpdate();
+    setTimeout(async () => {
+      const outcomes = [
+        { status: "success" as const },
+        { status: "success" as const },
+        { status: "failure" as const, errorMessage: "No local or remote branch found with this name" },
+        { status: "diverged" as const, errorMessage: "Local and remote branches have diverged. Resolve divergence before checking out." },
+        { status: "needs-sync" as const, errorMessage: "Branch is ahead/behind remote. Sync to continue." },
+      ];
+      const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
+      wt.status = outcome.status;
+      if (outcome.errorMessage) wt.errorMessage = outcome.errorMessage;
+      if (outcome.status === "success") await this._syncDetailReposToFile();
+      this._emitUpdate();
+    }, 1500);
+  }
+
+  private async _detailSyncWorktree(repoIndex: number, wtIndex: number): Promise<void> {
+    const repo = this._detailRepos[repoIndex];
+    if (!repo) return;
+    const wt = repo.worktrees[wtIndex];
+    if (!wt || wt.status !== "needs-sync") return;
+    wt.status = "validating";
+    wt.errorMessage = undefined;
+    this._emitUpdate();
+    setTimeout(async () => {
+      wt.status = "success";
+      await this._syncDetailReposToFile();
+      this._emitUpdate();
+    }, 1000);
+  }
+
   private async _syncDetailReposToFile(): Promise<void> {
     if (!this._selected) return;
-    this._selected.data.repos = this._detailRepos.map(r => ({ url: r.url, worktrees: [...r.worktrees] }));
+    this._selected.data.repos = this._detailRepos.map(r => ({ url: r.url, worktrees: r.worktrees.map(w => w.name) }));
     await window.openp41ge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
   }
 
@@ -858,13 +972,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                               i,
                               entry.expanded ? html`
                                 <div>
-                                  ${entry.worktrees.map((wt, wtIndex) => html`
-                                    <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                                      <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-                                      <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
-                                      <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${() => this._removeWorktree(i, wtIndex)}></openp41ge-inline-icon>
-                                    </div>
-                                  `)}
+                                  ${entry.worktrees.map((wt, wtIndex) => this._renderWorktreeRow(
+                                      i, wtIndex, wt,
+                                      () => this._removeWorktree(i, wtIndex),
+                                      () => this._verifyWorktree(i, wtIndex),
+                                      () => this._syncWorktree(i, wtIndex),
+                                    ))}
                                   ${entry.showNewWorktreeInput ? html`
                                     <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
                                       <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
@@ -1024,13 +1137,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     i,
                     entry.expanded ? html`
                       <div>
-                        ${entry.worktrees.map((wt, wtIndex) => html`
-                          <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                            <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-                            <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
-                            <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${async () => { this._detailRepos[i].worktrees.splice(wtIndex, 1); this._emitUpdate(); await this._syncDetailReposToFile(); }}></openp41ge-inline-icon>
-                          </div>
-                        `)}
+                        ${entry.worktrees.map((wt, wtIndex) => this._renderWorktreeRow(
+                            i, wtIndex, wt,
+                            async () => { this._detailRepos[i].worktrees.splice(wtIndex, 1); this._emitUpdate(); await this._syncDetailReposToFile(); },
+                            () => this._detailVerifyWorktree(i, wtIndex),
+                            async () => { this._detailSyncWorktree(i, wtIndex); },
+                          ))}
                         ${entry.showNewWorktreeInput ? html`
                           <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
                             <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
@@ -1039,11 +1151,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                               placeholder="Branch or path"
                               .value=${entry.newWorktreeValue}
                               @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
-                              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0); } } }}
+                              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { const name = entry.newWorktreeValue.trim(); entry.worktrees.push({ name, status: 'unverified' }); entry.newWorktreeValue = ''; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0); this._detailVerifyWorktree(i, entry.worktrees.length - 1); } } }}
                               style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;font-family:inherit;"
                               class="wt-input" autofocus
                             />
-                            <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${async () => { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0); await this._syncDetailReposToFile(); } }}></openp41ge-inline-icon>
+                            <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${async () => { if (entry.newWorktreeValue.trim()) { const name = entry.newWorktreeValue.trim(); entry.worktrees.push({ name, status: 'unverified' }); entry.newWorktreeValue = ''; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0); await this._syncDetailReposToFile(); this._detailVerifyWorktree(i, entry.worktrees.length - 1); } }}></openp41ge-inline-icon>
                           </div>
                         ` : ''}
                       </div>
