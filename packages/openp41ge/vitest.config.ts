@@ -23,6 +23,7 @@ export default defineConfig({
       "openp41ge-file-editor": path.resolve(__dirname, "../openp41ge-uikit/src/file-editor"),
       "openp41ge-git": path.resolve(__dirname, "../openp41ge-git/src"),
       "openp41ge-logger": path.resolve(__dirname, "../openp41ge-logger/src"),
+      "openp41ge-constants": path.resolve(__dirname, "../openp41ge-constants/src"),
       "@openp41ge-terminal": path.resolve(__dirname, "../openp41ge-terminal/src"),
       "@openp41ge-agent-chat": path.resolve(__dirname, "../openp41ge-agent-chat/src"),
       "openp41ge-uikit": path.resolve(__dirname, "../openp41ge-uikit/src"),

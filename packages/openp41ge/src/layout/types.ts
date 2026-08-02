@@ -254,11 +254,20 @@ export const WindowSchema = z.object({
   editorSystemTabIds: z.array(EditorSystemTabId).default([]),
   /** Active editor-area system tab ID. */
   editorSystemActiveTabId: EditorSystemTabId.nullable().default(null),
+  /** Bottom-pane grid layout (column-based, like main grid). */
+  bottomPaneGrid: GridSchema.default({
+    id: "bp-default",
+    rows: 1,
+    cols: 1,
+    placements: [],
+    dividers: { columns: [], rows: [] },
+  }),
 });
 export type Window = z.infer<typeof WindowSchema>;
 
 export function createWindow(id: string, bounds?: Bounds, monitor?: number): Window {
   const grid = createGrid(id, 1, 1);
+  const bpGrid = createGrid(`${id}-bp`, 1, 1);
   return WindowSchema.parse({
     id,
     bounds: bounds ?? { x: 0, y: 0, width: 1280, height: 800 },
@@ -267,6 +276,7 @@ export function createWindow(id: string, bounds?: Bounds, monitor?: number): Win
     repoRefs: [],
     sidebar: { activeViewId: null, width: 280 },
     overlays: [],
+    bottomPaneGrid: bpGrid,
   });
 }
 
@@ -290,10 +300,6 @@ export type Workspace = z.infer<typeof WorkspaceSchema>;
 export function createWorkspace(id: string): Workspace {
   const window0 = createWindow(`win-${id}-0`);
 
-  // Create default system tabs: explorer + git, pinned, on the left sidebar
-  const explorerTab = createSystemTab(`sys-explorer`, "explorer", "Explorer", true);
-  const gitTab = createSystemTab(`sys-git`, "git", "Git", true);
-
   return WorkspaceSchema.parse({
     id,
     windows: [
@@ -301,17 +307,14 @@ export function createWorkspace(id: string): Workspace {
         ...window0,
         sidebar: {
           ...window0.sidebar!,
-          rightSidebarTabs: [explorerTab.id, gitTab.id],
-          activeRightTab: explorerTab.id,
-          rightSidebarOpen: true,
+          rightSidebarTabs: [],
+          activeRightTab: null,
+          rightSidebarOpen: false,
         },
       },
     ],
     editorTabs: {},
-    systemTabs: {
-      [explorerTab.id]: explorerTab,
-      [gitTab.id]: gitTab,
-    },
+    systemTabs: {},
   });
 }
 

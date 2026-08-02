@@ -528,6 +528,9 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
     /** Reveal a file/folder in the native file manager (Finder). */
     revealInFinder: (filePath) => ipcRenderer.invoke("dialog:revealInFinder", filePath),
+
+    /** List all .openp41ge-workspace files in ~/.openp41ge/workspaces/. */
+    listWorkspaces: () => ipcRenderer.invoke("dialog:listWorkspaces"),
   },
 
   project: {

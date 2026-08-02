@@ -77,18 +77,29 @@ export class WorkspaceFileService {
     return filePath;
   }
 
-  // ── Draft ───────────────────────────────────────────
+  // ── List all workspaces ───────────────────────────
 
   /**
-   * Create a draft workspace file and its data directory.
-   * The file is written to ~/.openp41ge/workspaces/<uuid>.openp41ge-workspace.
-   * The data directory is ~/.openp41ge/workspaces-data/<uuid>/.
+   * List all .openp41ge-workspace files from ~/.openp41ge/workspaces/.
+   * Returns sorted array of { filePath, data }.
    */
-  async createDraft(): Promise<WorkspaceFileData | null> {
+  async listWorkspaces(): Promise<Array<{ filePath: string; data: WorkspaceFileData }>> {
+    return window.openp41ge.dialog.listWorkspaces();
+  }
+
+  // ── Create new workspace ───────────────────────────
+
+  /**
+   * Create a new workspace file with the given name.
+   * Writes to ~/.openp41ge/workspaces/<uuid>.openp41ge-workspace
+   * and sets it as the active workspace.
+   */
+  async createWorkspace(name: string): Promise<WorkspaceFileData | null> {
     const uuid = crypto.randomUUID();
     const now = new Date().toISOString();
     const data: WorkspaceFileData = {
       id: uuid,
+      name,
       version: 1,
       createdAt: now,
       dataDir: `~/.openp41ge/workspaces-data/${uuid}`,
@@ -97,9 +108,8 @@ export class WorkspaceFileService {
 
     const filePath = `~/.openp41ge/workspaces/${uuid}.openp41ge-workspace`;
 
-    // Ensure directories exist and write the file via IPC (handles ~ expansion on main)
-    const dataDirOk = await window.openp41ge.dialog.ensureDir(`~/.openp41ge/workspaces-data/${uuid}`);
-    if (!dataDirOk) return null;
+    // Ensure data directory exists
+    await window.openp41ge.dialog.ensureDir(`~/.openp41ge/workspaces-data/${uuid}`);
 
     const written = await window.openp41ge.dialog.writeWorkspaceFile(filePath, data);
     if (!written) return null;
@@ -112,14 +122,17 @@ export class WorkspaceFileService {
     return data;
   }
 
+  // ── Activate existing workspace ────────────────────
+
   /**
-   * Ensure a draft workspace exists. If none is active, creates one.
+   * Set a workspace (from listWorkspaces) as the active workspace.
    */
-  async ensureDraftExists(): Promise<WorkspaceFileData | null> {
-    if (this.activeFilePath && this.activeData) {
-      return this.activeData;
-    }
-    return this.createDraft();
+  activateWorkspace(entry: { filePath: string; data: WorkspaceFileData }): void {
+    this.activeFilePath = entry.filePath;
+    this.activeData = entry.data;
+    appState.activeWorkspaceFilePath = entry.filePath;
+    appState.notify();
+    this._emitChanged();
   }
 
   // ── Change data dir ─────────────────────────────────

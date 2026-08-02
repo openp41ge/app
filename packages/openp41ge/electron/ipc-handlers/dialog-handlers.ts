@@ -23,6 +23,7 @@ function readWorkspaceFile(filePath: string): WorkspaceFileData {
   const data = JSON.parse(raw);
   return {
     id: String(data.id ?? ""),
+    name: data.name ? String(data.name) : undefined,
     version: Number(data.version ?? 1),
     createdAt: String(data.createdAt ?? new Date().toISOString()),
     dataDir: String(data.dataDir ?? ""),
@@ -32,6 +33,7 @@ function readWorkspaceFile(filePath: string): WorkspaceFileData {
 
 export interface WorkspaceFileData {
   id: string;
+  name?: string;
   version: number;
   createdAt: string;
   dataDir: string;
@@ -134,6 +136,36 @@ export function registerDialogHandlers(): void {
       return true;
     } catch {
       return false;
+    }
+  });
+
+  // ── List all workspace files in ~/.openp41ge/workspaces/ ───────────
+
+  ipcMain.handle("dialog:listWorkspaces", async () => {
+    const dir = path.join(os.homedir(), ".openp41ge", "workspaces");
+    try {
+      if (!fs.existsSync(dir)) return [];
+      const files = fs.readdirSync(dir);
+      const workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
+      for (const file of files) {
+        if (!file.endsWith(`.${WORKSPACE_EXT}`)) continue;
+        const filePath = path.join(dir, file);
+        try {
+          const data = readWorkspaceFile(filePath);
+          workspaces.push({ filePath, data });
+        } catch {
+          // skip unparseable files
+        }
+      }
+      // Sort by name (or id if no name), case-insensitive
+      workspaces.sort((a, b) => {
+        const na = (a.data.name ?? a.data.id).toLowerCase();
+        const nb = (b.data.name ?? b.data.id).toLowerCase();
+        return na.localeCompare(nb);
+      });
+      return workspaces;
+    } catch {
+      return [];
     }
   });
 }

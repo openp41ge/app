@@ -142,6 +142,9 @@ declare global {
 
         /** Reveal a file/folder in the native file manager (Finder). */
         revealInFinder: (filePath: string) => Promise<boolean>;
+
+        /** List all .openp41ge-workspace files in ~/.openp41ge/workspaces/. */
+        listWorkspaces: () => Promise<Array<{ filePath: string; data: import("../../layout/types").WorkspaceFileData }>>;
       };
 
       lifecycle: {
