@@ -143,9 +143,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           style="${headerStyle}"
           @click=${onToggle}
         >
-          <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#999);transform:rotate(${item.expanded ? '90deg' : '0deg'});">
-            <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-          </svg>
+          <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#999)" style="transform:rotate(${item.expanded ? '90deg' : '0deg'});"></openp41ge-inline-icon>
           <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${item.url}</span>
           ${actionsContent}
           ${trailingContent}
@@ -158,14 +156,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** Shared delete/hover span for repo rows */
   private _renderDeleteAction(onRemove: (e: Event) => void): TemplateResult {
     return html`
-      <span
-        style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-        @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
-        @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
-        @click=${onRemove}
-      >
-        <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-      </span>
+      <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
     `;
   }
 
@@ -245,31 +236,20 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     return html`
       <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
         <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
-          <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#555);flex-shrink:0;">
-            <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-          </svg>
+          <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
           <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
           <div class="row-actions">
-            <span
-              style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-              @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
-              @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
-              @click=${() => handleRemove(i)}
-            >
-              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-            </span>
+            <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${() => handleRemove(i)}></openp41ge-inline-icon>
           </div>
           <!-- Always-rendered status icon (hidden when unverified so layout doesn't shift) -->
           <span
-            style="cursor:pointer;display:flex;align-items:center;color:${entry.status === 'failure' ? 'var(--error,#e53e3e)' : 'var(--accent,#007acc)'};flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;visibility:${entry.status === 'unverified' ? 'hidden' : 'visible'};"
-            @mouseenter=${(e: MouseEvent) => { if (entry.status === 'failure') { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; } }}
-            @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; }}
+            style="display:flex;align-items:center;visibility:${entry.status === 'unverified' ? 'hidden' : 'visible'};"
             @click=${(e: Event) => { if (entry.status === 'failure') { e.stopPropagation(); handleRetry(i); } }}
           >
             ${entry.status === 'failure' ? html`
-              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/></svg>
+              <openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger"></openp41ge-inline-icon>
             ` : html`
-              <svg class="cr-spinner" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-155.5t86-127Q252-817 325-848.5T480-880q17 0 28.5 11.5T520-840q0 17-11.5 28.5T480-800q-134 0-227 93t-93 227q0 134 93 227t227 93q134 0 227-93t93-227q0-17 11.5-28.5T840-520q17 0 28.5 11.5T880-480q0 82-31.5 155t-86 127.5q-54.5 54.5-127 86T480-80Z"/></svg>
+              <openp41ge-inline-icon name="spinner" size="12" no-hover icon-color="var(--text-secondary,#999)"></openp41ge-inline-icon>
             `}
           </span>
         </div>
@@ -720,8 +700,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       <style>
         .wm-wrap { display:flex; flex-direction:column; height:100%; overflow:hidden; position:relative; }
         .cr-row { }
-        .cr-spinner { animation:cr-spin 1s linear infinite; }
-        @keyframes cr-spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
         .wm-view {
           position:absolute; inset:0;
           transition:transform .25s ease, opacity .2s ease;
@@ -843,9 +821,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                         @dragend=${() => this._onDragEnd()}
                       >
                         ${i === this._dragIndex ? '' : html`
-                          <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#555);flex-shrink:0;">
-                            <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-                          </svg>
+                          <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                           <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
                         `}
                       </div>
@@ -857,7 +833,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                       @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                     >
-                      <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                      <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
                       <span>Add repository</span>
                     </div>
                     <div class="reorder-footer">
@@ -886,14 +862,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                     <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
                                       <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
                                       <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
-                                      <span
-                                        style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-                                        @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
-                                        @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
-                                        @click=${() => this._removeWorktree(i, wtIndex)}
-                                      >
-                                        <svg width="10" height="10" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                                      </span>
+                                      <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${() => this._removeWorktree(i, wtIndex)}></openp41ge-inline-icon>
                                     </div>
                                   `)}
                                   ${entry.showNewWorktreeInput ? html`
@@ -905,15 +874,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                         .value=${entry.newWorktreeValue}
                                         @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
                                         @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._addWorktree(i); }}
-                                        style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:4px 0;outline:none;"
+                                        style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;"
                                         autofocus
                                       />
-                                      <span
-                                        style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc);flex-shrink:0;"
-                                        @click=${() => this._addWorktree(i)}
-                                      >
-                                        <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-                                      </span>
+                                      <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${() => this._addWorktree(i)}></openp41ge-inline-icon>
                                     </div>
                                   ` : ''}
                                 </div>
@@ -923,14 +887,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                   @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                                   @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                                 >
-                                  <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                                  <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
                                   <span>Add worktree</span>
                                 </div>
                               ` : null,
                               html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._removeCreateRepo(i); })}</div>`,
-                              html`<svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--accent,#007acc);flex-shrink:0;" title="Ready to clone">
-                                <path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/>
-                              </svg>`,
+                              html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title="Ready to clone"></openp41ge-inline-icon>`,
                               () => this._toggleRepoExpanded(i),
                             )
                         : this._renderUnverifiedRepoRow(i, entry)}
@@ -939,9 +901,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     ${this._showNewRepoInput ? html`
                       <div class="cr-row" tabindex="0" style="display:flex;flex-direction:column;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border-left:1px solid var(--divider,#333);border-right:1px solid var(--divider,#333);border-bottom:1px solid var(--divider,#333);${(this._createRepos.length === 0 || (this._createRepos.length > 0 && this._createRepos[this._createRepos.length - 1].expanded)) ? 'border-top:1px solid var(--divider,#333);border-radius:6px 6px 0 0;' : ''}" @click=${() => { const inp = document.querySelector('.new-repo-input'); if (inp instanceof HTMLInputElement) inp.focus(); }}>
                         <div style="display:flex;align-items:center;gap:6px;">
-                            <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#555);flex-shrink:0;">
-                              <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-                            </svg>
+                            <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                           <input
                             type="text"
                             placeholder="Paste repo URL and press Enter"
@@ -952,14 +912,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                             style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
                             autofocus
                           />
-                          <span
-                            style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-                            @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(0,122,204,0.15)'; }}
-                            @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; }}
-                            @click=${(e: Event) => { e.stopPropagation(); this._addCreateRepo(); }}
-                          >
-                            <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-                          </span>
+                          <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${(e: Event) => { e.stopPropagation(); this._addCreateRepo(); }}></openp41ge-inline-icon>
                         </div>
                         ${this._repoUrlError ? html`
                           <div style="font-size:12px;color:var(--error,#e53e3e);margin-top:2px;">${this._repoUrlError}</div>
@@ -973,7 +926,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                       @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                     >
-                      <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                      <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
                       <span>Add repository</span>
                     </div>
                     <!-- Reorder repos button (only when 2+ repos) -->
@@ -1075,14 +1028,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                           <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
                             <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
                             <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
-                            <span
-                              style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-                              @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
-                              @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
-                              @click=${async () => { this._detailRepos[i].worktrees.splice(wtIndex, 1); this._emitUpdate(); await this._syncDetailReposToFile(); }}
-                            >
-                              <svg width="10" height="10" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                            </span>
+                            <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${async () => { this._detailRepos[i].worktrees.splice(wtIndex, 1); this._emitUpdate(); await this._syncDetailReposToFile(); }}></openp41ge-inline-icon>
                           </div>
                         `)}
                         ${entry.showNewWorktreeInput ? html`
@@ -1094,15 +1040,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                               .value=${entry.newWorktreeValue}
                               @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
                               @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); } } }}
-                              style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:4px 0;outline:none;"
+                              style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;"
                               autofocus
                             />
-                            <span
-                              style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc);flex-shrink:0;"
-                              @click=${async () => { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); await this._syncDetailReposToFile(); } }}
-                            >
-                              <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-                            </span>
+                            <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${async () => { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); await this._syncDetailReposToFile(); } }}></openp41ge-inline-icon>
                           </div>
                         ` : ''}
                       </div>
@@ -1112,14 +1053,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                         @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                         @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                       >
-                        <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                        <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
                         <span>Add worktree</span>
                       </div>
                     ` : null,
                     html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._onRemoveRepo(i); })}</div>`,
-                    html`<svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--accent,#007acc);flex-shrink:0;" title="Ready to clone">
-                      <path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/>
-                    </svg>`,
+                    html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title="Ready to clone"></openp41ge-inline-icon>`,
                     () => { this._detailRepos[i].expanded = !this._detailRepos[i].expanded; this._emitUpdate(); },
                   )
                 : this._renderUnverifiedRepoRow(i, entry, this._detailRepos, (idx) => this._onRemoveRepo(idx), (idx) => this._detailVerifyRepo(idx))}
@@ -1128,9 +1067,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             ${this._showAddInput ? html`
               <div class="cr-row" tabindex="0" style="display:flex;flex-direction:column;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border-left:1px solid var(--divider,#333);border-right:1px solid var(--divider,#333);border-bottom:1px solid var(--divider,#333);${(this._detailRepos.length === 0 || (this._detailRepos.length > 0 && this._detailRepos[this._detailRepos.length - 1].expanded)) ? 'border-top:1px solid var(--divider,#333);border-radius:6px 6px 0 0;' : ''}" @click=${() => { const inp = document.querySelector('.detail-repo-input'); if (inp instanceof HTMLInputElement) inp.focus(); }}>
                 <div style="display:flex;align-items:center;gap:6px;">
-                  <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#555);flex-shrink:0;">
-                    <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-                  </svg>
+                  <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                   <input
                     type="text"
                     placeholder="Paste repo URL and press Enter"
@@ -1141,14 +1078,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
                     autofocus
                   />
-                  <span
-                    style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-                    @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(0,122,204,0.15)'; }}
-                    @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; }}
-                    @click=${(e: Event) => { e.stopPropagation(); this._onAddConfirm(); }}
-                  >
-                    <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-                  </span>
+                    <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${(e: Event) => { e.stopPropagation(); this._onAddConfirm(); }}></openp41ge-inline-icon>
                 </div>
                 ${this._detailRepoUrlError ? html`
                   <div style="font-size:12px;color:var(--error,#e53e3e);margin-top:2px;">${this._detailRepoUrlError}</div>
@@ -1162,7 +1092,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
               @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
             >
-              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+              <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
               <span>Add repository</span>
             </div>
           </div>
