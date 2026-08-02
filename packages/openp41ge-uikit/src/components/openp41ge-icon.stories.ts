@@ -5,7 +5,7 @@ import type { IconName } from "openp41ge-uikit";
 import { iconRegistry } from "openp41ge-uikit";
 
 const meta: Meta = {
-  title: "Components/Icon",
+  title: "Icons/All",
   component: "openp41ge-icon",
   argTypes: {
     name: {
@@ -15,8 +15,8 @@ const meta: Meta = {
     size: { control: { type: "number", min: 8, max: 48 } },
   },
   args: {
-    name: "git",
-    size: 24,
+    name: "file",
+    size: 16,
   },
 };
 

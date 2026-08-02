@@ -4,7 +4,7 @@ import "./file-extension-svg";
 import { getAllIconNames } from "../icons/material-icons";
 
 const meta: Meta = {
-  title: "Components/FileExtensionSvg",
+  title: "Icons/File Extension",
   component: "file-extension-svg",
   argTypes: {
     filename: { control: "text" },
