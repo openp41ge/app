@@ -171,7 +171,7 @@ class Openp41geServiceModal extends LitElement {
               </svg>
             ` : ''}
             <span
-              style="${isFirst ? 'cursor:pointer;text-decoration:underline;text-decoration-color:var(--text-secondary,#999);' : ''}${i === parts.length - 1 ? 'font-weight:400;' : ''}"
+              style="${isFirst ? 'cursor:pointer;text-decoration:underline;text-decoration-color:var(--text-secondary,#999);' : ''}${i === parts.length - 1 ? 'font-weight:400;' : ''}${i === parts.length - 1 && part === 'Unnamed' ? 'font-style:italic;' : ''}"
               @click=${isFirst ? () => this._onHeaderClick() : undefined}
               @mouseenter=${isFirst ? (e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)' : undefined}
               @mouseleave=${isFirst ? (e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = '' : undefined}

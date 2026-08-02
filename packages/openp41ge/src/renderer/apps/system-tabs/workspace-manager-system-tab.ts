@@ -29,10 +29,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   get title(): string {
     if (this._creating) {
-      return "Workspaces  >  Create Workspace";
+      const name = this._createName.trim();
+      return `Workspaces  >  ${name || "Unnamed"}`;
     }
     if (this._view === "detail" && this._selected) {
-      return `Workspaces  >  ${this._selected.data.name ?? "(unnamed)"}`;
+      const name = this._selected.data.name ?? "";
+      return `Workspaces  >  ${name.trim() || "Unnamed"}`;
     }
     return "Workspaces";
   }
@@ -60,8 +62,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _repoUrlError = "";
 
   /** Detail view editing state. */
+  private _detailRepos: CreateRepoEntry[] = [];
   private _showAddInput = false;
   private _addInputValue = "";
+  private _detailRepoUrlError = "";
+  private _detailExpanded: boolean[] = [];
 
   private get _nameValid(): boolean {
     return this._createName.trim().length > 0;
@@ -93,14 +98,86 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     document.dispatchEvent(new CustomEvent("workspaces-tab:update", { bubbles: true }));
   }
 
+  /**
+   * Self-contained accordion item renderer.
+   * Neighbor-aware border/radius logic is computed internally from the full items array + index.
+   * Every caller gets identical behavior — no external opts needed.
+   */
+  private _renderAccordionItem(
+    items: ReadonlyArray<{ url: string; expanded: boolean }>,
+    index: number,
+    expandedContent: TemplateResult | null,
+    actionsContent: TemplateResult | null,
+    trailingContent: TemplateResult | null,
+    onToggle: () => void,
+  ): TemplateResult {
+    const item = items[index];
+    const isStandalone = item.expanded;
+    const isFirst = index === 0;
+    const prevExpanded = index > 0 && items[index - 1].expanded;
+    const nextExpanded = index < items.length - 1 && items[index + 1].expanded;
+
+    let wrapperStyle = 'box-sizing:border-box;min-height:38px;background:rgba(255,255,255,.04);overflow:hidden;';
+    let headerStyle = 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;';
+
+    if (isStandalone) {
+      wrapperStyle += 'border:1px solid var(--divider,#333);border-radius:6px;margin:4px 0;';
+      headerStyle += 'cursor:pointer;user-select:none;border-radius:6px 6px 0 0;';
+    } else {
+      const showTopBorder = isFirst || prevExpanded;
+      const topRounded = isFirst || prevExpanded;
+      const bottomRounded = !!nextExpanded;
+      wrapperStyle += 'border-left:1px solid var(--divider,#333);';
+      wrapperStyle += 'border-right:1px solid var(--divider,#333);';
+      wrapperStyle += 'border-bottom:1px solid var(--divider,#333);';
+      if (showTopBorder) wrapperStyle += 'border-top:1px solid var(--divider,#333);';
+      if (topRounded && bottomRounded) wrapperStyle += 'border-radius:6px;';
+      else if (topRounded) wrapperStyle += 'border-radius:6px 6px 0 0;';
+      else if (bottomRounded) wrapperStyle += 'border-radius:0 0 6px 6px;';
+      if (topRounded) headerStyle += 'border-radius:6px 6px 0 0;';
+    }
+
+    return html`
+      <div class="repo-wrapper" style="${wrapperStyle}">
+        <div class="cr-row" tabindex="0"
+          style="${headerStyle}"
+          @click=${onToggle}
+        >
+          <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#999);transform:rotate(${item.expanded ? '90deg' : '0deg'});">
+            <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
+          </svg>
+          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${item.url}</span>
+          ${actionsContent}
+          ${trailingContent}
+        </div>
+        ${item.expanded && expandedContent ? expandedContent : ''}
+      </div>
+    `;
+  }
+
+  /** Shared delete/hover span for repo rows */
+  private _renderDeleteAction(onRemove: (e: Event) => void): TemplateResult {
+    return html`
+      <span
+        style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
+        @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
+        @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
+        @click=${onRemove}
+      >
+        <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+      </span>
+    `;
+  }
+
   /** Style string for a repo wrapper based on expanded/collapsed state and neighbor state. */
-  private _repoWrapperStyle(i: number, entry: CreateRepoEntry): string {
+  private _repoWrapperStyle(i: number, entry: CreateRepoEntry, repos?: CreateRepoEntry[]): string {
+    const arr = repos ?? this._createRepos;
     if (entry.expanded) {
       return 'box-sizing:border-box;min-height:38px;border:1px solid var(--divider,#333);border-radius:6px;margin:4px 0;background:rgba(255,255,255,.04);';
     }
     // Collapsed — figure out if neighbors are expanded for border-radius
-    const prevExpanded = i > 0 && this._createRepos[i - 1]?.expanded;
-    const nextExpanded = i < this._createRepos.length - 1 && this._createRepos[i + 1]?.expanded;
+    const prevExpanded = i > 0 && arr[i - 1]?.expanded;
+    const nextExpanded = i < arr.length - 1 && arr[i + 1]?.expanded;
     const showTopBorder = i === 0 || prevExpanded;
     const topRounded = i === 0 || prevExpanded;
     const bottomRounded = !!nextExpanded;
@@ -124,16 +201,83 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const showTopBorder = isFirst;
     // If last repo above is expanded and there's no input row between, this row becomes its own card
     if (lastExpanded) {
-      return 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;border:1px solid var(--divider,#333);border-radius:6px;margin:-1px 0 0;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-secondary,#999);font-size:12px;';
+      return 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;border:1px solid var(--divider,#333);border-radius:6px;margin:-1px 0 0;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;';
     }
     // Connected to the group above — always left, right, bottom; top only if first
-    let style = 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-secondary,#999);font-size:12px;';
+    let style = 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;';
     style += 'border-left:1px solid var(--divider,#333);';
     style += 'border-right:1px solid var(--divider,#333);';
     style += 'border-bottom:1px solid var(--divider,#333);';
     if (showTopBorder) style += 'border-top:1px solid var(--divider,#333);';
     style += isFirst ? 'border-radius:6px;' : 'border-radius:0 0 6px 6px;';
     return style;
+  }
+
+  /** Style string for the detail view's "+ add repository" row, matching create form's _addRepoRowStyle. */
+  private _detailAddRepoRowStyle(): string {
+    const hasRepos = this._detailRepos.length > 0;
+    const directlyAfterRepos = !this._showAddInput;
+    const lastExpanded = hasRepos && directlyAfterRepos && this._detailRepos[this._detailRepos.length - 1].expanded;
+    const isFirst = !hasRepos && !this._showAddInput;
+    if (lastExpanded) {
+      return 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;border:1px solid var(--divider,#333);border-radius:6px;margin:-1px 0 0;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;';
+    }
+    let style = 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;';
+    style += 'border-left:1px solid var(--divider,#333);';
+    style += 'border-right:1px solid var(--divider,#333);';
+    style += 'border-bottom:1px solid var(--divider,#333);';
+    if (isFirst) style += 'border-top:1px solid var(--divider,#333);';
+    style += isFirst ? 'border-radius:6px;' : 'border-radius:0 0 6px 6px;';
+    return style;
+  }
+
+  /** Shared renderer for an unverified/failed/validating repo row (no accordion). */
+  private _renderUnverifiedRepoRow(
+    i: number,
+    entry: CreateRepoEntry,
+    repos?: CreateRepoEntry[],
+    onRemove?: (i: number) => void,
+    onRetry?: (i: number) => void,
+  ): TemplateResult {
+    const arr = repos ?? this._createRepos;
+    const handleRemove = onRemove ?? ((idx: number) => this._removeCreateRepo(idx));
+    const handleRetry = onRetry ?? ((idx: number) => this._verifyRepo(idx));
+    return html`
+      <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
+        <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
+          <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#555);flex-shrink:0;">
+            <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
+          </svg>
+          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
+          <div class="row-actions">
+            <span
+              style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
+              @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
+              @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
+              @click=${() => handleRemove(i)}
+            >
+              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+            </span>
+          </div>
+          <!-- Always-rendered status icon (hidden when unverified so layout doesn't shift) -->
+          <span
+            style="cursor:pointer;display:flex;align-items:center;color:${entry.status === 'failure' ? 'var(--error,#e53e3e)' : 'var(--accent,#007acc)'};flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;visibility:${entry.status === 'unverified' ? 'hidden' : 'visible'};"
+            @mouseenter=${(e: MouseEvent) => { if (entry.status === 'failure') { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; } }}
+            @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; }}
+            @click=${(e: Event) => { if (entry.status === 'failure') { e.stopPropagation(); handleRetry(i); } }}
+          >
+            ${entry.status === 'failure' ? html`
+              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/></svg>
+            ` : html`
+              <svg class="cr-spinner" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-155.5t86-127Q252-817 325-848.5T480-880q17 0 28.5 11.5T520-840q0 17-11.5 28.5T480-800q-134 0-227 93t-93 227q0 134 93 227t227 93q134 0 227-93t93-227q0-17 11.5-28.5T840-520q17 0 28.5 11.5T880-480q0 82-31.5 155t-86 127.5q-54.5 54.5-127 86T480-80Z"/></svg>
+            `}
+          </span>
+        </div>
+        ${entry.status === 'failure' && entry.errorMessage ? html`
+          <div style="font-size:12px;color:var(--error,#e53e3e);padding:2px 10px 6px 28px;">${entry.errorMessage}</div>
+        ` : ''}
+      </div>
+    `;
   }
 
   private _moveRepoUp(i: number): void {
@@ -247,6 +391,18 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _showDetail(entry: { filePath: string; data: WorkspaceFileData }): void {
     this._selected = entry;
     this._view = "detail";
+    this._detailRepos = entry.data.repos.map(r => ({
+      url: r.url,
+      status: "success" as const,
+      expanded: false,
+      worktrees: [...r.worktrees],
+      newWorktreeValue: "",
+      showNewWorktreeInput: false,
+    }));
+    this._detailExpanded = entry.data.repos.map(() => false);
+    this._showAddInput = false;
+    this._addInputValue = "";
+    this._detailRepoUrlError = "";
     this._emitUpdate();
   }
 
@@ -428,11 +584,41 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private async _onAddConfirm(): Promise<void> {
     const url = this._addInputValue.trim();
     if (!url || !this._selected) return;
-    this._selected.data.repos.push({ url, worktrees: [] });
-    await window.openp41ge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
+    // Validate URL has a protocol
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url) && !/^git@/.test(url)) {
+      this._detailRepoUrlError = "URL must include a protocol (e.g. https://, git@)";
+      this._emitUpdate();
+      return;
+    }
+    this._detailRepoUrlError = "";
+    const index = this._detailRepos.length;
+    this._detailRepos.push({ url, status: "unverified", expanded: false, worktrees: [], newWorktreeValue: "", showNewWorktreeInput: false });
+    this._detailExpanded.push(false);
     this._showAddInput = false;
     this._addInputValue = "";
     this._emitUpdate();
+    // Verify
+    const repo = this._detailRepos[index];
+    repo.status = "validating";
+    this._emitUpdate();
+    setTimeout(async () => {
+      const msgs = [
+        "Repository not found at this URL",
+        "Access denied: no permission to clone",
+        "Connection refused: host unreachable",
+        "Invalid repository URL format",
+        "Authentication required"
+      ];
+      const success = Math.random() > 0.3;
+      if (success) {
+        repo.status = "success";
+        await this._syncDetailReposToFile();
+      } else {
+        repo.status = "failure";
+        repo.errorMessage = msgs[Math.floor(Math.random() * msgs.length)];
+      }
+      this._emitUpdate();
+    }, 1500);
   }
 
   private _onAddCancel(): void {
@@ -443,9 +629,41 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   private async _onRemoveRepo(index: number): Promise<void> {
     if (!this._selected) return;
-    this._selected.data.repos.splice(index, 1);
-    await window.openp41ge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
+    this._detailRepos.splice(index, 1);
+    this._detailExpanded.splice(index, 1);
+    await this._syncDetailReposToFile();
     this._emitUpdate();
+  }
+
+  private _detailVerifyRepo(index: number): void {
+    const repo = this._detailRepos[index];
+    if (!repo || repo.status === "success" || repo.status === "validating") return;
+    repo.status = "validating";
+    this._emitUpdate();
+    setTimeout(async () => {
+      const msgs = [
+        "Repository not found at this URL",
+        "Access denied: no permission to clone",
+        "Connection refused: host unreachable",
+        "Invalid repository URL format",
+        "Authentication required"
+      ];
+      const success = Math.random() > 0.3;
+      if (success) {
+        repo.status = "success";
+        await this._syncDetailReposToFile();
+      } else {
+        repo.status = "failure";
+        repo.errorMessage = msgs[Math.floor(Math.random() * msgs.length)];
+      }
+      this._emitUpdate();
+    }, 1500);
+  }
+
+  private async _syncDetailReposToFile(): Promise<void> {
+    if (!this._selected) return;
+    this._selected.data.repos = this._detailRepos.map(r => ({ url: r.url, worktrees: [...r.worktrees] }));
+    await window.openp41ge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
   }
 
   private async _onCopy(e: MouseEvent, path: string): Promise<void> {
@@ -555,6 +773,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           color:var(--text-primary,#ccc); font-size:14px; padding:4px 0; outline:none; width:100%;
         }
         .wm-create-input:focus { border-bottom-color:var(--accent,#007acc); }
+        .wm-create-area input::placeholder {
+          color:var(--text-placeholder,#6e6e6e);
+        }
 
         .wm-back {
           display:flex; align-items:center; gap:4px;
@@ -565,25 +786,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-back:hover { color:var(--text-primary,#ccc); }
 
         /* Detail section styles (reused from old workspace-manager-system-tab) */
-        .ws-section { padding:8px 12px; margin:6px 10px; border-radius:8px; background:transparent; border:none; }
-        .ws-row { display:flex; align-items:center; gap:12px; min-height:28px; }
-        .ws-label { font-size:11px; font-weight:600; text-transform:uppercase; color:var(--text-secondary,#999); flex-shrink:0; width:140px; }
-        .ws-value { font-size:13px; color:var(--text-primary,#ccc); flex:1 1 auto; min-width:0; text-align:right; }
-        .ws-actions { display:inline-flex; gap:2px; }
-        .ws-act-btn {
-          padding:2px 6px; font-size:12px; border:none; border-radius:3px;
-          cursor:pointer; background:transparent; color:var(--text-secondary,#999);
-          transition:background .1s;
-        }
-        .ws-act-btn:hover { background:var(--bg-hover,rgba(128,128,128,.15)); color:var(--text-primary,#ccc); }
-        .ws-path { font-family:monospace; font-size:12px; color:var(--text-secondary,#999); text-align:left; word-break:break-all; padding:2px 0 0; }
-        .ws-name-input {
-          background:transparent; border:none; border-bottom:1px solid var(--divider,#555);
-          color:var(--text-primary,#ccc); font-size:13px; padding:0 0 2px; outline:none; width:100%;
-        }
-        .ws-name-input:focus { border-bottom-color:var(--accent,#007acc); }
-        .ws-empty { color:var(--text-secondary,#999); font-size:13px; }
-
         .row-actions { display:none; align-items:center; gap:0; }
         .cr-row:hover .row-actions { display:flex; }
 
@@ -617,7 +819,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     type="text"
                     placeholder="Workspace name"
                     .value=${this._createName}
-                    @input=${(e: Event) => { this._createName = (e.target as HTMLInputElement).value; this._nameError = ''; }}
+                    @input=${(e: Event) => { this._createName = (e.target as HTMLInputElement).value; this._nameError = ''; this._emitUpdate(); }}
                     @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._createWorkspace(); }}
                     style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
                     autofocus
@@ -653,10 +855,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       style="${this._addRepoRowStyle()}"
                       @click=${() => { this._repoUrlError = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                       @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                      @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'}
+                      @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                     >
                       <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-                      <span>add repository</span>
+                      <span>Add repository</span>
                     </div>
                     <div class="reorder-footer">
                       <button
@@ -674,116 +876,64 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     </div>
                   ` : html`
                     ${this._createRepos.map((entry, i) => html`
-                      <!-- Repo row -->
-                      <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry)}">
-                        ${entry.status === "success" ? html`
-                          <!-- Verified repo: collapsible header -->
-                          <div class="cr-row" tabindex="0"
-                            style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;cursor:pointer;user-select:none;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}"
-                            @click=${() => this._toggleRepoExpanded(i)}
-                          >
-                            <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#999);transform:rotate(${entry.expanded ? '90deg' : '0deg'});">
-                              <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-                            </svg>
-                            <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
-                            <div class="row-actions">
-                              <span
-                                style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-                                @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
-                                @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
-                                @click=${(e: Event) => { e.stopPropagation(); this._removeCreateRepo(i); }}
-                              >
-                                <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                              </span>
-                            </div>
-                            <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--accent,#007acc);flex-shrink:0;" title="Ready to clone">
-                              <path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/>
-                            </svg>
-                          </div>
-                          <!-- Expanded sub-list for worktrees -->
-                          ${entry.expanded ? html`
-                            <div>
-                              ${entry.worktrees.map((wt, wtIndex) => html`
-                                <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                                  <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
-                                  <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
-                                  <span
-                                    style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-                                    @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
-                                    @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
-                                    @click=${() => this._removeWorktree(i, wtIndex)}
-                                  >
-                                    <svg width="10" height="10" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                                  </span>
+                      ${entry.status === "success"
+                        ? this._renderAccordionItem(
+                              this._createRepos,
+                              i,
+                              entry.expanded ? html`
+                                <div>
+                                  ${entry.worktrees.map((wt, wtIndex) => html`
+                                    <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+                                      <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
+                                      <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
+                                      <span
+                                        style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
+                                        @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
+                                        @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
+                                        @click=${() => this._removeWorktree(i, wtIndex)}
+                                      >
+                                        <svg width="10" height="10" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                                      </span>
+                                    </div>
+                                  `)}
+                                  ${entry.showNewWorktreeInput ? html`
+                                    <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+                                      <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
+                                      <input
+                                        type="text"
+                                        placeholder="Branch or path"
+                                        .value=${entry.newWorktreeValue}
+                                        @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
+                                        @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._addWorktree(i); }}
+                                        style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:4px 0;outline:none;"
+                                        autofocus
+                                      />
+                                      <span
+                                        style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc);flex-shrink:0;"
+                                        @click=${() => this._addWorktree(i)}
+                                      >
+                                        <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                                      </span>
+                                    </div>
+                                  ` : ''}
                                 </div>
-                              `)}
-                              ${entry.showNewWorktreeInput ? html`
-                                <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                                  <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
-                                  <input
-                                    type="text"
-                                    placeholder="Branch or path"
-                                    .value=${entry.newWorktreeValue}
-                                    @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
-                                    @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._addWorktree(i); }}
-                                    style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:4px 0;outline:none;"
-                                    autofocus
-                                  />
-                                  <span
-                                    style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc);flex-shrink:0;"
-                                    @click=${() => this._addWorktree(i)}
-                                  >
-                                    <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-                                  </span>
+                                <div
+                                  style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
+                                  @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); }}
+                                  @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+                                  @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
+                                >
+                                  <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                                  <span>Add worktree</span>
                                 </div>
-                              ` : ''}
-                            </div>
-                            <div
-                              style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-secondary,#999);font-size:12px;border-top:1px solid var(--divider,#333);"
-                              @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); }}
-                              @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                              @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'}
-                            >
-                              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-                              <span>add worktree</span>
-                            </div>
-                          ` : ''}
-                        ` : html`
-                          <!-- Unverified repo: URL text + verify + remove -->
-                          <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
-                            <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#555);flex-shrink:0;">
-                              <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-                            </svg>
-                            <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
-                            <div class="row-actions">
-                              <span
-                                style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
-                                @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
-                                @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
-                                @click=${() => this._removeCreateRepo(i)}
-                              >
-                                <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                              </span>
-                            </div>
-                            <!-- Always-rendered status icon (hidden when unverified so layout doesn't shift) -->
-                            <span
-                              style="cursor:pointer;display:flex;align-items:center;color:${entry.status === 'failure' ? 'var(--error,#e53e3e)' : 'var(--accent,#007acc)'};flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;visibility:${entry.status === 'unverified' ? 'hidden' : 'visible'};"
-                              @mouseenter=${(e: MouseEvent) => { if (entry.status === 'failure') { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; } }}
-                              @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; }}
-                              @click=${(e: Event) => { if (entry.status === 'failure') { e.stopPropagation(); this._verifyRepo(i); } }}
-                            >
-                              ${entry.status === 'failure' ? html`
-                                <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/></svg>
-                              ` : html`
-                                <svg class="cr-spinner" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-155.5t86-127Q252-817 325-848.5T480-880q17 0 28.5 11.5T520-840q0 17-11.5 28.5T480-800q-134 0-227 93t-93 227q0 134 93 227t227 93q134 0 227-93t93-227q0-17 11.5-28.5T840-520q17 0 28.5 11.5T880-480q0 82-31.5 155t-86 127.5q-54.5 54.5-127 86T480-80Z"/></svg>
-                              `}
-                            </span>
-                          </div>
-                          ${entry.status === 'failure' && entry.errorMessage ? html`
-                            <div style="font-size:12px;color:var(--error,#e53e3e);padding:4px 10px 6px 28px;">${entry.errorMessage}</div>
-                          ` : ''}
-                        `}
-                      </div>
+                              ` : null,
+                              html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._removeCreateRepo(i); })}</div>`,
+                              html`<svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--accent,#007acc);flex-shrink:0;" title="Ready to clone">
+                                <path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/>
+                              </svg>`,
+                              () => this._toggleRepoExpanded(i),
+                            )
+                        : this._renderUnverifiedRepoRow(i, entry)}
                     `)}
                     <!-- New repo URL input row (above +add) -->
                     ${this._showNewRepoInput ? html`
@@ -821,10 +971,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       style="${this._addRepoRowStyle()}"
                       @click=${() => { this._repoUrlError = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                       @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                      @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'}
+                      @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                     >
                       <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
-                      <span>add repository</span>
+                      <span>Add repository</span>
                     </div>
                     <!-- Reorder repos button (only when 2+ repos) -->
                     ${this._createRepos.length >= 2 ? html`
@@ -896,102 +1046,141 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
-    const data = entry.data;
-
     return html`
-      <div class="ws-section">
-        <div class="ws-row">
-          <div class="ws-label">Name</div>
-          <div class="ws-value">
+      <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;min-height:100%;">
+        <div style="padding:12px 14px;">
+          <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Name</label>
+          <div style="display:flex;align-items:center;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--divider,#333);border-radius:6px;">
             <input
-              class="ws-name-input"
               type="text"
-              .value=${data.name ?? ''}
-              placeholder="Unnamed workspace"
+              placeholder="Workspace name"
+              .value=${entry.data.name ?? ''}
               @input=${(e: Event) => this._onNameChange(e)}
+              style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
+              autofocus
             />
           </div>
         </div>
-      </div>
-      <div class="ws-section">
-        <div class="ws-row">
-          <div class="ws-label">ID</div>
-          <div class="ws-value">
-            <span class="ws-actions">
-              <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, data.id)}>Copy</button>
-            </span>
-          </div>
-        </div>
-        <div class="ws-path">${data.id}</div>
-      </div>
-      <div class="ws-section">
-        <div class="ws-row">
-          <div class="ws-label">File</div>
-          <div class="ws-value">
-            <span class="ws-actions">
-              <button class="ws-act-btn" @click=${() => this._onSaveAs()}>Edit</button>
-              <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, entry.filePath)}>Copy</button>
-            </span>
-          </div>
-        </div>
-        <div class="ws-path">${entry.filePath}</div>
-      </div>
-      <div class="ws-section">
-        <div class="ws-row">
-          <div class="ws-label">Data Directory</div>
-          <div class="ws-value">
-            <span class="ws-actions">
-              <button class="ws-act-btn" @click=${() => this._onChangeDataDir()}>Edit</button>
-              <button class="ws-act-btn" @click=${(e: MouseEvent) => this._onCopy(e, data.dataDir)}>Copy</button>
-            </span>
-          </div>
-        </div>
-        <div class="ws-path">${data.dataDir}</div>
-      </div>
-      <div class="ws-section">
-        <div class="ws-row">
-          <div class="ws-label">Repositories (${data.repos.length})</div>
-          <div class="ws-value">
-            <span class="ws-actions">
-              <button class="ws-act-btn" @click=${() => this._onAddRepo()}>Add</button>
-            </span>
-          </div>
-        </div>
-        ${this._showAddInput ? html`
-          <div style="display:flex;align-items:center;gap:4px;margin-left:-6px;padding:4px 6px;border-radius:4px;background:rgba(255,255,255,.06)">
-            <input
-              type="text"
-              placeholder="Enter repo URL"
-              .value=${this._addInputValue}
-              @input=${(e: Event) => { this._addInputValue = (e.target as HTMLInputElement).value; }}
-              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._onAddConfirm(); if (e.key === 'Escape') this._onAddCancel(); }}
-              style="flex:1;background:transparent;color:var(--text-primary,#ccc);border:none;border-radius:3px;padding:3px 0;font-size:12px;outline:none"
-            />
-            <span style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc)" @click=${() => this._onAddConfirm()}>
-              <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>
-            </span>
-            <span style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999)" @click=${() => this._onAddCancel()}>
-              <svg width="16" height="16" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-            </span>
-          </div>
-        ` : ''}
-        <div class="ws-path">
-          ${data.repos.length > 0
-            ? data.repos.map((r, i) => html`
-              <div style="display:flex;align-items:center;gap:6px;margin:6px 0;padding:6px 10px;border-radius:6px;background:var(--bg-secondary,rgba(255,255,255,.04))">
-                <span style="flex:1;font-size:13px;color:var(--text-primary,#ccc);word-break:break-all">${r.url}</span>
-                <span
-                  style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0"
-                  title="Remove repository"
-                  @click=${() => this._onRemoveRepo(i)}
-                  @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                  @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'}
-                >
-                  <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
-                </span>
+        <div style="padding:12px 14px;flex:1;display:flex;flex-direction:column;">
+          <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Repositories</label>
+          <div style="flex:1;overflow-y:auto;">
+            ${this._detailRepos.map((entry, i) => html`
+              ${entry.status === "success"
+                ? this._renderAccordionItem(
+                    this._detailRepos,
+                    i,
+                    entry.expanded ? html`
+                      <div>
+                        ${entry.worktrees.map((wt, wtIndex) => html`
+                          <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+                            <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
+                            <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
+                            <span
+                              style="cursor:pointer;display:flex;align-items:center;color:var(--text-secondary,#999);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
+                              @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(229,62,62,0.15)'; el.style.color = 'var(--error,#e53e3e)'; }}
+                              @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
+                              @click=${async () => { this._detailRepos[i].worktrees.splice(wtIndex, 1); this._emitUpdate(); await this._syncDetailReposToFile(); }}
+                            >
+                              <svg width="10" height="10" viewBox="0 -960 960 960" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                            </span>
+                          </div>
+                        `)}
+                        ${entry.showNewWorktreeInput ? html`
+                          <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+                            <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
+                            <input
+                              type="text"
+                              placeholder="Branch or path"
+                              .value=${entry.newWorktreeValue}
+                              @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
+                              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); } } }}
+                              style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:4px 0;outline:none;"
+                              autofocus
+                            />
+                            <span
+                              style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc);flex-shrink:0;"
+                              @click=${async () => { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); await this._syncDetailReposToFile(); } }}
+                            >
+                              <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                            </span>
+                          </div>
+                        ` : ''}
+                      </div>
+                      <div
+                        style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
+                        @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); }}
+                        @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+                        @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
+                      >
+                        <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                        <span>Add worktree</span>
+                      </div>
+                    ` : null,
+                    html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._onRemoveRepo(i); })}</div>`,
+                    html`<svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--accent,#007acc);flex-shrink:0;" title="Ready to clone">
+                      <path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/>
+                    </svg>`,
+                    () => { this._detailRepos[i].expanded = !this._detailRepos[i].expanded; this._emitUpdate(); },
+                  )
+                : this._renderUnverifiedRepoRow(i, entry, this._detailRepos, (idx) => this._onRemoveRepo(idx), (idx) => this._detailVerifyRepo(idx))}
+            `)}
+            <!-- New repo URL input row (above +add) -->
+            ${this._showAddInput ? html`
+              <div class="cr-row" tabindex="0" style="display:flex;flex-direction:column;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border-left:1px solid var(--divider,#333);border-right:1px solid var(--divider,#333);border-bottom:1px solid var(--divider,#333);${(this._detailRepos.length === 0 || (this._detailRepos.length > 0 && this._detailRepos[this._detailRepos.length - 1].expanded)) ? 'border-top:1px solid var(--divider,#333);border-radius:6px 6px 0 0;' : ''}" @click=${() => { const inp = document.querySelector('.detail-repo-input'); if (inp instanceof HTMLInputElement) inp.focus(); }}>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#555);flex-shrink:0;">
+                    <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Paste repo URL and press Enter"
+                    class="detail-repo-input"
+                    .value=${this._addInputValue}
+                    @input=${(e: Event) => { this._addInputValue = (e.target as HTMLInputElement).value; this._detailRepoUrlError = ''; }}
+                    @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._onAddConfirm(); if (e.key === 'Escape') this._onAddCancel(); }}
+                    style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
+                    autofocus
+                  />
+                  <span
+                    style="cursor:pointer;display:flex;align-items:center;color:var(--accent,#007acc);flex-shrink:0;padding:2px;border-radius:3px;transition:background .1s,color .1s;"
+                    @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(0,122,204,0.15)'; }}
+                    @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; }}
+                    @click=${(e: Event) => { e.stopPropagation(); this._onAddConfirm(); }}
+                  >
+                    <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+                  </span>
+                </div>
+                ${this._detailRepoUrlError ? html`
+                  <div style="font-size:12px;color:var(--error,#e53e3e);margin-top:2px;">${this._detailRepoUrlError}</div>
+                ` : ''}
               </div>
-            `)
-            : html`<span class="ws-empty">No repositories added</span>`}
+            ` : ''}
+            <!-- + add repository row -->
+            <div class="cr-row" tabindex="0"
+              style="${this._detailAddRepoRowStyle()}"
+              @click=${() => { this._showAddInput = true; this._addInputValue = ""; this._detailRepoUrlError = ""; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.detail-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+              @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+              @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
+            >
+              <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+              <span>Add repository</span>
+            </div>
+          </div>
+        </div>
+        <!-- Bottom bar: Save/Cancel -->
+        <div style="display:flex;align-items:center;justify-content:flex-end;padding:0 6px;height:40px;border-top:1px solid var(--divider,#333);flex-shrink:0;gap:6px;">
+          <button
+            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text-secondary,#999);"
+            @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'; }}
+            @click=${() => this._showList()}
+          >Cancel</button>
+          <button
+            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
+            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
+            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
+            @click=${async () => { await this._syncDetailReposToFile(); this._showList(); }}
+          >Save</button>
         </div>
       </div>
     `;
