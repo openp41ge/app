@@ -34,7 +34,7 @@ export const AllInlineIcons: Story = {
     <div style="padding:16px;color:#ccc;font-family:monospace;">
       <h3 style="margin:0 0 12px;font-size:13px;color:#888;">Inline icons — 12px, hover shows coloured background</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,64px);gap:8px;">
-        ${["chevron-right", "chevron-down", "plus", "check-circle", "spinner", "file-added", "file-deleted", "file-modified", "file-renamed", "git-commit", "git-info", "refresh", "git-branch", "eye", "eye-off", "folder-closed"].map(
+        ${["chevron-right", "chevron-down", "plus", "check-circle", "spinner", "corner", "file-added", "file-deleted", "file-modified", "file-renamed", "git-commit", "git-info", "refresh", "git-branch", "eye", "eye-off", "folder-closed"].map(
           (name) => html`
             <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0;width:64px;">
               <openp41ge-inline-icon name=${name} size="12" hover-color="muted"></openp41ge-inline-icon>
@@ -86,6 +86,15 @@ export const InlineIconRow: Story = {
       <openp41ge-inline-icon name="plus" size="12" hover-color="accent"></openp41ge-inline-icon>
       <openp41ge-inline-icon name="file-added" size="12" hover-color="accent"></openp41ge-inline-icon>
       <openp41ge-inline-icon name="file-deleted" size="12" hover-color="danger"></openp41ge-inline-icon>
+    </div>
+  `,
+};
+
+export const WorktreeRow: Story = {
+  render: () => html`
+    <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(255,255,255,.04);border:1px solid #333;border-radius:6px;color:#ccc;font-family:monospace;font-size:12px;width:240px;">
+      <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
+      <span style="flex:1;color:#ccc;">main</span>
     </div>
   `,
 };

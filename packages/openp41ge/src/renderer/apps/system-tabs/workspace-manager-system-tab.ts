@@ -419,8 +419,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._repoUrlError = "";
     this._createRepos.push({ url, status: "unverified", expanded: false, worktrees: [], newWorktreeValue: "", showNewWorktreeInput: false });
     this._newRepoValue = "";
-    this._showNewRepoInput = false;
     this._emitUpdate();
+    setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0);
     // Start validation immediately
     this._verifyRepo(this._createRepos.length - 1);
   }
@@ -464,8 +464,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     if (!name) return;
     repo.worktrees.push(name);
     repo.newWorktreeValue = "";
-    repo.showNewWorktreeInput = false;
     this._emitUpdate();
+    setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0);
   }
 
   private _removeWorktree(repoIndex: number, wtIndex: number): void {
@@ -574,9 +574,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const index = this._detailRepos.length;
     this._detailRepos.push({ url, status: "unverified", expanded: false, worktrees: [], newWorktreeValue: "", showNewWorktreeInput: false });
     this._detailExpanded.push(false);
-    this._showAddInput = false;
     this._addInputValue = "";
     this._emitUpdate();
+    setTimeout(() => { const el = document.querySelector('.detail-repo-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0);
     // Verify
     const repo = this._detailRepos[index];
     repo.status = "validating";
@@ -829,7 +829,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     <!-- + add repository row (not draggable, always shown) -->
                     <div class="cr-row" tabindex="0"
                       style="${this._addRepoRowStyle()}"
-                      @click=${() => { this._repoUrlError = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                      @click=${() => { this._repoUrlError = ""; this._newRepoValue = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                       @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                       @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                     >
@@ -860,14 +860,14 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                 <div>
                                   ${entry.worktrees.map((wt, wtIndex) => html`
                                     <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                                      <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
+                                      <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                                       <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
                                       <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${() => this._removeWorktree(i, wtIndex)}></openp41ge-inline-icon>
                                     </div>
                                   `)}
                                   ${entry.showNewWorktreeInput ? html`
                                     <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                                      <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
+                                      <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                                       <input
                                         type="text"
                                         placeholder="Branch or path"
@@ -883,7 +883,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                 </div>
                                 <div
                                   style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
-                                  @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                                  @click=${() => { entry.showNewWorktreeInput = true; entry.newWorktreeValue = ""; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                                   @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                                   @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                                 >
@@ -922,7 +922,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     <!-- + add repository row -->
                     <div class="cr-row" tabindex="0"
                       style="${this._addRepoRowStyle()}"
-                      @click=${() => { this._repoUrlError = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                      @click=${() => { this._repoUrlError = ""; this._newRepoValue = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                       @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                       @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                     >
@@ -1026,30 +1026,30 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       <div>
                         ${entry.worktrees.map((wt, wtIndex) => html`
                           <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                            <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
+                            <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                             <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt}</span>
                             <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${async () => { this._detailRepos[i].worktrees.splice(wtIndex, 1); this._emitUpdate(); await this._syncDetailReposToFile(); }}></openp41ge-inline-icon>
                           </div>
                         `)}
                         ${entry.showNewWorktreeInput ? html`
                           <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                            <span style="color:var(--text-secondary,#555);flex-shrink:0;font-size:12px;font-family:monospace;line-height:12px;width:12px;text-align:center;">└</span>
+                            <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                             <input
                               type="text"
                               placeholder="Branch or path"
                               .value=${entry.newWorktreeValue}
                               @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
-                              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); } } }}
+                              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0); } } }}
                               style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;font-family:inherit;"
                               class="wt-input" autofocus
                             />
-                            <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${async () => { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; entry.showNewWorktreeInput = false; this._emitUpdate(); await this._syncDetailReposToFile(); } }}></openp41ge-inline-icon>
+                            <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${async () => { if (entry.newWorktreeValue.trim()) { entry.worktrees.push(entry.newWorktreeValue.trim()); entry.newWorktreeValue = ''; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0); await this._syncDetailReposToFile(); } }}></openp41ge-inline-icon>
                           </div>
                         ` : ''}
                       </div>
                       <div
                         style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
-                        @click=${() => { entry.showNewWorktreeInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                        @click=${() => { entry.showNewWorktreeInput = true; entry.newWorktreeValue = ""; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                         @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                         @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                       >

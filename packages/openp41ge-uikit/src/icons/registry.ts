@@ -36,7 +36,8 @@ export type IconName =
   | "git"
   | "check-circle"
   | "spinner"
-  | "close";
+  | "close"
+  | "corner";
 
 export type IconRegistry = Record<IconName, (size?: number) => string>;
 
@@ -232,6 +233,11 @@ export const iconRegistry: IconRegistry = {
   close: (size) => {
     const s = size ?? 16;
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>`;
+  },
+
+  corner: (size) => {
+    const s = size ?? 16;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1.5v7.5h5"/></svg>`;
   },
 
   git: (size) => {
