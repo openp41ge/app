@@ -9,7 +9,8 @@ import { describe, expect, test, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { ProjectStore, DRAFT_MAX_AGE_MS } from "@openp41ge/main/services/project-store";
+import { ProjectStore } from "@openp41ge/main/services/project-store";
+import { DRAFT_MAX_AGE_MS } from "openp41ge-constants";
 
 let tmpDir: string;
 let projectStore: ProjectStore;

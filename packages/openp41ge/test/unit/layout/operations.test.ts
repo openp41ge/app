@@ -10,9 +10,16 @@ import * as ops from "@openp41ge/layout/operations";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
+function addDefaultSidebarTabs(ws: any) {
+  const winId = ws.windows[0].id;
+  ws = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer", true);
+  ws = ops.openSystemTab(ws, winId, "right", "git", "Git", true);
+  return ws;
+}
+
 /** Create a workspace with one window and one tab "p1" (terminal) at (0,0). */
 function makeWs() {
-  const ws = types.createWorkspace("ws1");
+  const ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
   const winId = ws.windows[0].id;
   const tab = types.createTab("p1", "terminal", "Terminal");
   return ops.addTabToCell(ws, winId, tab, 0, 0);
@@ -23,7 +30,7 @@ function makeWsId(): string {
 }
 
 function makeWinGrid(ws?: any, winId?: string) {
-  ws = ws ?? types.createWorkspace("ws1");
+  ws = ws ?? addDefaultSidebarTabs(types.createWorkspace("ws1"));
   winId = winId ?? ws.windows[0].id;
   return ws.windows.find((w) => w.id === winId)!.grid;
 }
@@ -823,8 +830,9 @@ describe("system tab operations", () => {
 
     const result = ops.openSystemTab(ws, winId, "right", "search", "Search");
     const win = result.windows[0];
-    expect(win.sidebar?.rightSidebarTabs).toHaveLength(3);
-    expect(win.sidebar?.activeRightTab).toBe(win.sidebar?.rightSidebarTabs[2]);
+    // No default tabs anymore — just the one we opened
+    expect(win.sidebar?.rightSidebarTabs).toHaveLength(1);
+    expect(win.sidebar?.activeRightTab).toBe(win.sidebar?.rightSidebarTabs[0]);
   });
 
   test("openSystemTab prevents duplicates (same appType in same sidebar)", () => {
@@ -834,14 +842,15 @@ describe("system tab operations", () => {
     const r1 = ops.openSystemTab(ws, winId, "right", "search", "Search");
     const r2 = ops.openSystemTab(r1, winId, "right", "search", "Search");
     const win = r2.windows[0];
-    expect(win.sidebar?.rightSidebarTabs).toHaveLength(3);
+    // Duplicate prevention should keep only 1 tab
+    expect(win.sidebar?.rightSidebarTabs).toHaveLength(1);
   });
 
   test("toggleSidebar toggles the sidebar open state", () => {
-    const ws = types.createWorkspace("ws1");
+    const ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
 
-    // Sidebar already open with default tabs
+    // Sidebar open with default tabs
     expect(ws.windows[0].sidebar?.rightSidebarOpen).toBe(true);
 
     // Toggle closed
@@ -854,10 +863,10 @@ describe("system tab operations", () => {
   });
 
   test("openSidebar opens sidebar and activates first tab", () => {
-    const ws = types.createWorkspace("ws1");
+    const ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
 
-    // Sidebar already open with default tabs; close it first
+    // Close sidebar first
     const r0 = ops.closeSidebar(ws, winId, "right");
     expect(r0.windows[0].sidebar?.rightSidebarOpen).toBe(false);
 
@@ -867,21 +876,22 @@ describe("system tab operations", () => {
   });
 
   test("closeSystemTab removes tab from sidebar and registry", () => {
-    const ws = types.createWorkspace("ws1");
+    const ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
 
-    // Use a non-default appType to avoid conflict
+    // Add a non-default tab
     const r1 = ops.openSystemTab(ws, winId, "right", "search", "Search", false);
     const tabId = r1.windows[0].sidebar?.rightSidebarTabs[2]!;
     expect(r1.systemTabs[tabId]).toBeDefined();
 
     const r2 = ops.closeSystemTab(r1, winId, "right", tabId);
+    // 2 default tabs remain
     expect(r2.windows[0].sidebar?.rightSidebarTabs).toHaveLength(2);
     expect(r2.systemTabs[tabId]).toBeUndefined();
   });
 
   test("pinned system tabs propagate to all windows", () => {
-    const ws = types.createWorkspace("ws1");
+    const ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
     const ws2 = ops.addWindow(ws, "win-2");
 
@@ -895,8 +905,8 @@ describe("system tab operations", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
-    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
-    const r2 = ops.openSystemTab(r1, winId, "right", "git", "Git");
+    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer", true);
+    const r2 = ops.openSystemTab(r1, winId, "right", "git", "Git", true);
     const tabs = r2.windows[0].sidebar?.rightSidebarTabs!;
     expect(tabs).toHaveLength(2);
 
@@ -998,10 +1008,10 @@ describe("findSrcColumn", () => {
 
 describe("moveSystemTabToSidebar", () => {
   test("moves a tab from right to left sidebar and inserts at dropIndex", () => {
-    let ws = types.createWorkspace("ws1");
+    let ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
 
-    // Default workspace: explorer and git on the RIGHT sidebar
+    // Workspace with default tabs: explorer and git on the RIGHT sidebar
     expect((ws.windows[0].sidebar?.rightSidebarTabs ?? []).length).toBe(2);
     expect((ws.windows[0].sidebar?.leftSidebarTabs ?? []).length).toBe(0);
 
@@ -1024,7 +1034,7 @@ describe("moveSystemTabToSidebar", () => {
   });
 
   test("inserts at the correct position", () => {
-    let ws = types.createWorkspace("ws1");
+    let ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
 
     // Default right sidebar: explorer, git
@@ -1044,7 +1054,7 @@ describe("moveSystemTabToSidebar", () => {
   });
 
   test("reorders within the same sidebar when sourceSide equals targetSide", () => {
-    let ws = types.createWorkspace("ws1");
+    let ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
 
     const rightTabs = ws.windows[0].sidebar?.rightSidebarTabs ?? [];
@@ -1061,14 +1071,14 @@ describe("moveSystemTabToSidebar", () => {
   });
 
   test("does nothing for non-existent tab", () => {
-    const ws = types.createWorkspace("ws1");
+    const ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
     const result = ops.moveSystemTabToSidebar(ws, winId, "non-existent", "left", 0);
     expect(result).toBe(ws);
   });
 
   test("activates the moved tab on the target sidebar", () => {
-    let ws = types.createWorkspace("ws1");
+    let ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;
 
     const rightTabs = ws.windows[0].sidebar?.rightSidebarTabs ?? [];
@@ -1078,7 +1088,7 @@ describe("moveSystemTabToSidebar", () => {
 
     // The moved tab should be the active tab on the left
     expect(ws.windows[0].sidebar?.activeLeftTab).toBe(explorerTabId);
-    // The right sidebar should have no active tab if explorer was active
-    expect(ws.windows[0].sidebar?.activeRightTab).toBeNull();
+    // The right sidebar should still have git as the active tab
+    expect(ws.windows[0].sidebar?.activeRightTab).toBeTruthy();
   });
 });

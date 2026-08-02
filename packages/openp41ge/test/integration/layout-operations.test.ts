@@ -380,9 +380,9 @@ describe("Layout operations — integration", () => {
       const ws = types.createWorkspace("ws-sidebar");
       const winId = ws.windows[0].id;
 
-      // Open explorer system tab in right sidebar (default workspace already has it)
+      // Open explorer system tab (no default sidebar tabs anymore)
       let r = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
-      expect(r.windows[0].sidebar?.rightSidebarTabs).toHaveLength(2);
+      expect(r.windows[0].sidebar?.rightSidebarTabs).toHaveLength(1);
       expect(r.windows[0].sidebar?.rightSidebarOpen).toBe(true);
 
       // Add a tab

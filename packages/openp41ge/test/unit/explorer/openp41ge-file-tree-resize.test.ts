@@ -9,11 +9,8 @@
 import {
   calcWrapperResize,
   calcBoundaryResize,
-  MIN_PREVIEW,
-  MIN_DRAWER,
-  MIN_WRAPPER,
-  MAX_COMBINED_RATIO,
 } from "@openp41ge/renderer/components/openp41ge-file-tree-resize";
+import { MIN_PREVIEW, MIN_DRAWER, MIN_WRAPPER, MAX_COMBINED_RATIO } from "openp41ge-constants";
 
 // =========================================================================
 // calcWrapperResize — notch at left edge of wrapper
