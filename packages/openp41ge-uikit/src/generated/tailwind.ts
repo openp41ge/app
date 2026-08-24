@@ -1021,6 +1021,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   padding-bottom: 0.5rem
 }
 
+.py-2\\.5 {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem
+}
+
 .py-3 {
   padding-top: 0.75rem;
   padding-bottom: 0.75rem
@@ -1130,6 +1135,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   line-height: 1
 }
 
+.text-\\[11px\\] {
+  font-size: 11px
+}
+
 .text-\\[14px\\] {
   font-size: 14px
 }
@@ -1201,6 +1210,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .leading-none {
   line-height: 1
+}
+
+.leading-snug {
+  line-height: 1.375
 }
 
 .tracking-wider {

@@ -10,6 +10,8 @@ import { html, nothing, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 import type { WorkspaceFileData } from "../../../layout/types";
 import { workspaceFileService } from "../../services/workspace-file-service";
+import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
+import { toastService } from "../../components/openp41ge-toast";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bridge = (): any => window.openp41ge;
@@ -671,9 +673,33 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private async _onDeleteWorkspace(_entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
-    // We can't easily delete via IPC right now — just skip
-    // For now, let the user manage files manually
+  private async _onDeleteWorkspace(entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
+    const name = entry.data.name?.trim() || entry.data.id || "this workspace";
+    const result = await showConfirmModal({
+      title: "Delete workspace",
+      message: `Delete workspace "${name}"?`,
+      detail: "This removes the workspace from the list. Repositories and their worktrees are not deleted unless you also remove the workspace data.",
+      confirmLabel: "Delete",
+      confirmStyle: "danger",
+      checkboxLabel: "Also delete workspace data on disk",
+      checkboxDetail: "Removes ~/.openp41ge/workspaces-data/ for this workspace (cloned repos and worktrees).",
+    });
+
+    if (!result.confirmed) return;
+
+    const ok = await window.openp41ge.dialog.deleteWorkspaceFile(entry.filePath, result.checked);
+    if (!ok) {
+      toastService.show("Failed to delete workspace", "error");
+      return;
+    }
+
+    // If the deleted workspace was the active one, clear the active state
+    if (workspaceFileService.activeFilePath === entry.filePath) {
+      workspaceFileService.clear();
+    }
+
+    toastService.show(`Workspace "${name}" deleted`, "success");
+    this._showList();
   }
 
   // ── Detail view actions ─────────────────────────────────────────
@@ -1431,8 +1457,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             </div>
           </div>
         </div>
-        <!-- Bottom bar: Save/Cancel -->
-        <div style="display:flex;align-items:center;justify-content:flex-end;padding:0 6px;height:40px;border-top:1px solid var(--divider,#333);flex-shrink:0;gap:6px;">
+        <!-- Bottom bar: Delete (left) · Save/Cancel (right) -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px;height:40px;border-top:1px solid var(--divider,#333);flex-shrink:0;gap:6px;">
+          <button
+            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(244,71,71,0.15);color:var(--accent-error,#f44747);transition:background .1s;"
+            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,71,71,0.25)'; }}
+            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,71,71,0.15)'; }}
+            @click=${() => { if (this._selected) this._onDeleteWorkspace(this._selected); }}
+          >Delete</button>
+          <div style="display:flex;gap:6px;">
           <button
             style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text-secondary,#999);"
             @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
@@ -1445,6 +1478,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
             @click=${() => this._onDetailSave()}
           >Save</button>
+          </div>
         </div>
       </div>
     `;
