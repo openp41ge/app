@@ -108,10 +108,10 @@ class Openp41geWorkspaceSearch extends LitElement {
   private _searchHeader(manager: WorkspaceManagerModal): TemplateResult {
     return html`
       <div
-        style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:440px;height:34px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border-left:1px solid var(--border-divider,#2d2d2d);border-right:1px solid var(--border-divider,#2d2d2d);-webkit-app-region:no-drag;"
+        style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:440px;height:34px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:0 10px;border-left:1px solid var(--border-divider,#2d2d2d);border-right:1px solid var(--border-divider,#2d2d2d);-webkit-app-region:no-drag;"
       >
         <div
-          style="display:flex;align-items:center;gap:6px;width:calc(100% - 16px);box-sizing:border-box;height:26px;padding:0 10px;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);"
+          style="display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;height:26px;padding:0 10px;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);"
         >
           <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)">
             <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Z"/>
@@ -156,7 +156,7 @@ class Openp41geWorkspaceSearch extends LitElement {
 
     return html`
       <div
-        style="display:flex;align-items:center;gap:6px;width:260px;height:26px;padding:0 10px;box-sizing:border-box;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
+        style="display:flex;align-items:center;gap:6px;width:418px;height:26px;padding:0 10px;box-sizing:border-box;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
         title="Manage workspaces"
         @click=${this._toggleOpen}
         @mouseenter=${(e: MouseEvent) => {
