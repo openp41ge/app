@@ -1043,21 +1043,33 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           background:var(--bg-primary,#252526);
           border:1px solid var(--divider,#333);
           cursor:pointer;
+          position:relative;
           transition:background .1s, border-color .1s;
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
         .wm-card.active { border-color:var(--accent,#007acc); }
-        .wm-card-title { font-size:14px; color:var(--text-primary,#ccc); font-weight:500; }
-        .wm-card-sub { font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
-        .wm-card-actions { display:flex; gap:6px; margin-top:6px; }
+        .wm-card-title { font-size:14px; color:var(--text-primary,#ccc); font-weight:500; padding-right:80px; }
+        .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
+        .wm-card-copy {
+          display:flex; align-items:center; justify-content:center;
+          background:transparent; border:none; cursor:pointer;
+          color:var(--text-secondary,#999); padding:2px; border-radius:4px;
+          transition:background .1s, color .1s;
+        }
+        .wm-card-copy:hover { color:var(--text-primary,#ccc); background:var(--bg-hover-strong,#333); }
+        .wm-card-active-pill {
+          position:absolute; top:8px; right:12px;
+          padding:2px 10px; border-radius:999px; font-size:11px;
+          background:rgba(0,122,204,.15); color:var(--accent,#007acc);
+        }
         .wm-btn {
           padding:3px 8px; font-size:12px; border:none; border-radius:4px;
           cursor:pointer; background:transparent; color:var(--text-secondary,#999);
           transition:background .1s, color .1s;
         }
         .wm-btn:hover { background:var(--bg-hover-strong,#333); color:var(--text-primary,#ccc); }
-        .wm-btn.primary { color:var(--accent,#007acc); }
-        .wm-btn.primary:hover { background:rgba(0,122,204,.15); }
+        .wm-btn.activate { position:absolute; top:8px; right:12px; background:rgba(0,122,204,.15); color:var(--accent,#007acc); padding:4px 12px; }
+        .wm-btn.activate:hover { background:rgba(0,122,204,.25); color:var(--accent,#007acc); }
 
         .wm-create-area {
           margin:6px 10px; padding:10px 14px; border-radius:8px;
@@ -1343,13 +1355,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                 ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
                 : this._filteredWorkspaces.map((entry) => html`
                   <div class="wm-card ${isActive(entry) ? 'active' : ''}" @click=${() => this._showDetail(entry)}>
+                    ${isActive(entry)
+                      ? html`<span class="wm-card-active-pill">Active</span>`
+                      : html`<button class="wm-btn activate" @click=${(e: MouseEvent) => { e.stopPropagation(); this._activateWorkspace(entry); }}>Activate</button>`}
                     <div class="wm-card-title">${entry.data.name ?? "(unnamed)"}</div>
-                    <div class="wm-card-sub">${entry.data.id.slice(0, 8)}</div>
-                    <div class="wm-card-actions">
-                      ${isActive(entry)
-                        ? html`<span style="font-size:11px;color:var(--accent,#007acc);align-self:center;">Active</span>`
-                        : html`<button class="wm-btn primary" @click=${(e: MouseEvent) => { e.stopPropagation(); this._activateWorkspace(entry); }}>Activate</button>`}
-                      <button class="wm-btn" @click=${(e: MouseEvent) => { e.stopPropagation(); this._onCopy(e, entry.data.id); }}>Copy ID</button>
+                    <div class="wm-card-sub">
+                      <span>${entry.data.id.slice(0, 8)}</span>
+                      <button class="wm-card-copy" title="Copy ID" @click=${(e: MouseEvent) => { e.stopPropagation(); this._onCopy(e, entry.data.id); }}>
+                        <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Z"/></svg>
+                      </button>
                     </div>
                   </div>
                 `)}
@@ -1376,7 +1390,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                 @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'}
                 @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'}
                 @click=${() => this._showCreate()}
-              >+ Create Workspace</button>
+              >Create Workspace</button>
             `}
           </div>
         </div>
