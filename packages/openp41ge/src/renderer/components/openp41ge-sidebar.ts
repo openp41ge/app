@@ -233,6 +233,7 @@ class Openp41geSidebar extends LitElement {
         style="height:100%;min-width:${MIN_SIDEBAR_WIDTH}px"
       >
         <style>
+          .sidebar-tab-bar { min-height: 34px; }
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
           .sidebar-tab-close:hover { background: var(--bg-hover-strong, #444); }
           .sidebar-tab-add:hover { background: var(--bg-hover-strong, #444); }
@@ -285,7 +286,7 @@ class Openp41geSidebar extends LitElement {
         </div>
 
         <!-- Content area -->
-        <div class="sidebar-content flex-1 overflow-y-auto overflow-x-hidden"></div>
+        <div class="sidebar-content flex-1 overflow-y-auto overflow-x-hidden" data-sidebar-content="${this.side}"></div>
       </div>
     `;
   }
