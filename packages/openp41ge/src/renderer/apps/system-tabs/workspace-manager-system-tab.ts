@@ -1140,10 +1140,18 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           box-shadow:none;
         }
         .wsc-field-repos .repo-wrapper {
-          border-color: rgba(255,255,255,.2) !important;
+          border:none !important;
+          background:transparent !important;
+          border-radius:0 !important;
+          margin:0 !important;
         }
-        .wsc-field-repos .repo-wrapper + .cr-row,
-        .wsc-field-repos .cr-row + .cr-row {
+        /* Inner separators only — no outer borders */
+        .wsc-field-repos .repo-wrapper + .repo-wrapper,
+        .wsc-field-repos .repo-wrapper + .cr-row {
+          border-top: 1px solid rgba(255,255,255,.2);
+        }
+        .wsc-field-repos .repo-wrapper .cr-row + .cr-row,
+        .wsc-field-repos .repo-wrapper > .cr-row + div > .cr-row:first-child {
           border-top: 1px solid rgba(255,255,255,.2);
         }
         .wsc-label {
