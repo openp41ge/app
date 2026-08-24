@@ -53,6 +53,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   private _view: View = "list";
+
+  /** Active view of the modal ('list' | 'detail'). */
+  get view(): View { return this._view; }
   private _selected: { filePath: string; data: WorkspaceFileData } | null = null;
 
   /** Per-workspace working-tree change stats (loaded async per card). */
@@ -1065,7 +1068,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
     return html`
       <style>
-        .wm-wrap { display:flex; flex-direction:column; height:100%; overflow:hidden; position:relative; }
+        .wm-wrap { display:flex; flex-direction:column; overflow:hidden; position:relative; }
         .cr-row { outline:none; }
         .cr-row:focus-visible { outline:2px solid var(--accent,#007acc); outline-offset:-2px; }
         .wm-view {
@@ -1074,9 +1077,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           display:flex; flex-direction:column;
         }
         .wm-view.list {
+          position:relative;
+          max-height:min(70vh, 520px);
           transform:translateX(0); opacity:1;
         }
         .wm-view.list.slide-out {
+          position:absolute; inset:0;
+          max-height:none;
           transform:translateX(-40px); opacity:0;
           pointer-events:none;
         }
@@ -1085,6 +1092,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           pointer-events:none;
         }
         .wm-view.detail.slide-in {
+          position:relative;
+          max-height:min(70vh, 520px);
           transform:translateX(0); opacity:1;
           pointer-events:auto;
         }
@@ -1121,6 +1130,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           cursor:text;
         }
         .wsc-field-repos { cursor:default; }
+        .wsc-field:not(.wsc-field-repos) input:focus,
+        .wsc-field:not(.wsc-field-repos) input:focus-visible {
+          outline:none;
+          box-shadow:none;
+        }
         .wsc-field-repos:focus-within {
           outline:2px solid var(--accent,#007acc);
           outline-offset:-2px;
