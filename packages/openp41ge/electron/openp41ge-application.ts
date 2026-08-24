@@ -194,15 +194,12 @@ export class Openp41geApplication {
     // Garbage-collect expired drafts on every startup
     this.projectStore.gcDrafts();
 
-    // When no project is specified on the CLI, auto-create a draft project.
-    // This replaces the old flow where the project picker was required — now
-    // the app opens directly into a draft that can be saved later.
-    if (!this.projectName) {
-      this.projectName = this.projectStore.createDraft();
-      this.recentProjects.add(this.projectName);
-    }
-
-    const reposDir = this.projectStore.reposDir(this.projectName);
+    // When no project is specified, skip auto-creation. The project picker
+    // will prompt the user to create or select a project.
+    // Use a temporary repos dir that won't create persistent artifacts.
+    const reposDir = this.projectName
+      ? this.projectStore.reposDir(this.projectName)
+      : path.join(this.openp41geDir, ".no-project", "repositories");
 
     this.dispatcher = new OperationDispatcher();
     this.terminalManager = new TerminalManager();
