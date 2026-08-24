@@ -10,6 +10,7 @@ import { property, state } from "lit/decorators.js";
 import { emitEvent } from "../app";
 import type { SystemTabRegistration } from "../controllers/types";
 import { allSystemTabRegistrations } from "../apps/system-tabs";
+import { getSystemTabRegistration } from "../apps/app-registry";
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 
@@ -161,11 +162,10 @@ class Openp41geSidebar extends LitElement {
 
   private _mountView(): void {
     if (this._view || !this.activeTabId || !this.isOpen) return;
-    const reg = (window as unknown as Record<string, unknown>).__openp41geApp as
-      | { getSystemTabRegistration: (id: string) => SystemTabRegistration | undefined }
-      | undefined;
-    if (!reg) return;
-    const registration = reg.getSystemTabRegistration(this.activeTabId);
+    const tab = this.systemTabs.find((t) => t.id === this.activeTabId);
+    const appType = tab?.appType;
+    if (!appType) return;
+    const registration = getSystemTabRegistration(appType);
     if (!registration) return;
     const controller = registration.createController(this.activeTabId);
     const container = this.querySelector<HTMLElement>(".sidebar-content");
