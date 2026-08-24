@@ -208,6 +208,8 @@ declare global {
       onOpenWorkspace: (callback: () => void) => () => void;
       /** Listen for File > Save Workspace As... menu action. */
       onSaveWorkspaceAs: (callback: () => void) => () => void;
+      /** Listen for the Settings… app-menu action (Cmd+,). */
+      onOpenSettings: (callback: () => void) => () => void;
 
       config: {
         get: (key?: string) => Promise<any>;

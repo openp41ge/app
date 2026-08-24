@@ -66,6 +66,11 @@ export class RegisterIpcListenersStep implements IStartupStep {
       }
     });
 
+    // ── Menu: Settings… (app menu -> Cmd+,) ─────────────────────────────
+    window.openp41ge.onOpenSettings(() => {
+      serviceModalService.openModal("settings");
+    });
+
     log.info("IPC listeners registered");
   }
 }

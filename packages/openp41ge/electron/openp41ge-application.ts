@@ -332,6 +332,29 @@ export class Openp41geApplication {
 
   private _setupMenu(): void {
     const template: Electron.MenuItemConstructorOptions[] = [
+      // Application menu — this is the macOS app menu labelled app.name
+      // (without it, Electron shows a default "Electron" app menu). Settings
+      // lives here (Cmd+,) instead of the in-window bottom bar.
+      {
+        label: app.name,
+        submenu: [
+          { role: "about" },
+          { type: "separator" },
+          { role: "services" },
+          { type: "separator" },
+          { role: "hide" },
+          { role: "hideOthers" },
+          { role: "unhide" },
+          { type: "separator" },
+          {
+            label: "Settings…",
+            accelerator: "CmdOrCtrl+,",
+            click: () => {
+              BrowserWindow.getFocusedWindow()?.webContents.send("menu:open-settings");
+            },
+          },
+        ],
+      },
       {
         label: "Edit",
         submenu: [

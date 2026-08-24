@@ -477,6 +477,13 @@ contextBridge.exposeInMainWorld("openp41ge", {
     return () => ipcRenderer.removeListener("menu:save-workspace-as", handler);
   },
 
+  /** Listen for the Settings… app-menu action (Cmd+,). */
+  onOpenSettings: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu:open-settings", handler);
+    return () => ipcRenderer.removeListener("menu:open-settings", handler);
+  },
+
   lifecycle: {
     /** Notify the main process that the renderer's first render is complete. */
     notifyReady: () => ipcRenderer.send("lifecycle:renderer-ready"),
