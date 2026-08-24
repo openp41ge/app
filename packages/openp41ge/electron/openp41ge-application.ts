@@ -340,12 +340,6 @@ export class Openp41geApplication {
         submenu: [
           { role: "about" },
           { type: "separator" },
-          { role: "services" },
-          { type: "separator" },
-          { role: "hide" },
-          { role: "hideOthers" },
-          { role: "unhide" },
-          { type: "separator" },
           {
             label: "Settings…",
             accelerator: "CmdOrCtrl+,",
@@ -353,6 +347,12 @@ export class Openp41geApplication {
               BrowserWindow.getFocusedWindow()?.webContents.send("menu:open-settings");
             },
           },
+          { type: "separator" },
+          { role: "services" },
+          { type: "separator" },
+          { role: "hide" },
+          { role: "hideOthers" },
+          { role: "unhide" },
         ],
       },
       {
