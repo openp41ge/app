@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { WorkspaceFileService } from "../../../src/renderer/services/workspace-file-service";
+import {
+  WorkspaceFileService,
+  workspaceMatchesQuery,
+} from "../../../src/renderer/services/workspace-file-service";
+import type { WorkspaceFileData } from "../../../src/layout/types";
 
 function wsData(overrides: Partial<{ name?: string }> = {}): {
   id: string;
@@ -39,5 +43,40 @@ describe("WorkspaceFileService.activeWorkspaceName", () => {
 
   it("returns 'No workspace' when nothing is active", () => {
     expect(svc.activeWorkspaceName).toBe("No workspace");
+  });
+});
+
+describe("workspaceMatchesQuery", () => {
+  const data = (overrides: Partial<WorkspaceFileData> = {}): WorkspaceFileData => ({
+    id: "1",
+    name: "Alpha",
+    version: 1,
+    createdAt: "",
+    dataDir: "",
+    repos: [
+      { url: "https://github.com/acme/widget.git", worktrees: ["main", "feature/xyz"] },
+    ],
+    ...overrides,
+  });
+
+  it.each([
+    ["", true],
+    ["   ", true],
+    ["alpha", true],
+    ["al", true],
+    ["widget", true],
+    ["acme/widget", true],
+    ["feature/xyz", true],
+    ["main", true],
+    ["nothing-here", false],
+  ])("query %j -> %s", (q, expected) => {
+    expect(workspaceMatchesQuery(data(), "/x/alpha.openp41ge-workspace", q)).toBe(expected);
+  });
+
+  it("matches on the file basename when the workspace has no name", () => {
+    const d = data({ name: undefined });
+    expect(workspaceMatchesQuery(d, "~/.openp41ge/workspaces/zzz.openp41ge-workspace", "zzz")).toBe(
+      true,
+    );
   });
 });

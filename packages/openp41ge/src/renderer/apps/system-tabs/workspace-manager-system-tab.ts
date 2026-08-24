@@ -9,7 +9,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 import type { WorkspaceFileData } from "../../../layout/types";
-import { workspaceFileService } from "../../services/workspace-file-service";
+import { workspaceFileService, workspaceMatchesQuery } from "../../services/workspace-file-service";
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { toastService } from "../../components/openp41ge-toast";
 import { emitOpenSystemTab } from "../../components/openp41ge-worktree-controller";
@@ -97,11 +97,29 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   mount(): void {
     document.addEventListener("workspace-modal:back", this._onModalBack);
     this._loadWorkspaces();
+    // Focus the search input so "click the pill → type → filter" works
+    // immediately (HTML `autofocus` doesn't fire on dynamically mounted nodes).
+    setTimeout(() => this._focusSearch(), 0);
+  }
+
+  private _focusSearch(): void {
+    const el = document.querySelector("[data-workspace-search-input]");
+    if (el instanceof HTMLInputElement) el.focus();
   }
 
   // ── State refresh ───────────────────────────────────────────────
 
   private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
+
+  /** Search query filtering the workspace list (name, repo, worktree). */
+  private _searchQuery = "";
+
+  private get _filteredWorkspaces(): Array<{ filePath: string; data: WorkspaceFileData }> {
+    const q = this._searchQuery.trim();
+    return q
+      ? this._workspaces.filter((e) => workspaceMatchesQuery(e.data, e.filePath, q))
+      : this._workspaces;
+  }
 
   private async _loadWorkspaces(): Promise<void> {
     try {
@@ -1284,20 +1302,39 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             </div>
           ` : ''}
 
-          ${!this._creating && this._workspaces.length === 0
-            ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces yet.</div>`
-            : !this._creating ? this._workspaces.map((entry) => html`
-              <div class="wm-card ${isActive(entry) ? 'active' : ''}" @click=${() => this._showDetail(entry)}>
-                <div class="wm-card-title">${entry.data.name ?? "(unnamed)"}</div>
-                <div class="wm-card-sub">${entry.data.id.slice(0, 8)}</div>
-                <div class="wm-card-actions">
-                  ${isActive(entry)
-                    ? html`<span style="font-size:11px;color:var(--accent,#007acc);align-self:center;">Active</span>`
-                    : html`<button class="wm-btn primary" @click=${(e: MouseEvent) => { e.stopPropagation(); this._activateWorkspace(entry); }}>Activate</button>`}
-                  <button class="wm-btn" @click=${(e: MouseEvent) => { e.stopPropagation(); this._onCopy(e, entry.data.id); }}>Copy ID</button>
-                </div>
+          ${!this._creating ? html`
+            <!-- Search: filters by workspace name, repo name/url, worktree name -->
+            <div style="position:sticky;top:0;padding:8px 10px 6px;background:var(--bg-primary,#252526);z-index:1;">
+              <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--divider,#333);border-radius:6px;background:rgba(255,255,255,.04);padding:6px 10px;">
+                <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#999);flex-shrink:0;"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
+                <input
+                  type="text"
+                  data-workspace-search-input
+                  placeholder="Search workspaces… (name, repo, worktree)"
+                  .value=${this._searchQuery}
+                  @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
+                  style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;outline:none;"
+                  autofocus
+                />
               </div>
-            `) : ''}
+            </div>
+            ${this._workspaces.length === 0
+              ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces yet.</div>`
+              : this._filteredWorkspaces.length === 0
+                ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
+                : this._filteredWorkspaces.map((entry) => html`
+                  <div class="wm-card ${isActive(entry) ? 'active' : ''}" @click=${() => this._showDetail(entry)}>
+                    <div class="wm-card-title">${entry.data.name ?? "(unnamed)"}</div>
+                    <div class="wm-card-sub">${entry.data.id.slice(0, 8)}</div>
+                    <div class="wm-card-actions">
+                      ${isActive(entry)
+                        ? html`<span style="font-size:11px;color:var(--accent,#007acc);align-self:center;">Active</span>`
+                        : html`<button class="wm-btn primary" @click=${(e: MouseEvent) => { e.stopPropagation(); this._activateWorkspace(entry); }}>Activate</button>`}
+                      <button class="wm-btn" @click=${(e: MouseEvent) => { e.stopPropagation(); this._onCopy(e, entry.data.id); }}>Copy ID</button>
+                    </div>
+                  </div>
+                `)}
+          ` : ''}
           </div>
           <!-- Bottom bar: Create/Cancel when creating, otherwise + New -->
           <div style="display:flex;align-items:center;justify-content:flex-end;padding:0 6px;height:40px;border-top:1px solid var(--divider,#333);flex-shrink:0;gap:6px;">

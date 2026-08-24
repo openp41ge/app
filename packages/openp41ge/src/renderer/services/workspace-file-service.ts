@@ -197,3 +197,28 @@ export class WorkspaceFileService {
 
 /** Singleton instance. */
 export const workspaceFileService = new WorkspaceFileService();
+
+/**
+ * Pure filter: does this workspace match a search query? Matches against the
+ * workspace name, the file basename, repo names/urls, and worktree names.
+ * An empty/whitespace query matches everything.
+ */
+export function workspaceMatchesQuery(
+  data: WorkspaceFileData,
+  filePath: string,
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  if ((data.name ?? "").toLowerCase().includes(q)) return true;
+
+  const base = filePath.split(/[\\/]/).pop() ?? "";
+  if (base.toLowerCase().includes(q)) return true;
+
+  return (data.repos ?? []).some(
+    (r) =>
+      r.url.toLowerCase().includes(q) ||
+      (r.worktrees ?? []).some((w) => w.toLowerCase().includes(q)),
+  );
+}
