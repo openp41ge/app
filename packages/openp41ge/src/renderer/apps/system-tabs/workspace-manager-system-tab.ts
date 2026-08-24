@@ -1139,12 +1139,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
 
         .wm-back {
-          display:flex; align-items:center; gap:4px;
-          padding:6px 10px; cursor:pointer;
-          color:var(--text-secondary,#999); font-size:13px;
-          transition:color .1s;
+          display:flex; align-items:center; justify-content:center;
+          padding:5px; border-radius:4px; cursor:pointer;
+          background:var(--bg-secondary,#252526);
+          color:var(--text-secondary,#999);
+          transition:background .1s, color .1s;
         }
-        .wm-back:hover { color:var(--text-primary,#ccc); }
+        .wm-back:hover { background:var(--bg-hover-strong,#333); color:var(--text-primary,#ccc); }
 
         /* Detail section styles (reused from old workspace-manager-system-tab) */
         .row-actions { display:none; align-items:center; gap:0; }
@@ -1462,9 +1463,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 0;gap:8px;">
-        <div class="wm-back" @click=${() => this._showList()}>
-          <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/></svg>
-          <span>Back</span>
+        <div class="wm-back" title="Back" @click=${() => this._showList()}>
+          <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/></svg>
         </div>
         ${active
           ? html`<span class="wm-card-active-pill">Active</span>`
