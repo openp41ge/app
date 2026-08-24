@@ -1120,11 +1120,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           outline:none;
           cursor:text;
         }
-        .wsc-field:focus-within {
+        .wsc-field-repos { cursor:default; }
+        .wsc-field-repos:focus-within {
           outline:2px solid var(--accent,#007acc);
           outline-offset:-2px;
         }
-        .wsc-field-repos { cursor:default; }
         .wsc-field-repos .cr-row + .cr-row { border-top:1px solid var(--divider,#333); }
         .wsc-label {
           display:block;
@@ -1512,7 +1512,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             @input=${(e: Event) => this._onNameChange(e)}
           />
         </div>
-        <div class="wsc-field wsc-field-repos" tabindex="0" @click=${(e: Event) => { (e.currentTarget as HTMLElement).focus(); }} style="flex:1;min-height:0;display:flex;flex-direction:column;">
+        <div class="wsc-field wsc-field-repos" tabindex="0" @click=${(e: Event) => { (e.currentTarget as HTMLElement).focus(); }} style="display:flex;flex-direction:column;">
           <label class="wsc-label">What repos are you working on?</label>
           <div style="flex:1;min-height:0;overflow-y:auto;margin-top:8px;">
             ${this._detailRepos.map((entry, i) => html`
