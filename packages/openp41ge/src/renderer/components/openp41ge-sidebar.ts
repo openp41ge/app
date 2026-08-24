@@ -8,7 +8,6 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { emitEvent } from "../app";
-import { appState } from "../services/app-state";
 import type { SystemTabRegistration } from "../controllers/types";
 import { allSystemTabRegistrations } from "../apps/system-tabs";
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
@@ -156,12 +155,6 @@ class Openp41geSidebar extends LitElement {
 
   private _resizeObserver: ResizeObserver | null = null;
 
-
-  /** True when this sidebar is the focused sidebar and the window is active. */
-  private get _isFocused(): boolean {
-    return appState.focusedSide === this.side && appState.windowFocused;
-  }
-
   // ═══ Mount / unmount view ────────────────────────────────────────────
 
   private _view: { mount: (container: HTMLElement) => void; unmount: () => void } | null = null;
@@ -247,7 +240,10 @@ class Openp41geSidebar extends LitElement {
                 const isActive = tab.id === this.activeTabId;
                 const isLast = idx === this.systemTabs.length - 1;
                 let sideBorder = idx === 0 && this.side !== "right" ? "border-l" : "";
-                if ((!isLast || !this._hasOverflow) && !(isLast && this.side === "left")) sideBorder += " border-r";
+                // Divider between tabs (including the strip's right end) so each
+                // tab's extent is visible on both sidebars. Border on the last
+                // tab is dropped only while overflowing (offscreen/at the fade).
+                if (!isLast || !this._hasOverflow) sideBorder += " border-r";
                 return html`
                   <div
                     class="sidebar-tab flex items-center gap-2.5 px-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
@@ -255,9 +251,7 @@ class Openp41geSidebar extends LitElement {
                     data-sidebar-side=${this.side}
                     data-tab-title=${tab.title}
                     style="width:120px;height:34px;font-size:13px;${isActive
-                      ? this._isFocused
-                        ? "background:var(--tab-active-bg, rgba(74,158,255,0.12));color:var(--text-primary, #ccc)"
-                        : "background:rgba(255,255,255,0.05);color:var(--text-primary, #ccc)"
+                      ? "background:var(--border-divider, #2d2d2d);color:var(--text-primary, #ccc)"
                       : "color:var(--text-secondary, #999)"}"
                     @click=${() => this._onTabClick(tab.id)}
                     @mouseup=${(e: MouseEvent) => this._onTabMiddleClick(e, tab.id)}
