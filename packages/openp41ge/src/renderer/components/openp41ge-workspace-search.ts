@@ -2,9 +2,11 @@
  * <openp41ge-workspace-search> — title-bar workspace control.
  *
  * A centered, fixed-width pill showing the current workspace name (truncated
- * if long). Clicking toggles an inline dropdown (anchored under the pill) that
- * embeds the Workspace manager: search filters by workspace name, repo
- * names/urls, and worktree names; activating a workspace updates the pill.
+ * if long). Clicking expands it into an inline dropdown that doubles as the
+ * search box: the pill itself becomes the focused search input at the top of
+ * the palette, and the workspace list below filters live by workspace name,
+ * repo names/urls, and worktree names. Escape or click-outside collapses back
+ * to the pill.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
@@ -12,9 +14,9 @@ import { state } from "lit/decorators.js";
 import { workspaceFileService } from "../services/workspace-file-service";
 import { WorkspaceManagerModal } from "../apps/system-tabs/workspace-manager-system-tab";
 
-const BAR_H = 26;
 const WORKSPACE_CHANGED_EVENT = "workspace-file-changed";
 const WORKSPACES_TAB_UPDATE = "workspaces-tab:update";
+const SEARCH_INPUT_SELECTOR = "[data-workspace-search-input]";
 
 class Openp41geWorkspaceSearch extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -68,8 +70,16 @@ class Openp41geWorkspaceSearch extends LitElement {
 
   private _openDropdown(): void {
     const manager = this._ensureManager();
+    // Reopen fresh: the pill switches back to the workspace name on close,
+    // so start with an empty search (all workspaces listed).
+    manager.query = "";
     manager.mount();
     this._open = true;
+    // The pill input is only in the DOM once the palette has rendered.
+    requestAnimationFrame(() => {
+      const input = this.querySelector<HTMLInputElement>(SEARCH_INPUT_SELECTOR);
+      input?.focus();
+    });
   }
 
   private _close(): void {
@@ -78,36 +88,81 @@ class Openp41geWorkspaceSearch extends LitElement {
 
   private _ensureManager(): WorkspaceManagerModal {
     if (!this._manager) {
-      this._manager = new WorkspaceManagerModal("dropdown-workspace-manager");
+      // The search box lives in the pill, so the panel renders without one.
+      this._manager = new WorkspaceManagerModal("dropdown-workspace-manager", {
+        showSearch: false,
+      });
     }
     return this._manager;
   }
 
+  private _onQueryInput(e: Event, manager: WorkspaceManagerModal): void {
+    manager.query = (e.target as HTMLInputElement).value;
+  }
+
+  private _clearQuery(manager: WorkspaceManagerModal): void {
+    manager.query = "";
+    this.querySelector<HTMLInputElement>(SEARCH_INPUT_SELECTOR)?.focus();
+  }
+
+  private _searchBar(manager: WorkspaceManagerModal): TemplateResult {
+    return html`
+      <div
+        style="display:flex;align-items:center;gap:6px;flex-shrink:0;height:40px;padding:0 10px;border-bottom:1px solid var(--border-divider,#2d2d2d);"
+        -webkit-app-region="no-drag"
+      >
+        <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)">
+          <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
+        </svg>
+        <input
+          type="text"
+          data-workspace-search-input
+          placeholder="Search workspaces… (name, repo, worktree)"
+          .value=${manager.query}
+          @input=${(e: Event) => this._onQueryInput(e, manager)}
+          style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
+        />
+        ${manager.query
+          ? html`
+              <button
+                @click=${() => this._clearQuery(manager)}
+                title="Clear search"
+                style="flex-shrink:0;background:transparent;border:none;cursor:pointer;color:var(--text-secondary,#999);font-size:14px;line-height:1;padding:2px;"
+              >✕</button>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
   render(): TemplateResult {
     const name = workspaceFileService.activeWorkspaceName;
-    const dropdown =
-      this._open && this._manager
-        ? html`
-            <div
-              style="position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);width:440px;height:min(70vh,560px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border-divider,#2d2d2d);border-radius:6px;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);z-index:1000;-webkit-app-region:no-drag;"
-            >
-              ${this._manager.render()}
-            </div>
-          `
-        : nothing;
+    const manager = this._manager;
+    const open = this._open && manager;
+
+    if (open && manager) {
+      return html`
+        <div
+          style="position:absolute;top:4px;left:50%;transform:translateX(-50%);width:440px;height:min(70vh,560px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border-divider,#2d2d2d);border-radius:6px;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);-webkit-app-region:no-drag;"
+        >
+          ${this._searchBar(manager)}
+          <div style="flex:1;min-height:0;overflow:hidden;">
+            ${manager.render()}
+          </div>
+        </div>
+      `;
+    }
 
     return html`
       <div
-        style="display:flex;align-items:center;gap:6px;width:260px;height:${BAR_H}px;padding:0 10px;box-sizing:border-box;border:1px solid ${this._open ? "var(--accent,#007acc)" : "var(--border-divider,#2d2d2d)"};border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:border-color .1s, background .1s;"
+        style="display:flex;align-items:center;gap:6px;width:260px;height:26px;padding:0 10px;box-sizing:border-box;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
         title="Manage workspaces"
         @click=${this._toggleOpen}
         @mouseenter=${(e: MouseEvent) => {
-          const el = e.currentTarget as HTMLElement;
-          el.style.background = "var(--bg-hover,#2a2a2a)";
+          (e.currentTarget as HTMLElement).style.background = "var(--bg-hover,#2a2a2a)";
         }}
         @mouseleave=${(e: MouseEvent) => {
-          const el = e.currentTarget as HTMLElement;
-          el.style.background = "var(--bg-secondary,#252526)";
+          (e.currentTarget as HTMLElement).style.background = "var(--bg-secondary,#252526)";
         }}
       >
         <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)">
@@ -118,7 +173,6 @@ class Openp41geWorkspaceSearch extends LitElement {
           <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
         </svg>
       </div>
-      ${dropdown}
     `;
   }
 }

@@ -85,8 +85,25 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     return this._createName.trim().length > 0;
   }
 
-  constructor(tabId: string) {
+  /**
+   * Whether the panel renders its own search box. When hosted in the
+   * title-bar pill the search input lives in the pill instead (no duplicates).
+   */
+  private readonly _showSearch: boolean;
+
+  constructor(tabId: string, options?: { showSearch?: boolean }) {
     this.id = tabId;
+    this._showSearch = options?.showSearch ?? true;
+  }
+
+  /** Search query driving the workspace filter (used by a hosted search input). */
+  get query(): string {
+    return this._searchQuery;
+  }
+  set query(q: string) {
+    if (this._searchQuery === q) return;
+    this._searchQuery = q;
+    this._emitUpdate();
   }
 
   /** Access the openp41ge bridge (guaranteed non-null in app). */
@@ -1303,21 +1320,23 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           ` : ''}
 
           ${!this._creating ? html`
-            <!-- Search: filters by workspace name, repo name/url, worktree name -->
-            <div style="position:sticky;top:0;padding:8px 10px 6px;background:var(--bg-primary,#252526);z-index:1;">
-              <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--divider,#333);border-radius:6px;background:rgba(255,255,255,.04);padding:6px 10px;">
-                <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#999);flex-shrink:0;"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
-                <input
-                  type="text"
-                  data-workspace-search-input
-                  placeholder="Search workspaces… (name, repo, worktree)"
-                  .value=${this._searchQuery}
-                  @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
-                  style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;outline:none;"
-                  autofocus
-                />
+            ${this._showSearch ? html`
+              <!-- Search: filters by workspace name, repo name/url, worktree name -->
+              <div style="position:sticky;top:0;padding:8px 10px 6px;background:var(--bg-primary,#252526);z-index:1;">
+                <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--divider,#333);border-radius:6px;background:rgba(255,255,255,.04);padding:6px 10px;">
+                  <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#999);flex-shrink:0;"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
+                  <input
+                    type="text"
+                    data-workspace-search-input
+                    placeholder="Search workspaces… (name, repo, worktree)"
+                    .value=${this._searchQuery}
+                    @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
+                    style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;outline:none;"
+                    autofocus
+                  />
+                </div>
               </div>
-            </div>
+            ` : nothing}
             ${this._workspaces.length === 0
               ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces yet.</div>`
               : this._filteredWorkspaces.length === 0
