@@ -95,10 +95,10 @@ class Openp41geTitleBar extends LitElement {
           </svg>
         </div>
 
-        <!-- Workspace search bar (centered) -->
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:0;height:100%;display:flex;align-items:center;justify-content:center;-webkit-app-region:no-drag;">
-          <openp41ge-workspace-search></openp41ge-workspace-search>
-        </div>
+        <!-- Workspace search bar (centered, dropdown anchored below) -->
+        <openp41ge-workspace-search
+          style="position:absolute;left:50%;transform:translateX(-50%);top:0;height:100%;display:flex;align-items:center;-webkit-app-region:no-drag;"
+        ></openp41ge-workspace-search>
 
         <!-- Spacer to push content to the right -->
         <div class="flex-1 min-w-0"></div>
