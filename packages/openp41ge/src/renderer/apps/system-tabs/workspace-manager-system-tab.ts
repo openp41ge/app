@@ -1112,6 +1112,36 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-add { color:#4caf50; }
         .wm-del { color:#ef5350; }
         .wm-meta-loading { opacity:.6; }
+        .wsc-field {
+          margin:12px 14px;
+          padding:12px 14px;
+          border-radius:8px;
+          background:rgba(255,255,255,.05);
+          outline:none;
+          cursor:text;
+        }
+        .wsc-field:focus-within {
+          outline:2px solid var(--accent,#007acc);
+          outline-offset:-2px;
+        }
+        .wsc-field-repos { cursor:default; }
+        .wsc-label {
+          display:block;
+          font-size:12px;
+          color:var(--text-secondary,#bbb);
+        }
+        .wsc-input {
+          display:block;
+          width:100%;
+          margin-top:8px;
+          background:transparent;
+          border:none;
+          outline:none;
+          color:var(--text-primary,#ccc);
+          font-size:14px;
+          font-family:inherit;
+          padding:0;
+        }
         .wm-btn.activate { background:rgba(0,122,204,.2); color:var(--accent,#007acc); padding:5px 14px; }
         .wm-btn.activate:hover { background:rgba(0,122,204,.3); color:var(--accent,#007acc); }
         .wm-card-active-pill {
@@ -1471,22 +1501,20 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           : html`<button class="wm-btn activate" @click=${() => this._activateWorkspace(entry)}>Activate</button>`}
       </div>
       <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;">
-        <div style="padding:12px 14px;">
-          <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Name</label>
-          <div style="display:flex;align-items:center;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--divider,#333);border-radius:6px;">
-            <input
-              type="text"
-              placeholder="Workspace name"
-              .value=${entry.data.name ?? ''}
-              @input=${(e: Event) => this._onNameChange(e)}
-              style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
-              autofocus
-            />
-          </div>
+        <div class="wsc-field" @click=${(e: Event) => { (e.currentTarget as HTMLElement).querySelector("input")?.focus(); }}>
+          <label class="wsc-label">What's the workspace name?</label>
+          <input
+            type="text"
+            class="wsc-input"
+            placeholder="Workspace name"
+            .value=${entry.data.name ?? ''}
+            @input=${(e: Event) => this._onNameChange(e)}
+            autofocus
+          />
         </div>
-        <div style="padding:12px 14px;flex:1;display:flex;flex-direction:column;">
-          <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Repositories</label>
-          <div style="flex:1;overflow-y:auto;">
+        <div class="wsc-field wsc-field-repos" style="flex:1;min-height:0;display:flex;flex-direction:column;">
+          <label class="wsc-label">What repos are you working on?</label>
+          <div style="flex:1;min-height:0;overflow-y:auto;margin-top:8px;">
             ${this._detailRepos.map((entry, i) => html`
               ${entry.status === "success"
                 ? this._renderAccordionItem(
