@@ -55,6 +55,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _view: View = "list";
   private _selected: { filePath: string; data: WorkspaceFileData } | null = null;
 
+  /** Card currently focused by a click (a second click on it activates). */
+  private _focusedPath: string | null = null;
+
   /** Whether we're in the "creating" state (showing the create form). */
   private _creating = false;
   private _createName = "";
@@ -113,6 +116,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   mount(): void {
     document.addEventListener("workspace-modal:back", this._onModalBack);
+    this._focusedPath = null;
     this._loadWorkspaces();
     // Focus the search input so "click the pill → type → filter" works
     // immediately (HTML `autofocus` doesn't fire on dynamically mounted nodes).
@@ -473,6 +477,16 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   // ── Navigation ──────────────────────────────────────────────────
+
+  private _onCardClick(entry: { filePath: string; data: WorkspaceFileData }): void {
+    // First click focuses the card; a second click (on the focused card) activates it.
+    if (this._focusedPath === entry.filePath) {
+      this._activateWorkspace(entry);
+    } else {
+      this._focusedPath = entry.filePath;
+      this._emitUpdate();
+    }
+  }
 
   private _onModalBack = (): void => {
     if (this._creating) {
@@ -1048,6 +1062,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
         .wm-card.active { border-color:var(--accent,#007acc); }
+        .wm-card.focused:not(.active) {
+          background:rgba(128,128,128,0.12);
+          border-color:var(--text-secondary,#999);
+        }
         .wm-card-title { font-size:14px; color:var(--text-primary,#ccc); font-weight:500; padding-right:100px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
@@ -1358,7 +1376,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               : this._filteredWorkspaces.length === 0
                 ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
                 : this._filteredWorkspaces.map((entry) => html`
-                  <div class="wm-card ${isActive(entry) ? 'active' : ''}" @click=${() => this._activateWorkspace(entry)}>
+                  <div class="wm-card ${isActive(entry) ? 'active' : ''} ${this._focusedPath === entry.filePath ? 'focused' : ''}" @click=${() => this._onCardClick(entry)}>
                     <div style="position:absolute;top:8px;right:12px;display:flex;align-items:center;gap:6px;">
                       ${isActive(entry) ? html`<span class="wm-card-active-pill">Active</span>` : nothing}
                       <button class="wm-card-edit" title="Edit workspace" @click=${(e: MouseEvent) => { e.stopPropagation(); this._showDetail(entry); }}>
