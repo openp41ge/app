@@ -12,7 +12,7 @@ import { emitEvent } from "../app";
 import { serviceModalService } from "../services/service-modal-service";
 
 import { setContextMenuActive } from "../services/drag-context";
-import { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, NOTCH_WIDTH, NOTCH_OVERFLOW, TITLEBAR_HEIGHT } from "openp41ge-constants";
+import { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, NOTCH_WIDTH, NOTCH_OVERFLOW } from "openp41ge-constants";
 
 import "./openp41ge-sidebar";
 
@@ -47,6 +47,10 @@ class Openp41geWindowView extends LitElement {
   private _dragStartY = 0;
   private _dragStartLeftWidth = 280;
   private _dragStartRightWidth = 280;
+  /** Latest applied width during an active drag (written straight to the DOM so
+   * the handle tracks the mouse every move, without a full re-render per mousemove). */
+  private _dragLeftWidth = 280;
+  private _dragRightWidth = 280;
 
   // ── Context menu ─────────────────────────────────────────────────────
 
@@ -97,6 +101,8 @@ class Openp41geWindowView extends LitElement {
     this._dragStartY = e.clientY;
     this._dragStartLeftWidth = this._leftWidth;
     this._dragStartRightWidth = this._rightWidth;
+    this._dragLeftWidth = this._leftWidth;
+    this._dragRightWidth = this._rightWidth;
 
     document.addEventListener("mousemove", this._onResizeMove);
     document.addEventListener("mouseup", this._onResizeEnd);
@@ -112,16 +118,31 @@ class Openp41geWindowView extends LitElement {
     switch (this._activeHandle) {
       case "left": {
         const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, this._dragStartLeftWidth + dx));
-        this._leftWidth = newWidth;
+        this._dragLeftWidth = newWidth;
+        this._applyWidth("left", newWidth);
         break;
       }
       case "right": {
         const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, this._dragStartRightWidth - dx));
-        this._rightWidth = newWidth;
+        this._dragRightWidth = newWidth;
+        this._applyWidth("right", newWidth);
         break;
       }
     }
   };
+
+  /**
+   * Write a sidebar width straight to its DOM host element. Bypasses Lit
+   * re-rendering so the resize handle tracks the mouse position on every
+   * mousemove — even very fast ones — instead of lagging behind.
+   */
+  private _applyWidth(side: "left" | "right", width: number): void {
+    const el = this.querySelector<HTMLElement>(`openp41ge-sidebar[side="${side}"]`);
+    if (!el) return;
+    el.style.flex = `0 1 ${width}px`;
+    // Mirror the template's max-width clamp (sidebar fills up to 35% viewport).
+    el.style.maxWidth = `min(${width}px, 35vw)`;
+  }
 
   private _onResizeEnd = (): void => {
     this._activeHandle = null;
@@ -131,7 +152,9 @@ class Openp41geWindowView extends LitElement {
     // Reset cursor
     document.body.style.cursor = "";
 
-    // Persist widths
+    // Commit the final drag width into reactive state (single render) and persist
+    this._leftWidth = this._dragLeftWidth;
+    this._rightWidth = this._dragRightWidth;
     localStorage.setItem("openp41ge:sidebar-width-left", String(this._leftWidth));
     localStorage.setItem("openp41ge:sidebar-width-right", String(this._rightWidth));
   };
