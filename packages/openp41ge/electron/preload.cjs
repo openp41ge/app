@@ -574,5 +574,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.invoke("workspaceData:checkoutWorktree", url, branch),
     encodeRepoUrl: (url) => ipcRenderer.invoke("workspaceData:encodeRepoUrl", url),
     getDir: () => ipcRenderer.invoke("workspaceData:getDir"),
+    // Aggregate working-tree change stats for a saved workspace's worktrees.
+    getWorkspaceStats: (repos) => ipcRenderer.invoke("workspaceData:getWorkspaceStats", repos),
   },
 });

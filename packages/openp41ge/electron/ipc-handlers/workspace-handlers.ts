@@ -66,6 +66,47 @@ function repoAlreadyCloned(url: string): boolean {
   return fs.existsSync(gitDir) && fs.statSync(gitDir).isDirectory();
 }
 
+/**
+ * Aggregate working-tree change stats across a saved workspace's repos/worktrees.
+ * Best-effort: repos without a local clone or worktrees that don't exist are skipped.
+ */
+async function getWorkspaceStats(
+  repos: Array<{ url: string; worktrees?: string[] }>,
+): Promise<{ filesChanged: number; added: number; deleted: number; untracked: number }> {
+  let filesChanged = 0;
+  let added = 0;
+  let deleted = 0;
+  let untracked = 0;
+  for (const repo of repos ?? []) {
+    for (const branch of repo.worktrees ?? []) {
+      const wtDir = path.join(getWorktreesDir(repo.url), branch.replace(/\//g, "--"));
+      if (!fs.existsSync(wtDir)) continue;
+      try {
+        const numstat = await runGit(["diff", "HEAD", "--numstat"], wtDir);
+        for (const line of numstat.stdout.trim().split("\n")) {
+          if (!line) continue;
+          const parts = line.split("\t");
+          const a = parseInt(parts[0], 10);
+          const d = parseInt(parts[1], 10);
+          if (!Number.isNaN(a)) added += a;
+          if (!Number.isNaN(d)) deleted += d;
+        }
+      } catch {
+        // Worktree may not be a git repo — skip.
+      }
+      try {
+        const status = await runGit(["status", "--porcelain"], wtDir);
+        const lines = status.stdout.split("\n").filter((l) => l.trim().length > 0);
+        filesChanged += lines.length;
+        untracked += lines.filter((l) => l.startsWith("??")).length;
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return { filesChanged, added, deleted, untracked };
+}
+
 // ── Workspace-data remote verification helpers ───────────────────────────
 
 /**
@@ -340,4 +381,18 @@ export function registerWorkspaceHandlers(
   ipcMain.handle("workspaceData:getDir", async () => {
     return getWorkspaceDataDir();
   });
+
+  /**
+   * Aggregate working-tree change stats (edits) for a saved workspace's worktrees.
+   */
+  ipcMain.handle(
+    "workspaceData:getWorkspaceStats",
+    async (_event, repos: Array<{ url: string; worktrees?: string[] }>) => {
+      try {
+        return await getWorkspaceStats(repos);
+      } catch {
+        return { filesChanged: 0, added: 0, deleted: 0, untracked: 0 };
+      }
+    },
+  );
 }

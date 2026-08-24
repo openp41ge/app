@@ -55,8 +55,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _view: View = "list";
   private _selected: { filePath: string; data: WorkspaceFileData } | null = null;
 
-  /** Card currently focused by a click (a second click on it activates). */
-  private _focusedPath: string | null = null;
+  /** Per-workspace working-tree change stats (loaded async per card). */
+  private _stats = new Map<string, { filesChanged: number; added: number; deleted: number; untracked: number }>();
 
   /** Whether we're in the "creating" state (showing the create form). */
   private _creating = false;
@@ -116,7 +116,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   mount(): void {
     document.addEventListener("workspace-modal:back", this._onModalBack);
-    this._focusedPath = null;
     this._loadWorkspaces();
     // Focus the search input so "click the pill → type → filter" works
     // immediately (HTML `autofocus` doesn't fire on dynamically mounted nodes).
@@ -149,6 +148,51 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       this._workspaces = [];
     }
     this._emitUpdate();
+    this._refreshStats();
+  }
+
+  /** Fetch working-tree change stats for every listed workspace (best-effort). */
+  private _refreshStats(): void {
+    for (const entry of this._workspaces) {
+      this._stats.delete(entry.filePath); // mark as loading
+      void this._fetchStats(entry);
+    }
+    this._emitUpdate();
+  }
+
+  private async _fetchStats(entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
+    try {
+      const stats = await this._bridge.workspaceData.getWorkspaceStats(entry.data.repos ?? []);
+      if (this._workspaces.some((w) => w.filePath === entry.filePath)) {
+        this._stats.set(entry.filePath, stats);
+        this._emitUpdate();
+      }
+    } catch {
+      // Leave card without stats.
+    }
+  }
+
+  /** Render the metadata line for a workspace card (repos, worktrees, edits). */
+  private _cardMeta(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
+    const repos = entry.data.repos ?? [];
+    const reposCount = repos.length;
+    const worktreesCount = repos.reduce((s, r) => s + (r.worktrees?.length ?? 0), 0);
+    const stats = this._stats.get(entry.filePath);
+    return html`
+      <span>${reposCount} ${reposCount === 1 ? "repo" : "repos"}</span>
+      <span class="wm-meta-sep">·</span>
+      <span>${worktreesCount} ${worktreesCount === 1 ? "worktree" : "worktrees"}</span>
+      <span class="wm-meta-sep">·</span>
+      ${stats
+        ? html`
+            <span class="wm-add">+${stats.added}</span>
+            <span class="wm-del">−${stats.deleted}</span>
+            ${stats.untracked > 0
+              ? html`<span class="wm-meta-sep">·</span><span>${stats.untracked} untracked</span>`
+              : nothing}
+          `
+        : html`<span class="wm-meta-loading">…</span>`}
+    `;
   }
 
   private _emitUpdate(): void {
@@ -477,16 +521,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   // ── Navigation ──────────────────────────────────────────────────
-
-  private _onCardClick(entry: { filePath: string; data: WorkspaceFileData }): void {
-    // First click focuses the card; a second click (on the focused card) activates it.
-    if (this._focusedPath === entry.filePath) {
-      this._activateWorkspace(entry);
-    } else {
-      this._focusedPath = entry.filePath;
-      this._emitUpdate();
-    }
-  }
 
   private _onModalBack = (): void => {
     if (this._creating) {
@@ -1053,20 +1087,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
 
         .wm-card {
-          padding:10px 14px; margin:6px 10px; border-radius:8px;
+          padding:12px 14px; margin:6px 10px; border-radius:8px;
           background:var(--bg-primary,#252526);
           border:1px solid var(--divider,#333);
-          cursor:pointer;
+          cursor:default;
           position:relative;
           transition:background .1s, border-color .1s;
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
-        .wm-card.active { border-color:var(--accent,#007acc); }
-        .wm-card.focused:not(.active) {
-          background:rgba(128,128,128,0.12);
-          border-color:var(--text-secondary,#999);
-        }
-        .wm-card-title { font-size:14px; color:var(--text-primary,#ccc); font-weight:500; padding-right:100px; }
+        .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:100px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
           display:flex; align-items:center; justify-content:center;
@@ -1075,6 +1104,14 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           transition:background .1s, color .1s;
         }
         .wm-card-copy:hover { color:var(--text-primary,#ccc); background:var(--bg-hover-strong,#333); }
+        .wm-card-meta { display:flex; align-items:center; gap:5px; margin-top:6px; font-size:11px; color:var(--text-secondary,#999); flex-wrap:wrap; }
+        .wm-meta-sep { opacity:.45; }
+        .wm-add { color:#4caf50; }
+        .wm-del { color:#ef5350; }
+        .wm-meta-loading { opacity:.6; }
+        .wm-card-footer { display:flex; justify-content:flex-end; margin-top:8px; }
+        .wm-btn.activate { background:rgba(0,122,204,.2); color:var(--accent,#007acc); padding:5px 14px; }
+        .wm-btn.activate:hover { background:rgba(0,122,204,.3); color:var(--accent,#007acc); }
         .wm-card-active-pill {
           padding:2px 10px; border-radius:999px; font-size:11px;
           background:rgba(0,122,204,.15); color:var(--accent,#007acc);
@@ -1376,7 +1413,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               : this._filteredWorkspaces.length === 0
                 ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
                 : this._filteredWorkspaces.map((entry) => html`
-                  <div class="wm-card ${isActive(entry) ? 'active' : ''} ${this._focusedPath === entry.filePath ? 'focused' : ''}" @click=${() => this._onCardClick(entry)}>
+                  <div class="wm-card ${isActive(entry) ? 'active' : ''}">
                     <div style="position:absolute;top:8px;right:12px;display:flex;align-items:center;gap:6px;">
                       ${isActive(entry) ? html`<span class="wm-card-active-pill">Active</span>` : nothing}
                       <button class="wm-card-edit" title="Edit workspace" @click=${(e: MouseEvent) => { e.stopPropagation(); this._showDetail(entry); }}>
@@ -1390,6 +1427,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                         <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Z"/></svg>
                       </button>
                     </div>
+                    <div class="wm-card-meta">${this._cardMeta(entry)}</div>
+                    ${isActive(entry) ? nothing : html`
+                      <div class="wm-card-footer">
+                        <button class="wm-btn activate" @click=${(e: MouseEvent) => { e.stopPropagation(); this._activateWorkspace(entry); }}>Activate</button>
+                      </div>
+                    `}
                   </div>
                 `)}
           ` : ''}

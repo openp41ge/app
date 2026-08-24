@@ -170,6 +170,13 @@ declare global {
         encodeRepoUrl: (url: string) => Promise<string>;
         /** Get the workspace-data directory path. */
         getDir: () => Promise<string>;
+        /** Aggregate working-tree change stats (edits) for a saved workspace's worktrees. */
+        getWorkspaceStats: (repos: Array<{ url: string; worktrees?: string[] }>) => Promise<{
+          filesChanged: number;
+          added: number;
+          deleted: number;
+          untracked: number;
+        }>;
       };
 
       lifecycle: {
