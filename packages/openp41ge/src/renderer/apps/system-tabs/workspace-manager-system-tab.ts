@@ -375,20 +375,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   /** Style string for the detail view's "+ add repository" row, matching create form's _addRepoRowStyle. */
   private _detailAddRepoRowStyle(): string {
-    const hasRepos = this._detailRepos.length > 0;
-    const directlyAfterRepos = !this._showAddInput;
-    const lastExpanded = hasRepos && directlyAfterRepos && this._detailRepos[this._detailRepos.length - 1].expanded;
-    const isFirst = !hasRepos && !this._showAddInput;
-    if (lastExpanded) {
-      return 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;border:1px solid var(--divider,#333);border-radius:6px;margin:-1px 0 0;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;';
-    }
-    let style = 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;';
-    style += 'border-left:1px solid var(--divider,#333);';
-    style += 'border-right:1px solid var(--divider,#333);';
-    style += 'border-bottom:1px solid var(--divider,#333);';
-    if (isFirst) style += 'border-top:1px solid var(--divider,#333);';
-    style += isFirst ? 'border-radius:6px;' : 'border-radius:0 0 6px 6px;';
-    return style;
+    // Flat row: no box. The CSS rule `.repo-wrapper + .cr-row` renders the
+    // bright inner separator above it.
+    return 'display:flex;align-items:center;gap:4px;padding:8px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;';
   }
 
   /** Shared renderer for an unverified/failed/validating repo row (no accordion). */
@@ -1145,14 +1134,20 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           border-radius:0 !important;
           margin:0 !important;
         }
-        /* Inner separators only — no outer borders */
+        /* Each row keeps a subtle background so rows read as distinct */
+        .wsc-field-repos .cr-row {
+          background: rgba(255,255,255,.04);
+        }
+        /* Inner separators only — no outer borders. One shared color so
+           worktree separators match the repo separators exactly. */
+        .wsc-field-repos { --wsc-sep: rgba(255,255,255,.2); }
         .wsc-field-repos .repo-wrapper + .repo-wrapper,
         .wsc-field-repos .repo-wrapper + .cr-row {
-          border-top: 1px solid rgba(255,255,255,.2);
+          border-top: 1px solid var(--wsc-sep);
         }
-        .wsc-field-repos .repo-wrapper .cr-row + .cr-row,
-        .wsc-field-repos .repo-wrapper > .cr-row + div > .cr-row:first-child {
-          border-top: 1px solid rgba(255,255,255,.2);
+        .wsc-field-repos .repo-wrapper > .cr-row + div,
+        .wsc-field-repos .repo-wrapper > div > .cr-row ~ .cr-row {
+          border-top: 1px solid var(--wsc-sep);
         }
         .wsc-label {
           display:block;
