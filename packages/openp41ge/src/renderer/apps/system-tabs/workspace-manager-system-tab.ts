@@ -1147,6 +1147,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wsc-field-repos .add-repo-trigger {
           border-radius: 0 0 8px 8px;
         }
+        .wsc-field-repos .repo-wrapper:has(> .cr-row + div) + .add-repo-trigger {
+          border-top:none;
+          border-radius:8px;
+        }
         /* Inner separators only — no outer borders. One shared color so
            worktree separators match the repo separators exactly. */
         .wsc-field-repos { --wsc-sep: rgba(255,255,255,.2); }
