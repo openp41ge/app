@@ -1135,15 +1135,28 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           margin:0 !important;
         }
         /* Each row keeps a subtle background so rows read as distinct */
-        .wsc-field-repos .cr-row {
+        .wsc-field-repos .cr-row,
+        .wsc-field-repos .add-wt-trigger {
           background: rgba(255,255,255,.04);
+        }
+        .wsc-field-repos .add-wt-trigger {
+          border-top-color: var(--wsc-sep) !important;
+        }
+        .wsc-field-repos .add-repo-trigger {
+          border-radius: 0 0 8px 8px;
         }
         /* Inner separators only — no outer borders. One shared color so
            worktree separators match the repo separators exactly. */
         .wsc-field-repos { --wsc-sep: rgba(255,255,255,.2); }
-        .wsc-field-repos .repo-wrapper + .repo-wrapper,
+        .wsc-field-repos .repo-wrapper + .repo-wrapper {
+          border-top: 1px solid var(--wsc-sep);
+        }
         .wsc-field-repos .repo-wrapper + .cr-row {
           border-top: 1px solid var(--wsc-sep);
+        }
+        .wsc-field-repos .repo-wrapper:has(> .cr-row + div) + .repo-wrapper {
+          border-top:none;
+          margin-top:8px !important;
         }
         .wsc-field-repos .repo-wrapper > .cr-row + div,
         .wsc-field-repos .repo-wrapper > div > .cr-row ~ .cr-row {
