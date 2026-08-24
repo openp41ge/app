@@ -168,4 +168,35 @@ export function registerDialogHandlers(): void {
       return [];
     }
   });
+
+  // ── Delete workspace file (optionally incl. data dir) ─────────────
+
+  ipcMain.handle("dialog:deleteWorkspaceFile", async (_event, filePath: string, deleteData?: boolean) => {
+    try {
+      const resolved = resolveTilde(filePath);
+      // Only delete files (guard against misdirected directory paths)
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) return false;
+
+      if (deleteData) {
+        // Remove the workspace's data directory, derived from the file contents.
+        try {
+          const data = readWorkspaceFile(resolved);
+          if (data.dataDir) {
+            const dataDirResolved = resolveTilde(data.dataDir);
+            if (fs.existsSync(dataDirResolved)) {
+              fs.rmSync(dataDirResolved, { recursive: true, force: true });
+            }
+          }
+        } catch (err) {
+          console.error("Failed to remove workspace data dir:", err);
+        }
+      }
+
+      fs.rmSync(resolved, { force: true });
+      return true;
+    } catch (err) {
+      console.error("Failed to delete workspace file:", err);
+      return false;
+    }
+  });
 }

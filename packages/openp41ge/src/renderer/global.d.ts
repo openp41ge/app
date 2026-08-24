@@ -145,6 +145,9 @@ declare global {
 
         /** List all .openp41ge-workspace files in ~/.openp41ge/workspaces/. */
         listWorkspaces: () => Promise<Array<{ filePath: string; data: import("../../layout/types").WorkspaceFileData }>>;
+
+        /** Delete a workspace file; optionally also remove its data dir when deleteData is true. */
+        deleteWorkspaceFile: (filePath: string, deleteData?: boolean) => Promise<boolean>;
       };
 
       /** Workspace manager git operations (workspace-data/ directory). */

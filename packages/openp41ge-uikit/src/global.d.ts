@@ -14,6 +14,7 @@ interface Openp41geBridge {
     pickFolder(): Promise<string | null>;
     ensureDir(dirPath: string): Promise<boolean>;
     readWorkspaceFile(filePath: string): Promise<{ filePath: string; data: Record<string, unknown> } | null>;
+    deleteWorkspaceFile(filePath: string, deleteData?: boolean): Promise<boolean>;
   };
   workspaceData: {
     checkRepoAccess(url: string): Promise<{ ok: boolean; error?: string }>;

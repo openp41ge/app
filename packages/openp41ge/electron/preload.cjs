@@ -531,6 +531,9 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
     /** List all .openp41ge-workspace files in ~/.openp41ge/workspaces/. */
     listWorkspaces: () => ipcRenderer.invoke("dialog:listWorkspaces"),
+
+    /** Delete a .openp41ge-workspace file. Optionally also remove its data dir when deleteData is true. */
+    deleteWorkspaceFile: (filePath, deleteData) => ipcRenderer.invoke("dialog:deleteWorkspaceFile", filePath, deleteData),
   },
 
   project: {
