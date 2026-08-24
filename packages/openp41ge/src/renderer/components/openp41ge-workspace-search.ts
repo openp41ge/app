@@ -108,7 +108,7 @@ class Openp41geWorkspaceSearch extends LitElement {
   private _searchHeader(manager: WorkspaceManagerModal): TemplateResult {
     return html`
       <div
-        style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:440px;height:34px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:0 10px;border-left:1px solid var(--border-divider,#2d2d2d);border-right:1px solid var(--border-divider,#2d2d2d);-webkit-app-region:no-drag;"
+        style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:min(422px, calc(100vw - 248px));height:34px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:0 10px;border-left:1px solid var(--border-divider,#2d2d2d);border-right:1px solid var(--border-divider,#2d2d2d);-webkit-app-region:no-drag;"
       >
         <div
           style="display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;height:26px;padding:0 10px;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);"
@@ -147,7 +147,7 @@ class Openp41geWorkspaceSearch extends LitElement {
       return html`
         ${this._searchHeader(manager)}
         <div
-          style="position:absolute;top:calc(100% - 1px);left:50%;transform:translateX(-50%);width:440px;height:min(70vh,520px);overflow:hidden;border:1px solid var(--border-divider,#2d2d2d);border-radius:0 0 6px 6px;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);-webkit-app-region:no-drag;"
+          style="position:absolute;top:calc(100% - 1px);left:50%;transform:translateX(-50%);width:min(422px, calc(100vw - 248px));height:min(70vh,520px);overflow:hidden;border:1px solid var(--border-divider,#2d2d2d);border-radius:0 0 6px 6px;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);-webkit-app-region:no-drag;"
         >
           ${manager.render()}
         </div>
@@ -156,7 +156,7 @@ class Openp41geWorkspaceSearch extends LitElement {
 
     return html`
       <div
-        style="display:flex;align-items:center;gap:6px;width:418px;height:26px;padding:0 10px;box-sizing:border-box;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
+        style="display:flex;align-items:center;gap:6px;width:min(400px, calc(100vw - 248px));height:26px;padding:0 10px;box-sizing:border-box;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
         title="Manage workspaces"
         @click=${this._toggleOpen}
         @mouseenter=${(e: MouseEvent) => {
