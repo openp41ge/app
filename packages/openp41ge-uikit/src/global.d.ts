@@ -9,6 +9,25 @@ interface Openp41geBridge {
     readFile(path: string): Promise<string>;
     writeFile(path: string, content: string): Promise<void>;
   };
+  dialog: {
+    writeWorkspaceFile(filePath: string, data: Record<string, unknown>): Promise<boolean>;
+    pickFolder(): Promise<string | null>;
+    ensureDir(dirPath: string): Promise<boolean>;
+    readWorkspaceFile(filePath: string): Promise<{ filePath: string; data: Record<string, unknown> } | null>;
+  };
+  workspaceData: {
+    checkRepoAccess(url: string): Promise<{ ok: boolean; error?: string }>;
+    checkWorktreeBranch(wsDir: string, url: string, branch: string): Promise<{
+      status: "success" | "failure" | "diverged" | "needs-sync";
+      error?: string;
+      warning?: string;
+    }>;
+    repoAlreadyCloned(url: string): Promise<boolean>;
+    cloneBareRepo(url: string): Promise<{ ok: boolean; error?: string }>;
+    checkoutWorktree(url: string, branch: string): Promise<{ ok: boolean; error?: string }>;
+    encodeRepoUrl(url: string): Promise<string>;
+    getDir(): Promise<string>;
+  };
 }
 
 interface Window {

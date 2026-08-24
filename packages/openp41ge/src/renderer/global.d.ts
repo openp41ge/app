@@ -147,6 +147,28 @@ declare global {
         listWorkspaces: () => Promise<Array<{ filePath: string; data: import("../../layout/types").WorkspaceFileData }>>;
       };
 
+      /** Workspace manager git operations (workspace-data/ directory). */
+      workspaceData: {
+        /** Check if a repo URL is accessible via git ls-remote. */
+        checkRepoAccess: (url: string) => Promise<{ ok: boolean; error?: string }>;
+        /** Check branch existence and divergence for a worktree. */
+        checkWorktreeBranch: (wsDir: string, url: string, branch: string) => Promise<{
+          status: "success" | "failure" | "diverged" | "needs-sync";
+          error?: string;
+          warning?: string;
+        }>;
+        /** Check if a bare repo already exists for the given URL. */
+        repoAlreadyCloned: (url: string) => Promise<boolean>;
+        /** Clone a bare repo into workspace-data for the given URL. */
+        cloneBareRepo: (url: string) => Promise<{ ok: boolean; error?: string }>;
+        /** Checkout a worktree branch. */
+        checkoutWorktree: (url: string, branch: string) => Promise<{ ok: boolean; error?: string }>;
+        /** Encode a repo URL into a filesystem-safe directory name. */
+        encodeRepoUrl: (url: string) => Promise<string>;
+        /** Get the workspace-data directory path. */
+        getDir: () => Promise<string>;
+      };
+
       lifecycle: {
         /** Notify the main process that the renderer's first render completed. */
         notifyReady: () => void;

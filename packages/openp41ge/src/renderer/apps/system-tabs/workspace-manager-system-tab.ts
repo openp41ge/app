@@ -11,15 +11,19 @@ import type { EditorSystemTabController } from "../../controllers/types";
 import type { WorkspaceFileData } from "../../../layout/types";
 import { workspaceFileService } from "../../services/workspace-file-service";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const bridge = (): any => window.openp41ge;
+
 interface WorktreeEntry {
   name: string;
   status: "unverified" | "validating" | "success" | "failure" | "diverged" | "needs-sync";
   errorMessage?: string;
+  warningMessage?: string;
 }
 
 interface CreateRepoEntry {
   url: string;
-  status: "unverified" | "validating" | "success" | "failure";
+  status: "unverified" | "validating" | "success" | "failure" | "diverged" | "needs-sync";
   errorMessage?: string;
   expanded: boolean;
   worktrees: WorktreeEntry[];
@@ -80,6 +84,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   constructor(tabId: string) {
     this.id = tabId;
+  }
+
+  /** Access the openp41ge bridge (guaranteed non-null in app). */
+  private get _bridge(): ReturnType<typeof bridge> {
+    return bridge();
   }
 
   mount(): void {
@@ -148,6 +157,25 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         <div class="cr-row" tabindex="0"
           style="${headerStyle}"
           @click=${onToggle}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === 'ArrowRight' && !item.expanded) { onToggle(); }
+            if (e.key === 'ArrowLeft' && item.expanded) { onToggle(); }
+            if (e.key === 'ArrowDown' && item.expanded) {
+              e.preventDefault();
+              const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
+              if (wrapper) {
+                const first = wrapper.querySelector('input, .cr-row');
+                if (first instanceof HTMLElement) first.focus();
+              }
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              const allHeaders = Array.from(document.querySelectorAll('.repo-wrapper > .cr-row'));
+              const idx = allHeaders.indexOf(e.currentTarget as HTMLElement);
+              const prev = allHeaders[idx - 1];
+              if (prev instanceof HTMLElement) prev.focus();
+            }
+          }}
         >
           <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#999)" style="transform:rotate(${item.expanded ? '90deg' : '0deg'});"></openp41ge-inline-icon>
           <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${item.url}</span>
@@ -183,16 +211,28 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       : wt.status === 'needs-sync' ? html`<openp41ge-inline-icon name="sync" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${onSync}></openp41ge-inline-icon>`
       : nothing;
     return html`
-      <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+      <div class="cr-row" tabindex="-1" style="display:flex;align-items:center;gap:6px;padding:8px 10px;" @mouseenter=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'visible'; }} @mouseleave=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'hidden'; }} @keydown=${(e: KeyboardEvent) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              const all = Array.from((e.currentTarget as HTMLElement).closest('.repo-wrapper')?.querySelectorAll('.cr-row') ?? []);
+              const idx = all.indexOf(e.currentTarget as HTMLElement);
+              const next = e.key === 'ArrowDown' ? all[idx + 1] : all[idx - 1];
+              if (next instanceof HTMLElement) next.focus();
+            }
+          }}>
         <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
         <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt.name}</span>
+        <span class="wt-del" style="display:flex;align-items:center;visibility:hidden;">
+          <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
+        </span>
         <span style="display:flex;align-items:center;visibility:${wt.status === 'unverified' ? 'hidden' : 'visible'};">${statusIcon}</span>
-        <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
       </div>
       ${wt.errorMessage && (wt.status === 'failure' || wt.status === 'diverged') ? html`
-        <div style="font-size:12px;color:var(--error,#e53e3e);padding:2px 10px 6px 28px;">${wt.errorMessage}</div>
+        <div style="font-size:12px;color:var(--error,#e53e3e);padding:2px 10px 6px 32px;">${wt.errorMessage}</div>
       ` : wt.errorMessage && wt.status === 'needs-sync' ? html`
-        <div style="font-size:12px;color:var(--accent,#007acc);padding:2px 10px 6px 28px;">${wt.errorMessage}</div>
+        <div style="font-size:12px;color:var(--accent,#007acc);padding:2px 10px 6px 32px;">${wt.errorMessage}</div>
+      ` : wt.warningMessage && wt.status === 'success' ? html`
+        <div style="font-size:12px;color:var(--text-warning,#e5a50a);padding:2px 10px 6px 32px;">${wt.warningMessage}</div>
       ` : ''}
     `;
   }
@@ -291,7 +331,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           </span>
         </div>
         ${entry.status === 'failure' && entry.errorMessage ? html`
-          <div style="font-size:12px;color:var(--error,#e53e3e);padding:2px 10px 6px 28px;">${entry.errorMessage}</div>
+          <div style="font-size:12px;color:var(--error,#e53e3e);padding:2px 10px 6px 32px;">${entry.errorMessage}</div>
         ` : ''}
       </div>
     `;
@@ -412,7 +452,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       url: r.url,
       status: "success" as const,
       expanded: false,
-      worktrees: r.worktrees.map(w => typeof w === 'string' ? { name: w, status: 'success' as const } : { name: w.name, status: w.status || 'success' }),
+      worktrees: r.worktrees.map(w => ({ name: w, status: 'success' as const })),
       newWorktreeValue: "",
       showNewWorktreeInput: false,
     }));
@@ -444,7 +484,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private _addCreateRepo(): void {
+  private async _addCreateRepo(): Promise<void> {
     const url = this._newRepoValue.trim();
     if (!url) return;
     // Validate URL has a protocol
@@ -459,7 +499,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
     setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0);
     // Start validation immediately
-    this._verifyRepo(this._createRepos.length - 1);
+    await this._verifyRepo(this._createRepos.length - 1);
   }
 
   private _removeCreateRepo(index: number): void {
@@ -467,24 +507,25 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private _verifyRepo(index: number): void {
+  private async _verifyRepo(index: number): Promise<void> {
     const repo = this._createRepos[index];
     if (!repo || repo.status === "success" || repo.status === "validating") return;
     repo.status = "validating";
+    repo.errorMessage = undefined;
     this._emitUpdate();
-    setTimeout(() => {
-      const msgs = [
-        "Repository not found at this URL",
-        "Access denied: no permission to clone",
-        "Connection refused: host unreachable",
-        "Invalid repository URL format",
-        "Authentication required"
-      ];
-      const success = Math.random() > 0.3;
-      repo.status = success ? "success" : "failure";
-      if (!success) repo.errorMessage = msgs[Math.floor(Math.random() * msgs.length)];
-      this._emitUpdate();
-    }, 1500);
+    try {
+      const result = await this._bridge.workspaceData.checkRepoAccess(repo.url);
+      if (result.ok) {
+        repo.status = "success";
+      } else {
+        repo.status = "failure";
+        repo.errorMessage = result.error || "Repository not accessible";
+      }
+    } catch (e) {
+      repo.status = "failure";
+      repo.errorMessage = (e as Error).message || "Verification failed";
+    }
+    this._emitUpdate();
   }
 
   private _toggleRepoExpanded(index: number): void {
@@ -494,7 +535,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private _addWorktree(repoIndex: number): void {
+  private async _addWorktree(repoIndex: number): Promise<void> {
     const repo = this._createRepos[repoIndex];
     if (!repo) return;
     const name = repo.newWorktreeValue.trim();
@@ -505,43 +546,48 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
     setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0);
     // Trigger verification
-    this._verifyWorktree(repoIndex, repo.worktrees.length - 1);
+    await this._verifyWorktree(repoIndex, repo.worktrees.length - 1);
   }
 
-  private _verifyWorktree(repoIndex: number, wtIndex: number): void {
+  private async _verifyWorktree(repoIndex: number, wtIndex: number): Promise<void> {
     const repo = this._createRepos[repoIndex];
     if (!repo) return;
     const wt = repo.worktrees[wtIndex];
     if (!wt || wt.status === "success" || wt.status === "validating") return;
     wt.status = "validating";
+    wt.errorMessage = undefined;
     this._emitUpdate();
-    setTimeout(() => {
-      const outcomes = [
-        { status: "success" as const },
-        { status: "success" as const },
-        { status: "failure" as const, errorMessage: "No local or remote branch found with this name" },
-        { status: "diverged" as const, errorMessage: "Local and remote branches have diverged. Resolve divergence before checking out." },
-        { status: "needs-sync" as const, errorMessage: "Branch is ahead/behind remote. Sync to continue." },
-      ];
-      const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
-      wt.status = outcome.status;
-      if (outcome.errorMessage) wt.errorMessage = outcome.errorMessage;
-      this._emitUpdate();
-    }, 1500);
+    try {
+      const result = await this._bridge.workspaceData.checkWorktreeBranch("", repo.url, wt.name);
+      wt.status = result.status;
+      if (result.error) wt.errorMessage = result.error;
+      wt.warningMessage = result.warning || undefined;
+    } catch (e) {
+      wt.status = "failure";
+      wt.errorMessage = (e as Error).message || "Verification failed";
+    }
+    this._emitUpdate();
   }
 
-  private _syncWorktree(repoIndex: number, wtIndex: number): void {
+  private async _syncWorktree(repoIndex: number, wtIndex: number): Promise<void> {
     const repo = this._createRepos[repoIndex];
     if (!repo) return;
     const wt = repo.worktrees[wtIndex];
     if (!wt || wt.status !== "needs-sync") return;
+    // Re-verify after sync (in real git, this would trigger git pull)
     wt.status = "validating";
     wt.errorMessage = undefined;
     this._emitUpdate();
-    setTimeout(() => {
-      wt.status = "success";
-      this._emitUpdate();
-    }, 1000);
+    try {
+      const result = await this._bridge.workspaceData.checkWorktreeBranch("", repo.url, wt.name);
+      wt.status = result.status;
+      if (result.error) wt.errorMessage = result.error;
+      wt.warningMessage = result.warning || undefined;
+    } catch (e) {
+      wt.status = "failure";
+      wt.errorMessage = (e as Error).message || "Sync failed";
+    }
+    this._emitUpdate();
   }
 
   private _removeWorktree(repoIndex: number, wtIndex: number): void {
@@ -564,6 +610,40 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._nameError = "";
     const data = await workspaceFileService.createWorkspace(name);
     if (data) {
+      // Check for failures — only save verified repos
+      let hasDiverged = false;
+      let hasFailures = false;
+      for (const entry of this._createRepos) {
+        if (entry.status === "diverged") hasDiverged = true;
+        if (entry.status === "failure") hasFailures = true;
+      }
+      if (hasDiverged || hasFailures) {
+        // Don't save — let user fix verification first
+        return;
+      }
+
+      // Clone bare repos and checkout worktrees
+      for (const entry of this._createRepos) {
+        if (entry.status !== "success") continue;
+        const cloneResult = await this._bridge.workspaceData.cloneBareRepo(entry.url);
+        if (!cloneResult.ok) {
+          entry.status = "failure";
+          entry.errorMessage = cloneResult.error || "Clone failed";
+          this._emitUpdate();
+          continue;
+        }
+        // Checkout worktrees
+        for (const wt of entry.worktrees) {
+          if (wt.status !== "success") continue;
+          const wtResult = await this._bridge.workspaceData.checkoutWorktree(entry.url, wt.name);
+          if (!wtResult.ok) {
+            wt.status = "failure";
+            wt.errorMessage = wtResult.error || "Worktree checkout failed";
+            this._emitUpdate();
+          }
+        }
+      }
+
       // Persist verified repos with their worktrees
       for (const entry of this._createRepos) {
         if (entry.status === "success") {
@@ -571,7 +651,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
       }
       if (this._createRepos.length > 0) {
-        await window.openp41ge.dialog.writeWorkspaceFile(
+        await this._bridge.dialog.writeWorkspaceFile(
           `~/.openp41ge/workspaces/${data.id}.openp41ge-workspace`,
           data
         );
@@ -591,7 +671,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private async _onDeleteWorkspace(entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
+  private async _onDeleteWorkspace(_entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
     // We can't easily delete via IPC right now — just skip
     // For now, let the user manage files manually
   }
@@ -615,11 +695,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   private async _onChangeDataDir(): Promise<void> {
-    const folder = await window.openp41ge.dialog.pickFolder();
+    const folder = await this._bridge.dialog.pickFolder();
     if (!folder || !this._selected) return;
     this._selected.data.dataDir = folder;
     // Persist to disk
-    await window.openp41ge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
+    await this._bridge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
     this._emitUpdate();
   }
 
@@ -627,7 +707,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     if (!this._selected) return;
     const val = (e.target as HTMLInputElement).value;
     this._selected.data.name = val || undefined;
-    await window.openp41ge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
+    await this._bridge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
     this._emitUpdate();
   }
 
@@ -653,28 +733,25 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._addInputValue = "";
     this._emitUpdate();
     setTimeout(() => { const el = document.querySelector('.detail-repo-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0);
-    // Verify
+    // Verify via real git check
     const repo = this._detailRepos[index];
     repo.status = "validating";
+    repo.errorMessage = undefined;
     this._emitUpdate();
-    setTimeout(async () => {
-      const msgs = [
-        "Repository not found at this URL",
-        "Access denied: no permission to clone",
-        "Connection refused: host unreachable",
-        "Invalid repository URL format",
-        "Authentication required"
-      ];
-      const success = Math.random() > 0.3;
-      if (success) {
+    try {
+      const result = await this._bridge.workspaceData.checkRepoAccess(url);
+      if (result.ok) {
         repo.status = "success";
         await this._syncDetailReposToFile();
       } else {
         repo.status = "failure";
-        repo.errorMessage = msgs[Math.floor(Math.random() * msgs.length)];
+        repo.errorMessage = result.error || "Repository not accessible";
       }
-      this._emitUpdate();
-    }, 1500);
+    } catch (e) {
+      repo.status = "failure";
+      repo.errorMessage = (e as Error).message || "Verification failed";
+    }
+    this._emitUpdate();
   }
 
   private _onAddCancel(): void {
@@ -691,52 +768,47 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
   }
 
-  private _detailVerifyRepo(index: number): void {
+  private async _detailVerifyRepo(index: number): Promise<void> {
     const repo = this._detailRepos[index];
     if (!repo || repo.status === "success" || repo.status === "validating") return;
     repo.status = "validating";
+    repo.errorMessage = undefined;
     this._emitUpdate();
-    setTimeout(async () => {
-      const msgs = [
-        "Repository not found at this URL",
-        "Access denied: no permission to clone",
-        "Connection refused: host unreachable",
-        "Invalid repository URL format",
-        "Authentication required"
-      ];
-      const success = Math.random() > 0.3;
-      if (success) {
+    try {
+      const result = await this._bridge.workspaceData.checkRepoAccess(repo.url);
+      if (result.ok) {
         repo.status = "success";
         await this._syncDetailReposToFile();
       } else {
         repo.status = "failure";
-        repo.errorMessage = msgs[Math.floor(Math.random() * msgs.length)];
+        repo.errorMessage = result.error || "Repository not accessible";
       }
-      this._emitUpdate();
-    }, 1500);
+    } catch (e) {
+      repo.status = "failure";
+      repo.errorMessage = (e as Error).message || "Verification failed";
+    }
+    this._emitUpdate();
   }
 
-  private _detailVerifyWorktree(repoIndex: number, wtIndex: number): void {
+  private async _detailVerifyWorktree(repoIndex: number, wtIndex: number): Promise<void> {
     const repo = this._detailRepos[repoIndex];
     if (!repo) return;
     const wt = repo.worktrees[wtIndex];
     if (!wt || wt.status === "success" || wt.status === "validating") return;
     wt.status = "validating";
+    wt.errorMessage = undefined;
     this._emitUpdate();
-    setTimeout(async () => {
-      const outcomes = [
-        { status: "success" as const },
-        { status: "success" as const },
-        { status: "failure" as const, errorMessage: "No local or remote branch found with this name" },
-        { status: "diverged" as const, errorMessage: "Local and remote branches have diverged. Resolve divergence before checking out." },
-        { status: "needs-sync" as const, errorMessage: "Branch is ahead/behind remote. Sync to continue." },
-      ];
-      const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
-      wt.status = outcome.status;
-      if (outcome.errorMessage) wt.errorMessage = outcome.errorMessage;
-      if (outcome.status === "success") await this._syncDetailReposToFile();
-      this._emitUpdate();
-    }, 1500);
+    try {
+      const result = await this._bridge.workspaceData.checkWorktreeBranch("", repo.url, wt.name);
+      wt.status = result.status;
+      if (result.error) wt.errorMessage = result.error;
+      wt.warningMessage = result.warning || undefined;
+      if (result.status === "success") await this._syncDetailReposToFile();
+    } catch (e) {
+      wt.status = "failure";
+      wt.errorMessage = (e as Error).message || "Verification failed";
+    }
+    this._emitUpdate();
   }
 
   private async _detailSyncWorktree(repoIndex: number, wtIndex: number): Promise<void> {
@@ -744,20 +816,79 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     if (!repo) return;
     const wt = repo.worktrees[wtIndex];
     if (!wt || wt.status !== "needs-sync") return;
+    // Re-verify after sync
     wt.status = "validating";
     wt.errorMessage = undefined;
     this._emitUpdate();
-    setTimeout(async () => {
-      wt.status = "success";
-      await this._syncDetailReposToFile();
-      this._emitUpdate();
-    }, 1000);
+    try {
+      const result = await this._bridge.workspaceData.checkWorktreeBranch("", repo.url, wt.name);
+      wt.status = result.status;
+      if (result.error) wt.errorMessage = result.error;
+      wt.warningMessage = result.warning || undefined;
+      if (result.status === "success") await this._syncDetailReposToFile();
+    } catch (e) {
+      wt.status = "failure";
+      wt.errorMessage = (e as Error).message || "Sync failed";
+    }
+    this._emitUpdate();
   }
 
   private async _syncDetailReposToFile(): Promise<void> {
     if (!this._selected) return;
     this._selected.data.repos = this._detailRepos.map(r => ({ url: r.url, worktrees: r.worktrees.map(w => w.name) }));
-    await window.openp41ge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
+    await this._bridge.dialog.writeWorkspaceFile(this._selected.filePath, this._selected.data);
+  }
+
+  /**
+   * Clone bare repos and checkout worktrees for a set of entries.
+   * Updates status and errorMessage in place for any failures.
+   * Returns true if all operations succeeded.
+   */
+  private async _cloneReposAndCheckoutWorktrees(entries: CreateRepoEntry[]): Promise<boolean> {
+    let allOk = true;
+    for (const entry of entries) {
+      if (entry.status !== "success") {
+        allOk = false;
+        continue;
+      }
+      // Clone bare repo
+      if (!(await this._bridge.workspaceData.repoAlreadyCloned(entry.url))) {
+        const cloneResult = await this._bridge.workspaceData.cloneBareRepo(entry.url);
+        if (!cloneResult.ok) {
+          entry.status = "failure";
+          entry.errorMessage = cloneResult.error || "Clone failed";
+          allOk = false;
+          continue;
+        }
+      }
+      // Checkout worktrees
+      for (const wt of entry.worktrees) {
+        if (wt.status !== "success") {
+          allOk = false;
+          continue;
+        }
+        const wtResult = await this._bridge.workspaceData.checkoutWorktree(entry.url, wt.name);
+        if (!wtResult.ok) {
+          wt.status = "failure";
+          wt.errorMessage = wtResult.error || "Worktree checkout failed";
+          allOk = false;
+        }
+      }
+    }
+    return allOk;
+  }
+
+  /**
+   * Handle detail view Save button:
+   * 1. Clone bare repos and checkout worktrees
+   * 2. Sync to disk
+   * 3. Return to list view
+   */
+  private async _onDetailSave(): Promise<void> {
+    if (!this._selected) return;
+    await this._cloneReposAndCheckoutWorktrees(this._detailRepos);
+    await this._syncDetailReposToFile();
+    this._showList();
   }
 
   private async _onCopy(e: MouseEvent, path: string): Promise<void> {
@@ -813,7 +944,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     return html`
       <style>
         .wm-wrap { display:flex; flex-direction:column; height:100%; overflow:hidden; position:relative; }
-        .cr-row { }
+        .cr-row { outline:none; }
+        .cr-row:focus-visible { outline:2px solid var(--accent,#007acc); outline-offset:-2px; }
         .wm-view {
           position:absolute; inset:0;
           transition:transform .25s ease, opacity .2s ease;
@@ -941,9 +1073,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       </div>
                     `)}
                     <!-- + add repository row (not draggable, always shown) -->
-                    <div class="cr-row" tabindex="0"
+                    <div class="cr-row add-repo-trigger" tabindex="0"
                       style="${this._addRepoRowStyle()}"
                       @click=${() => { this._repoUrlError = ""; this._newRepoValue = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                      @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { (e.currentTarget as HTMLElement).click(); } }}
                       @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                       @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                     >
@@ -979,14 +1112,39 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                       () => this._syncWorktree(i, wtIndex),
                                     ))}
                                   ${entry.showNewWorktreeInput ? html`
-                                    <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+                                    <div class="cr-row" tabindex="-1" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
                                       <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                                       <input
                                         type="text"
                                         placeholder="Branch or path"
                                         .value=${entry.newWorktreeValue}
                                         @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
-                                        @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._addWorktree(i); }}
+                                        @keydown=${(e: KeyboardEvent) => {
+                                          if (e.key === 'Enter') this._addWorktree(i);
+                                          if (e.key === 'Escape') {
+                                            entry.showNewWorktreeInput = false;
+                                            entry.newWorktreeValue = '';
+                                            this._emitUpdate();
+                                            setTimeout(() => {
+                                              const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
+                                              if (wrapper) {
+                                                const trigger = wrapper.querySelector('.add-wt-trigger');
+                                                if (trigger instanceof HTMLElement) trigger.focus();
+                                              }
+                                            }, 0);
+                                          }
+                                          if (e.key === 'ArrowUp') {
+                                            e.preventDefault();
+                                            const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
+                                            if (wrapper) {
+                                              const rows = wrapper.querySelectorAll('.cr-row');
+                                              if (rows.length > 1) {
+                                                const lastRow = rows[rows.length - 2];
+                                                if (lastRow instanceof HTMLElement) lastRow.focus();
+                                              }
+                                            }
+                                          }
+                                        }}
                                         style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;font-family:inherit;"
                                         class="wt-input" autofocus
                                       />
@@ -994,8 +1152,18 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                                     </div>
                                   ` : ''}
                                 </div>
-                                <div
+                                <div class="add-wt-trigger"
                                   style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
+                                  tabindex="-1"
+                                  @keydown=${(e: KeyboardEvent) => {
+                                    if (e.key === 'ArrowUp') {
+                                      e.preventDefault();
+                                      const all = Array.from((e.currentTarget as HTMLElement).closest('.repo-wrapper')?.querySelectorAll('.cr-row') ?? []);
+                                      const idx = all.indexOf(e.currentTarget as HTMLElement);
+                                      const prev = all[idx - 1];
+                                      if (prev instanceof HTMLElement) prev.focus();
+                                    }
+                                  }}
                                   @click=${() => { entry.showNewWorktreeInput = true; entry.newWorktreeValue = ""; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                                   @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                                   @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
@@ -1021,7 +1189,24 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                             class="new-repo-input"
                             .value=${this._newRepoValue}
                             @input=${(e: Event) => { this._newRepoValue = (e.target as HTMLInputElement).value; this._repoUrlError = ''; }}
-                            @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._addCreateRepo(); }}
+                            @keydown=${(e: KeyboardEvent) => {
+                              if (e.key === 'Enter') this._addCreateRepo();
+                              if (e.key === 'Escape') {
+                                this._showNewRepoInput = false;
+                                this._repoUrlError = '';
+                                this._emitUpdate();
+                                setTimeout(() => {
+                                  const trigger = document.querySelector('.add-repo-trigger');
+                                  if (trigger instanceof HTMLElement) trigger.focus();
+                                }, 0);
+                              }
+                              if (e.key === 'ArrowUp' && this._createRepos.length > 0) {
+                                // Focus the last repo row's header
+                                const wrappers = document.querySelectorAll('.repo-wrapper .cr-row');
+                                const last = wrappers[wrappers.length - 1];
+                                if (last instanceof HTMLElement) last.focus();
+                              }
+                            }}
                             style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
                             autofocus
                           />
@@ -1033,9 +1218,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       </div>
                     ` : ''}
                     <!-- + add repository row -->
-                    <div class="cr-row" tabindex="0"
+                    <div class="cr-row add-repo-trigger" tabindex="0"
                       style="${this._addRepoRowStyle()}"
                       @click=${() => { this._repoUrlError = ""; this._newRepoValue = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                      @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { (e.currentTarget as HTMLElement).click(); } }}
                       @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                       @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
                     >
@@ -1144,14 +1330,39 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                             async () => { this._detailSyncWorktree(i, wtIndex); },
                           ))}
                         ${entry.showNewWorktreeInput ? html`
-                          <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+                          <div class="cr-row" tabindex="-1" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
                             <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
                             <input
                               type="text"
                               placeholder="Branch or path"
                               .value=${entry.newWorktreeValue}
                               @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
-                              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { const name = entry.newWorktreeValue.trim(); entry.worktrees.push({ name, status: 'unverified' }); entry.newWorktreeValue = ''; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0); this._detailVerifyWorktree(i, entry.worktrees.length - 1); } } }}
+                              @keydown=${(e: KeyboardEvent) => {
+                                if (e.key === 'Enter') { if (entry.newWorktreeValue.trim()) { const name = entry.newWorktreeValue.trim(); entry.worktrees.push({ name, status: 'unverified' }); entry.newWorktreeValue = ''; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) { el.value = ''; el.focus(); } }, 0); this._detailVerifyWorktree(i, entry.worktrees.length - 1); } }
+                                if (e.key === 'Escape') {
+                                  entry.showNewWorktreeInput = false;
+                                  entry.newWorktreeValue = '';
+                                  this._emitUpdate();
+                                  setTimeout(() => {
+                                    const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
+                                    if (wrapper) {
+                                      const trigger = wrapper.querySelector('.add-wt-trigger');
+                                      if (trigger instanceof HTMLElement) trigger.focus();
+                                    }
+                                  }, 0);
+                                }
+                                if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
+                                  if (wrapper) {
+                                    const rows = wrapper.querySelectorAll('.cr-row');
+                                    if (rows.length > 1) {
+                                      const lastRow = rows[rows.length - 2];
+                                      if (lastRow instanceof HTMLElement) lastRow.focus();
+                                    }
+                                  }
+                                }
+                              }}
                               style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;font-family:inherit;"
                               class="wt-input" autofocus
                             />
@@ -1159,8 +1370,18 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                           </div>
                         ` : ''}
                       </div>
-                      <div
+                      <div class="add-wt-trigger"
                         style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
+                        tabindex="-1"
+                        @keydown=${(e: KeyboardEvent) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const all = Array.from((e.currentTarget as HTMLElement).closest('.repo-wrapper')?.querySelectorAll('.cr-row') ?? []);
+                            const idx = all.indexOf(e.currentTarget as HTMLElement);
+                            const prev = all[idx - 1];
+                            if (prev instanceof HTMLElement) prev.focus();
+                          }
+                        }}
                         @click=${() => { entry.showNewWorktreeInput = true; entry.newWorktreeValue = ""; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
                         @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
                         @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
@@ -1198,9 +1419,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               </div>
             ` : ''}
             <!-- + add repository row -->
-            <div class="cr-row" tabindex="0"
+            <div class="cr-row add-repo-trigger" tabindex="0"
               style="${this._detailAddRepoRowStyle()}"
               @click=${() => { this._showAddInput = true; this._addInputValue = ""; this._detailRepoUrlError = ""; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.detail-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { (e.currentTarget as HTMLElement).click(); } }}
               @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
               @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
             >
@@ -1221,7 +1443,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
             @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
             @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
-            @click=${async () => { await this._syncDetailReposToFile(); this._showList(); }}
+            @click=${() => this._onDetailSave()}
           >Save</button>
         </div>
       </div>

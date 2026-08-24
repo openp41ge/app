@@ -552,4 +552,17 @@ contextBridge.exposeInMainWorld("openp41ge", {
     setRepoOrder: (name, order) => ipcRenderer.invoke("project:setRepoOrder", name, order),
     rename: (oldName, newName) => ipcRenderer.invoke("project:rename", oldName, newName),
   },
+
+  /** Workspace manager git operations (workspace-data/ directory). */
+  workspaceData: {
+    checkRepoAccess: (url) => ipcRenderer.invoke("workspaceData:checkRepoAccess", url),
+    checkWorktreeBranch: (wsDir, url, branch) =>
+      ipcRenderer.invoke("workspaceData:checkWorktreeBranch", wsDir, url, branch),
+    repoAlreadyCloned: (url) => ipcRenderer.invoke("workspaceData:repoAlreadyCloned", url),
+    cloneBareRepo: (url) => ipcRenderer.invoke("workspaceData:cloneBareRepo", url),
+    checkoutWorktree: (url, branch) =>
+      ipcRenderer.invoke("workspaceData:checkoutWorktree", url, branch),
+    encodeRepoUrl: (url) => ipcRenderer.invoke("workspaceData:encodeRepoUrl", url),
+    getDir: () => ipcRenderer.invoke("workspaceData:getDir"),
+  },
 });
