@@ -80,6 +80,8 @@ export const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Dispatched when a sidebar tab is dropped. */
 export const SIDEBAR_DROP_EVENT = "sidebar-tab-drop";
 
+export const SIDEBAR_TAB_BUTTON_SELECTOR = "[data-sidebar-tab-id]";
+
 /** Dispatched on <openp41ge-windowview> to expand the bottom pane. */
 export const BP_EXPAND_EVENT = "bp-expand";
 

@@ -18,7 +18,7 @@ import type { IDragSource, IDropTarget, DragResult, TargetFeedback } from "../..
 
 
 
-import { SIDEBAR_DROP_EVENT } from "openp41ge-constants";
+import { SIDEBAR_DROP_EVENT, SIDEBAR_TAB_BUTTON_SELECTOR } from "openp41ge-constants";
 
 function getTabButtonsInSidebarBar(bar: HTMLElement): HTMLElement[] {
   return Array.from(bar.querySelectorAll(SIDEBAR_TAB_BUTTON_SELECTOR)).filter(
