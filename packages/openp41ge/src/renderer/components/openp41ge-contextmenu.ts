@@ -6,7 +6,7 @@ import { LitElement, html, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 
-type MenuItem = { label?: string; action?: () => void; children?: MenuItem[]; type?: "separator" };
+type MenuItem = { label?: string; action?: () => void; children?: MenuItem[]; type?: "separator"; badge?: string };
 
 class Openp41geContextMenu extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -148,7 +148,15 @@ class Openp41geContextMenu extends LitElement {
               }}
             >
               <span>${item.label ?? ""}</span>
-              ${hasChildren ? html`<span class="text-muted ml-4">▸</span>` : ""}
+              ${item.badge
+                ? html`<span
+                    class="flex-none ml-3 h-4 min-w-4 px-1 inline-flex items-center justify-center rounded bg-[#3f3f3f] text-[10px] text-secondary py-0"
+                    style="box-sizing:border-box"
+                    >${item.badge}</span
+                  >`
+                : hasChildren
+                ? html`<span class="text-muted ml-4">▸</span>`
+                : ""}
             </div>
           `;
         })}

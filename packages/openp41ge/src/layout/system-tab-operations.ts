@@ -70,21 +70,10 @@ export function openSystemTab(
   let win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
 
-  // Close any unpinned active tab across ALL sidebars before opening a new one,
-  // unless the unpinned tab has associated editor tabs still open (e.g. a
-  // project-detail tab opened from the Projects sidebar).
-  for (const s of ["left" as const, "right" as const]) {
-    const activeTabId = s === "left" ? win.sidebar?.activeLeftTab : win.sidebar?.activeRightTab;
-    if (activeTabId) {
-      const prevTab = workspace.systemTabs[activeTabId as SystemTabId];
-      if (prevTab && !prevTab.pinned && !_hasOpenChildren(workspace, activeTabId)) {
-        workspace = closeSystemTab(workspace, winId, s, activeTabId);
-        const w = workspace.windows.find((w) => w.id === winId);
-        if (!w) return workspace;
-        win = w;
-      }
-    }
-  }
+  // NOTE: Tabs accumulate — opening a new tab type does NOT close the
+  // previously active tab. Sidebar tabs behave like pinned tabs: all open
+  // types stay open, one instance per appType, and picking an already-open
+  // type just activates it (handled below).
 
   // Check if appType already exists in ANY sidebar of this window
   const leftSidebarTabs = win.sidebar?.leftSidebarTabs ?? [];

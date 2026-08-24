@@ -10,6 +10,9 @@ import { property, state } from "lit/decorators.js";
 import { emitEvent } from "../app";
 import { appState } from "../services/app-state";
 import type { SystemTabRegistration } from "../controllers/types";
+import { allSystemTabRegistrations } from "../apps/system-tabs";
+import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
+import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 
 // Keep in sync with openp41ge-windowview if changed
 
@@ -87,11 +90,72 @@ class Openp41geSidebar extends LitElement {
     emitEvent("sidebar-toggle", { windowId: this.windowId, side: this.side });
   }
 
+  // ═══ + add-tab menu ─────────────────────────────────────────────────
+
+  /**
+   * Which side(s) each sidebar-tab appType is currently open in, for the
+   * + menu's R/L badges (from workspace state, not local props).
+   */
+  private _openSidesFor(appType: string): string {
+    const ws = this.workspaceData as unknown as {
+      windows?: Array<{ id: string; sidebar?: { leftSidebarTabs?: string[]; rightSidebarTabs?: string[] } }>;
+      systemTabs?: Record<string, { appType?: string }>;
+    } | null;
+    const win = ws?.windows?.find((w) => w.id === this.windowId);
+    const sysTabs = ws?.systemTabs ?? {};
+    const inLeft = (win?.sidebar?.leftSidebarTabs ?? []).some((id) => sysTabs[id]?.appType === appType);
+    const inRight = (win?.sidebar?.rightSidebarTabs ?? []).some((id) => sysTabs[id]?.appType === appType);
+    if (inLeft && inRight) return "R/L";
+    if (inRight) return "R";
+    if (inLeft) return "L";
+    return "";
+  }
+
+  /** Open the inline + menu listing all registered sidebar tabs. */
+  private _onAddTabClick(): void {
+    const btn = this.querySelector(".sidebar-tab-add") as HTMLElement | null;
+    const r = btn?.getBoundingClientRect();
+    const menu = document.createElement("openp41ge-contextmenu") as Openp41geContextMenuElement;
+    // Anchor the menu so it drops below the + button, right-aligned to it,
+    // and stays inside the viewport (never negative x).
+    menu.x = Math.max(8, (r?.right ?? 160) - 160);
+    menu.y = (r?.bottom ?? 0) + 2;
+    menu.items = allSystemTabRegistrations.map((reg: SystemTabRegistration) => ({
+      label: reg.label,
+      badge: this._openSidesFor(reg.id),
+      action: () => emitOpenSystemTab(this.windowId, reg.id, reg.label, reg.defaultSide),
+    }));
+    document.body.appendChild(menu);
+  }
+
   private _onTabBarScroll(e: Event): void {
     const target = e.target as HTMLElement;
     this._scrollLeft = target.scrollLeft;
     this._hasOverflow = target.scrollWidth - target.clientWidth > 2;
   }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Keep the scroll overflow/shadow state in sync when the sidebar is
+    // resized (no scroll event fires on resize, and width is parent-set).
+    this._resizeObserver = new ResizeObserver(() => {
+      const el = this.querySelector<HTMLElement>(".sidebar-tab-scroll");
+      if (el) {
+        this._scrollLeft = el.scrollLeft;
+        this._hasOverflow = el.scrollWidth - el.clientWidth > 2;
+      }
+    });
+    this._resizeObserver.observe(this);
+  }
+
+  disconnectedCallback(): void {
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
+    super.disconnectedCallback();
+  }
+
+  private _resizeObserver: ResizeObserver | null = null;
+
 
   /** True when this sidebar is the focused sidebar and the window is active. */
   private get _isFocused(): boolean {
@@ -171,12 +235,13 @@ class Openp41geSidebar extends LitElement {
         <style>
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
           .sidebar-tab-close:hover { background: var(--bg-hover-strong, #444); }
+          .sidebar-tab-add:hover { background: var(--bg-hover-strong, #444); }
         </style>
 
         <!-- System tab bar -->
         <div class="sidebar-tab-bar relative shrink-0${this.systemTabs.length > 0 ? ' border-b border-divider' : ''}" data-sidebar-tab-bar="${this.side}">
           ${this.systemTabs.length > 0 ? html`
-            <div class="sidebar-tab-scroll flex items-stretch overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;" @scroll=${this._onTabBarScroll}>
+            <div class="sidebar-tab-scroll flex items-stretch overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;margin-right:29px;" @scroll=${this._onTabBarScroll}>
               ${this.systemTabs.map((tab, idx) => {
                 const isActive = tab.id === this.activeTabId;
                 const isLast = idx === this.systemTabs.length - 1;
@@ -206,8 +271,17 @@ class Openp41geSidebar extends LitElement {
               })}
             </div>
           ` : nothing}
-          ${this._showLeftShadow ? html`<div class="absolute top-0 left-0 w-4 h-full pointer-events-none" style="background:linear-gradient(to right, rgba(0,0,0,0.3), transparent)"></div>` : nothing}
-          ${this._showRightShadow ? html`<div class="absolute top-0 right-0 w-4 h-full pointer-events-none" style="background:linear-gradient(to left, rgba(0,0,0,0.3), transparent)"></div>` : nothing}
+          <div class="absolute top-0 left-0 w-4 h-full pointer-events-none" style="opacity:${this._showLeftShadow ? 1 : 0};transition:opacity .12s ease;background:linear-gradient(to right, rgba(0,0,0,0.35), transparent)"></div>
+          <div class="absolute top-0 w-4 h-full pointer-events-none" style="right:29px;opacity:${this._showRightShadow ? 1 : 0};transition:opacity .12s ease;background:linear-gradient(to left, rgba(0,0,0,0.35), transparent)"></div>
+          <!-- + button: open inline menu of registered sidebar tabs -->
+          <div
+            class="sidebar-tab-add absolute top-0 flex items-center justify-center cursor-pointer select-none transition-colors duration-75"
+            style="height:18px;width:18px;top:8px;right:7px;color:var(--text-secondary,#999);z-index:2;border-radius:3px;"
+            title="Open sidebar tab"
+            @click=${this._onAddTabClick}
+            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.color = "var(--text-primary,#ccc)"; }}
+            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.color = "var(--text-secondary,#999)"; }}
+          >＋</div>
         </div>
 
         <!-- Content area -->

@@ -184,6 +184,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   margin-left: 0.5rem
 }
 
+.ml-3 {
+  margin-left: 0.75rem
+}
+
 .ml-4 {
   margin-left: 1rem
 }
@@ -440,6 +444,10 @@ export const tailwindCSS: string = `.pointer-events-none {
   min-width: 0px
 }
 
+.min-w-4 {
+  min-width: 1rem
+}
+
 .min-w-7 {
   min-width: 1.75rem
 }
@@ -478,6 +486,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 
 .flex-1 {
   flex: 1 1 0%
+}
+
+.flex-none {
+  flex: none
 }
 
 .flex-shrink {
@@ -808,6 +820,11 @@ export const tailwindCSS: string = `.pointer-events-none {
   background-color: rgb(51 51 51 / var(--tw-bg-opacity, 1))
 }
 
+.bg-\\[\\#3f3f3f\\] {
+  --tw-bg-opacity: 1;
+  background-color: rgb(63 63 63 / var(--tw-bg-opacity, 1))
+}
+
 .bg-\\[\\#4a9eff\\] {
   --tw-bg-opacity: 1;
   background-color: rgb(74 158 255 / var(--tw-bg-opacity, 1))
@@ -1133,6 +1150,10 @@ export const tailwindCSS: string = `.pointer-events-none {
 .text-5xl {
   font-size: 3rem;
   line-height: 1
+}
+
+.text-\\[10px\\] {
+  font-size: 10px
 }
 
 .text-\\[11px\\] {

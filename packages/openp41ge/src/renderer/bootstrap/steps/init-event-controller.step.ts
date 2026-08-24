@@ -15,6 +15,7 @@ import { createLayoutHandlers } from "../../handlers/layout.handlers";
 import { initDebugAPI } from "../../debug-api";
 import { workspaceFileService } from "../../services/workspace-file-service";
 import { setEventRouter } from "../../app";
+import { emitOpenSystemTab } from "../../components/openp41ge-worktree-controller";
 
 /**
  * Bootstrap step: initialize the event controller system.
@@ -99,17 +100,16 @@ export class InitEventControllerStep implements IStartupStep {
 
     // 10. Listen for workspace file changes to add/remove sidebar tabs
     document.addEventListener("workspace-file-changed", () => {
-      // When a workspace file is loaded, add explorer and git sidebar tabs
+      // When a workspace file is loaded, open explorer and git sidebar tabs
+      // (direct dispatch — the DOM-event route drops args). Explorer/git use
+      // their default right sidebar and open it, so the files panel shows.
       if (workspaceFileService.activeData) {
-        // Find the first window ID from the workspace state
         const ws = context.workspaceState.getWorkspace();
         const winId = ws?.windows?.[0]?.id;
         if (winId) {
-          router.emit("tab-open-system", { windowId: winId, side: "right", appType: "explorer", title: "Explorer" });
-          router.emit("tab-open-system", { windowId: winId, side: "right", appType: "git", title: "Git" });
+          emitOpenSystemTab(winId, "explorer", "Explorer");
+          emitOpenSystemTab(winId, "git", "Git");
         }
-      } else {
-        // Workspace file closed — sidebar tabs will be handled by the model
       }
     });
 
@@ -120,8 +120,8 @@ export class InitEventControllerStep implements IStartupStep {
         const ws = context.workspaceState.getWorkspace();
         const winId = ws?.windows?.[0]?.id;
         if (winId) {
-          router.emit("tab-open-system", { windowId: winId, side: "right", appType: "explorer", title: "Explorer" });
-          router.emit("tab-open-system", { windowId: winId, side: "right", appType: "git", title: "Git" });
+          emitOpenSystemTab(winId, "explorer", "Explorer");
+          emitOpenSystemTab(winId, "git", "Git");
         }
       }
     }, 100);

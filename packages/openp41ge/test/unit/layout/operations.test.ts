@@ -846,6 +846,24 @@ describe("system tab operations", () => {
     expect(win.sidebar?.rightSidebarTabs).toHaveLength(1);
   });
 
+  test("openSystemTab accumulates tabs (one per appType) instead of replacing", () => {
+    const ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+
+    const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
+    const r2 = ops.openSystemTab(r1, winId, "right", "git", "Git");
+    const win = r2.windows[0];
+    // Both tab types stay open — opening a new type no longer closes the previous
+    expect(win.sidebar?.rightSidebarTabs).toHaveLength(2);
+
+    // Re-requesting an existing type just activates the existing tab (no duplicate)
+    const r3 = ops.openSystemTab(r2, winId, "right", "explorer", "Explorer");
+    const win3 = r3.windows[0];
+    expect(win3.sidebar?.rightSidebarTabs).toHaveLength(2);
+    const sysTabs = r3.systemTabs as Record<string, { appType?: string }>;
+    expect(sysTabs[win3.sidebar?.activeRightTab as string]?.appType).toBe("explorer");
+  });
+
   test("toggleSidebar toggles the sidebar open state", () => {
     const ws = addDefaultSidebarTabs(types.createWorkspace("ws1"));
     const winId = ws.windows[0].id;

@@ -26,8 +26,7 @@ export function isWorktreeOpen(): boolean {
   return (win.sidebar?.rightSidebarOpen ?? false) && win.sidebar?.activeRightTab != null;
 }
 
-/**
- * Toggle the right sidebar open/closed.
+/** Toggle the right sidebar open/closed.
  * Uses the new toggleSidebar operation.
  */
 export function toggleWorktree(): void {
@@ -39,6 +38,31 @@ export function toggleWorktree(): void {
   if (!win) return;
 
   emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
+}
+
+/**
+ * Open a system (sidebar) tab.
+ *
+ * Uses the direct workspace dispatch → openSystemTab operation (the same
+ * proven path worktree-tree uses), which:
+ *   - if the appType already exists in any sidebar → activates it there and
+ *     opens that sidebar;
+ *   - otherwise → creates the tab and opens it in the given default sidebar
+ *     (explorer/git → right, search → left).
+ *
+ * Note: the DOM-event route (tab-open-system → graph → handler) was found to
+ * drop the positional args before reaching the operation, so we dispatch
+ * directly instead.
+ */
+export function emitOpenSystemTab(winId: string, appType: string, title: string, side?: "left" | "right"): void {
+  const defaultSides: Record<string, "left" | "right"> = {
+    explorer: "right",
+    git: "right",
+    projects: "left",
+    search: "left",
+  };
+  const resolvedSide = side ?? defaultSides[appType] ?? "right";
+  window.openp41ge?.workspace?.dispatch?.("openSystemTab", winId, resolvedSide, appType, title);
 }
 
 interface WorktreeTreeWithDialog extends Openp41geWorktreeTreeElement {

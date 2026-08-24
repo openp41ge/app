@@ -12,6 +12,7 @@ import type { WorkspaceFileData } from "../../../layout/types";
 import { workspaceFileService } from "../../services/workspace-file-service";
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { toastService } from "../../components/openp41ge-toast";
+import { emitOpenSystemTab } from "../../components/openp41ge-worktree-controller";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bridge = (): any => window.openp41ge;
@@ -670,6 +671,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   private async _activateWorkspace(entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
     workspaceFileService.activateWorkspace(entry);
+    // Activating a workspace always opens its default sidebar tab (Explorer →
+    // right sidebar); the openSystemTab op creates it if needed, or opens and
+    // activates the existing one.
+    try {
+      const winId = window.openp41ge.workspace.getWindowId();
+      if (winId) emitOpenSystemTab(winId, "explorer", "Explorer");
+    } catch {
+      // ignore — explorer opening is best-effort alongside workspace-file-changed
+    }
     this._emitUpdate();
   }
 
