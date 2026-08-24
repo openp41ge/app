@@ -105,11 +105,10 @@ class Openp41geWorkspaceSearch extends LitElement {
     this.querySelector<HTMLInputElement>(SEARCH_INPUT_SELECTOR)?.focus();
   }
 
-  private _searchBar(manager: WorkspaceManagerModal): TemplateResult {
+  private _searchHeader(manager: WorkspaceManagerModal): TemplateResult {
     return html`
       <div
-        style="display:flex;align-items:center;gap:6px;flex-shrink:0;height:40px;padding:0 10px;border-bottom:1px solid var(--border-divider,#2d2d2d);"
-        -webkit-app-region="no-drag"
+        style="position:absolute;top:4px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;width:440px;box-sizing:border-box;height:40px;padding:0 10px;border:1px solid var(--border-divider,#2d2d2d);border-bottom:none;border-radius:6px 6px 0 0;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);-webkit-app-region:no-drag;"
       >
         <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)">
           <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
@@ -142,13 +141,11 @@ class Openp41geWorkspaceSearch extends LitElement {
 
     if (open && manager) {
       return html`
+        ${this._searchHeader(manager)}
         <div
-          style="position:absolute;top:4px;left:50%;transform:translateX(-50%);width:440px;height:min(70vh,560px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border-divider,#2d2d2d);border-radius:6px;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);-webkit-app-region:no-drag;"
+          style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:440px;height:min(70vh,516px);overflow:hidden;border:1px solid var(--border-divider,#2d2d2d);border-radius:0 0 6px 6px;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);-webkit-app-region:no-drag;"
         >
-          ${this._searchBar(manager)}
-          <div style="flex:1;min-height:0;overflow:hidden;">
-            ${manager.render()}
-          </div>
+          ${manager.render()}
         </div>
       `;
     }
