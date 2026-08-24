@@ -1130,16 +1130,22 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           cursor:text;
         }
         .wsc-field-repos { cursor:default; }
+        .wsc-field:focus-within {
+          outline:2px solid var(--accent,#007acc);
+          outline-offset:-2px;
+        }
         .wsc-field:not(.wsc-field-repos) input:focus,
         .wsc-field:not(.wsc-field-repos) input:focus-visible {
           outline:none;
           box-shadow:none;
         }
-        .wsc-field-repos:focus-within {
-          outline:2px solid var(--accent,#007acc);
-          outline-offset:-2px;
+        .wsc-field-repos .repo-wrapper {
+          border-color: rgba(255,255,255,.2) !important;
         }
-        .wsc-field-repos .cr-row + .cr-row { border-top:1px solid var(--divider,#333); }
+        .wsc-field-repos .repo-wrapper + .cr-row,
+        .wsc-field-repos .cr-row + .cr-row {
+          border-top: 1px solid rgba(255,255,255,.2);
+        }
         .wsc-label {
           display:block;
           font-size:12px;
