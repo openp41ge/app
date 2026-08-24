@@ -143,7 +143,7 @@ class Openp41geWorkspaceSearch extends LitElement {
       return html`
         ${this._searchHeader(manager)}
         <div
-          style="position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);width:440px;height:min(70vh,520px);overflow:hidden;border:1px solid var(--border-divider,#2d2d2d);border-radius:6px;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);-webkit-app-region:no-drag;"
+          style="position:absolute;top:calc(100% - 1px);left:50%;transform:translateX(-50%);width:440px;height:min(70vh,520px);overflow:hidden;border:1px solid var(--border-divider,#2d2d2d);border-radius:0 0 6px 6px;background:var(--bg-primary,#1e1e1e);box-shadow:0 12px 32px rgba(0,0,0,0.45);-webkit-app-region:no-drag;"
         >
           ${manager.render()}
         </div>
