@@ -1128,12 +1128,14 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           outline:none;
           box-shadow:none;
         }
-        .wsc-field-repos .repo-wrapper {
+        .wsc-field-repos .repo-wrapper:not(:has(> .cr-row + div)) {
           border:none !important;
           background:transparent !important;
           border-radius:0 !important;
           margin:0 !important;
         }
+        /* Expanded repos keep their detached boxed look (inline border,
+           radius, 4px margin) untouched. */
         /* Each row keeps a subtle background so rows read as distinct */
         .wsc-field-repos .cr-row,
         .wsc-field-repos .add-wt-trigger {
