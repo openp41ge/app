@@ -178,20 +178,23 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const reposCount = repos.length;
     const worktreesCount = repos.reduce((s, r) => s + (r.worktrees?.length ?? 0), 0);
     const stats = this._stats.get(entry.filePath);
+    const showEdits = !!stats && (stats.added > 0 || stats.deleted > 0 || stats.untracked > 0);
     return html`
       <span>${reposCount} ${reposCount === 1 ? "repo" : "repos"}</span>
       <span class="wm-meta-sep">·</span>
       <span>${worktreesCount} ${worktreesCount === 1 ? "worktree" : "worktrees"}</span>
-      <span class="wm-meta-sep">·</span>
-      ${stats
-        ? html`
-            <span class="wm-add">+${stats.added}</span>
-            <span class="wm-del">−${stats.deleted}</span>
-            ${stats.untracked > 0
-              ? html`<span class="wm-meta-sep">·</span><span>${stats.untracked} untracked</span>`
-              : nothing}
-          `
-        : html`<span class="wm-meta-loading">…</span>`}
+      ${!stats
+        ? html`<span class="wm-meta-sep">·</span><span class="wm-meta-loading">…</span>`
+        : showEdits
+          ? html`
+              <span class="wm-meta-sep">·</span>
+              ${stats.added > 0 ? html`<span class="wm-add">+${stats.added}</span>` : nothing}
+              ${stats.deleted > 0 ? html`<span class="wm-del">−${stats.deleted}</span>` : nothing}
+              ${stats.untracked > 0
+                ? html`<span class="wm-meta-sep">·</span><span>${stats.untracked} untracked</span>`
+                : nothing}
+            `
+          : nothing}
     `;
   }
 
@@ -1090,12 +1093,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           padding:12px 14px; margin:6px 10px; border-radius:8px;
           background:var(--bg-primary,#252526);
           border:1px solid var(--divider,#333);
-          cursor:default;
+          cursor:pointer;
           position:relative;
           transition:background .1s, border-color .1s;
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
-        .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:100px; }
+        .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:78px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
           display:flex; align-items:center; justify-content:center;
@@ -1109,20 +1112,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-add { color:#4caf50; }
         .wm-del { color:#ef5350; }
         .wm-meta-loading { opacity:.6; }
-        .wm-card-footer { display:flex; justify-content:flex-end; margin-top:8px; }
         .wm-btn.activate { background:rgba(0,122,204,.2); color:var(--accent,#007acc); padding:5px 14px; }
         .wm-btn.activate:hover { background:rgba(0,122,204,.3); color:var(--accent,#007acc); }
         .wm-card-active-pill {
           padding:2px 10px; border-radius:999px; font-size:11px;
           background:rgba(0,122,204,.15); color:var(--accent,#007acc);
         }
-        .wm-card-edit {
-          display:flex; align-items:center; justify-content:center;
-          background:transparent; border:none; cursor:pointer;
-          color:var(--text-secondary,#999); padding:3px; border-radius:4px;
-          transition:background .1s, color .1s;
-        }
-        .wm-card-edit:hover { color:var(--text-primary,#ccc); background:var(--bg-hover-strong,#333); }
         .wm-btn {
           padding:3px 8px; font-size:12px; border:none; border-radius:4px;
           cursor:pointer; background:transparent; color:var(--text-secondary,#999);
@@ -1413,12 +1408,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               : this._filteredWorkspaces.length === 0
                 ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
                 : this._filteredWorkspaces.map((entry) => html`
-                  <div class="wm-card ${isActive(entry) ? 'active' : ''}">
-                    <div style="position:absolute;top:8px;right:12px;display:flex;align-items:center;gap:6px;">
+                  <div class="wm-card ${isActive(entry) ? 'active' : ''}" @click=${() => this._showDetail(entry)}>
+                    <div style="position:absolute;top:8px;right:12px;">
                       ${isActive(entry) ? html`<span class="wm-card-active-pill">Active</span>` : nothing}
-                      <button class="wm-card-edit" title="Edit workspace" @click=${(e: MouseEvent) => { e.stopPropagation(); this._showDetail(entry); }}>
-                        <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-56q0-17 6-32l584-584q12-12 27-18t31-6q16 0 31 6t27 18l52 52q12 12 18 27t6 31q0 16-6 31t-18 27l-584 584q-15 15-30 21t-32 6h-56Zm0-80h56l568-568-56-56-568 568v56Zm640-616-56-56 56 56Z"/></svg>
-                      </button>
                     </div>
                     <div class="wm-card-title">${entry.data.name ?? "(unnamed)"}</div>
                     <div class="wm-card-sub">
@@ -1428,11 +1420,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       </button>
                     </div>
                     <div class="wm-card-meta">${this._cardMeta(entry)}</div>
-                    ${isActive(entry) ? nothing : html`
-                      <div class="wm-card-footer">
-                        <button class="wm-btn activate" @click=${(e: MouseEvent) => { e.stopPropagation(); this._activateWorkspace(entry); }}>Activate</button>
-                      </div>
-                    `}
                   </div>
                 `)}
           ` : ''}
@@ -1472,8 +1459,18 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
+    const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
-      <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;min-height:100%;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 0;gap:8px;">
+        <div class="wm-back" @click=${() => this._showList()}>
+          <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/></svg>
+          <span>Back</span>
+        </div>
+        ${active
+          ? html`<span class="wm-card-active-pill">Active</span>`
+          : html`<button class="wm-btn activate" @click=${() => this._activateWorkspace(entry)}>Activate</button>`}
+      </div>
+      <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;">
         <div style="padding:12px 14px;">
           <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Name</label>
           <div style="display:flex;align-items:center;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--divider,#333);border-radius:6px;">
