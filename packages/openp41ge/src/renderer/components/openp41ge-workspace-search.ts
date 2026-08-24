@@ -156,7 +156,7 @@ class Openp41geWorkspaceSearch extends LitElement {
 
     return html`
       <div
-        style="display:flex;align-items:center;gap:6px;width:min(400px, calc(100vw - 248px));height:26px;padding:0 10px;box-sizing:border-box;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
+        style="display:flex;align-items:center;gap:6px;width:min(400px, calc(100vw - 270px));height:26px;padding:0 10px;box-sizing:border-box;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
         title="Manage workspaces"
         @click=${this._toggleOpen}
         @mouseenter=${(e: MouseEvent) => {
