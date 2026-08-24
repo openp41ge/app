@@ -108,28 +108,32 @@ class Openp41geWorkspaceSearch extends LitElement {
   private _searchHeader(manager: WorkspaceManagerModal): TemplateResult {
     return html`
       <div
-        style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;width:260px;box-sizing:border-box;height:26px;padding:0 10px;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);-webkit-app-region:no-drag;"
+        style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:440px;height:34px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border-left:1px solid var(--border-divider,#2d2d2d);border-right:1px solid var(--border-divider,#2d2d2d);-webkit-app-region:no-drag;"
       >
-        <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)">
-          <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Z"/>
-        </svg>
-        <input
-          type="text"
-          data-workspace-search-input
-          placeholder="Search workspaces… (name, repo, worktree)"
-          .value=${manager.query}
-          @input=${(e: Event) => this._onQueryInput(e, manager)}
-          style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
-        />
-        ${manager.query
-          ? html`
-              <button
-                @click=${() => this._clearQuery(manager)}
-                title="Clear search"
-                style="flex-shrink:0;background:transparent;border:none;cursor:pointer;color:var(--text-secondary,#999);font-size:13px;line-height:1;padding:2px;"
-              >✕</button>
-            `
-          : nothing}
+        <div
+          style="display:flex;align-items:center;gap:6px;width:calc(100% - 16px);box-sizing:border-box;height:26px;padding:0 10px;border:1px solid var(--border-divider,#2d2d2d);border-radius:4px;background:var(--bg-secondary,#252526);"
+        >
+          <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)">
+            <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Z"/>
+          </svg>
+          <input
+            type="text"
+            data-workspace-search-input
+            placeholder="Search workspaces… (name, repo, worktree)"
+            .value=${manager.query}
+            @input=${(e: Event) => this._onQueryInput(e, manager)}
+            style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
+          />
+          ${manager.query
+            ? html`
+                <button
+                  @click=${() => this._clearQuery(manager)}
+                  title="Clear search"
+                  style="flex-shrink:0;background:transparent;border:none;cursor:pointer;color:var(--text-secondary,#999);font-size:13px;line-height:1;padding:2px;"
+                >✕</button>
+              `
+            : nothing}
+        </div>
       </div>
     `;
   }
