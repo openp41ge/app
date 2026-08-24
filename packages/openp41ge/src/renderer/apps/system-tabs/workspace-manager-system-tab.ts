@@ -1048,7 +1048,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
         .wm-card.active { border-color:var(--accent,#007acc); }
-        .wm-card-title { font-size:14px; color:var(--text-primary,#ccc); font-weight:500; padding-right:80px; }
+        .wm-card-title { font-size:14px; color:var(--text-primary,#ccc); font-weight:500; padding-right:100px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
           display:flex; align-items:center; justify-content:center;
@@ -1058,18 +1058,22 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-card-copy:hover { color:var(--text-primary,#ccc); background:var(--bg-hover-strong,#333); }
         .wm-card-active-pill {
-          position:absolute; top:8px; right:12px;
           padding:2px 10px; border-radius:999px; font-size:11px;
           background:rgba(0,122,204,.15); color:var(--accent,#007acc);
         }
+        .wm-card-edit {
+          display:flex; align-items:center; justify-content:center;
+          background:transparent; border:none; cursor:pointer;
+          color:var(--text-secondary,#999); padding:3px; border-radius:4px;
+          transition:background .1s, color .1s;
+        }
+        .wm-card-edit:hover { color:var(--text-primary,#ccc); background:var(--bg-hover-strong,#333); }
         .wm-btn {
           padding:3px 8px; font-size:12px; border:none; border-radius:4px;
           cursor:pointer; background:transparent; color:var(--text-secondary,#999);
           transition:background .1s, color .1s;
         }
         .wm-btn:hover { background:var(--bg-hover-strong,#333); color:var(--text-primary,#ccc); }
-        .wm-btn.activate { position:absolute; top:8px; right:12px; background:rgba(0,122,204,.15); color:var(--accent,#007acc); padding:4px 12px; }
-        .wm-btn.activate:hover { background:rgba(0,122,204,.25); color:var(--accent,#007acc); }
 
         .wm-create-area {
           margin:6px 10px; padding:10px 14px; border-radius:8px;
@@ -1354,10 +1358,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               : this._filteredWorkspaces.length === 0
                 ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
                 : this._filteredWorkspaces.map((entry) => html`
-                  <div class="wm-card ${isActive(entry) ? 'active' : ''}" @click=${() => this._showDetail(entry)}>
-                    ${isActive(entry)
-                      ? html`<span class="wm-card-active-pill">Active</span>`
-                      : html`<button class="wm-btn activate" @click=${(e: MouseEvent) => { e.stopPropagation(); this._activateWorkspace(entry); }}>Activate</button>`}
+                  <div class="wm-card ${isActive(entry) ? 'active' : ''}" @click=${() => this._activateWorkspace(entry)}>
+                    <div style="position:absolute;top:8px;right:12px;display:flex;align-items:center;gap:6px;">
+                      ${isActive(entry) ? html`<span class="wm-card-active-pill">Active</span>` : nothing}
+                      <button class="wm-card-edit" title="Edit workspace" @click=${(e: MouseEvent) => { e.stopPropagation(); this._showDetail(entry); }}>
+                        <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-56q0-17 6-32l584-584q12-12 27-18t31-6q16 0 31 6t27 18l52 52q12 12 18 27t6 31q0 16-6 31t-18 27l-584 584q-15 15-30 21t-32 6h-56Zm0-80h56l568-568-56-56-568 568v56Zm640-616-56-56 56 56Z"/></svg>
+                      </button>
+                    </div>
                     <div class="wm-card-title">${entry.data.name ?? "(unnamed)"}</div>
                     <div class="wm-card-sub">
                       <span>${entry.data.id.slice(0, 8)}</span>
