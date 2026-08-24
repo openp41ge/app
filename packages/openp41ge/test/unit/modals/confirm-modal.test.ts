@@ -92,6 +92,150 @@ describe("openp41ge-confirm-modal — showConfirmModal", () => {
     return promise;
   });
 
+  // ── Checkbox opt-in behaviour ─────────────────────────────────────
+
+  describe("opt-in checkbox", () => {
+    test("renders checkbox when checkboxLabel is provided", () => {
+      const promise = showConfirmModal({
+        message: "Delete workspace?",
+        checkboxLabel: "Also delete workspace data on disk",
+      });
+      const el = document.body.querySelector("openp41ge-confirm-modal");
+      expect(el!.textContent).toContain("Also delete workspace data on disk");
+      expect(el!.querySelector(".openp41ge-confirm-checkbox input")).toBeTruthy();
+      // Cleanup
+      (el!.querySelector(".openp41ge-confirm-cancel") as HTMLElement)?.click();
+      return promise;
+    });
+
+    test("does not render checkbox without checkboxLabel", () => {
+      const promise = showConfirmModal({ message: "Delete workspace?" });
+      const el = document.body.querySelector("openp41ge-confirm-modal");
+      expect(el!.querySelector(".openp41ge-confirm-checkbox input")).toBeNull();
+      (el!.querySelector(".openp41ge-confirm-cancel") as HTMLElement)?.click();
+      return promise;
+    });
+
+    test("renders checkbox detail as a subtitle in the card", () => {
+      const promise = showConfirmModal({
+        message: "Delete workspace?",
+        checkboxLabel: "Also delete data",
+        checkboxDetail: "Removes the data directory.",
+      });
+      const el = document.body.querySelector("openp41ge-confirm-modal");
+      expect(el!.querySelector(".openp41ge-confirm-checkbox-card")).toBeTruthy();
+      expect(el!.textContent).toContain("Removes the data directory.");
+      (el!.querySelector(".openp41ge-confirm-cancel") as HTMLElement)?.click();
+      return promise;
+    });
+
+    test("clicking the card toggles the checkbox without closing the modal", async () => {
+      const promise = showConfirmModal({
+        message: "Delete workspace?",
+        checkboxLabel: "Also delete data",
+      });
+      const card = document.body.querySelector(".openp41ge-confirm-checkbox-card") as HTMLElement;
+      card?.click();
+      const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+      expect(checkbox!.checked).toBe(true);
+      expect(document.body.querySelector("openp41ge-confirm-modal")).toBeTruthy();
+      // Cleanup
+      (document.body.querySelector(".openp41ge-confirm-cancel") as HTMLElement)?.click();
+      await promise;
+    });
+
+    test("confirm with unchecked checkbox resolves confirmed true, checked false", async () => {
+      const promise = showConfirmModal({
+        message: "Delete workspace?",
+        confirmLabel: "Delete",
+        checkboxLabel: "Also delete data",
+      });
+      const okBtn = document.body.querySelector(".openp41ge-confirm-ok") as HTMLElement;
+      okBtn?.click();
+      const result = await promise;
+      expect(result).toEqual({ confirmed: true, checked: false });
+    });
+
+    test("confirm with checked checkbox resolves confirmed true, checked true", async () => {
+      const promise = showConfirmModal({
+        message: "Delete workspace?",
+        confirmLabel: "Delete",
+        checkboxLabel: "Also delete data",
+      });
+      const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+      checkbox?.click();
+      const okBtn = document.body.querySelector(".openp41ge-confirm-ok") as HTMLElement;
+      okBtn?.click();
+      const result = await promise;
+      expect(result).toEqual({ confirmed: true, checked: true });
+    });
+
+    test("cancel resolves confirmed false, checked false even when checked", async () => {
+      const promise = showConfirmModal({
+        message: "Delete workspace?",
+        checkboxLabel: "Also delete data",
+      });
+      const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+      checkbox?.click();
+      const cancelBtn = document.body.querySelector(".openp41ge-confirm-cancel") as HTMLElement;
+      cancelBtn?.click();
+      const result = await promise;
+      expect(result).toEqual({ confirmed: false, checked: false });
+    });
+
+    test("Tab cycle includes checkbox between Cancel and Confirm", () => {
+      showConfirmModal({
+        message: "Test?",
+        checkboxLabel: "Also delete data",
+      });
+      return new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+          const cancelBtn = document.body.querySelector(".openp41ge-confirm-cancel") as HTMLElement;
+          const okBtn = document.body.querySelector(".openp41ge-confirm-ok") as HTMLElement;
+
+          // Initial focus on Confirm
+          expect(document.activeElement).toBe(okBtn);
+          // Tab: Confirm → Checkbox (wraps to first focusable in DOM order)
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+          expect(document.activeElement).toBe(checkbox);
+          // Tab: Checkbox → Cancel
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+          expect(document.activeElement).toBe(cancelBtn);
+          // Tab: Cancel → Confirm
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+          expect(document.activeElement).toBe(okBtn);
+
+          cancelBtn.click();
+          resolve();
+        });
+      });
+    });
+
+    test("Enter on focused checkbox toggles it without confirming or re-rendering the modal away", async () => {
+      const promise = showConfirmModal({
+        message: "Delete workspace?",
+        checkboxLabel: "Also delete data",
+      });
+      const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+      checkbox?.focus();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+      expect(checkbox!.checked).toBe(true);
+
+      // Flush Lit's scheduled update (if any) to ensure no re-render wipes
+      // the modal content (regression guard: the checkbox must NOT be reactive).
+      await new Promise((r) => setTimeout(r, 0));
+      expect(document.body.querySelector(".openp41ge-confirm-checkbox input")).toBeTruthy();
+      expect(document.body.querySelector("openp41ge-confirm-modal")).toBeTruthy();
+
+      // Cleanup — cancel to dismiss
+      (document.body.querySelector(".openp41ge-confirm-cancel") as HTMLElement)?.click();
+      const result = await promise;
+      expect(result).toEqual({ confirmed: false, checked: false });
+    });
+  });
+
   // ── Modal lockdown tests ───────────────────────────────────────
 
   describe("modal lockdown", () => {
