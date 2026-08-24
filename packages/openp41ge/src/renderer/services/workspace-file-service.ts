@@ -17,6 +17,22 @@ export class WorkspaceFileService {
   /** Parsed contents of the active workspace file. */
   activeData: WorkspaceFileData | null = null;
 
+  /**
+   * Human-readable name of the active workspace:
+   * `data.name` if set, else the workspace file's basename (minus the
+   * `.openp41ge-workspace` extension), else "No workspace".
+   */
+  get activeWorkspaceName(): string {
+    const name = this.activeData?.name?.trim();
+    if (name) return name;
+    if (this.activeFilePath) {
+      const base = this.activeFilePath.split(/[\\/]/).pop() ?? "";
+      const cleaned = base.replace(/\.openp41ge-workspace$/i, "").trim();
+      if (cleaned) return cleaned;
+    }
+    return "No workspace";
+  }
+
   // ── Open (via dialog) ───────────────────────────────
 
   /**

@@ -12,6 +12,8 @@ import type { Window } from "../../layout/types";
 import { emitEvent } from "../app";
 import { TITLEBAR_HEIGHT } from "openp41ge-constants";
 
+import "./openp41ge-workspace-search";
+
 const isMac = (() => {
   try {
     return window.openp41ge?.platform === "darwin" || navigator.platform.startsWith("Mac");
@@ -92,6 +94,11 @@ class Openp41geTitleBar extends LitElement {
               : "M500-640v320l160-160-160-160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm120-80v-560H200v560h120Zm80 0h360v-560H400v560Zm-80 0H200h120Z"}"></path>
           </svg>
         </div>
+
+        <!-- Workspace search bar -->
+        <openp41ge-workspace-search
+          style="margin-right:12px;-webkit-app-region:no-drag;"
+        ></openp41ge-workspace-search>
 
         <!-- Spacer to push content to the right -->
         <div class="flex-1 min-w-0"></div>

@@ -1,15 +1,14 @@
 /**
  * <openp41ge-windowview> — top-level component for a Openp41ge window (Lit).
  *
- * Owns the sidebar resize handles. Bottom area uses a thin bottom bar
- * with a workspace indicator. System tabs replaced by a service modal.
+ * Owns the sidebar resize handles. Bottom area uses a thin (empty) bar
+ * reserved for future use. System tabs replaced by a service modal.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import type { Window, Workspace, Rect, SystemTabId } from "../../layout/types";
 import { emitEvent } from "../app";
-import { serviceModalService } from "../services/service-modal-service";
 
 import { setContextMenuActive } from "../services/drag-context";
 import { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, NOTCH_WIDTH, NOTCH_OVERFLOW } from "openp41ge-constants";
@@ -158,12 +157,6 @@ class Openp41geWindowView extends LitElement {
     localStorage.setItem("openp41ge:sidebar-width-left", String(this._leftWidth));
     localStorage.setItem("openp41ge:sidebar-width-right", String(this._rightWidth));
   };
-
-  // ═══ Bottom bar handlers ──────────────────────────────────────────────
-
-  private _onBarWorkspaceClick(): void {
-    serviceModalService.openModal("workspace-manager");
-  }
 
   // ═══ Helpers ─────────────────────────────────────────────────────────
 
@@ -325,20 +318,12 @@ class Openp41geWindowView extends LitElement {
         <!-- Service modal (fixed overlay, renders above grid) -->
         <openp41ge-service-modal></openp41ge-service-modal>
 
-        <!-- Bottom bar: workspace indicator, right-aligned (Settings moved to the app menu) -->
+        <!-- Bottom bar: empty placeholder bar (kept for future use) -->
         <div
           class="wv-bottom-bar"
           style="border-top:1px solid var(--divider,#333);height:24px;flex-shrink:0;display:flex;align-items:center;padding:0 4px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary,#252526);"
         >
           <span style="flex:1"></span>
-          <openp41ge-bottom-bar-btn
-            title="Open workspaces"
-            @click=${() => this._onBarWorkspaceClick()}
-          >
-            <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
-              <path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/>
-            </svg>
-          </openp41ge-bottom-bar-btn>
         </div>
       </div>
     `;
