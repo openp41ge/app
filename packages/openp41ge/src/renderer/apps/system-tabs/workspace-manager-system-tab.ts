@@ -1780,7 +1780,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
     const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 0;gap:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 12px;gap:8px;flex-shrink:0;border-bottom:1px solid var(--divider,#333);">
         <div class="wm-back" title="Back" @click=${() => this._showList()}>
           <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/></svg>
         </div>
