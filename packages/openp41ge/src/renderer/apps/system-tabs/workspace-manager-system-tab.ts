@@ -307,7 +307,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** Stacked status lines: coloured dot + text + optional action pill. */
   private _renderStatusList(items: StatusItem[]): TemplateResult {
     return html`
-      <div class="wsc-status-list" style="display:flex;flex-direction:column;gap:4px;padding:6px 12px 6px 20px;">
+      <div class="wsc-status-list" style="display:flex;flex-direction:column;gap:4px;">
         ${items.map((it) => html`
           <div style="display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;">
             <span style="flex:1;min-width:0;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
@@ -1345,7 +1345,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           background: rgba(255,255,255,.04);
         }
         .wsc-field-repos .wsc-status-list {
+          padding: 6px 12px 6px 32px;
           background: rgba(255,255,255,.04);
+        }
+        /* Status list nested inside a worktree row: the cr-row already adds
+           10px left padding, so use less so text still aligns with the name. */
+        .wsc-field-repos .wsc-wt-row .wsc-status-list {
+          padding-left: 22px;
         }
         .wsc-field-repos .add-wt-trigger {
           border-top-color: var(--wsc-sep) !important;
