@@ -319,7 +319,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             <span style="flex:1;min-width:0;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
             ${it.action ? (it.action.icon
               ? html`
-              <span class="wsc-status-icon-btn" flex-shrink="0" title=${it.action.title} style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;color:var(--text-secondary,#999);cursor:pointer;"
+              <span class="wsc-status-icon-btn" flex-shrink="0" title=${it.action.title} style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--text-secondary,#999);cursor:pointer;transition:background .1s;"
+                @mouseenter=${(e: Event) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.18)'; }}
+                @mouseleave=${(e: Event) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.08)'; }}
                 @click=${(e: Event) => { e.stopPropagation(); it.action!.onClick(); }}>
                 <openp41ge-inline-icon name=${it.action.icon} size="11" no-hover></openp41ge-inline-icon>
               </span>
@@ -460,18 +462,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   /** Repo-level sync indicator: warning when any worktree needs attention, else a green check. */
-  private _repoSyncIcon(entry: CreateRepoEntry): TemplateResult {
-    const warnColor = "var(--text-warning,#e5a50a)";
-    const affected = entry.worktrees.filter((wt) =>
-      wt.status === "needs-sync" || wt.status === "diverged" || wt.status === "failure");
-    if (affected.length > 0) {
-      const labels = affected.map((wt) => wt.name).join(", ");
-      return html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} no-hover title=${`${affected.length} worktree(s) need sync/resync: ${labels}`}></openp41ge-inline-icon>`;
-    }
-    const anyVerified = entry.worktrees.some((wt) => wt.status !== "unverified" && wt.status !== "validating");
-    return html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title=${anyVerified ? "All worktrees in sync" : "Ready to clone"}></openp41ge-inline-icon>`;
-  }
-
   /** Style string for a repo wrapper based on expanded/collapsed state and neighbor state. */
   private _repoWrapperStyle(i: number, entry: CreateRepoEntry, repos?: CreateRepoEntry[]): string {
     const arr = repos ?? this._createRepos;
@@ -1901,7 +1891,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       </div>
                     ` : null,
                     html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._onRemoveRepo(i); })}</div>`,
-                    this._repoSyncIcon(entry),
+                    html``, // no trailing status icon — sync state is shown in the status list below
                     () => { this._detailRepos[i].expanded = !this._detailRepos[i].expanded; this._emitUpdate(); },
                     this._repoStatusContent(i, entry, () => { this._detailRepos[i].expanded = !this._detailRepos[i].expanded; this._emitUpdate(); }),
                   )
