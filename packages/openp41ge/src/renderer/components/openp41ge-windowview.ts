@@ -14,6 +14,7 @@ import { setContextMenuActive } from "../services/drag-context";
 import { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, NOTCH_WIDTH, NOTCH_OVERFLOW } from "openp41ge-constants";
 
 import "./openp41ge-sidebar";
+import "./openp41ge-workspaces-overlay";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -313,6 +314,8 @@ class Openp41geWindowView extends LitElement {
             class="sidebar-element ${win.sidebar?.rightSidebarOpen ? '' : 'sidebar-element-hidden'}"
             style="flex: 0 1 ${this._rightWidth}px; max-width: min(${this._rightWidth}px, 35vw)"
           ></openp41ge-sidebar>
+          <!-- Workspaces overlay: covers the tab + sidebar area only -->
+          <openp41ge-workspaces-overlay></openp41ge-workspaces-overlay>
         </div>
 
         <!-- Service modal (fixed overlay, renders above grid) -->

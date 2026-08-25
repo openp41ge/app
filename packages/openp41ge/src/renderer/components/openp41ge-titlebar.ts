@@ -95,7 +95,7 @@ class Openp41geTitleBar extends LitElement {
           </svg>
         </div>
 
-        <!-- Workspace search bar (centered, dropdown anchored below) -->
+        <!-- Workspace button (centered, toggles the workspaces overlay) -->
         <openp41ge-workspace-search
           style="position:absolute;left:50%;transform:translateX(-50%);top:0;height:100%;display:flex;align-items:center;z-index:1000;-webkit-app-region:no-drag;"
         ></openp41ge-workspace-search>

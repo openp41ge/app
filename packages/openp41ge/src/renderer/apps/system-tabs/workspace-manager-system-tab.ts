@@ -1,15 +1,16 @@
 /**
- * Workspace manager modal controller — list + detail views.
+ * Workspace manager controller — two-pane overlay (left list, right detail/create).
  *
- * List view shows all .openp41ge-workspace files from
- * ~/.openp41ge/workspaces/. Clicking a workspace slides to a detail
- * view with its settings. "New Workspace" creates a new workspace file.
+ * Hosted by <openp41ge-workspaces-overlay>, which covers the tab/sidebar area.
+ * The left pane lists workspaces; clicking a workspace activates its detail
+ * (or the create form) in the right pane. No view transitions.
  */
 
 import { html, nothing, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 import type { WorkspaceFileData } from "../../../layout/types";
 import { workspaceFileService, workspaceMatchesQuery } from "../../services/workspace-file-service";
+import { workspacesOverlayService } from "../../services/workspaces-overlay-service";
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { toastService } from "../../components/openp41ge-toast";
 import { emitOpenSystemTab } from "../../components/openp41ge-worktree-controller";
@@ -99,15 +100,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     return this._createName.trim().length > 0;
   }
 
-  /**
-   * Whether the panel renders its own search box. When hosted in the
-   * title-bar pill the search input lives in the pill instead (no duplicates).
-   */
-  private readonly _showSearch: boolean;
-
-  constructor(tabId: string, options?: { showSearch?: boolean }) {
+  constructor(tabId: string) {
     this.id = tabId;
-    this._showSearch = options?.showSearch ?? true;
   }
 
   /** Search query driving the workspace filter (used by a hosted search input). */
@@ -126,11 +120,23 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   mount(): void {
-    document.addEventListener("workspace-modal:back", this._onModalBack);
     this._loadWorkspaces();
-    // Focus the search input so "click the pill → type → filter" works
-    // immediately (HTML `autofocus` doesn't fire on dynamically mounted nodes).
+    // Focus the overlay search input once the pane is in the DOM.
     setTimeout(() => this._focusSearch(), 0);
+  }
+
+  unmount(): void {
+    // Nothing global to tear down — this controller holds no document listeners.
+  }
+
+  /** Open straight into the create form (File > New Workspace). */
+  startCreate(): void {
+    this._showCreate();
+  }
+
+  /** Open on the workspace list (title-bar button / File > Open Workspace). */
+  startList(): void {
+    this._showList();
   }
 
   private _focusSearch(): void {
@@ -679,17 +685,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   // ── Navigation ──────────────────────────────────────────────────
 
-  private _onModalBack = (): void => {
-    if (this._creating) {
-      this._creating = false;
-      this._emitUpdate();
-    } else if (this._view === "detail") {
-      this._showList();
-    }
-  };
-
   private _showDetail(entry: { filePath: string; data: WorkspaceFileData }): void {
     this._selected = entry;
+    this._creating = false;
     this._view = "detail";
     this._detailRepos = entry.data.repos.map(r => ({
       url: r.url,
@@ -1261,35 +1259,64 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
     return html`
       <style>
-        .wm-wrap { display:flex; flex-direction:column; overflow:hidden; position:relative; }
+        .wm-wrap { display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; position:relative; }
         .cr-row { outline:none; }
         .cr-row:focus-visible { outline:2px solid var(--accent,#007acc); outline-offset:-2px; }
-        .wm-view {
-          position:absolute; inset:0;
-          transition:transform .25s ease, opacity .2s ease;
-          display:flex; flex-direction:column;
+
+        /* Overlay top bar (below the window title bar) */
+        .wm-topbar {
+          display:flex; align-items:center; gap:8px; flex-shrink:0;
+          padding:8px 10px; border-bottom:1px solid var(--divider,#333);
+          background:var(--bg-secondary,#252526);
         }
-        .wm-view.list {
-          position:relative;
-          max-height:min(70vh, 520px);
-          transform:translateX(0); opacity:1;
+        .wm-search-box {
+          display:flex; align-items:center; gap:6px; flex:1; min-width:0; height:26px;
+          padding:0 8px; border:1px solid var(--divider,#333); border-radius:6px;
+          background:rgba(255,255,255,.04);
         }
-        .wm-view.list.slide-out {
-          position:absolute; inset:0;
-          max-height:none;
-          transform:translateX(-40px); opacity:0;
-          pointer-events:none;
+        .wm-search-box input { flex:1; min-width:0; background:transparent; border:none; outline:none; color:var(--text-primary,#ccc); font-size:12px; }
+        .wm-search-box input::placeholder { color:var(--text-placeholder,#6e6e6e); }
+        .wm-tb-new {
+          display:inline-flex; align-items:center; gap:4px; flex-shrink:0;
+          height:24px; padding:0 10px; border:none; border-radius:4px; cursor:pointer;
+          background:rgba(0,122,204,.15); color:var(--accent,#007acc);
+          font-size:12px; font-weight:600;
         }
-        .wm-view.detail {
-          transform:translateX(40px); opacity:0;
-          pointer-events:none;
+        .wm-tb-new:hover { background:rgba(0,122,204,.25); }
+        .wm-tb-close {
+          display:flex; align-items:center; justify-content:center; flex-shrink:0;
+          width:22px; height:22px; border-radius:4px; cursor:pointer; color:var(--text-secondary,#999);
         }
-        .wm-view.detail.slide-in {
-          position:relative;
-          max-height:min(70vh, 520px);
-          transform:translateX(0); opacity:1;
-          pointer-events:auto;
+        .wm-tb-close:hover { background:var(--bg-hover,#2a2a2a); color:var(--text-primary,#ccc); }
+
+        /* Two-pane body */
+        .wm-overlay-body { display:flex; flex:1; min-height:0; }
+        .wm-left {
+          display:flex; flex-direction:column; flex-shrink:0; width:260px; min-width:0;
+          border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
         }
+        .wm-left-title {
+          padding:10px 12px 4px; font-size:11px; font-weight:600; text-transform:uppercase;
+          letter-spacing:.5px; color:var(--text-secondary,#999); flex-shrink:0;
+        }
+        .wm-left-scroll { flex:1; overflow-y:auto; min-height:0; padding:4px 0 8px; }
+        .wm-right { flex:1; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
+        .wm-right-form { display:flex; flex-direction:column; min-height:100%; }
+        .wm-empty { padding:40px 20px; text-align:center; color:var(--text-secondary,#999); font-size:13px; }
+        .wm-form-actions {
+          display:flex; align-items:center; justify-content:flex-end; gap:6px;
+          padding:10px 14px; border-top:1px solid var(--divider,#333); flex-shrink:0;
+        }
+        .wm-fa-primary {
+          font-size:13px; padding:6px 14px; border-radius:4px; border:none; cursor:pointer;
+          background:rgba(0,122,204,.15); color:var(--accent,#007acc); transition:background .1s;
+        }
+        .wm-fa-primary:hover { background:rgba(0,122,204,.25); }
+        .wm-fa-secondary {
+          font-size:13px; padding:6px 12px; border-radius:4px; border:none; cursor:pointer;
+          background:transparent; color:var(--text-secondary,#999); transition:color .1s;
+        }
+        .wm-fa-secondary:hover { color:var(--text-primary,#ccc); }
 
         .wm-card {
           padding:12px 14px; margin:6px 10px; border-radius:8px;
@@ -1300,6 +1327,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           transition:background .1s, border-color .1s;
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
+        .wm-card.selected { border-color:var(--accent,#007acc); background:rgba(0,122,204,.12); }
         .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:78px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
@@ -1440,15 +1468,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           color:var(--text-placeholder,#6e6e6e);
         }
 
-        .wm-back {
-          display:flex; align-items:center; justify-content:center;
-          padding:5px; border-radius:4px; cursor:pointer;
-          background:var(--bg-secondary,#252526);
-          color:var(--text-secondary,#999);
-          transition:background .1s, color .1s;
-        }
-        .wm-back:hover { background:var(--bg-hover-strong,#333); color:var(--text-primary,#ccc); }
-
         /* Detail section styles (reused from old workspace-manager-system-tab) */
         .row-actions {
           display:none;
@@ -1495,247 +1514,38 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .reorder-footer { display:flex; gap:6px; padding:8px 10px; justify-content:flex-end; }
       </style>
       <div class="wm-wrap">
-        <!-- ── List view ── -->
-        <div class="wm-view list ${this._view === 'detail' ? 'slide-out' : ''}">
-          <div style="flex:1;overflow-y:auto;padding:4px 0;">
-          ${this._creating ? html`
-            <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;min-height:100%;">
-              <div style="padding:12px 14px;">
-                <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Name</label>
-                <div style="display:flex;align-items:center;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--divider,#333);border-radius:6px;">
-                  <input
-                    type="text"
-                    placeholder="Workspace name"
-                    .value=${this._createName}
-                    @input=${(e: Event) => { this._createName = (e.target as HTMLInputElement).value; this._nameError = ''; this._emitUpdate(); }}
-                    @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._createWorkspace(); }}
-                    style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
-                    autofocus
-                  />
-                </div>
-                ${this._nameTouched && !this._nameValid ? html`
-                  <div style="font-size:11px;color:var(--error,#e53e3e);margin-top:4px;">${this._nameError}</div>
-                ` : ''}
-              </div>
-              <div style="padding:12px 14px;">
-                <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Repositories</label>
-                <div style="display:block;">
-                  ${this._reordering ? html`
-                    <!-- Reorder mode: draggable rows -->
-                    ${this._createRepos.map((entry, i) => html`
-                      <div class="drag-row${i === this._dragIndex ? ' drop-target' : ''}"
-                        draggable="true"
-                        @dragstart=${(e: DragEvent) => this._onDragStart(e, i)}
-                        @dragover=${(e: DragEvent) => this._onDragOver(e, i)}
-                        @drop=${() => this._onDrop()}
-                        @dragend=${() => this._onDragEnd()}
-                      >
-                        ${i === this._dragIndex ? '' : html`
-                          <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-                          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
-                        `}
-                      </div>
-                    `)}
-                    <!-- + add repository row (not draggable, always shown) -->
-                    <div class="cr-row add-repo-trigger" tabindex="0"
-                      style="${this._addRepoRowStyle()}"
-                      @click=${() => { this._repoUrlError = ""; this._newRepoValue = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
-                      @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { (e.currentTarget as HTMLElement).click(); } }}
-                      @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                      @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
-                    >
-                      <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
-                      <span>Add repository</span>
-                    </div>
-                    <div class="reorder-footer">
-                      <button
-                        style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text-secondary,#999);"
-                        @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                        @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'}
-                        @click=${() => this._cancelReorder()}
-                      >Cancel</button>
-                      <button
-                        style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
-                        @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
-                        @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
-                        @click=${() => this._confirmReorder()}
-                      >Confirm</button>
-                    </div>
-                  ` : html`
-                    ${this._createRepos.map((entry, i) => html`
-                      ${entry.status === "success"
-                        ? this._renderAccordionItem(
-                              this._createRepos,
-                              i,
-                              entry.expanded ? html`
-                                <div>
-                                  ${entry.worktrees.map((wt, wtIndex) => this._renderWorktreeRow(
-                                      i, wtIndex, wt,
-                                      () => this._removeWorktree(i, wtIndex),
-                                      () => this._verifyWorktree(i, wtIndex),
-                                      () => this._syncWorktree(i, wtIndex),
-                                    ))}
-                                  ${entry.showNewWorktreeInput ? html`
-                                    <div class="cr-row" tabindex="-1" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
-                                      <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-                                      <input
-                                        type="text"
-                                        placeholder="Branch or path"
-                                        .value=${entry.newWorktreeValue}
-                                        @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
-                                        @keydown=${(e: KeyboardEvent) => {
-                                          if (e.key === 'Enter') this._addWorktree(i);
-                                          if (e.key === 'Escape') {
-                                            entry.showNewWorktreeInput = false;
-                                            entry.newWorktreeValue = '';
-                                            this._emitUpdate();
-                                            setTimeout(() => {
-                                              const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
-                                              if (wrapper) {
-                                                const trigger = wrapper.querySelector('.add-wt-trigger');
-                                                if (trigger instanceof HTMLElement) trigger.focus();
-                                              }
-                                            }, 0);
-                                          }
-                                          if (e.key === 'ArrowUp') {
-                                            e.preventDefault();
-                                            const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
-                                            if (wrapper) {
-                                              const rows = wrapper.querySelectorAll('.cr-row');
-                                              if (rows.length > 1) {
-                                                const lastRow = rows[rows.length - 2];
-                                                if (lastRow instanceof HTMLElement) lastRow.focus();
-                                              }
-                                            }
-                                          }
-                                        }}
-                                        style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;font-family:inherit;"
-                                        class="wt-input" autofocus
-                                      />
-                                      <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${() => this._addWorktree(i)}></openp41ge-inline-icon>
-                                    </div>
-                                  ` : ''}
-                                </div>
-                                <div class="add-wt-trigger"
-                                  style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
-                                  tabindex="-1"
-                                  @keydown=${(e: KeyboardEvent) => {
-                                    if (e.key === 'ArrowUp') {
-                                      e.preventDefault();
-                                      const all = Array.from((e.currentTarget as HTMLElement).closest('.repo-wrapper')?.querySelectorAll('.cr-row') ?? []);
-                                      const idx = all.indexOf(e.currentTarget as HTMLElement);
-                                      const prev = all[idx - 1];
-                                      if (prev instanceof HTMLElement) prev.focus();
-                                    }
-                                  }}
-                                  @click=${() => { entry.showNewWorktreeInput = true; entry.newWorktreeValue = ""; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
-                                  @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                                  @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
-                                >
-                                  <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
-                                  <span>Add worktree</span>
-                                </div>
-                              ` : null,
-                              html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._removeCreateRepo(i); })}</div>`,
-                              html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title="Ready to clone"></openp41ge-inline-icon>`,
-                              () => this._toggleRepoExpanded(i),
-                            )
-                        : this._renderUnverifiedRepoRow(i, entry)}
-                    `)}
-                    <!-- New repo URL input row (above +add) -->
-                    ${this._showNewRepoInput ? html`
-                      <div class="cr-row" tabindex="0" style="display:flex;flex-direction:column;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border-left:1px solid var(--divider,#333);border-right:1px solid var(--divider,#333);border-bottom:1px solid var(--divider,#333);${(this._createRepos.length === 0 || (this._createRepos.length > 0 && this._createRepos[this._createRepos.length - 1].expanded)) ? 'border-top:1px solid var(--divider,#333);border-radius:6px 6px 0 0;' : ''}" @click=${() => { const inp = document.querySelector('.new-repo-input'); if (inp instanceof HTMLInputElement) inp.focus(); }}>
-                        <div style="display:flex;align-items:center;gap:6px;">
-                            <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-                          <input
-                            type="text"
-                            placeholder="Paste repo URL and press Enter"
-                            class="new-repo-input"
-                            .value=${this._newRepoValue}
-                            @input=${(e: Event) => { this._newRepoValue = (e.target as HTMLInputElement).value; this._repoUrlError = ''; }}
-                            @keydown=${(e: KeyboardEvent) => {
-                              if (e.key === 'Enter') this._addCreateRepo();
-                              if (e.key === 'Escape') {
-                                this._showNewRepoInput = false;
-                                this._repoUrlError = '';
-                                this._emitUpdate();
-                                setTimeout(() => {
-                                  const trigger = document.querySelector('.add-repo-trigger');
-                                  if (trigger instanceof HTMLElement) trigger.focus();
-                                }, 0);
-                              }
-                              if (e.key === 'ArrowUp' && this._createRepos.length > 0) {
-                                // Focus the last repo row's header
-                                const wrappers = document.querySelectorAll('.repo-wrapper .cr-row');
-                                const last = wrappers[wrappers.length - 1];
-                                if (last instanceof HTMLElement) last.focus();
-                              }
-                            }}
-                            style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
-                            autofocus
-                          />
-                          <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${(e: Event) => { e.stopPropagation(); this._addCreateRepo(); }}></openp41ge-inline-icon>
-                        </div>
-                        ${this._repoUrlError ? html`
-                          <div style="font-size:12px;color:var(--error,#e53e3e);margin-top:2px;">${this._repoUrlError}</div>
-                        ` : ''}
-                      </div>
-                    ` : ''}
-                    <!-- + add repository row -->
-                    <div class="cr-row add-repo-trigger" tabindex="0"
-                      style="${this._addRepoRowStyle()}"
-                      @click=${() => { this._repoUrlError = ""; this._newRepoValue = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
-                      @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { (e.currentTarget as HTMLElement).click(); } }}
-                      @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                      @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
-                    >
-                      <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
-                      <span>Add repository</span>
-                    </div>
-                    <!-- Reorder repos button (only when 2+ repos) -->
-                    ${this._createRepos.length >= 2 ? html`
-                      <div style="display:flex;justify-content:flex-end;">
-                        <div
-                          style="display:flex;align-items:center;cursor:pointer;color:var(--text-secondary,#999);font-size:12px;gap:4px;padding:4px 8px;border-radius:4px;"
-                          @click=${() => this._startReorder()}
-                          @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(128,128,128,0.15)'; el.style.color = 'var(--text-primary,#ccc)'; }}
-                          @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
-                        >
-                          <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M120-200v-80h720v80H120Zm0-160v-80h720v80H120Zm0-160v-80h720v80H120Zm0-160v-80h720v80H120Z"/></svg>
-                          <span>Reorder repos</span>
-                        </div>
-                      </div>
-                    ` : ''}
-                  `}
-                </div>
-              </div>
-            </div>
-          ` : ''}
-
-          ${!this._creating ? html`
-            ${this._showSearch ? html`
-              <!-- Search: filters by workspace name, repo name/url, worktree name -->
-              <div style="position:sticky;top:0;padding:8px 10px 6px;background:var(--bg-primary,#252526);z-index:1;">
-                <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--divider,#333);border-radius:6px;background:rgba(255,255,255,.04);padding:6px 10px;">
-                  <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" style="color:var(--text-secondary,#999);flex-shrink:0;"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
-                  <input
-                    type="text"
-                    data-workspace-search-input
-                    placeholder="Search workspaces… (name, repo, worktree)"
-                    .value=${this._searchQuery}
-                    @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
-                    style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;outline:none;"
-                    autofocus
-                  />
-                </div>
-              </div>
-            ` : nothing}
-            ${this._workspaces.length === 0
+        <!-- Overlay top bar: search + new workspace + close -->
+        <div class="wm-topbar">
+          <div class="wm-search-box">
+            <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
+            <input
+              type="text"
+              data-workspace-search-input
+              placeholder="Search workspaces… (name, repo, worktree)"
+              .value=${this._searchQuery}
+              @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
+              style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
+            />
+          </div>
+          <button type="button" class="wm-tb-new" title="New workspace" @click=${() => this._showCreate()}>
+            <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-280h80v-160h160v-80H520v-160h-80v160H280v80h160v160Zm40 200q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
+            <span>New workspace</span>
+          </button>
+          <span class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
+            <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+          </span>
+        </div>
+        <div class="wm-overlay-body">
+          <!-- Left pane: workspace list -->
+          <div class="wm-left">
+            <div class="wm-left-title">Workspaces</div>
+            <div class="wm-left-scroll">
+              ${this._workspaces.length === 0
               ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces yet.</div>`
               : this._filteredWorkspaces.length === 0
                 ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
                 : this._filteredWorkspaces.map((entry) => html`
-                  <div class="wm-card ${isActive(entry) ? 'active' : ''}" @click=${() => this._showDetail(entry)}>
+                  <div class="wm-card ${isActive(entry) ? 'active' : ''}${this._selected?.filePath === entry.filePath ? ' selected' : ''}" @click=${() => this._showDetail(entry)}>
                     <div style="position:absolute;top:8px;right:12px;">
                       ${isActive(entry) ? html`<span class="wm-card-active-pill">Active</span>` : nothing}
                     </div>
@@ -1749,49 +1559,241 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     <div class="wm-card-meta">${this._cardMeta(entry)}</div>
                   </div>
                 `)}
-          ` : ''}
+            </div>
           </div>
-          <!-- Bottom bar: Create/Cancel when creating, otherwise + New -->
-          <div style="display:flex;align-items:center;justify-content:flex-end;padding:0 6px;height:40px;border-top:1px solid var(--divider,#333);flex-shrink:0;gap:6px;">
+          <!-- Right pane: detail / create -->
+          <div class="wm-right">
             ${this._creating ? html`
-              <button
-                style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text-secondary,#999);"
-                @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-                @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'}
-                @click=${() => { this._creating = false; this._emitUpdate(); }}
-              >Cancel</button>
-              <button
-                style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
-                @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
-                @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
-                @click=${() => this._createWorkspace()}
-              >Create</button>
-            ` : html`
-              <button
-                style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);"
-                @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'}
-                @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'}
-                @click=${() => this._showCreate()}
-              >Create Workspace</button>
-            `}
+              <div class="wm-right-form">
+                <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;min-height:100%;">
+                  <div style="padding:12px 14px;">
+                    <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Name</label>
+                    <div style="display:flex;align-items:center;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--divider,#333);border-radius:6px;">
+                      <input
+                        type="text"
+                        placeholder="Workspace name"
+                        .value=${this._createName}
+                        @input=${(e: Event) => { this._createName = (e.target as HTMLInputElement).value; this._nameError = ''; this._emitUpdate(); }}
+                        @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._createWorkspace(); }}
+                        style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
+                        autofocus
+                      />
+                    </div>
+                    ${this._nameTouched && !this._nameValid ? html`
+                      <div style="font-size:11px;color:var(--error,#e53e3e);margin-top:4px;">${this._nameError}</div>
+                    ` : ''}
+                  </div>
+                  <div style="padding:12px 14px;">
+                    <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-secondary,#999);margin-bottom:4px;">Repositories</label>
+                    <div style="display:block;">
+                      ${this._reordering ? html`
+                        <!-- Reorder mode: draggable rows -->
+                        ${this._createRepos.map((entry, i) => html`
+                          <div class="drag-row${i === this._dragIndex ? ' drop-target' : ''}"
+                            draggable="true"
+                            @dragstart=${(e: DragEvent) => this._onDragStart(e, i)}
+                            @dragover=${(e: DragEvent) => this._onDragOver(e, i)}
+                            @drop=${() => this._onDrop()}
+                            @dragend=${() => this._onDragEnd()}
+                          >
+                            ${i === this._dragIndex ? '' : html`
+                              <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
+                              <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
+                            `}
+                          </div>
+                        `)}
+                        <!-- + add repository row (not draggable, always shown) -->
+                        <div class="cr-row add-repo-trigger" tabindex="0"
+                          style="${this._addRepoRowStyle()}"
+                          @click=${() => { this._repoUrlError = ""; this._newRepoValue = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                          @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { (e.currentTarget as HTMLElement).click(); } }}
+                          @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+                          @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
+                        >
+                          <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
+                          <span>Add repository</span>
+                        </div>
+                        <div class="reorder-footer">
+                          <button
+                            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text-secondary,#999);"
+                            @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+                            @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'}
+                            @click=${() => this._cancelReorder()}
+                          >Cancel</button>
+                          <button
+                            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
+                            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
+                            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
+                            @click=${() => this._confirmReorder()}
+                          >Confirm</button>
+                        </div>
+                      ` : html`
+                        ${this._createRepos.map((entry, i) => html`
+                          ${entry.status === "success"
+                            ? this._renderAccordionItem(
+                                  this._createRepos,
+                                  i,
+                                  entry.expanded ? html`
+                                    <div>
+                                      ${entry.worktrees.map((wt, wtIndex) => this._renderWorktreeRow(
+                                          i, wtIndex, wt,
+                                          () => this._removeWorktree(i, wtIndex),
+                                          () => this._verifyWorktree(i, wtIndex),
+                                          () => this._syncWorktree(i, wtIndex),
+                                        ))}
+                                      ${entry.showNewWorktreeInput ? html`
+                                        <div class="cr-row" tabindex="-1" style="display:flex;align-items:center;gap:6px;padding:8px 10px;">
+                                          <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
+                                          <input
+                                            type="text"
+                                            placeholder="Branch or path"
+                                            .value=${entry.newWorktreeValue}
+                                            @input=${(e: Event) => { entry.newWorktreeValue = (e.target as HTMLInputElement).value; }}
+                                            @keydown=${(e: KeyboardEvent) => {
+                                              if (e.key === 'Enter') this._addWorktree(i);
+                                              if (e.key === 'Escape') {
+                                                entry.showNewWorktreeInput = false;
+                                                entry.newWorktreeValue = '';
+                                                this._emitUpdate();
+                                                setTimeout(() => {
+                                                  const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
+                                                  if (wrapper) {
+                                                    const trigger = wrapper.querySelector('.add-wt-trigger');
+                                                    if (trigger instanceof HTMLElement) trigger.focus();
+                                                  }
+                                                }, 0);
+                                              }
+                                              if (e.key === 'ArrowUp') {
+                                                e.preventDefault();
+                                                const wrapper = (e.currentTarget as HTMLElement).closest('.repo-wrapper');
+                                                if (wrapper) {
+                                                  const rows = wrapper.querySelectorAll('.cr-row');
+                                                  if (rows.length > 1) {
+                                                    const lastRow = rows[rows.length - 2];
+                                                    if (lastRow instanceof HTMLElement) lastRow.focus();
+                                                  }
+                                                }
+                                              }
+                                            }}
+                                            style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:0;outline:none;font-family:inherit;"
+                                            class="wt-input" autofocus
+                                          />
+                                          <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${() => this._addWorktree(i)}></openp41ge-inline-icon>
+                                        </div>
+                                      ` : ''}
+                                    </div>
+                                    <div class="add-wt-trigger"
+                                      style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;color:var(--text-placeholder,#6e6e6e);font-size:12px;border-top:1px solid var(--divider,#333);"
+                                      tabindex="-1"
+                                      @keydown=${(e: KeyboardEvent) => {
+                                        if (e.key === 'ArrowUp') {
+                                          e.preventDefault();
+                                          const all = Array.from((e.currentTarget as HTMLElement).closest('.repo-wrapper')?.querySelectorAll('.cr-row') ?? []);
+                                          const idx = all.indexOf(e.currentTarget as HTMLElement);
+                                          const prev = all[idx - 1];
+                                          if (prev instanceof HTMLElement) prev.focus();
+                                        }
+                                      }}
+                                      @click=${() => { entry.showNewWorktreeInput = true; entry.newWorktreeValue = ""; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.wt-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                                      @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+                                      @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
+                                    >
+                                      <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
+                                      <span>Add worktree</span>
+                                    </div>
+                                  ` : null,
+                                  html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._removeCreateRepo(i); })}</div>`,
+                                  html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title="Ready to clone"></openp41ge-inline-icon>`,
+                                  () => this._toggleRepoExpanded(i),
+                                )
+                            : this._renderUnverifiedRepoRow(i, entry)}
+                        `)}
+                        <!-- New repo URL input row (above +add) -->
+                        ${this._showNewRepoInput ? html`
+                          <div class="cr-row" tabindex="0" style="display:flex;flex-direction:column;padding:6px 10px;height:38px;box-sizing:border-box;background:rgba(255,255,255,.04);border-left:1px solid var(--divider,#333);border-right:1px solid var(--divider,#333);border-bottom:1px solid var(--divider,#333);${(this._createRepos.length === 0 || (this._createRepos.length > 0 && this._createRepos[this._createRepos.length - 1].expanded)) ? 'border-top:1px solid var(--divider,#333);border-radius:6px 6px 0 0;' : ''}" @click=${() => { const inp = document.querySelector('.new-repo-input'); if (inp instanceof HTMLInputElement) inp.focus(); }}>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
+                              <input
+                                type="text"
+                                placeholder="Paste repo URL and press Enter"
+                                class="new-repo-input"
+                                .value=${this._newRepoValue}
+                                @input=${(e: Event) => { this._newRepoValue = (e.target as HTMLInputElement).value; this._repoUrlError = ''; }}
+                                @keydown=${(e: KeyboardEvent) => {
+                                  if (e.key === 'Enter') this._addCreateRepo();
+                                  if (e.key === 'Escape') {
+                                    this._showNewRepoInput = false;
+                                    this._repoUrlError = '';
+                                    this._emitUpdate();
+                                    setTimeout(() => {
+                                      const trigger = document.querySelector('.add-repo-trigger');
+                                      if (trigger instanceof HTMLElement) trigger.focus();
+                                    }, 0);
+                                  }
+                                  if (e.key === 'ArrowUp' && this._createRepos.length > 0) {
+                                    // Focus the last repo row's header
+                                    const wrappers = document.querySelectorAll('.repo-wrapper .cr-row');
+                                    const last = wrappers[wrappers.length - 1];
+                                    if (last instanceof HTMLElement) last.focus();
+                                  }
+                                }}
+                                style="flex:1;background:transparent;border:none;color:var(--text-primary,#ccc);font-size:12px;padding:5px 0;outline:none;font-family:inherit;"
+                                autofocus
+                              />
+                              <openp41ge-inline-icon name="plus" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${(e: Event) => { e.stopPropagation(); this._addCreateRepo(); }}></openp41ge-inline-icon>
+                            </div>
+                            ${this._repoUrlError ? html`
+                              <div style="font-size:12px;color:var(--error,#e53e3e);margin-top:2px;">${this._repoUrlError}</div>
+                            ` : ''}
+                          </div>
+                        ` : ''}
+                        <!-- + add repository row -->
+                        <div class="cr-row add-repo-trigger" tabindex="0"
+                          style="${this._addRepoRowStyle()}"
+                          @click=${() => { this._repoUrlError = ""; this._newRepoValue = ""; this._showNewRepoInput = true; this._emitUpdate(); setTimeout(() => { const el = document.querySelector('.new-repo-input'); if (el instanceof HTMLInputElement) el.focus(); }, 0); }}
+                          @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { (e.currentTarget as HTMLElement).click(); } }}
+                          @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
+                          @mouseleave=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-placeholder,#6e6e6e)'}
+                        >
+                          <openp41ge-inline-icon name="plus" size="12" icon-color="var(--text-placeholder,#6e6e6e)" no-hover></openp41ge-inline-icon>
+                          <span>Add repository</span>
+                        </div>
+                        <!-- Reorder repos button (only when 2+ repos) -->
+                        ${this._createRepos.length >= 2 ? html`
+                          <div style="display:flex;justify-content:flex-end;">
+                            <div
+                              style="display:flex;align-items:center;cursor:pointer;color:var(--text-secondary,#999);font-size:12px;gap:4px;padding:4px 8px;border-radius:4px;"
+                              @click=${() => this._startReorder()}
+                              @mouseenter=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(128,128,128,0.15)'; el.style.color = 'var(--text-primary,#ccc)'; }}
+                              @mouseleave=${(e: MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'var(--text-secondary,#999)'; }}
+                            >
+                              <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M120-200v-80h720v80H120Zm0-160v-80h720v80H120Zm0-160v-80h720v80H120Zm0-160v-80h720v80H120Z"/></svg>
+                              <span>Reorder repos</span>
+                            </div>
+                          </div>
+                        ` : ''}
+                      `}
+                    </div>
+                  </div>
+                </div>
+          
+                <div class="wm-form-actions">
+                  <button type="button" class="wm-fa-secondary" @click=${() => { this._creating = false; this._emitUpdate(); }}>Cancel</button>
+                  <button type="button" class="wm-fa-primary" @click=${() => this._createWorkspace()}>Create workspace</button>
+                </div>
+              </div>
+            ` : (this._selected ? this._renderDetail(this._selected) : html`
+              <div class="wm-empty">Select a workspace to view or edit it — or create a new one.</div>
+            `)}
           </div>
-        </div>
-
-        <!-- ── Detail view ── -->
-        <div class="wm-view detail ${this._view === 'detail' ? 'slide-in' : ''}" style="padding-top:0;">
-          ${this._selected ? this._renderDetail(this._selected) : ''}
         </div>
       </div>
     `;
   }
-
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
     const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 12px;gap:8px;flex-shrink:0;border-bottom:1px solid var(--divider,#333);">
-        <div class="wm-back" title="Back" @click=${() => this._showList()}>
-          <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/></svg>
-        </div>
+      <div style="display:flex;align-items:center;justify-content:flex-start;padding:8px 14px 12px;gap:8px;flex-shrink:0;border-bottom:1px solid var(--divider,#333);">
         ${active
           ? html`<span class="wm-card-active-pill">Active</span>`
           : html`<button class="wm-btn activate" @click=${() => this._activateWorkspace(entry)}>Activate</button>`}

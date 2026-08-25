@@ -16,6 +16,7 @@ import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { wireResetListener } from "../../app";
 import { workspaceFileService } from "../../services/workspace-file-service";
 import { serviceModalService } from "../../services/service-modal-service";
+import { workspacesOverlayService } from "../../services/workspaces-overlay-service";
 
 export class RegisterIpcListenersStep implements IStartupStep {
   readonly name = "register-ipc-listeners";
@@ -47,14 +48,14 @@ export class RegisterIpcListenersStep implements IStartupStep {
 
     // ── Menu: New Workspace ─────────────────────────────────────────────
     window.openp41ge.onNewWorkspace(async () => {
-      serviceModalService.openModal("workspace-manager");
+      workspacesOverlayService.open("create");
     });
 
     // ── Menu: Open Workspace ────────────────────────────────────────────
     window.openp41ge.onOpenWorkspace(() => {
       workspaceFileService.openDialog().then((loaded) => {
         if (loaded) {
-          serviceModalService.openModal("workspace-manager");
+          workspacesOverlayService.open("list");
         }
       });
     });
