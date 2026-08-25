@@ -1212,13 +1212,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
    * Handle detail view Save button:
    * 1. Clone bare repos and checkout worktrees
    * 2. Sync to disk
-   * 3. Return to list view
+   *
+   * Stays on the detail view (use the Back arrow to return to the list).
    */
   private async _onDetailSave(): Promise<void> {
     if (!this._selected) return;
     await this._cloneReposAndCheckoutWorktrees(this._detailRepos);
     await this._syncDetailReposToFile();
-    this._showList();
   }
 
   private async _onCopy(e: MouseEvent, path: string): Promise<void> {
@@ -1951,12 +1951,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             @click=${() => { if (this._selected) this._onDeleteWorkspace(this._selected); }}
           >Delete</button>
           <div style="display:flex;gap:6px;">
-          <button
-            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text-secondary,#999);"
-            @mouseenter=${(e: MouseEvent) => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary,#ccc)'}
-            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary,#999)'; }}
-            @click=${() => this._showList()}
-          >Cancel</button>
           <button
             style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
             @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
