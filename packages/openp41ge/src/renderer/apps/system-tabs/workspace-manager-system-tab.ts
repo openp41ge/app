@@ -237,7 +237,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     let headerStyle = 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;cursor:pointer;user-select:none;';
 
     if (isStandalone) {
-      wrapperStyle += 'border:1px solid var(--divider,#333);border-radius:6px;margin:4px 0;';
+      wrapperStyle += 'border-radius:6px;margin:4px 0;';
       headerStyle += 'border-radius:6px 6px 0 0;';
     } else {
       const showTopBorder = isFirst || prevExpanded;
@@ -292,7 +292,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** Shared delete/hover span for repo rows */
   private _renderDeleteAction(onRemove: (e: Event) => void): TemplateResult {
     return html`
-      <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
+      <openp41ge-inline-icon name="close" size="12" no-hover @click=${onRemove}></openp41ge-inline-icon>
     `;
   }
 
@@ -544,7 +544,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
             <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
             <div class="row-actions">
-              <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${() => handleRemove(i)}></openp41ge-inline-icon>
+              <openp41ge-inline-icon name="close" size="12" no-hover @click=${() => handleRemove(i)}></openp41ge-inline-icon>
             </div>
             <span style="display:flex;align-items:center;visibility:${entry.status === 'unverified' ? 'hidden' : 'visible'};">
               ${entry.status === 'failure' ? html`
@@ -564,7 +564,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
           <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
           <div class="row-actions">
-            <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${() => handleRemove(i)}></openp41ge-inline-icon>
+            <openp41ge-inline-icon name="close" size="12" no-hover @click=${() => handleRemove(i)}></openp41ge-inline-icon>
           </div>
           <!-- Always-rendered status icon (hidden when unverified so layout doesn't shift) -->
           <span
@@ -1455,11 +1455,23 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-back:hover { background:var(--bg-hover-strong,#333); color:var(--text-primary,#ccc); }
 
         /* Detail section styles (reused from old workspace-manager-system-tab) */
-        .row-actions { display:none; align-items:center; gap:0; }
+        .row-actions {
+          display:none;
+          align-items:center;
+          gap:0;
+          padding:1px;
+          border-radius:3px;
+          background: rgba(229,62,62,.14);
+        }
         .cr-row:hover .row-actions { display:flex; }
         /* The repo header and its status list are one unit: hovering the
            statuses also reveals the row's delete action. */
         .repo-wrapper:has(> .wsc-status-list:hover) > .cr-row .row-actions { display:flex; }
+        /* Red delete button; brighten both the background and icon when
+           hovering the button itself. */
+        .row-actions:hover { background: rgba(229,62,62,.38); }
+        .row-actions openp41ge-inline-icon { color: var(--error,#e53e3e); }
+        .row-actions:hover openp41ge-inline-icon { color: #ff7b72; }
 
         .drag-row {
           display:flex; align-items:center; gap:6px; padding:8px 10px; height:37px; box-sizing:border-box;
