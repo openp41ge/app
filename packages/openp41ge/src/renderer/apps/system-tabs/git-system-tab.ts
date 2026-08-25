@@ -7,6 +7,12 @@
  */
 
 import type { SystemTabController } from "../../controllers/types";
+import {
+  classifyWorktree,
+  worstOf,
+  worktreeStatusLabel,
+  WARNING_COLOR,
+} from "../../services/worktree-status";
 
 interface RepoInfo {
   path: string;
@@ -171,6 +177,15 @@ export class GitSystemTabController implements SystemTabController {
 
     head.appendChild(dot);
     head.appendChild(name);
+
+    const headStatus = document.createElement("span");
+    Object.assign(headStatus.style, {
+      display: "flex",
+      alignItems: "center",
+      flexShrink: "0",
+    });
+    head.appendChild(headStatus);
+
     card.appendChild(head);
 
     // Path (secondary line).
@@ -207,7 +222,7 @@ export class GitSystemTabController implements SystemTabController {
       margin: "4px 0 0 18px",
     });
     card.appendChild(wtList);
-    void this._loadWorktrees(repo, wtList);
+    void this._loadWorktrees(repo, wtList, headStatus);
 
     return card;
   }
@@ -257,19 +272,48 @@ export class GitSystemTabController implements SystemTabController {
     }
   }
 
-  private async _loadWorktrees(repo: RepoInfo, container: HTMLElement): Promise<void> {
+  private async _loadWorktrees(
+    repo: RepoInfo,
+    container: HTMLElement,
+    headStatus: HTMLElement,
+  ): Promise<void> {
     let branches: Array<{ branch: string; exists: boolean }> = [];
+    let branchMap = new Map<string, { ahead: number; behind: number }>();
     try {
-      branches = (await window.openp41ge.workspaceController.listWorktrees(repo.name)) as unknown as Array<{
+      const raw = (await window.openp41ge.workspaceController.listWorktrees(repo.name)) as unknown as Array<{
         branch: string;
         exists: boolean;
       }>;
+      branches = Array.isArray(raw) ? raw : [];
     } catch {
       branches = [];
     }
+    try {
+      const entries = (await window.openp41ge.workspaceController.getBranches(repo.name)) as unknown as Array<{
+        shortName?: string;
+        name?: string;
+        ahead?: number;
+        behind?: number;
+      }>;
+      for (const e of entries ?? []) {
+        branchMap.set(e.shortName ?? e.name ?? "", {
+          ahead: e.ahead ?? 0,
+          behind: e.behind ?? 0,
+        });
+      }
+    } catch {
+      branchMap = new Map();
+    }
     if (!this._viewElement) return;
 
+    const infos = [];
     for (const wt of branches) {
+      const has = branchMap.has(wt.branch);
+      const counts = has
+        ? (branchMap.get(wt.branch) ?? { ahead: 0, behind: 0 })
+        : { ahead: 0, behind: 0 };
+      const info = classifyWorktree(counts.ahead, counts.behind, wt.exists, has);
+      infos.push(info);
 
       const row = document.createElement("div");
       Object.assign(row.style, {
@@ -291,7 +335,40 @@ export class GitSystemTabController implements SystemTabController {
       });
       row.appendChild(caret);
       row.appendChild(label);
+
+      if (info.state !== "ok" && info.state !== "unknown") {
+        const warn = document.createElement("span");
+        warn.style.cssText = "display:flex;align-items:center;margin-left:1px;";
+        const icon = document.createElement("openp41ge-inline-icon");
+        icon.setAttribute("name", "warning");
+        icon.setAttribute("size", "11");
+        icon.setAttribute("icon-color", WARNING_COLOR);
+        icon.setAttribute("no-hover", "");
+        icon.setAttribute("title", worktreeStatusLabel(info));
+        warn.appendChild(icon);
+        row.appendChild(warn);
+      }
+
       container.appendChild(row);
+    }
+
+    const worst = worstOf(infos);
+    if (infos.length > 0 && worst.state !== "ok" && worst.state !== "unknown") {
+      const icon = document.createElement("openp41ge-inline-icon");
+      icon.setAttribute("name", "warning");
+      icon.setAttribute("size", "12");
+      icon.setAttribute("icon-color", WARNING_COLOR);
+      icon.setAttribute("no-hover", "");
+      icon.setAttribute("title", `${infos.length} worktree(s): ${worktreeStatusLabel(worst)}`);
+      headStatus.replaceChildren(icon);
+    } else if (infos.length > 0) {
+      const icon = document.createElement("openp41ge-inline-icon");
+      icon.setAttribute("name", "check-circle");
+      icon.setAttribute("size", "12");
+      icon.setAttribute("icon-color", "var(--accent,#007acc)");
+      icon.setAttribute("no-hover", "");
+      icon.setAttribute("title", "All worktrees in sync");
+      headStatus.replaceChildren(icon);
     }
   }
 }

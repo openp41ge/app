@@ -260,9 +260,10 @@ export class NodeGitService implements IGitService {
         if (!branch) continue;
         const dirName = branch.replace(/\//g, "--");
         const worktreePath = path.join(repoDir, dirName);
-        if (fs.existsSync(worktreePath) && fs.lstatSync(worktreePath).isDirectory()) {
-          worktrees.push({ branch, path: worktreePath, exists: true });
-        }
+        const exists = fs.existsSync(worktreePath) && fs.lstatSync(worktreePath).isDirectory();
+        // Keep branches whose folder is missing (exists:false) so upstream
+        // surfaces can show a “not checked out / resync needed” warning.
+        worktrees.push({ branch, path: worktreePath, exists });
       }
       return worktrees;
     } catch {

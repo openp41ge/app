@@ -18,6 +18,11 @@ import { property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { plusIconThick, refreshIcon } from "../icons";
 import {
+  classifyWorktree,
+  worstOf,
+  worktreeStatusLabel,
+} from "../services/worktree-status";
+import {
   WorktreeFileLoader,
   DirPersistenceService,
   type WorktreeData,
@@ -61,6 +66,10 @@ export class Openp41geRepoTreeItem extends LitElement {
   @state() private _expandedWorktrees = new Set<string>();
   @state() private _expandedDirs = new Map<string, Set<string>>();
   @state() private _pullingBranches = new Set<string>();
+  /** shortName → ahead/behind counters, loaded once per repo to show sync warnings. */
+  private _branchSync = new Map<string, { ahead: number; behind: number }>();
+  private _syncKnown = false;
+  private _syncRequested = false;
 
   // Single completion timestamp (branch → Date.now()) so green flash persists
   private _pullCompleted = new Map<string, number>();
@@ -75,6 +84,7 @@ export class Openp41geRepoTreeItem extends LitElement {
     this._expanded = restored.expanded;
     this._expandedWorktrees = restored.expandedWorktrees;
     // _expandedDirs will be populated by _loadRestoredFiles once worktrees arrive
+    this._loadSync();
   }
 
   firstUpdated(): void {
@@ -82,9 +92,65 @@ export class Openp41geRepoTreeItem extends LitElement {
   }
 
   updated(changedProperties: Map<string | number | symbol, unknown>): void {
+    this._loadSync();
     if (changedProperties.has("worktrees")) {
       queueMicrotask(() => this._loadRestoredFiles());
     }
+  }
+
+  /** Load ahead/behind counters for this repo's branches to show sync warnings. */
+  private _loadSync(): void {
+    if (this._syncRequested || !this.repoName || !window.openp41ge?.workspaceController) return;
+    this._syncRequested = true;
+    window.openp41ge.workspaceController
+      .getBranches(this.repoName)
+      .then((entries) => {
+        if (!this.isConnected) return;
+        this._branchSync.clear();
+        for (const e of entries) {
+          if (!e?.name && !e?.shortName) continue;
+          this._branchSync.set(e.shortName ?? e.name, { ahead: e.ahead ?? 0, behind: e.behind ?? 0 });
+        }
+        this._syncKnown = true;
+        this.requestUpdate();
+      })
+      .catch(() => {
+        // No local clone or repo error — warnings still surface for missing worktrees.
+        this._syncKnown = false;
+      });
+  }
+
+  /** Warning indicator for a single worktree row (ahead/behind or missing folder). */
+  private _wtWarn(wt: WorktreeData): TemplateResult | typeof nothing {
+    const info = this._wtSyncInfo(wt);
+    if (info.state === "ok" || info.state === "unknown") return nothing;
+    return html`
+      <span class="shrink-0 flex items-center" style="color:var(--text-warning,#e5a50a)" title=${worktreeStatusLabel(info)}>
+        <openp41ge-icon name="warning" size="11"></openp41ge-icon>
+      </span>
+    `;
+  }
+
+  /** Aggregate warning indicator shown on the repo header row. */
+  private _repoWarn(): TemplateResult | typeof nothing {
+    const infos = this.worktrees.map((wt) => this._wtSyncInfo(wt));
+    const worst = worstOf(infos);
+    if (worst.state === "ok" || worst.state === "unknown") return nothing;
+    return html`
+      <span class="shrink-0 flex items-center" style="color:var(--text-warning,#e5a50a)" title=${`${infos.length} worktree(s): ${worktreeStatusLabel(worst)}`}>
+        <openp41ge-icon name="warning" size="11"></openp41ge-icon>
+      </span>
+    `;
+  }
+
+  private _wtSyncInfo(wt: WorktreeData) {
+    const counts = this._branchSync.get(wt.branch);
+    return classifyWorktree(
+      counts?.ahead ?? 0,
+      counts?.behind ?? 0,
+      wt.exists,
+      this._syncKnown && counts !== undefined,
+    );
   }
 
   private async _loadRestoredFiles(): Promise<void> {
@@ -258,7 +324,7 @@ export class Openp41geRepoTreeItem extends LitElement {
           <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
             >${wt.branch}</span
           >
-          ${!wt.exists ? html`<span class="text-muted text-2xs">(pending)</span>` : ""}
+          ${this._wtWarn(wt)}
           ${
             this._fileLoader.isRefreshingWorktree(wt.branch) ||
             this._fileLoader.isLoadingWorktree(wt.branch)
@@ -485,6 +551,7 @@ export class Openp41geRepoTreeItem extends LitElement {
             <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
               >${this.repoName}</span
             >
+            ${this._repoWarn()}
             ${html`
               <!-- + button (add worktree) -->
               <span

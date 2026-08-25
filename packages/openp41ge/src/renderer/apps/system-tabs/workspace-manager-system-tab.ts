@@ -295,12 +295,14 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     onRetry: () => void,
     onSync: () => void,
   ): TemplateResult {
+    const warnColor = "var(--text-warning,#e5a50a)";
+    const wtTitle = (dflt: string) => wt.errorMessage || wt.warningMessage || dflt;
     const statusIcon = wt.status === 'unverified' ? nothing
       : wt.status === 'validating' ? html`<openp41ge-inline-icon name="spinner" size="12" no-hover icon-color="var(--text-secondary,#999)"></openp41ge-inline-icon>`
-      : wt.status === 'success' ? html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover></openp41ge-inline-icon>`
-      : wt.status === 'failure' ? html`<openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" @click=${onRetry}></openp41ge-inline-icon>`
-      : wt.status === 'diverged' ? html`<openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" @click=${onRetry}></openp41ge-inline-icon>`
-      : wt.status === 'needs-sync' ? html`<openp41ge-inline-icon name="sync" size="12" icon-color="var(--accent,#007acc)" hover-color="accent" @click=${onSync}></openp41ge-inline-icon>`
+      : wt.status === 'success' ? html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title="In sync"></openp41ge-inline-icon>`
+      : wt.status === 'failure' ? html`<openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" title=${wtTitle("Resync failed — retry")} @click=${onRetry}></openp41ge-inline-icon>`
+      : wt.status === 'diverged' ? html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} hover-color="danger" title=${wtTitle("Diverged from remote — resolve, then resync")} @click=${onRetry}></openp41ge-inline-icon>`
+      : wt.status === 'needs-sync' ? html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} hover-color="accent" title=${wtTitle("Ahead/behind remote — resync needed")} @click=${onSync}></openp41ge-inline-icon>`
       : nothing;
     return html`
       <div class="cr-row" tabindex="-1" style="display:flex;align-items:center;gap:6px;padding:8px 10px;" @mouseenter=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'visible'; }} @mouseleave=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'hidden'; }} @keydown=${(e: KeyboardEvent) => {
@@ -322,11 +324,24 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       ${wt.errorMessage && (wt.status === 'failure' || wt.status === 'diverged') ? html`
         <div style="font-size:12px;color:var(--error,#e53e3e);padding:2px 10px 6px 32px;">${wt.errorMessage}</div>
       ` : wt.errorMessage && wt.status === 'needs-sync' ? html`
-        <div style="font-size:12px;color:var(--accent,#007acc);padding:2px 10px 6px 32px;">${wt.errorMessage}</div>
+        <div style="font-size:12px;color:var(--text-warning,#e5a50a);padding:2px 10px 6px 32px;">${wt.errorMessage}</div>
       ` : wt.warningMessage && wt.status === 'success' ? html`
         <div style="font-size:12px;color:var(--text-warning,#e5a50a);padding:2px 10px 6px 32px;">${wt.warningMessage}</div>
       ` : ''}
     `;
+  }
+
+  /** Repo-level sync indicator: warning when any worktree needs attention, else a green check. */
+  private _repoSyncIcon(entry: CreateRepoEntry): TemplateResult {
+    const warnColor = "var(--text-warning,#e5a50a)";
+    const affected = entry.worktrees.filter((wt) =>
+      wt.status === "needs-sync" || wt.status === "diverged" || wt.status === "failure");
+    if (affected.length > 0) {
+      const labels = affected.map((wt) => wt.name).join(", ");
+      return html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} no-hover title=${`${affected.length} worktree(s) need sync/resync: ${labels}`}></openp41ge-inline-icon>`;
+    }
+    const anyVerified = entry.worktrees.some((wt) => wt.status !== "unverified" && wt.status !== "validating");
+    return html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title=${anyVerified ? "All worktrees in sync" : "Ready to clone"}></openp41ge-inline-icon>`;
   }
 
   /** Style string for a repo wrapper based on expanded/collapsed state and neighbor state. */
@@ -1632,7 +1647,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                       </div>
                     ` : null,
                     html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._onRemoveRepo(i); })}</div>`,
-                    html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title="Ready to clone"></openp41ge-inline-icon>`,
+                    this._repoSyncIcon(entry),
                     () => { this._detailRepos[i].expanded = !this._detailRepos[i].expanded; this._emitUpdate(); },
                   )
                 : this._renderUnverifiedRepoRow(i, entry, this._detailRepos, (idx) => this._onRemoveRepo(idx), (idx) => this._detailVerifyRepo(idx))}
