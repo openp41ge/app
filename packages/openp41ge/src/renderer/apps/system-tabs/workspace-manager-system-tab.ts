@@ -338,15 +338,22 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     `;
   }
 
+  /** True while any of a repo's worktrees is being checked (validating). */
+  private _repoIsChecking(repoIndex: number): boolean {
+    const repo = this._detailRepos[repoIndex] ?? this._createRepos[repoIndex];
+    return !!repo?.worktrees.some((w) => w.status === "validating");
+  }
+
   /** Status list for a single worktree row: one line per state with its action. */
   private _worktreeStatusContent(
-    _repoIndex: number,
+    repoIndex: number,
     _wtIndex: number,
     wt: WorktreeEntry,
     onVerify: () => void,
     onSync: () => void,
   ): TemplateResult {
     const items: StatusItem[] = [];
+    const checking = this._repoIsChecking(repoIndex);
     switch (wt.status) {
       case 'success':
         items.push({ tone: 'ok', text: 'In sync with remote', detail: wt.warningMessage });
@@ -364,7 +371,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         items.push({ tone: 'info', text: 'Checking status…' });
         break;
       case 'unverified':
-        items.push({ tone: 'info', text: 'Not yet verified', action: { label: 'Verify', title: 'Check branch status', onClick: onVerify } });
+        items.push({ tone: 'info', text: 'Not yet verified', action: checking ? undefined : { label: 'Verify', title: 'Check branch status', onClick: onVerify } });
         break;
     }
     return this._renderStatusList(items);
@@ -439,7 +446,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       items.push({
         tone: 'info',
         text: `${unverified} of ${total} worktree${total > 1 ? 's' : ''} not yet verified`,
-        action: { label: 'Verify', title: 'Check worktree sync status', onClick: () => { this._detailVerifyAll(i); } },
+        action: validating === 0 ? { label: 'Verify', title: 'Check worktree sync status', onClick: () => { this._detailVerifyAll(i); } } : undefined,
       });
     } else if (validating === 0) {
       items.push({
