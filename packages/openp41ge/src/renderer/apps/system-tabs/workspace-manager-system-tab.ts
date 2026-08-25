@@ -307,7 +307,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** Stacked status lines: coloured dot + text + optional action pill. */
   private _renderStatusList(items: StatusItem[]): TemplateResult {
     return html`
-      <div style="display:flex;flex-direction:column;gap:4px;padding:2px 12px 8px 20px;">
+      <div class="wsc-status-list" style="display:flex;flex-direction:column;gap:4px;padding:2px 12px 8px 20px;">
         ${items.map((it) => html`
           <div style="display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;">
             <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${this._toneColor(it.tone)};"></span>
@@ -1370,6 +1370,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wsc-field-repos .repo-wrapper > .cr-row + div,
         .wsc-field-repos .repo-wrapper > div > .cr-row ~ .cr-row {
+          border-top: 1px solid var(--wsc-sep);
+        }
+        /* Status messages sit above the separator — the line goes between the
+           status list and the worktree rows, not above the status list. */
+        .wsc-field-repos .repo-wrapper > .cr-row + .wsc-status-list,
+        .wsc-field-repos .repo-wrapper > .wsc-status-list {
+          border-top: none;
+        }
+        .wsc-field-repos .repo-wrapper > .wsc-status-list + div {
           border-top: 1px solid var(--wsc-sep);
         }
         .wsc-label {
