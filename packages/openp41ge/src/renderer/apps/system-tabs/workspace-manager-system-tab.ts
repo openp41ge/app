@@ -445,8 +445,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     } else if (validating === 0) {
       items.push({
         tone: 'ok',
-        text: `All ${total} worktree${total > 1 ? 's' : ''} up to date`,
-        action: { label: 'Verify', title: 'Re-check worktree sync status', onClick: () => { this._detailVerifyAll(i); } },
+        text: 'All worktrees are up to date',
+        // No action: this status already reflects a successful check.
       });
     }
     return this._renderStatusList(items, onToggle);
