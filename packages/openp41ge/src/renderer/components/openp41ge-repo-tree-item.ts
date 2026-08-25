@@ -283,7 +283,7 @@ export class Openp41geRepoTreeItem extends LitElement {
     const showGreen = pullDoneTime !== undefined && Date.now() - pullDoneTime < 2500;
     return html`
       <div
-        class="sticky top-[30px] z-[1] bg-gutter h-[26px] pointer-events-none border-b border-[#232323]"
+        class="relative bg-gutter h-[26px] pointer-events-none border-b border-[#232323]"
       >
         <div
           class="pointer-events-auto flex items-center h-[26px] px-2 pl-7 cursor-pointer text-sm text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
@@ -518,7 +518,7 @@ export class Openp41geRepoTreeItem extends LitElement {
       <div class="select-none">
         <!-- Repo header -->
         <div
-          class="sticky top-0 z-[2] bg-gutter h-[30px] border-b border-[#232323] pointer-events-none"
+          class="relative bg-gutter h-[30px] border-b border-[#232323] pointer-events-none"
         >
           <!-- Inner wrapper: receives all pointer events -->
           <div
