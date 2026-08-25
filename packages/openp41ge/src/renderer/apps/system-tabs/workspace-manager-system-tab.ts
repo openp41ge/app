@@ -237,7 +237,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     let headerStyle = 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;cursor:pointer;user-select:none;';
 
     if (isStandalone) {
-      wrapperStyle += 'border-radius:6px;margin:4px 0;';
+      wrapperStyle += `border-radius:6px;margin:${index === 0 ? '0 0 4px 0' : '4px 0'};`;
       headerStyle += 'border-radius:6px 6px 0 0;';
     } else {
       const showTopBorder = isFirst || prevExpanded;
@@ -393,7 +393,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
           <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt.name}</span>
           <span class="wt-del" style="display:flex;align-items:center;visibility:hidden;">
-            <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
+            <openp41ge-inline-icon name="close" size="12" no-hover @click=${onRemove}></openp41ge-inline-icon>
           </span>
           <span style="display:flex;align-items:center;visibility:${wt.status === 'unverified' ? 'hidden' : 'visible'};">${statusIcon}</span>
         </div>
@@ -1472,6 +1472,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .row-actions:hover { background: rgba(229,62,62,.38); }
         .row-actions openp41ge-inline-icon { color: var(--error,#e53e3e); }
         .row-actions:hover openp41ge-inline-icon { color: #ff7b72; }
+        /* Worktree row delete button: same red-on-hover treatment. */
+        .wsc-wt-row .wt-del {
+          padding:1px;
+          border-radius:3px;
+          background: rgba(229,62,62,.14);
+        }
+        .wsc-wt-row .wt-del:hover { background: rgba(229,62,62,.38); }
+        .wsc-wt-row .wt-del openp41ge-inline-icon { color: var(--error,#e53e3e); }
+        .wsc-wt-row .wt-del:hover openp41ge-inline-icon { color: #ff7b72; }
 
         .drag-row {
           display:flex; align-items:center; gap:6px; padding:8px 10px; height:37px; box-sizing:border-box;
