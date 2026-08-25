@@ -319,15 +319,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             <span style="flex:1;min-width:0;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
             ${it.action ? (it.action.icon
               ? html`
-              <span class="wsc-status-icon-btn" flex-shrink="0" title=${it.action.title} style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--text-secondary,#999);cursor:pointer;transition:background .1s;"
+              <span class="wsc-status-icon-btn" flex-shrink="0" title=${it.action.title} style="display:inline-flex;align-items:center;justify-content:center;padding:1px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--text-secondary,#999);cursor:pointer;transition:background .1s;"
                 @mouseenter=${(e: Event) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.18)'; }}
                 @mouseleave=${(e: Event) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.08)'; }}
                 @click=${(e: Event) => { e.stopPropagation(); it.action!.onClick(); }}>
-                <openp41ge-inline-icon name=${it.action.icon} size="11" no-hover></openp41ge-inline-icon>
+                <openp41ge-inline-icon name=${it.action.icon} size="12" no-hover></openp41ge-inline-icon>
               </span>
               `
               : html`
-              <button type="button" class="wsc-status-btn" style="flex-shrink:0;background:var(--bg-hover,#2a2d2e);border:1px solid var(--divider,#444);color:var(--text-primary,#ddd);border-radius:4px;font-size:10px;font-weight:600;padding:2px 9px;cursor:pointer;" title=${it.action.title}
+              <button type="button" class="wsc-status-btn" style="flex-shrink:0;display:inline-flex;align-items:center;height:18px;box-sizing:border-box;background:var(--bg-hover,#2a2d2e);border:1px solid var(--divider,#444);color:var(--text-primary,#ddd);border-radius:4px;font-size:10px;font-weight:600;padding:0 8px;cursor:pointer;" title=${it.action.title}
                 @click=${(e: Event) => { e.stopPropagation(); it.action!.onClick(); }}
                 @mouseenter=${(e: Event) => ((e.currentTarget as HTMLElement).style.background = 'var(--accent,#007acc)')}
                 @mouseleave=${(e: Event) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-hover,#2a2d2e)')}>${it.action.label}</button>
@@ -1348,7 +1348,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           background: rgba(255,255,255,.04);
         }
         .wsc-field-repos .wsc-status-list {
-          padding: 2px 12px 6px 32px;
+          padding: 2px 10px 6px 32px;
           background: rgba(255,255,255,.04);
         }
         /* Nested worktree status: don't stack another tint on the worktree
