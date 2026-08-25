@@ -1354,6 +1354,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           padding: 2px 12px 6px 32px;
           background: rgba(255,255,255,.04);
         }
+        /* Nested worktree status: don't stack another tint on the worktree
+           row's background (it would read as a lighter band). */
+        .wsc-field-repos .wsc-wt-row .wsc-status-list {
+          background: transparent;
+        }
         /* Status list nested inside a worktree row: the cr-row already adds
            10px left padding, so use less so text still aligns with the name. */
         .wsc-field-repos .wsc-wt-row .wsc-status-list {
