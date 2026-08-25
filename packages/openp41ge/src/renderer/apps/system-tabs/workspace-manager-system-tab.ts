@@ -39,7 +39,7 @@ interface StatusItem {
   tone: "ok" | "info" | "warn" | "error";
   text: string;
   detail?: string;
-  action?: { label: string; title: string; onClick: () => void };
+  action?: { label: string; title: string; icon?: string; onClick: () => void };
 }
 
 type View = "list" | "detail";
@@ -317,12 +317,19 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         ${items.map((it) => html`
           <div style="display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;">
             <span style="flex:1;min-width:0;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
-            ${it.action ? html`
+            ${it.action ? (it.action.icon
+              ? html`
+              <span class="wsc-status-icon-btn" flex-shrink="0" title=${it.action.title} style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;color:var(--text-secondary,#999);cursor:pointer;"
+                @click=${(e: Event) => { e.stopPropagation(); it.action!.onClick(); }}>
+                <openp41ge-inline-icon name=${it.action.icon} size="11" no-hover></openp41ge-inline-icon>
+              </span>
+              `
+              : html`
               <button type="button" class="wsc-status-btn" style="flex-shrink:0;background:var(--bg-hover,#2a2d2e);border:1px solid var(--divider,#444);color:var(--text-primary,#ddd);border-radius:4px;font-size:10px;font-weight:600;padding:2px 9px;cursor:pointer;" title=${it.action.title}
                 @click=${(e: Event) => { e.stopPropagation(); it.action!.onClick(); }}
                 @mouseenter=${(e: Event) => ((e.currentTarget as HTMLElement).style.background = 'var(--accent,#007acc)')}
                 @mouseleave=${(e: Event) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-hover,#2a2d2e)')}>${it.action.label}</button>
-            ` : ''}
+              `) : ''}
           </div>
         `)}
       </div>
@@ -446,7 +453,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       items.push({
         tone: 'ok',
         text: 'All worktrees are up to date',
-        action: { label: 'Reverify', title: 'Re-check worktree sync status', onClick: () => { this._detailVerifyAll(i); } },
+        action: { label: 'Reverify', title: 'Re-check worktree sync status', icon: 'refresh', onClick: () => { this._detailVerifyAll(i); } },
       });
     }
     return this._renderStatusList(items, onToggle);
@@ -1814,6 +1821,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         </div>
         <div class="wsc-field wsc-field-repos" tabindex="0" @click=${(e: Event) => { (e.currentTarget as HTMLElement).focus(); }} style="display:flex;flex-direction:column;">
           <label class="wsc-label">What repos are you working on?</label>
+          <div style="font-size:11px;color:var(--text-secondary,#999);margin:2px 0 0;line-height:1.35;">You need read access to each repository so openp41ge can pull (clone/sync) them without asking for a password.</div>
           <div style="flex:1;min-height:0;overflow-y:auto;margin-top:8px;">
             ${this._detailRepos.map((entry, i) => html`
               ${entry.status === "success"
