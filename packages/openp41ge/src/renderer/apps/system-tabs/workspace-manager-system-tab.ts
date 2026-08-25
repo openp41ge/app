@@ -1344,6 +1344,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wsc-field-repos .add-wt-trigger {
           background: rgba(255,255,255,.04);
         }
+        .wsc-field-repos .wsc-status-list {
+          background: rgba(255,255,255,.04);
+        }
         .wsc-field-repos .add-wt-trigger {
           border-top-color: var(--wsc-sep) !important;
         }
