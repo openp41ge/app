@@ -379,15 +379,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     onVerify: () => void,
     onSync: () => void,
   ): TemplateResult {
-    const warnColor = "var(--text-warning,#e5a50a)";
-    const wtTitle = (dflt: string) => wt.errorMessage || wt.warningMessage || dflt;
-    const statusIcon = wt.status === 'unverified' ? nothing
-      : wt.status === 'validating' ? html`<openp41ge-inline-icon name="spinner" size="12" no-hover icon-color="var(--text-secondary,#999)"></openp41ge-inline-icon>`
-      : wt.status === 'success' ? html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title="In sync"></openp41ge-inline-icon>`
-      : wt.status === 'failure' ? html`<openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" title=${wtTitle("Resync failed — retry")} @click=${onVerify}></openp41ge-inline-icon>`
-      : wt.status === 'diverged' ? html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} hover-color="danger" title=${wtTitle("Diverged from remote — resolve, then resync")} @click=${onSync}></openp41ge-inline-icon>`
-      : wt.status === 'needs-sync' ? html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} hover-color="accent" title=${wtTitle("Ahead/behind remote — resync needed")} @click=${onSync}></openp41ge-inline-icon>`
-      : nothing;
     return html`
       <div class="cr-row wsc-wt-row" tabindex="-1" style="display:flex;flex-direction:column;padding:8px 10px;" @mouseenter=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'visible'; }} @mouseleave=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'hidden'; }} @keydown=${(e: KeyboardEvent) => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -404,7 +395,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           <span class="wt-del" style="display:flex;align-items:center;visibility:hidden;">
             <openp41ge-inline-icon name="close" size="12" no-hover @click=${onRemove}></openp41ge-inline-icon>
           </span>
-          <span style="display:flex;align-items:center;visibility:${wt.status === 'unverified' ? 'hidden' : 'visible'};">${statusIcon}</span>
         </div>
         ${this._worktreeStatusContent(repoIndex, wtIndex, wt, onVerify, onSync)}
       </div>
