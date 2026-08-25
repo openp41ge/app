@@ -1821,7 +1821,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         </div>
         <div class="wsc-field wsc-field-repos" tabindex="0" @click=${(e: Event) => { (e.currentTarget as HTMLElement).focus(); }} style="display:flex;flex-direction:column;">
           <label class="wsc-label">What repos are you working on?</label>
-          <div style="font-size:11px;color:var(--text-secondary,#999);margin:2px 0 0;line-height:1.35;">You need read access to each repository so openp41ge can pull (clone/sync) them without asking for a password.</div>
+          <div style="display:flex;align-items:flex-start;gap:6px;margin:6px 0 0;padding:6px 8px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
+            <openp41ge-inline-icon name="warning" size="12" no-hover icon-color="var(--text-warning,#e5a50a)" style="flex-shrink:0;margin-top:1px;"></openp41ge-inline-icon>
+            <span>You need read access to each repository so openp41ge can pull (clone/sync) them without asking for a password.</span>
+          </div>
           <div style="flex:1;min-height:0;overflow-y:auto;margin-top:8px;">
             ${this._detailRepos.map((entry, i) => html`
               ${entry.status === "success"
