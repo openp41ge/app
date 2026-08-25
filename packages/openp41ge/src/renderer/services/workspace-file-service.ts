@@ -10,6 +10,33 @@ import { appState } from "./app-state";
 
 const WORKSPACE_CHANGED_EVENT = "workspace-file-changed";
 
+/** Result of materialising (cloning) a repo for a workspace. */
+export interface MaterializeOutcome {
+  url: string;
+  name: string;
+  ok: boolean;
+  error?: string;
+  worktrees: Array<{ branch: string; ok: boolean; error?: string }>;
+}
+
+/**
+ * Derive the repository name from a git URL, matching the main-process
+ * NodeGitService derivation so repos land under the same directory name.
+ * https://github.com/acme/widget.git -> github.com/acme/widget
+ * git@github.com:acme/widget.git    -> github.com/acme/widget
+ */
+export function deriveRepoName(url: string): string {
+  const cleaned = url
+    .replace(/^https?:\/\//, "")
+    .replace(/^git@/, "")
+    .replace(/\.git$/, "");
+  const parts = cleaned.split(/[/:]/);
+  const provider = parts[0];
+  const repoName = parts[parts.length - 1];
+  const orgPath = parts.slice(1, -1).join("/");
+  return orgPath ? `${provider}/${orgPath}/${repoName}` : `${provider}/${repoName}`;
+}
+
 export class WorkspaceFileService {
   /** Path to the active .openp41ge-workspace file, or null if none. */
   activeFilePath: string | null = null;
@@ -160,6 +187,60 @@ export class WorkspaceFileService {
     if (!this.activeData) return;
     this.activeData.dataDir = newPath;
     this._emitChanged();
+  }
+
+  // ── Materialize repos (clone on disk) ────────────────────────────
+
+  /**
+   * Best-effort clone of the active workspace's repos into the project
+   * repositories dir + registration in the window's repoRefs, and checkout
+   * of their worktrees, so the Explorer/Git sidebar panels can list them.
+   *
+   * Uses the workspaceController APIs (the same path normal repo-add uses),
+   * which clone into the directory the sidebar panels scan. All operations
+   * are idempotent at the main-process level (existing clones/worktrees are
+   * skipped), so this is safe to run on every activation. Returns a per-repo
+   * outcome summary (for tests/diagnostics).
+   */
+  async materializeActiveRepos(): Promise<MaterializeOutcome[]> {
+    const data = this.activeData;
+    if (!data || !Array.isArray(data.repos) || data.repos.length === 0) return [];
+
+    const outcomes: MaterializeOutcome[] = [];
+    for (const repo of data.repos) {
+      const name = deriveRepoName(repo.url);
+      const out: MaterializeOutcome = { url: repo.url, name, ok: false, worktrees: [] };
+      try {
+        // Clone the bare repo into the project repos dir (idempotent).
+        const clone = await window.openp41ge.workspaceController.clone(repo.url).promise;
+        if (!clone.success) {
+          out.error = clone.error || "Clone failed";
+          outcomes.push(out);
+          continue;
+        }
+        // Register the repo in the window's repoRefs so sidebar panels show it.
+        await window.openp41ge.workspaceController.worksetAddRepo(name, repo.url, repo.worktrees ?? []);
+
+        for (const branch of repo.worktrees ?? []) {
+          try {
+            await window.openp41ge.workspaceController.checkoutWorktree(name, branch);
+            await window.openp41ge.workspaceController.worksetAddWorktreeToRepo(name, branch);
+            out.worktrees.push({ branch, ok: true });
+          } catch (wtErr) {
+            out.worktrees.push({
+              branch,
+              ok: false,
+              error: wtErr instanceof Error ? wtErr.message : String(wtErr),
+            });
+          }
+        }
+        out.ok = out.worktrees.every((w) => w.ok);
+      } catch (e) {
+        out.error = e instanceof Error ? e.message : String(e);
+      }
+      outcomes.push(out);
+    }
+    return outcomes;
   }
 
   // ── Clear ───────────────────────────────────────────

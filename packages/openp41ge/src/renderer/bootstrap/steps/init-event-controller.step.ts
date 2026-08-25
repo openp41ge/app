@@ -110,6 +110,12 @@ export class InitEventControllerStep implements IStartupStep {
           emitOpenSystemTab(winId, "explorer", "Explorer");
           emitOpenSystemTab(winId, "git", "Git");
         }
+        // Materialise the workspace's repos (clone + checkout) so Explorer and
+        // Git panels can list them; refresh both after the clones land.
+        void workspaceFileService.materializeActiveRepos().then(() => {
+          document.dispatchEvent(new CustomEvent("git:refresh", { bubbles: true }));
+          document.dispatchEvent(new CustomEvent("project:changed", { bubbles: true }));
+        });
       }
     });
 
