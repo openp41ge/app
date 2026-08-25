@@ -305,9 +305,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   /** Stacked status lines: coloured dot + text + optional action pill. */
-  private _renderStatusList(items: StatusItem[]): TemplateResult {
+  private _renderStatusList(items: StatusItem[], onAreaClick?: () => void): TemplateResult {
     return html`
-      <div class="wsc-status-list" style="display:flex;flex-direction:column;gap:4px;">
+      <div class="wsc-status-list" style="display:flex;flex-direction:column;gap:4px;${onAreaClick ? 'cursor:pointer;' : ''}"
+        @click=${(e: Event) => {
+          if (!onAreaClick) return;
+          const target = e.target as HTMLElement | null;
+          if (target && target.closest && target.closest('.wsc-status-btn')) return;
+          onAreaClick();
+        }}>
         ${items.map((it) => html`
           <div style="display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;">
             <span style="flex:1;min-width:0;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
@@ -397,7 +403,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   /** Status list for a repository row (cloned): aggregate + per-worktree trouble lines. */
-  private _repoStatusContent(i: number, entry: CreateRepoEntry): TemplateResult {
+  private _repoStatusContent(i: number, entry: CreateRepoEntry, onToggle: () => void): TemplateResult {
     const items: StatusItem[] = [];
     const trouble: Array<{ tone: 'warn' | 'error'; wt: WorktreeEntry; label: string; title: string; onClick: () => void }> = [];
     let validating = 0;
@@ -443,7 +449,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         action: { label: 'Verify', title: 'Re-check worktree sync status', onClick: () => { this._detailVerifyAll(i); } },
       });
     }
-    return this._renderStatusList(items);
+    return this._renderStatusList(items, onToggle);
   }
 
   /** Repo-level sync indicator: warning when any worktree needs attention, else a green check. */
@@ -1345,7 +1351,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           background: rgba(255,255,255,.04);
         }
         .wsc-field-repos .wsc-status-list {
-          padding: 6px 12px 6px 32px;
+          padding: 2px 12px 6px 32px;
           background: rgba(255,255,255,.04);
         }
         /* Status list nested inside a worktree row: the cr-row already adds
@@ -1857,7 +1863,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._onRemoveRepo(i); })}</div>`,
                     this._repoSyncIcon(entry),
                     () => { this._detailRepos[i].expanded = !this._detailRepos[i].expanded; this._emitUpdate(); },
-                    this._repoStatusContent(i, entry),
+                    this._repoStatusContent(i, entry, () => { this._detailRepos[i].expanded = !this._detailRepos[i].expanded; this._emitUpdate(); }),
                   )
                 : this._renderUnverifiedRepoRow(i, entry, this._detailRepos, (idx) => this._onRemoveRepo(idx), (idx) => this._detailVerifyRepo(idx), true)}
             `)}
