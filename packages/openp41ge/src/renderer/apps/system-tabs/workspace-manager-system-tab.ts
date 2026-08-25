@@ -307,10 +307,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** Stacked status lines: coloured dot + text + optional action pill. */
   private _renderStatusList(items: StatusItem[]): TemplateResult {
     return html`
-      <div class="wsc-status-list" style="display:flex;flex-direction:column;gap:4px;padding:2px 12px 8px 20px;">
+      <div class="wsc-status-list" style="display:flex;flex-direction:column;gap:4px;padding:6px 12px 6px 20px;">
         ${items.map((it) => html`
           <div style="display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;">
-            <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${this._toneColor(it.tone)};"></span>
             <span style="flex:1;min-width:0;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
             ${it.action ? html`
               <button type="button" class="wsc-status-btn" style="flex-shrink:0;background:var(--bg-hover,#2a2d2e);border:1px solid var(--divider,#444);color:var(--text-primary,#ddd);border-radius:4px;font-size:10px;font-weight:600;padding:2px 9px;cursor:pointer;" title=${it.action.title}
