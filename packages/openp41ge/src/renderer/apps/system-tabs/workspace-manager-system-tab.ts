@@ -1788,7 +1788,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           ? html`<span class="wm-card-active-pill">Active</span>`
           : html`<button class="wm-btn activate" @click=${() => this._activateWorkspace(entry)}>Activate</button>`}
       </div>
-      <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;">
+      <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
         <div class="wsc-field" @click=${(e: Event) => { (e.currentTarget as HTMLElement).querySelector("input")?.focus(); }}>
           <label class="wsc-label">What's the workspace name?</label>
           <input
@@ -1799,13 +1799,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             @input=${(e: Event) => this._onNameChange(e)}
           />
         </div>
-        <div class="wsc-field wsc-field-repos" tabindex="0" @click=${(e: Event) => { (e.currentTarget as HTMLElement).focus(); }} style="display:flex;flex-direction:column;flex:1;min-height:0;">
+        <div class="wsc-field wsc-field-repos" tabindex="0" @click=${(e: Event) => { (e.currentTarget as HTMLElement).focus(); }} style="display:flex;flex-direction:column;">
           <label class="wsc-label">What repos are you working on?</label>
           <div style="display:flex;align-items:flex-start;gap:6px;margin:6px 0 0;padding:6px 8px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
             <openp41ge-inline-icon name="warning" size="12" no-hover icon-color="var(--text-warning,#e5a50a)" style="flex-shrink:0;margin-top:1px;"></openp41ge-inline-icon>
             <span>You need read access to each repository so openp41ge can pull (clone/sync) them without asking for a password.</span>
           </div>
-          <div style="flex:1;min-height:0;overflow-y:auto;margin-top:8px;">
+          <div style="margin-top:8px;">
             ${this._detailRepos.map((entry, i) => html`
               ${entry.status === "success"
                 ? this._renderAccordionItem(
@@ -1922,6 +1922,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             </div>
           </div>
         </div>
+        </div>
         <!-- Bottom bar: Delete (left) · Save/Cancel (right) -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px;height:40px;border-top:1px solid var(--divider,#333);flex-shrink:0;gap:6px;">
           <button
@@ -1938,7 +1939,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             @click=${() => this._onDetailSave()}
           >Save</button>
           </div>
-        </div>
       </div>
     `;
   }
