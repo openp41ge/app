@@ -1331,7 +1331,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           outline:none;
           box-shadow:none;
         }
-        .wsc-field-repos .repo-wrapper:not(:has(> .cr-row + div)) {
+        .wsc-field-repos .repo-wrapper:not(:has(> .cr-row + div:not(.wsc-status-list))):not(:has(> .wsc-status-list + div)) {
           border:none !important;
           background:transparent !important;
           border-radius:0 !important;
@@ -1350,7 +1350,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wsc-field-repos .add-repo-trigger {
           border-radius: 0 0 8px 8px;
         }
-        .wsc-field-repos .repo-wrapper:has(> .cr-row + div) + .add-repo-trigger {
+        .wsc-field-repos .repo-wrapper:has(> .cr-row + div:not(.wsc-status-list)) + .add-repo-trigger,
+        .wsc-field-repos .repo-wrapper:has(> .wsc-status-list + div) + .add-repo-trigger {
           border-top:none;
           border-radius:8px;
         }
@@ -1363,7 +1364,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wsc-field-repos .repo-wrapper + .cr-row {
           border-top: 1px solid var(--wsc-sep);
         }
-        .wsc-field-repos .repo-wrapper:has(> .cr-row + div) + .repo-wrapper {
+        .wsc-field-repos .repo-wrapper:has(> .cr-row + div:not(.wsc-status-list)) + .repo-wrapper,
+        .wsc-field-repos .repo-wrapper:has(> .wsc-status-list + div) + .repo-wrapper {
           border-top:none;
           margin-top:8px !important;
         }
