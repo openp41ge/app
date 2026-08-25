@@ -234,10 +234,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const nextExpanded = index < items.length - 1 && items[index + 1].expanded;
 
     let wrapperStyle = 'box-sizing:border-box;min-height:38px;background:rgba(255,255,255,.04);overflow:hidden;';
-    let headerStyle =
-      statusContent !== null
-        ? 'display:flex;align-items:center;gap:6px;padding:10px 12px;min-height:48px;box-sizing:border-box;'
-        : 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;';
+    let headerStyle = 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;';
 
     if (isStandalone) {
       wrapperStyle += 'border:1px solid var(--divider,#333);border-radius:6px;margin:4px 0;';
@@ -282,7 +279,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           }}
         >
           <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#999)" style="transform:rotate(${item.expanded ? '90deg' : '0deg'});"></openp41ge-inline-icon>
-          <span style="flex:1;font-size:${statusContent !== null ? '13px' : '12px'};color:var(--text-primary,#ccc);word-break:break-all;">${item.url}</span>
+          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${item.url}</span>
           ${actionsContent}
           ${trailingContent}
         </div>
@@ -378,7 +375,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       : wt.status === 'needs-sync' ? html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} hover-color="accent" title=${wtTitle("Ahead/behind remote — resync needed")} @click=${onSync}></openp41ge-inline-icon>`
       : nothing;
     return html`
-      <div class="cr-row wsc-wt-row" tabindex="-1" style="display:flex;flex-direction:column;padding:8px 12px 7px;" @mouseenter=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'visible'; }} @mouseleave=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'hidden'; }} @keydown=${(e: KeyboardEvent) => {
+      <div class="cr-row wsc-wt-row" tabindex="-1" style="display:flex;flex-direction:column;padding:8px 10px;" @mouseenter=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'visible'; }} @mouseleave=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'hidden'; }} @keydown=${(e: KeyboardEvent) => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
               const all = Array.from((e.currentTarget as HTMLElement).closest('.repo-wrapper')?.querySelectorAll('.cr-row') ?? []);
@@ -389,7 +386,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           }}>
         <div style="display:flex;align-items:center;gap:6px;">
           <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-          <span style="flex:1;font-size:13px;font-weight:500;color:var(--text-primary,#e0e0e0);word-break:break-all;">${wt.name}</span>
+          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt.name}</span>
           <span class="wt-del" style="display:flex;align-items:center;visibility:hidden;">
             <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
           </span>
@@ -538,9 +535,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       }
       return html`
         <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
-          <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:10px 12px;min-height:48px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
+          <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
             <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-            <span style="flex:1;font-size:13px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
+            <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
             <div class="row-actions">
               <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${() => handleRemove(i)}></openp41ge-inline-icon>
             </div>
