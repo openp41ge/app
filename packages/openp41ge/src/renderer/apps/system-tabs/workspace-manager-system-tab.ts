@@ -316,7 +316,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }}>
         ${items.map((it) => html`
           <div style="display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;">
-            <span style="flex:1;min-width:0;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
+            <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
             ${it.action ? (it.action.icon
               ? html`
               <span class="wsc-status-icon-btn" flex-shrink="0" title=${it.action.title} style="display:inline-flex;align-items:center;justify-content:center;padding:1px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--text-secondary,#999);cursor:pointer;transition:background .1s;"
@@ -429,9 +429,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     });
     const total = entry.worktrees.length;
     if (validating > 0) {
-      items.push({ tone: 'info', text: 'Checking worktrees…' });
-    }
-    if (total === 0) {
+      // Single in-progress line that counts up to the total as worktrees finish.
+      const checked = entry.worktrees.filter((w) => w.status !== 'validating' && w.status !== 'unverified').length;
+      items.push({ tone: 'info', text: `Checking ${checked} of ${total} worktrees` });
+    } else if (total === 0) {
       items.push({ tone: 'info', text: 'No worktrees yet — add one when the repository is expanded.' });
     } else if (trouble.length > 0) {
       items.push({
@@ -446,9 +447,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       items.push({
         tone: 'info',
         text: `${unverified} of ${total} worktree${total > 1 ? 's' : ''} not yet verified`,
-        action: validating === 0 ? { label: 'Verify', title: 'Check worktree sync status', onClick: () => { this._detailVerifyAll(i); } } : undefined,
+        action: { label: 'Verify', title: 'Check worktree sync status', onClick: () => { this._detailVerifyAll(i); } },
       });
-    } else if (validating === 0) {
+    } else {
       items.push({
         tone: 'ok',
         text: 'All worktrees are up to date',
