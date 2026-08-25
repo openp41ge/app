@@ -234,11 +234,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const nextExpanded = index < items.length - 1 && items[index + 1].expanded;
 
     let wrapperStyle = 'box-sizing:border-box;min-height:38px;background:rgba(255,255,255,.04);overflow:hidden;';
-    let headerStyle = 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;';
+    let headerStyle = 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;cursor:pointer;user-select:none;';
 
     if (isStandalone) {
       wrapperStyle += 'border:1px solid var(--divider,#333);border-radius:6px;margin:4px 0;';
-      headerStyle += 'cursor:pointer;user-select:none;border-radius:6px 6px 0 0;';
+      headerStyle += 'border-radius:6px 6px 0 0;';
     } else {
       const showTopBorder = isFirst || prevExpanded;
       const topRounded = isFirst || prevExpanded;
@@ -1457,6 +1457,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         /* Detail section styles (reused from old workspace-manager-system-tab) */
         .row-actions { display:none; align-items:center; gap:0; }
         .cr-row:hover .row-actions { display:flex; }
+        /* The repo header and its status list are one unit: hovering the
+           statuses also reveals the row's delete action. */
+        .repo-wrapper:has(> .wsc-status-list:hover) > .cr-row .row-actions { display:flex; }
 
         .drag-row {
           display:flex; align-items:center; gap:6px; padding:8px 10px; height:37px; box-sizing:border-box;
