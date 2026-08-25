@@ -164,6 +164,8 @@ declare global {
         repoAlreadyCloned: (url: string) => Promise<boolean>;
         /** Clone a bare repo into workspace-data for the given URL. */
         cloneBareRepo: (url: string) => Promise<{ ok: boolean; error?: string }>;
+        /** Resync a worktree branch to match its remote (fetch + reset to origin/<branch>). */
+        syncWorktree: (url: string, branch: string) => Promise<{ ok: boolean; error?: string }>;
         /** Checkout a worktree branch. */
         checkoutWorktree: (url: string, branch: string) => Promise<{ ok: boolean; error?: string }>;
         /** Encode a repo URL into a filesystem-safe directory name. */

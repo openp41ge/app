@@ -519,7 +519,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
     openWorkspaceFile: () => ipcRenderer.invoke("dialog:openWorkspaceFile"),
 
     /** Open native save dialog for .openp41ge-workspace files. Returns path or null. */
-    saveWorkspaceFile: (data, defaultPath) => ipcRenderer.invoke("dialog:saveWorkspaceFile", data, defaultPath),
+    saveWorkspaceFile: (data, defaultPath) =>
+      ipcRenderer.invoke("dialog:saveWorkspaceFile", data, defaultPath),
 
     /** Open native folder picker. Returns path or null. */
     pickFolder: () => ipcRenderer.invoke("dialog:pickFolder"),
@@ -528,7 +529,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
     readWorkspaceFile: (filePath) => ipcRenderer.invoke("dialog:readWorkspaceFile", filePath),
 
     /** Write a .openp41ge-workspace file to a known path (no dialog). Returns boolean success. */
-    writeWorkspaceFile: (filePath, data) => ipcRenderer.invoke("dialog:writeWorkspaceFile", filePath, data),
+    writeWorkspaceFile: (filePath, data) =>
+      ipcRenderer.invoke("dialog:writeWorkspaceFile", filePath, data),
 
     /** Ensure a directory exists (create it recursively). Returns boolean success. */
     ensureDir: (dirPath) => ipcRenderer.invoke("dialog:ensureDir", dirPath),
@@ -540,7 +542,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
     listWorkspaces: () => ipcRenderer.invoke("dialog:listWorkspaces"),
 
     /** Delete a .openp41ge-workspace file. Optionally also remove its data dir when deleteData is true. */
-    deleteWorkspaceFile: (filePath, deleteData) => ipcRenderer.invoke("dialog:deleteWorkspaceFile", filePath, deleteData),
+    deleteWorkspaceFile: (filePath, deleteData) =>
+      ipcRenderer.invoke("dialog:deleteWorkspaceFile", filePath, deleteData),
   },
 
   project: {
@@ -570,6 +573,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.invoke("workspaceData:checkWorktreeBranch", wsDir, url, branch),
     repoAlreadyCloned: (url) => ipcRenderer.invoke("workspaceData:repoAlreadyCloned", url),
     cloneBareRepo: (url) => ipcRenderer.invoke("workspaceData:cloneBareRepo", url),
+    syncWorktree: (url, branch) => ipcRenderer.invoke("workspaceData:syncWorktree", url, branch),
     checkoutWorktree: (url, branch) =>
       ipcRenderer.invoke("workspaceData:checkoutWorktree", url, branch),
     encodeRepoUrl: (url) => ipcRenderer.invoke("workspaceData:encodeRepoUrl", url),

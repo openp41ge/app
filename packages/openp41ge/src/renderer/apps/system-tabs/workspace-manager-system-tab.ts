@@ -34,6 +34,14 @@ interface CreateRepoEntry {
   showNewWorktreeInput: boolean;
 }
 
+/** A single line in a status list: coloured dot + text + optional action button. */
+interface StatusItem {
+  tone: "ok" | "info" | "warn" | "error";
+  text: string;
+  detail?: string;
+  action?: { label: string; title: string; onClick: () => void };
+}
+
 type View = "list" | "detail";
 
 export class WorkspaceManagerModal implements EditorSystemTabController {
@@ -217,6 +225,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     actionsContent: TemplateResult | null,
     trailingContent: TemplateResult | null,
     onToggle: () => void,
+    statusContent: TemplateResult | null = null,
   ): TemplateResult {
     const item = items[index];
     const isStandalone = item.expanded;
@@ -225,7 +234,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const nextExpanded = index < items.length - 1 && items[index + 1].expanded;
 
     let wrapperStyle = 'box-sizing:border-box;min-height:38px;background:rgba(255,255,255,.04);overflow:hidden;';
-    let headerStyle = 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;';
+    let headerStyle =
+      statusContent !== null
+        ? 'display:flex;align-items:center;gap:6px;padding:10px 12px;min-height:48px;box-sizing:border-box;'
+        : 'display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;';
 
     if (isStandalone) {
       wrapperStyle += 'border:1px solid var(--divider,#333);border-radius:6px;margin:4px 0;';
@@ -270,10 +282,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           }}
         >
           <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#999)" style="transform:rotate(${item.expanded ? '90deg' : '0deg'});"></openp41ge-inline-icon>
-          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${item.url}</span>
+          <span style="flex:1;font-size:${statusContent !== null ? '13px' : '12px'};color:var(--text-primary,#ccc);word-break:break-all;">${item.url}</span>
           ${actionsContent}
           ${trailingContent}
         </div>
+        ${statusContent ?? ''}
         ${item.expanded && expandedContent ? expandedContent : ''}
       </div>
     `;
@@ -286,13 +299,73 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     `;
   }
 
-  /** Render a worktree row with verification status and sync/retry actions */
+  /** Colour for a status tone. */
+  private _toneColor(tone: StatusItem["tone"]): string {
+    return tone === "ok" ? "var(--accent,#007acc)"
+      : tone === "warn" ? "var(--text-warning,#e5a50a)"
+      : tone === "error" ? "var(--error,#e53e3e)"
+      : "var(--text-secondary,#999)";
+  }
+
+  /** Stacked status lines: coloured dot + text + optional action pill. */
+  private _renderStatusList(items: StatusItem[]): TemplateResult {
+    return html`
+      <div style="display:flex;flex-direction:column;gap:4px;padding:2px 12px 8px 20px;">
+        ${items.map((it) => html`
+          <div style="display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;">
+            <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${this._toneColor(it.tone)};"></span>
+            <span style="flex:1;min-width:0;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
+            ${it.action ? html`
+              <button type="button" class="wsc-status-btn" style="flex-shrink:0;background:var(--bg-hover,#2a2d2e);border:1px solid var(--divider,#444);color:var(--text-primary,#ddd);border-radius:4px;font-size:10px;font-weight:600;padding:2px 9px;cursor:pointer;" title=${it.action.title}
+                @click=${(e: Event) => { e.stopPropagation(); it.action!.onClick(); }}
+                @mouseenter=${(e: Event) => ((e.currentTarget as HTMLElement).style.background = 'var(--accent,#007acc)')}
+                @mouseleave=${(e: Event) => ((e.currentTarget as HTMLElement).style.background = 'var(--bg-hover,#2a2d2e)')}>${it.action.label}</button>
+            ` : ''}
+          </div>
+        `)}
+      </div>
+    `;
+  }
+
+  /** Status list for a single worktree row: one line per state with its action. */
+  private _worktreeStatusContent(
+    _repoIndex: number,
+    _wtIndex: number,
+    wt: WorktreeEntry,
+    onVerify: () => void,
+    onSync: () => void,
+  ): TemplateResult {
+    const items: StatusItem[] = [];
+    switch (wt.status) {
+      case 'success':
+        items.push({ tone: 'ok', text: 'In sync with remote', detail: wt.warningMessage });
+        break;
+      case 'needs-sync':
+        items.push({ tone: 'warn', text: 'Needs sync', detail: wt.errorMessage || 'ahead/behind remote', action: { label: 'Sync', title: 'Fetch and reset branch to remote', onClick: onSync } });
+        break;
+      case 'diverged':
+        items.push({ tone: 'error', text: 'Diverged from remote', detail: wt.errorMessage, action: { label: 'Resync', title: 'Fetch and reset branch to remote (discards local commits)', onClick: onSync } });
+        break;
+      case 'failure':
+        items.push({ tone: 'error', text: 'Verification failed', detail: wt.errorMessage, action: { label: 'Retry', title: 'Re-check branch status', onClick: onVerify } });
+        break;
+      case 'validating':
+        items.push({ tone: 'info', text: 'Checking status…' });
+        break;
+      case 'unverified':
+        items.push({ tone: 'info', text: 'Not yet verified', action: { label: 'Verify', title: 'Check branch status', onClick: onVerify } });
+        break;
+    }
+    return this._renderStatusList(items);
+  }
+
+  /** Render a worktree row: title line + status list with actions. */
   private _renderWorktreeRow(
     repoIndex: number,
     wtIndex: number,
     wt: WorktreeEntry,
     onRemove: () => void,
-    onRetry: () => void,
+    onVerify: () => void,
     onSync: () => void,
   ): TemplateResult {
     const warnColor = "var(--text-warning,#e5a50a)";
@@ -300,12 +373,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const statusIcon = wt.status === 'unverified' ? nothing
       : wt.status === 'validating' ? html`<openp41ge-inline-icon name="spinner" size="12" no-hover icon-color="var(--text-secondary,#999)"></openp41ge-inline-icon>`
       : wt.status === 'success' ? html`<openp41ge-inline-icon name="check-circle" size="12" icon-color="var(--accent,#007acc)" no-hover title="In sync"></openp41ge-inline-icon>`
-      : wt.status === 'failure' ? html`<openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" title=${wtTitle("Resync failed — retry")} @click=${onRetry}></openp41ge-inline-icon>`
-      : wt.status === 'diverged' ? html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} hover-color="danger" title=${wtTitle("Diverged from remote — resolve, then resync")} @click=${onRetry}></openp41ge-inline-icon>`
+      : wt.status === 'failure' ? html`<openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" title=${wtTitle("Resync failed — retry")} @click=${onVerify}></openp41ge-inline-icon>`
+      : wt.status === 'diverged' ? html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} hover-color="danger" title=${wtTitle("Diverged from remote — resolve, then resync")} @click=${onSync}></openp41ge-inline-icon>`
       : wt.status === 'needs-sync' ? html`<openp41ge-inline-icon name="warning" size="12" icon-color=${warnColor} hover-color="accent" title=${wtTitle("Ahead/behind remote — resync needed")} @click=${onSync}></openp41ge-inline-icon>`
       : nothing;
     return html`
-      <div class="cr-row" tabindex="-1" style="display:flex;align-items:center;gap:6px;padding:8px 10px;" @mouseenter=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'visible'; }} @mouseleave=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'hidden'; }} @keydown=${(e: KeyboardEvent) => {
+      <div class="cr-row wsc-wt-row" tabindex="-1" style="display:flex;flex-direction:column;padding:8px 12px 7px;" @mouseenter=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'visible'; }} @mouseleave=${(e: Event) => { const del = (e.currentTarget as HTMLElement).querySelector('.wt-del'); if (del instanceof HTMLElement) del.style.visibility = 'hidden'; }} @keydown=${(e: KeyboardEvent) => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
               const all = Array.from((e.currentTarget as HTMLElement).closest('.repo-wrapper')?.querySelectorAll('.cr-row') ?? []);
@@ -314,21 +387,67 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               if (next instanceof HTMLElement) next.focus();
             }
           }}>
-        <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-        <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt.name}</span>
-        <span class="wt-del" style="display:flex;align-items:center;visibility:hidden;">
-          <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
-        </span>
-        <span style="display:flex;align-items:center;visibility:${wt.status === 'unverified' ? 'hidden' : 'visible'};">${statusIcon}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
+          <span style="flex:1;font-size:13px;font-weight:500;color:var(--text-primary,#e0e0e0);word-break:break-all;">${wt.name}</span>
+          <span class="wt-del" style="display:flex;align-items:center;visibility:hidden;">
+            <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${onRemove}></openp41ge-inline-icon>
+          </span>
+          <span style="display:flex;align-items:center;visibility:${wt.status === 'unverified' ? 'hidden' : 'visible'};">${statusIcon}</span>
+        </div>
+        ${this._worktreeStatusContent(repoIndex, wtIndex, wt, onVerify, onSync)}
       </div>
-      ${wt.errorMessage && (wt.status === 'failure' || wt.status === 'diverged') ? html`
-        <div style="font-size:12px;color:var(--error,#e53e3e);padding:2px 10px 6px 32px;">${wt.errorMessage}</div>
-      ` : wt.errorMessage && wt.status === 'needs-sync' ? html`
-        <div style="font-size:12px;color:var(--text-warning,#e5a50a);padding:2px 10px 6px 32px;">${wt.errorMessage}</div>
-      ` : wt.warningMessage && wt.status === 'success' ? html`
-        <div style="font-size:12px;color:var(--text-warning,#e5a50a);padding:2px 10px 6px 32px;">${wt.warningMessage}</div>
-      ` : ''}
     `;
+  }
+
+  /** Status list for a repository row (cloned): aggregate + per-worktree trouble lines. */
+  private _repoStatusContent(i: number, entry: CreateRepoEntry): TemplateResult {
+    const items: StatusItem[] = [];
+    const trouble: Array<{ tone: 'warn' | 'error'; wt: WorktreeEntry; label: string; title: string; onClick: () => void }> = [];
+    let validating = 0;
+    let unverified = 0;
+    entry.worktrees.forEach((wt, wtIndex) => {
+      if (wt.status === 'needs-sync') {
+        trouble.push({ tone: 'warn', wt, label: 'Sync', title: 'Fetch and reset branch to remote', onClick: () => { this._detailSyncWorktree(i, wtIndex); } });
+      } else if (wt.status === 'diverged') {
+        trouble.push({ tone: 'error', wt, label: 'Resync', title: 'Fetch and reset branch to remote (discards local commits)', onClick: () => { this._detailSyncWorktree(i, wtIndex); } });
+      } else if (wt.status === 'failure') {
+        trouble.push({ tone: 'error', wt, label: 'Retry', title: 'Re-check branch status', onClick: () => { this._forceVerifyWorktree(i, wtIndex); } });
+      } else if (wt.status === 'validating') {
+        validating += 1;
+      } else if (wt.status === 'unverified') {
+        unverified += 1;
+      }
+    });
+    const total = entry.worktrees.length;
+    if (validating > 0) {
+      items.push({ tone: 'info', text: 'Checking worktrees…' });
+    }
+    if (total === 0) {
+      items.push({ tone: 'info', text: 'No worktrees yet — add one when the repository is expanded.' });
+    } else if (trouble.length > 0) {
+      items.push({
+        tone: 'warn',
+        text: `${trouble.length} of ${total} worktree${total > 1 ? 's' : ''} need attention`,
+        action: { label: 'Sync all', title: 'Resync all out-of-sync worktrees to remote', onClick: () => { this._detailSyncAll(i); } },
+      });
+      for (const t of trouble) {
+        items.push({ tone: t.tone, text: `worktree ${t.wt.name}`, detail: t.wt.errorMessage, action: { label: t.label, title: t.title, onClick: t.onClick } });
+      }
+    } else if (unverified > 0) {
+      items.push({
+        tone: 'info',
+        text: `${unverified} of ${total} worktree${total > 1 ? 's' : ''} not yet verified`,
+        action: { label: 'Verify', title: 'Check worktree sync status', onClick: () => { this._detailVerifyAll(i); } },
+      });
+    } else if (validating === 0) {
+      items.push({
+        tone: 'ok',
+        text: `All ${total} worktree${total > 1 ? 's' : ''} up to date`,
+        action: { label: 'Verify', title: 'Re-check worktree sync status', onClick: () => { this._detailVerifyAll(i); } },
+      });
+    }
+    return this._renderStatusList(items);
   }
 
   /** Repo-level sync indicator: warning when any worktree needs attention, else a green check. */
@@ -402,10 +521,41 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     repos?: CreateRepoEntry[],
     onRemove?: (i: number) => void,
     onRetry?: (i: number) => void,
+    detailed = false,
   ): TemplateResult {
     const arr = repos ?? this._createRepos;
     const handleRemove = onRemove ?? ((idx: number) => this._removeCreateRepo(idx));
     const handleRetry = onRetry ?? ((idx: number) => this._verifyRepo(idx));
+    if (detailed) {
+      // Larger row with a status list + action buttons (Workspace detail view).
+      const items: StatusItem[] = [];
+      if (entry.status === 'validating') {
+        items.push({ tone: 'info', text: 'Verifying repository access…' });
+      } else if (entry.status === 'failure') {
+        items.push({ tone: 'error', text: 'Repository not accessible', detail: entry.errorMessage, action: { label: 'Retry', title: 'Re-check repository access', onClick: () => handleRetry(i) } });
+      } else {
+        items.push({ tone: 'info', text: 'Not verified yet', action: { label: 'Verify', title: 'Check repository access', onClick: () => handleRetry(i) } });
+      }
+      return html`
+        <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
+          <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:10px 12px;min-height:48px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
+            <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
+            <span style="flex:1;font-size:13px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
+            <div class="row-actions">
+              <openp41ge-inline-icon name="close" size="12" icon-color="var(--text-secondary,#999)" hover-color="danger" @click=${() => handleRemove(i)}></openp41ge-inline-icon>
+            </div>
+            <span style="display:flex;align-items:center;visibility:${entry.status === 'unverified' ? 'hidden' : 'visible'};">
+              ${entry.status === 'failure' ? html`
+                <openp41ge-inline-icon name="refresh" size="12" icon-color="var(--error,#e53e3e)" hover-color="danger" title="Retry" @click=${() => handleRetry(i)}></openp41ge-inline-icon>
+              ` : html`
+                <openp41ge-inline-icon name="spinner" size="12" no-hover icon-color="var(--text-secondary,#999)"></openp41ge-inline-icon>
+              `}
+            </span>
+          </div>
+          ${this._renderStatusList(items)}
+        </div>
+      `;
+    }
     return html`
       <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
         <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
@@ -548,7 +698,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       url: r.url,
       status: "success" as const,
       expanded: false,
-      worktrees: r.worktrees.map(w => ({ name: w, status: 'success' as const })),
+      worktrees: r.worktrees.map(w => ({ name: w, status: 'unverified' as const })),
       newWorktreeValue: "",
       showNewWorktreeInput: false,
     }));
@@ -557,6 +707,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._addInputValue = "";
     this._detailRepoUrlError = "";
     this._emitUpdate();
+    // Verify the real worktree status on open so the status list reflects
+    // actual ahead/behind/diverged state rather than pre-marked "success".
+    for (let i = 0; i < this._detailRepos.length; i++) {
+      void this._detailVerifyAll(i);
+    }
   }
 
   private _showList(): void {
@@ -944,22 +1099,59 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const repo = this._detailRepos[repoIndex];
     if (!repo) return;
     const wt = repo.worktrees[wtIndex];
-    if (!wt || wt.status !== "needs-sync") return;
-    // Re-verify after sync
+    if (!wt) return;
     wt.status = "validating";
     wt.errorMessage = undefined;
     this._emitUpdate();
     try {
-      const result = await this._bridge.workspaceData.checkWorktreeBranch("", repo.url, wt.name);
-      wt.status = result.status;
-      if (result.error) wt.errorMessage = result.error;
-      wt.warningMessage = result.warning || undefined;
-      if (result.status === "success") await this._syncDetailReposToFile();
+      const sync = await this._bridge.workspaceData.syncWorktree(repo.url, wt.name);
+      if (sync?.ok) {
+        const result = await this._bridge.workspaceData.checkWorktreeBranch("", repo.url, wt.name);
+        wt.status = result.status;
+        if (result.error) wt.errorMessage = result.error;
+        wt.warningMessage = result.warning || undefined;
+        if (result.status === "success") await this._syncDetailReposToFile();
+      } else {
+        wt.status = "failure";
+        wt.errorMessage = sync?.error || "Sync failed";
+      }
     } catch (e) {
       wt.status = "failure";
       wt.errorMessage = (e as Error).message || "Sync failed";
     }
     this._emitUpdate();
+  }
+
+  /** Re-verify every worktree of a repo, bypassing the existing status. */
+  private async _detailVerifyAll(repoIndex: number): Promise<void> {
+    const repo = this._detailRepos[repoIndex];
+    if (!repo) return;
+    for (let w = 0; w < repo.worktrees.length; w++) {
+      await this._forceVerifyWorktree(repoIndex, w);
+    }
+  }
+
+  /** Resync every out-of-sync/diverged worktree of a repo to its remote. */
+  private async _detailSyncAll(repoIndex: number): Promise<void> {
+    const repo = this._detailRepos[repoIndex];
+    if (!repo) return;
+    for (let w = 0; w < repo.worktrees.length; w++) {
+      const wt = repo.worktrees[w];
+      if (wt.status === "needs-sync" || wt.status === "diverged") {
+        await this._detailSyncWorktree(repoIndex, w);
+      }
+    }
+  }
+
+  /** Force re-verification of a single worktree (ignores current status). */
+  private async _forceVerifyWorktree(repoIndex: number, wtIndex: number): Promise<void> {
+    const repo = this._detailRepos[repoIndex];
+    const wt = repo?.worktrees[wtIndex];
+    if (repo && wt) {
+      wt.status = "unverified";
+      wt.errorMessage = undefined;
+    }
+    await this._detailVerifyWorktree(repoIndex, wtIndex);
   }
 
   private async _syncDetailReposToFile(): Promise<void> {
@@ -1649,8 +1841,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     html`<div class="row-actions">${this._renderDeleteAction((e: Event) => { e.stopPropagation(); this._onRemoveRepo(i); })}</div>`,
                     this._repoSyncIcon(entry),
                     () => { this._detailRepos[i].expanded = !this._detailRepos[i].expanded; this._emitUpdate(); },
+                    this._repoStatusContent(i, entry),
                   )
-                : this._renderUnverifiedRepoRow(i, entry, this._detailRepos, (idx) => this._onRemoveRepo(idx), (idx) => this._detailVerifyRepo(idx))}
+                : this._renderUnverifiedRepoRow(i, entry, this._detailRepos, (idx) => this._onRemoveRepo(idx), (idx) => this._detailVerifyRepo(idx), true)}
             `)}
             <!-- New repo URL input row (above +add) -->
             ${this._showAddInput ? html`

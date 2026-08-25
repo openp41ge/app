@@ -19,7 +19,10 @@ import { createWorkspace } from "../../src/layout/types.js";
  * Encode a repo URL into a filesystem-safe directory name.
  */
 function encodeRepoUrl(url: string): string {
-  return url.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return url
+    .replace(/[^a-zA-Z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 /**
@@ -46,7 +49,11 @@ function getWorktreesDir(url: string): string {
 /**
  * Run a git command and return { stdout, stderr } or throw on non-zero exit.
  */
-function runGit(args: string[], cwd?: string, timeout = 30_000): Promise<{ stdout: string; stderr: string }> {
+function runGit(
+  args: string[],
+  cwd?: string,
+  timeout = 30_000,
+): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     execFile("git", args, { cwd, timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
@@ -123,6 +130,26 @@ async function checkRepoAccess(url: string): Promise<{ ok: boolean; error?: stri
 }
 
 /**
+ * Ensure a workspace-data bare repo fetches remote-tracking refs
+ * (refs/remotes/origin/*) so ahead/behind divergence checks work.
+ * Bare clones don't get a fetch refspec by default, which silently
+ * disables sync-status detection.
+ */
+async function ensureRemoteRefs(gitDir: string): Promise<void> {
+  let fetchSpec = "";
+  try {
+    const { stdout } = await runGit(["config", "--get", "remote.origin.fetch"], gitDir);
+    fetchSpec = stdout.trim();
+  } catch {
+    // Key missing — fetchSpec stays empty and we set it below.
+  }
+  if (fetchSpec !== "+refs/heads/*:refs/remotes/origin/*") {
+    await runGit(["config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"], gitDir);
+  }
+  await runGit(["fetch", "origin", "--quiet"], gitDir);
+}
+
+/**
  * Check a worktree branch for existence and divergence.
  *
  * If the repo isn't cloned yet, checks via ls-remote.
@@ -131,7 +158,12 @@ async function checkRepoAccess(url: string): Promise<{ ok: boolean; error?: stri
  * Returns:
  *   { status: "success", warning? } | { status: "failure", error } | { status: "diverged", error } | { status: "needs-sync", error }
  */
-async function checkWorktreeBranch(wsDir: string, url: string, branch: string, _isDetail = false): Promise<{
+async function checkWorktreeBranch(
+  wsDir: string,
+  url: string,
+  branch: string,
+  _isDetail = false,
+): Promise<{
   status: "success" | "failure" | "diverged" | "needs-sync";
   error?: string;
   warning?: string;
@@ -152,7 +184,10 @@ async function checkWorktreeBranch(wsDir: string, url: string, branch: string, _
       if (headMatch && headMatch[1] === branch) {
         return { status: "success" };
       }
-      return { status: "success", warning: `Branch "${branch}" not found on remote — will be created locally` };
+      return {
+        status: "success",
+        warning: `Branch "${branch}" not found on remote — will be created locally`,
+      };
     } catch (e) {
       return { status: "failure", error: (e as Error).message };
     }
@@ -160,7 +195,7 @@ async function checkWorktreeBranch(wsDir: string, url: string, branch: string, _
 
   // Repo is cloned — fetch to get latest remote state
   try {
-    await runGit(["fetch", "origin", "--quiet"], gitDir);
+    await ensureRemoteRefs(gitDir);
   } catch {
     // Fetch is best-effort — proceed with what we have
   }
@@ -173,14 +208,20 @@ async function checkWorktreeBranch(wsDir: string, url: string, branch: string, _
     // Check if branch exists on remote
     let existsRemotely = false;
     try {
-      const { stdout: remoteBranches } = await runGit(["branch", "--list", "-r", "origin/" + branch], gitDir);
+      const { stdout: remoteBranches } = await runGit(
+        ["branch", "--list", "-r", "origin/" + branch],
+        gitDir,
+      );
       existsRemotely = remoteBranches.trim().length > 0;
     } catch {
       // If remote check fails, proceed with local-only check
     }
 
     if (!existsLocally && !existsRemotely) {
-      return { status: "success", warning: `Branch "${branch}" does not exist yet — will be created locally on checkout` };
+      return {
+        status: "success",
+        warning: `Branch "${branch}" does not exist yet — will be created locally on checkout`,
+      };
     }
 
     if (existsLocally && existsRemotely) {
@@ -222,6 +263,45 @@ async function checkWorktreeBranch(wsDir: string, url: string, branch: string, _
 /**
  * Clone a bare repo into the workspace data directory.
  */
+/**
+ * Resync a worktree branch to match its remote: fetch, then reset the local
+ * branch (and checked-out worktree, if any) to origin/<branch>.
+ * Discards local-only commits on that branch.
+ */
+async function syncWorktreeBranch(
+  url: string,
+  branch: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const gitDir = getRepoDir(url);
+  const wtDir = path.join(getWorktreesDir(url), branch.replace(/\//g, "--"));
+  if (!fs.existsSync(gitDir)) {
+    return { ok: false, error: "Repository not cloned yet. Clone before syncing." };
+  }
+  try {
+    await ensureRemoteRefs(gitDir);
+    const { stdout: remoteBranches } = await runGit(
+      ["branch", "--list", "-r", "origin/" + branch],
+      gitDir,
+    );
+    if (!remoteBranches.trim()) {
+      return { ok: false, error: `Branch "${branch}" does not exist on remote.` };
+    }
+    if (fs.existsSync(wtDir)) {
+      // Worktree checked out — reset it in place (also moves the branch ref).
+      await runGit(["reset", "--hard", "origin/" + branch], wtDir);
+    } else {
+      // No worktree — move the local branch ref to match remote.
+      await runGit(["update-ref", "refs/heads/" + branch, "refs/remotes/origin/" + branch], gitDir);
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Clone a bare repo for the given URL.
+ */
 async function cloneBareRepo(url: string): Promise<{ ok: boolean; error?: string }> {
   const repoParentDir = path.dirname(getRepoDir(url));
   const gitDir = getRepoDir(url);
@@ -233,6 +313,8 @@ async function cloneBareRepo(url: string): Promise<{ ok: boolean; error?: string
   try {
     fs.mkdirSync(repoParentDir, { recursive: true });
     await runGit(["clone", "--bare", url, gitDir]);
+    // Ensure future fetches build remote-tracking refs for sync-status checks.
+    await runGit(["config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"], gitDir);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -242,7 +324,10 @@ async function cloneBareRepo(url: string): Promise<{ ok: boolean; error?: string
 /**
  * Checkout a worktree for a given repo URL and branch.
  */
-async function checkoutWorktreeBranch(url: string, branch: string): Promise<{ ok: boolean; error?: string }> {
+async function checkoutWorktreeBranch(
+  url: string,
+  branch: string,
+): Promise<{ ok: boolean; error?: string }> {
   const gitDir = getRepoDir(url);
   const wtDir = path.join(getWorktreesDir(url), branch.replace(/\//g, "--"));
 
@@ -340,9 +425,12 @@ export function registerWorkspaceHandlers(
    * Check if a worktree branch exists and check divergence.
    * wsDir param is unused but kept for backward compatibility.
    */
-  ipcMain.handle("workspaceData:checkWorktreeBranch", async (_event, _wsDir: string, url: string, branch: string) => {
-    return checkWorktreeBranch(_wsDir, url, branch);
-  });
+  ipcMain.handle(
+    "workspaceData:checkWorktreeBranch",
+    async (_event, _wsDir: string, url: string, branch: string) => {
+      return checkWorktreeBranch(_wsDir, url, branch);
+    },
+  );
 
   /**
    * Check if a repo is already cloned for the given URL.
@@ -355,6 +443,10 @@ export function registerWorkspaceHandlers(
    * Clone a bare repo into workspace-data for the given URL.
    * Returns { ok: true } or { ok: false, error }.
    */
+  ipcMain.handle("workspaceData:syncWorktree", async (_event, url: string, branch: string) => {
+    return syncWorktreeBranch(url, branch);
+  });
+
   ipcMain.handle("workspaceData:cloneBareRepo", async (_event, url: string) => {
     return cloneBareRepo(url);
   });
