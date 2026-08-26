@@ -217,8 +217,26 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     `;
   }
 
+  /** True when the left workspace list reaches (or overflows) the container bottom. */
+  private _leftFull = false;
+
   private _emitUpdate(): void {
     document.dispatchEvent(new CustomEvent("workspaces-tab:update", { bubbles: true }));
+    // After the next paint, detect whether the row list fills the column so the
+    // last row's separator can be dropped (the column edge already delineates it).
+    setTimeout(() => {
+      const el = document.querySelector('openp41ge-workspaces-overlay .wm-left-scroll');
+      if (!el) return;
+      const lastRow = el.querySelector('.wm-card:last-child');
+      if (!lastRow) return;
+      const cr = el.getBoundingClientRect();
+      const lr = lastRow.getBoundingClientRect();
+      const full = lr.bottom >= cr.bottom - 1;
+      if (full !== this._leftFull) {
+        this._leftFull = full;
+        this._emitUpdate();
+      }
+    }, 0);
   }
 
   /**
@@ -1312,7 +1330,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           display:flex; flex-direction:column; flex-shrink:0; width:260px; min-width:0;
           border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
         }
-        .wm-left-scroll { flex:1; overflow-y:auto; min-height:0; padding:4px 0 8px; }
+        .wm-left-scroll { flex:1; overflow-y:auto; min-height:0; padding:0; }
         .wm-right { flex:1; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
         .wm-right-form { display:flex; flex-direction:column; min-height:100%; }
         .wm-empty { padding:40px 20px; text-align:center; color:var(--text-secondary,#999); font-size:13px; }
@@ -1333,12 +1351,16 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
         .wm-card {
           padding:8px 12px; margin:0; border-radius:0;
+          border-bottom:1px solid var(--divider,#333);
           cursor:pointer;
           position:relative;
           transition:background .1s;
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
         .wm-card.selected { background:rgba(0,122,204,.12); }
+        /* Drop the last row's separator when the list fills (or overflows) the
+           column — the column edge already delineates the final row. */
+        .wm-left-scroll.full .wm-card:last-child { border-bottom:0; }
         .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:78px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
@@ -1549,7 +1571,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         <div class="wm-overlay-body">
           <!-- Left pane: workspace list -->
           <div class="wm-left">
-            <div class="wm-left-scroll">
+            <div class="wm-left-scroll${this._leftFull ? ' full' : ''}">
               ${this._workspaces.length === 0
               ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces yet.</div>`
               : this._filteredWorkspaces.length === 0
