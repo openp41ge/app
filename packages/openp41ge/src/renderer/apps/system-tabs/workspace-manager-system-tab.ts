@@ -41,6 +41,8 @@ interface StatusItem {
   text: string;
   detail?: string;
   action?: { label: string; title: string; icon?: string; onClick: () => void };
+  /** Render trailing dots that animate in one at a time (checking…). */
+  checkingDots?: boolean;
 }
 
 type View = "list" | "detail";
@@ -313,6 +315,19 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** Stacked status lines: coloured dot + text + optional action pill. */
   private _renderStatusList(items: StatusItem[], onAreaClick?: () => void): TemplateResult {
     return html`
+      <style>
+        .ws-anim-dot {
+          display:inline-block;
+          opacity:.2;
+          animation: ws-dot-wave 1.5s ease-in-out infinite;
+        }
+        .wsc-status-list .ws-anim-dot:nth-child(2) { animation-delay:.25s; }
+        .wsc-status-list .ws-anim-dot:nth-child(3) { animation-delay:.5s; }
+        @keyframes ws-dot-wave {
+          0%, 100% { opacity:.2; }
+          40% { opacity:1; }
+        }
+      </style>
       <div class="wsc-status-list" style="display:flex;flex-direction:column;gap:4px;${onAreaClick ? 'cursor:pointer;' : ''}"
         @click=${(e: Event) => {
           if (!onAreaClick) return;
@@ -322,7 +337,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }}>
         ${items.map((it) => html`
           <div style="display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.35;min-height:18px;">
-            <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${this._toneColor(it.tone)};">${it.text}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
+            <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${this._toneColor(it.tone)};">${it.checkingDots
+              ? html`${it.text}<span class="ws-anim-dot">.</span><span class="ws-anim-dot">.</span><span class="ws-anim-dot">.</span>`
+              : html`${it.text}`}${it.detail ? html` <span style="color:var(--text-secondary,#999);">· ${it.detail}</span>` : ''}</span>
             ${it.action ? (it.action.icon
               ? html`
               <span class="wsc-status-icon-btn" flex-shrink="0" title=${it.action.title} style="display:inline-flex;align-items:center;justify-content:center;padding:1px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--text-secondary,#999);cursor:pointer;transition:background .1s;"
@@ -374,7 +391,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         items.push({ tone: 'error', text: 'Verification failed', detail: wt.errorMessage, action: { label: 'Retry', title: 'Re-check branch status', onClick: onVerify } });
         break;
       case 'validating':
-        items.push({ tone: 'info', text: 'Checking status…' });
+        items.push({ tone: 'info', text: 'Checking status', checkingDots: true });
         break;
       case 'unverified':
         items.push({ tone: 'info', text: 'Not yet verified', action: checking ? undefined : { label: 'Verify', title: 'Check branch status', onClick: onVerify } });
