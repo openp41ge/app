@@ -217,13 +217,14 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     `;
   }
 
-  /** True when the left workspace list reaches (or overflows) the container bottom. */
+  /** True when the left workspace list reaches (or overflows) the column bottom. */
   private _leftFull = false;
 
   private _emitUpdate(): void {
     document.dispatchEvent(new CustomEvent("workspaces-tab:update", { bubbles: true }));
-    // After the next paint, detect whether the row list fills the column so the
-    // last row's separator can be dropped (the column edge already delineates it).
+    // After the next paint, detect whether the row list reaches the column
+    // bottom so the last row's separator can be dropped (the bottom bar's
+    // border above/at the pane edge already delineates the final row).
     setTimeout(() => {
       const el = document.querySelector('openp41ge-workspaces-overlay .wm-left-scroll');
       if (!el) return;
@@ -1358,8 +1359,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
         .wm-card.selected { background:rgba(0,122,204,.12); }
-        /* Drop the last row's separator when the list fills (or overflows) the
-           column — the column edge already delineates the final row. */
+        /* Drop the last row's separator when the list reaches (or overflows) the
+           column bottom: the app's bottom bar border already delineates it, and
+           leaving the row border would double the line. */
         .wm-left-scroll.full .wm-card:last-child { border-bottom:0; }
         .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:78px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
