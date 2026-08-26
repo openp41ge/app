@@ -107,9 +107,14 @@ describe("ExplorerSystemTabController", () => {
     treeHost.appendChild(headerRow);
     const fileTree = document.createElement("openp41ge-tree");
     const sr = fileTree.attachShadow({ mode: "open" });
-    sr.innerHTML = '<div class="tree-node" data-node-id="/repo/file.ts">file.ts</div></div>';
+    sr.innerHTML = '<div class="tree-node" data-node-id="/repo/file.ts">file.ts</div>';
+    const other = document.createElement("div");
+    other.className = "tree-node";
+    other.dataset.nodeId = "/repo/other.ts";
+    other.textContent = "other.ts";
+    sr.appendChild(other);
     treeHost.appendChild(fileTree);
-    const node = sr.querySelector(".tree-node") as HTMLElement;
+    const node = sr.querySelector('[data-node-id="/repo/file.ts"]') as HTMLElement;
     tree._focusedRowEl = headerRow;
 
     // The uikit tree stops propagation of the DOM click but emits this
@@ -131,10 +136,15 @@ describe("ExplorerSystemTabController", () => {
     // The owning tree reports the same node as its selectedId.
     expect((fileTree as unknown as { selectedId: string }).selectedId).toBe("/repo/file.ts");
 
-    // Moving the focus away must clear BOTH painted styles from the node
-    // (a lingering border/background on click is the reported bug).
-    tree._setFocusedRow(null);
-    expect(node.style.background).toBe("");
+    // Arrow-focus moves to a second file row.
+    const nodeB = sr.querySelector('[data-node-id="/repo/other.ts"]') as HTMLElement;
+    tree._setFocusedRow(nodeB);
+    // The previously clicked row must NOT keep a border (the lingering-border
+    // bug) — it keeps only its faded-blue selection background.
     expect(node.style.boxShadow).toBe("");
+    expect(node.style.background).not.toBe("");
+    // The newly focused row carries the fade + outline.
+    expect(nodeB.style.background).not.toBe("");
+    expect(nodeB.style.boxShadow).not.toBe("");
   });
 });

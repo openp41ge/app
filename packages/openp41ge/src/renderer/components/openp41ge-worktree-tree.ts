@@ -155,6 +155,11 @@ class Openp41geWorktreeTree extends LitElement {
   private _scrollResizeObserved = false;
   /** Explorer row currently selected by click or keyboard (VS Code-style). */
   private _focusedRowEl: HTMLElement | null = null;
+
+  /** Row the user most recently CLICKED. Keeps a faded-blue background until
+   * another row is clicked (VS Code's selection); the arrow focus is a
+   * separate, moving highlight with the blue outline on top. */
+  private _selectedRowEl: HTMLElement | null = null;
   private _wsDrawerEl: HTMLElement | null = null;
   @state() private _wsDrawerOpen = false;
   @state() private _activeWsId: string | null = null;
@@ -241,9 +246,13 @@ class Openp41geWorktreeTree extends LitElement {
         background: rgba(255,255,255,0.35);
       }
       /* VS Code-style keyboard/click selection for repo & worktree rows.
-         Two-class specificity keeps it above the row :hover highlight. */
-      .wt-row-header.wt-row-focused {
+         Two-class specificity keeps it above the row :hover highlight.
+         - .wt-row-focused: faded bg + outline (the arrow-focus row)
+         - .wt-row-selected: faded bg only (the last-clicked row) */
+      .wt-row-header.wt-row-focused, .wt-row-header.wt-row-selected {
         background: var(--tree-selected-bg, rgba(74,158,255,0.12));
+      }
+      .wt-row-header.wt-row-focused {
         box-shadow: inset 0 0 0 1px var(--tree-focus, #4a9eff);
       }
       /* Rows already have padding-right:8px in their inline styles, so
@@ -1012,7 +1021,13 @@ class Openp41geWorktreeTree extends LitElement {
         (p): p is HTMLElement => p instanceof HTMLElement && p.classList?.contains("wt-row-header"),
       );
     const target = node ?? row;
-    if (target) this._setFocusedRow(target);
+    if (target) {
+      // Clicking selects AND focuses the row: it keeps a faded-blue
+      // background (selection) while the arrow focus adds the outline and
+      // can move away without stealing it.
+      this._selectedRowEl = target;
+      this._setFocusedRow(target);
+    }
   };
 
   /**
@@ -1022,20 +1037,24 @@ class Openp41geWorktreeTree extends LitElement {
    * data-node-id instead — this is what the user actually clicked, and arrow
    * navigation must continue from here (overwriting any prior arrow focus).
    * Adoption is synchronous (RAF schedules too late / never runs when the
-   * window is backgrounded); a short deferred re-resolve covers the case
-   * where the toggle re-rendered the node (expand/collapse) right after the
-   * event fired.
+   * window is backgrounded); a short deferred re-resolve only refreshes the
+   * SELECTION element reference (an expand/collapse may have replaced the
+   * node) — it never steals arrow focus back from a row the user moved to.
    */
   private _onTreeNodeActivated = (e: CustomEvent): void => {
     const detail = e.detail as { nodeId?: string } | undefined;
     const nodeId = detail?.nodeId;
     if (typeof nodeId !== "string" || !nodeId) return;
     const el = this._findTreeNodeByNodeId(nodeId);
-    if (el) this._setFocusedRow(el);
+    if (el) {
+      this._selectedRowEl = el;
+      this._setFocusedRow(el);
+    }
     setTimeout(() => {
       const el2 = this._findTreeNodeByNodeId(nodeId);
-      if (el2 && el2.isConnected && this._focusedRowEl !== el2) {
-        this._setFocusedRow(el2);
+      if (el2 && el2.isConnected && this._selectedRowEl?.dataset?.nodeId === el2.dataset?.nodeId) {
+        this._selectedRowEl = el2;
+        this._repaintSelection();
       }
     }, 60);
   };
@@ -1094,7 +1113,7 @@ class Openp41geWorktreeTree extends LitElement {
 
   /**
    * Clear selection on every file tree AND every Explorer row (headers and
-   * shadow-root tree nodes). Runs on every focus change so no inline
+   * shadow-root tree nodes). Runs on every repaint so no inline
    * border/background can survive a move — Lit recycling a previously-focused
    * node element could otherwise leave its painted selection behind.
    */
@@ -1112,6 +1131,7 @@ class Openp41geWorktreeTree extends LitElement {
           el.style.background = "";
         } else if (el.classList.contains("wt-row-header")) {
           el.classList.remove("wt-row-focused");
+          el.classList.remove("wt-row-selected");
           el.style.boxShadow = "";
           el.style.background = "";
         } else {
@@ -1123,40 +1143,52 @@ class Openp41geWorktreeTree extends LitElement {
   }
 
   /**
-   * Paint the VS Code-style selection on `el` (or clear it when null).
-   * Selection reads as a faded-blue row background with a thin blue outline
-   * — the same treatment for header rows (.wt-row-focused) and file/folder
-   * rows (inline styles, because they live in shadow roots that global CSS
-   * cannot reach).
+   * Paint the VS Code-style two-tier selection on `el` (or clear it when
+   * null). Everything is re-painted from scratch on every change so nothing
+   * can linger:
+   *   - clicked row (_selectedRowEl): faded-blue BACKGROUND only,
+   *   - arrow-focused row (_focusedRowEl): faded background + blue OUTLINE.
+   * Header rows use CSS classes; file/folder rows use inline styles because
+   * they live in shadow roots that global CSS cannot reach.
    */
   private _setFocusedRow(el: HTMLElement | null): void {
     if (this._focusedRowEl === el) return;
     this._focusedRowEl = el;
+    this._repaintSelection();
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }
 
-    // One selection across the panel: clear every row, then paint ONLY el.
-    // (Clearing everything first — not just the previous _focusedRowEl — is
-    // what guarantees no stale border/background survives an arrow move.)
+  private _repaintSelection(): void {
+    // Wipe every highlight, then re-paint the persistent selection fade and
+    // the current focus row. The sweep guarantees that a row the user already
+    // arrowed away from can never keep a stale border.
     this._clearAllTreeSelections();
-    if (!el) return;
+    const sel = this._selectedRowEl && this._selectedRowEl.isConnected ? this._selectedRowEl : null;
+    const focus = this._focusedRowEl && this._focusedRowEl.isConnected ? this._focusedRowEl : null;
+    if (sel && sel !== focus) this._paintRow(sel, false);
+    if (focus) this._paintRow(focus, true);
+  }
 
+  /** Paint fade-only (focused=false) or fade + outline (focused=true) on el. */
+  private _paintRow(el: HTMLElement, focused: boolean): void {
     if (el.classList.contains("tree-node")) {
-      // closest() does not cross the shadow boundary — resolve the owning
-      // <openp41ge-tree> host through getRootNode() instead.
-      const root = el.getRootNode();
-      const host = (root instanceof ShadowRoot ? root.host : null) as
-        (HTMLElement & { selectedId: string | null }) | null;
-      if (host && host.tagName === "OPENP41GE-TREE")
-        host.selectedId = el.getAttribute("data-node-id");
-      // Faded-blue row background + blue outline. Inline because the node
-      // lives in the tree's shadow root, which global CSS cannot target.
       el.style.background = "var(--tree-selected-bg, rgba(74,158,255,0.12))";
-      el.style.boxShadow = "inset 0 0 0 1px var(--tree-focus, #4a9eff)";
+      el.style.boxShadow = focused ? "inset 0 0 0 1px var(--tree-focus, #4a9eff)" : "";
+      if (focused) {
+        // closest() does not cross the shadow boundary — resolve the owning
+        // <openp41ge-tree> host through getRootNode() instead.
+        const root = el.getRootNode();
+        const host = (root instanceof ShadowRoot ? root.host : null) as
+          (HTMLElement & { selectedId: string | null }) | null;
+        if (host && host.tagName === "OPENP41GE-TREE")
+          host.selectedId = el.getAttribute("data-node-id");
+      }
     } else {
-      el.classList.add("wt-row-focused");
+      el.classList.remove(focused ? "wt-row-selected" : "wt-row-focused");
+      el.classList.add(focused ? "wt-row-focused" : "wt-row-selected");
       el.style.boxShadow = "";
       el.style.background = "";
     }
-    el.scrollIntoView({ block: "nearest" });
   }
 
   private _isExpandable(el: HTMLElement): boolean {
