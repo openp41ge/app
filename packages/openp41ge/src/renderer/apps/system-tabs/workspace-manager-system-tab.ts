@@ -1793,10 +1793,24 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
     const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
-      <div style="display:flex;align-items:center;justify-content:flex-start;padding:8px 14px 12px;gap:8px;flex-shrink:0;border-bottom:1px solid var(--divider,#333);">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;border-bottom:1px solid var(--divider,#333);">
         ${active
-          ? html`<span class="wm-card-active-pill">Active</span>`
+          ? nothing
           : html`<button class="wm-btn activate" @click=${() => this._activateWorkspace(entry)}>Activate</button>`}
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button
+            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(244,71,71,0.15);color:var(--accent-error,#f44747);transition:background .1s;"
+            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,71,71,0.25)'; }}
+            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,71,71,0.15)'; }}
+            @click=${() => { if (this._selected) this._onDeleteWorkspace(this._selected); }}
+          >Delete</button>
+          <button
+            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
+            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
+            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
+            @click=${() => this._onDetailSave()}
+          >Save</button>
+        </div>
       </div>
       <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
         <div class="wsc-field" @click=${(e: Event) => { (e.currentTarget as HTMLElement).querySelector("input")?.focus(); }}>
@@ -1932,23 +1946,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             </div>
           </div>
         </div>
-        </div>
-        <!-- Bottom bar: Delete (left) · Save/Cancel (right) -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px;height:40px;border-top:1px solid var(--divider,#333);flex-shrink:0;gap:6px;">
-          <button
-            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(244,71,71,0.15);color:var(--accent-error,#f44747);transition:background .1s;"
-            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,71,71,0.25)'; }}
-            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,71,71,0.15)'; }}
-            @click=${() => { if (this._selected) this._onDeleteWorkspace(this._selected); }}
-          >Delete</button>
-          <div style="display:flex;gap:6px;">
-          <button
-            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
-            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
-            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
-            @click=${() => this._onDetailSave()}
-          >Save</button>
-          </div>
       </div>
     `;
   }

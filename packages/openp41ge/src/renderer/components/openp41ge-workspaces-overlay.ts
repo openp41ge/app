@@ -98,6 +98,10 @@ class Openp41geWorkspacesOverlay extends LitElement {
         .wm-overlay-backdrop {
           position: absolute;
           inset: 0;
+          /* Must sit above main-area children (sidebar tab-add z-index:2,
+             resize notches z-index:5) since .openp41ge-main-area does not
+             create its own stacking context. */
+          z-index: 50;
           background: var(--bg-primary, #1e1e1e);
           overflow: hidden;
         }
