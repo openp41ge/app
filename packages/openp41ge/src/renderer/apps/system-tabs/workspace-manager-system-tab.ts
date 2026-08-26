@@ -123,12 +123,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   mount(): void {
     this._loadWorkspaces();
+    // Re-check the row-list fill state on window resize (the column height
+    // changes and an _emitUpdate may not fire there).
+    window.addEventListener("resize", this._syncLeftFill);
     // Focus the overlay search input once the pane is in the DOM.
     setTimeout(() => this._focusSearch(), 0);
   }
 
   unmount(): void {
-    // Nothing global to tear down — this controller holds no document listeners.
+    window.removeEventListener("resize", this._syncLeftFill);
   }
 
   /** Open straight into the create form (File > New Workspace). */
@@ -220,24 +223,33 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** True when the left workspace list reaches (or overflows) the column bottom. */
   private _leftFull = false;
 
+  /** Detect whether the row list fills the column, and refresh state if it changed. */
+  private _syncLeftFill = (): void => {
+    // Measure after the next paint (double rAF) so a window resize has laid
+    // out before we compare the last row against the column bottom.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.querySelector('openp41ge-workspaces-overlay .wm-left-scroll');
+        if (!el) return;
+        const lastRow = el.querySelector('.wm-card:last-child');
+        if (!lastRow) return;
+        const cr = el.getBoundingClientRect();
+        const lr = lastRow.getBoundingClientRect();
+        const full = lr.bottom >= cr.bottom - 1;
+        if (full !== this._leftFull) {
+          this._leftFull = full;
+          this._emitUpdate();
+        }
+      });
+    });
+  };
+
   private _emitUpdate(): void {
     document.dispatchEvent(new CustomEvent("workspaces-tab:update", { bubbles: true }));
     // After the next paint, detect whether the row list reaches the column
     // bottom so the last row's separator can be dropped (the bottom bar's
     // border above/at the pane edge already delineates the final row).
-    setTimeout(() => {
-      const el = document.querySelector('openp41ge-workspaces-overlay .wm-left-scroll');
-      if (!el) return;
-      const lastRow = el.querySelector('.wm-card:last-child');
-      if (!lastRow) return;
-      const cr = el.getBoundingClientRect();
-      const lr = lastRow.getBoundingClientRect();
-      const full = lr.bottom >= cr.bottom - 1;
-      if (full !== this._leftFull) {
-        this._leftFull = full;
-        this._emitUpdate();
-      }
-    }, 0);
+    setTimeout(() => this._syncLeftFill(), 0);
   }
 
   /**
