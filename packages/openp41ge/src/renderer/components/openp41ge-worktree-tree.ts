@@ -900,6 +900,13 @@ class Openp41geWorktreeTree extends LitElement {
     // navigation is owned here (VS Code behaviour). Don't steal focus from
     // text-entry controls (add-repository / add-worktree inputs etc.).
     if (target?.matches("input, textarea, select, [contenteditable]")) return;
+    // A click on a file/folder row would otherwise hand DOM focus to the
+    // tree node (tabindex 0), showing a second :focus-visible ring and
+    // letting the inner tree own the arrow keys. The rows aren't draggable,
+    // so preventing the default focus change is safe.
+    if (target?.closest?.(".tree-node")) {
+      e.preventDefault();
+    }
     this.focus();
   };
 
@@ -922,8 +929,10 @@ class Openp41geWorktreeTree extends LitElement {
     if (rows.length === 0) return;
 
     if (this._focusedRowEl && !this._focusedRowEl.isConnected) this._focusedRowEl = null;
-    let idx = this._focusedRowEl ? rows.indexOf(this._focusedRowEl) : -1;
-    if (idx === -1) idx = 0;
+    const selectedIdx = this._focusedRowEl ? rows.indexOf(this._focusedRowEl) : -1;
+    // With nothing focused yet, the first arrow selects the first row
+    // (VS Code behaviour) instead of advancing from index 0.
+    const idx = selectedIdx < 0 ? 0 : selectedIdx;
     const focusAt = (i: number) => {
       this._setFocusedRow(rows[Math.max(0, Math.min(i, rows.length - 1))]);
     };
@@ -931,11 +940,11 @@ class Openp41geWorktreeTree extends LitElement {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        focusAt(idx + 1);
+        focusAt(selectedIdx < 0 ? 0 : selectedIdx + 1);
         break;
       case "ArrowUp":
         e.preventDefault();
-        focusAt(idx - 1);
+        focusAt(selectedIdx < 0 ? 0 : selectedIdx - 1);
         break;
       case "Home":
         e.preventDefault();
