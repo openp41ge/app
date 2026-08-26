@@ -1,18 +1,17 @@
 /**
  * GitSystemTabController — system tab controller for the Git panel.
  *
- * Renders the workspace repository list with per-repo working-tree change
- * summary. Loads live data via the IPC bridge and refreshes on the
- * "git:refresh" event (fired on workspace changes).
+ * Renders the repository/worktree row list (chevron rows with expandable
+ * worktree sub-rows). Repo rows AND worktree rows are draggable into the
+ * central tab system: dragging one onto the grid opens a pinned
+ * git-repository tab for that repo (the grid already understands the
+ * payload — see tab-grid.ts native drop handling).
+ *
+ * Loads live data via the IPC bridge and refreshes on the "git:refresh"
+ * event (fired on workspace changes).
  */
 
 import type { SystemTabController } from "../../controllers/types";
-import {
-  classifyWorktree,
-  worstOf,
-  worktreeStatusLabel,
-  WARNING_COLOR,
-} from "../../services/worktree-status";
 
 interface RepoInfo {
   path: string;
@@ -20,13 +19,14 @@ interface RepoInfo {
   url: string;
 }
 
-interface ChangeCounts {
-  filesChanged: number;
-  added: number;
-  deleted: number;
-  untracked: number;
-  known: boolean;
+interface WorktreeInfo {
+  branch: string;
+  path: string;
+  exists: boolean;
 }
+
+/** Drag payload MIME — same one the Explorer's repo rows use. */
+const REPO_DRAG_TYPE = "application/x-openp41ge-repo";
 
 export class GitSystemTabController implements SystemTabController {
   readonly tabId: string;
@@ -36,6 +36,8 @@ export class GitSystemTabController implements SystemTabController {
   private _list: HTMLElement | null = null;
   private _reloadToken = 0;
   private _onGitRefresh: (() => void) | null = null;
+  private _repos: Array<{ info: RepoInfo; worktrees: WorktreeInfo[] }> = [];
+  private _expanded = new Set<string>();
 
   constructor(tabId: string) {
     this.tabId = tabId;
@@ -71,8 +73,8 @@ export class GitSystemTabController implements SystemTabController {
       overflowY: "auto",
       overflowX: "hidden",
     });
-    wrapper.appendChild(list);
 
+    wrapper.appendChild(list);
     container.appendChild(wrapper);
     this._viewElement = wrapper;
     this._list = list;
@@ -98,7 +100,7 @@ export class GitSystemTabController implements SystemTabController {
     this._list = null;
   }
 
-  // ─── Loading ──────────────────────────────────────────────────────────────
+  // ─── Loading ────────────────────────────────────────────────────────────
 
   private async _reload(): Promise<void> {
     const list = this._list;
@@ -108,16 +110,25 @@ export class GitSystemTabController implements SystemTabController {
     list.replaceChildren(this._message("Loading…", "var(--text-secondary,#999)"));
 
     try {
-      const repos = await window.openp41ge.workspaceController.listRepos();
+      const repos = (await window.openp41ge.workspaceController.listRepos()) as RepoInfo[];
       if (token !== this._reloadToken || !this._list) return;
-      list.replaceChildren();
-      if (repos.length === 0) {
-        list.appendChild(this._message("No repositories", "var(--text-secondary,#999)"));
-        return;
+
+      const items: Array<{ info: RepoInfo; worktrees: WorktreeInfo[] }> = [];
+      for (const info of repos) {
+        let worktrees: WorktreeInfo[] = [];
+        try {
+          worktrees = (await window.openp41ge.workspaceController.listWorktrees(
+            info.name,
+          )) as WorktreeInfo[];
+        } catch {
+          worktrees = [];
+        }
+        if (token !== this._reloadToken || !this._list) return;
+        items.push({ info, worktrees });
       }
-      for (const repo of repos) {
-        list.appendChild(await this._repoCard(repo));
-      }
+
+      this._repos = items;
+      this._renderList(list);
     } catch (err: unknown) {
       if (token !== this._reloadToken || !this._list) return;
       list.replaceChildren();
@@ -138,237 +149,153 @@ export class GitSystemTabController implements SystemTabController {
     return el;
   }
 
-  // ─── Repo card ────────────────────────────────────────────────────────────
+  // ─── Rendering ──────────────────────────────────────────────────────────
 
-  private async _repoCard(repo: RepoInfo): Promise<HTMLElement> {
-    const card = document.createElement("div");
-    card.dataset.repo = repo.name;
-    Object.assign(card.style, {
-      margin: "0 10px 8px",
-      padding: "0 0 6px",
-      borderBottom: "1px solid var(--divider,#333)",
-    });
+  private _renderList(list: HTMLElement): void {
+    list.replaceChildren();
 
-    // Repository header row.
-    const head = document.createElement("div");
-    Object.assign(head.style, {
+    if (this._repos.length === 0) {
+      list.appendChild(this._message("No repositories", "var(--text-secondary,#999)"));
+      return;
+    }
+
+    for (const item of this._repos) {
+      list.appendChild(this._repoRow(item.info, item.worktrees));
+      if (this._expanded.has(item.info.name)) {
+        for (const sub of this._worktreeSubRows(item.info, item.worktrees)) {
+          list.appendChild(sub);
+        }
+      }
+    }
+  }
+
+  /** Rebuild the list (e.g. after expand/collapse) without a reload. */
+  private _rerender(): void {
+    const list = this._list;
+    if (!list) return;
+    this._renderList(list);
+  }
+
+  /** Set the drag payload shared by repo + worktree rows. */
+  private _setupDrag(e: DragEvent, repoName: string): void {
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    dt.setData(REPO_DRAG_TYPE, repoName);
+    dt.effectAllowed = "move";
+    dt.dropEffect = "move";
+  }
+
+  private _hoverable(row: HTMLElement, on: boolean): void {
+    row.style.background = on ? "var(--bg-hover,rgba(255,255,255,0.06))" : "transparent";
+  }
+
+  private _repoRow(info: RepoInfo, worktrees: WorktreeInfo[]): HTMLElement {
+    const short = info.name.split("/").pop() || info.name;
+    const expanded = this._expanded.has(info.name);
+
+    const row = document.createElement("div");
+    Object.assign(row.style, {
       display: "flex",
       alignItems: "center",
       gap: "6px",
-      padding: "6px 0 2px",
+      cursor: "grab",
+      userSelect: "none",
+      height: "28px",
+      padding: "0 10px",
+      fontSize: "12px",
+      color: "var(--text-primary,#ccc)",
     });
+    row.addEventListener("mouseenter", () => this._hoverable(row, true));
+    row.addEventListener("mouseleave", () => this._hoverable(row, false));
+    row.addEventListener("click", () => {
+      if (this._expanded.has(info.name)) this._expanded.delete(info.name);
+      else this._expanded.add(info.name);
+      this._rerender();
+    });
+    row.draggable = true;
+    row.addEventListener("dragstart", (e: DragEvent) => this._setupDrag(e, info.name));
 
-    const dot = document.createElement("span");
-    dot.textContent = "\u25C9";
-    Object.assign(dot.style, { fontSize: "12px", color: "var(--accent,#007acc)" });
+    const chevron = document.createElement("span");
+    chevron.textContent = expanded ? "\u25BE" : "\u25B8";
+    Object.assign(chevron.style, {
+      width: "16px",
+      flexShrink: "0",
+      fontSize: "10px",
+      color: "var(--text-secondary,#888)",
+    });
+    row.appendChild(chevron);
 
-    const name = document.createElement("span");
-    name.textContent = repo.name;
-    Object.assign(name.style, {
+    const label = document.createElement("span");
+    label.textContent = short;
+    label.dataset.repoRow = info.name;
+    Object.assign(label.style, {
       flex: "1",
       minWidth: "0",
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
-      fontSize: "12px",
-      fontWeight: 500,
-      color: "var(--text-primary,#ccc)",
     });
+    row.appendChild(label);
 
-    head.appendChild(dot);
-    head.appendChild(name);
+    const count = document.createElement("span");
+    count.textContent = String(worktrees.length);
+    Object.assign(count.style, {
+      flexShrink: "0",
+      fontSize: "10px",
+      color: "var(--text-secondary,#666)",
+    });
+    row.appendChild(count);
 
-    const headStatus = document.createElement("span");
-    Object.assign(headStatus.style, {
+    return row;
+  }
+
+  private _worktreeRow(wt: WorktreeInfo, repoName: string): HTMLElement {
+    const row = document.createElement("div");
+    Object.assign(row.style, {
       display: "flex",
       alignItems: "center",
-      flexShrink: "0",
-    });
-    head.appendChild(headStatus);
-
-    card.appendChild(head);
-
-    // Path (secondary line).
-    const path = document.createElement("div");
-    path.textContent = repo.path;
-    Object.assign(path.style, {
+      gap: "6px",
+      cursor: "grab",
+      userSelect: "none",
+      height: "24px",
+      padding: "0 10px 0 26px",
       fontSize: "11px",
-      color: "var(--text-secondary,#777)",
+      color: wt.exists ? "var(--text-secondary,#aaa)" : "var(--text-muted,#666)",
+    });
+    row.addEventListener("mouseenter", () => this._hoverable(row, true));
+    row.addEventListener("mouseleave", () => this._hoverable(row, false));
+    row.draggable = true;
+    row.addEventListener("dragstart", (e: DragEvent) => this._setupDrag(e, repoName));
+
+    const label = document.createElement("span");
+    label.textContent = wt.branch;
+    label.dataset.worktreeRow = wt.branch;
+    Object.assign(label.style, {
+      flex: "1",
+      minWidth: "0",
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
-      margin: "0 0 2px 18px",
     });
-    card.appendChild(path);
+    row.appendChild(label);
 
-    // Async summary row.
-    const summary = document.createElement("div");
-    Object.assign(summary.style, {
-      fontSize: "11px",
-      color: "var(--text-secondary,#999)",
-      margin: "2px 0 0 18px",
-    });
-    summary.textContent = "…";
-    card.appendChild(summary);
-
-    void this._loadSummary(repo, summary);
-
-    // Worktree branches.
-    const wtList = document.createElement("div");
-    Object.assign(wtList.style, {
-      display: "flex",
-      flexDirection: "column",
-      gap: "2px",
-      margin: "4px 0 0 18px",
-    });
-    card.appendChild(wtList);
-    void this._loadWorktrees(repo, wtList, headStatus);
-
-    return card;
+    return row;
   }
 
-  private async _loadSummary(repo: RepoInfo, summary: HTMLElement): Promise<void> {
-    const counts = await this._changeCounts(repo.name);
-    if (!this._viewElement) return;
-
-    if (!counts.known) {
-      summary.textContent = "No local clone";
-      return;
-    }
-    if (counts.filesChanged === 0) {
-      summary.textContent = "Working tree clean";
-      summary.style.color = "var(--text-secondary,#777)";
-      return;
-    }
-    const parts: string[] = [];
-    parts.push(`${counts.filesChanged} changed`);
-    if (counts.added > 0) parts.push(`+${counts.added}`);
-    if (counts.deleted > 0) parts.push(`\u2212${counts.deleted}`);
-    if (counts.untracked > 0) parts.push(`${counts.untracked} untracked`);
-    summary.textContent = parts.join("  \u00B7  ");
-  }
-
-  private async _changeCounts(repoName: string): Promise<ChangeCounts> {
-    try {
-      const [stat, untracked] = await Promise.all([
-        window.openp41ge.workspaceController.getDiffStat(repoName),
-        window.openp41ge.workspaceController.getUntrackedFiles(repoName).catch(() => [] as string[]),
-      ]);
-      let added = 0;
-      let deleted = 0;
-      for (const entry of stat ?? []) {
-        added += entry.added ?? 0;
-        deleted += entry.deleted ?? 0;
-      }
-      return {
-        filesChanged: (stat?.length ?? 0) + untracked.length,
-        added,
-        deleted,
-        untracked: untracked.length,
-        known: true,
-      };
-    } catch {
-      return { filesChanged: 0, added: 0, deleted: 0, untracked: 0, known: false };
-    }
-  }
-
-  private async _loadWorktrees(
-    repo: RepoInfo,
-    container: HTMLElement,
-    headStatus: HTMLElement,
-  ): Promise<void> {
-    let branches: Array<{ branch: string; exists: boolean }> = [];
-    let branchMap = new Map<string, { ahead: number; behind: number }>();
-    try {
-      const raw = (await window.openp41ge.workspaceController.listWorktrees(repo.name)) as unknown as Array<{
-        branch: string;
-        exists: boolean;
-      }>;
-      branches = Array.isArray(raw) ? raw : [];
-    } catch {
-      branches = [];
-    }
-    try {
-      const entries = (await window.openp41ge.workspaceController.getBranches(repo.name)) as unknown as Array<{
-        shortName?: string;
-        name?: string;
-        ahead?: number;
-        behind?: number;
-      }>;
-      for (const e of entries ?? []) {
-        branchMap.set(e.shortName ?? e.name ?? "", {
-          ahead: e.ahead ?? 0,
-          behind: e.behind ?? 0,
-        });
-      }
-    } catch {
-      branchMap = new Map();
-    }
-    if (!this._viewElement) return;
-
-    const infos = [];
-    for (const wt of branches) {
-      const has = branchMap.has(wt.branch);
-      const counts = has
-        ? (branchMap.get(wt.branch) ?? { ahead: 0, behind: 0 })
-        : { ahead: 0, behind: 0 };
-      const info = classifyWorktree(counts.ahead, counts.behind, wt.exists, has);
-      infos.push(info);
-
-      const row = document.createElement("div");
-      Object.assign(row.style, {
-        display: "flex",
-        alignItems: "center",
-        gap: "5px",
+  private _worktreeSubRows(info: RepoInfo, worktrees: WorktreeInfo[]): HTMLElement[] {
+    const rows: HTMLElement[] = [];
+    if (worktrees.length === 0) {
+      const empty = this._message("No worktrees", "var(--text-secondary,#777)");
+      Object.assign(empty.style, {
+        padding: "2px 10px 2px 26px",
         fontSize: "11px",
-        color: "var(--text-secondary,#bbb)",
       });
-      const caret = document.createElement("span");
-      caret.textContent = "\u251C";
-      caret.style.color = "var(--text-secondary,#666)";
-      const label = document.createElement("span");
-      label.textContent = wt.branch;
-      Object.assign(label.style, {
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      });
-      row.appendChild(caret);
-      row.appendChild(label);
-
-      if (info.state !== "ok" && info.state !== "unknown") {
-        const warn = document.createElement("span");
-        warn.style.cssText = "display:flex;align-items:center;margin-left:1px;";
-        const icon = document.createElement("openp41ge-inline-icon");
-        icon.setAttribute("name", "warning");
-        icon.setAttribute("size", "11");
-        icon.setAttribute("icon-color", WARNING_COLOR);
-        icon.setAttribute("no-hover", "");
-        icon.setAttribute("title", worktreeStatusLabel(info));
-        warn.appendChild(icon);
-        row.appendChild(warn);
-      }
-
-      container.appendChild(row);
+      rows.push(empty);
+      return rows;
     }
-
-    const worst = worstOf(infos);
-    if (infos.length > 0 && worst.state !== "ok" && worst.state !== "unknown") {
-      const icon = document.createElement("openp41ge-inline-icon");
-      icon.setAttribute("name", "warning");
-      icon.setAttribute("size", "12");
-      icon.setAttribute("icon-color", WARNING_COLOR);
-      icon.setAttribute("no-hover", "");
-      icon.setAttribute("title", `${infos.length} worktree(s): ${worktreeStatusLabel(worst)}`);
-      headStatus.replaceChildren(icon);
-    } else if (infos.length > 0) {
-      const icon = document.createElement("openp41ge-inline-icon");
-      icon.setAttribute("name", "check-circle");
-      icon.setAttribute("size", "12");
-      icon.setAttribute("icon-color", "var(--accent,#007acc)");
-      icon.setAttribute("no-hover", "");
-      icon.setAttribute("title", "All worktrees in sync");
-      headStatus.replaceChildren(icon);
+    for (const wt of worktrees) {
+      rows.push(this._worktreeRow(wt, info.name));
     }
+    return rows;
   }
 }
