@@ -794,8 +794,10 @@ export class FileEditorElement extends LitElement {
     // Compute content width from ALL lines and set it once
     this._updateContentWidth();
 
-    // Focus the textarea for editing
-    this._textAreaInput.focus();
+    // Do NOT focus the textarea here. Opening a file (e.g. from the Explorer)
+    // must not steal focus or place a caret — the user keeps focus where it
+    // is (e.g. to keep arrow-navigating) and only gets an editable caret by
+    // explicitly clicking/type-tabbing into the editor.
   }
 
   private _computeBracketDepths(startLine: number, endLine: number): void {
