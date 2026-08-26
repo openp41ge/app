@@ -1312,10 +1312,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           display:flex; flex-direction:column; flex-shrink:0; width:260px; min-width:0;
           border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
         }
-        .wm-left-title {
-          padding:10px 12px 4px; font-size:11px; font-weight:600; text-transform:uppercase;
-          letter-spacing:.5px; color:var(--text-secondary,#999); flex-shrink:0;
-        }
         .wm-left-scroll { flex:1; overflow-y:auto; min-height:0; padding:4px 0 8px; }
         .wm-right { flex:1; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
         .wm-right-form { display:flex; flex-direction:column; min-height:100%; }
@@ -1336,15 +1332,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-fa-secondary:hover { color:var(--text-primary,#ccc); }
 
         .wm-card {
-          padding:12px 14px; margin:6px 10px; border-radius:8px;
-          background:var(--bg-primary,#252526);
-          border:1px solid var(--divider,#333);
+          padding:8px 12px; margin:0; border-radius:0;
           cursor:pointer;
           position:relative;
-          transition:background .1s, border-color .1s;
+          transition:background .1s;
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
-        .wm-card.selected { border-color:var(--accent,#007acc); background:rgba(0,122,204,.12); }
+        .wm-card.selected { background:rgba(0,122,204,.12); }
         .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:78px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
@@ -1555,7 +1549,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         <div class="wm-overlay-body">
           <!-- Left pane: workspace list -->
           <div class="wm-left">
-            <div class="wm-left-title">Workspaces</div>
             <div class="wm-left-scroll">
               ${this._workspaces.length === 0
               ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces yet.</div>`
