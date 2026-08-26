@@ -1092,7 +1092,12 @@ class Openp41geWorktreeTree extends LitElement {
     return out;
   }
 
-  /** Clear selection on every file tree (including ones nested in shadow roots). */
+  /**
+   * Clear selection on every file tree AND every Explorer row (headers and
+   * shadow-root tree nodes). Runs on every focus change so no inline
+   * border/background can survive a move — Lit recycling a previously-focused
+   * node element could otherwise leave its painted selection behind.
+   */
   private _clearAllTreeSelections(): void {
     const walk = (root: ParentNode) => {
       for (const el of Array.from(root.children)) {
@@ -1102,6 +1107,13 @@ class Openp41geWorktreeTree extends LitElement {
           const root2 = (el as unknown as HTMLElement & { shadowRoot?: ShadowRoot | null })
             .shadowRoot;
           if (root2) walk(root2);
+        } else if (el.classList.contains("tree-node")) {
+          el.style.boxShadow = "";
+          el.style.background = "";
+        } else if (el.classList.contains("wt-row-header")) {
+          el.classList.remove("wt-row-focused");
+          el.style.boxShadow = "";
+          el.style.background = "";
         } else {
           walk(el);
         }
@@ -1110,17 +1122,20 @@ class Openp41geWorktreeTree extends LitElement {
     walk(this);
   }
 
-  /** Paint the VS Code-style selection on `el` (or clear it when null). */
+  /**
+   * Paint the VS Code-style selection on `el` (or clear it when null).
+   * Selection reads as a faded-blue row background with a thin blue outline
+   * — the same treatment for header rows (.wt-row-focused) and file/folder
+   * rows (inline styles, because they live in shadow roots that global CSS
+   * cannot reach).
+   */
   private _setFocusedRow(el: HTMLElement | null): void {
     if (this._focusedRowEl === el) return;
-    if (this._focusedRowEl) {
-      this._focusedRowEl.classList.remove("wt-row-focused");
-      this._focusedRowEl.style.boxShadow = ""; // clear the nav focus border
-    }
     this._focusedRowEl = el;
 
-    // One selection across the panel: clear file-tree selections unless the
-    // focused row IS a tree node (then select it in its own tree).
+    // One selection across the panel: clear every row, then paint ONLY el.
+    // (Clearing everything first — not just the previous _focusedRowEl — is
+    // what guarantees no stale border/background survives an arrow move.)
     this._clearAllTreeSelections();
     if (!el) return;
 
@@ -1132,12 +1147,14 @@ class Openp41geWorktreeTree extends LitElement {
         (HTMLElement & { selectedId: string | null }) | null;
       if (host && host.tagName === "OPENP41GE-TREE")
         host.selectedId = el.getAttribute("data-node-id");
-      // Focus border around the file/folder node. Inline because the node
+      // Faded-blue row background + blue outline. Inline because the node
       // lives in the tree's shadow root, which global CSS cannot target.
+      el.style.background = "var(--tree-selected-bg, rgba(74,158,255,0.12))";
       el.style.boxShadow = "inset 0 0 0 1px var(--tree-focus, #4a9eff)";
     } else {
       el.classList.add("wt-row-focused");
       el.style.boxShadow = "";
+      el.style.background = "";
     }
     el.scrollIntoView({ block: "nearest" });
   }

@@ -92,6 +92,7 @@ describe("ExplorerSystemTabController", () => {
       _repoService: unknown;
       _focusedRowEl: HTMLElement | null;
       _clearAllTreeSelections(): void;
+      _setFocusedRow(el: HTMLElement | null): void;
     };
     tree._repoService = new TestRepoService();
     (tree._repoService as TestRepoService).createRepo("test-repo");
@@ -123,8 +124,17 @@ describe("ExplorerSystemTabController", () => {
 
     // Selection must move to the clicked row — NOT stay on the arrow focus.
     expect(tree._focusedRowEl).toBe(node);
+    // VS Code-style: the focused row paints a faded-blue background with a
+    // blue outline (VS Code uses a background, not just a border).
+    expect(node.style.background).not.toBe("");
     expect(node.style.boxShadow).not.toBe("");
     // The owning tree reports the same node as its selectedId.
     expect((fileTree as unknown as { selectedId: string }).selectedId).toBe("/repo/file.ts");
+
+    // Moving the focus away must clear BOTH painted styles from the node
+    // (a lingering border/background on click is the reported bug).
+    tree._setFocusedRow(null);
+    expect(node.style.background).toBe("");
+    expect(node.style.boxShadow).toBe("");
   });
 });
