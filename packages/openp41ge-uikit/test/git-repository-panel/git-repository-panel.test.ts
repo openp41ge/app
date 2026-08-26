@@ -41,7 +41,7 @@ describe("git-repository-panel skeleton", () => {
     host.remove();
   });
 
-  test("renders the accordion with per-section skeletons while data is null", async () => {
+  test("renders the accordion with header spinners while data is null", async () => {
     panel = document.createElement("git-repository-panel") as typeof panel;
     host.appendChild(panel);
     await panel.updateComplete;
@@ -52,11 +52,14 @@ describe("git-repository-panel skeleton", () => {
     // The accordion sections render immediately (structure is known).
     expect(container.textContent).toContain("Branches");
     expect(container.textContent).toContain("Commits");
-    // Each section's content area shows skeleton rows while loading.
-    expect(container.querySelectorAll(".gbr-skel").length).toBeGreaterThan(0);
+    // Loading is indicated by the round spinner in each section header.
+    expect(container.querySelectorAll(".git-section-spinner").length).toBe(3);
+    // No skeleton rows or placeholder text in the bodies while loading.
+    expect(container.querySelectorAll(".gbr-skel").length).toBe(0);
+    expect(container.textContent).not.toContain("Loading");
   });
 
-  test("replaces each section's skeleton once data arrives", async () => {
+  test("replaces each section's spinner once data arrives", async () => {
     panel = document.createElement("git-repository-panel") as typeof panel;
     host.appendChild(panel);
     await panel.updateComplete;
@@ -66,12 +69,12 @@ describe("git-repository-panel skeleton", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     const container = panel.querySelector("#panel-container");
-    expect(container.querySelectorAll(".gbr-skel").length).toBe(0);
+    expect(container.querySelectorAll(".git-section-spinner").length).toBe(0);
     expect(container.textContent).toContain("main");
     expect(container.textContent).toContain("Branches");
   });
 
-  test("shows the error view instead of skeletons on error data", async () => {
+  test("shows the error view instead of loading spinners on error data", async () => {
     panel = document.createElement("git-repository-panel") as typeof panel;
     host.appendChild(panel);
     await panel.updateComplete;
@@ -81,7 +84,7 @@ describe("git-repository-panel skeleton", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     const container = panel.querySelector("#panel-container");
-    expect(container.querySelectorAll(".gbr-skel").length).toBe(0);
+    expect(container.querySelectorAll(".git-section-spinner").length).toBe(0);
     expect(container.textContent).toContain("boom");
   });
 });

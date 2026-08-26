@@ -205,30 +205,13 @@ class GitBrowserRenderer {
    * section is still loading (data.loadingBranches/Commits/Files). Matches
    * the renderer's dark hard-coded palette.
    */
-  private _renderSkeletonRows(wrapper: HTMLElement, count = 3): void {
-    wrapper.style.padding = "8px 12px";
-    wrapper.style.fontStyle = "normal";
-    const style = document.createElement("style");
-    style.textContent = `
-      .gbr-skel {
-        height:20px; border-radius:3px; margin:5px 0;
-        background: linear-gradient(90deg,#2a2a2a 25%,#383838 50%,#2a2a2a 75%);
-        background-size:200% 100%;
-        animation: gbr-skel-slide 1.3s ease-in-out infinite;
-      }
-      @keyframes gbr-skel-slide {
-        0%   { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-      }
-    `;
-    wrapper.appendChild(style);
-    const widths = ["100%", "72%", "85%", "60%"];
-    for (let i = 0; i < count; i++) {
-      const row = document.createElement("div");
-      row.className = "gbr-skel";
-      row.style.width = widths[i % widths.length];
-      wrapper.appendChild(row);
-    }
+  /**
+   * Loading sections render an EMPTY body — loading is communicated by the
+   * round spinner in the section header bar (see _renderSection's spinner).
+   */
+  private _emptyLoading(wrapper: HTMLElement): HTMLElement {
+    wrapper.style.padding = "4px 12px";
+    return wrapper;
   }
 
   private _renderBranchesContent(
@@ -239,8 +222,7 @@ class GitBrowserRenderer {
     wrapper.style.cssText = "display:flex;flex-direction:column;";
 
     if (data.loadingBranches) {
-      this._renderSkeletonRows(wrapper);
-      return wrapper;
+      return this._emptyLoading(wrapper);
     }
 
     if (data.branches.length === 0) {
@@ -451,8 +433,7 @@ class GitBrowserRenderer {
     wrapper.style.cssText = "display:flex;flex-direction:column;";
 
     if (data.loadingCommits || data.loadingBranches) {
-      this._renderSkeletonRows(wrapper, 4);
-      return wrapper;
+      return this._emptyLoading(wrapper);
     }
 
     if (data.commits.length === 0) {
@@ -500,8 +481,7 @@ class GitBrowserRenderer {
     wrapper.style.cssText = "display:flex;flex-direction:column;";
 
     if (data.loadingFiles || data.loadingBranches) {
-      this._renderSkeletonRows(wrapper, 4);
-      return wrapper;
+      return this._emptyLoading(wrapper);
     }
 
     if (data.filesChanged.length === 0) {
