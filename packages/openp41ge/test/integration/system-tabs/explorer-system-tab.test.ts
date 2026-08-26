@@ -9,27 +9,64 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
+// Side-effect: registers the <openp41ge-worktree-tree> custom element so
+// document.createElement returns the real component class in jsdom.
+import "../../../src/renderer/components/openp41ge-worktree-tree";
+import { TestRepoService } from "../../../src/renderer/models/test-models";
 import { ExplorerSystemTabController } from "../../../src/renderer/apps/system-tabs/explorer-system-tab";
 
 describe("ExplorerSystemTabController", () => {
   let host: HTMLElement;
   let controller: ExplorerSystemTabController;
+  // The tree's async _loadRepos/_loadWorkspaces read these off the preload.
+  // jsdom's default stub only has file.*, so give a minimal but sufficient
+  // surface for every mount (otherwise the real connectedCallback throws).
+  const ORIG_OPENP41GE: unknown = window.openp41ge;
+  const ORIG_SCROLL_INTO_VIEW = HTMLElement.prototype.scrollIntoView;
+  const stubPreload = () => {
+    (window as unknown as { openp41ge: unknown }).openp41ge = {
+      ...(ORIG_OPENP41GE as Record<string, unknown>),
+      workspace: { getWindowId: () => "test-win" },
+      workspaceController: {
+        onWorksetRepoRefsChanged: () => () => {},
+        loadStore: async () => ({ workspaces: [], lastActiveId: null }),
+        createWorkspace: async () => ({ id: "w", title: "Workspace" }),
+        listRepos: async () => [],
+        getBranches: async () => [],
+      },
+    };
+  };
 
   beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     controller = new ExplorerSystemTabController("sys-explorer-test");
+    // jsdom doesn't implement scrollIntoView; _setFocusedRow calls it.
+    HTMLElement.prototype.scrollIntoView = () => {};
+    stubPreload();
   });
 
   afterEach(() => {
+    HTMLElement.prototype.scrollIntoView = ORIG_SCROLL_INTO_VIEW;
+    (window as unknown as { openp41ge: unknown }).openp41ge = ORIG_OPENP41GE;
     controller.unmount();
     host.remove();
   });
 
-  it("mounts an <openp41ge-worktree-tree> styled to fill the sidebar (width + height)", async () => {
-    await controller.mount(host);
+  /** Mount the controller as an Explorer tab of a (fake) sidebar — the real
+   * component only reports open width/height when inside a sidebar. */
+  async function mountInSidebar(): Promise<HTMLElement> {
+    const sidebar = document.createElement("openp41ge-sidebar");
+    host.appendChild(sidebar);
+    await controller.mount(sidebar);
+    return sidebar;
+  }
 
-    const tree = host.querySelector("openp41ge-worktree-tree") as HTMLElement | null;
+  it("mounts an <openp41ge-worktree-tree> styled to fill the sidebar (width + height)", async () => {
+    const sidebar = await mountInSidebar();
+
+    const tree = sidebar.querySelector("openp41ge-worktree-tree") as HTMLElement | null;
     expect(tree).not.toBeNull();
 
     const style = (tree as HTMLElement).style;
@@ -43,8 +80,51 @@ describe("ExplorerSystemTabController", () => {
   });
 
   it("unmount removes the mounted tree", async () => {
-    await controller.mount(host);
+    const sidebar = await mountInSidebar();
     controller.unmount();
-    expect(host.querySelector("openp41ge-worktree-tree")).toBeNull();
+    expect(sidebar.querySelector("openp41ge-worktree-tree")).toBeNull();
+  });
+
+  it("adopts a clicked file node as the focused row (overwrites arrow focus)", async () => {
+    // Mount a real <openp41ge-worktree-tree> with a real (in-memory) repo
+    // service injected BEFORE it connects, so load/render is deterministic.
+    const tree = document.createElement("openp41ge-worktree-tree") as unknown as {
+      _repoService: unknown;
+      _focusedRowEl: HTMLElement | null;
+      _clearAllTreeSelections(): void;
+    };
+    tree._repoService = new TestRepoService();
+    (tree._repoService as TestRepoService).createRepo("test-repo");
+    host.appendChild(tree);
+    await (tree as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
+
+    // Simulate the file tree the uikit component would render inside its
+    // shadow root, plus a prior arrow-key focus on a header row.
+    const treeHost = tree as unknown as HTMLElement;
+    const headerRow = document.createElement("div");
+    headerRow.className = "wt-row-header";
+    treeHost.appendChild(headerRow);
+    const fileTree = document.createElement("openp41ge-tree");
+    const sr = fileTree.attachShadow({ mode: "open" });
+    sr.innerHTML = '<div class="tree-node" data-node-id="/repo/file.ts">file.ts</div></div>';
+    treeHost.appendChild(fileTree);
+    const node = sr.querySelector(".tree-node") as HTMLElement;
+    tree._focusedRowEl = headerRow;
+
+    // The uikit tree stops propagation of the DOM click but emits this
+    // composed CustomEvent on a real click of a leaf file row.
+    node.dispatchEvent(
+      new CustomEvent("tree-node-click", {
+        bubbles: true,
+        composed: true,
+        detail: { nodeId: "/repo/file.ts", meta: {} },
+      }),
+    );
+
+    // Selection must move to the clicked row — NOT stay on the arrow focus.
+    expect(tree._focusedRowEl).toBe(node);
+    expect(node.style.boxShadow).not.toBe("");
+    // The owning tree reports the same node as its selectedId.
+    expect((fileTree as unknown as { selectedId: string }).selectedId).toBe("/repo/file.ts");
   });
 });

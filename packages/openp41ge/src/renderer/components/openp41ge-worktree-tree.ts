@@ -306,6 +306,14 @@ class Openp41geWorktreeTree extends LitElement {
     this.addEventListener("mousedown", this._onMousedownFocus);
     this.addEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.addEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
+    // Uikit <openp41ge-tree> nodes stop propagation of the DOM click event,
+    // so the panel's bubble-phase _onPanelClick never sees file/folder rows.
+    // Adopt selection from the composed tree-node-* events instead, so a
+    // mouse click overwrites the arrow-navigation focus the same way a
+    // keypress does.
+    this.addEventListener("tree-node-click", this._onTreeNodeActivated as EventListener);
+    this.addEventListener("tree-node-dblclick", this._onTreeNodeActivated as EventListener);
+    this.addEventListener("tree-node-toggle", this._onTreeNodeActivated as EventListener);
 
     // Subscribe to openp41ge repoRefs changes from other windows
     this._openp41geRepoUnsub = window.openp41ge.workspaceController.onWorksetRepoRefsChanged(
@@ -362,6 +370,9 @@ class Openp41geWorktreeTree extends LitElement {
     this.removeEventListener("mousedown", this._onMousedownFocus);
     this.removeEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.removeEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
+    this.removeEventListener("tree-node-click", this._onTreeNodeActivated as EventListener);
+    this.removeEventListener("tree-node-dblclick", this._onTreeNodeActivated as EventListener);
+    this.removeEventListener("tree-node-toggle", this._onTreeNodeActivated as EventListener);
   }
 
   // ═══ Lit template ═══════════════════════════════════════════════════
@@ -1003,6 +1014,55 @@ class Openp41geWorktreeTree extends LitElement {
     const target = node ?? row;
     if (target) this._setFocusedRow(target);
   };
+
+  /**
+   * Selected/toggled a node inside a uikit <openp41ge-tree> (file or folder
+   * row). The tree calls stopPropagation() on the underlying click event, so
+   * _onPanelClick can't see these rows. Adopt selection here from the node's
+   * data-node-id instead — this is what the user actually clicked, and arrow
+   * navigation must continue from here (overwriting any prior arrow focus).
+   * Adoption is synchronous (RAF schedules too late / never runs when the
+   * window is backgrounded); a short deferred re-resolve covers the case
+   * where the toggle re-rendered the node (expand/collapse) right after the
+   * event fired.
+   */
+  private _onTreeNodeActivated = (e: CustomEvent): void => {
+    const detail = e.detail as { nodeId?: string } | undefined;
+    const nodeId = detail?.nodeId;
+    if (typeof nodeId !== "string" || !nodeId) return;
+    const el = this._findTreeNodeByNodeId(nodeId);
+    if (el) this._setFocusedRow(el);
+    setTimeout(() => {
+      const el2 = this._findTreeNodeByNodeId(nodeId);
+      if (el2 && el2.isConnected && this._focusedRowEl !== el2) {
+        this._setFocusedRow(el2);
+      }
+    }, 60);
+  };
+
+  /**
+   * Resolve a node id to its current .tree-node element anywhere inside the
+   * panel (uikit <openp41ge-tree> shadow roots, or light DOM). Useful because
+   * tree nodes are recreated on expand/collapse.
+   */
+  private _findTreeNodeByNodeId(nodeId: string): HTMLElement | null {
+    const walk = (root: ParentNode): HTMLElement | null => {
+      for (const el of Array.from(root.children)) {
+        if (!(el instanceof HTMLElement)) continue;
+        if (el.tagName === "OPENP41GE-TREE") {
+          const sr = (el as HTMLElement & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          const hit = sr ? walk(sr) : null;
+          if (hit) return hit;
+          continue;
+        }
+        if (el.dataset?.nodeId === nodeId) return el;
+        const hit = walk(el);
+        if (hit) return hit;
+      }
+      return null;
+    };
+    return walk(this);
+  }
 
   /**
    * Visible, navigable rows in visual (DOM) order. Rows live partly in light

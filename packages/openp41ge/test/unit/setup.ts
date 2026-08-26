@@ -44,6 +44,18 @@ if (typeof customElements === "undefined") {
   };
 }
 
+// ── Stub ResizeObserver (absent in jsdom) ────────────────────────────
+
+// Several real components (openp41ge-sidebar, openp41ge-worktree-tree) create
+// one in their lifecycle hooks. A no-op variant keeps mounts/reflows safe.
+if (typeof ResizeObserver === "undefined") {
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}
+
 // ── Stub ShadowRoot if not available ──────────────────────────────────
 
 if (typeof ShadowRoot === "undefined") {
