@@ -1942,7 +1942,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             </div>
           </div>
         </div>
-        <div style="display:flex;align-items:flex-start;gap:6px;margin-top:6px;padding:6px 8px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
+        <div style="display:flex;align-items:flex-start;gap:6px;margin:6px 14px 0;padding:6px 8px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
           <span style="flex-shrink:0;display:flex;align-items:center;height:1.35em;"><openp41ge-inline-icon name="warning" size="12" no-hover icon-color="var(--text-warning,#e5a50a)"></openp41ge-inline-icon></span>
           <span style="flex:1;min-width:0;">You need read access to each repository so openp41ge can pull (clone/sync) them without asking for a password.</span>
         </div>
