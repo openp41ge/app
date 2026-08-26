@@ -244,6 +244,7 @@ class Openp41geWorktreeTree extends LitElement {
          Two-class specificity keeps it above the row :hover highlight. */
       .wt-row-header.wt-row-focused {
         background: var(--tree-selected-bg, rgba(74,158,255,0.12));
+        box-shadow: inset 0 0 0 1px var(--tree-focus, #4a9eff);
       }
       /* Rows already have padding-right:8px in their inline styles, so
          the overlay scrollbar sits in the padded area — content text/buttons
@@ -1043,7 +1044,10 @@ class Openp41geWorktreeTree extends LitElement {
   /** Paint the VS Code-style selection on `el` (or clear it when null). */
   private _setFocusedRow(el: HTMLElement | null): void {
     if (this._focusedRowEl === el) return;
-    if (this._focusedRowEl) this._focusedRowEl.classList.remove("wt-row-focused");
+    if (this._focusedRowEl) {
+      this._focusedRowEl.classList.remove("wt-row-focused");
+      this._focusedRowEl.style.boxShadow = ""; // clear the nav focus border
+    }
     this._focusedRowEl = el;
 
     // One selection across the panel: clear file-tree selections unless the
@@ -1059,8 +1063,12 @@ class Openp41geWorktreeTree extends LitElement {
         (HTMLElement & { selectedId: string | null }) | null;
       if (host && host.tagName === "OPENP41GE-TREE")
         host.selectedId = el.getAttribute("data-node-id");
+      // Focus border around the file/folder node. Inline because the node
+      // lives in the tree's shadow root, which global CSS cannot target.
+      el.style.boxShadow = "inset 0 0 0 1px var(--tree-focus, #4a9eff)";
     } else {
       el.classList.add("wt-row-focused");
+      el.style.boxShadow = "";
     }
     el.scrollIntoView({ block: "nearest" });
   }
