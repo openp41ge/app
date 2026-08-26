@@ -145,11 +145,23 @@ export class Openp41geApplication {
       console.error("Unhandled Rejection:", reason);
     });
 
-    // Also intercept console.error in main process
+    // Also intercept console.error in main process.
     const origError = console.error;
     console.error = (...args: unknown[]) => {
       const msg = args.map((a) => (typeof a === "object" ? String(a) : String(a))).join(" ");
-      forwardError(msg, "main-process");
+      // Don't forward pure Node diagnostics to the renderers — they are
+      // not application errors and would otherwise freeze every window
+      // in the blocking overlay. Real uncaught exceptions / rejections /
+      // app-level console.error are handled below and still forwarded.
+      const isNodeWarning =
+        (/^\(node:\d+\)\s*Warning:/i.test(msg.trim()) ||
+          msg.includes("Closing file descriptor") ||
+          msg.includes("MaxListenersExceededWarning") ||
+          msg.includes("DeprecationWarning")) &&
+        !msg.toLowerCase().includes("error");
+      if (!isNodeWarning && msg.trim().length > 0) {
+        forwardError(msg, "main-process");
+      }
       origError.apply(console, args);
     };
   }

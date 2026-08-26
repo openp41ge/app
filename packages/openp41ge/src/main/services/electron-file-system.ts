@@ -74,13 +74,20 @@ export class ElectronFileSystem implements IFileSystemService {
     try {
       const resolved = path.resolve(filePath);
       const fd = await fs.promises.open(resolved, "r");
-      const stats = await fd.stat();
-      const totalSize = stats.size;
-      const buf = Buffer.alloc(Math.min(length, Math.max(0, totalSize - offset)));
-      const { bytesRead } = await fd.read(buf, 0, buf.length, offset);
-      await fd.close();
-      const data = buf.toString("utf-8", 0, bytesRead);
-      return { data, totalSize };
+      try {
+        const stats = await fd.stat();
+        const totalSize = stats.size;
+        const buf = Buffer.alloc(Math.min(length, Math.max(0, totalSize - offset)));
+        const { bytesRead } = await fd.read(buf, 0, buf.length, offset);
+        const data = buf.toString("utf-8", 0, bytesRead);
+        return { data, totalSize };
+      } finally {
+        // Always release the descriptor — even if a read/stat threw
+        // (e.g. EISDIR when handed a directory). An unclosed handle is
+        // only closed by GC, leaking the fd and spamming Node with
+        // "Closing file descriptor N on garbage collection".
+        await fd.close();
+      }
     } catch {
       return { data: "", totalSize: 0 };
     }
@@ -94,27 +101,31 @@ export class ElectronFileSystem implements IFileSystemService {
     try {
       const resolved = path.resolve(filePath);
       const fd = await fs.promises.open(resolved, "r");
-      const stats = await fd.stat();
-      const totalSize = stats.size;
-      let offset = 0;
-      const chunks: string[] = [];
+      try {
+        const stats = await fd.stat();
+        const totalSize = stats.size;
+        let offset = 0;
+        const chunks: string[] = [];
 
-      while (offset < totalSize) {
-        const toRead = Math.min(chunkSize, totalSize - offset);
-        const buf = Buffer.alloc(toRead);
-        const { bytesRead } = await fd.read(buf, 0, toRead, offset);
-        if (bytesRead === 0) break;
-        const chunkStr = buf.toString("utf-8", 0, bytesRead);
-        chunks.push(chunkStr);
-        offset += bytesRead;
-        onProgress({ loaded: offset, total: totalSize, chunk: chunkStr });
-        // Yield to the event loop every 4 chunks
-        if (chunks.length % 4 === 0) {
-          await new Promise((resolve) => setImmediate(resolve));
+        while (offset < totalSize) {
+          const toRead = Math.min(chunkSize, totalSize - offset);
+          const buf = Buffer.alloc(toRead);
+          const { bytesRead } = await fd.read(buf, 0, toRead, offset);
+          if (bytesRead === 0) break;
+          const chunkStr = buf.toString("utf-8", 0, bytesRead);
+          chunks.push(chunkStr);
+          offset += bytesRead;
+          onProgress({ loaded: offset, total: totalSize, chunk: chunkStr });
+          // Yield to the event loop every 4 chunks
+          if (chunks.length % 4 === 0) {
+            await new Promise((resolve) => setImmediate(resolve));
+          }
         }
+        return { data: chunks.join(""), totalSize };
+      } finally {
+        // Always release the descriptor, even on mid-read errors.
+        await fd.close();
       }
-      await fd.close();
-      return { data: chunks.join(""), totalSize };
     } catch {
       return { data: "", totalSize: 0 };
     }
