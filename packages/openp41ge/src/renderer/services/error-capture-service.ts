@@ -94,6 +94,17 @@ function escHtml(s: string): string {
 }
 
 /**
+ * True when a message is a benign browser-internal diagnostic that must NOT
+ * block the error overlay. The browser reports these itself (e.g.
+ * ResizeObserver loop completion) and recovers internally — they are not app
+ * errors. Used in BOTH the console.error interceptor and the window.onerror
+ * handler, because Chromium can emit the SAME message through either path.
+ */
+function isBenignRendererDiagnostic(msg: string): boolean {
+  return msg.includes("ResizeObserver loop completed with undelivered notifications");
+}
+
+/**
  * Clear all captured errors and hide the overlay.
  * Called after a successful project selection to dismiss stale errors
  * from a previous session or hot reload.
@@ -169,13 +180,18 @@ export function installErrorCapture(): void {
     error?: Error,
   ) => {
     const msg = typeof message === "string" ? message : String(message);
-    addError({
-      message: msg,
-      source: source || "",
-      stack: error?.stack || "",
-      timestamp: Date.now(),
-      type: "exception",
-    });
+    // Benign browser diagnostics (e.g. ResizeObserver loop completion) also
+    // arrive through window.onerror as uncaught "exceptions" — skip them so
+    // they never block the overlay, matching the console.error filter below.
+    if (!isBenignRendererDiagnostic(msg)) {
+      addError({
+        message: msg,
+        source: source || "",
+        stack: error?.stack || "",
+        timestamp: Date.now(),
+        type: "exception",
+      });
+    }
     if (typeof origOnerror === "function") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (origOnerror as any)(message, source, lineno, colno, error);
@@ -207,9 +223,9 @@ export function installErrorCapture(): void {
   const origConsoleError = console.error;
   // eslint-disable-next-line no-console
   console.error = (...args: unknown[]) => {
-    const msg = args.map((a) => (typeof a === "object" ? String(a) : String(a))).join(" ");
+    const msg = args.map((a: unknown) => (typeof a === "object" ? String(a) : String(a))).join(" ");
     // Skip benign browser-internal warnings that are not real app errors
-    if (msg.includes("ResizeObserver loop completed with undelivered notifications")) {
+    if (isBenignRendererDiagnostic(msg)) {
       origConsoleError.apply(console, args);
       return;
     }
