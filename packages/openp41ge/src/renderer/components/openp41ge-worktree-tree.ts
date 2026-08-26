@@ -160,6 +160,11 @@ class Openp41geWorktreeTree extends LitElement {
    * another row is clicked (VS Code's selection); the arrow focus is a
    * separate, moving highlight with the blue outline on top. */
   private _selectedRowEl: HTMLElement | null = null;
+
+  /** Whether the Explorer owns keyboard focus. The arrow-focus border hides
+   * when the user clicks outside the Explorer (VS Code behaviour) while the
+   * clicked-file faded background stays. */
+  private _navFocusVisible = true;
   private _wsDrawerEl: HTMLElement | null = null;
   @state() private _wsDrawerOpen = false;
   @state() private _activeWsId: string | null = null;
@@ -313,6 +318,9 @@ class Openp41geWorktreeTree extends LitElement {
       this.setAttribute("tabindex", "-1");
     }
     this.addEventListener("mousedown", this._onMousedownFocus);
+    // Hide the arrow-focus border when the user interacts anywhere outside
+    // the Explorer (VS Code behaviour); show it again when they return.
+    document.addEventListener("mousedown", this._onDocMousedown);
     this.addEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.addEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
     // Uikit <openp41ge-tree> nodes stop propagation of the DOM click event,
@@ -377,6 +385,7 @@ class Openp41geWorktreeTree extends LitElement {
     this.removeEventListener("keydown", this._onKeyDown);
     this.removeEventListener("click", this._onPanelClick);
     this.removeEventListener("mousedown", this._onMousedownFocus);
+    document.removeEventListener("mousedown", this._onDocMousedown);
     this.removeEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.removeEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
     this.removeEventListener("tree-node-click", this._onTreeNodeActivated as EventListener);
@@ -930,6 +939,26 @@ class Openp41geWorktreeTree extends LitElement {
     this.focus();
   };
 
+  /**
+   * VS Code behaviour: clicking outside the Explorer hides the arrow-focus
+   * border (the navigation cursor), while the clicked-file faded background
+   * stays visible. Clicking back inside restores the border.
+   */
+  private _onDocMousedown = (e: MouseEvent): void => {
+    const inside = e
+      .composedPath()
+      .some((p) => p instanceof Node && (p === this || this.contains(p)));
+    if (inside) {
+      if (!this._navFocusVisible) {
+        this._navFocusVisible = true;
+        this._repaintSelection();
+      }
+    } else if (this._navFocusVisible) {
+      this._navFocusVisible = false;
+      this._repaintSelection();
+    }
+  };
+
   // ── Key handler ───────────────────────────────────────────────────────
 
   /**
@@ -945,6 +974,7 @@ class Openp41geWorktreeTree extends LitElement {
    * - Enter/Space              — toggle expandables / activate file leaves.
    */
   private _onKeyDown = (e: KeyboardEvent) => {
+    this._navFocusVisible = true; // keyboard interaction re-shows the cursor
     const rows = this._navigableRows();
     if (rows.length === 0) return;
 
@@ -1025,6 +1055,7 @@ class Openp41geWorktreeTree extends LitElement {
       // Clicking selects AND focuses the row: it keeps a faded-blue
       // background (selection) while the arrow focus adds the outline and
       // can move away without stealing it.
+      this._navFocusVisible = true;
       this._selectedRowEl = target;
       this._setFocusedRow(target);
     }
@@ -1047,6 +1078,7 @@ class Openp41geWorktreeTree extends LitElement {
     if (typeof nodeId !== "string" || !nodeId) return;
     const el = this._findTreeNodeByNodeId(nodeId);
     if (el) {
+      this._navFocusVisible = true;
       this._selectedRowEl = el;
       this._setFocusedRow(el);
     }
@@ -1165,8 +1197,12 @@ class Openp41geWorktreeTree extends LitElement {
     this._clearAllTreeSelections();
     const sel = this._selectedRowEl && this._selectedRowEl.isConnected ? this._selectedRowEl : null;
     const focus = this._focusedRowEl && this._focusedRowEl.isConnected ? this._focusedRowEl : null;
-    if (sel && sel !== focus) this._paintRow(sel, false);
-    if (focus) this._paintRow(focus, true);
+    // The clicked/active-file row keeps a faded background regardless of who
+    // owns the keyboard focus (VS Code's persistent selection).
+    if (sel) this._paintRow(sel, false);
+    // The arrow-focus cursor adds the blue outline only while the Explorer
+    // owns keyboard focus; clicking outside hides it (VS Code behaviour).
+    if (focus && this._navFocusVisible) this._paintRow(focus, true);
   }
 
   /** Paint fade-only (focused=false) or fade + outline (focused=true) on el. */

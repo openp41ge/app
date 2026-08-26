@@ -146,5 +146,11 @@ describe("ExplorerSystemTabController", () => {
     // The newly focused row carries the fade + outline.
     expect(nodeB.style.background).not.toBe("");
     expect(nodeB.style.boxShadow).not.toBe("");
+
+    // Clicking OUTSIDE the explorer hides the arrow-focus border (VS Code
+    // behaviour) while the clicked-file fade stays visible.
+    document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    expect(nodeB.style.boxShadow).toBe(""); // border (cursor) hidden
+    expect(node.style.background).not.toBe(""); // selection fade persists
   });
 });
