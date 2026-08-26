@@ -1191,21 +1191,19 @@ class Openp41geWorktreeTree extends LitElement {
   }
 
   private _repaintSelection(): void {
-    // Wipe every highlight, then re-paint the persistent selection fade and
-    // the current focus row. The sweep guarantees that a row the user already
-    // arrowed away from can never keep a stale border.
+    // Wipe every highlight, then re-paint from scratch. The sweep guarantees
+    // a row the user arrowed away from can never keep a stale border.
     this._clearAllTreeSelections();
     const sel = this._selectedRowEl && this._selectedRowEl.isConnected ? this._selectedRowEl : null;
     const focus = this._focusedRowEl && this._focusedRowEl.isConnected ? this._focusedRowEl : null;
-    // The clicked/active-file row keeps a faded background regardless of who
-    // owns the keyboard focus (VS Code's persistent selection) and NEVER a
-    // border — even while it is also the current navigation row.
-    if (sel) this._paintRow(sel, false);
-    // The arrow-focus cursor adds the blue outline only on a row that is
-    // NOT the clicked selection (so the clicked row stays border-free), and
-    // only while the Explorer owns keyboard focus — clicking outside hides it
-    // (VS Code behaviour).
-    if (focus && focus !== sel && this._navFocusVisible) this._paintRow(focus, true);
+    // The originally-clicked (active-file) row keeps a faded background with
+    // NO border ONCE the cursor has moved elsewhere (focus !== sel).
+    if (sel && sel !== focus) this._paintRow(sel, false);
+    // The navigation cursor paints its background + outline whenever the
+    // Explorer owns the keyboard focus — including right after a click when
+    // both focus types coincide (sel === focus) so the single row shows
+    // background + border. Clicking outside hides the cursor.
+    if (focus && this._navFocusVisible) this._paintRow(focus, true);
   }
 
   /** Paint fade-only (focused=false) or fade + outline (focused=true) on el. */

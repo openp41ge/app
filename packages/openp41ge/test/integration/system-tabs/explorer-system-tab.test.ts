@@ -129,16 +129,15 @@ describe("ExplorerSystemTabController", () => {
 
     // Selection must move to the clicked row — NOT stay on the arrow focus.
     expect(tree._focusedRowEl).toBe(node);
-    // The CLICKED row (active-file selection) is a faded-blue background with
-    // NO border at all — even right after clicking, when it is also the
-    // navigation row.
+    // Right after a click both focus types coincide, so the row shows the
+    // faded background AND the blue outline (VS Code).
     expect(node.style.background).not.toBe("");
-    expect(node.style.boxShadow).toBe("");
+    expect(node.style.boxShadow).not.toBe("");
     // The owning tree reports the same node as its selectedId.
     expect((fileTree as unknown as { selectedId: string }).selectedId).toBe("/repo/file.ts");
 
-    // Arrow-focus moves to a second file row — only THAT row carries the
-    // outline; the clicked row keeps fade, no border.
+    // Arrow-focus moves to a second file row: the cursor carries the outline,
+    // the originally-clicked row keeps only its faded background (no border).
     const nodeB = sr.querySelector('[data-node-id="/repo/other.ts"]') as HTMLElement;
     tree._setFocusedRow(nodeB);
     expect(node.style.boxShadow).toBe("");
@@ -146,10 +145,10 @@ describe("ExplorerSystemTabController", () => {
     expect(nodeB.style.background).not.toBe("");
     expect(nodeB.style.boxShadow).not.toBe("");
 
-    // Clicking OUTSIDE the explorer hides the arrow-focus row (VS Code
+    // Clicking OUTSIDE the explorer hides the cursor row entirely (VS Code
     // behaviour) while the clicked-file fade stays visible.
     document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-    expect(nodeB.style.boxShadow).toBe(""); // cursor row hidden entirely
+    expect(nodeB.style.boxShadow).toBe("");
     expect(nodeB.style.background).toBe("");
     expect(node.style.background).not.toBe(""); // selection fade persists
   });
