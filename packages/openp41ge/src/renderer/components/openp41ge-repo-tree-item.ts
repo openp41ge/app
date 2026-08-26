@@ -286,7 +286,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         class="relative bg-gutter h-[26px] pointer-events-none border-b border-[#232323]"
       >
         <div
-          class="pointer-events-auto flex items-center h-[26px] px-2 pl-7 cursor-pointer text-sm text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
+          class="pointer-events-auto flex items-center h-[26px] px-2 pl-7 pr-3 cursor-pointer text-sm text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
           @click=${() => {
             const path = wt.path || `${this.repoName}/${wt.branch}`;
             this._toggleWorktreeFiles(wt.branch, path);
@@ -503,17 +503,41 @@ export class Openp41geRepoTreeItem extends LitElement {
   render() {
     return html`
       <style>
-        .repo-header-btn:hover { background-color: var(--bg-hover, #2a2d2e); }
-        .repo-header-btn:hover svg { color: var(--accent, #4a9eff); }
-        .wt-row-btn:hover { background-color: var(--bg-hover, #2a2d2e); }
-        .wt-row-btn:hover svg { color: var(--accent, #4a9eff); }
-        .wt-row-btn svg { transition: color 0.1s; }
-        .wt-row-header:hover { background-color: var(--bg-hover, #2a2d2e); }
-        .wt-row-btn:hover { background-color: var(--bg-hover, #2a2d2e); }
-        .wt-row-btn:hover svg { color: var(--accent, #4a9eff); }
-        .wt-row-btn svg { transition: color 0.1s; }
-        #wt-addwt-input:focus { outline: none !important; }
-        #wt-addwt-row.duplicate-name:focus-within { outline-color: #e81123 !important; }
+        /* End-of-row action buttons read as rounded squares: a flat fill
+           defines the tile, hover brightens it. */
+        .repo-header-btn,
+        .wt-row-btn {
+          width: 20px;
+          height: 20px;
+          box-sizing: border-box;
+          border-radius: 5px;
+          background: var(--bg-hover, #2a2d2e);
+        }
+        .repo-header-btn:hover,
+        .wt-row-btn:hover {
+          background: var(--bg-hover-strong, #3a3d3f);
+        }
+        .repo-header-btn:hover svg {
+          color: var(--accent, #4a9eff);
+        }
+        .wt-row-btn:hover svg {
+          color: var(--accent, #4a9eff);
+        }
+        .wt-row-btn svg {
+          transition: color 0.1s;
+        }
+        .wt-row-header:hover {
+          background-color: var(--bg-hover, #2a2d2e);
+        }
+        .wt-row-btn svg {
+          transition: color 0.1s;
+        }
+        #wt-addwt-input:focus {
+          outline: none !important;
+        }
+        #wt-addwt-row.duplicate-name:focus-within {
+          outline-color: #e81123 !important;
+        }
       </style>
       <div class="select-none">
         <!-- Repo header -->
@@ -523,7 +547,7 @@ export class Openp41geRepoTreeItem extends LitElement {
           <!-- Inner wrapper: receives all pointer events -->
           <div
             draggable="true"
-            class="pointer-events-auto flex items-center h-[30px] px-2 pl-3 cursor-pointer text-sm text-[#ccc] gap-1 transition-colors duration-100 wt-row-header"
+            class="pointer-events-auto flex items-center h-[30px] px-2 pl-3 pr-3 cursor-pointer text-sm text-[#ccc] gap-1 transition-colors duration-100 wt-row-header"
             @click=${this._toggleExpand}
             @dragstart=${(e: DragEvent) => {
               e.dataTransfer!.setData("application/x-openp41ge-repo", this.repoName);
@@ -618,7 +642,7 @@ export class Openp41geRepoTreeItem extends LitElement {
           this._showingAddWorktree
             ? html` <div
                 id="wt-addwt-row"
-                class="flex items-center h-[26px] px-2 pl-7 text-sm gap-1 border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
+                class="flex items-center h-[26px] px-2 pl-7 pr-3 text-sm gap-1 border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
               >
                 <input
                   id="wt-addwt-input"

@@ -151,6 +151,8 @@ class Openp41geWorktreeTree extends LitElement {
 
   private _drawerEl: HTMLElement | null = null;
   private _treeEl: HTMLElement | null = null;
+  private _scrollResizeObserver: ResizeObserver | null = null;
+  private _scrollResizeObserved = false;
   private _wsDrawerEl: HTMLElement | null = null;
   @state() private _wsDrawerOpen = false;
   @state() private _activeWsId: string | null = null;
@@ -330,6 +332,12 @@ class Openp41geWorktreeTree extends LitElement {
     super.disconnectedCallback();
     window.removeEventListener("resize", this._onWindowResize);
     this._gitDisconnected = true;
+
+    if (this._scrollResizeObserver) {
+      this._scrollResizeObserver.disconnect();
+      this._scrollResizeObserver = null;
+      this._scrollResizeObserved = false;
+    }
 
     if (this._openp41geRepoUnsub) {
       this._openp41geRepoUnsub();
@@ -759,6 +767,22 @@ class Openp41geWorktreeTree extends LitElement {
     if (!this._hasLoadedOnce) {
       this._hasLoadedOnce = true;
       this._loadRepos();
+    }
+
+    // Keep the custom scrollbar in sync with content height. Tree rows are
+    // rendered by the child <openp41ge-repo-tree-item>, which re-renders
+    // independently of this component — so _syncScrollbar() (normally only
+    // re-run on our own updated()/scroll) is never re-triggered by child
+    // content growth/shrink. Observing the scroll content's box size closes
+    // that gap: the track appears as soon as the list overflows and
+    // disappears the moment it fits again.
+    if (typeof ResizeObserver !== "undefined") {
+      const contentEl = this.querySelector(".wt-tree-scroll-content") as HTMLElement | null;
+      if (contentEl && !this._scrollResizeObserved) {
+        this._scrollResizeObserver = new ResizeObserver(() => this._syncScrollbar());
+        this._scrollResizeObserver.observe(contentEl);
+        this._scrollResizeObserved = true;
+      }
     }
 
     // If a load was deferred because _treeEl wasn't available, run it now
