@@ -25,8 +25,11 @@ export class ExplorerSystemTabController implements SystemTabController {
     // Wait for Lit to finish its first render cycle
     await (el as HTMLElement & { updateComplete?: Promise<void> }).updateComplete;
 
-    // Ensure the element fills the sidebar
-    el.style.cssText = "flex:1;min-height:0;display:flex;flex-direction:column;width:100%;";
+    // Ensure the element fills the sidebar — flex:1 fills a flex parent,
+    // height:100% fills .sidebar-content (which has a definite flex-computed
+    // height), matching the Git tab's sizing.
+    el.style.cssText =
+      "flex:1 1 0%;min-height:0;display:flex;flex-direction:column;width:100%;height:100%;";
   }
 
   unmount(): void {

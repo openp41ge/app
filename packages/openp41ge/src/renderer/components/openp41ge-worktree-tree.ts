@@ -110,12 +110,22 @@ function _restoreGridFocus(): void {
 function updateDrawerVisibility(): void {
   const el = document.querySelector("openp41ge-worktree-tree") as Openp41geWorktreeTree | null;
   if (el) {
+    const inSidebar = el.closest?.("openp41ge-sidebar") != null;
     el.style.position = "relative";
     el.style.inset = "auto";
-    el.style.width = _isOpen ? "" : "0";
     el.style.zIndex = "";
-    el.style.borderLeft = _isOpen ? "1px solid #2a2a2a" : "none";
-    el.style.height = "";
+
+    if (inSidebar) {
+      // Explorer tree mounted in a sidebar fills the sidebar — it is never a
+      // collapsible overlay drawer there, so don't collapse it to 0 width.
+      el.style.width = "100%";
+      el.style.height = "100%";
+      el.style.borderLeft = "none";
+    } else {
+      el.style.width = _isOpen ? "" : "0";
+      el.style.height = "";
+      el.style.borderLeft = _isOpen ? "1px solid #2a2a2a" : "none";
+    }
 
     const drawer = el.querySelector(".wt-drawer") as HTMLElement | null;
     if (drawer) {
@@ -123,7 +133,7 @@ function updateDrawerVisibility(): void {
     }
     const notch = el.querySelector(".wt-resize-notch") as HTMLElement | null;
     if (notch) {
-      notch.style.display = _isOpen ? "" : "none";
+      notch.style.display = inSidebar ? "none" : _isOpen ? "" : "none";
       notch.classList.toggle("fullwidth", false);
     }
   }
@@ -630,6 +640,21 @@ class Openp41geWorktreeTree extends LitElement {
    * This ensures the tree opens/closes when switching worksets.
    */
   private _syncExplorerState(): void {
+    // When the tree is mounted inside a sidebar (Explorer tab), it is by
+    // definition open — the sidebar only mounts the active tab's content, so
+    // the tree must never present itself as a collapsed overlay drawer here.
+    const inSidebar = this.closest?.("openp41ge-sidebar") != null;
+    if (inSidebar) {
+      if (!_isOpen) {
+        _isOpen = true;
+        _clearGridCellFocus();
+        // Trigger repo loading — like open() does — so content loads promptly
+        // when the explorer is restored from persisted state on startup.
+        this._loadRepos();
+      }
+      return;
+    }
+
     const app = (window as unknown as Record<string, unknown>).__openp41geApp as
       | { getWorkspace: () => unknown; dispatch: (fn: string, ...args: unknown[]) => void }
       | undefined;
@@ -648,11 +673,35 @@ class Openp41geWorktreeTree extends LitElement {
       (window as unknown as Record<string, unknown>).__openp41geWindowId;
     if (!myWindowId) return;
     const wss = ws as {
-      windows?: Array<{ id: string; sidebar?: { activeViewId: string | null; width?: number } }>;
+      systemTabs?: Record<string, { appType?: string }>;
+      windows?: Array<{
+        id: string;
+        sidebar?: {
+          leftSidebarTabs?: string[];
+          rightSidebarTabs?: string[];
+          activeLeftTab?: string | null;
+          activeRightTab?: string | null;
+          leftSidebarOpen?: boolean;
+          rightSidebarOpen?: boolean;
+        };
+      }>;
     };
     const win = wss.windows?.find((w: { id: string }) => w.id === myWindowId);
-    if (!win) return;
-    const shouldBeOpen = win.sidebar?.activeViewId === "explorer";
+    const sidebar = win?.sidebar;
+    if (!sidebar) return;
+
+    // Resolve the active sidebar system tab's appType. The sidebar model
+    // persists activation in activeLeftTab/activeRightTab (resolved through
+    // systemTabs[].appType), not the legacy activeViewId field.
+    const resolveActive = (
+      tabId: string | null | undefined,
+      open: boolean | undefined,
+    ): string | null => (open && tabId ? (wss.systemTabs?.[tabId]?.appType ?? null) : null);
+    const activeAppType =
+      resolveActive(sidebar.activeLeftTab, sidebar.leftSidebarOpen) ??
+      resolveActive(sidebar.activeRightTab, sidebar.rightSidebarOpen);
+
+    const shouldBeOpen = activeAppType === "explorer";
     if (shouldBeOpen !== _isOpen) {
       _isOpen = shouldBeOpen;
       if (_isOpen) {
