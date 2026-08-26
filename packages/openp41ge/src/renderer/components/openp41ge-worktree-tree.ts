@@ -325,6 +325,9 @@ class Openp41geWorktreeTree extends LitElement {
     // kill a bubble-phase document listener and leave the cursor visible
     // forever. Capture fires before any of those handlers run.
     document.addEventListener("mousedown", this._onDocMousedown, true);
+    // Enforce the single-border invariant the instant a row gains DOM focus
+    // (capture, so it wins regardless of other handlers).
+    document.addEventListener("focusin", this._onDocFocusIn, true);
     this.addEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.addEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
     // Uikit <openp41ge-tree> nodes stop propagation of the DOM click event,
@@ -390,6 +393,7 @@ class Openp41geWorktreeTree extends LitElement {
     this.removeEventListener("click", this._onPanelClick);
     this.removeEventListener("mousedown", this._onMousedownFocus);
     document.removeEventListener("mousedown", this._onDocMousedown, true);
+    document.removeEventListener("focusin", this._onDocFocusIn, true);
     this.removeEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.removeEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
     this.removeEventListener("tree-node-click", this._onTreeNodeActivated as EventListener);
@@ -953,6 +957,25 @@ class Openp41geWorktreeTree extends LitElement {
   }
 
   /**
+   * Resolve the REAL row that currently holds DOM focus. document.activeElement
+   * retargets to the <openp41ge-tree> HOST when a node inside its shadow root
+   * has focus, so a plain .tree-node check misses it — reach into the host's
+   * shadow root to find the focused row.
+   */
+  private _focusTargetIsOurRow(t: Element | null): HTMLElement | null {
+    if (!t) return null;
+    // Directly focused row (light-DOM case).
+    if (this._isOurTreeNode(t as HTMLElement)) return t as HTMLElement;
+    // Retargeted host: the real focused row lives in its shadow root.
+    if (t instanceof HTMLElement && this.contains(t)) {
+      const host = t as HTMLElement & { shadowRoot?: ShadowRoot | null };
+      const inner = host.shadowRoot ? (host.shadowRoot.activeElement as HTMLElement | null) : null;
+      if (inner && inner.classList?.contains("tree-node")) return inner;
+    }
+    return null;
+  }
+
+  /**
    * The uikit tree gives its rows tabindex=0, so a row can end up holding
    * real DOM focus (e.g. a browser/OS focus quirk). Its :focus-visible CSS
    * paints the SAME inset blue border as our cursor, and inline styles can't
@@ -960,11 +983,68 @@ class Openp41geWorktreeTree extends LitElement {
    * our own cursor paint.
    */
   private _blurFocusedTreeNode(): void {
-    const ae = document.activeElement as HTMLElement | null;
-    if (ae && ae !== this && this._isOurTreeNode(ae)) {
-      ae.blur();
-      this.focus();
+    const row = this._focusTargetIsOurRow(document.activeElement);
+    if (row && row !== this) {
+      row.blur();
+      if (document.activeElement !== this) this.focus();
     }
+  }
+
+  /**
+   * ENFORCE the invariant: only the arrow-cursor row may carry a blue
+   * outline. Walks every Explorer row (headers and shadow-root tree nodes)
+   * and strips any inline focus border / wt-row-focused class from a row
+   * that is NOT the live cursor. Runs on every repaint AND on every focusin,
+   * so a stray border from any source (re-render, uikit's own keyboard
+   * path, :focus-visible) is corrected immediately.
+   */
+  private _enforceSingleBorder(): void {
+    const cursor = this._navFocusVisible && this._focusedRowEl?.isConnected ? this._focusedRowEl : null;
+    const walk = (root: ParentNode) => {
+      for (const el of Array.from(root.children)) {
+        if (!(el instanceof HTMLElement)) continue;
+        if (el.tagName === "OPENP41GE-TREE") {
+          const root2 = (el as unknown as HTMLElement & { shadowRoot?: ShadowRoot | null })
+            .shadowRoot;
+          if (root2) walk(root2);
+        } else if (el.classList.contains("tree-node")) {
+          if (el !== cursor && el.style.boxShadow) el.style.boxShadow = "";
+        } else if (el.classList.contains("wt-row-header")) {
+          if (el !== cursor) el.classList.remove("wt-row-focused");
+        } else {
+          walk(el);
+        }
+      }
+    };
+    walk(this);
+  }
+
+  /**
+   * DOM focus can land on a tabindex=0 row from ANY source (mouse default
+   * action, keyboard, programmatic). The moment it does, the uikit's
+   * :focus-visible paints a border inline styles can't clear. This capture
+   * listener blurs the row immediately and re-enforces the single-border
+   * invariant. Capture phase so it wins even if another handler would stop
+   * propagation on focusin.
+   */
+  private _onDocFocusIn = (e: FocusEvent): void => {
+    const row = this._focusTargetIsOurRow(e.target as HTMLElement | null);
+    if (row) {
+      row.blur();
+      if (document.activeElement !== this) this.focus();
+      this._enforceSingleBorder();
+    }
+  };
+
+  /**
+   * True when a mousedown target lands on (or inside) one of our file rows
+   * or a uikit tree host — used by the capture-phase guard to stop the
+   * browser's default focus action before it can ever put DOM focus on a
+   * tabindex=0 row.
+   */
+  private _isExplorerRowOrHost(el: HTMLElement): boolean {
+    if (el.tagName === "OPENP41GE-TREE" && this.contains(el)) return true;
+    return this._isOurTreeNode(el);
   }
 
   /**
@@ -973,6 +1053,18 @@ class Openp41geWorktreeTree extends LitElement {
    * stays visible. Clicking back inside restores the border.
    */
   private _onDocMousedown = (e: MouseEvent): void => {
+    // Capture-phase safety net (runs before any other handler can stop
+    // propagation): a real mousedown on a tabindex=0 row would otherwise
+    // let the browser's DEFAULT action focus the row, and the uikit's
+    // :focus-visible would paint a border inline styles can't clear. Stop
+    // that default HERE so DOM focus can never land on a row.
+    if (
+      e
+        .composedPath()
+        .some((p) => p instanceof HTMLElement && this._isExplorerRowOrHost(p))
+    ) {
+      e.preventDefault();
+    }
     const inside = e
       .composedPath()
       .some((p) => p instanceof Node && (p === this || this.contains(p)));
@@ -1240,6 +1332,10 @@ class Openp41geWorktreeTree extends LitElement {
     // Never let a tabindex=0 row keep DOM focus — its :focus-visible ring
     // would paint a border inline styles cannot clear.
     this._blurFocusedTreeNode();
+    // Belt-and-braces: guarantee no row other than the cursor can carry a
+    // border, correcting any stray paint from re-renders or other focus
+    // paths that bypassed the sweep.
+    this._enforceSingleBorder();
   }
 
   /** Paint fade-only (focused=false) or fade + outline (focused=true) on el. */
