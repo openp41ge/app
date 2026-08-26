@@ -95,9 +95,9 @@ class Openp41geTitleBar extends LitElement {
           </svg>
         </div>
 
-        <!-- Workspace button (centered, toggles the workspaces overlay) -->
+        <!-- Workspace button (left-aligned, toggles the workspaces overlay) -->
         <openp41ge-workspace-search
-          style="position:absolute;left:50%;transform:translateX(-50%);top:0;height:100%;display:flex;align-items:center;z-index:1000;-webkit-app-region:no-drag;"
+          style="position:relative;height:100%;display:flex;align-items:center;-webkit-app-region:no-drag;margin-left:2px;"
         ></openp41ge-workspace-search>
 
         <!-- Spacer to push content to the right -->
