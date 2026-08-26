@@ -151,5 +151,22 @@ describe("ExplorerSystemTabController", () => {
     expect(nodeB.style.boxShadow).toBe("");
     expect(nodeB.style.background).toBe("");
     expect(node.style.background).not.toBe(""); // selection fade persists
+
+    // A click that goes straight INTO the editor with NO arrowing: selector
+    // and cursor share the row (sel === focus), so clicking outside must NOT
+    // wipe the fade — the clicked row keeps its background, border cleared.
+    nodeB.dispatchEvent(
+      new CustomEvent("tree-node-click", {
+        bubbles: true,
+        composed: true,
+        detail: { nodeId: "/repo/other.ts", meta: {} },
+      }),
+    );
+    expect(tree._focusedRowEl).toBe(nodeB);
+    expect(tree._navFocusVisible).toBe(true);
+    document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    expect(tree._navFocusVisible).toBe(false);
+    expect(nodeB.style.boxShadow).toBe(""); // cursor hidden with the row
+    expect(nodeB.style.background).not.toBe(""); // clicked-row fade persists
   });
 });

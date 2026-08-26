@@ -320,7 +320,11 @@ class Openp41geWorktreeTree extends LitElement {
     this.addEventListener("mousedown", this._onMousedownFocus);
     // Hide the arrow-focus border when the user interacts anywhere outside
     // the Explorer (VS Code behaviour); show it again when they return.
-    document.addEventListener("mousedown", this._onDocMousedown);
+    // CAPTURE phase: components elsewhere in the app (grid cells, the file
+    // editor's shadow root) call stopPropagation() on mousedown, which would
+    // kill a bubble-phase document listener and leave the cursor visible
+    // forever. Capture fires before any of those handlers run.
+    document.addEventListener("mousedown", this._onDocMousedown, true);
     this.addEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.addEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
     // Uikit <openp41ge-tree> nodes stop propagation of the DOM click event,
@@ -385,7 +389,7 @@ class Openp41geWorktreeTree extends LitElement {
     this.removeEventListener("keydown", this._onKeyDown);
     this.removeEventListener("click", this._onPanelClick);
     this.removeEventListener("mousedown", this._onMousedownFocus);
-    document.removeEventListener("mousedown", this._onDocMousedown);
+    document.removeEventListener("mousedown", this._onDocMousedown, true);
     this.removeEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.removeEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
     this.removeEventListener("tree-node-click", this._onTreeNodeActivated as EventListener);
@@ -937,7 +941,31 @@ class Openp41geWorktreeTree extends LitElement {
       e.preventDefault();
     }
     this.focus();
+    this._blurFocusedTreeNode();
   };
+
+  /** Returns true if el is a .tree-node row belonging to any of our trees. */
+  private _isOurTreeNode(el: HTMLElement | null): boolean {
+    if (!el || !el.classList?.contains("tree-node")) return false;
+    const root = el.getRootNode();
+    const host = root instanceof ShadowRoot ? root.host : null;
+    return !!host && this.contains(host);
+  }
+
+  /**
+   * The uikit tree gives its rows tabindex=0, so a row can end up holding
+   * real DOM focus (e.g. a browser/OS focus quirk). Its :focus-visible CSS
+   * paints the SAME inset blue border as our cursor, and inline styles can't
+   * clear it. Blur any such row so the only border that can ever appear is
+   * our own cursor paint.
+   */
+  private _blurFocusedTreeNode(): void {
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && ae !== this && this._isOurTreeNode(ae)) {
+      ae.blur();
+      this.focus();
+    }
+  }
 
   /**
    * VS Code behaviour: clicking outside the Explorer hides the arrow-focus
@@ -1196,14 +1224,22 @@ class Openp41geWorktreeTree extends LitElement {
     this._clearAllTreeSelections();
     const sel = this._selectedRowEl && this._selectedRowEl.isConnected ? this._selectedRowEl : null;
     const focus = this._focusedRowEl && this._focusedRowEl.isConnected ? this._focusedRowEl : null;
-    // The originally-clicked (active-file) row keeps a faded background with
-    // NO border ONCE the cursor has moved elsewhere (focus !== sel).
-    if (sel && sel !== focus) this._paintRow(sel, false);
-    // The navigation cursor paints its background + outline whenever the
-    // Explorer owns the keyboard focus — including right after a click when
-    // both focus types coincide (sel === focus) so the single row shows
-    // background + border. Clicking outside hides the cursor.
-    if (focus && this._navFocusVisible) this._paintRow(focus, true);
+    if (focus && this._navFocusVisible) {
+      // Cursor: faded background + outline, only while the Explorer owns
+      // keyboard focus (hidden by an outside click). When sel === focus
+      // (just clicked) this single paint shows background + border.
+      this._paintRow(focus, true);
+      // Clicked/active-file row beside the cursor: faded background, NO
+      // outline — the cursor paint above already covers the coincide case.
+      if (sel && sel !== focus) this._paintRow(sel, false);
+    } else if (sel) {
+      // Keyboard focus lost (outside click): the cursor is hidden entirely,
+      // but the clicked-row fade persists (VS Code active-file selection).
+      this._paintRow(sel, false);
+    }
+    // Never let a tabindex=0 row keep DOM focus — its :focus-visible ring
+    // would paint a border inline styles cannot clear.
+    this._blurFocusedTreeNode();
   }
 
   /** Paint fade-only (focused=false) or fade + outline (focused=true) on el. */
