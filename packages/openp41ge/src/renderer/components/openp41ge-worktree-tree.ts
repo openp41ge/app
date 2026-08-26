@@ -153,6 +153,8 @@ class Openp41geWorktreeTree extends LitElement {
   private _treeEl: HTMLElement | null = null;
   private _scrollResizeObserver: ResizeObserver | null = null;
   private _scrollResizeObserved = false;
+  /** Explorer row currently selected by click or keyboard (VS Code-style). */
+  private _focusedRowEl: HTMLElement | null = null;
   private _wsDrawerEl: HTMLElement | null = null;
   @state() private _wsDrawerOpen = false;
   @state() private _activeWsId: string | null = null;
@@ -238,6 +240,11 @@ class Openp41geWorktreeTree extends LitElement {
       .wt-tree-scroll-wrapper .wt-scrollbar-thumb:hover {
         background: rgba(255,255,255,0.35);
       }
+      /* VS Code-style keyboard/click selection for repo & worktree rows.
+         Two-class specificity keeps it above the row :hover highlight. */
+      .wt-row-header.wt-row-focused {
+        background: var(--tree-selected-bg, rgba(74,158,255,0.12));
+      }
       /* Rows already have padding-right:8px in their inline styles, so
          the overlay scrollbar sits in the padded area — content text/buttons
          are never hidden underneath it. Row backgrounds fill the full width
@@ -291,6 +298,7 @@ class Openp41geWorktreeTree extends LitElement {
     this.style.borderLeft = _isOpen ? "1px solid #2a2a2a" : "none";
 
     this.addEventListener("keydown", this._onKeyDown);
+    this.addEventListener("click", this._onPanelClick);
     if (!this.hasAttribute("tabindex")) {
       this.setAttribute("tabindex", "-1");
     }
@@ -349,6 +357,7 @@ class Openp41geWorktreeTree extends LitElement {
       this._repoDropHandler = null;
     }
     this.removeEventListener("keydown", this._onKeyDown);
+    this.removeEventListener("click", this._onPanelClick);
     this.removeEventListener("mousedown", this._onMousedownFocus);
     this.removeEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.removeEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
@@ -885,21 +894,222 @@ class Openp41geWorktreeTree extends LitElement {
   // ── Focus ─────────────────────────────────────────────────────────────
 
   private _onMousedownFocus = (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (
-      target &&
-      (target.tabIndex >= 0 || target.matches("button, input, textarea, select, a, [tabindex]"))
-    ) {
-      return;
-    }
+    const target = e.target as HTMLElement | null;
+    // Keep DOM focus on the panel for the whole tree, so arrow-key
+    // navigation is owned here (VS Code behaviour). Don't steal focus from
+    // text-entry controls (add-repository / add-worktree inputs etc.).
+    if (target?.matches("input, textarea, select, [contenteditable]")) return;
     this.focus();
   };
 
   // ── Key handler ───────────────────────────────────────────────────────
 
-  private _onKeyDown = (_e: KeyboardEvent) => {
-    // Reserved for future keyboard shortcuts.
+  /**
+   * VS Code-style tree navigation for the whole Explorer panel.
+   *
+   * Rows are flattened from the live DOM in visual order:
+   *   repo header → worktree headers → each worktree's file tree nodes → next repo.
+   * Collapsed levels aren't in the DOM, so the flattening is always correct.
+   *
+   * - ArrowDown/Up, Home, End  — move selection.
+   * - ArrowRight               — expand a collapsed repo/worktree/folder.
+   * - ArrowLeft                — collapse an expanded one, else move to parent.
+   * - Enter/Space              — toggle expandables / activate file leaves.
+   */
+  private _onKeyDown = (e: KeyboardEvent) => {
+    const rows = this._navigableRows();
+    if (rows.length === 0) return;
+
+    if (this._focusedRowEl && !this._focusedRowEl.isConnected) this._focusedRowEl = null;
+    let idx = this._focusedRowEl ? rows.indexOf(this._focusedRowEl) : -1;
+    if (idx === -1) idx = 0;
+    const focusAt = (i: number) => {
+      this._setFocusedRow(rows[Math.max(0, Math.min(i, rows.length - 1))]);
+    };
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        focusAt(idx + 1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        focusAt(idx - 1);
+        break;
+      case "Home":
+        e.preventDefault();
+        focusAt(0);
+        break;
+      case "End":
+        e.preventDefault();
+        focusAt(rows.length - 1);
+        break;
+      case "ArrowRight": {
+        e.preventDefault();
+        const el = rows[idx];
+        if (!this._isExpandable(el) || this._isExpanded(el)) break;
+        this._fireToggle(el);
+        break;
+      }
+      case "ArrowLeft": {
+        e.preventDefault();
+        const el = rows[idx];
+        if (this._isExpandable(el) && this._isExpanded(el)) {
+          this._fireToggle(el);
+        } else {
+          const parent = this._parentRow(el);
+          if (parent) this._setFocusedRow(parent);
+        }
+        break;
+      }
+      case "Enter":
+      case " ": {
+        e.preventDefault();
+        const el = rows[idx];
+        if (this._isExpandable(el)) {
+          this._fireToggle(el);
+        } else if (el.classList.contains("tree-node")) {
+          // Activate a file leaf — same as a left-click (opens preview).
+          el.click();
+        }
+        break;
+      }
+    }
   };
+
+  private _onPanelClick = (e: Event) => {
+    // composedPath() crosses the <openp41ge-tree> shadow boundary so we can
+    // adopt selection of clicked file/folder rows too.
+    const node = e
+      .composedPath()
+      .find(
+        (p): p is HTMLElement => p instanceof HTMLElement && p.classList?.contains("tree-node"),
+      );
+    const row = e
+      .composedPath()
+      .find(
+        (p): p is HTMLElement => p instanceof HTMLElement && p.classList?.contains("wt-row-header"),
+      );
+    const target = node ?? row;
+    if (target) this._setFocusedRow(target);
+  };
+
+  /**
+   * Visible, navigable rows in visual (DOM) order. Rows live partly in light
+   * DOM (.wt-row-header) and partly inside <openp41ge-tree> shadow roots
+   * (.tree-node), so this walks both. Hidden levels aren't in the DOM at all,
+   * so the walk naturally yields: repo → worktrees → each worktree's file
+   * tree (recursively) → next repo.
+   */
+  private _navigableRows(): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    const walk = (root: ParentNode) => {
+      for (const el of Array.from(root.children)) {
+        if (!(el instanceof HTMLElement)) continue;
+        if (el.tagName === "OPENP41GE-TREE") {
+          const root2 = (el as unknown as HTMLElement & { shadowRoot?: ShadowRoot | null })
+            .shadowRoot;
+          if (root2) walk(root2);
+        } else if (el.classList.contains("wt-row-header") || el.classList.contains("tree-node")) {
+          out.push(el);
+        } else {
+          // Recurse into containers, <openp41ge-repo-tree-item>, nested wrappers.
+          walk(el);
+        }
+      }
+    };
+    walk(this);
+    return out;
+  }
+
+  /** Clear selection on every file tree (including ones nested in shadow roots). */
+  private _clearAllTreeSelections(): void {
+    const walk = (root: ParentNode) => {
+      for (const el of Array.from(root.children)) {
+        if (!(el instanceof HTMLElement)) continue;
+        if (el.tagName === "OPENP41GE-TREE") {
+          (el as unknown as { selectedId: string | null }).selectedId = null;
+          const root2 = (el as unknown as HTMLElement & { shadowRoot?: ShadowRoot | null })
+            .shadowRoot;
+          if (root2) walk(root2);
+        } else {
+          walk(el);
+        }
+      }
+    };
+    walk(this);
+  }
+
+  /** Paint the VS Code-style selection on `el` (or clear it when null). */
+  private _setFocusedRow(el: HTMLElement | null): void {
+    if (this._focusedRowEl === el) return;
+    if (this._focusedRowEl) this._focusedRowEl.classList.remove("wt-row-focused");
+    this._focusedRowEl = el;
+
+    // One selection across the panel: clear file-tree selections unless the
+    // focused row IS a tree node (then select it in its own tree).
+    this._clearAllTreeSelections();
+    if (!el) return;
+
+    if (el.classList.contains("tree-node")) {
+      // closest() does not cross the shadow boundary — resolve the owning
+      // <openp41ge-tree> host through getRootNode() instead.
+      const root = el.getRootNode();
+      const host = (root instanceof ShadowRoot ? root.host : null) as
+        (HTMLElement & { selectedId: string | null }) | null;
+      if (host && host.tagName === "OPENP41GE-TREE")
+        host.selectedId = el.getAttribute("data-node-id");
+    } else {
+      el.classList.add("wt-row-focused");
+    }
+    el.scrollIntoView({ block: "nearest" });
+  }
+
+  private _isExpandable(el: HTMLElement): boolean {
+    if (el.classList.contains("wt-row-header")) return true;
+    return el.classList.contains("tree-node") && el.classList.contains("has-children");
+  }
+
+  private _isExpanded(el: HTMLElement): boolean {
+    if (el.classList.contains("tree-node")) {
+      return el.getAttribute("aria-expanded") === "true";
+    }
+    const icon = el.querySelector("openp41ge-icon");
+    return icon?.getAttribute("name") === "chevron-down";
+  }
+
+  /** Toggle-open/close a row through its existing click path. */
+  private _fireToggle(el: HTMLElement): void {
+    if (el.classList.contains("wt-row-header")) {
+      el.click(); // repo/worktree header toggles (keeps persistence + events)
+      return;
+    }
+    const chevron = el.querySelector<HTMLElement>(".tree-chevron-cell");
+    chevron?.click();
+  }
+
+  /** Parent row, or null if the row has no parent in the panel. */
+  private _parentRow(el: HTMLElement): HTMLElement | null {
+    if (el.classList.contains("tree-node")) {
+      // Owning <openp41ge-tree> host (shadow-root aware).
+      const root = el.getRootNode();
+      const childTree = root instanceof ShadowRoot ? root.host : null;
+      const prev = childTree?.previousElementSibling;
+      if (prev) {
+        if (prev.classList.contains("tree-node")) return prev as HTMLElement;
+        const header = prev.querySelector<HTMLElement>(".wt-row-header");
+        if (header) return header;
+      }
+      return null;
+    }
+    // Worktree header → owning repo header (first .wt-row-header in the repo).
+    const repoItem = el.closest("openp41ge-repo-tree-item");
+    if (repoItem) {
+      const first = repoItem.querySelector<HTMLElement>(".wt-row-header");
+      if (first && first !== el) return first;
+    }
+    return null;
+  }
 
   // ── Edit mode toggle ────────────────────────────────────────────────
 
