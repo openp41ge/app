@@ -200,6 +200,37 @@ class GitBrowserRenderer {
     return container;
   }
 
+  /**
+   * Shimmer skeleton rows shown inside an accordion section while that
+   * section is still loading (data.loadingBranches/Commits/Files). Matches
+   * the renderer's dark hard-coded palette.
+   */
+  private _renderSkeletonRows(wrapper: HTMLElement, count = 3): void {
+    wrapper.style.padding = "8px 12px";
+    wrapper.style.fontStyle = "normal";
+    const style = document.createElement("style");
+    style.textContent = `
+      .gbr-skel {
+        height:20px; border-radius:3px; margin:5px 0;
+        background: linear-gradient(90deg,#2a2a2a 25%,#383838 50%,#2a2a2a 75%);
+        background-size:200% 100%;
+        animation: gbr-skel-slide 1.3s ease-in-out infinite;
+      }
+      @keyframes gbr-skel-slide {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+    `;
+    wrapper.appendChild(style);
+    const widths = ["100%", "72%", "85%", "60%"];
+    for (let i = 0; i < count; i++) {
+      const row = document.createElement("div");
+      row.className = "gbr-skel";
+      row.style.width = widths[i % widths.length];
+      wrapper.appendChild(row);
+    }
+  }
+
   private _renderBranchesContent(
     data: GitBrowserData,
     callbacks: GitBrowserCallbacks,
@@ -208,11 +239,7 @@ class GitBrowserRenderer {
     wrapper.style.cssText = "display:flex;flex-direction:column;";
 
     if (data.loadingBranches) {
-      wrapper.textContent = "Loading branches...";
-      (wrapper.style as CSSStyleDeclaration).padding = "8px";
-      wrapper.style.color = "#555";
-      wrapper.style.fontStyle = "italic";
-      wrapper.style.fontSize = "11px";
+      this._renderSkeletonRows(wrapper);
       return wrapper;
     }
 
@@ -424,11 +451,7 @@ class GitBrowserRenderer {
     wrapper.style.cssText = "display:flex;flex-direction:column;";
 
     if (data.loadingCommits || data.loadingBranches) {
-      wrapper.textContent = "Loading commits...";
-      (wrapper.style as CSSStyleDeclaration).padding = "8px";
-      wrapper.style.color = "#555";
-      wrapper.style.fontStyle = "italic";
-      wrapper.style.fontSize = "11px";
+      this._renderSkeletonRows(wrapper, 4);
       return wrapper;
     }
 
@@ -477,11 +500,7 @@ class GitBrowserRenderer {
     wrapper.style.cssText = "display:flex;flex-direction:column;";
 
     if (data.loadingFiles || data.loadingBranches) {
-      wrapper.textContent = "Loading files...";
-      (wrapper.style as CSSStyleDeclaration).padding = "8px";
-      wrapper.style.color = "#555";
-      wrapper.style.fontStyle = "italic";
-      wrapper.style.fontSize = "11px";
+      this._renderSkeletonRows(wrapper, 4);
       return wrapper;
     }
 

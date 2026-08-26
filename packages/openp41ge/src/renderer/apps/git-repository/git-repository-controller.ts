@@ -143,16 +143,47 @@ export class GitRepositoryController extends BaseController implements TabContro
 
   // ─── Data fetching ────────────────────────────────────────────────────
 
+  /**
+   * Data that still resolves every section (accordion structure is known in
+   * advance, so the panel renders immediately with per-section skeletons).
+   */
+  private _loadingData(repoName: string): GitBrowserData {
+    return {
+      repoName,
+      branches: [],
+      selectedBranch: "",
+      commits: [],
+      filesChanged: [],
+      loadingBranches: true,
+      loadingCommits: true,
+      loadingFiles: true,
+      commitSkipCount: 0,
+      hasMoreCommits: false,
+      visibleCommitCount: 0,
+      selectedCommit: null,
+    };
+  }
+
+  private _errorData(repoName: string, msg: string): GitBrowserData {
+    return {
+      ...this._loadingData(repoName),
+      loadingBranches: false,
+      loadingCommits: false,
+      loadingFiles: false,
+      error: msg,
+    };
+  }
+
   private async _fetchAndSetData(): Promise<void> {
     const repoName = this.repoName;
     if (!repoName) return;
 
-    // Set loading state
-    if (this._panel) {
-      this._panel.data = null;
-    }
+    // Show the accordion (Branches/Commits/Files) with per-section skeletons
+    // IMMEDIATELY — the structure is known before any data arrives.
+    this._data = this._loadingData(repoName);
+    this._pushData();
 
-    // Fetch latest from remote first
+    // Fetch latest from remote first (optional — skeleton is already showing).
     try {
       await window.openp41ge.workspaceController.fetch(repoName);
     } catch {
@@ -160,66 +191,72 @@ export class GitRepositoryController extends BaseController implements TabContro
     }
     if (repoName !== this.repoName) return;
 
+    // ── Branches ────────────────────────────────────────────────────────
+    let branches: GitBrowserData["branches"] = [];
     try {
-      const [branches, diffStat] = await Promise.all([
-        window.openp41ge.workspaceController.getBranches(repoName),
-        window.openp41ge.workspaceController.getDiffStat(repoName),
-      ]);
-
-      if (repoName !== this.repoName) return;
-
-      const selectedBranch = branches.length > 0 ? branches[0].name : "";
-
-      let commits: CommitEntry[] = [];
-      let hasMoreCommits = false;
-      if (selectedBranch) {
-        const commitLog = await window.openp41ge.workspaceController.getCommitLog(
-          repoName,
-          selectedBranch,
-          { maxCount: 50 },
-        );
-        if (repoName !== this.repoName) return;
-        commits = commitLog;
-        hasMoreCommits = commitLog.length >= 50;
-      }
-
-      this._data = {
+      branches = (await window.openp41ge.workspaceController.getBranches(
         repoName,
-        branches,
-        selectedBranch,
-        commits,
-        filesChanged: diffStat,
-        loadingBranches: false,
-        loadingCommits: false,
-        loadingFiles: false,
-        commitSkipCount: 0,
-        hasMoreCommits,
-        visibleCommitCount: 10,
-        selectedCommit: null,
-      };
-
-      this._pushData();
+      )) as GitBrowserData["branches"];
     } catch (err: unknown) {
       if (repoName !== this.repoName) return;
       const msg = err instanceof Error ? err.message : String(err);
-      this._data = {
-        repoName,
-        branches: [],
-        selectedBranch: "",
-        commits: [],
-        filesChanged: [],
-        loadingBranches: false,
-        loadingCommits: false,
-        loadingFiles: false,
-        commitSkipCount: 0,
-        hasMoreCommits: false,
-        visibleCommitCount: 0,
-        selectedCommit: null,
-        error: msg,
-      };
+      this._data = this._errorData(repoName, msg);
       this._pushData();
       toastService.show("Failed to load git data: " + msg, "error", 5000);
+      return;
     }
+    if (repoName !== this.repoName) return;
+
+    const selectedBranch = branches.length > 0 ? branches[0].name : "";
+    this._data = { ...this._data, branches, selectedBranch, loadingBranches: false };
+    this._pushData();
+
+    // ── Commits + Files changed — resolve independently so each section's
+    //    skeleton is replaced as soon as its own data arrives. ─────────
+    void this._loadCommits(repoName, selectedBranch);
+    void this._loadFiles(repoName);
+  }
+
+  private async _loadCommits(repoName: string, selectedBranch: string): Promise<void> {
+    let commits: CommitEntry[] = [];
+    let hasMoreCommits = false;
+    if (selectedBranch) {
+      try {
+        const commitLog = (await window.openp41ge.workspaceController.getCommitLog(
+          repoName,
+          selectedBranch,
+          { maxCount: 50 },
+        )) as CommitEntry[];
+        if (repoName !== this.repoName) return;
+        commits = commitLog;
+        hasMoreCommits = commitLog.length >= 50;
+      } catch {
+        if (repoName !== this.repoName) return;
+      }
+    }
+    if (repoName !== this.repoName || !this._data) return;
+    this._data = {
+      ...this._data,
+      commits,
+      hasMoreCommits,
+      visibleCommitCount: 10,
+      loadingCommits: false,
+    };
+    this._pushData();
+  }
+
+  private async _loadFiles(repoName: string): Promise<void> {
+    let filesChanged: GitBrowserData["filesChanged"] = [];
+    try {
+      filesChanged = (await window.openp41ge.workspaceController.getDiffStat(
+        repoName,
+      )) as GitBrowserData["filesChanged"];
+    } catch {
+      if (repoName !== this.repoName) return;
+    }
+    if (repoName !== this.repoName || !this._data) return;
+    this._data = { ...this._data, filesChanged, loadingFiles: false };
+    this._pushData();
   }
 
   /**

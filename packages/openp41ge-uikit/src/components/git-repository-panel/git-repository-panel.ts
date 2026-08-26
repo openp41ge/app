@@ -90,13 +90,10 @@ export class GitRepositoryPanel extends LitElement {
     const container = this._getContainer();
     if (!container) return;
 
-    // No data yet (fresh tab / initial fetch): show a shimmer skeleton so the
-    // pane is never blank the moment it mounts.
-    if (!this.data) {
-      this._renderSkeleton(container);
-      return;
-    }
-    const data = this.data;
+    // No data yet (fresh tab): render the accordion NOW — the section
+    // structure (Branches / Commits / Files) is known in advance — with
+    // every section showing per-section skeletons until its data resolves.
+    const data = this.data ?? this._skeletonData();
 
     // Clear container
     container.innerHTML = "";
@@ -114,67 +111,24 @@ export class GitRepositoryPanel extends LitElement {
   }
 
   /**
-   * Shimmer skeleton shown while `data` is still null (loading the repo).
-   * Mirrors the real panel's section structure: two collapsible sections
-   * (branches, then commits) each with a few placeholder rows. Uses theme
-   * --bg-hover so it matches dark and light themes.
+   * Loading datum used when no data is set yet: tells the renderer to build
+   * the full accordion with every section loading (showing skeleton rows).
    */
-  private _renderSkeleton(container: HTMLElement): void {
-    container.innerHTML = "";
-
-    const style = document.createElement("style");
-    style.textContent = `
-      .gsk {
-        display: block;
-        box-sizing: border-box;
-        border-radius: 3px;
-      }
-      .gsk-title {
-        width: 42%;
-        max-width: 180px;
-        height: 12px;
-        margin: 10px 12px 8px;
-      }
-      .gsk-row {
-        height: 22px;
-        margin: 6px 12px;
-      }
-      .gsk-row.w60 { width: 60%; }
-      .gsk-row.w72 { width: 72%; }
-      .gsk-row.w45 { width: 45%; }
-      .gsk-shimmer {
-        background: linear-gradient(
-          90deg,
-          var(--bg-hover, rgba(255,255,255,0.05)) 25%,
-          rgba(255,255,255,0.10) 50%,
-          var(--bg-hover, rgba(255,255,255,0.05)) 75%
-        );
-        background-size: 200% 100%;
-        animation: gsk-slide 1.4s ease-in-out infinite;
-      }
-      @keyframes gsk-slide {
-        0%   { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-      }
-    `;
-    container.appendChild(style);
-
-    // Branches section
-    container.appendChild(this._skeletonTitle("gsk gsk-title gsk-shimmer"));
-    for (const w of ["w72", "w60", "w72"]) {
-      container.appendChild(this._skeletonTitle(`gsk gsk-row gsk-shimmer ${w}`));
-    }
-    // Commits section
-    container.appendChild(this._skeletonTitle("gsk gsk-title gsk-shimmer"));
-    for (const w of ["w60", "w45", "w72"]) {
-      container.appendChild(this._skeletonTitle(`gsk gsk-row gsk-shimmer ${w}`));
-    }
-  }
-
-  private _skeletonTitle(className: string): HTMLElement {
-    const el = document.createElement("div");
-    el.className = className;
-    return el;
+  private _skeletonData(): GitBrowserData {
+    return {
+      repoName: "",
+      branches: [],
+      selectedBranch: "",
+      commits: [],
+      filesChanged: [],
+      loadingBranches: true,
+      loadingCommits: true,
+      loadingFiles: true,
+      commitSkipCount: 0,
+      hasMoreCommits: false,
+      visibleCommitCount: 0,
+      selectedCommit: null,
+    };
   }
 
   private _createCallbacks() {

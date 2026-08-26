@@ -41,7 +41,7 @@ describe("git-repository-panel skeleton", () => {
     host.remove();
   });
 
-  test("shows a shimmer skeleton while data is null (fresh mount)", async () => {
+  test("renders the accordion with per-section skeletons while data is null", async () => {
     panel = document.createElement("git-repository-panel") as typeof panel;
     host.appendChild(panel);
     await panel.updateComplete;
@@ -49,24 +49,29 @@ describe("git-repository-panel skeleton", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(container).not.toBeNull();
-    expect(container.querySelectorAll(".gsk-shimmer").length).toBeGreaterThan(0);
+    // The accordion sections render immediately (structure is known).
+    expect(container.textContent).toContain("Branches");
+    expect(container.textContent).toContain("Commits");
+    // Each section's content area shows skeleton rows while loading.
+    expect(container.querySelectorAll(".gbr-skel").length).toBeGreaterThan(0);
   });
 
-  test("replaces the skeleton with the real panel once data arrives", async () => {
+  test("replaces each section's skeleton once data arrives", async () => {
     panel = document.createElement("git-repository-panel") as typeof panel;
     host.appendChild(panel);
     await panel.updateComplete;
 
-    panel.data = makeData();
+    panel.data = makeData({ branches: [{ name: "main", shortName: "main", isLocal: true }] });
     await panel.updateComplete;
     await new Promise((r) => setTimeout(r, 0));
 
     const container = panel.querySelector("#panel-container");
-    expect(container.querySelectorAll(".gsk-shimmer").length).toBe(0);
-    expect((container.textContent ?? "").includes("Branches")).toBe(true);
+    expect(container.querySelectorAll(".gbr-skel").length).toBe(0);
+    expect(container.textContent).toContain("main");
+    expect(container.textContent).toContain("Branches");
   });
 
-  test("shows the error view instead of a skeleton on error data", async () => {
+  test("shows the error view instead of skeletons on error data", async () => {
     panel = document.createElement("git-repository-panel") as typeof panel;
     host.appendChild(panel);
     await panel.updateComplete;
@@ -76,7 +81,7 @@ describe("git-repository-panel skeleton", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     const container = panel.querySelector("#panel-container");
-    expect(container.querySelectorAll(".gsk-shimmer").length).toBe(0);
+    expect(container.querySelectorAll(".gbr-skel").length).toBe(0);
     expect(container.textContent).toContain("boom");
   });
 });
