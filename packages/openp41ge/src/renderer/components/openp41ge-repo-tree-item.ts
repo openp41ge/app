@@ -503,8 +503,9 @@ export class Openp41geRepoTreeItem extends LitElement {
   render() {
     return html`
       <style>
-        /* End-of-row action buttons read as rounded squares: a flat fill
-           defines the tile, hover brightens it. */
+        /* End-of-row action buttons only appear when hovering the row: a flat
+           fill defines the tile while visible, and hovering the row fades the
+           buttons in (they are kept pointer-inert while hidden). */
         .repo-header-btn,
         .wt-row-btn {
           width: 20px;
@@ -512,6 +513,16 @@ export class Openp41geRepoTreeItem extends LitElement {
           box-sizing: border-box;
           border-radius: 5px;
           background: var(--bg-hover, #2a2d2e);
+          opacity: 0;
+          pointer-events: none;
+          transition:
+            opacity 0.05s ease,
+            color 0.1s;
+        }
+        .wt-row-header:hover .repo-header-btn,
+        .wt-row-header:hover .wt-row-btn {
+          opacity: 1;
+          pointer-events: auto;
         }
         .repo-header-btn:hover,
         .wt-row-btn:hover {
