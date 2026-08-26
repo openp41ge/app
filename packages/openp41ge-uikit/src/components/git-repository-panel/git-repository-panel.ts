@@ -87,9 +87,16 @@ export class GitRepositoryPanel extends LitElement {
   }
 
   private _updatePanel(): void {
-    const data = this.data;
     const container = this._getContainer();
-    if (!data || !container) return;
+    if (!container) return;
+
+    // No data yet (fresh tab / initial fetch): show a shimmer skeleton so the
+    // pane is never blank the moment it mounts.
+    if (!this.data) {
+      this._renderSkeleton(container);
+      return;
+    }
+    const data = this.data;
 
     // Clear container
     container.innerHTML = "";
@@ -104,6 +111,70 @@ export class GitRepositoryPanel extends LitElement {
     const callbacks = this._createCallbacks();
     const panel = gitBrowserRenderer.renderGitPanel(data, callbacks);
     container.appendChild(panel);
+  }
+
+  /**
+   * Shimmer skeleton shown while `data` is still null (loading the repo).
+   * Mirrors the real panel's section structure: two collapsible sections
+   * (branches, then commits) each with a few placeholder rows. Uses theme
+   * --bg-hover so it matches dark and light themes.
+   */
+  private _renderSkeleton(container: HTMLElement): void {
+    container.innerHTML = "";
+
+    const style = document.createElement("style");
+    style.textContent = `
+      .gsk {
+        display: block;
+        box-sizing: border-box;
+        border-radius: 3px;
+      }
+      .gsk-title {
+        width: 42%;
+        max-width: 180px;
+        height: 12px;
+        margin: 10px 12px 8px;
+      }
+      .gsk-row {
+        height: 22px;
+        margin: 6px 12px;
+      }
+      .gsk-row.w60 { width: 60%; }
+      .gsk-row.w72 { width: 72%; }
+      .gsk-row.w45 { width: 45%; }
+      .gsk-shimmer {
+        background: linear-gradient(
+          90deg,
+          var(--bg-hover, rgba(255,255,255,0.05)) 25%,
+          rgba(255,255,255,0.10) 50%,
+          var(--bg-hover, rgba(255,255,255,0.05)) 75%
+        );
+        background-size: 200% 100%;
+        animation: gsk-slide 1.4s ease-in-out infinite;
+      }
+      @keyframes gsk-slide {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+    `;
+    container.appendChild(style);
+
+    // Branches section
+    container.appendChild(this._skeletonTitle("gsk gsk-title gsk-shimmer"));
+    for (const w of ["w72", "w60", "w72"]) {
+      container.appendChild(this._skeletonTitle(`gsk gsk-row gsk-shimmer ${w}`));
+    }
+    // Commits section
+    container.appendChild(this._skeletonTitle("gsk gsk-title gsk-shimmer"));
+    for (const w of ["w60", "w45", "w72"]) {
+      container.appendChild(this._skeletonTitle(`gsk gsk-row gsk-shimmer ${w}`));
+    }
+  }
+
+  private _skeletonTitle(className: string): HTMLElement {
+    const el = document.createElement("div");
+    el.className = className;
+    return el;
   }
 
   private _createCallbacks() {
