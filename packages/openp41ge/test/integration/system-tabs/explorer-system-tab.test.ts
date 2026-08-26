@@ -129,28 +129,28 @@ describe("ExplorerSystemTabController", () => {
 
     // Selection must move to the clicked row — NOT stay on the arrow focus.
     expect(tree._focusedRowEl).toBe(node);
-    // VS Code-style: the focused row paints a faded-blue background with a
-    // blue outline (VS Code uses a background, not just a border).
+    // The CLICKED row (active-file selection) is a faded-blue background with
+    // NO border at all — even right after clicking, when it is also the
+    // navigation row.
     expect(node.style.background).not.toBe("");
-    expect(node.style.boxShadow).not.toBe("");
+    expect(node.style.boxShadow).toBe("");
     // The owning tree reports the same node as its selectedId.
     expect((fileTree as unknown as { selectedId: string }).selectedId).toBe("/repo/file.ts");
 
-    // Arrow-focus moves to a second file row.
+    // Arrow-focus moves to a second file row — only THAT row carries the
+    // outline; the clicked row keeps fade, no border.
     const nodeB = sr.querySelector('[data-node-id="/repo/other.ts"]') as HTMLElement;
     tree._setFocusedRow(nodeB);
-    // The previously clicked row must NOT keep a border (the lingering-border
-    // bug) — it keeps only its faded-blue selection background.
     expect(node.style.boxShadow).toBe("");
     expect(node.style.background).not.toBe("");
-    // The newly focused row carries the fade + outline.
     expect(nodeB.style.background).not.toBe("");
     expect(nodeB.style.boxShadow).not.toBe("");
 
-    // Clicking OUTSIDE the explorer hides the arrow-focus border (VS Code
+    // Clicking OUTSIDE the explorer hides the arrow-focus row (VS Code
     // behaviour) while the clicked-file fade stays visible.
     document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-    expect(nodeB.style.boxShadow).toBe(""); // border (cursor) hidden
+    expect(nodeB.style.boxShadow).toBe(""); // cursor row hidden entirely
+    expect(nodeB.style.background).toBe("");
     expect(node.style.background).not.toBe(""); // selection fade persists
   });
 });

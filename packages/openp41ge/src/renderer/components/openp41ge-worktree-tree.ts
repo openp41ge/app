@@ -1198,27 +1198,30 @@ class Openp41geWorktreeTree extends LitElement {
     const sel = this._selectedRowEl && this._selectedRowEl.isConnected ? this._selectedRowEl : null;
     const focus = this._focusedRowEl && this._focusedRowEl.isConnected ? this._focusedRowEl : null;
     // The clicked/active-file row keeps a faded background regardless of who
-    // owns the keyboard focus (VS Code's persistent selection).
+    // owns the keyboard focus (VS Code's persistent selection) and NEVER a
+    // border — even while it is also the current navigation row.
     if (sel) this._paintRow(sel, false);
-    // The arrow-focus cursor adds the blue outline only while the Explorer
-    // owns keyboard focus; clicking outside hides it (VS Code behaviour).
-    if (focus && this._navFocusVisible) this._paintRow(focus, true);
+    // The arrow-focus cursor adds the blue outline only on a row that is
+    // NOT the clicked selection (so the clicked row stays border-free), and
+    // only while the Explorer owns keyboard focus — clicking outside hides it
+    // (VS Code behaviour).
+    if (focus && focus !== sel && this._navFocusVisible) this._paintRow(focus, true);
   }
 
   /** Paint fade-only (focused=false) or fade + outline (focused=true) on el. */
   private _paintRow(el: HTMLElement, focused: boolean): void {
     if (el.classList.contains("tree-node")) {
+      // closest() does not cross the shadow boundary — resolve the owning
+      // <openp41ge-tree> host through getRootNode() instead. The clicked
+      // AND the arrow-focused row both count as the tree's selection, so
+      // the uikit tree's selectedId follows either of them.
+      const root = el.getRootNode();
+      const host = (root instanceof ShadowRoot ? root.host : null) as
+        (HTMLElement & { selectedId: string | null }) | null;
+      if (host && host.tagName === "OPENP41GE-TREE")
+        host.selectedId = el.getAttribute("data-node-id");
       el.style.background = "var(--tree-selected-bg, rgba(74,158,255,0.12))";
       el.style.boxShadow = focused ? "inset 0 0 0 1px var(--tree-focus, #4a9eff)" : "";
-      if (focused) {
-        // closest() does not cross the shadow boundary — resolve the owning
-        // <openp41ge-tree> host through getRootNode() instead.
-        const root = el.getRootNode();
-        const host = (root instanceof ShadowRoot ? root.host : null) as
-          (HTMLElement & { selectedId: string | null }) | null;
-        if (host && host.tagName === "OPENP41GE-TREE")
-          host.selectedId = el.getAttribute("data-node-id");
-      }
     } else {
       el.classList.remove(focused ? "wt-row-selected" : "wt-row-focused");
       el.classList.add(focused ? "wt-row-focused" : "wt-row-selected");
