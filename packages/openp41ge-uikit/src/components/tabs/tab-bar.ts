@@ -352,7 +352,7 @@ export class TabBar extends LitElement {
             const tab = this.tabs[id];
             const isActive = id === this.activeTabId;
             const aBg = this.focused
-              ? "background:rgba(74,158,255,0.12);border-bottom:2px solid rgb(74,158,255);color:#eee;"
+              ? "background:var(--border-divider,#2d2d2d);color:#eee;"
               : "background:rgba(255,255,255,0.06);color:#ccc;";
             const iBg = "color:#888;";
             const isEphemeral = tab?.ephemeral ?? false;
