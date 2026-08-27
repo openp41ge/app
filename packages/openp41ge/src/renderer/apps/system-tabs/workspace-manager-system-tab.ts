@@ -69,6 +69,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   get view(): View { return this._view; }
   private _selected: { filePath: string; data: WorkspaceFileData } | null = null;
 
+  /** Left-aligned configuration tabs in the overlay top bar (not draggable). */
+  private _systemTabs: Array<{ id: string; label: string }> = [
+    { id: "workspaces", label: "Workspaces" },
+  ];
+  private _activeTab = "workspaces";
+
   /** Per-workspace working-tree change stats (loaded async per card). */
   private _stats = new Map<string, { filesChanged: number; added: number; deleted: number; untracked: number }>();
 
@@ -147,6 +153,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _focusSearch(): void {
     const el = document.querySelector("[data-workspace-search-input]");
     if (el instanceof HTMLInputElement) el.focus();
+  }
+
+  /** Switch the overlay's configuration tab (tabs are not draggable). */
+  private _selectTab(id: string): void {
+    if (id === this._activeTab) return;
+    this._activeTab = id;
+    this._emitUpdate();
   }
 
   // ── State refresh ───────────────────────────────────────────────
@@ -1349,12 +1362,24 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .cr-row { outline:none; }
         .cr-row:focus-visible { outline:2px solid var(--accent,#007acc); outline-offset:-2px; }
 
-        /* Overlay top bar (below the window title bar) */
+        /* Overlay top bar — left-aligned configuration tabs + close button.
+           Tabs are feature switches (NOT draggable); the bar is reusable
+           across systems. */
         .wm-topbar {
-          display:flex; align-items:center; gap:8px; flex-shrink:0;
-          padding:8px 10px; border-bottom:1px solid var(--divider,#333);
+          display:flex; align-items:center; flex-shrink:0; box-sizing:border-box;
+          height:48px; padding:0 10px; border-bottom:1px solid var(--divider,#333);
           background:var(--bg-secondary,#252526);
         }
+        .wm-topbar-inner { display:flex; align-items:stretch; height:100%; gap:6px; flex:1; min-width:0; }
+        .wm-tabs { display:flex; align-items:stretch; gap:2px; }
+        .wm-tab {
+          display:flex; align-items:center; padding:0 12px; border:none; background:transparent;
+          color:var(--text-secondary,#999); font-size:12px; cursor:pointer;
+          appearance:none; -webkit-appearance:none; border-bottom:2px solid transparent; margin-bottom:-1px;
+        }
+        .wm-tab:hover { color:var(--text-primary,#ccc); }
+        .wm-tab.active { color:var(--text-primary,#ccc); border-bottom-color:var(--accent,#007acc); }
+        .wm-topbar-close-side { display:flex; align-items:center; margin-left:auto; }
         .wm-search-box {
           display:flex; align-items:center; gap:6px; flex:1; min-width:0; height:26px;
           padding:0 8px; border:1px solid var(--divider,#333); border-radius:6px;
@@ -1369,8 +1394,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-tb-close:hover { background:var(--bg-hover,#2a2a2a); color:var(--text-primary,#ccc); }
 
-        /* Two-pane body — fixed width (window min width), centered */
-        .wm-overlay-body { display:flex; flex:1; min-height:0; width:100%; max-width:600px; margin:0 auto; }
+        /* Two-pane body — fixed width, left aligned */
+        .wm-overlay-body { display:flex; flex:1; min-height:0; width:100%; max-width:600px; margin:0; }
         .wm-left {
           display:flex; flex-direction:column; flex-shrink:0; width:200px; min-width:0;
           border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
@@ -1600,14 +1625,20 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .reorder-footer { display:flex; gap:6px; padding:8px 10px; justify-content:flex-end; }
       </style>
       <div class="wm-wrap">
-        <!-- Overlay top bar: system chrome only (close). The search box lives
-             in the system-specific list pane (.wm-left-search) so this bar can
-             be reused for other systems. -->
+        <!-- Overlay top bar: left-aligned feature tabs + close on the right.
+             Tabs are configuration switches, not draggable. -->
         <div class="wm-topbar">
-          <div style="display:flex;align-items:center;justify-content:flex-end;flex:1;min-width:0;">
-            <button type="button" class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
-              <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-            </button>
+          <div class="wm-topbar-inner">
+            <div class="wm-tabs">
+              ${this._systemTabs.map((t) => html`
+                <button type="button" class="wm-tab${t.id === this._activeTab ? ' active' : ''}" @click=${() => this._selectTab(t.id)}>${t.label}</button>
+              `)}
+            </div>
+            <div class="wm-topbar-close-side">
+              <button type="button" class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
+                <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+              </button>
+            </div>
           </div>
         </div>
         <div class="wm-overlay-body">
