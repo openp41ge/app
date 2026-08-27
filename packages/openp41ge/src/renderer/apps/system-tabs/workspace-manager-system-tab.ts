@@ -1596,20 +1596,22 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       <div class="wm-wrap">
         <!-- Overlay top bar: search + new workspace + close -->
         <div class="wm-topbar">
-          <div class="wm-search-box">
-            <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
-            <input
-              type="text"
-              data-workspace-search-input
-              placeholder="Search workspaces… (name, repo, worktree)"
-              .value=${this._searchQuery}
-              @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
-              style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
-            />
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;width:100%;max-width:600px;margin:0 auto;">
+            <div class="wm-search-box">
+              <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
+              <input
+                type="text"
+                data-workspace-search-input
+                placeholder="Search workspaces… (name, repo, worktree)"
+                .value=${this._searchQuery}
+                @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
+                style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
+              />
+            </div>
+            <button type="button" class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
+              <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+            </button>
           </div>
-          <button type="button" class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
-            <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-          </span>
         </div>
         <div class="wm-overlay-body">
           <!-- Left pane: workspace list -->
