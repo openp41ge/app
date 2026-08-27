@@ -179,6 +179,42 @@ describe("Openp41geTabsEventHandler — command wiring", () => {
     document.body.removeChild(grid);
   });
 
+  // ── Grid open tab (worktree drop) ──────────────────────────────
+
+  it("opens a worktree-scoped git tab titled by the branch", () => {
+    const grid = document.createElement("tab-grid");
+    (grid as any).winId = "w1";
+    grid.style.display = "none";
+    document.body.appendChild(grid);
+
+    document.dispatchEvent(
+      new CustomEvent("grid-open-tab", {
+        detail: {
+          tabType: "git-repository",
+          tabConfig: { repoName: "acme", branch: "feature-x" },
+          targetCol: 0,
+        },
+      }),
+    );
+
+    // Pending state for GitRepositoryController's worktree mode.
+    expect((window as any).__pendingGitRepo).toBe("acme");
+    expect((window as any).__pendingGitWorktree).toBe("feature-x");
+
+    // Tab titled by the BRANCH name (not the repo name); path stays the repo.
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      "actionOpenFile",
+      "w1",
+      "git-repository",
+      "feature-x",
+      "acme",
+      0,
+      true,
+    );
+
+    document.body.removeChild(grid);
+  });
+
   // ── Tab close button click ──────────────────────────────────────
 
   it("handles click on .tab-close button and dispatches removeTabFromCell", () => {

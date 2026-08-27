@@ -148,7 +148,7 @@ export class Openp41geTabsEventHandler {
       } = detail as {
         winId?: string;
         tabType: string;
-        tabConfig: { filePath: string; repoName?: string };
+        tabConfig: { filePath: string; repoName?: string; branch?: string };
         targetCol: number;
         isBoundary?: boolean;
         splitCol?: number;
@@ -158,13 +158,22 @@ export class Openp41geTabsEventHandler {
       const winId = eventWinId || this._findWinId();
       if (!winId) return;
 
-      // ── Git repository drop ─────────────────────────────────
+      // ── Git repository / worktree drop ────────────────────
       if (_tabType === "git-repository") {
         const repoName = tabConfig.repoName;
         if (!repoName) return;
 
-        // Set pending repo for GitRepositoryController to pick up on mount
+        // Set pending repo (and, for a worktree row, its branch) for
+        // GitRepositoryController to pick up on mount.
         (window as unknown as Record<string, unknown>).__pendingGitRepo = repoName;
+        if (tabConfig.branch) {
+          (window as unknown as Record<string, unknown>).__pendingGitWorktree =
+            tabConfig.branch;
+        } else {
+          (window as unknown as Record<string, unknown>).__pendingGitWorktree = null;
+        }
+        // Worktree tabs are titled by their branch; repo tabs by the repoName.
+        const tabName = tabConfig.branch || repoName;
 
         const focusCol = isBoundary
           ? (splitLeft ?? true)
@@ -178,7 +187,7 @@ export class Openp41geTabsEventHandler {
             "splitFileOpen",
             winId,
             "git-repository",
-            repoName,
+            tabName,
             repoName,
             splitCol ?? targetCol,
             splitLeft ?? true,
@@ -188,7 +197,7 @@ export class Openp41geTabsEventHandler {
             "actionOpenFile",
             winId,
             "git-repository",
-            repoName,
+            tabName,
             repoName,
             targetCol,
             true,

@@ -15,6 +15,11 @@ import type { TabContent } from "./tab-content";
 import "./tab-bar";
 import "./tab-content";
 
+/** Repo-row drag MIME (value: repoName). */
+const REPO_DRAG_TYPE = "application/x-openp41ge-repo";
+/** Worktree-row drag MIME (value: "<repoName>\u0000<branch>"). */
+const WORKTREE_DRAG_TYPE = "application/x-openp41ge-worktree";
+
 export interface GridState {
   winId: string;
   cols: number;
@@ -432,7 +437,8 @@ export class TabGrid extends LitElement {
         types.includes("Files") ||
         types.includes("text/uri-list") ||
         types.includes("text/plain") ||
-        types.includes("application/x-openp41ge-repo")
+        types.includes(REPO_DRAG_TYPE) ||
+        types.includes(WORKTREE_DRAG_TYPE)
       ) {
         e.preventDefault();
         // Repo / file drags use effectAllowed="move", so set dropEffect="move".
@@ -455,12 +461,21 @@ export class TabGrid extends LitElement {
       this._hideBarIndicators();
       if (!e.dataTransfer) return;
 
-      // ── Repo drop ────────────────────────────────────────────
-      const repoName = e.dataTransfer.getData("application/x-openp41ge-repo");
+      // ── Repo / worktree drop ─────────────────────────────────
+      // Worktree rows carry WORKTREE_DRAG_TYPE ("<repo>\u0000<branch>")
+      // and open a worktree-scoped git tab; repo rows use REPO_DRAG_TYPE.
+      const worktreePayload = e.dataTransfer.getData(WORKTREE_DRAG_TYPE);
+      const repoName = worktreePayload
+        ? worktreePayload.split("\u0000")[0] || ""
+        : e.dataTransfer.getData(REPO_DRAG_TYPE);
+      const branch = worktreePayload
+        ? worktreePayload.split("\u0000")[1] || undefined
+        : undefined;
       if (repoName) {
         e.preventDefault();
         e.stopPropagation();
 
+        const tabConfig = { repoName, ...(branch ? { branch } : {}) };
         const rect = this.getBoundingClientRect();
         const relX = e.clientX - rect.left;
         const pos = computeDropTarget(this, relX, rect.width, this.cols);
@@ -484,7 +499,7 @@ export class TabGrid extends LitElement {
               detail: {
                 winId: this.winId,
                 tabType: "git-repository",
-                tabConfig: { repoName },
+                tabConfig,
                 targetCol: splitCol,
                 isBoundary: true,
                 splitCol,
@@ -500,7 +515,7 @@ export class TabGrid extends LitElement {
               detail: {
                 winId: this.winId,
                 tabType: "git-repository",
-                tabConfig: { repoName },
+                tabConfig,
                 targetCol: pos.col,
                 pinned: true,
               },

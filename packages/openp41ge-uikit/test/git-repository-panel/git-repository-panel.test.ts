@@ -87,4 +87,42 @@ describe("git-repository-panel skeleton", () => {
     expect(container.querySelectorAll(".git-section-spinner").length).toBe(0);
     expect(container.textContent).toContain("boom");
   });
+
+  // ── Worktree mode: hide Branches ──────────────────────────────────
+
+  test("branchOnly skeleton hides the Branches section (worktree mode)", async () => {
+    panel = document.createElement("git-repository-panel") as typeof panel;
+    (panel as any).branchOnly = true;
+    host.appendChild(panel);
+    await panel.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+
+    const container = panel.querySelector("#panel-container");
+    expect(container.textContent).not.toContain("Branches");
+    expect(container.textContent).toContain("Commits");
+    expect(container.textContent).toContain("Files changed");
+    expect(container.querySelectorAll(".git-section-spinner").length).toBe(2);
+  });
+
+  test("hideBranches data renders Commits + Files only, with the files hint", async () => {
+    panel = document.createElement("git-repository-panel") as typeof panel;
+    host.appendChild(panel);
+    await panel.updateComplete;
+
+    panel.data = makeData({
+      hideBranches: true,
+      selectedBranch: "feature-x",
+      selectedCommit: null,
+      filesEmptyMessage: "Select a commit to view its changes",
+    });
+    await panel.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+
+    const container = panel.querySelector("#panel-container");
+    expect(container.textContent).not.toContain("Branches");
+    expect(container.textContent).toContain("Commits");
+    expect(container.textContent).toContain("Files changed");
+    expect(container.textContent).toContain("Select a commit to view its changes");
+    expect(container.querySelectorAll(".git-section-spinner").length).toBe(0);
+  });
 });

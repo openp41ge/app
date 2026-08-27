@@ -86,6 +86,10 @@ export interface GitBrowserData {
   hasMoreCommits: boolean;
   visibleCommitCount: number;
   selectedCommit: string | null;
+  /** Hide the Branches section (worktree-scoped tab). */
+  hideBranches?: boolean;
+  /** Shown instead of "No changed files" when the files list is empty. */
+  filesEmptyMessage?: string;
   error?: string;
 }
 

@@ -67,6 +67,14 @@ export class GitRepositoryPanel extends LitElement {
   @property({ type: Object, attribute: false })
   data: GitBrowserData | null = null;
 
+  /**
+   * Worktree-scoped mode: hide the Branches section even in the skeleton
+   * (only Commits + Files changed). The controller sets this for worktree
+   * tabs before any data arrives.
+   */
+  @property({ type: Boolean, attribute: "branch-only" })
+  branchOnly = false;
+
   override createRenderRoot(): HTMLElement | ShadowRoot {
     // Light DOM so the renderer's styles and event listeners work naturally
     return this;
@@ -128,6 +136,7 @@ export class GitRepositoryPanel extends LitElement {
       hasMoreCommits: false,
       visibleCommitCount: 0,
       selectedCommit: null,
+      hideBranches: this.branchOnly,
     };
   }
 

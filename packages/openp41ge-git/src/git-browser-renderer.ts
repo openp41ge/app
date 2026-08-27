@@ -97,15 +97,17 @@ class GitBrowserRenderer {
     body.style.cssText =
       "flex:1;overflow:hidden;padding:0 0 4px 0;display:flex;flex-direction:column;";
 
-    // Build all three sections
-    const branchesSection = this._renderSection(
-      "branches",
-      "Branches (" + (data.loadingBranches ? "..." : data.branches.length) + ")",
-      data.loadingBranches,
-      () => this._renderBranchesContent(data, callbacks),
-    );
-    this._addRefreshButton(branchesSection, "Refresh branches", callbacks.onRefreshBranches);
-    body.appendChild(branchesSection);
+    // Build all sections (branches skipped in worktree mode)
+    if (!data.hideBranches) {
+      const branchesSection = this._renderSection(
+        "branches",
+        "Branches (" + (data.loadingBranches ? "..." : data.branches.length) + ")",
+        data.loadingBranches,
+        () => this._renderBranchesContent(data, callbacks),
+      );
+      this._addRefreshButton(branchesSection, "Refresh branches", callbacks.onRefreshBranches);
+      body.appendChild(branchesSection);
+    }
 
     const commitsLabel = data.selectedBranch
       ? "Commits \u2014 " +
@@ -520,7 +522,7 @@ class GitBrowserRenderer {
     }
 
     if (data.filesChanged.length === 0) {
-      wrapper.textContent = "No changed files";
+      wrapper.textContent = data.filesEmptyMessage || "No changed files";
       (wrapper.style as CSSStyleDeclaration).padding = "8px";
       wrapper.style.color = "#555";
       wrapper.style.fontStyle = "italic";

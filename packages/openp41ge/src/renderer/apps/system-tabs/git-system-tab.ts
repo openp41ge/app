@@ -28,6 +28,12 @@ interface WorktreeInfo {
 /** Drag payload MIME — same one the Explorer's repo rows use. */
 const REPO_DRAG_TYPE = "application/x-openp41ge-repo";
 
+/**
+ * Worktree-row drag MIME. Value is "<repoName>\u0000<branch>" (NUL is
+ * unambiguous — neither repo nor branch names contain NUL).
+ */
+const WORKTREE_DRAG_TYPE = "application/x-openp41ge-worktree";
+
 export class GitSystemTabController implements SystemTabController {
   readonly tabId: string;
   readonly appType = "git";
@@ -185,6 +191,15 @@ export class GitSystemTabController implements SystemTabController {
     dt.dropEffect = "move";
   }
 
+  /** Set the worktree-row drag payload: repo + branch, distinct MIME. */
+  private _setupWorktreeDrag(e: DragEvent, repoName: string, branch: string): void {
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    dt.setData(WORKTREE_DRAG_TYPE, repoName + "\u0000" + branch);
+    dt.effectAllowed = "move";
+    dt.dropEffect = "move";
+  }
+
   private _hoverable(row: HTMLElement, on: boolean): void {
     row.style.background = on ? "var(--bg-hover,rgba(255,255,255,0.06))" : "transparent";
   }
@@ -198,7 +213,7 @@ export class GitSystemTabController implements SystemTabController {
       display: "flex",
       alignItems: "center",
       gap: "6px",
-      cursor: "grab",
+      cursor: "pointer",
       userSelect: "none",
       height: "28px",
       padding: "0 10px",
@@ -265,7 +280,9 @@ export class GitSystemTabController implements SystemTabController {
     row.addEventListener("mouseenter", () => this._hoverable(row, true));
     row.addEventListener("mouseleave", () => this._hoverable(row, false));
     row.draggable = true;
-    row.addEventListener("dragstart", (e: DragEvent) => this._setupDrag(e, repoName));
+    row.addEventListener("dragstart", (e: DragEvent) =>
+      this._setupWorktreeDrag(e, repoName, wt.branch),
+    );
 
     const label = document.createElement("span");
     label.textContent = wt.branch;

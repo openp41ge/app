@@ -151,9 +151,12 @@ describe("GitSystemTabController", () => {
     expect(wt.length).toBe(1);
     expect(wt[0].draggable).toBe(true);
 
-    // Dragging a worktree row opens the same repo's git tab.
+    // Dragging a worktree row carries its own worktree payload (repo + branch),
+    // so the grid can open a branch-scoped git tab.
     const dt = dragstartPayload(wt[0]);
-    expect(dt.getData("application/x-openp41ge-repo")).toBe("acme");
+    expect(dt.getData("application/x-openp41ge-repo")).toBe("");
+    expect(dt.getData("application/x-openp41ge-worktree")).toBe("acme\u0000main");
+    expect(dt.effectAllowed).toBe("move");
 
     // Collapse hides them again.
     repoRows(host)[0].click();

@@ -424,7 +424,7 @@ class Openp41geWorktreeTree extends LitElement {
                 this._dropIndex = -1;
               }}
               @dragenter=${(e: DragEvent) => {
-                if (e.dataTransfer?.types.includes("application/x-openp41ge-repo")) {
+                if (e.dataTransfer?.types?.includes("application/x-openp41ge-repo")) {
                   e.preventDefault();
                   const dragName = e.dataTransfer!.getData("application/x-openp41ge-repo");
                   if (dragName) {
@@ -434,7 +434,7 @@ class Openp41geWorktreeTree extends LitElement {
                 }
               }}
               @dragover=${(e: DragEvent) => {
-                if (!e.dataTransfer?.types.includes("application/x-openp41ge-repo")) return;
+                if (!e.dataTransfer?.types?.includes("application/x-openp41ge-repo")) return;
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "move";
                 const items = this.renderRoot?.querySelectorAll("openp41ge-repo-tree-item");

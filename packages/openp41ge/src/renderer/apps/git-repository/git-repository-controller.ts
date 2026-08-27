@@ -33,6 +33,12 @@ export class GitRepositoryController extends BaseController implements TabContro
   /** The repo name being displayed. */
   repoName: string = "";
 
+  /**
+   * When set, this tab is a WORKTREE-scoped browser: only Commits + Files
+   * changed for this branch (no Branches section), titled by the branch.
+   */
+  branch: string = "";
+
   /** The git repository panel component instance. */
   private _panel: GitRepositoryPanel | null = null;
 
@@ -57,6 +63,17 @@ export class GitRepositoryController extends BaseController implements TabContro
       (window as unknown as Record<string, unknown>).__pendingGitRepo = null;
     }
 
+    // Worktree-scoped drop: pick up the pending branch (set by the tab drop
+    // handler alongside __pendingGitRepo).
+    const pendingWorktree = (window as unknown as Record<string, unknown>)
+      .__pendingGitWorktree as string | undefined;
+    if (pendingWorktree && !this.branch) {
+      this.branch = pendingWorktree;
+    }
+    if (pendingWorktree !== undefined) {
+      (window as unknown as Record<string, unknown>).__pendingGitWorktree = null;
+    }
+
     container.style.cssText = "width:100%;height:100%;overflow:hidden;background:#121212;";
 
     if (!this.repoName) {
@@ -71,6 +88,7 @@ export class GitRepositoryController extends BaseController implements TabContro
 
     // Create the panel component
     const panel = document.createElement("git-repository-panel") as GitRepositoryPanel;
+    (panel as GitRepositoryPanel & { branchOnly?: boolean }).branchOnly = !!this.branch;
     this._panel = panel;
     container.appendChild(panel);
 
@@ -104,13 +122,19 @@ export class GitRepositoryController extends BaseController implements TabContro
   }
 
   snapshot(): Record<string, unknown> {
-    return { repoName: this.repoName };
+    return this.branch
+      ? { repoName: this.repoName, worktreeBranch: this.branch }
+      : { repoName: this.repoName };
   }
 
   restore(state: Record<string, unknown>): void {
     const name = state.repoName || state.filePath;
     if (name && typeof name === "string") {
       this.repoName = name;
+    }
+    const wt = state.worktreeBranch;
+    if (wt && typeof wt === "string") {
+      this.branch = wt;
     }
   }
 
@@ -151,7 +175,7 @@ export class GitRepositoryController extends BaseController implements TabContro
     return {
       repoName,
       branches: [],
-      selectedBranch: "",
+      selectedBranch: this.branch,
       commits: [],
       filesChanged: [],
       loadingBranches: true,
@@ -161,6 +185,7 @@ export class GitRepositoryController extends BaseController implements TabContro
       hasMoreCommits: false,
       visibleCommitCount: 0,
       selectedCommit: null,
+      hideBranches: !!this.branch,
     };
   }
 
@@ -190,6 +215,24 @@ export class GitRepositoryController extends BaseController implements TabContro
       // Non-fatal
     }
     if (repoName !== this.repoName) return;
+
+    // ── Worktree mode: NO Branches section — this tab is scoped to a
+    //    single branch. Commits load for that branch; the Files section is
+    //    driven purely by the selected commit (the working-tree diff is the
+    //    MAIN checkout's and is never shown here). ────────────────────────
+    if (this.branch) {
+      this._data = {
+        ...this._data,
+        loadingBranches: false,
+        selectedBranch: this.branch,
+        loadingFiles: false,
+        filesChanged: [],
+        filesEmptyMessage: "Select a commit to view its changes",
+      };
+      this._pushData();
+      void this._loadCommits(repoName, this.branch);
+      return;
+    }
 
     // ── Branches ────────────────────────────────────────────────────────
     let branches: GitBrowserData["branches"] = [];
@@ -275,6 +318,7 @@ export class GitRepositoryController extends BaseController implements TabContro
   private async _refreshAll(): Promise<void> {
     if (!this._data || !this.repoName) return;
     const repoName = this.repoName;
+    const isWorktreeMode = !!this.branch;
 
     try {
       await window.openp41ge.workspaceController.fetch(repoName);
@@ -283,20 +327,28 @@ export class GitRepositoryController extends BaseController implements TabContro
     }
     if (repoName !== this.repoName || !this._data) return;
 
-    const commitRef = this._resolveBranchRef(this._data.selectedBranch);
+    const commitRef =
+      this._resolveBranchRef(this._data.selectedBranch) || this.branch || "";
     try {
       const [branches, commitLog] = await Promise.all([
-        window.openp41ge.workspaceController.getBranches(repoName),
+        isWorktreeMode
+          ? Promise.resolve([] as GitBrowserData["branches"])
+          : window.openp41ge.workspaceController.getBranches(repoName),
         commitRef
           ? window.openp41ge.workspaceController.getCommitLog(repoName, commitRef, { maxCount: 50 })
-          : [],
+          : Promise.resolve([]),
       ]);
       if (repoName !== this.repoName || !this._data) return;
 
-      const diffStat = await window.openp41ge.workspaceController.getDiffStat(
-        repoName,
-        this._data.selectedCommit ?? undefined,
-      );
+      // Files changed: worktree mode never fetches the working-tree diff
+      // (it is the MAIN checkout's) — only a selected commit's diff.
+      const showWorkingTree = isWorktreeMode ? !!this._data.selectedCommit : true;
+      const diffStat = showWorkingTree
+        ? await window.openp41ge.workspaceController.getDiffStat(
+            repoName,
+            this._data.selectedCommit ?? undefined,
+          )
+        : [];
       if (repoName !== this.repoName || !this._data) return;
 
       this._data = {
@@ -304,6 +356,10 @@ export class GitRepositoryController extends BaseController implements TabContro
         branches,
         commits: commitLog,
         filesChanged: diffStat,
+        filesEmptyMessage:
+          isWorktreeMode && !this._data.selectedCommit
+            ? "Select a commit to view its changes"
+            : undefined,
         loadingBranches: false,
         loadingCommits: false,
         loadingFiles: false,
@@ -378,6 +434,21 @@ export class GitRepositoryController extends BaseController implements TabContro
   private _onSelectCommit = async (e: Event): Promise<void> => {
     if (!this._data || !this.repoName) return;
     const { commitHash } = (e as CustomEvent).detail as { commitHash: string | null };
+    const isWorktreeMode = !!this.branch;
+
+    // Worktree mode: a deselected commit returns to the empty hint — the
+    // working-tree diff is never shown (it belongs to the main checkout).
+    if (isWorktreeMode && !commitHash) {
+      this._data = {
+        ...this._data,
+        selectedCommit: null,
+        loadingFiles: false,
+        filesChanged: [],
+        filesEmptyMessage: "Select a commit to view its changes",
+      };
+      this._pushData();
+      return;
+    }
 
     this._data = { ...this._data, selectedCommit: commitHash, loadingFiles: !!commitHash };
     this._pushData();
