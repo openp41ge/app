@@ -257,7 +257,7 @@ class Openp41geWindowView extends LitElement {
         }
         .wv-notch-v:hover::before,
         .wv-notch-v.dragging::before { opacity: 1; }
-        .wv-notch-v.left-notch::before { left: -1px; }
+        .wv-notch-v.left-notch::before { left: 1px; }
         .wv-notch-v.right-notch::before { right: 2px; }
 
         /* ── Bottom bar icon hover ── */
