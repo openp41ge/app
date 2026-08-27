@@ -1,8 +1,7 @@
 /**
  * ExplorerSystemTabController — system tab controller for the Explorer panel.
  *
- * Wraps ExplorerSidebarView as a SystemTabController. Mounts the file tree
- * in the sidebar content area.
+ * Mounts the file tree in the sidebar content area.
  */
 
 import type { SystemTabController } from "../../controllers/types";

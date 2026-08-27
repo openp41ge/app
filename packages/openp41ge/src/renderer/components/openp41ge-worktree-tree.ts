@@ -362,7 +362,7 @@ class Openp41geWorktreeTree extends LitElement {
     // Sync open/closed state from the workspace state on initial mount.
     // This is needed because _syncExplorerState is also called from willUpdate
     // but only fires when worksetId changes — which may not happen on first mount
-    // (worksetId is often "" when the tree is created by ExplorerSidebarView).
+    // (worksetId is often "" when the tree is first created).
     this._syncExplorerState();
 
     // Initial load
