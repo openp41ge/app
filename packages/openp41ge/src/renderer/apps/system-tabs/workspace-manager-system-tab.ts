@@ -246,10 +246,48 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   private _emitUpdate(): void {
     document.dispatchEvent(new CustomEvent("workspaces-tab:update", { bubbles: true }));
+    // Middle-truncate repo names once the re-render has painted (keep as much
+    // of the head/domain and tail/repo-name as fits in the row).
+    requestAnimationFrame(() => this._applyRepoNameTruncation());
     // After the next paint, detect whether the row list reaches the column
     // bottom so the last row's separator can be dropped (the bottom bar's
     // border above/at the pane edge already delineates the final row).
     setTimeout(() => this._syncLeftFill(), 0);
+  }
+
+  /**
+   * Collapse over-wide repo/worktree names instead of wrapping: keep as much
+   * of the start (domain) and end (repo name) as fits, with "…" between them.
+   */
+  private _applyRepoNameTruncation(): void {
+    const spans = Array.from(document.querySelectorAll<HTMLElement>(".wm-repo-name"));
+    for (const el of spans) {
+      const full = el.dataset.full ?? "";
+      if (!full) continue;
+      const fits = (): boolean => el.scrollWidth <= el.clientWidth;
+      if (fits()) {
+        if (el.textContent !== full) el.textContent = full;
+        continue;
+      }
+      const ellipsis = "…";
+      let max = full.length - 1;
+      let best = full;
+      while (max > ellipsis.length) {
+        const avail = max - ellipsis.length;
+        if (avail <= 0) break;
+        const headLen = Math.ceil(avail / 2);
+        const tailLen = avail - headLen;
+        const candidate = full.slice(0, headLen) + ellipsis + full.slice(-tailLen);
+        el.textContent = candidate;
+        if (fits()) {
+          best = candidate;
+          break;
+        }
+        best = candidate;
+        max--;
+      }
+      el.textContent = best;
+    }
   }
 
   /**
@@ -318,7 +356,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           }}
         >
           <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#999)" style="transform:rotate(${item.expanded ? '90deg' : '0deg'});"></openp41ge-inline-icon>
-          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${item.url}</span>
+          <span class="wm-repo-name" data-full="${item.url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${item.url}</span>
           ${actionsContent}
           ${trailingContent}
         </div>
@@ -452,7 +490,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           }}>
         <div style="display:flex;align-items:center;gap:6px;">
           <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${wt.name}</span>
+          <span class="wm-repo-name" data-full="${wt.name}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${wt.name}</span>
           <span class="wt-del" style="display:flex;align-items:center;visibility:hidden;">
             <openp41ge-inline-icon name="close" size="12" no-hover @click=${onRemove}></openp41ge-inline-icon>
           </span>
@@ -591,7 +629,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
           <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
             <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-            <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
+            <span class="wm-repo-name" data-full="${entry.url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${entry.url}</span>
             <div class="row-actions">
               <openp41ge-inline-icon name="close" size="12" no-hover @click=${() => handleRemove(i)}></openp41ge-inline-icon>
             </div>
@@ -611,7 +649,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
         <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
           <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-          <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
+          <span class="wm-repo-name" data-full="${entry.url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${entry.url}</span>
           <div class="row-actions">
             <openp41ge-inline-icon name="close" size="12" no-hover @click=${() => handleRemove(i)}></openp41ge-inline-icon>
           </div>
@@ -1340,7 +1378,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         /* Two-pane body — fixed width (window min width), centered */
         .wm-overlay-body { display:flex; flex:1; min-height:0; width:100%; max-width:600px; margin:0 auto; }
         .wm-left {
-          display:flex; flex-direction:column; flex-shrink:0; width:260px; min-width:0;
+          display:flex; flex-direction:column; flex-shrink:0; width:200px; min-width:0;
           border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
         }
         .wm-left-header {
@@ -1651,7 +1689,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                           >
                             ${i === this._dragIndex ? '' : html`
                               <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-                              <span style="flex:1;font-size:12px;color:var(--text-primary,#ccc);word-break:break-all;">${entry.url}</span>
+                              <span class="wm-repo-name" data-full="${entry.url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${entry.url}</span>
                             `}
                           </div>
                         `)}
