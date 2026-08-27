@@ -237,8 +237,12 @@ class Openp41geWindowView extends LitElement {
           position: relative;
           z-index: 5;
           background: transparent;
+          /* Asymmetric negative margins cancel the 7px width to a ZERO-width
+             flex track (margin-box 7 - 3 - 4 = 0), so the sidebar border sits
+             flush against the grid — no hairline gap — while the 7px element
+             and its hover highlight bar still overlap the boundary. */
           margin-left: -${NOTCH_OVERFLOW}px;
-          margin-right: -${NOTCH_OVERFLOW}px;
+          margin-right: -${NOTCH_WIDTH - NOTCH_OVERFLOW}px;
         }
         .wv-notch-v::before {
           content: "";
