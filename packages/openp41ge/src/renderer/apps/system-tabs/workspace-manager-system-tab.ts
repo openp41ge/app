@@ -1375,12 +1375,17 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           display:flex; flex-direction:column; flex-shrink:0; width:200px; min-width:0;
           border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
         }
-        .wm-left-header {
-          display:flex; align-items:center; justify-content:flex-end; flex-shrink:0; box-sizing:border-box;
-          height:45px; padding:0 10px;
+        .wm-left-search {
+          flex-shrink:0; padding:8px 10px; border-bottom:1px solid var(--divider,#333);
           background:var(--bg-secondary,#252526);
         }
+        .wm-left-search .wm-search-box { width:100%; box-sizing:border-box; }
         .wm-left-scroll { flex:1; overflow-y:auto; min-height:0; padding:0; }
+        .wm-left-footer {
+          display:flex; align-items:center; justify-content:flex-end; flex-shrink:0;
+          padding:8px 10px; border-top:1px solid var(--divider,#333);
+          background:var(--bg-secondary,#252526);
+        }
         .wm-right { flex:1; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
         .wm-right-form { display:flex; flex-direction:column; min-height:100%; }
         .wm-empty { padding:40px 20px; text-align:center; color:var(--text-secondary,#999); font-size:13px; }
@@ -1595,20 +1600,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .reorder-footer { display:flex; gap:6px; padding:8px 10px; justify-content:flex-end; }
       </style>
       <div class="wm-wrap">
-        <!-- Overlay top bar: search + new workspace + close -->
+        <!-- Overlay top bar: system chrome only (close). The search box lives
+             in the system-specific list pane (.wm-left-search) so this bar can
+             be reused for other systems. -->
         <div class="wm-topbar">
-          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;width:100%;max-width:600px;margin:0 auto;padding:0 10px;box-sizing:border-box;">
-            <div class="wm-search-box">
-              <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
-              <input
-                type="text"
-                data-workspace-search-input
-                placeholder="Search workspaces… (name, repo, worktree)"
-                .value=${this._searchQuery}
-                @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
-                style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
-              />
-            </div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;flex:1;min-width:0;">
             <button type="button" class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
               <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
             </button>
@@ -1617,8 +1613,18 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         <div class="wm-overlay-body">
           <!-- Left pane: workspace list -->
           <div class="wm-left">
-            <div class="wm-left-header">
-              ${this._wmBtn("New", () => this._showCreate())}
+            <div class="wm-left-search">
+              <div class="wm-search-box">
+                <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
+                <input
+                  type="text"
+                  data-workspace-search-input
+                  placeholder="Search workspaces… (name, repo, worktree)"
+                  .value=${this._searchQuery}
+                  @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
+                  style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
+                />
+              </div>
             </div>
             <div class="wm-left-scroll${this._leftFull ? ' full' : ''}">
               ${this._workspaces.length === 0
@@ -1640,6 +1646,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                     <div class="wm-card-meta">${this._cardMeta(entry)}</div>
                   </div>
                 `)}
+            </div>
+            <div class="wm-left-footer">
+              ${this._wmBtn("New", () => this._showCreate())}
             </div>
           </div>
           <!-- Right pane: detail / create -->
