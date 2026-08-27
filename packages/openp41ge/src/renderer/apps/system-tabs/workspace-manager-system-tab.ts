@@ -184,8 +184,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const left = document.querySelector<HTMLElement>(".wm-left");
     if (!body || !left) return;
     const rect = body.getBoundingClientRect();
-    // Min 140px; leave room for the 600px detail column + a small margin.
-    const w = Math.min(Math.max(e.clientX - rect.left, 140), rect.width - 620);
+    // Min 140px; leave at least the detail column's min (320px) + small margins.
+    const w = Math.min(Math.max(e.clientX - rect.left, 140), rect.width - 340);
     left.style.width = `${w}px`;
   };
 
@@ -1483,11 +1483,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           padding:8px 10px;
           background:var(--bg-secondary,#252526);
         }
-        /* Fixed detail-column width — never squeezed by the workspaces drag
-           and never shrinks: its min-width is always kept, so a narrow window
-           makes the workspaces column (flex-shrink:1) give room first.
-           600px = 50% wider than the original 400px (cards grow with it). */
-        .wm-right { width:600px; min-width:600px; flex-shrink:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
+        /* Detail column fills all remaining space (so the vertical scrollbar
+           rides the far right edge of the pane, not the card edge). Only the
+           cards inside are width-limited (see .wsc-field max-width). */
+        .wm-right { flex:1; min-width:320px; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
         .wm-right-form { display:flex; flex-direction:column; min-height:100%; }
         /* Draggable separator between the workspaces column and the detail
            pane. Resizing only changes the workspaces column width. The
