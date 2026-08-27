@@ -1328,7 +1328,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           display:inline-flex; align-items:center; gap:4px; flex-shrink:0;
           height:24px; padding:0 10px; border:none; border-radius:4px; cursor:pointer;
           background:rgba(0,122,204,.15); color:var(--accent,#007acc);
-          font-size:12px; font-weight:600;
+          font-size:12px;
         }
         .wm-tb-new:hover { background:rgba(0,122,204,.25); }
         .wm-tb-close {
@@ -1575,7 +1575,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             />
           </div>
           <button type="button" class="wm-tb-new" title="New workspace" @click=${() => this._showCreate()}>
-            <svg width="12" height="12" viewBox="0 -960 960 960" fill="currentColor"><path d="M440-280h80v-160h160v-80H520v-160h-80v160H280v80h160v160Zm40 200q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
             <span>New workspace</span>
           </button>
           <span class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
@@ -1591,7 +1590,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               : this._filteredWorkspaces.length === 0
                 ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
                 : this._filteredWorkspaces.map((entry) => html`
-                  <div class="wm-card ${isActive(entry) ? 'active' : ''}${this._selected?.filePath === entry.filePath ? ' selected' : ''}" @click=${() => this._showDetail(entry)}>
+                  <div class="wm-card ${isActive(entry) ? 'active' : ''}${this._selected?.filePath === entry.filePath ? ' selected' : ''}" @click=${() => this._showDetail(entry)} @dblclick=${() => { this._showDetail(entry); this._activateWorkspace(entry); }}>
                     <div style="position:absolute;top:8px;right:12px;">
                       ${isActive(entry) ? html`<span class="wm-card-active-pill">Active</span>` : nothing}
                     </div>
