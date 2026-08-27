@@ -1362,7 +1362,12 @@ class Openp41geWorktreeTree extends LitElement {
 
   private _isExpandable(el: HTMLElement): boolean {
     if (el.classList.contains("wt-row-header")) return true;
-    return el.classList.contains("tree-node") && el.classList.contains("has-children");
+    if (!el.classList.contains("tree-node")) return false;
+    if (el.classList.contains("has-children")) return true;
+    // Lazily-loaded folders have no has-children class / aria-expanded until
+    // their children are fetched, but they render a chevron — a chevron icon
+    // means the row is expandable.
+    return !!el.querySelector(".tree-chevron-cell openp41ge-icon");
   }
 
   private _isExpanded(el: HTMLElement): boolean {
