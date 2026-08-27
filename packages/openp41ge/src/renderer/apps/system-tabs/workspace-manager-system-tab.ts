@@ -1453,8 +1453,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-topbar-close-side { display:flex; align-items:center; margin-left:auto; }
         .wm-search-box {
           display:flex; align-items:center; gap:6px; flex:1; min-width:0; height:26px;
-          padding:0 8px; border:1px solid var(--divider,#333); border-radius:6px;
-          background:rgba(255,255,255,.04);
+          padding:0 8px;
+          background:transparent;
         }
         .wm-search-box input { flex:1; min-width:0; background:transparent; border:none; outline:none; color:var(--text-primary,#ccc); font-size:12px; }
         .wm-search-box input::placeholder { color:var(--text-placeholder,#6e6e6e); }
@@ -1741,7 +1741,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                 <input
                   type="text"
                   data-workspace-search-input
-                  placeholder="Search workspaces… (name, repo, worktree)"
+                  placeholder="Search"
                   .value=${this._searchQuery}
                   @input=${(e: Event) => { this._searchQuery = (e.target as HTMLInputElement).value; this._emitUpdate(); }}
                   style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
