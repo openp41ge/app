@@ -75,6 +75,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   ];
   private _activeTab = "workspaces";
 
+  /** Width of the workspaces column (drag the divider to resize). */
+  private _leftColWidth = parseInt(localStorage.getItem("openp41ge:workspaces-col-left") ?? "200", 10);
+  private _draggingCol = false;
+
   /** Per-workspace working-tree change stats (loaded async per card). */
   private _stats = new Map<string, { filesChanged: number; added: number; deleted: number; untracked: number }>();
 
@@ -138,6 +142,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   unmount(): void {
     window.removeEventListener("resize", this._syncLeftFill);
+    this._endColDrag();
   }
 
   /** Open straight into the create form (File > New Workspace). */
@@ -159,6 +164,51 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _selectTab(id: string): void {
     if (id === this._activeTab) return;
     this._activeTab = id;
+    this._emitUpdate();
+  }
+
+  /** Start dragging the column divider (only the workspaces column resizes). */
+  private _startColDrag(e: MouseEvent): void {
+    e.preventDefault();
+    this._draggingCol = true;
+    window.addEventListener("mousemove", this._onColDrag);
+    window.addEventListener("mouseup", this._endColDrag);
+    document.body.style.cursor = "col-resize";
+    const r = document.querySelector(".wm-col-resizer");
+    if (r) r.classList.add("dragging");
+  }
+
+  private _onColDrag = (e: MouseEvent): void => {
+    if (!this._draggingCol) return;
+    const body = document.querySelector(".wm-overlay-body");
+    const left = document.querySelector(".wm-left");
+    if (!body || !left) return;
+    const rect = body.getBoundingClientRect();
+    // Min 140px; leave room for the 400px detail column + a small margin.
+    const w = Math.min(Math.max(e.clientX - rect.left, 140), rect.width - 420);
+    left.style.width = `${w}px`;
+  };
+
+  private _endColDrag = (): void => {
+    const left = document.querySelector(".wm-left");
+    if (left && this._draggingCol) {
+      this._leftColWidth = Math.round(parseFloat(left.style.width) || this._leftColWidth);
+      this._emitUpdate();
+    }
+    this._draggingCol = false;
+    window.removeEventListener("mousemove", this._onColDrag);
+    window.removeEventListener("mouseup", this._endColDrag);
+    document.body.style.cursor = "";
+    const r = document.querySelector(".wm-col-resizer");
+    if (r) r.classList.remove("dragging");
+    localStorage.setItem("openp41ge:workspaces-col-left", String(this._leftColWidth));
+    this._syncLeftFill();
+  };
+
+  /** Reset the workspaces column to its default width. */
+  private _resetColWidth(): void {
+    this._leftColWidth = 200;
+    localStorage.setItem("openp41ge:workspaces-col-left", "200");
     this._emitUpdate();
   }
 
@@ -1394,11 +1444,12 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-tb-close:hover { background:var(--bg-hover,#2a2a2a); color:var(--text-primary,#ccc); }
 
-        /* Two-pane body — fixed width, left aligned */
-        .wm-overlay-body { display:flex; flex:1; min-height:0; width:100%; max-width:600px; margin:0; }
+        /* Two-pane body — left aligned; widths: workspaces column is
+           adjustable via the divider, detail column stays fixed (400px). */
+        .wm-overlay-body { display:flex; flex:1; min-height:0; width:100%; margin:0; }
         .wm-left {
           display:flex; flex-direction:column; flex-shrink:0; width:200px; min-width:0;
-          border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
+          background:var(--bg-secondary,#252526);
         }
         .wm-left-search {
           flex-shrink:0; padding:8px 10px;
@@ -1411,8 +1462,20 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           padding:8px 10px;
           background:var(--bg-secondary,#252526);
         }
-        .wm-right { flex:1; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
+        /* Fixed detail-column width — never squeezed by the workspaces drag. */
+        .wm-right { width:400px; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
         .wm-right-form { display:flex; flex-direction:column; min-height:100%; }
+        /* Draggable separator between the workspaces column and the detail
+           pane. Resizing only changes the workspaces column width. */
+        .wm-col-resizer {
+          flex-shrink:0; width:6px; cursor:col-resize; position:relative; z-index:3;
+        }
+        .wm-col-resizer::after {
+          content:''; position:absolute; top:0; bottom:0; left:3px; width:1px;
+          background:var(--divider,#333);
+        }
+        .wm-col-resizer:hover::after,
+        .wm-col-resizer.dragging::after { background:var(--accent,#007acc); }
         .wm-empty { padding:40px 20px; text-align:center; color:var(--text-secondary,#999); font-size:13px; }
         .wm-form-actions {
           display:flex; align-items:center; justify-content:flex-end; gap:6px;
@@ -1430,17 +1493,17 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-fa-secondary:hover { color:var(--text-primary,#ccc); }
 
         .wm-card {
-          position:relative;
-          margin:8px 10px;
-          padding:8px 10px;
-          border-radius:8px;
-          background:rgba(255,255,255,.04);
-          border:1px solid var(--divider,#333);
+          padding:8px 12px; margin:0; border-radius:0;
+          border-bottom:1px solid var(--divider,#333);
           cursor:pointer;
-          transition:background .1s, border-color .1s;
+          position:relative;
+          transition:background .1s;
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
-        .wm-card.selected { background:rgba(0,122,204,.12); border-color:rgba(0,122,204,.35); }
+        .wm-card.selected { background:rgba(0,122,204,.12); }
+        /* Drop the last row's separator when the list reaches (or overflows) the
+           column bottom: the app's bottom bar border already delineates it. */
+        .wm-left-scroll.full .wm-card:last-child { border-bottom:0; }
         .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:62px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
@@ -1643,7 +1706,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         </div>
         <div class="wm-overlay-body">
           <!-- Left pane: workspace list -->
-          <div class="wm-left">
+          <div class="wm-left" style="width:${this._leftColWidth}px;">
             <div class="wm-left-search">
               <div class="wm-search-box">
                 <svg width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" style="flex-shrink:0;color:var(--text-secondary,#999)"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
@@ -1682,6 +1745,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               ${this._wmBtn("New", () => this._showCreate())}
             </div>
           </div>
+          <div class="wm-col-resizer" title="Drag to resize the workspaces column · double-click to reset"
+            @mousedown=${(e: MouseEvent) => this._startColDrag(e)}
+            @dblclick=${() => this._resetColWidth()}></div>
           <!-- Right pane: detail / create -->
           <div class="wm-right">
             ${this._creating ? html`
