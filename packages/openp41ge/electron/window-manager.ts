@@ -108,6 +108,9 @@ export function createOpenp41geWindow(
     minHeight: 200,
     title: "Openp41ge",
     titleBarStyle: "hiddenInset",
+    // Match the app's dark surface so the areas exposed while the window
+    // grows (native maximize animation, resize) never flash white.
+    backgroundColor: "#161616",
     show: !isTest,
     focusable: !isTest,
     x,

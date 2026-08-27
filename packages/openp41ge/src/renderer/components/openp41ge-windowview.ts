@@ -56,14 +56,37 @@ class Openp41geWindowView extends LitElement {
 
   private _contextMenu: { x: number; y: number; paneId?: string } | null = null;
   private _skeletonInitialized = false;
+  private _resizeRaf = 0;
+
+  /**
+   * On every window resize, force a top-level Lit re-render (rAF-throttled).
+   * The CSS shell already tracks the viewport, but JS-measured sub-layouts
+   * (sidebar heights, editor/tree viewports, bottom pane) capture pixel sizes
+   * during render — so they must re-render as the window grows or they go
+   * stale until some later event. The macOS native maximize animation is a
+   * particular case where this matters.
+   */
+  private _onWindowResize = (): void => {
+    if (this._resizeRaf) return;
+    this._resizeRaf = requestAnimationFrame(() => {
+      this._resizeRaf = 0;
+      this.requestUpdate();
+    });
+  };
 
   connectedCallback(): void {
     super.connectedCallback();
     this._ensureSkeleton();
+    window.addEventListener("resize", this._onWindowResize);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    window.removeEventListener("resize", this._onWindowResize);
+    if (this._resizeRaf) {
+      cancelAnimationFrame(this._resizeRaf);
+      this._resizeRaf = 0;
+    }
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
   }
