@@ -1444,10 +1444,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-tab {
           display:flex; align-items:center; padding:0 12px; border:none; background:transparent;
           color:var(--text-secondary,#999); font-size:12px; cursor:pointer;
-          appearance:none; -webkit-appearance:none; border-bottom:2px solid transparent; margin-bottom:-1px;
+          appearance:none; -webkit-appearance:none;
         }
         .wm-tab:hover { color:var(--text-primary,#ccc); }
-        .wm-tab.active { color:var(--text-primary,#ccc); border-bottom-color:var(--accent,#007acc); }
+        /* Active tab: grey fill (not a coloured underline). */
+        .wm-tab.active { color:var(--text-primary,#ccc); background:var(--bg-hover,#2a2a2a); }
         .wm-topbar-close-side { display:flex; align-items:center; margin-left:auto; }
         .wm-search-box {
           display:flex; align-items:center; gap:6px; flex:1; min-width:0; height:26px;
@@ -1487,12 +1488,14 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-right { width:400px; min-width:400px; flex-shrink:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
         .wm-right-form { display:flex; flex-direction:column; min-height:100%; }
         /* Draggable separator between the workspaces column and the detail
-           pane. Resizing only changes the workspaces column width. */
+           pane. Resizing only changes the workspaces column width. The
+           handle is 1px — the line itself — so there is no spacing around it
+           on hover; the thin hit area keeps the cursor (col-resize). */
         .wm-col-resizer {
-          flex-shrink:0; width:6px; cursor:col-resize; position:relative; z-index:3;
+          flex-shrink:0; width:1px; cursor:col-resize; position:relative; z-index:3;
         }
         .wm-col-resizer::after {
-          content:''; position:absolute; top:0; bottom:0; left:3px; width:1px;
+          content:''; position:absolute; inset:0;
           background:var(--divider,#333);
         }
         .wm-col-resizer:hover::after,
