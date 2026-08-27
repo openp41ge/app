@@ -20,26 +20,21 @@ For a monorepo of Openp41ge's size (442 `.ts` files across 9 packages), this mea
 
 ## Approach
 
-### Phase 1 — Wait for dependency compatibility (current state)
+### Phase 0 — Remove the blocker (IN PROGRESS, done first)
 
-**Blocking dependency: `typescript-eslint`**
+**What blocked us: `typescript-eslint`.** The ecosystem (`@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `typescript-eslint`) peers `typescript: ">=4.8.4 <6.1.0"` — still true at the latest release (8.68.0). It is the **only** dependency constraining `typescript` in the tree (verified by sweep; vite/vitest/nx/tsx use esbuild or the `tsc` CLI, and every tsc invocation in this repo is CLI-based so the unstable TS 7.0 programmatic API is irrelevant here).
 
-The `typescript-eslint` ecosystem (`@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `typescript-eslint`) currently caps its TypeScript peer dependency at `<6.1.0`. Even the latest stable (v8.65.0) restricts:
+**Decision:** do not wait for a typescript-eslint release. **Remove the toolchain entirely** by migrating lint from ESLint to **oxlint** (Rust/oxc, no `typescript` peer, covers our 6-rule non-type-aware ruleset 1:1). See `plans/2026-08-27-replace-eslint-with-oxlint.md` — that change lands first and keeps `typescript` untouched.
 
-```
-typescript: ">=4.8.4 <6.1.0"
-```
+**Current TS state (2026-08-27):** installed `typescript` is already **6.0.3** (root `package.json` says `^6.0.3`) — pinned at the top of the old `<6.1.0` cap. The 12 package-level `package.json` files still declare `^5.x` (stale declarations; hoisting resolves 6.0.3). Phase 2 step 2 will correct them to `^7.0.2`.
 
-This means we **cannot upgrade `typescript` to 7** without losing ESLint type-aware linting (or disabling it entirely). All 9 packages in the monorepo are covered by the root `eslint.config.js` which uses `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin`.
-
-Additionally, the TypeScript programmatic API is not yet stable in TS 7.0 — Microsoft recommends waiting for **TS 7.1** for stable API consumers (which includes `typescript-eslint`).
-
-**Status**: BLOCKED — monitor `typescript-eslint` releases for TS 7 support (likely `typescript-eslint` v9).
+**Precondition for Phase 2 (COMPLETE once oxlint lands):** no dependency constrains `typescript` anymore; lint is `typescript`-version-independent.
 
 ### Phase 2 — Execute upgrade (once unblocked)
 
-1. **Update root `package.json`** — bump `typescript` from `^5.9.3` to `^7.0.2`.
-2. **Update all 9 package-level `package.json` files** — bump `typescript` from `^5.7.0`/`^5.5.0` to `^7.0.2`.
+1. **Update root `package.json`** — bump `typescript` from `^6.0.3` to `^7.0.2`.
+2. **Update all 12 package-level `package.json` files** — bump `typescript` from their stale `^5.x` declarations to `^7.0.2`.
+2b. **Verify no other dependency constrains `typescript`** — after the oxlint migration, `pnpm why typescript` must list no `eslint`/`typescript-eslint` consumers.
 3. **Run `pnpm install`** — let pnpm resolve the new TypeScript version.
 4. **Run `npx tsc --noEmit` across the monorepo** — identify any new type errors introduced by TS 7's stricter checking. The codebase has zero `@ts-ignore`/`@ts-expect-error` directives, so any new errors are genuine type issues.
 5. **Fix type errors iteratively** — per package, resolve errors found in step 4.
@@ -47,26 +42,20 @@ Additionally, the TypeScript programmatic API is not yet stable in TS 7.0 — Mi
 7. **Consider TS 7 parallelism flags** — evaluate `--checkers` and `--builders` for optimal CI performance. The root `tsconfig.json` has `noEmit: true`; flags can be added via `tsc` CLI or per-package build scripts.
 8. **Run full test suite** — `pnpm test` must pass.
 9. **Run full build** — `cd packages/openp41ge && pnpm build` must succeed.
-10. **Run linting** — ensure ESLint still works correctly with the updated typescript-eslint.
+10. **Run linting** — `nx lint` (oxlint) must pass. oxlint does not depend on the TypeScript package or compiler API, so it is unaffected by the TS 7 upgrade.
 
 ## Files Changed
 
 ### Root level
 
 - `package.json` — bump `typescript` to `^7.0.2`
-- `eslint.config.js` — may need adjustments if typescript-eslint API changes
+- `eslint.config.js` — **already deleted** by the oxlint migration (`2026-08-27-replace-eslint-with-oxlint.md`); `.oxlintrc.json` needs no TS-specific change (oxlint is typescript-version-independent)
 
-### Per-package `package.json` (9 files)
+### Per-package `package.json` (12 files)
 
-- `packages/openp41ge/package.json` — bump `typescript` from `^5.7.0` to `^7.0.2`
-- `packages/openp41ge-file-editor/package.json` — same
-- `packages/openp41ge-terminal/package.json` — same
-- `packages/openp41ge-git-repository/package.json` — same
-- `packages/openp41ge-agent-chat/package.json` — same
-- `packages/openp41ge-logger/package.json` — same
-- `packages/openp41ge-syntax-highlighting/package.json` — same
-- `packages/openp41ge-themes/package.json` — same
-- `packages/openp41ge-tabs/package.json` — bump from `^5.5.0` to `^7.0.2`
+- `packages/openp41ge/package.json` — bump `typescript` to `^7.0.2`
+- `packages/openp41ge-agent-chat/`, `openp41ge-constants/`, `openp41ge-editor-engine/`, `openp41ge-filesystem/`, `openp41ge-git/`, `openp41ge-logger/`, `openp41ge-piece-tree/`, `openp41ge-syntax-highlighting/`, `openp41ge-terminal/`, `openp41ge-uikit/` — bump `typescript` to `^7.0.2`
+- `packages/openp41ge-tabs/package.json` — bump `typescript` to `^7.0.2`
 
 ### Config files (if needed)
 
@@ -79,7 +68,7 @@ Additionally, the TypeScript programmatic API is not yet stable in TS 7.0 — Mi
 | Type-checking            | `npx tsc --noEmit` across the monorepo — zero errors expected                       |
 | Unit / integration tests | `pnpm test` — all 2134+ tests must pass                                             |
 | Build                    | `cd packages/openp41ge && pnpm build` — must succeed                                |
-| Linting                  | `npx eslint .` — must pass with updated typescript-eslint                           |
+| Linting                  | `nx lint` (oxlint) — must pass; oxlint is independent of the TS version            |
 | E2E                      | `cd packages/openp41ge && bash scripts/test-e2e.sh` — verify no runtime regressions |
 
 Pre-existing issues to be aware of:
@@ -95,17 +84,17 @@ Not directly applicable — this is a build tooling upgrade with no user-facing 
 
 ## Open Questions
 
-1. **typescript-eslint compatibility** — will `typescript-eslint` v9 support TS 7, or will we need a v8.x minor that relaxes the peer dep? Monitor https://github.com/typescript-eslint/typescript-eslint.
-2. **TS 7.1 timing** — the stable programmatic API arrives in 7.1. If `typescript-eslint` requires this, we may need to wait for TS 7.1. Current latest is 7.0.2.
+1. ~~**typescript-eslint compatibility**~~ — **RESOLVED**. We are not waiting for a typescript-eslint release; lint has been migrated to **oxlint** (`2026-08-27-replace-eslint-with-oxlint.md`), which has no `typescript` peer. This was the only dependency blocking TS 7.
+2. ~~**TS 7.1 timing**~~ — **N/A**. The stable programmatic-API concern (TS 7.1) only mattered for consumers like typescript-eslint. This repo's every `tsc` invocation is CLI-based, and oxlint never touches the TS compiler API — no JS-API consumer remains that could break on 7.0.
 3. **Pre-existing build error** — should we fix the `openp41ge-tabs/src/orchestrator.ts:270` type assertion issue as part of this upgrade, or file separately?
 
 ## Completion Criteria
 
-- [ ] `typescript-eslint` has published a version compatible with TypeScript 7
-- [ ] All `package.json` files updated to `typescript: "^7.0.2"`
+- [x] **Blocker removed**: lint migrated from `typescript-eslint` to **oxlint** (tracked by `2026-08-27-replace-eslint-with-oxlint.md`); no dependency constrains `typescript`
+- [ ] All `package.json` files (root + 12 packages) updated to `typescript: "^7.0.2"`
 - [ ] `pnpm install` succeeds
 - [ ] `npx tsc --noEmit` produces zero errors across all packages
 - [ ] `pnpm test` passes (95 test files, 2134+ tests)
 - [ ] `cd packages/openp41ge && pnpm build` succeeds
-- [ ] `npx eslint .` passes
+- [ ] `nx lint` (oxlint) passes — oxlint is `typescript`-version-independent
 - [ ] Any new TS 7-specific warnings/errors are resolved
