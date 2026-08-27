@@ -1337,11 +1337,16 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-tb-close:hover { background:var(--bg-hover,#2a2a2a); color:var(--text-primary,#ccc); }
 
-        /* Two-pane body */
-        .wm-overlay-body { display:flex; flex:1; min-height:0; }
+        /* Two-pane body — fixed width (window min width), centered */
+        .wm-overlay-body { display:flex; flex:1; min-height:0; width:100%; max-width:600px; margin:0 auto; }
         .wm-left {
           display:flex; flex-direction:column; flex-shrink:0; width:260px; min-width:0;
           border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
+        }
+        .wm-left-header {
+          display:flex; align-items:center; flex-shrink:0; box-sizing:border-box;
+          height:45px; padding:0 10px;
+          background:var(--bg-secondary,#252526); border-bottom:1px solid var(--divider,#333);
         }
         .wm-left-scroll { flex:1; overflow-y:auto; min-height:0; padding:0; }
         .wm-right { flex:1; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
@@ -1575,16 +1580,18 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text-primary,#ccc);font-size:12px;"
             />
           </div>
-          <button type="button" class="wm-tb-new" title="New workspace" @click=${() => this._showCreate()}>
-            <span>New workspace</span>
-          </button>
-          <span class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
+          <button type="button" class="wm-tb-close" title="Close" @click=${() => workspacesOverlayService.close()}>
             <svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor"><path d="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
           </span>
         </div>
         <div class="wm-overlay-body">
           <!-- Left pane: workspace list -->
           <div class="wm-left">
+            <div class="wm-left-header">
+              <button type="button" class="wm-tb-new" title="New workspace" @click=${() => this._showCreate()}>
+                <span>New workspace</span>
+              </button>
+            </div>
             <div class="wm-left-scroll${this._leftFull ? ' full' : ''}">
               ${this._workspaces.length === 0
               ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces yet.</div>`
@@ -1839,7 +1846,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
     const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;border-bottom:1px solid var(--divider,#333);">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;height:45px;box-sizing:border-box;border-bottom:1px solid var(--divider,#333);">
         <button class="wm-btn activate" style="${active ? 'visibility:hidden;' : ''}" @click=${() => this._activateWorkspace(entry)}>Activate</button>
         <div style="display:flex;align-items:center;gap:6px;">
           <button
