@@ -1376,14 +1376,14 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
         }
         .wm-left-search {
-          flex-shrink:0; padding:8px 10px; border-bottom:1px solid var(--divider,#333);
+          flex-shrink:0; padding:8px 10px;
           background:var(--bg-secondary,#252526);
         }
         .wm-left-search .wm-search-box { width:100%; box-sizing:border-box; }
         .wm-left-scroll { flex:1; overflow-y:auto; min-height:0; padding:0; }
         .wm-left-footer {
           display:flex; align-items:center; justify-content:flex-end; flex-shrink:0;
-          padding:8px 10px; border-top:1px solid var(--divider,#333);
+          padding:8px 10px;
           background:var(--bg-secondary,#252526);
         }
         .wm-right { flex:1; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
