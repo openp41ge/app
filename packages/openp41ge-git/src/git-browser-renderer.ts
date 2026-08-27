@@ -222,6 +222,7 @@ class GitBrowserRenderer {
     span.style.cssText = `
       width:13px;height:13px;flex-shrink:0;display:inline-flex;
       align-items:center;justify-content:center;color:#4a9eff;
+      margin-right:7px;
     `;
     span.innerHTML = `
       <svg class="git-spin-arc" viewBox="0 0 16 16" width="13" height="13"
