@@ -133,8 +133,7 @@ export class InitEventControllerStep implements IStartupStep {
     }, 100);
 
     // Store references on the context for other steps/services to use
-    const ctx = context as StartupContext & Record<string, unknown>;
-    ctx.__eventController = {
+    context.__eventController = {
       graph,
       router,
       logBuffer,

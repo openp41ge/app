@@ -112,6 +112,9 @@ export interface EditorSystemTabController {
   readonly appType: string;
   readonly title: string;
   render(): unknown;
+  /** Legacy lifecycle hooks, still used by service-modals that host controllers. */
+  mount?(container?: HTMLElement): void;
+  unmount?(): void;
 }
 
 export interface EditorSystemTabRegistration {

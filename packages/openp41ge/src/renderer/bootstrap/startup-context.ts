@@ -18,6 +18,11 @@ import type { IQuoteController } from "../interfaces/quote-controller";
 import type { IFileOpenHandler } from "../interfaces/file-open-handler";
 import type { IFileDropHandler } from "../interfaces/file-drop-handler";
 import type { IContextMenuBuilder } from "../interfaces/context-menu-builder";
+import type { EventGraph } from "../services/event-graph";
+import type { EventRouter } from "../services/event-router";
+import type { EventLogBuffer } from "../services/event-log-buffer";
+import type { PluginRegistry } from "../services/plugin-registry";
+import type { DOMBridge } from "../services/dom-bridge";
 
 import { WorkspaceStateManager } from "../services/workspace-state-manager";
 import { CommandBus } from "../services/command-bus";
@@ -67,6 +72,19 @@ export class StartupContext {
 
   /** This window's ID, resolved during startup. */
   windowId: string | null = null;
+
+  // ── Ad-hoc references set by steps ───────────────────────────────────
+  /**
+   * Event-system references (graph, router, log buffer, plugin registry,
+   * DOM bridge) populated by the init-event-controller step during bootstrap.
+   */
+  __eventController?: {
+    graph: EventGraph;
+    router: EventRouter;
+    logBuffer: EventLogBuffer;
+    pluginRegistry: PluginRegistry;
+    domBridge: DOMBridge;
+  };
 
   constructor() {
     // Instantiate all services (only construction, no init/wiring)

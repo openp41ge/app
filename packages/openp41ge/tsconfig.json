@@ -14,7 +14,10 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "experimentalDecorators": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "paths": {
+      "openp41ge-file-editor": ["../openp41ge-uikit/dist/file-editor/index"]
+    }
   },
   "include": ["src"],
   "exclude": ["dist", "node_modules"]

@@ -19,6 +19,7 @@ import {
   type IDragSource,
   type IDropTarget,
   type DragResult,
+  type DragSourceData,
 } from "../openp41ge-tabs-adapter";
 
 import { FileDragSource } from "./drag-sources/file-drag-source";
@@ -84,7 +85,7 @@ class SidebarTabDragSource implements IDragSource {
     return ghost;
   }
 
-  getDragData(): Record<string, unknown> {
+  getDragData(): DragSourceData {
     return {
       type: "system-tab",
       tabId: this._tabId,

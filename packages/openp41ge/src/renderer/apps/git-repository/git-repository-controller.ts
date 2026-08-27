@@ -109,11 +109,6 @@ export class GitRepositoryController extends BaseController implements TabContro
     this._boundHandlers = [];
     this._panel = null;
     this._data = null;
-
-    if (this._storeUnsub) {
-      this._storeUnsub();
-      this._storeUnsub = null;
-    }
     this.container = null;
   }
 

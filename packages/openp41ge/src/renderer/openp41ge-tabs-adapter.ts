@@ -40,6 +40,7 @@ export type {
   IDropTarget,
   TargetFeedback,
   DragResult,
+  DragSourceData,
   GhostPreview,
   GhostColumn,
   TargetResolver,

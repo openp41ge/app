@@ -107,7 +107,7 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
     // searches for tabs in the grid layout. Without this await, sync() runs
     // synchronously after setting windowData but before Lit's async microtask
     // processes the windowview update, leaving grid placements stale.
-    await (el as Openp41geWindowviewElement).updateComplete;
+    await (el as unknown as { updateComplete: Promise<void> }).updateComplete;
 
     // Sync controller mounts after the grid has rendered its DOM
     // (await Lit's updateComplete to ensure [data-tab-id] elements exist).

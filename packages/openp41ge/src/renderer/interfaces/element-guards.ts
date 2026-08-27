@@ -31,8 +31,8 @@ export function isOpenp41geTopbar(el: unknown): el is Openp41geTopBarElement {
  * Type guard: checks if an element is a <openp41ge-windowview> custom element.
  */
 export interface Openp41geWindowviewElement extends HTMLElement {
-  windowData: Window;
-  workspaceData: Workspace;
+  windowData: Window | null;
+  workspaceData: Workspace | null;
   layouts: Map<string, Map<string, { x: number; y: number; width: number; height: number }>>;
 }
 
