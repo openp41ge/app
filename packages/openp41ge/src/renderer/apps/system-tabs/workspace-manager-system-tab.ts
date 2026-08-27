@@ -1448,7 +1448,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
            adjustable via the divider, detail column stays fixed (400px). */
         .wm-overlay-body { display:flex; flex:1; min-height:0; width:100%; margin:0; }
         .wm-left {
-          display:flex; flex-direction:column; flex-shrink:0; width:200px; min-width:0;
+          display:flex; flex-direction:column; flex-shrink:1; width:200px; min-width:140px;
           background:var(--bg-secondary,#252526);
         }
         .wm-left-search {
@@ -1462,8 +1462,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           padding:8px 10px;
           background:var(--bg-secondary,#252526);
         }
-        /* Fixed detail-column width — never squeezed by the workspaces drag. */
-        .wm-right { width:400px; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
+        /* Fixed detail-column width — never squeezed by the workspaces drag
+           and never shrinks: its min-width is always kept, so a narrow window
+           makes the workspaces column (flex-shrink:1) give room first. */
+        .wm-right { width:400px; min-width:400px; flex-shrink:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
         .wm-right-form { display:flex; flex-direction:column; min-height:100%; }
         /* Draggable separator between the workspaces column and the detail
            pane. Resizing only changes the workspaces column width. */
@@ -1501,6 +1503,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
         .wm-card.selected { background:rgba(0,122,204,.12); }
+        /* The first row separates from the search bar above it. */
+        .wm-left-scroll .wm-card:first-child { border-top:1px solid var(--divider,#333); }
         /* Drop the last row's separator when the list reaches (or overflows) the
            column bottom: the app's bottom bar border already delineates it. */
         .wm-left-scroll.full .wm-card:last-child { border-bottom:0; }
