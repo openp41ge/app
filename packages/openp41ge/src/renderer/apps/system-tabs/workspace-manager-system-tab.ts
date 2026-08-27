@@ -1839,16 +1839,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;border-bottom:1px solid var(--divider,#333);">
-        ${active
-          ? nothing
-          : html`<button class="wm-btn activate" @click=${() => this._activateWorkspace(entry)}>Activate</button>`}
+        <button class="wm-btn activate" style="${active ? 'visibility:hidden;' : ''}" @click=${() => this._activateWorkspace(entry)}>Activate</button>
         <div style="display:flex;align-items:center;gap:6px;">
-          <button
-            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(244,71,71,0.15);color:var(--accent-error,#f44747);transition:background .1s;"
-            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,71,71,0.25)'; }}
-            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,71,71,0.15)'; }}
-            @click=${() => { if (this._selected) this._onDeleteWorkspace(this._selected); }}
-          >Delete</button>
           <button
             style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
             @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
@@ -1870,7 +1862,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         </div>
         <div class="wsc-field wsc-field-repos" style="display:flex;flex-direction:column;">
           <label class="wsc-label">What repos are you working on?</label>
-          <div style="margin-top:8px;">
+          <div style="margin-top:8px;max-width:620px;">
             ${this._detailRepos.map((entry, i) => html`
               ${entry.status === "success"
                 ? this._renderAccordionItem(
@@ -1990,6 +1982,23 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         <div style="display:flex;align-items:flex-start;gap:6px;margin:6px 14px 0;padding:6px 8px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
           <span style="flex-shrink:0;display:flex;align-items:center;height:1.35em;"><openp41ge-inline-icon name="warning" size="12" no-hover icon-color="var(--text-warning,#e5a50a)"></openp41ge-inline-icon></span>
           <span style="flex:1;min-width:0;">You need read access to each repository so openp41ge can pull (clone/sync) them without asking for a password.</span>
+        </div>
+      </div>
+
+      <!-- Dangerous actions (footer) -->
+      <div style="flex-shrink:0;border-top:1px solid var(--divider,#333);padding:12px 14px 14px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary,#999);margin-bottom:8px;">Dangerous Actions</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;max-width:620px;border:1px solid rgba(244,71,71,.35);border-radius:6px;background:rgba(244,71,71,.06);">
+          <div style="min-width:0;">
+            <div style="font-size:12px;color:var(--text-primary,#ccc);">Delete this workspace</div>
+            <div style="font-size:11px;color:var(--text-secondary,#999);margin-top:2px;line-height:1.35;">Removes the workspace from the list. Repositories and worktrees are not deleted unless you also delete the workspace data on disk.</div>
+          </div>
+          <button
+            style="flex-shrink:0;font-size:12px;padding:5px 14px;border-radius:4px;border:none;cursor:pointer;background:rgba(244,71,71,0.15);color:var(--accent-error,#f44747);transition:background .1s;"
+            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(244,71,71,0.25)"; }}
+            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(244,71,71,0.15)"; }}
+            @click=${() => { if (this._selected) this._onDeleteWorkspace(this._selected); }}
+          >Delete workspace</button>
         </div>
       </div>
     `;
