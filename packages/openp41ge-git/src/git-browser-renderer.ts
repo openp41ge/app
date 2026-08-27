@@ -225,9 +225,10 @@ class GitBrowserRenderer {
     `;
     span.innerHTML = `
       <svg class="git-spin-arc" viewBox="0 0 16 16" width="13" height="13"
-           style="display:block;animation:git-render-spin .9s linear infinite;transform-origin:8px 8px;">
-        <path d="M8 2.4a5.6 5.6 0 1 0 5.5 4.85v-1" fill="none"
-              stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+           style="display:block;animation:git-render-spin .9s linear infinite;transform-origin:50% 50%;">
+        <circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor"
+                stroke-width="2.2" stroke-linecap="round"
+                stroke-dasharray="24.5 8.2"/>
       </svg>`;
     GitBrowserRenderer.ensureSpinKeyframes();
     return span;
