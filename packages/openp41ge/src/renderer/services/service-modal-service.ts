@@ -8,7 +8,10 @@
 
 import type { EditorSystemTabController } from "../controllers/types";
 import type { IKeyboardManager } from "../interfaces/keyboard-manager";
+import { createLogger } from "openp41ge-logger";
 import { getEditorSystemTabRegistration } from "../apps/app-registry";
+
+const log = createLogger("service-modal-service");
 
 export type ModalAppType = "workspace-manager" | "settings";
 
@@ -57,7 +60,7 @@ class ServiceModalService {
     // Look up the registration for this app type
     const reg = getEditorSystemTabRegistration(appType);
     if (!reg) {
-      console.warn(`[ServiceModal] No registration for appType "${appType}"`);
+      log.warn(`No registration for appType "${appType}"`);
       return;
     }
 

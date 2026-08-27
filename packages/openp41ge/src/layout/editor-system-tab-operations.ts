@@ -18,7 +18,7 @@
  * Closing all system tabs restores the editor grid.
  */
 
-import type { Workspace, Window, EditorSystemTabId, Grid } from "./types.js";
+import type { Workspace, Window, EditorSystemTabId, Grid, TabId } from "./types.js";
 import { mapWindow } from "./common.js";
 
 // ─── Open ────────────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ export function hasEditorSystemTabs(win: Window): boolean {
  */
 function _placeInBottomPaneGrid(grid: Grid | undefined, tabId: string): Grid {
   const g = grid ?? { id: "bp", rows: 1, cols: 1, placements: [], dividers: { columns: [], rows: [] } };
-  const sid = tabId as any;
+  const sid = tabId as TabId;
 
   // Check if the tab already exists in a placement
   const existingPlacement = g.placements.find((p) =>
@@ -210,7 +210,7 @@ function _placeInBottomPaneGrid(grid: Grid | undefined, tabId: string): Grid {
  */
 function _activateInBottomPaneGrid(grid: Grid | undefined, tabId: string): Grid {
   if (!grid) return _placeInBottomPaneGrid(grid, tabId);
-  const sid = tabId as any;
+  const sid = tabId as TabId;
 
   const hasTab = grid.placements.some((p) => p.tabIds.includes(sid));
   if (!hasTab) {
@@ -232,7 +232,7 @@ function _activateInBottomPaneGrid(grid: Grid | undefined, tabId: string): Grid 
  */
 function _removeFromBottomPaneGrid(grid: Grid | undefined, tabId: string): Grid {
   if (!grid) return grid!;
-  const sid = tabId as any;
+  const sid = tabId as TabId;
 
   return {
     ...grid,
