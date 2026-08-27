@@ -317,7 +317,7 @@ export class TabBar extends LitElement {
       <div class="tab-bar-wrapper" style="position:relative;flex:1;min-width:0;">
         <div
           class="tab-bar-container"
-          style="display:flex;align-items:center;height:34px;background:#181818;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;"
+          style="display:flex;align-items:center;height:35px;border-bottom:1px solid var(--border-divider, #2d2d2d);background:#181818;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;"
         >
           <style>
             .tab-bar-container::-webkit-scrollbar {
