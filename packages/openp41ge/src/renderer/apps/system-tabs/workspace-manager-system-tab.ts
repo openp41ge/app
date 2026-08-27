@@ -1392,6 +1392,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wsc-field {
           margin:12px 14px;
           padding:12px 14px;
+          max-width:620px;
           border-radius:8px;
           background:rgba(255,255,255,.05);
           outline:none;
@@ -1850,6 +1851,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         </div>
       </div>
       <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary,#999);margin:14px 16px 0;flex-shrink:0;">GENERAL</div>
         <div class="wsc-field" @click=${(e: Event) => { (e.currentTarget as HTMLElement).querySelector("input")?.focus(); }}>
           <label class="wsc-label">What's the workspace name?</label>
           <input
@@ -1862,7 +1864,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         </div>
         <div class="wsc-field wsc-field-repos" style="display:flex;flex-direction:column;">
           <label class="wsc-label">What repos are you working on?</label>
-          <div style="margin-top:8px;max-width:620px;">
+          <div style="margin-top:8px;">
             ${this._detailRepos.map((entry, i) => html`
               ${entry.status === "success"
                 ? this._renderAccordionItem(
@@ -1979,7 +1981,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             </div>
           </div>
         </div>
-        <div style="display:flex;align-items:flex-start;gap:6px;margin:6px 14px 0;padding:6px 8px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
+        <div style="display:flex;align-items:flex-start;gap:6px;margin:6px 14px 16px;padding:6px 8px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
           <span style="flex-shrink:0;display:flex;align-items:center;height:1.35em;"><openp41ge-inline-icon name="warning" size="12" no-hover icon-color="var(--text-warning,#e5a50a)"></openp41ge-inline-icon></span>
           <span style="flex:1;min-width:0;">You need read access to each repository so openp41ge can pull (clone/sync) them without asking for a password.</span>
         </div>
