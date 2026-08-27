@@ -64,6 +64,24 @@ function fileModifiedSvg(size = 10): string {
 }
 
 class GitBrowserRenderer {
+  /** Whether the spinner keyframes have been injected into the page. */
+  static _spinKeyframesInjected = false;
+
+  /**
+   * Inject the spinner rotation keyframes once per page (self-contained;
+   * the renderer must not rely on host-app global CSS for its spinner).
+   */
+  static ensureSpinKeyframes(): void {
+    if (GitBrowserRenderer._spinKeyframesInjected) return;
+    GitBrowserRenderer._spinKeyframesInjected = true;
+    try {
+      const s = document.createElement("style");
+      s.textContent = "@keyframes git-render-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}";
+      document.head.appendChild(s);
+    } catch {
+      /* non-DOM environment — nothing to inject */
+    }
+  }
   renderGitPanel(data: GitBrowserData, callbacks: GitBrowserCallbacks): HTMLElement {
     const panel = document.createElement("div");
     panel.style.cssText = `
@@ -163,14 +181,7 @@ class GitBrowserRenderer {
     header.appendChild(label);
 
     if (loading) {
-      const spinner = document.createElement("span");
-      spinner.className = "git-section-spinner";
-      spinner.style.cssText = `
-        width:12px;height:12px;flex-shrink:0;
-        border:1.5px solid #444;border-top-color:#4a9eff;
-        border-radius:50%;animation:wt-spin 0.8s linear infinite;
-      `;
-      header.appendChild(spinner);
+      header.appendChild(this._sectionSpinner());
     }
 
     header.addEventListener("click", () => {
@@ -198,6 +209,28 @@ class GitBrowserRenderer {
     container.dataset.section = key;
 
     return container;
+  }
+
+  /**
+   * Material-style loading spinner for a section header: a single rounded
+   * arc that rotates (reads as a SPINNER, not a progress ring). Self-
+   * contained — the keyframes are injected once per page.
+   */
+  private _sectionSpinner(): HTMLElement {
+    const span = document.createElement("span");
+    span.className = "git-section-spinner";
+    span.style.cssText = `
+      width:13px;height:13px;flex-shrink:0;display:inline-flex;
+      align-items:center;justify-content:center;color:#4a9eff;
+    `;
+    span.innerHTML = `
+      <svg class="git-spin-arc" viewBox="0 0 16 16" width="13" height="13"
+           style="display:block;animation:git-render-spin .9s linear infinite;transform-origin:8px 8px;">
+        <path d="M8 2.4a5.6 5.6 0 1 0 5.5 4.85v-1" fill="none"
+              stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>`;
+    GitBrowserRenderer.ensureSpinKeyframes();
+    return span;
   }
 
   /**
