@@ -1981,7 +1981,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
             </div>
           </div>
         </div>
-        <div style="display:flex;align-items:flex-start;gap:6px;margin:6px 14px 16px;padding:6px 8px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
+        <div style="display:flex;align-items:flex-start;gap:6px;margin:6px 14px 16px;padding:6px 8px;max-width:620px;border-radius:4px;background:rgba(229,165,10,.10);border:1px solid rgba(229,165,10,.30);font-size:11px;color:var(--text-warning,#e5a50a);line-height:1.35;">
           <span style="flex-shrink:0;display:flex;align-items:center;height:1.35em;"><openp41ge-inline-icon name="warning" size="12" no-hover icon-color="var(--text-warning,#e5a50a)"></openp41ge-inline-icon></span>
           <span style="flex:1;min-width:0;">You need read access to each repository so openp41ge can pull (clone/sync) them without asking for a password.</span>
         </div>
@@ -1990,7 +1990,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       <!-- Dangerous actions (footer) -->
       <div style="flex-shrink:0;border-top:1px solid var(--divider,#333);padding:12px 14px 14px;">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary,#999);margin-bottom:8px;">Dangerous Actions</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;max-width:620px;border:1px solid rgba(244,71,71,.35);border-radius:6px;background:rgba(244,71,71,.06);">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:10px 12px;max-width:620px;border:1px solid rgba(244,71,71,.35);border-radius:6px;background:rgba(244,71,71,.06);">
           <div style="min-width:0;">
             <div style="font-size:12px;color:var(--text-primary,#ccc);">Delete this workspace</div>
             <div style="font-size:11px;color:var(--text-secondary,#999);margin-top:2px;line-height:1.35;">Removes the workspace from the list. Repositories and worktrees are not deleted unless you also delete the workspace data on disk.</div>
