@@ -1406,19 +1406,18 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-fa-secondary:hover { color:var(--text-primary,#ccc); }
 
         .wm-card {
-          padding:8px 12px; margin:0; border-radius:0;
-          border-bottom:1px solid var(--divider,#333);
-          cursor:pointer;
           position:relative;
-          transition:background .1s;
+          margin:8px 10px;
+          padding:8px 10px;
+          border-radius:8px;
+          background:rgba(255,255,255,.04);
+          border:1px solid var(--divider,#333);
+          cursor:pointer;
+          transition:background .1s, border-color .1s;
         }
         .wm-card:hover { background:var(--bg-hover,#2a2a2a); }
-        .wm-card.selected { background:rgba(0,122,204,.12); }
-        /* Drop the last row's separator when the list reaches (or overflows) the
-           column bottom: the app's bottom bar border already delineates it, and
-           leaving the row border would double the line. */
-        .wm-left-scroll.full .wm-card:last-child { border-bottom:0; }
-        .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:78px; }
+        .wm-card.selected { background:rgba(0,122,204,.12); border-color:rgba(0,122,204,.35); }
+        .wm-card-title { font-size:15px; color:var(--text-primary,#ccc); font-weight:500; padding-right:62px; }
         .wm-card-sub { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-secondary,#999); margin-top:2px; font-family:monospace; }
         .wm-card-copy {
           display:flex; align-items:center; justify-content:center;
