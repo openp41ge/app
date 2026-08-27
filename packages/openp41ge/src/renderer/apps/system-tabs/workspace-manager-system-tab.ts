@@ -1362,13 +1362,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         }
         .wm-search-box input { flex:1; min-width:0; background:transparent; border:none; outline:none; color:var(--text-primary,#ccc); font-size:12px; }
         .wm-search-box input::placeholder { color:var(--text-placeholder,#6e6e6e); }
-        .wm-tb-new {
-          display:inline-flex; align-items:center; gap:4px; flex-shrink:0;
-          height:24px; padding:0 10px; border:none; border-radius:4px; cursor:pointer;
-          background:rgba(0,122,204,.15); color:var(--accent,#007acc);
-          font-size:12px;
-        }
-        .wm-tb-new:hover { background:rgba(0,122,204,.25); }
         .wm-tb-close {
           display:flex; align-items:center; justify-content:center; flex-shrink:0;
           width:22px; height:22px; border-radius:4px; cursor:pointer; color:var(--text-secondary,#999);
@@ -1382,9 +1375,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           border-right:1px solid var(--divider,#333); background:var(--bg-secondary,#252526);
         }
         .wm-left-header {
-          display:flex; align-items:center; flex-shrink:0; box-sizing:border-box;
+          display:flex; align-items:center; justify-content:flex-end; flex-shrink:0; box-sizing:border-box;
           height:45px; padding:0 10px;
-          background:var(--bg-secondary,#252526); border-bottom:1px solid var(--divider,#333);
+          background:var(--bg-secondary,#252526);
         }
         .wm-left-scroll { flex:1; overflow-y:auto; min-height:0; padding:0; }
         .wm-right { flex:1; min-width:0; overflow-y:auto; position:relative; background:var(--bg-primary,#1e1e1e); }
@@ -1392,7 +1385,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-empty { padding:40px 20px; text-align:center; color:var(--text-secondary,#999); font-size:13px; }
         .wm-form-actions {
           display:flex; align-items:center; justify-content:flex-end; gap:6px;
-          padding:10px 14px; border-top:1px solid var(--divider,#333); flex-shrink:0;
+          padding:10px 14px; flex-shrink:0;
         }
         .wm-fa-primary {
           font-size:13px; padding:6px 14px; border-radius:4px; border:none; cursor:pointer;
@@ -1532,18 +1525,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           font-family:inherit;
           padding:0;
         }
-        .wm-btn.activate { background:rgba(0,122,204,.2); color:var(--accent,#007acc); padding:5px 14px; }
-        .wm-btn.activate:hover { background:rgba(0,122,204,.3); color:var(--accent,#007acc); }
         .wm-card-active-pill {
           padding:2px 10px; border-radius:999px; font-size:11px;
           background:rgba(0,122,204,.15); color:var(--accent,#007acc);
         }
-        .wm-btn {
-          padding:3px 8px; font-size:12px; border:none; border-radius:4px;
-          cursor:pointer; background:transparent; color:var(--text-secondary,#999);
-          transition:background .1s, color .1s;
-        }
-        .wm-btn:hover { background:var(--bg-hover-strong,#333); color:var(--text-primary,#ccc); }
 
         .wm-create-area {
           margin:6px 10px; padding:10px 14px; border-radius:8px;
@@ -1625,9 +1610,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           <!-- Left pane: workspace list -->
           <div class="wm-left">
             <div class="wm-left-header">
-              <button type="button" class="wm-tb-new" title="New workspace" @click=${() => this._showCreate()}>
-                <span>New workspace</span>
-              </button>
+              ${this._wmBtn("New", () => this._showCreate())}
             </div>
             <div class="wm-left-scroll${this._leftFull ? ' full' : ''}">
               ${this._workspaces.length === 0
@@ -1883,16 +1866,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
     const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;height:45px;box-sizing:border-box;border-bottom:1px solid var(--divider,#333);">
-        <div style="display:flex;align-items:center;gap:6px;">
-          <button
-            style="font-size:13px;padding:6px 12px;border-radius:4px;border:none;cursor:pointer;background:rgba(0,122,204,0.15);color:var(--accent,#007acc);transition:background .1s;"
-            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.25)'; }}
-            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,122,204,0.15)'; }}
-            @click=${() => this._onDetailSave()}
-          >Save</button>
-        </div>
-        <button class="wm-btn activate" style="${active ? 'visibility:hidden;' : ''}" @click=${() => this._activateWorkspace(entry)}>Activate</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;height:45px;box-sizing:border-box;">
+        ${this._wmBtn("Save", () => this._onDetailSave())}
+        ${this._wmBtn("Activate", () => this._activateWorkspace(entry), { hidden: active })}
       </div>
       <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary,#999);margin:14px 16px 0;flex-shrink:0;">GENERAL</div>
@@ -2032,21 +2008,43 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       </div>
 
       <!-- Dangerous actions (footer) -->
-      <div style="flex-shrink:0;border-top:1px solid var(--divider,#333);padding:12px 14px 14px;">
+      <div style="flex-shrink:0;padding:12px 14px 14px;">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary,#999);margin-bottom:8px;">Dangerous Actions</div>
         <div style="display:flex;flex-direction:column;gap:10px;padding:10px 12px;max-width:620px;border:1px solid rgba(244,71,71,.35);border-radius:6px;background:rgba(244,71,71,.06);">
           <div>
             <div style="font-size:12px;color:var(--text-primary,#ccc);">Delete this workspace</div>
             <div style="font-size:11px;color:var(--text-secondary,#999);margin-top:2px;line-height:1.35;">Removes the workspace from the list. Repositories and worktrees are not deleted unless you also delete the workspace data on disk.</div>
           </div>
-          <button
-            style="align-self:flex-start;font-size:12px;padding:5px 14px;border-radius:4px;border:none;cursor:pointer;background:rgba(244,71,71,0.15);color:var(--accent-error,#f44747);transition:background .1s;"
-            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(244,71,71,0.25)"; }}
-            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = "rgba(244,71,71,0.15)"; }}
-            @click=${() => { if (this._selected) this._onDeleteWorkspace(this._selected); }}
-          >Delete workspace</button>
+          <div style="display:flex;justify-content:flex-end;">
+            ${this._wmBtn("Delete", () => { if (this._selected) this._onDeleteWorkspace(this._selected); }, { danger: true })}
+          </div>
         </div>
       </div>
+    `;
+  }
+
+  /**
+   * Shared workspace-manager action button (single source for New / Save /
+   * Activate / Delete). `danger: true` selects the red delete style;
+   * `hidden: true` keeps the slot occupied but hides it (used by Activate so
+   * the header keeps its position once the workspace is already active).
+   */
+  private _wmBtn(
+    label: string,
+    onClick: () => void,
+    opts: { danger?: boolean; hidden?: boolean } = {},
+  ): TemplateResult {
+    const danger = opts.danger ?? false;
+    const bg = danger ? "rgba(244,71,71,.15)" : "rgba(0,122,204,.15)";
+    const bgHover = danger ? "rgba(244,71,71,.25)" : "rgba(0,122,204,.25)";
+    return html`
+      <button
+        type="button"
+        style="color:${danger ? "var(--accent-error,#f44747)" : "var(--accent,#007acc)"};background:${bg};font-size:12px;padding:5px 14px;border-radius:4px;border:none;cursor:pointer;transition:background .1s;${opts.hidden ? "visibility:hidden;" : ""}"
+        @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = bgHover; }}
+        @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = bg; }}
+        @click=${onClick}
+      >${label}</button>
     `;
   }
 }
