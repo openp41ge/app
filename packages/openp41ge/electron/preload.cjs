@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
   window: {
     minimize: () => ipcRenderer.send("window:minimize"),
     maximize: () => ipcRenderer.send("window:maximize"),
+    /** Animated grow-to-fit used by the custom title-bar double-click. */
+    maximizeAnimated: () => ipcRenderer.send("window:maximize-animated"),
     close: () => ipcRenderer.send("window:close"),
     isMaximized: () => ipcRenderer.invoke("window:isMaximized"),
     openDevTools: () => ipcRenderer.send("window:open-dev-tools"),

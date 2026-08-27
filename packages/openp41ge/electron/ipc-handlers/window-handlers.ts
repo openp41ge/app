@@ -3,7 +3,7 @@
  * minimize, maximize, close, isMaximized.
  */
 
-import { ipcMain, BrowserWindow, type IpcMainEvent } from "electron";
+import { ipcMain, BrowserWindow, screen, type IpcMainEvent } from "electron";
 import type { OperationDispatcher } from "../../src/main/index.js";
 import type { TabNameGenerator } from "../../src/main/index.js";
 import {
@@ -66,6 +66,44 @@ export function registerWindowHandlers(
       if (win.isMaximized()) win.unmaximize();
       else win.maximize();
     }
+  });
+
+  /**
+   * Animated maximize used by the custom title-bar double-click. Steps the
+   * window bounds to the screen work area with an ease-in-out curve. Every
+   * setBounds resizes the web contents, so the renderer gets a live resize
+   * + relayout on each frame — the UI grows WITH the window instead of
+   * freezing during macOS's native zoom animation.
+   */
+  ipcMain.on("window:maximize-animated", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (win.isMaximized()) {
+      win.unmaximize();
+      return;
+    }
+    const target = screen.getDisplayMatching(win.getBounds()).workArea;
+    const start = win.getBounds();
+    const steps = 12;
+    const per = 16; // ~190ms total, close to macOS's zoom ease
+    const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    let i = 0;
+    const tick = () => {
+      if (i > steps) {
+        win.maximize(); // lock the native maximized state
+        return;
+      }
+      const e = ease(i / steps);
+      win.setBounds({
+        x: Math.round(start.x + (target.x - start.x) * e),
+        y: Math.round(start.y + (target.y - start.y) * e),
+        width: Math.round(start.width + (target.width - start.width) * e),
+        height: Math.round(start.height + (target.height - start.height) * e),
+      });
+      i += 1;
+      setTimeout(tick, per);
+    };
+    tick();
   });
 
   ipcMain.on("window:close", (event) => {

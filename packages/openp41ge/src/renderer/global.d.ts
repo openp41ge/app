@@ -11,6 +11,7 @@ declare global {
       window: {
         minimize: () => void;
         maximize: () => void;
+        maximizeAnimated: () => void;
         close: () => void;
         isMaximized: () => Promise<boolean>;
         openDevTools: () => void;
