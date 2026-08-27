@@ -181,7 +181,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _onColDrag = (e: MouseEvent): void => {
     if (!this._draggingCol) return;
     const body = document.querySelector(".wm-overlay-body");
-    const left = document.querySelector(".wm-left");
+    const left = document.querySelector<HTMLElement>(".wm-left");
     if (!body || !left) return;
     const rect = body.getBoundingClientRect();
     // Min 140px; leave room for the 400px detail column + a small margin.
@@ -190,7 +190,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   };
 
   private _endColDrag = (): void => {
-    const left = document.querySelector(".wm-left");
+    const left = document.querySelector<HTMLElement>(".wm-left");
     if (left && this._draggingCol) {
       this._leftColWidth = Math.round(parseFloat(left.style.width) || this._leftColWidth);
       this._emitUpdate();
@@ -319,19 +319,38 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   /**
+   * Repo/worktree name span. The visible text is written by
+   * _applyRepoNameTruncation into the inner .wm-repo-name-text element, which
+   * has NO Lit interpolation — so rewriting its textContent is safe. Never put
+   * `${url}` as a direct child part of .wm-repo-name and rewrite textContent
+   * on it: Lit loses its child-part marker nodes and throws "ChildPart has no
+   * parentNode" on the next update.
+   */
+  private _repoNameSpan(url: string): TemplateResult {
+    return html`
+      <span class="wm-repo-name" data-full="${url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;"><span class="wm-repo-name-text"></span></span>
+    `;
+  }
+
+  /**
    * Collapse over-wide repo/worktree names instead of wrapping: keep as much
    * of the start (domain) and end (repo name) as fits, with "…" between them.
+   * Writes into the (Lit-unmanaged) .wm-repo-name-text child so the
+   * truncation never touches a Lit child part.
    */
   private _applyRepoNameTruncation(): void {
     const spans = Array.from(document.querySelectorAll<HTMLElement>(".wm-repo-name"));
     for (const el of spans) {
       const full = el.dataset.full ?? "";
       if (!full) continue;
+      const textEl = el.querySelector<HTMLElement>(".wm-repo-name-text");
+      if (!textEl) continue;
+      const setText = (t: string): void => {
+        if (textEl.textContent !== t) textEl.textContent = t;
+      };
       const fits = (): boolean => el.scrollWidth <= el.clientWidth;
-      if (fits()) {
-        if (el.textContent !== full) el.textContent = full;
-        continue;
-      }
+      setText(full);
+      if (fits()) continue;
       const ellipsis = "…";
       let max = full.length - 1;
       let best = full;
@@ -341,7 +360,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         const headLen = Math.ceil(avail / 2);
         const tailLen = avail - headLen;
         const candidate = full.slice(0, headLen) + ellipsis + full.slice(-tailLen);
-        el.textContent = candidate;
+        setText(candidate);
         if (fits()) {
           best = candidate;
           break;
@@ -349,7 +368,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         best = candidate;
         max--;
       }
-      el.textContent = best;
+      setText(best);
     }
   }
 
@@ -419,7 +438,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           }}
         >
           <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#999)" style="transform:rotate(${item.expanded ? '90deg' : '0deg'});"></openp41ge-inline-icon>
-          <span class="wm-repo-name" data-full="${item.url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${item.url}</span>
+          ${this._repoNameSpan(item.url)}
           ${actionsContent}
           ${trailingContent}
         </div>
@@ -553,7 +572,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           }}>
         <div style="display:flex;align-items:center;gap:6px;">
           <openp41ge-inline-icon name="corner" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-          <span class="wm-repo-name" data-full="${wt.name}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${wt.name}</span>
+          ${this._repoNameSpan(wt.name)}
           <span class="wt-del" style="display:flex;align-items:center;visibility:hidden;">
             <openp41ge-inline-icon name="close" size="12" no-hover @click=${onRemove}></openp41ge-inline-icon>
           </span>
@@ -692,7 +711,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
           <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
             <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-            <span class="wm-repo-name" data-full="${entry.url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${entry.url}</span>
+            ${this._repoNameSpan(entry.url)}
             <div class="row-actions">
               <openp41ge-inline-icon name="close" size="12" no-hover @click=${() => handleRemove(i)}></openp41ge-inline-icon>
             </div>
@@ -712,7 +731,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       <div class="repo-wrapper" style="${this._repoWrapperStyle(i, entry, arr)}">
         <div class="cr-row" tabindex="0" style="display:flex;align-items:center;gap:6px;padding:8px 10px;height:37px;box-sizing:border-box;${i === 0 ? 'border-radius:6px 6px 0 0;' : ''}">
           <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-          <span class="wm-repo-name" data-full="${entry.url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${entry.url}</span>
+          ${this._repoNameSpan(entry.url)}
           <div class="row-actions">
             <openp41ge-inline-icon name="close" size="12" no-hover @click=${() => handleRemove(i)}></openp41ge-inline-icon>
           </div>
@@ -1789,7 +1808,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
                           >
                             ${i === this._dragIndex ? '' : html`
                               <openp41ge-inline-icon name="chevron-right" size="12" no-hover icon-color="var(--text-secondary,#555)"></openp41ge-inline-icon>
-                              <span class="wm-repo-name" data-full="${entry.url}" style="flex:1;font-size:12px;color:var(--text-primary,#ccc);white-space:nowrap;overflow:hidden;">${entry.url}</span>
+                              ${this._repoNameSpan(entry.url)}
                             `}
                           </div>
                         `)}
