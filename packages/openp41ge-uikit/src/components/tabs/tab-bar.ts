@@ -269,6 +269,9 @@ export class TabBar extends LitElement {
           justify-content: center;
           margin-left: 4px;
           font-size: 12px;
+          /* The ✕ glyph must never inherit the tab's italic (unpinned tabs
+             italicize their title). Always render it upright. */
+          font-style: normal;
           color: #666;
           cursor: pointer;
           width: 16px;
