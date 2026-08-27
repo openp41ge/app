@@ -272,6 +272,10 @@ export class TabBar extends LitElement {
           /* The ✕ glyph must never inherit the tab's italic (unpinned tabs
              italicize their title). Always render it upright. */
           font-style: normal;
+          /* Neutralize the inherited 34px line-height (from the tab) that
+             pushes the glyph low in its 16px button; a tight line box lets
+             flex center the ✕ in the box. */
+          line-height: 1;
           color: #666;
           cursor: pointer;
           width: 16px;
