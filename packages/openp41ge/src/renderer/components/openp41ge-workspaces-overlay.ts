@@ -102,7 +102,18 @@ class Openp41geWorkspacesOverlay extends LitElement {
              resize notches z-index:5) since .openp41ge-main-area does not
              create its own stacking context. */
           z-index: 50;
-          background: var(--bg-primary, #1e1e1e);
+          /* The centered two-pane body is 600px wide; paint everything left
+             of it with the same background as the left list column so the
+             entire left side reads as one color, and keep the right side in
+             the lighter pane background. Offsets track the body centering
+             (600px / 2 = 300px). */
+          background: linear-gradient(
+            to right,
+            var(--bg-secondary, #252526) 0%,
+            var(--bg-secondary, #252526) calc(50% - 300px),
+            var(--bg-primary, #1e1e1e) calc(50% - 300px),
+            var(--bg-primary, #1e1e1e) 100%
+          );
           overflow: hidden;
         }
       </style>
