@@ -20,7 +20,7 @@ This runs `scripts/dev.sh`, which:
 
 1. Builds `openp41ge-file-editor` (generates `.d.ts`)
 2. Compiles Electron main process TypeScript (`build-electron.sh`)
-3. Starts the Vite dev server on `http://localhost:7392`
+3. Starts the Vite dev server on `http://localhost:8642`
 4. Launches Electron pointing at the Vite dev server (hot-reload)
 
 **With DevTools auto-open:**
@@ -44,8 +44,16 @@ The main process TypeScript does **not** hot-reload — restart `pnpm dev` after
 
 ```bash
 cd packages/openp41ge && bash scripts/dev-renderer.sh
-# Then open http://localhost:7392 in a browser
+# Then open http://localhost:8642 in a browser
 ```
+
+> **Dev port** — openp41ge deliberately uses an uncommon port (`8642`, not
+> Vite's `5173` or other agents' usual ports) so stray dev servers never end
+> up rendered in the Electron window. If it ever needs changing, update ALL
+> of these together: `packages/openp41ge/vite.config.ts` (`server.port`),
+> `packages/openp41ge/scripts/wait-for-vite.mjs`, 
+> `packages/openp41ge/electron/window-manager.ts` (`win.loadURL`), and this
+> skill.
 
 ### Chrome DevTools Remote Debugging
 

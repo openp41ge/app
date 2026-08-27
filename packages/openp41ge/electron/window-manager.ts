@@ -146,7 +146,7 @@ export function createOpenp41geWindow(
   if (process.env.OPENP41GE_E2E_TEST || !isDev) {
     win.loadFile(path.join(__dirname, "../../dist/index.html"));
   } else {
-    win.loadURL("http://localhost:7392");
+    win.loadURL("http://localhost:8642");
   }
 
   // Auto-open DevTools in dev mode
