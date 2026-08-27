@@ -68,42 +68,83 @@ export function registerWindowHandlers(
     }
   });
 
-  /**
-   * Animated maximize used by the custom title-bar double-click. Steps the
-   * window bounds to the screen work area with an ease-in-out curve. Every
-   * setBounds resizes the web contents, so the renderer gets a live resize
-   * + relayout on each frame — the UI grows WITH the window instead of
-   * freezing during macOS's native zoom animation.
-   */
-  ipcMain.on("window:maximize-animated", (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    if (win.isMaximized()) {
-      win.unmaximize();
-      return;
-    }
-    const target = screen.getDisplayMatching(win.getBounds()).workArea;
-    const start = win.getBounds();
+  // ── Animated maximize / restore (custom title-bar double-click) ─────────
+  // Steps the window bounds to the screen work area with an ease-in-out
+  // curve; every setBounds resizes the web contents, so the renderer gets a
+  // live resize + relayout each frame — the UI grows WITH the window instead
+  // of freezing during macOS's native zoom animation. We remember the
+  // original bounds in `maxState` so a second double-click can restore them.
+  // We deliberately do NOT use win.maximize() for this path: we move the
+  // window to the target before anything else, and macOS would then record
+  // the target itself as the restore frame, making unmaximize a no-op.
+
+  type MaxAnimToken = { cancelled: boolean };
+  const maxTokens = new WeakMap<BrowserWindow, MaxAnimToken>();
+  const maxState = new WeakMap<BrowserWindow, Electron.Rectangle>();
+
+  function cancelWindowAnimation(win: BrowserWindow): void {
+    const token = maxTokens.get(win);
+    if (token) token.cancelled = true;
+    maxTokens.delete(win);
+  }
+
+  function animateWindowBounds(
+    win: BrowserWindow,
+    from: Electron.Rectangle,
+    to: Electron.Rectangle,
+    onDone: () => void,
+  ): void {
+    cancelWindowAnimation(win);
+    const token: MaxAnimToken = { cancelled: false };
+    maxTokens.set(win, token);
     const steps = 12;
     const per = 16; // ~190ms total, close to macOS's zoom ease
     const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
     let i = 0;
-    const tick = () => {
+    const tick = (): void => {
+      if (token.cancelled) {
+        onDone();
+        return;
+      }
       if (i > steps) {
-        win.maximize(); // lock the native maximized state
+        maxTokens.delete(win);
+        onDone();
         return;
       }
       const e = ease(i / steps);
       win.setBounds({
-        x: Math.round(start.x + (target.x - start.x) * e),
-        y: Math.round(start.y + (target.y - start.y) * e),
-        width: Math.round(start.width + (target.width - start.width) * e),
-        height: Math.round(start.height + (target.height - start.height) * e),
+        x: Math.round(from.x + (to.x - from.x) * e),
+        y: Math.round(from.y + (to.y - from.y) * e),
+        width: Math.round(from.width + (to.width - from.width) * e),
+        height: Math.round(from.height + (to.height - from.height) * e),
       });
       i += 1;
       setTimeout(tick, per);
     };
     tick();
+  }
+
+  ipcMain.on("window:maximize-animated", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+
+    const restore = maxState.get(win);
+    if (restore) {
+      // Second double-click: reduce back to the original bounds.
+      maxState.delete(win);
+      animateWindowBounds(win, win.getBounds(), restore, () => undefined);
+      return;
+    }
+    if (win.isMaximized()) {
+      // Maximized natively (e.g. the macOS green button) — restore natively.
+      win.unmaximize();
+      return;
+    }
+
+    const start = win.getBounds();
+    const target = screen.getDisplayMatching(start).workArea;
+    maxState.set(win, { ...start });
+    animateWindowBounds(win, start, target, () => undefined);
   });
 
   // ── Custom titlebar drag ───────────────────────────────────────────────
@@ -118,7 +159,16 @@ export function registerWindowHandlers(
   ipcMain.on("window:start-drag", (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
-    if (win.isMaximized()) win.unmaximize(); // macOS-style: restore before dragging
+    cancelWindowAnimation(win);
+    const restore = maxState.get(win);
+    if (restore) {
+      // Maximized by our animated grow — drop back to the original bounds
+      // first (macOS-style restore-on-drag) so dragging moves a normal window.
+      maxState.delete(win);
+      win.setBounds(restore);
+    } else if (win.isMaximized()) {
+      win.unmaximize(); // natively maximized — restore before dragging
+    }
     activeDrags.add(win);
   });
 
@@ -138,7 +188,8 @@ export function registerWindowHandlers(
   });
 
   ipcMain.handle("window:isMaximized", (event) => {
-    return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return win ? win.isMaximized() || maxState.has(win) : false;
   });
 
   ipcMain.handle("window:getBounds", (event) => {

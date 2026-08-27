@@ -44,8 +44,10 @@ class Openp41geTitleBar extends LitElement {
   // Instead we reimplement the move over IPC (setPosition) and intercept the
   // double-click to run the animated maximize.
   private _dragActive = false;
+  private _dragStarted = false;
   private _dragMoved = false;
   private _dragMovePending = false;
+  private _downScreen = { x: 0, y: 0 };
   private _grabOffset = { x: 0, y: 0 };
 
   connectedCallback(): void {
@@ -74,17 +76,22 @@ class Openp41geTitleBar extends LitElement {
     emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
   }
 
-  // Custom window drag. The grab offset keeps the window's top-left pinned to
-  // the same spot under the cursor for the whole gesture. Moves are
-  // rAF-throttled (one IPC per frame); IPC send (not invoke) keeps it fire-and-
-  // forget so pointer tracking stays tight.
+  // Custom window drag. startDrag is deferred until the pointer actually
+  // travels past a small threshold; a clean click / double-click never
+  // touches the drag machinery, which keeps the second double-click
+  // (maximize → restore) intact. The grab offset pins the window's top-left
+  // to the same spot under the cursor for the whole gesture. Moves are
+  // rAF-throttled (one IPC per frame); IPC send (not invoke) keeps it
+  // fire-and-forget so pointer tracking stays tight.
   private _onBarPointerDown = (e: PointerEvent): void => {
     const target = e.target as HTMLElement;
     if (target.closest(".tb-btn, openp41ge-workspace-search, [data-winbtn]")) return;
     if (e.button !== 0) return;
 
     this._dragActive = true;
+    this._dragStarted = false;
     this._dragMoved = false;
+    this._downScreen = { x: e.screenX, y: e.screenY };
     this._grabOffset = { x: window.screenX - e.screenX, y: window.screenY - e.screenY };
 
     e.preventDefault(); // no text/image-selection while dragging the window
@@ -93,17 +100,25 @@ class Openp41geTitleBar extends LitElement {
     } catch {
       /* synthetic or already-released pointer */
     }
-    window.openp41ge?.window.startDrag();
   };
 
   private _onBarPointerMove = (e: PointerEvent): void => {
-    if (!this._dragActive || this._dragMovePending) return;
+    if (!this._dragActive) return;
+    if (!this._dragStarted) {
+      // Click-vs-drag discriminant: don't call this a drag (and don't send
+      // any IPC) until the pointer has clearly travelled — slight jitter
+      // during a double-click must never start a drag/restore.
+      if (Math.abs(e.screenX - this._downScreen.x) <= 3 && Math.abs(e.screenY - this._downScreen.y) <= 3) return;
+      this._dragStarted = true;
+      this._dragMoved = true;
+      window.openp41ge?.window.startDrag();
+    }
+    if (this._dragMovePending) return;
     const sx = e.screenX;
     const sy = e.screenY;
     this._dragMovePending = true;
     requestAnimationFrame(() => {
       this._dragMovePending = false;
-      this._dragMoved = true;
       window.openp41ge?.window.dragMove(sx + this._grabOffset.x, sy + this._grabOffset.y);
     });
   };
@@ -111,12 +126,13 @@ class Openp41geTitleBar extends LitElement {
   private _onBarPointerUp = (e: PointerEvent): void => {
     if (!this._dragActive) return;
     this._dragActive = false;
+    if (this._dragStarted) window.openp41ge?.window.endDrag();
+    this._dragStarted = false;
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {
       /* already released */
     }
-    window.openp41ge?.window.endDrag();
   };
 
   private _onBarDblClick = (e: MouseEvent): void => {
