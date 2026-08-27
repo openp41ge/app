@@ -1476,6 +1476,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wsc-field-repos .add-repo-trigger {
           border-radius: 0 0 8px 8px;
         }
+        /* Empty repo list: the trigger has no row above it, so round its top
+           corners too (otherwise the card's top corners stay square). */
+        .wsc-field-repos .add-repo-trigger:first-child {
+          border-radius: 8px;
+        }
         .wsc-field-repos .repo-wrapper:has(> .cr-row + div:not(.wsc-status-list)) + .add-repo-trigger,
         .wsc-field-repos .repo-wrapper:has(> .wsc-status-list + div) + .add-repo-trigger {
           border-top:none;
@@ -1866,7 +1871,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
     const active = workspaceFileService.activeFilePath === entry.filePath;
     return html`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;height:45px;box-sizing:border-box;">
+      <div style="position:sticky;top:0;z-index:10;background:var(--bg-primary,#1e1e1e);display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;height:45px;box-sizing:border-box;">
         ${this._wmBtn("Save", () => this._onDetailSave())}
         ${this._wmBtn("Activate", () => this._activateWorkspace(entry), { hidden: active })}
       </div>
