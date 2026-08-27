@@ -13,7 +13,7 @@ Run all available tooling in sequence to verify the health of the codebase. Alwa
 | ---------------------------- | --------------------------- | ------------------------------------------------------------------- |
 | **Dead code detection**      | `nx knip`                   | All packages — finds unused files, exports, dependencies, and types |
 | **TypeScript type check**    | `nx run-many -t typecheck`  | All packages                                                        |
-| **ESLint**                   | `nx lint`                   | `packages/` — configured in `eslint.config.js`                      |
+| **Lint (oxlint)**           | `nx lint`                   | `packages/` + `demos/` — configured in `.oxlintrc.json` (replaced ESLint to unblock TS 7; oxlint has no `typescript` peer) |
 | **Prettier check**           | `nx format:check`           | All files — config in `.prettierrc`                                 |
 | **Unit + integration tests** | `nx run-many -t test`       | All packages via per-package vitest configs                         |
 | **E2E tests**                | `nx run-many -t e2e`        | Playwright E2E tests across packages                                |
@@ -25,6 +25,8 @@ Run all available tooling in sequence to verify the health of the codebase. Alwa
 Root-level targets (`lint`, `format:check`) run from the monorepo root project but Nx only considers the root project's own files for its cache key by default. Changing files under `packages/` won't invalidate the cache.
 
 **Fix:** `nx.json` now has explicit `inputs: ["{workspaceRoot}/packages/**/*"]` on the `lint` target default so any change under `packages/` properly invalidates the cache. If you add new root-level targets, ensure they have similar `inputs` coverage.
+
+> Since 2026-08-27: `lint` runs **uncached** (`"cache": false` in `nx.json`) so it always runs fresh — a stale cached pass once hid 6 real violations under ESLint. oxlint is fast enough (~0.4s) that caching buys nothing.
 
 ## Quick Checks (pre-commit)
 

@@ -9,8 +9,6 @@
       "project": ["!packages/**"],
       "ignoreDependencies": [
         "@earendil-works/pi-coding-agent",
-        "@eslint/js",
-        "typescript-eslint",
         "@xterm/addon-fit",
         "concurrently",
         "lit",

@@ -89,7 +89,7 @@ Most targets are **per-project**, so they need `run-many`. Only `lint`, `knip`, 
 | `nx run openp41ge:dev`       | Start Electron app in dev mode (vite + Electron)    |
 | `nx run-many -t test`        | Run vitest tests across all projects that have them |
 | `nx run-many -t typecheck`   | TypeScript type-checking across all packages        |
-| `nx lint`                    | ESLint across `packages/` and `demos/`              |
+| `nx lint`                    | oxlint across `packages/` and `demos/` (config in `.oxlintrc.json`) |
 | `nx knip`                    | Dead code detection                                 |
 | `nx format` / `format:check` | Prettier write / check                              |
 | `nx run-many -t clean`       | Remove all `dist/` directories                      |
