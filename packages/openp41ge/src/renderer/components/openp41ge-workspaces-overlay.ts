@@ -89,7 +89,12 @@ class Openp41geWorkspacesOverlay extends LitElement {
     const controller = this._controller;
     return html`
       <style>
-        :host {
+        /* NOTE: this component renders in light DOM (createRenderRoot returns
+           this), so :host does NOT match — the rule must target the tag name
+           directly. That's what makes the host a positioned, z-index:200
+           stacking context while open; without it the caret (z-index:100 in
+           the editor) painted above the backdrop (z-index:50). */
+        openp41ge-workspaces-overlay {
           display: block;
           position: absolute;
           inset: 0;
