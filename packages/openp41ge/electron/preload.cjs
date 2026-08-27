@@ -53,8 +53,13 @@ contextBridge.exposeInMainWorld("openp41ge", {
     maximize: () => ipcRenderer.send("window:maximize"),
     /** Animated grow-to-fit used by the custom title-bar double-click. */
     maximizeAnimated: () => ipcRenderer.send("window:maximize-animated"),
+    /** Custom titlebar drag: animate a real window move over IPC. */
+    startDrag: () => ipcRenderer.send("window:start-drag"),
+    dragMove: (x, y) => ipcRenderer.send("window:drag-move", x, y),
+    endDrag: () => ipcRenderer.send("window:end-drag"),
     close: () => ipcRenderer.send("window:close"),
     isMaximized: () => ipcRenderer.invoke("window:isMaximized"),
+    getBounds: () => ipcRenderer.invoke("window:getBounds"),
     openDevTools: () => ipcRenderer.send("window:open-dev-tools"),
   },
 

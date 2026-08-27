@@ -12,8 +12,12 @@ declare global {
         minimize: () => void;
         maximize: () => void;
         maximizeAnimated: () => void;
+        startDrag: () => void;
+        dragMove: (x: number, y: number) => void;
+        endDrag: () => void;
         close: () => void;
         isMaximized: () => Promise<boolean>;
+        getBounds: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
         openDevTools: () => void;
       };
       workspace: {

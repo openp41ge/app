@@ -106,12 +106,43 @@ export function registerWindowHandlers(
     tick();
   });
 
+  // ── Custom titlebar drag ───────────────────────────────────────────────
+  // The bar is permanently `no-drag` so the renderer can intercept the
+  // double-click for the animated maximize above. We reimplement the window
+  // move over IPC: the renderer sends the desired absolute top-left (DIP),
+  // and we setPosition it. Moves are rAF-throttled renderer-side (one IPC per
+  // frame) so pointer tracking stays tight.
+
+  const activeDrags = new WeakSet<BrowserWindow>();
+
+  ipcMain.on("window:start-drag", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (win.isMaximized()) win.unmaximize(); // macOS-style: restore before dragging
+    activeDrags.add(win);
+  });
+
+  ipcMain.on("window:drag-move", (event, x: number, y: number) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || !activeDrags.has(win)) return;
+    win.setPosition(Math.round(x), Math.round(y));
+  });
+
+  ipcMain.on("window:end-drag", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) activeDrags.delete(win);
+  });
+
   ipcMain.on("window:close", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
 
   ipcMain.handle("window:isMaximized", (event) => {
     return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+  });
+
+  ipcMain.handle("window:getBounds", (event) => {
+    return BrowserWindow.fromWebContents(event.sender)?.getBounds() ?? null;
   });
 
   ipcMain.on("window:open-dev-tools", (event) => {

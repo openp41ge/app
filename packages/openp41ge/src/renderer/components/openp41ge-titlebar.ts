@@ -38,6 +38,16 @@ class Openp41geTitleBar extends LitElement {
   @property({ attribute: false })
   rightSidebarVisible: boolean = false;
 
+  // ── Custom titlebar drag ────────────────────────────────────────────
+  // The bar is permanently `no-drag`: on a `-webkit-app-region: drag` region
+  // the OS swallows all mouse events, so we could never hear the double-click.
+  // Instead we reimplement the move over IPC (setPosition) and intercept the
+  // double-click to run the animated maximize.
+  private _dragActive = false;
+  private _dragMoved = false;
+  private _dragMovePending = false;
+  private _grabOffset = { x: 0, y: 0 };
+
   connectedCallback(): void {
     super.connectedCallback();
     document.addEventListener("workspace-file-changed", this._requestUpdate);
@@ -64,6 +74,58 @@ class Openp41geTitleBar extends LitElement {
     emitEvent("sidebar-toggle", { windowId: win.id, side: "right" });
   }
 
+  // Custom window drag. The grab offset keeps the window's top-left pinned to
+  // the same spot under the cursor for the whole gesture. Moves are
+  // rAF-throttled (one IPC per frame); IPC send (not invoke) keeps it fire-and-
+  // forget so pointer tracking stays tight.
+  private _onBarPointerDown = (e: PointerEvent): void => {
+    const target = e.target as HTMLElement;
+    if (target.closest(".tb-btn, openp41ge-workspace-search, [data-winbtn]")) return;
+    if (e.button !== 0) return;
+
+    this._dragActive = true;
+    this._dragMoved = false;
+    this._grabOffset = { x: window.screenX - e.screenX, y: window.screenY - e.screenY };
+
+    e.preventDefault(); // no text/image-selection while dragging the window
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* synthetic or already-released pointer */
+    }
+    window.openp41ge?.window.startDrag();
+  };
+
+  private _onBarPointerMove = (e: PointerEvent): void => {
+    if (!this._dragActive || this._dragMovePending) return;
+    const sx = e.screenX;
+    const sy = e.screenY;
+    this._dragMovePending = true;
+    requestAnimationFrame(() => {
+      this._dragMovePending = false;
+      this._dragMoved = true;
+      window.openp41ge?.window.dragMove(sx + this._grabOffset.x, sy + this._grabOffset.y);
+    });
+  };
+
+  private _onBarPointerUp = (e: PointerEvent): void => {
+    if (!this._dragActive) return;
+    this._dragActive = false;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    window.openp41ge?.window.endDrag();
+  };
+
+  private _onBarDblClick = (e: MouseEvent): void => {
+    const target = e.target as HTMLElement;
+    if (target.closest(".tb-btn, openp41ge-workspace-search, [data-winbtn]")) return;
+    if (this._dragMoved) return; // was a real drag, not a double-click
+    window.openp41ge?.window.maximizeAnimated();
+  };
+
 
 
   render(): TemplateResult | typeof nothing {
@@ -76,7 +138,12 @@ class Openp41geTitleBar extends LitElement {
       </style>
       <div
         class="tb-row flex items-center bg-gutter border-b border-divider shrink-0 select-none relative"
-        style="--tb-h:${TITLEBAR_HEIGHT}px;-webkit-app-region:drag;"
+        style="--tb-h:${TITLEBAR_HEIGHT}px;-webkit-app-region:no-drag;"
+        @pointerdown=${this._onBarPointerDown}
+        @pointermove=${this._onBarPointerMove}
+        @pointerup=${this._onBarPointerUp}
+        @pointercancel=${this._onBarPointerUp}
+        @dblclick=${this._onBarDblClick}
       >
         <!-- Traffic-light spacer (85px on Mac, 12px otherwise) -->
         <div class="tb-mw shrink-0" style="--tb-mw:${isMac ? 85 : 12}px"></div>
@@ -137,6 +204,7 @@ class Openp41geTitleBar extends LitElement {
       <div
         class="w-[46px] h-full flex items-center justify-center cursor-pointer text-sm text-secondary transition-[background] duration-100"
         style="-webkit-app-region:no-drag"
+        data-winbtn
         @mouseenter=${(e: MouseEvent) => {
           const el = e.currentTarget as HTMLElement;
           el.classList.add(isClose ? "bg-[#e81123]" : "bg-[#333]");
