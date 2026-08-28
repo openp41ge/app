@@ -194,6 +194,22 @@ Remaining: none blocking. (Native `dragend` fallback is kept, not removed.)
 - **L / I / D** — no interface changes; `FileDragSource`, `GridDropTarget`, resolver,
   and handlers are reused as-is.
 
+## Implementation Status
+
+Original four changes (implemented + unit-tested, all green):
+- `openp41ge-uikit/src/components/tree/tree.ts` — `data-file-path` on draggable rows with `meta.filePath`.
+- `init-drag-system.ts` — `onFileMouseDown` walks `composedPath()` (sees through the tree's shadow root); capture-phase `dragstart` suppression for file rows; resolver routes file drops on a cell tab bar to the enclosing grid.
+- `openp41ge-tabs grid-drop-target.ts` — file cell drop passes `winId: this.winId` + explicit `pinned: true`.
+- `vitest.config.ts` — `openp41ge-tabs` → source alias for unit tests.
+
+Runtime review found a `data-file-path` follow-up + a new-window copy request, now implemented:
+1. **Ghost leaves the window (BrowserWindow ghost = captured bitmap of the row).** An in-DOM `position:fixed` ghost is clipped to the viewport and can never leave the BrowserWindow. The file drag therefore uses the main-process `DragGhostManager` — a transparent `alwaysOnTop`, `focusable:false`, `skipTaskbar` BrowserWindow that follows the cursor everywhere (OS-level). Rather than re-styling HTML, the ghost now shows a **pixel-accurate bitmap** of the real source row: at first POSITION (drag threshold), the renderer sends the row's `getBoundingClientRect` with `drag.start`; the main `drag-handlers` `await webContents.capturePage(rect)` → PNG data URL → `show(..., bitmapDataUrl)` renders `<img>` at the row's exact CSS dims and the window adopts those dimensions. So the ghost is an exact snapshot of the dragged element (the user's chosen approach over native `setDragImage`). Fallbacks: `isFile` row-styled HTML if capture fails, pill for tabs. `FileDragSource` keeps an invisible in-DOM ghost (like tabs) and **no longer dims the source row**, so the threshold capture is pristine. Source-row dims/offset/captureRect are passed through `drag.start` so the ghost lines up under the cursor.
+2. **New window copies the source window's chrome.** `actionOpenFileInNewWindow(ws, filePath, fileName?, sourceWinId?)` now clones the source window's `sidebar` (tabs + open state) and `repoRefs` onto the new window; the central grid still starts fresh with just the dropped file. `init-drag-system` passes the source window id in both dispatch sites; `dispatch-handler` reads drop coords at arg indices 3/4.
+
+Tests added (all passing): `test/unit/layout/file-operations.test.ts` (new-window copy behaviour), `test/unit/services/file-drag-source.test.ts` (invisible ghost + pristine row).
+
+Quality: `openp41ge:test` full suite green; lint green; `tsc` clean for all changed files (only the pre-existing `openp41ge-system-overlay.ts` error remains, present on HEAD). Main-process changes (`drag-ghost-manager.ts`, `dispatch-handler.ts`) require an Electron restart in dev (main does not hot-reload).
+
 ## Completion Criteria
 
 - [ ] Explorer file rows render `data-file-path`; directories do not.

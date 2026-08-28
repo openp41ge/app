@@ -98,10 +98,16 @@ export default defineConfig({
   resolve: {
     alias: {
       "@openp41ge": path.resolve(__dirname, "./packages/openp41ge/src"),
-      "@openp41ge-file-editor": path.resolve(__dirname, "./packages/openp41ge-uikit/src/file-editor"),
+      "@openp41ge-file-editor": path.resolve(
+        __dirname,
+        "./packages/openp41ge-uikit/src/file-editor",
+      ),
       "@openp41ge-logger": path.resolve(__dirname, "./packages/openp41ge-logger/src"),
       "@openp41ge-terminal": path.resolve(__dirname, "./packages/openp41ge-terminal/src"),
       "@openp41ge-agent-chat": path.resolve(__dirname, "./packages/openp41ge-agent-chat/src"),
+      // Source alias so unit tests import openp41ge-tabs source (its dist has
+      // declarations only), mirroring the main app's dev-mode aliasing.
+      "openp41ge-tabs": path.resolve(__dirname, "./packages/openp41ge-tabs/src"),
     },
   },
 });
