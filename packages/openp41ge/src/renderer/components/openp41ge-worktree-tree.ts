@@ -651,6 +651,12 @@ class Openp41geWorktreeTree extends LitElement {
           </div>
         </div>
         <!-- wt-tree-scroll-wrapper -->
+        <div
+          class="sb-bottom-bar"
+          style="border-top:1px solid var(--divider,#333);height:24px;flex-shrink:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary,#252526);"
+        >
+          <span style="flex:1"></span>
+        </div>
       </div>
     `;
   }

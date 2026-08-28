@@ -81,6 +81,21 @@ export class GitSystemTabController implements SystemTabController {
     });
 
     wrapper.appendChild(list);
+
+    // Empty bottom bar (placeholder for now — sidebar tabs own their footer).
+    const footer = document.createElement("div");
+    Object.assign(footer.style, {
+      flexShrink: "0",
+      height: "24px",
+      display: "flex",
+      alignItems: "center",
+      padding: "0 8px",
+      borderTop: "1px solid var(--divider,#333)",
+      fontSize: "12px",
+      color: "var(--text-secondary,#999)",
+      background: "var(--bg-secondary,#252526)",
+    });
+    wrapper.appendChild(footer);
     container.appendChild(wrapper);
     this._viewElement = wrapper;
     this._list = list;
