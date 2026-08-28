@@ -22,7 +22,7 @@ import { repoTreeRenderer } from "../services/repo-tree-renderer";
 import { plusIconThick } from "../icons";
 import { showConfirmModal } from "./openp41ge-confirm-modal";
 import "./openp41ge-repo-tree-item";
-import { repoOrderCache } from "../repo-order-cache";
+import { saveRepoOrder, applyRepoOrder } from "../repo-order-cache";
 import "./openp41ge-clone-dialog";
 import "./openp41ge-add-worktree-dialog";
 import { appServices } from "../app";
@@ -456,22 +456,10 @@ class Openp41geWorktreeTree extends LitElement {
                 const [moved] = newRepos.splice(fromIdx, 1);
                 newRepos.splice(dropIndex > fromIdx ? dropIndex - 1 : dropIndex, 0, moved);
                 this._repos = newRepos;
-                // Persist the new order
-                const orderNames = newRepos.map((r) => r.name);
-                const pn = window.__openp41geProjectName;
-                const projectName = pn ?? "";
-                if (projectName) repoOrderCache.set(projectName, orderNames);
-                const doSave = (name: string) => {
-                  window.openp41ge.project.setRepoOrder(name, orderNames);
-                  document.dispatchEvent(new CustomEvent("project:changed"));
-                };
-                if (projectName) {
-                  doSave(projectName);
-                } else {
-                  window.openp41ge.project.current().then((n) => {
-                    if (n) doSave(n);
-                  });
-                }
+                // Persist the new order to localStorage (the per-project
+                // repo-order store was removed with the project system)
+                saveRepoOrder(newRepos.map((r) => r.name));
+                document.dispatchEvent(new CustomEvent("project:changed"));
               }}
             >
               ${this._repos.map((repo, idx) => {
@@ -1491,6 +1479,9 @@ class Openp41geWorktreeTree extends LitElement {
       if (!this._editMode) {
         this._repos = this._repos.filter((r) => repoRefs.some((ref) => ref.name === r.name));
       }
+
+      // Restore the persisted drag-reorder (localStorage; no per-project store)
+      this._repos = applyRepoOrder(this._repos);
 
       // Also rebuild _worktreesByRepo from repoRef worktree lists
       for (const repoRef of repoRefs) {
