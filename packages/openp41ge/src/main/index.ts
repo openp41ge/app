@@ -15,3 +15,5 @@ export { TabNameGenerator } from "./services/tab-name-generator.js";
 export { ConfigService } from "./services/config-service.js";
 export type { UserConfig } from "./services/config-service.js";
 export { WorkspaceStateStore } from "./services/workspace-state-store.js";
+export { LogFileStore } from "./services/log-file-store.js";
+export type { LogFileInfo, PersistedLogEntry } from "./services/log-file-store.js";

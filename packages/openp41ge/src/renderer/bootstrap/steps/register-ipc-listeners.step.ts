@@ -15,8 +15,7 @@ const log = createLogger("bootstrap:register-ipc-listeners");
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { wireResetListener } from "../../app";
 import { workspaceFileService } from "../../services/workspace-file-service";
-import { serviceModalService } from "../../services/service-modal-service";
-import { workspacesOverlayService } from "../../services/workspaces-overlay-service";
+import { systemOverlayService } from "../../services/system-overlay-service";
 
 export class RegisterIpcListenersStep implements IStartupStep {
   readonly name = "register-ipc-listeners";
@@ -48,14 +47,14 @@ export class RegisterIpcListenersStep implements IStartupStep {
 
     // ── Menu: New Workspace ─────────────────────────────────────────────
     window.openp41ge.onNewWorkspace(async () => {
-      workspacesOverlayService.open("create");
+      systemOverlayService.open("create", "workspaces");
     });
 
     // ── Menu: Open Workspace ────────────────────────────────────────────
     window.openp41ge.onOpenWorkspace(() => {
       workspaceFileService.openDialog().then((loaded) => {
         if (loaded) {
-          workspacesOverlayService.open("list");
+          systemOverlayService.open("list", "workspaces");
         }
       });
     });
@@ -67,9 +66,14 @@ export class RegisterIpcListenersStep implements IStartupStep {
       }
     });
 
-    // ── Menu: Settings… (app menu -> Cmd+,) ─────────────────────────────
-    window.openp41ge.onOpenSettings(() => {
-      serviceModalService.openModal("settings");
+    // ── Menu: View > Workspaces… (opens the system overlay on Workspaces) ──
+    window.openp41ge.onOpenWorkspaces(() => {
+      systemOverlayService.open("list", "workspaces");
+    });
+
+    // ── Menu: View > Logs… (opens the system overlay on Logs) ─────────
+    window.openp41ge.onOpenLogs(() => {
+      systemOverlayService.open("list", "logs");
     });
 
     log.info("IPC listeners registered");

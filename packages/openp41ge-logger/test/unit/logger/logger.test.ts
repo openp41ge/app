@@ -1,12 +1,18 @@
 /**
  * Unit tests for logger.ts
+ *
+ * NOTE: the console transport is installed automatically when logger.ts is
+ * imported, so `log.*` calls replay to console synchronously via the bus.
+ * DEBUG capture is gated: entries are only captured (and replayed) while
+ * `setMinLevel(LogLevel.DEBUG)` is active. Tests below assert both behaviours.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createLogger, createNoopLogger, type ILogger } from "@openp41ge-logger/logger";
-import { LogLevel, getLogBuffer, clearLogBuffer } from "@openp41ge-logger/log-buffer";
+import { LogLevel, getLogBuffer, clearLogBuffer, setMinLevel } from "@openp41ge-logger/log-buffer";
 
 beforeEach(() => {
   clearLogBuffer();
+  setMinLevel(LogLevel.DEBUG); // capture everything for these tests
 });
 
 // ── createLogger ──
@@ -26,6 +32,17 @@ describe("createLogger()", () => {
     log.debug("hello", "world");
 
     expect(spy).toHaveBeenCalledWith("[my-module]", "hello", "world");
+    spy.mockRestore();
+  });
+
+  it("does not call console.debug for dropped DEBUG by default", () => {
+    setMinLevel(LogLevel.INFO);
+    const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const log = createLogger("my-module");
+    log.debug("hello", "world");
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(getLogBuffer()).toHaveLength(0);
     spy.mockRestore();
   });
 
@@ -85,6 +102,29 @@ describe("createLogger()", () => {
     expect(entries[3].text).toBe("error msg");
 
     spies.forEach((s) => s.mockRestore());
+  });
+
+  it("detaches a structured data payload from the trailing plain object", () => {
+    const log = createLogger("drag");
+    const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
+
+    log.debug("mousemove", { x: 12, y: 40, isBoundary: true });
+
+    const entry = getLogBuffer()[0];
+    expect(entry.data).toEqual({ x: 12, y: 40, isBoundary: true });
+    // Console replay keeps the original call shape (including the object)
+    expect(spy).toHaveBeenCalledWith("[drag]", "mousemove", { x: 12, y: 40, isBoundary: true });
+    spy.mockRestore();
+  });
+
+  it("does not treat Errors or plain trailing non-objects as data", () => {
+    const log = createLogger("err");
+    const err = new Error("boom");
+    log.error("something failed:", err);
+
+    const entry = getLogBuffer()[0];
+    expect(entry.data).toBeUndefined();
+    expect(entry.text).toBe("something failed: Error: boom");
   });
 
   it("passes all args to both console and log buffer", () => {

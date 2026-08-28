@@ -4,6 +4,7 @@ import type { AppState } from "./services/app-state";
 import type { WorkspaceData } from "./services/workspace-data";
 import type { PluginRegistry, PluginRegistration } from "./services/plugin-registry";
 import type { WorkspaceFileService } from "./services/workspace-file-service";
+import { queryLog, type LogQuery as BusLogQuery } from "openp41ge-logger";
 
 export interface DebugAPI {
   state: AppState;
@@ -12,6 +13,10 @@ export interface DebugAPI {
     getLogs(filter?: LogFilter): LogEntry[];
     getEvent(eventId: string): LogEntry | undefined;
     clear(): void;
+    /** Query the renderer's captured log bus (openp41ge-logger). */
+    query(filter?: BusLogQuery): ReturnType<typeof queryLog>;
+    /** Path to the persisted logs directory (~/.openp41ge/logs). */
+    path(): Promise<string | null>;
   };
   graph: {
     hash(): string;
@@ -40,6 +45,18 @@ export function initDebugAPI(
       getLogs: (filter) => logBuffer.getLogs(filter),
       getEvent: (eventId) => logBuffer.getEvent(eventId),
       clear: () => logBuffer.clear(),
+      query: (filter) => queryLog(filter),
+      path: async () => {
+        try {
+          if (typeof window !== "undefined" && window.openp41ge?.logs?.getPath) {
+            const r = await window.openp41ge.logs.getPath();
+            return r.logsDir;
+          }
+        } catch {
+          // IPC may be unavailable in some contexts
+        }
+        return null;
+      },
     },
     graph: {
       hash: () => graph.hash(),

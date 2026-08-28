@@ -22,6 +22,10 @@ import {
   type DragSourceData,
 } from "../openp41ge-tabs-adapter";
 
+import { createLogger } from "openp41ge-logger";
+
+const log = createLogger("cross-window-drag");
+
 import { FileDragSource } from "./drag-sources/file-drag-source";
 import { SidebarDropTarget } from "./drop-targets/sidebar-drop-target";
 import { SIDEBAR_DROP_EVENT } from "openp41ge-constants";
@@ -301,7 +305,8 @@ export function initDragSystem(): () => void {
 
     const tabId = sidebarTab.getAttribute("data-sidebar-tab-id") || "";
     const side = sidebarTab.getAttribute("data-sidebar-side") || "";
-    const title = sidebarTab.getAttribute("data-tab-title") || sidebarTab.textContent?.trim() || "Tab";
+    const title =
+      sidebarTab.getAttribute("data-tab-title") || sidebarTab.textContent?.trim() || "Tab";
     const winId = _resolveMyWinId();
 
     const sidebarEl = sidebarTab.closest?.("openp41ge-sidebar");
@@ -342,6 +347,12 @@ export function initDragSystem(): () => void {
   // ── Mousemove: update grid ghost or show cross-window ghost ───────────
   let _focusedOnEntry = false;
   const onMouseMove = (e: MouseEvent) => {
+    log.debug("mousemove", {
+      x: e.clientX,
+      y: e.clientY,
+      localDragActive: _localDragActive,
+      remoteDragActive: _remoteDragActive,
+    });
     if (_localDragActive) {
       updateGridGhost(e.clientX, e.clientY);
       return;
@@ -621,6 +632,7 @@ export function initDragSystem(): () => void {
     // Convert screen → viewport coordinates and show ghost
     const cx = screenX - window.screenX;
     const cy = screenY - window.screenY;
+    log.debug("ipc-ghost", { screenX, screenY, clientX: cx, clientY: cy });
     _updateCrossWindowGhost(cx, cy);
   });
 
@@ -681,6 +693,14 @@ async function _handleCrossWindowDrop(
 
     const data = active.dragData;
     const sourceWinId = active.sourceWinId;
+    log.debug("drop", {
+      targetType: target.type,
+      x: clientX,
+      y: clientY,
+      sourceWinId,
+      tabId: (data as { tabId?: string }).tabId,
+      dragType: data.type,
+    });
 
     // Handle file drops: open the file in the target window/grid
     if (data.type === "file") {
@@ -800,10 +820,14 @@ async function _handleCrossWindowDrop(
       const relX = clientX - gridRect.left;
       const cols = (gridEl as HTMLElement & { cols?: number }).cols || 1;
 
-      // Use computeDropTarget for boundary detection — same logic as
-      // GridDropTarget.onDrop, handles all column counts including cols === 1.
       const pos = computeDropTarget(gridEl, relX, gridRect.width, cols);
       const mouseCol = pos.col;
+      log.debug("drop-grid", {
+        col: mouseCol,
+        isBoundary: pos.isBoundary,
+        boundaryIndex: pos.boundaryIndex ?? -1,
+        cols,
+      });
 
       if (pos.isBoundary) {
         const splitLeft =
@@ -983,6 +1007,15 @@ function _updateCrossWindowGhost(clientX: number, clientY: number): void {
   const relX = clientX - rect.left;
   const pos = computeDropTarget(_crossWindowGrid, relX, rect.width, _crossWindowGridCols);
   const mouseCol = pos.col;
+  log.debug("compute-drop-target", {
+    x: clientX,
+    y: clientY,
+    cols: _crossWindowGridCols,
+    col: mouseCol,
+    isBoundary: pos.isBoundary,
+    boundaryIndex: pos.boundaryIndex ?? -1,
+    relX,
+  });
 
   if (pos.isBoundary) {
     const splitLeft =
@@ -1010,6 +1043,13 @@ function _updateCrossWindowGhost(clientX: number, clientY: number): void {
       activeCol: mouseCol,
     });
   }
+  log.debug("ghost-update", {
+    x: clientX,
+    y: clientY,
+    cols: _crossWindowGridCols,
+    isBoundary: pos.isBoundary,
+    mouseCol,
+  });
   _crossGhostGrid = _crossWindowGrid;
 }
 

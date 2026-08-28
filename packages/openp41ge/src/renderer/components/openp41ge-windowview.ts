@@ -11,10 +11,15 @@ import type { Window, Workspace, Rect, SystemTabId } from "../../layout/types";
 import { emitEvent } from "../app";
 
 import { setContextMenuActive } from "../services/drag-context";
-import { MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, NOTCH_WIDTH, NOTCH_OVERFLOW } from "openp41ge-constants";
+import {
+  MIN_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+  NOTCH_WIDTH,
+  NOTCH_OVERFLOW,
+} from "openp41ge-constants";
 
 import "./openp41ge-sidebar";
-import "./openp41ge-workspaces-overlay";
+import "./openp41ge-system-overlay";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -38,7 +43,10 @@ class Openp41geWindowView extends LitElement {
 
   /** Right sidebar width in pixels. */
   @state()
-  private _rightWidth = parseInt(localStorage.getItem("openp41ge:sidebar-width-right") ?? "280", 10);
+  private _rightWidth = parseInt(
+    localStorage.getItem("openp41ge:sidebar-width-right") ?? "280",
+    10,
+  );
 
   // ── Drag state ────────────────────────────────────────────────────────
 
@@ -140,13 +148,19 @@ class Openp41geWindowView extends LitElement {
 
     switch (this._activeHandle) {
       case "left": {
-        const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, this._dragStartLeftWidth + dx));
+        const newWidth = Math.max(
+          MIN_SIDEBAR_WIDTH,
+          Math.min(MAX_SIDEBAR_WIDTH, this._dragStartLeftWidth + dx),
+        );
         this._dragLeftWidth = newWidth;
         this._applyWidth("left", newWidth);
         break;
       }
       case "right": {
-        const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, this._dragStartRightWidth - dx));
+        const newWidth = Math.max(
+          MIN_SIDEBAR_WIDTH,
+          Math.min(MAX_SIDEBAR_WIDTH, this._dragStartRightWidth - dx),
+        );
         this._dragRightWidth = newWidth;
         this._applyWidth("right", newWidth);
         break;
@@ -236,21 +250,30 @@ class Openp41geWindowView extends LitElement {
     }
 
     const effectiveCols = Math.max(1, win.grid.cols);
-    const placements = win.grid.placements.length > 0
-      ? win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))
-      : [{ position: { row: 0, col: 0 }, tabIds: [] as string[] }];
+    const placements =
+      win.grid.placements.length > 0
+        ? win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))
+        : [{ position: { row: 0, col: 0 }, tabIds: [] as string[] }];
 
     // Resolve system tab data for sidebars
     const leftSysTabs = (win.sidebar?.leftSidebarTabs ?? []).map((id) => ({
-      id, title: this._getSystemTabTitle(id), appType: this._getSystemTabAppType(id), pinned: this._getSystemTabPinned(id),
+      id,
+      title: this._getSystemTabTitle(id),
+      appType: this._getSystemTabAppType(id),
+      pinned: this._getSystemTabPinned(id),
     }));
     const rightSysTabs = (win.sidebar?.rightSidebarTabs ?? []).map((id) => ({
-      id, title: this._getSystemTabTitle(id), appType: this._getSystemTabAppType(id), pinned: this._getSystemTabPinned(id),
+      id,
+      title: this._getSystemTabTitle(id),
+      appType: this._getSystemTabAppType(id),
+      pinned: this._getSystemTabPinned(id),
     }));
 
     return html`
       <style>
-        .sidebar-element-hidden { display: none !important; }
+        .sidebar-element-hidden {
+          display: none !important;
+        }
 
         /* ── Resize notches (like sidebar notches but owned by windowview) ── */
         .wv-notch-v {
@@ -279,9 +302,15 @@ class Openp41geWindowView extends LitElement {
           pointer-events: none;
         }
         .wv-notch-v:hover::before,
-        .wv-notch-v.dragging::before { opacity: 1; }
-        .wv-notch-v.left-notch::before { left: 1px; }
-        .wv-notch-v.right-notch::before { right: 2px; }
+        .wv-notch-v.dragging::before {
+          opacity: 1;
+        }
+        .wv-notch-v.left-notch::before {
+          left: 1px;
+        }
+        .wv-notch-v.right-notch::before {
+          right: 2px;
+        }
       </style>
       <div class="flex flex-col w-full h-full bg-surface relative">
         <openp41ge-titlebar
@@ -299,19 +328,22 @@ class Openp41geWindowView extends LitElement {
             .systemTabs=${leftSysTabs}
             .activeTabId=${win.sidebar?.activeLeftTab ?? null}
             .isOpen=${win.sidebar?.leftSidebarOpen ?? false}
-            class="sidebar-element ${win.sidebar?.leftSidebarOpen ? '' : 'sidebar-element-hidden'}"
+            class="sidebar-element ${win.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
             style="flex: 0 1 ${this._leftWidth}px; max-width: min(${this._leftWidth}px, 35vw)"
           ></openp41ge-sidebar>
 
           <!-- Left resize notch (between left sidebar and grid) -->
           <div
-            class="wv-notch-v left-notch ${win.sidebar?.leftSidebarOpen ? '' : 'sidebar-element-hidden'}"
+            class="wv-notch-v left-notch ${win.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "left")}
           ></div>
 
           <!-- Central area: grid always renders -->
           <div class="flex flex-col flex-1 overflow-hidden" style="min-width:280px">
-            <div class="wv-code openp41ge-grid-area relative overflow-hidden flex-1" style="--wv-code-min:200px">
+            <div
+              class="wv-code openp41ge-grid-area relative overflow-hidden flex-1"
+              style="--wv-code-min:200px"
+            >
               <tab-grid
                 winId=${win.id}
                 .cols=${effectiveCols}
@@ -324,7 +356,7 @@ class Openp41geWindowView extends LitElement {
 
           <!-- Right resize notch (between grid and right sidebar) -->
           <div
-            class="wv-notch-v right-notch ${win.sidebar?.rightSidebarOpen ? '' : 'sidebar-element-hidden'}"
+            class="wv-notch-v right-notch ${win.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "right")}
           ></div>
 
@@ -336,15 +368,12 @@ class Openp41geWindowView extends LitElement {
             .systemTabs=${rightSysTabs}
             .activeTabId=${win.sidebar?.activeRightTab ?? null}
             .isOpen=${win.sidebar?.rightSidebarOpen ?? false}
-            class="sidebar-element ${win.sidebar?.rightSidebarOpen ? '' : 'sidebar-element-hidden'}"
+            class="sidebar-element ${win.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
             style="flex: 0 1 ${this._rightWidth}px; max-width: min(${this._rightWidth}px, 35vw)"
           ></openp41ge-sidebar>
-          <!-- Workspaces overlay: covers the tab + sidebar area only -->
-          <openp41ge-workspaces-overlay></openp41ge-workspaces-overlay>
+          <!-- System overlay: covers the tab + sidebar area only -->
+          <openp41ge-system-overlay></openp41ge-system-overlay>
         </div>
-
-        <!-- Service modal (fixed overlay, renders above grid) -->
-        <openp41ge-service-modal></openp41ge-service-modal>
       </div>
     `;
   }
@@ -376,12 +405,20 @@ class Openp41geWindowView extends LitElement {
     const id = await window.openp41ge.showContextMenu(items);
     document.removeEventListener("mousedown", blockNextMousedown, true);
     setTimeout(() => setContextMenuActive(false), 0);
-    if (!id) { this._contextMenu = null; return; }
+    if (!id) {
+      this._contextMenu = null;
+      return;
+    }
 
     switch (id) {
       case "detach-tab-window":
         if (this._contextMenu?.paneId) {
-          window.openp41ge.workspace.detachTab(w.id, this._contextMenu.paneId, { x: 100, y: 100, width: 800, height: 600 });
+          window.openp41ge.workspace.detachTab(w.id, this._contextMenu.paneId, {
+            x: 100,
+            y: 100,
+            width: 800,
+            height: 600,
+          });
         }
         break;
       case "close-tab":

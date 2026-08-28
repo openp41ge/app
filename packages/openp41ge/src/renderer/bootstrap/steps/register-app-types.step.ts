@@ -12,7 +12,11 @@ import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("bootstrap:register-app-types");
 
-import { registerAppType, registerSystemTabType, registerEditorSystemTabType } from "../../apps/app-registry";
+import {
+  registerAppType,
+  registerSystemTabType,
+  registerEditorSystemTabType,
+} from "../../apps/app-registry";
 import { terminalAppRegistration } from "../../apps/terminal/index";
 import { videoAppRegistration } from "../../apps/video/index";
 import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
@@ -20,10 +24,11 @@ import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
 import { WorkspaceManagerModal } from "../../apps/system-tabs/workspace-manager-system-tab";
-import { SettingsSystemTab } from "../../apps/system-tabs/settings-system-tab";
+import { LogsSystemTab } from "../../apps/system-tabs/logs-overlay-tab";
 import { explorerPlugin } from "../../apps/system-tabs/explorer-plugin";
 import { gitPlugin } from "../../apps/system-tabs/git-plugin";
 import { workspaceData } from "../../services/workspace-data";
+import { systemOverlayService } from "../../services/system-overlay-service";
 
 // ─── Log viewer component (auto-registers <openp41ge-log-viewer>) ──────────
 import "openp41ge-logger/viewer";
@@ -50,10 +55,24 @@ export class RegisterAppTypesStep implements IStartupStep {
       createController: (tabId: string) => new WorkspaceManagerModal(tabId),
     });
 
-    registerEditorSystemTabType({
-      appType: "settings",
-      title: "Settings",
-      createController: (tabId: string) => new SettingsSystemTab(tabId),
+    // ── System overlay tabs ──────────────────────────────────────────
+    // The system overlay is the settings/config surface: every system that
+    // wants configuration or internal data registers a top-bar tab here (and
+    // other packages can too, e.g. from their own startup step).
+    systemOverlayService.registerTab({
+      id: "workspaces",
+      label: "Workspaces",
+      createController: (tabId: string) => {
+        const c = new WorkspaceManagerModal(tabId);
+        if (systemOverlayService.mode === "create") c.startCreate();
+        else c.startList();
+        return c;
+      },
+    });
+    systemOverlayService.registerTab({
+      id: "logs",
+      label: "Logs",
+      createController: (tabId: string) => new LogsSystemTab(tabId),
     });
 
     // ── Register built-in plugins through PluginRegistry ──────────────

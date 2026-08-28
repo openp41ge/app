@@ -37,7 +37,7 @@ import { Openp41geTabsEventHandler } from "../services/openp41ge-tabs-event-hand
 import { TabMountManager } from "../services/tab-mount-manager";
 import { ModelRegistry } from "../models/model-registry";
 import { initDragSystem } from "../services/init-drag-system";
-import { serviceModalService } from "../services/service-modal-service";
+import { initRendererLogTransport } from "../services/renderer-log-transport";
 
 import type { Workspace } from "../../layout/types";
 
@@ -114,10 +114,10 @@ export class StartupContext {
       getWorkspace: () => this.workspaceState.getWorkspace(),
     });
 
-    // Wire keyboard manager into service modal for shortcut suppression
-    serviceModalService.setKeyboardManager(this.keyboardManager);
-
     // Initialize tab drag-and-drop system
     initDragSystem();
+
+    // Forward renderer log bus to the main process (~/.openp41ge/logs).
+    initRendererLogTransport();
   }
 }

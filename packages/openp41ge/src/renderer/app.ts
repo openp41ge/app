@@ -14,7 +14,7 @@
  * backward compatibility while components migrate to DI.
  */
 
-import { createLogger } from "openp41ge-logger";
+import { createLogger, setMinLevel, LogLevel } from "openp41ge-logger";
 const log = createLogger("app");
 
 // ─── Component registration (side-effect imports — must be at module level) ──
@@ -26,8 +26,10 @@ import "./components/openp41ge-pane-picker";
 import "./components/openp41ge-worktree-tree";
 import "./components/openp41ge-sidebar";
 import "./components/focus-section";
-import "./components/openp41ge-service-modal";
 import "./components/openp41ge-bottom-bar-btn";
+import "./components/debug-log-panel";
+
+import { isDebugSeed } from "./components/debug-log-panel";
 
 // Import openp41ge-uikit (registers <tab-grid>, <tab-bar>, <tab-content>, etc.)
 import "openp41ge-uikit";
@@ -134,6 +136,7 @@ export const appServices = {
 
 import { unmountAllControllers } from "./controllers/registry";
 import { resetTabDragState } from "./services/drag-context";
+import { systemOverlayService } from "./services/system-overlay-service";
 import { injectGlobalTailwind } from "./services/inject-global-tailwind";
 
 /**
@@ -205,6 +208,15 @@ export const renderer = {
   /** Start the renderer bootstrap. Returns immediately — UI renders synchronously. */
   start(): void {
     log.info("starting renderer");
+
+    // Seed a debug session when OPENP41GE_DEBUG=1 (build) or
+    // localStorage["openp41ge-debug"]="1": capture DEBUG, open the Logs tab.
+    if (isDebugSeed()) {
+      log.info("debug session seeded by environment flag");
+      setMinLevel(LogLevel.DEBUG);
+      window.openp41ge?.logs?.setDebug?.(true);
+      systemOverlayService.open("list", "logs");
+    }
 
     // Inject global Tailwind utility classes before any UI renders
     injectGlobalTailwind();

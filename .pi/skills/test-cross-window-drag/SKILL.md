@@ -744,6 +744,30 @@ If a specific scenario fails, check in order:
 6. **Is the `workspace.dispatch` call correct?**
    Set a breakpoint or intercept as shown in Scenario 4.
 
+## Log & Overlay Assisted Debugging
+
+The drag system emits structured debug events (`source: "cross-window-drag"`) for
+mousemove, compute-drop-target, ghost-update, ipc-ghost, and drop. These are live in the
+workspaces overlay's **Logs tab → Events** sub-view when a debug session is on (enable it
+via the **Debug** toggle in the Logs view), and persisted to `~/.openp41ge/logs/` while the
+session is on.
+
+Quick paths when a cross-window drag scenario misbehaves:
+
+```javascript
+// 1. In the target window: start a debug session + open the Logs tab
+window.openp41ge.logs.setDebug(true);
+// then press Cmd+Shift+D (opens workspaces overlay on Logs), switch to Events,
+// perform the drag.// 2. Query persisted history for drag-specific events
+await window.openp41ge.logs.query({ search: "ghost-update" });
+await window.openp41ge.logs.query({ source: "cross-window-drag", limit: 50 });
+
+// 3. Logs dir + files
+await window.openp41ge.logs.getPath();
+await window.openp41ge.logs.listFiles();
+// then tail ~/.openp41ge/logs/openp41ge.log from a terminal
+```
+
 ## When to Use This Skill
 
 - Cross-window ghost overlay doesn't show or shows wrong variation

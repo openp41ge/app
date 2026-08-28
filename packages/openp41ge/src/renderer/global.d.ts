@@ -212,6 +212,20 @@ declare global {
         writeFile: (filePath: string, content: string) => Promise<{ success: boolean }>;
       };
 
+      /** Persistent log bus → main process (files under ~/.openp41ge/logs). */
+      logs: {
+        /** Forward a batch of captured log entries to disk. */
+        append: (entries: Array<Record<string, unknown>>) => void;
+        /** Session debug toggle → also lower the main process capture level. */
+        setDebug: (enabled: boolean) => void;
+        /** Query persisted log history. Returns [] when none. */
+        query: (filter?: LogQueryFilter) => Promise<PersistedLogEntryShape[]>;
+        /** Get the logs directory path. */
+        getPath: () => Promise<{ logsDir: string }>;
+        /** List log files (name, size, mtime). */
+        listFiles: () => Promise<Array<{ name: string; sizeBytes: number; mtimeMs: number }>>;
+      };
+
       onZoomIn: (callback: () => void) => () => void;
       onZoomOut: (callback: () => void) => () => void;
       onZoomReset: (callback: () => void) => () => void;
@@ -222,8 +236,10 @@ declare global {
       onOpenWorkspace: (callback: () => void) => () => void;
       /** Listen for File > Save Workspace As... menu action. */
       onSaveWorkspaceAs: (callback: () => void) => () => void;
-      /** Listen for the Settings… app-menu action (Cmd+,). */
-      onOpenSettings: (callback: () => void) => () => void;
+      /** Listen for View > Workspaces… menu action (opens the system overlay). */
+      onOpenWorkspaces: (callback: () => void) => () => void;
+      /** Listen for View > Logs… menu action (opens the system overlay Logs tab). */
+      onOpenLogs: (callback: () => void) => () => void;
 
       config: {
         get: (key?: string) => Promise<any>;
@@ -286,5 +302,30 @@ declare global {
     added: number;
     deleted: number;
     status: "added" | "modified" | "deleted" | "renamed";
+  }
+
+  /** Filters for window.openp41ge.logs.query(). */
+  interface LogQueryFilter {
+    source?: string | string[];
+    minLevel?: number;
+    maxLevel?: number;
+    since?: number;
+    before?: number;
+    limit?: number;
+    search?: string;
+    process?: "main" | "renderer";
+    winId?: string;
+  }
+
+  /** A persisted log entry returned by window.openp41ge.logs.query(). */
+  interface PersistedLogEntryShape {
+    timestamp: number;
+    level: number;
+    levelLabel: string;
+    source: string;
+    message: string;
+    data?: Record<string, unknown>;
+    process: "main" | "renderer";
+    winId?: string;
   }
 }

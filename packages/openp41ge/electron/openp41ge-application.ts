@@ -9,6 +9,7 @@
 import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createLogger } from "openp41ge-logger";
 
 // ─── Service imports ─────────────────────────────────────────────────────
 import {
@@ -20,6 +21,7 @@ import {
   NodeGitCommitService,
   ElectronFileSystem,
   WorkspaceStateStore,
+  LogFileStore,
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
 import { ConfigService } from "../src/main/services/config-service.js";
@@ -45,6 +47,7 @@ import { registerWorkspaceHandlers } from "./ipc-handlers/workspace-handlers.js"
 import { registerGitHandlers } from "./ipc-handlers/git-handlers.js";
 import { registerRepoRefHandlers } from "./ipc-handlers/repo-ref-handlers.js";
 import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
+import { registerLogHandlers } from "./ipc-handlers/log-handlers.js";
 
 // ─── Lifecycle manager ──────────────────────────────────────────────────
 import { LifecycleManager, registerLifecycleHandlers } from "./lifecycle-manager.js";
@@ -68,6 +71,7 @@ export class Openp41geApplication {
   private fileSystem!: ElectronFileSystem;
   private workspaceService!: WorkspaceService;
   private workspaceStateStore!: WorkspaceStateStore;
+  private logStore!: LogFileStore;
   private openp41geDir!: string;
 
   /** Repos live in their own subdirectory of the app data dir. */
@@ -117,6 +121,7 @@ export class Openp41geApplication {
   // ── Step 1: Error handlers ────────────────────────────────────────────
 
   private _registerErrorHandlers(): void {
+    const log = createLogger("main-process");
     const isEpipe = (err: unknown): boolean => {
       if (!err || typeof err !== "object") return false;
       const e = err as { code?: string; message?: string };
@@ -137,16 +142,16 @@ export class Openp41geApplication {
 
     process.on("uncaughtException", (err) => {
       if (isEpipe(err)) return;
+      log.error("Uncaught Exception:", err);
       forwardError(err.message, "main-process", err.stack);
-      console.error("Uncaught Exception:", err);
       // Don't exit — let the app continue if possible
     });
     process.on("unhandledRejection", (reason) => {
       if (isEpipe(reason)) return;
       const msg = reason instanceof Error ? reason.message : String(reason);
       const stack = reason instanceof Error ? reason.stack : "";
+      log.error("Unhandled Rejection:", reason);
       forwardError(msg, "main-process", stack);
-      console.error("Unhandled Rejection:", reason);
     });
 
     // Also intercept console.error in main process.
@@ -211,6 +216,7 @@ export class Openp41geApplication {
     this.fileSystem = new ElectronFileSystem();
     this.workspaceService = new WorkspaceService(this.gitService, this.fileSystem, reposDir);
     this.workspaceStateStore = new WorkspaceStateStore(this.openp41geDir);
+    this.logStore = new LogFileStore(this.openp41geDir);
   }
 
   // ── Step 5: Wire cross-service dependencies ───────────────────────────
@@ -267,6 +273,7 @@ export class Openp41geApplication {
     registerGitHandlers(this.gitCommitService, this.gitService);
     registerRepoRefHandlers(this.dispatcher);
     registerConfigHandlers(this.configService);
+    registerLogHandlers(this.logStore);
     registerLifecycleHandlers(this.lifecycle);
     registerDialogHandlers();
   }
@@ -324,14 +331,6 @@ export class Openp41geApplication {
         label: app.name,
         submenu: [
           { role: "about" },
-          { type: "separator" },
-          {
-            label: "Settings…",
-            accelerator: "CmdOrCtrl+,",
-            click: () => {
-              BrowserWindow.getFocusedWindow()?.webContents.send("menu:open-settings");
-            },
-          },
           { type: "separator" },
           { role: "services" },
           { type: "separator" },
@@ -416,6 +415,19 @@ export class Openp41geApplication {
             label: "Reset Zoom",
             accelerator: "CmdOrCtrl+0",
             click: () => BrowserWindow.getFocusedWindow()?.webContents.send("zoom:reset"),
+          },
+          { type: "separator" },
+          {
+            label: "Workspaces…",
+            click: () => {
+              BrowserWindow.getFocusedWindow()?.webContents.send("menu:open-workspaces");
+            },
+          },
+          {
+            label: "Logs…",
+            click: () => {
+              BrowserWindow.getFocusedWindow()?.webContents.send("menu:open-logs");
+            },
           },
         ],
       },

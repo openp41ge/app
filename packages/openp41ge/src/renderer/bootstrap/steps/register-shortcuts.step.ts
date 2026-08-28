@@ -14,6 +14,7 @@ const log = createLogger("bootstrap:register-shortcuts");
 
 import { showCloneDialog } from "../../components/openp41ge-worktree-controller";
 import { Openp41geTabsEventHandler } from "../../services/openp41ge-tabs-event-handler";
+import { systemOverlayService } from "../../services/system-overlay-service";
 
 export class RegisterShortcutsStep implements IStartupStep {
   readonly name = "register-shortcuts";
@@ -54,8 +55,9 @@ export class RegisterShortcutsStep implements IStartupStep {
 
           // Get the last focused column, falling back to the first placement
           const focusedCol = Openp41geTabsEventHandler.getLastFocusedCol(myWindowId);
-          const placement = win.grid.placements.find((p) => p.position.col === focusedCol)
-            ?? win.grid.placements[0];
+          const placement =
+            win.grid.placements.find((p) => p.position.col === focusedCol) ??
+            win.grid.placements[0];
           if (!placement || placement.tabIds.length === 0) return;
           const activeTabId = placement.activeTabId ?? placement.tabIds[0];
           if (!activeTabId) return;
@@ -138,7 +140,12 @@ export class RegisterShortcutsStep implements IStartupStep {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
           emitEvent("sidebar-open", { windowId: myWindowId, side: "right", appType: "" });
-          emitEvent("tab-open-system", { windowId: myWindowId, side: "right", appType: "explorer", title: "Explorer" });
+          emitEvent("tab-open-system", {
+            windowId: myWindowId,
+            side: "right",
+            appType: "explorer",
+            title: "Explorer",
+          });
         } catch (_err) {
           // ignore
         }
@@ -157,7 +164,12 @@ export class RegisterShortcutsStep implements IStartupStep {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
           emitEvent("sidebar-open", { windowId: myWindowId, side: "right", appType: "" });
-          emitEvent("tab-open-system", { windowId: myWindowId, side: "right", appType: "git", title: "Git" });
+          emitEvent("tab-open-system", {
+            windowId: myWindowId,
+            side: "right",
+            appType: "git",
+            title: "Git",
+          });
         } catch (_err) {
           // ignore
         }
@@ -175,7 +187,12 @@ export class RegisterShortcutsStep implements IStartupStep {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          emitEvent("tab-open-system", { windowId: myWindowId, side: "right", appType: "search", title: "Search" });
+          emitEvent("tab-open-system", {
+            windowId: myWindowId,
+            side: "right",
+            appType: "search",
+            title: "Search",
+          });
         } catch (_err) {
           // ignore
         }
@@ -278,6 +295,30 @@ export class RegisterShortcutsStep implements IStartupStep {
       handler: handleSave,
       description: "Save File",
       category: "File",
+    });
+
+    // ── App logs (Cmd+Shift+D) ───────────────────────────────────────
+    // Opens the system overlay on its Logs tab (or switches to it if the
+    // overlay is already open on Workspaces; a second press closes it). The
+    // Logs tab (and its Events sub-tab) is always present — the Debug toggle
+    // inside it only gates DEBUG capture/storage for the session.
+    km.register({
+      modifiers: 12, // Meta + Shift
+      key: "d",
+      code: "KeyD",
+      handler: () => {
+        if (systemOverlayService.isOpen) {
+          if (systemOverlayService.activeTab === "logs") {
+            systemOverlayService.close();
+          } else {
+            systemOverlayService.open("list", "logs");
+          }
+        } else {
+          systemOverlayService.open("list", "logs");
+        }
+      },
+      description: "Open App Logs (system overlay → Logs)",
+      category: "Debug",
     });
 
     // ── Global keydown listener ─────────────────────────────────────

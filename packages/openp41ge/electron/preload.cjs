@@ -484,11 +484,32 @@ contextBridge.exposeInMainWorld("openp41ge", {
     return () => ipcRenderer.removeListener("menu:save-workspace-as", handler);
   },
 
-  /** Listen for the Settings… app-menu action (Cmd+,). */
-  onOpenSettings: (callback) => {
+  /** Listen for View > Workspaces… menu action (opens the system overlay). */
+  onOpenWorkspaces: (callback) => {
     const handler = () => callback();
-    ipcRenderer.on("menu:open-settings", handler);
-    return () => ipcRenderer.removeListener("menu:open-settings", handler);
+    ipcRenderer.on("menu:open-workspaces", handler);
+    return () => ipcRenderer.removeListener("menu:open-workspaces", handler);
+  },
+
+  /** Listen for View > Logs… menu action (opens the system overlay Logs tab). */
+  onOpenLogs: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu:open-logs", handler);
+    return () => ipcRenderer.removeListener("menu:open-logs", handler);
+  },
+
+  /** Persistent log bus → main process (files under ~/.openp41ge/logs). */
+  logs: {
+    /** Forward a batch of captured log entries to disk. */
+    append: (entries) => ipcRenderer.send("log:append", entries),
+    /** Session debug toggle → also lower the main process capture level. */
+    setDebug: (enabled) => ipcRenderer.send("log:set-debug", !!enabled),
+    /** Query persisted log history. Returns [] when none. */
+    query: (filter) => ipcRenderer.invoke("log:query", filter || {}),
+    /** Get the logs directory path. */
+    getPath: () => ipcRenderer.invoke("log:path"),
+    /** List log files (name, size, mtime). */
+    listFiles: () => ipcRenderer.invoke("log:files"),
   },
 
   lifecycle: {
