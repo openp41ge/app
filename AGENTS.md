@@ -371,14 +371,13 @@ The renderer starts as an ordered list of single-responsibility steps in `src/re
  3. RegisterAppTypesStep       — register app type controller factories
  4. InitServicesStep           — wire cross-service dependencies
  5. SubscribeStateUpdatesStep  — register render subscriber BEFORE any async step
- 6. CheckProjectStep           — check for active project; show picker if needed
- 7. RegisterEventListenersStep — document-level event listeners
- 8. FetchInitialStateStep      — *** async: fetch + set state → UI RENDERS ***
- 9. LoadConfigStep             — async: load config (cosmetic, after UI is visible)
-10. RegisterShortcutsStep      — keyboard shortcuts
-11. RegisterIpcListenersStep   — zoom + confirm IPC listeners
-12. StartQuoteControllerStep   — quote rotation
-13. SignalReadyStep            — signal readiness to main process
+ 6. RegisterEventListenersStep — document-level event listeners
+ 7. FetchInitialStateStep      — *** async: fetch + set state → UI RENDERS ***
+ 8. LoadConfigStep             — async: load config (cosmetic, after UI is visible)
+ 9. RegisterShortcutsStep      — keyboard shortcuts
+10. RegisterIpcListenersStep   — zoom + confirm IPC listeners
+11. StartQuoteControllerStep   — quote rotation
+12. SignalReadyStep            — signal readiness to main process
 ```
 
 **Order matters.** The render subscriber must be registered before any async step, or the first state set will not paint. If the app fails before step 8 nothing renders — but the error overlay still appears, because `installErrorCapture()` runs before the pipeline starts. A blank window with _no_ overlay therefore points at the bootstrap itself.
