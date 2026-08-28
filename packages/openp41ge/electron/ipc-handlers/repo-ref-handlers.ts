@@ -32,8 +32,14 @@ export function registerRepoRefHandlers(dispatcher: OperationDispatcher): void {
     // Add to the focused window (first window with matching sender)
     for (const win of ws.windows) {
       if (win.repoRefs.some((r) => r.name === name)) {
-        // Already added to some window — broadcast and return
-        broadcastRepoRefsChanged();
+        // Already added to some window — nothing changed, so do NOT
+        // broadcast. Broadcasting here is what used to create an infinite
+        // cross-window loop: a non-[0] window whose own repoRefs already
+        // contain the repo re-reads windows[0].repoRefs (which returns the
+        // first window's list), finds the repo "missing", re-adds (hitting
+        // this branch again), and every iteration re-broadcast `repo-refs-
+        // changed`, making every window's explorer re-run `_loadRepos()`
+        // and re-render non-stop.
         return true;
       }
     }
