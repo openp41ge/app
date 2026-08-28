@@ -543,6 +543,15 @@ export class Openp41geTree extends LitElement {
     // Status CSS class
     const statusClass = node.status ? `tree-node--status-${node.status}` : "";
 
+    // Expose the node's file path to host apps (e.g. the platform's custom
+    // drag pipeline) via a data attribute. Only draggable nodes that declare
+    // a `meta.filePath` qualify — directories carry a filePath too but are not
+    // marked draggable, so this reliably targets files.
+    const filePath =
+      node.draggable && typeof node.meta?.filePath === "string"
+        ? (node.meta.filePath as string)
+        : undefined;
+
     return html`
       <div
         class="tree-node ${classMap({
@@ -563,6 +572,7 @@ export class Openp41geTree extends LitElement {
         aria-expanded=${hasChildren ? (expanded ? "true" : "false") : undefined}
         aria-selected=${selected ? "true" : "false"}
         draggable=${node.draggable ? "true" : "false"}
+        data-file-path=${filePath ?? nothing}
         @click=${(e: MouseEvent) => this._onNodeClick(e, node)}
         @dblclick=${(e: MouseEvent) => this._onNodeDblClick(e, node)}
         @contextmenu=${(e: MouseEvent) => this._onContextMenu(e, node)}

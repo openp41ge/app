@@ -81,8 +81,12 @@ const sampleNodes: TreeNode[] = [
 ];
 
 async function createTree(): Promise<Openp41geTree> {
+  return createTreeWithNodes(sampleNodes);
+}
+
+async function createTreeWithNodes(nodes: TreeNode[]): Promise<Openp41geTree> {
   const tree = document.createElement("openp41ge-tree") as Openp41geTree;
-  tree.nodes = sampleNodes;
+  tree.nodes = nodes;
   document.body.appendChild(tree);
   await (tree as any).updateComplete;
   return tree;
@@ -512,6 +516,46 @@ describe("onExpandedChange", () => {
 });
 
 // ─── Drag and Drop ─────────────────────────────────────────────────
+
+describe("file path marker (data-file-path)", () => {
+  test("draggable node with meta.filePath renders data-file-path", async () => {
+    const tree = await createTreeWithNodes([
+      {
+        id: "/repo/app.ts",
+        label: "app.ts",
+        icon: "typescript",
+        draggable: true,
+        meta: { filePath: "/repo/app.ts" },
+      },
+    ]);
+    const row = getNodeRow(tree, "/repo/app.ts");
+    expect(row?.getAttribute("data-file-path")).toBe("/repo/app.ts");
+    // Native draggable stays intact (the platform suppresses it via dragstart)
+    expect(row?.getAttribute("draggable")).toBe("true");
+  });
+
+  test("draggable node without meta.filePath does not render data-file-path", async () => {
+    const tree = await createTree();
+    const readmeRow = getNodeRow(tree, "README.md");
+    expect(readmeRow?.getAttribute("data-file-path")).toBeNull();
+    expect(readmeRow?.getAttribute("draggable")).toBe("true");
+  });
+
+  test("non-draggable directory node with meta.filePath does not render data-file-path", async () => {
+    const tree = await createTreeWithNodes([
+      {
+        id: "/repo/src",
+        label: "src",
+        icon: "folder-closed",
+        expandable: true,
+        meta: { filePath: "/repo/src", isDirectory: true },
+      },
+    ]);
+    const row = getNodeRow(tree, "/repo/src");
+    expect(row?.getAttribute("draggable")).toBe("false");
+    expect(row?.getAttribute("data-file-path")).toBeNull();
+  });
+});
 
 describe("drag and drop", () => {
   test("draggable node has draggable attribute", async () => {
