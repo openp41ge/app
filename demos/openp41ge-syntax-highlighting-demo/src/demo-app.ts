@@ -5,9 +5,41 @@
  * grammars, and highlights code samples with theme-aware CSS.
  */
 
-import { initTextMate, TokenRegistry, highlightCode } from "openp41ge-uikit";
+import { initTextMate, TokenRegistry, renderViewLine } from "openp41ge-editor-engine";
+import type { ITokenizer } from "openp41ge-syntax-highlighting";
 
 import { getThemeById, generateThemeCSS } from "openp41ge-uikit/theme";
+
+/**
+ * highlightCode — tokenize `code` with `tokenizer` and render highlight HTML.
+ *
+ * The documented highlightCode() helper was never implemented in a package, so
+ * this demo-local version uses the real public APIs: thread the textmate rule
+ * stack line-by-line via tokenizeLine(), and render each line's HTML with the
+ * editor engine's renderViewLine() (the same renderer the file editor uses).
+ */
+function highlightCode(
+  code: string,
+  tokenizer: ITokenizer,
+): { html: string; lineCount: number; durationMs: number } {
+  const startMs = performance.now();
+  const lines = code.split("\n");
+  const htmls: string[] = [];
+  let prevState: unknown = null;
+
+  for (const line of lines) {
+    const result = tokenizer.tokenizeLine(line, prevState as never);
+    prevState = result.ruleStack;
+    const out = renderViewLine(line, result.tokens as never, 4, undefined, htmls.length);
+    htmls.push(out.html);
+  }
+
+  return {
+    html: htmls.join("\n"),
+    lineCount: lines.length,
+    durationMs: performance.now() - startMs,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Types
