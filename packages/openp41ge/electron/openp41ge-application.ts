@@ -23,6 +23,7 @@ import {
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
 import { ConfigService } from "../src/main/services/config-service.js";
+import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-arg.js";
 
 // ─── Window manager ──────────────────────────────────────────────────────
 import {
@@ -239,11 +240,15 @@ export class Openp41geApplication {
   // ── Step 5b: Load saved state ───────────────────────────────────────
 
   /**
-   * Load saved workspace state for the current project.
-   * This is now called for both regular projects and drafts.
-   * Drafts that have never been saved simply get a fresh empty workspace.
+   * Load saved workspace state at startup, but ONLY when a workspace was
+   * explicitly provided as a launch argument (future CLI seam — see
+   * parseWorkspaceLaunchArg). A normal launch starts fresh: the dispatcher
+   * keeps its default createWorkspace("ws1") so a previous session's tabs
+   * are not reinstated without context (e.g. sidebar tabs with no active
+   * workspace).
    */
   private _maybeLoadState(): void {
+    if (!parseWorkspaceLaunchArg(process.argv)) return;
     const saved = this.workspaceStateStore.load(this.workspaceStatePath);
     if (saved) {
       this.dispatcher.setWorkspace(saved);
