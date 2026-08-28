@@ -282,8 +282,6 @@ class Openp41geWindowView extends LitElement {
         .wv-notch-v.dragging::before { opacity: 1; }
         .wv-notch-v.left-notch::before { left: 1px; }
         .wv-notch-v.right-notch::before { right: 2px; }
-
-        /* ── Bottom bar icon hover ── */
       </style>
       <div class="flex flex-col w-full h-full bg-surface relative">
         <openp41ge-titlebar
@@ -347,14 +345,6 @@ class Openp41geWindowView extends LitElement {
 
         <!-- Service modal (fixed overlay, renders above grid) -->
         <openp41ge-service-modal></openp41ge-service-modal>
-
-        <!-- Bottom bar: empty placeholder bar (kept for future use) -->
-        <div
-          class="wv-bottom-bar"
-          style="border-top:1px solid var(--divider,#333);height:24px;flex-shrink:0;display:flex;align-items:center;padding:0 4px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary,#252526);"
-        >
-          <span style="flex:1"></span>
-        </div>
       </div>
     `;
   }
