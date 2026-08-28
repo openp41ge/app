@@ -36,7 +36,6 @@ import { FileDropHandler } from "../services/file-drop-handler";
 import { Openp41geTabsEventHandler } from "../services/openp41ge-tabs-event-handler";
 import { TabMountManager } from "../services/tab-mount-manager";
 import { ModelRegistry } from "../models/model-registry";
-import { ModalStateService } from "../services/modal-state-service";
 import { initDragSystem } from "../services/init-drag-system";
 import { serviceModalService } from "../services/service-modal-service";
 
@@ -56,7 +55,6 @@ export class StartupContext {
   readonly openp41geTabsEventHandler: Openp41geTabsEventHandler;
   readonly tabMountManager: TabMountManager;
   readonly modelRegistry: ModelRegistry;
-  readonly modalState: ModalStateService;
 
   // ── Pre-started IPC promises (fired early, awaited later) ───────────
   /**
@@ -100,7 +98,6 @@ export class StartupContext {
     this.openp41geTabsEventHandler = new Openp41geTabsEventHandler();
     this.tabMountManager = new TabMountManager();
     this.modelRegistry = new ModelRegistry();
-    this.modalState = new ModalStateService();
   }
 
   /**
