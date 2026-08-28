@@ -277,11 +277,12 @@ export class NodeGitService implements IGitService {
     const dirName = branch.replace(/\//g, "--");
     const worktreePath = path.join(repoDir, dirName);
 
+    // Already materialized — idempotent on re-activation.
     if (fs.existsSync(worktreePath)) {
       return { branch, path: worktreePath, exists: true };
     }
 
-    // Check if branch exists locally
+    // Check if branch exists locally.
     let branchExists = false;
     try {
       const output = await this._execGit(["rev-parse", "--verify", branch], repoName);
@@ -290,11 +291,14 @@ export class NodeGitService implements IGitService {
       branchExists = false;
     }
 
-    if (branchExists) {
-      // Local branch exists — create worktree directly
-      await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
-    } else {
-      // Check if branch exists on remote
+    try {
+      if (branchExists) {
+        // Local branch exists — create worktree directly.
+        await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
+        return { branch, path: worktreePath, exists: true };
+      }
+
+      // Check if branch exists on remote.
       let remoteExists = false;
       try {
         const remoteOutput = await this._execGit(
@@ -307,17 +311,34 @@ export class NodeGitService implements IGitService {
       }
 
       if (remoteExists) {
-        // Remote branch exists — fetch it, create local tracking branch, then worktree
+        // Remote branch exists — fetch it, create local tracking branch, then worktree.
         await this._execGit(["fetch", "origin", `${branch}:${branch}`], repoName);
         await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
-      } else {
-        // Branch doesn't exist anywhere — create it from HEAD and add worktree
-        await this._execGit(["branch", branch], repoName);
-        await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
+        return { branch, path: worktreePath, exists: true };
       }
-    }
 
-    return { branch, path: worktreePath, exists: true };
+      // Branch exists nowhere we can see — create it from HEAD. A concurrent
+      // activation (another window) may have created it in the meantime;
+      // "already exists" is not an error, just fall through to materializing
+      // the worktree for the now-existing branch.
+      try {
+        await this._execGit(["branch", branch], repoName);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!/already exists/i.test(msg)) throw err;
+      }
+      await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
+      return { branch, path: worktreePath, exists: true };
+    } catch (err) {
+      // Another window may have checked out this branch's worktree concurrently
+      // ("already used by worktree" / "already checked out"); if the dir now
+      // exists, treat it as materialized instead of erroring.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/already used by worktree|already checked out/i.test(msg) && fs.existsSync(worktreePath)) {
+        return { branch, path: worktreePath, exists: true };
+      }
+      throw err;
+    }
   }
 
   async deleteWorktree(repoName: string, branch: string): Promise<void> {
