@@ -35,14 +35,7 @@ export class FetchInitialStateStep implements IStartupStep {
       return;
     }
 
-    // If a project was selected via the CheckProjectStep, the main process
-    // already switched state via project:switch. We need a fresh fetch to get
-    // the updated state, not the pre-started promise (which fired before
-    // project selection).
-    const projectSelected = !!window.__openp41geProjectName;
-    const statePromise = projectSelected
-      ? window.openp41ge.workspace.getState()
-      : (context.initialStatePromise ?? window.openp41ge.workspace.getState());
+    const statePromise = context.initialStatePromise ?? window.openp41ge.workspace.getState();
 
     // Fire state fetch AND waitForInit in parallel — the state fetch
     // might already have the data (via cached initial state) while

@@ -231,30 +231,6 @@ declare global {
         getAll: () => Promise<Record<string, any>>;
       };
 
-      recentProjects: {
-        list: () => Promise<Array<{ name: string; openedAt: string }>>;
-        add: (name: string) => Promise<void>;
-        remove: (name: string) => Promise<void>;
-      };
-
-      project: {
-        list: () => Promise<string[]>;
-        listWithInfo: () => Promise<Array<{ name: string; config: { name: string; createdAt: string; updatedAt: string; draft?: boolean } | null }>>;
-        exists: (name: string) => Promise<boolean>;
-        create: (name: string) => Promise<boolean>;
-        delete: (name: string) => Promise<boolean>;
-        workspaceStatePath: (name: string) => Promise<string>;
-        reposDir: (name: string) => Promise<string>;
-        listRepos: (name: string) => Promise<Array<{ name: string; worktrees: string[] }>>;
-        current: () => Promise<string | null>;
-        switchTo: (name: string) => Promise<{ success: boolean; error?: string }>;
-        saveDraftAs: (draftName: string, newName: string) => Promise<boolean>;
-        isDraft: (name: string) => Promise<boolean>;
-        gcDrafts: () => Promise<number>;
-        createDraft: () => Promise<string>;
-        setRepoOrder: (name: string, order: string[]) => Promise<boolean>;
-        rename: (oldName: string, newName: string) => Promise<boolean>;
-      };
     };
 
     // @deprecated — no longer consumed by FileEditorController. The file path is now
@@ -264,10 +240,6 @@ declare global {
     __pendingFileName?: string;
     __pendingGitRepo?: string | null;
 
-    // Set by check-project step, consumed by fetch-initial-state step
-    __openp41geProjectName?: string;
-
-    // Set by signal-ready step, read by test framework
     __openp41geReady?: boolean;
   }
 

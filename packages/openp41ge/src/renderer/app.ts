@@ -51,7 +51,6 @@ import {
   StartQuoteControllerStep,
   SignalReadyStep,
 } from "./bootstrap/index";
-import { CheckProjectStep } from "./bootstrap/steps/check-project.step";
 import { InitEventControllerStep } from "./bootstrap/steps/init-event-controller.step";
 
 import type { Workspace } from "../layout/types";
@@ -67,9 +66,8 @@ const steps = [
   new ExposeTestModelsStep(), // 1: Expose test models for test injection
   new InitEventControllerStep(), // 2: Initialize event controller (graph + router)
   new RegisterAppTypesStep(), // 3: Register app types
-  new InitServicesStep(), // 3: Wire cross-service dependencies
-  new SubscribeStateUpdatesStep(), // 4: ** Register render subscriber BEFORE any async **
-  new CheckProjectStep(), // 5: Check for active project; show picker if needed
+  new InitServicesStep(), // 4: Wire cross-service dependencies
+  new SubscribeStateUpdatesStep(), // 5: ** Register render subscriber BEFORE any async **
   new RegisterEventListenersStep(), // 6: Document-level event listeners
   new FetchInitialStateStep(), // 7: ** Async: fetch + set state → subscriber fires → UI RENDERS **
   new LoadConfigStep(), // 8: Async: load config (cosmetic, after UI is visible)

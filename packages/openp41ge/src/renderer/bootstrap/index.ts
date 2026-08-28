@@ -14,4 +14,3 @@ export { RegisterShortcutsStep } from "./steps/register-shortcuts.step";
 export { RegisterIpcListenersStep } from "./steps/register-ipc-listeners.step";
 export { StartQuoteControllerStep } from "./steps/start-quote-controller.step";
 export { SignalReadyStep } from "./steps/signal-ready.step";
-export { CheckProjectStep } from "./steps/check-project.step";
