@@ -250,10 +250,11 @@ export class GridDropTarget implements IDropTarget {
 
     if (data.type === "file") {
       this._fire(GRID_EVENTS.OPEN_TAB, {
-        winId: "",
+        winId: this.winId,
         tabType: "file-viewer",
         tabConfig: { filePath: data.filePath },
         targetCol,
+        pinned: true,
       });
       return { success: true };
     }
