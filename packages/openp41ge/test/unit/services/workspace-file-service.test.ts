@@ -215,3 +215,86 @@ describe("deriveRepoName", () => {
     expect(deriveRepoName("https://github.com/widget")).toBe("github.com/widget");
   });
 });
+
+describe("WorkspaceFileService activation recency stamping", () => {
+  let svc: WorkspaceFileService;
+  let write: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    svc = new WorkspaceFileService();
+    write = vi.fn().mockResolvedValue(true);
+    (
+      window as unknown as { openp41ge: { dialog: { writeWorkspaceFile: unknown } } }
+    ).openp41ge.dialog = { writeWorkspaceFile: write };
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-02T03:04:05.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const entry = () => ({
+    filePath: "~/.openp41ge/workspaces/x.openp41ge-workspace",
+    data: wsData({ name: "X" }),
+  });
+
+  it("stamps lastActivatedAt, persists it, and sets activeData to the stamped copy", async () => {
+    const ok = await svc.activateWorkspace(entry());
+    expect(ok).toBe(true);
+    expect(write).toHaveBeenCalledTimes(1);
+    const [path, data] = write.mock.calls[0] as [string, WorkspaceFileData];
+    expect(path).toBe("~/.openp41ge/workspaces/x.openp41ge-workspace");
+    expect(data.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+    expect(svc.activeData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+  });
+
+  it("does not write when recordAccess is false", async () => {
+    const ok = await svc.activateWorkspace(entry(), { recordAccess: false });
+    expect(ok).toBe(true);
+    expect(write).not.toHaveBeenCalled();
+    expect(svc.activeData?.lastActivatedAt).toBeUndefined();
+  });
+
+  it("swallows persist failure: activation still succeeds but reports false", async () => {
+    write.mockResolvedValue(false);
+    const ok = await svc.activateWorkspace(entry());
+    expect(ok).toBe(false);
+    expect(svc.activeFilePath).toBe("~/.openp41ge/workspaces/x.openp41ge-workspace");
+    expect(svc.activeData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+  });
+
+  it("still activates without throwing when writeWorkspaceFile itself throws", async () => {
+    write.mockRejectedValue(new Error("disk"));
+    await expect(svc.activateWorkspace(entry())).resolves.toBe(false);
+    expect(svc.activeData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+  });
+
+  it("createWorkspace persists a lastActivatedAt equal to creation time", async () => {
+    (
+      window as unknown as { openp41ge: { dialog: { ensureDir: () => Promise<boolean> } } }
+    ).openp41ge.dialog.ensureDir = vi.fn().mockResolvedValue(true);
+    const data = await svc.createWorkspace("Alpha");
+    expect(data?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+    expect(write).toHaveBeenCalled();
+  });
+
+  it("saveAs stamps the data sent to the save dialog (and only that file)", async () => {
+    let sent: WorkspaceFileData | undefined;
+    (
+      window as unknown as {
+        openp41ge: { dialog: { saveWorkspaceFile: (d: WorkspaceFileData) => Promise<string | null> } };
+      }
+    ).openp41ge.dialog.saveWorkspaceFile = vi
+      .fn()
+      .mockImplementation(async (d: WorkspaceFileData) => {
+        sent = d;
+        return "~/.openp41ge/workspaces/new.openp41ge-workspace";
+      });
+    svc.activeData = wsData({ name: "X" });
+    const saved = await svc.saveAs();
+    expect(saved).toBe("~/.openp41ge/workspaces/new.openp41ge-workspace");
+    expect(sent?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+    expect(write).not.toHaveBeenCalled(); // saveAs writes via the save dialog, not writeWorkspaceFile
+  });
+});

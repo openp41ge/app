@@ -35,6 +35,8 @@ export interface WorkspaceFileData {
   createdAt: string;
   dataDir: string;
   repos: Array<{ url: string; worktrees: string[] }>;
+  /** ISO-8601 timestamp of the last time this workspace was activated. */
+  lastActivatedAt?: string;
 }
 
 // ─── Rect / Bounds ─────────────────────────────────────────────────────────

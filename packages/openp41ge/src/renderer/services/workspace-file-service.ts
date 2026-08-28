@@ -69,8 +69,11 @@ export class WorkspaceFileService {
   async openDialog(): Promise<boolean> {
     const result = await window.openp41ge.dialog.openWorkspaceFile();
     if (!result) return false;
+    // Opening a file counts as an activation — record it best-effort.
+    const stamped = this._stamp(result.data);
+    await this._persistAccess(result.filePath, stamped);
     this.activeFilePath = result.filePath;
-    this.activeData = result.data;
+    this.activeData = stamped;
     appState.activeWorkspaceFilePath = result.filePath;
     appState.notify();
     this._emitChanged();
@@ -86,8 +89,10 @@ export class WorkspaceFileService {
   async loadPath(filePath: string): Promise<boolean> {
     const result = await window.openp41ge.dialog.readWorkspaceFile(filePath);
     if (!result) return false;
+    const stamped = this._stamp(result.data);
+    await this._persistAccess(result.filePath, stamped);
     this.activeFilePath = result.filePath;
-    this.activeData = result.data;
+    this.activeData = stamped;
     appState.activeWorkspaceFilePath = result.filePath;
     appState.notify();
     this._emitChanged();
@@ -110,10 +115,13 @@ export class WorkspaceFileService {
    */
   async saveAs(): Promise<string | null> {
     if (!this.activeData) return null;
+    // Save As records access only for the newly written file.
+    const stamped = this._stamp(this.activeData);
     const defaultPath = this.activeFilePath ?? undefined;
-    const filePath = await window.openp41ge.dialog.saveWorkspaceFile(this.activeData, defaultPath);
+    const filePath = await window.openp41ge.dialog.saveWorkspaceFile(stamped, defaultPath);
     if (!filePath) return null;
     this.activeFilePath = filePath;
+    this.activeData = stamped;
     appState.activeWorkspaceFilePath = filePath;
     appState.notify();
     this._emitChanged();
@@ -147,6 +155,7 @@ export class WorkspaceFileService {
       createdAt: now,
       dataDir: `~/.openp41ge/workspaces-data/${uuid}`,
       repos: [],
+      lastActivatedAt: now,
     };
 
     const filePath = `~/.openp41ge/workspaces/${uuid}.openp41ge-workspace`;
@@ -169,13 +178,48 @@ export class WorkspaceFileService {
 
   /**
    * Set a workspace (from listWorkspaces) as the active workspace.
+   *
+   * By default this records the activation: it stamps `lastActivatedAt` on a
+   * copy of the data, persists it best-effort to the workspace file, and sets
+   * the in-memory state to the stamped copy. Persistence failure does not
+   * block activation (best-effort) — the returned boolean reports whether the
+   * persist succeeded. Pass `{ recordAccess: false }` for internal/restore
+   * activations that should not bump recency.
    */
-  activateWorkspace(entry: { filePath: string; data: WorkspaceFileData }): void {
+  async activateWorkspace(
+    entry: { filePath: string; data: WorkspaceFileData },
+    opts: { recordAccess?: boolean } = {},
+  ): Promise<boolean> {
+    const recordAccess = opts.recordAccess ?? true;
+    let activeData = entry.data;
+    let persisted = true;
+    if (recordAccess) {
+      const stamped = this._stamp(entry.data);
+      activeData = stamped;
+      persisted = await this._persistAccess(entry.filePath, stamped);
+    }
     this.activeFilePath = entry.filePath;
-    this.activeData = entry.data;
+    this.activeData = activeData;
     appState.activeWorkspaceFilePath = entry.filePath;
     appState.notify();
     this._emitChanged();
+    return persisted;
+  }
+
+  // ── Stamping ────────────────────────────────────────
+
+  /** Shallow copy with a fresh `lastActivatedAt`; never mutates the input. */
+  private _stamp(data: WorkspaceFileData): WorkspaceFileData {
+    return { ...data, lastActivatedAt: new Date().toISOString() };
+  }
+
+  /** Best-effort write of activation data; failures are swallowed. */
+  private async _persistAccess(filePath: string, data: WorkspaceFileData): Promise<boolean> {
+    try {
+      return await window.openp41ge.dialog.writeWorkspaceFile(filePath, data);
+    } catch {
+      return false;
+    }
   }
 
   // ── Change data dir ─────────────────────────────────

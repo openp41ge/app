@@ -6,6 +6,7 @@ import { ipcMain, dialog, shell } from "electron";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { sortWorkspacesByLastActivated } from "../../src/layout/workspace-sort.js";
 
 const WORKSPACE_EXT = "openp41ge-workspace";
 
@@ -28,6 +29,7 @@ function readWorkspaceFile(filePath: string): WorkspaceFileData {
     createdAt: String(data.createdAt ?? new Date().toISOString()),
     dataDir: String(data.dataDir ?? ""),
     repos: Array.isArray(data.repos) ? data.repos : [],
+    lastActivatedAt: data.lastActivatedAt ? String(data.lastActivatedAt) : undefined,
   };
 }
 
@@ -38,6 +40,8 @@ export interface WorkspaceFileData {
   createdAt: string;
   dataDir: string;
   repos: Array<{ url: string; worktrees: string[] }>;
+  /** ISO-8601 timestamp of the last activation. Additive; round-trips through read/write. */
+  lastActivatedAt?: string;
 }
 
 export function registerDialogHandlers(): void {
@@ -157,12 +161,8 @@ export function registerDialogHandlers(): void {
           // skip unparseable files
         }
       }
-      // Sort by name (or id if no name), case-insensitive
-      workspaces.sort((a, b) => {
-        const na = (a.data.name ?? a.data.id).toLowerCase();
-        const nb = (b.data.name ?? b.data.id).toLowerCase();
-        return na.localeCompare(nb);
-      });
+      // Sort by last activated (epoch fallback), tie-broken alphabetically by name.
+      workspaces.sort((a, b) => sortWorkspacesByLastActivated(a.data, b.data));
       return workspaces;
     } catch {
       return [];

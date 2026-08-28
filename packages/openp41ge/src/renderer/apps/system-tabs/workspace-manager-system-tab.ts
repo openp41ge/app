@@ -9,6 +9,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 import type { WorkspaceFileData } from "../../../layout/types";
+import { sortWorkspacesByLastActivated } from "../../../layout/workspace-sort";
 import { workspaceFileService, workspaceMatchesQuery } from "../../services/workspace-file-service";
 import { workspacesOverlayService } from "../../services/workspaces-overlay-service";
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
@@ -1081,7 +1082,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   }
 
   private async _activateWorkspace(entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
-    workspaceFileService.activateWorkspace(entry);
+    await workspaceFileService.activateWorkspace(entry);
+    // Re-sort locally so returning to the list (without a reload) keeps the
+    // freshly activated workspace at the top; _showList() also reloads.
+    this._workspaces.sort((a, b) => sortWorkspacesByLastActivated(a.data, b.data));
     // Activating a workspace always opens its default sidebar tab (Explorer →
     // right sidebar); the openSystemTab op creates it if needed, or opens and
     // activates the existing one.
@@ -1127,14 +1131,19 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   private async _onSaveAs(): Promise<void> {
     if (this._selected) {
-      // Temporarily set as active to use saveAs
+      // Temporarily set as active to use saveAs — but do NOT bump recency for
+      // the selected card or the restored previous workspace; saveAs() stamps
+      // only the newly written file.
       const prevPath = workspaceFileService.activeFilePath;
       const prevData = workspaceFileService.activeData;
-      workspaceFileService.activateWorkspace(this._selected);
+      await workspaceFileService.activateWorkspace(this._selected, { recordAccess: false });
       await workspaceFileService.saveAs();
       // Restore previous active workspace
       if (prevPath && prevData) {
-        workspaceFileService.activateWorkspace({ filePath: prevPath, data: prevData });
+        await workspaceFileService.activateWorkspace(
+          { filePath: prevPath, data: prevData },
+          { recordAccess: false },
+        );
       }
       this._loadWorkspaces();
       this._emitUpdate();
