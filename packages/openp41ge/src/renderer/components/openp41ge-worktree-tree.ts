@@ -241,6 +241,9 @@ class Openp41geWorktreeTree extends LitElement {
          the overlay scrollbar sits in the padded area — content text/buttons
          are never hidden underneath it. Row backgrounds fill the full width
          (edge to edge) because .wt-tree-scroll-content has no padding. */
+      /* When the tree fills the drawer, hide the last child's bottom border
+         so it cannot double up with the bottom bar's top border. */
+      .wt-tree-scroll.full .wt-tree-scroll-content > :last-child { border-bottom: 0; }
       #wt-addrepo-row:focus-within,
       #wt-addwt-row:focus-within { outline: 2px solid #4a9eff; outline-offset: -2px; }
       #wt-addwt-input::placeholder,
@@ -547,11 +550,10 @@ class Openp41geWorktreeTree extends LitElement {
               }
               ${
                 (() => {
-                  const _anyExpanded = this._repos.some(r => _expandedRepos.has(r.name) && (this._worktreesByRepo.get(r.name) ?? []).length > 0);
                   return _showingAddRepo
                     ? html`<div
                         id="wt-addrepo-row"
-                        class="flex items-center h-[30px] pl-3 pr-2 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100${_anyExpanded ? " border-t border-divider" : ""}"
+                        class="flex items-center h-[30px] pl-3 pr-2 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100"
                     >
                       <span class="hidden">${unsafeHTML(plusIconThick(16))}</span
                       ><input
@@ -869,6 +871,12 @@ class Openp41geWorktreeTree extends LitElement {
   private _syncScrollbar(): void {
     const el = this._treeEl;
     if (!el) return;
+
+    // When the list fills the viewport, drop the *last* row's bottom border so
+    // it does not stack with the bottom bar's top border into a single 2px
+    // line. Mirrors the Workspaces overlay list (_syncLeftFill + the
+    // `.wm-left-scroll.full` rule). CSS-only: no component state, no re-render.
+    el.classList.toggle("full", el.scrollHeight >= el.clientHeight - 1);
 
     // Track and thumb are outside .wt-tree-scroll (sibling, not child) to avoid
     // overflow clipping. Query from the wrapper parent instead.

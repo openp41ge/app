@@ -629,7 +629,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                           ${
                             this._expandedWorktrees.has(wt.branch) &&
                             this._fileLoader.isWorktreeLoaded(wt.branch)
-                              ? html`<openp41ge-tree
+                              ? html`<div class="wt-expanded-wt-block border-b border-[#232323]"><openp41ge-tree
                                   style="--tree-font-size:12px;--tree-indent:20px"
                                   .nodes=${this._buildFileTreeNodes(wt.branch)}
                                   .renderIcon=${this._renderIcon}
@@ -639,7 +639,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                                   @tree-node-click=${this._onFileClick}
                                   @tree-node-dblclick=${this._onFileDblClick}
                                   @tree-node-contextmenu=${this._onFileContextMenu}
-                                ></openp41ge-tree>`
+                                ></openp41ge-tree></div>`
                               : ""
                           }
                         `,
