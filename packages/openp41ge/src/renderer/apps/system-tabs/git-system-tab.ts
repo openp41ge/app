@@ -101,6 +101,12 @@ export class GitSystemTabController implements SystemTabController {
     this._list = list;
 
     this._onGitRefresh = () => {
+      if (this._suspended) {
+        // Keep alive: a refresh while hidden just marks the tab dirty; it is
+        // applied in place the next time the tab is shown.
+        this._suspendDirty = true;
+        return;
+      }
       void this._reload();
     };
     document.addEventListener("git:refresh", this._onGitRefresh);
@@ -119,6 +125,21 @@ export class GitSystemTabController implements SystemTabController {
     }
     this._viewElement = null;
     this._list = null;
+  }
+
+  // ─── Keep-alive (SystemTabController.setVisible) ──────────────────────
+
+  private _suspended = false;
+  private _suspendDirty = false;
+
+  /** Pause background reloads while hidden; reload on show only if data
+   * changed meanwhile (dirty flag). The rows stay cached for instant return. */
+  setVisible(visible: boolean): void {
+    this._suspended = !visible;
+    if (visible && this._suspendDirty) {
+      this._suspendDirty = false;
+      void this._reload();
+    }
   }
 
   // ─── Loading ────────────────────────────────────────────────────────────

@@ -79,6 +79,15 @@ export interface SystemTabController {
   readonly appType: string;
   mount(container: HTMLElement): void | Promise<void>;
   unmount(): void;
+
+  /**
+   * Optional keep-alive hook: the sidebar keeps the controller/element mounted
+   * while the tab is inactive, but tells it to suspend background work (reloads,
+   * listeners, recompute) so hidden tabs cost nothing. Controllers should mark
+   * a dirty bit on changes and reconcile in place when made visible again.
+   * Mirrors the main-app TabController.setVisible contract.
+   */
+  setVisible?(visible: boolean): void;
 }
 
 /**

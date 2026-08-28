@@ -13,6 +13,7 @@ import { allSystemTabRegistrations } from "../apps/system-tabs";
 import { getSystemTabRegistration } from "../apps/app-registry";
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
+import type { SystemTabController } from "../controllers/types";
 
 // Keep in sync with openp41ge-windowview if changed
 
@@ -156,50 +157,113 @@ class Openp41geSidebar extends LitElement {
 
   private _resizeObserver: ResizeObserver | null = null;
 
-  // ═══ Mount / unmount view ────────────────────────────────────────────
+  // ═══ Keep-alive host management ─────────────────────────────────────
 
-  private _view: { mount: (container: HTMLElement) => void; unmount: () => void } | null = null;
+  /**
+   * Per-side cache of tab controllers. Hosts + controllers are created once and
+   * stay mounted (hidden) across tab switches and sidebar open/close. Inactive
+   * tabs get setVisible(false) so they run no background work while hidden.
+   * Key: `${side}:${tabId}`.
+   */
+  private _controllers = new Map<string, SystemTabController>();
 
-  private _mountView(): void {
-    if (this._view || !this.activeTabId || !this.isOpen) return;
-    const tab = this.systemTabs.find((t) => t.id === this.activeTabId);
+  /** Last visibility signalled to each controller (avoid redundant setVisible). */
+  private _hostSignaled = new Map<string, boolean>();
+
+  /** Find a tab's persistent host in the content area. */
+  private _hostFor(tabId: string): HTMLElement | null {
+    const content = this.querySelector<HTMLElement>(".sidebar-content");
+    return content?.querySelector<HTMLElement>(
+      `[data-tab-host="${tabId}"][data-side="${this.side}"]`,
+    ) ?? null;
+  }
+
+  /** Create the controller + content for a tab inside its host (once). */
+  private _mountInto(host: HTMLElement, tabId: string): void {
+    if (this._controllers.has(`${this.side}:${tabId}`)) return;
+    const tab = this.systemTabs.find((t) => t.id === tabId);
     const appType = tab?.appType;
     if (!appType) return;
     const registration = getSystemTabRegistration(appType);
     if (!registration) return;
-    const controller = registration.createController(this.activeTabId);
-    const container = this.querySelector<HTMLElement>(".sidebar-content");
-    if (!container) return;
-    controller.mount(container);
-    this._view = controller;
+    const controller = registration.createController(tabId);
+    this._controllers.set(`${this.side}:${tabId}`, controller);
+    void controller.mount(host);
   }
 
-  private _unmountView(): void {
-    if (this._view) {
-      this._view.unmount();
-      this._view = null;
+  /** Ensure one persistent host per system tab; destroy removed tabs. */
+  private _reconcileHosts(): void {
+    const content = this.querySelector<HTMLElement>(".sidebar-content");
+    if (!content) return;
+    const wanted = new Set(this.systemTabs.map((t) => t.id));
+
+    // Create hosts for present tabs, matching systemTabs order.
+    for (const tab of this.systemTabs) {
+      if (!this._hostFor(tab.id)) {
+        const host = document.createElement("div");
+        host.className = "sidebar-tab-host";
+        host.dataset.tabHost = tab.id;
+        host.dataset.side = this.side;
+        content.appendChild(host);
+      }
     }
-    const container = this.querySelector<HTMLElement>(".sidebar-content");
-    if (container) {
-      while (container.lastChild) {
-        container.removeChild(container.lastChild);
+
+    // Remove + unmount tabs that have left the window state.
+    const hosts = Array.from(
+      content.querySelectorAll<HTMLElement>(
+        `[data-tab-host][data-side="${this.side}"]`,
+      ),
+    );
+    for (const hostEl of hosts) {
+      const tabId = hostEl.dataset.tabHost!;
+      if (wanted.has(tabId)) continue;
+      const ctrl = this._controllers.get(`${this.side}:${tabId}`);
+      if (ctrl) {
+        try {
+          ctrl.unmount();
+        } catch {
+          /* ignore */
+        }
+        this._controllers.delete(`${this.side}:${tabId}`);
+      }
+      this._hostSignaled.delete(`${this.side}:${tabId}`);
+      hostEl.remove();
+    }
+  }
+
+  /** Show only the active host; hide + suspend the rest. */
+  private _syncActiveHost(): void {
+    const content = this.querySelector<HTMLElement>(".sidebar-content");
+    if (!content) return;
+    const open = this.isOpen;
+    const activeId = this.activeTabId;
+    const hosts = Array.from(
+      content.querySelectorAll<HTMLElement>(
+        `[data-tab-host][data-side="${this.side}"]`,
+      ),
+    );
+    for (const host of hosts) {
+      const tabId = host.dataset.tabHost!;
+      const isActive = open && tabId === activeId;
+      host.classList.toggle("visible", isActive);
+      if (isActive) this._mountInto(host, tabId);
+      const key = `${this.side}:${tabId}`;
+      const ctrl = this._controllers.get(key);
+      // Signal visibility only on an actual change — controllers must not be
+      // woken on every sidebar update while their visibility is unchanged.
+      if (ctrl && this._hostSignaled.get(key) !== isActive) {
+        this._hostSignaled.set(key, isActive);
+        ctrl.setVisible?.(isActive);
       }
     }
   }
 
   updated(changed: Map<string | number | symbol, unknown>): void {
-    if (changed.has("activeTabId")) {
-      this._unmountView();
-      if (this.activeTabId && this.isOpen) {
-        this._mountView();
-      }
-    } else if (changed.has("isOpen")) {
-      if (this.isOpen && this.activeTabId && !this._view) {
-        this._mountView();
-      } else if (!this.isOpen && this._view) {
-        this._unmountView();
-      }
-    }
+    // Keep alive: hosts + controllers persist across tab switches and sidebar
+    // open/close. Only the active host is shown; hidden controllers get
+    // setVisible(false) so they run no background work while inactive.
+    this._reconcileHosts();
+    this._syncActiveHost();
     if (changed.has("width") || changed.has("activeTabId")) {
       const el = this.querySelector(".sidebar-tab-scroll");
       if (el) {
@@ -230,6 +294,16 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
           .sidebar-tab-close:hover { background: var(--bg-hover-strong, #444); }
           .sidebar-tab-add:hover { background: var(--bg-hover-strong, #444); }
+          /* Keep-alive hosts: one absolute full-fill container per tab. Only the
+             active one is displayed; the rest stay mounted (hidden) so
+             switching back is an instant display flip. */
+          .sidebar-content { position: relative; }
+          .sidebar-tab-host {
+            position: absolute; inset: 0;
+            display: none;
+            overflow-y: auto; overflow-x: hidden;
+          }
+          .sidebar-tab-host.visible { display: block; }
         </style>
 
         <!-- System tab bar -->
@@ -279,8 +353,8 @@ class Openp41geSidebar extends LitElement {
           >＋</div>
         </div>
 
-        <!-- Content area -->
-        <div class="sidebar-content flex-1 overflow-y-auto overflow-x-hidden" data-sidebar-content="${this.side}"></div>
+        <!-- Content area (keep-alive host stack: one persistent host per tab) -->
+        <div class="sidebar-content flex-1 relative overflow-hidden" data-sidebar-content="${this.side}"></div>
       </div>
     `;
   }

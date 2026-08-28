@@ -176,6 +176,12 @@ class Openp41geWorktreeTree extends LitElement {
   private _gitDisconnected = false;
   private _repoDropHandler: ((e: Event) => void) | null = null;
   private _onProjectChanged = (): void => {
+    if (this._suspended) {
+      // Keep alive: a change while hidden just marks the tab dirty; it is
+      // reconciled in place on the next setVisible(true) call.
+      this._suspendDirty = true;
+      return;
+    }
     this._loadRepos();
   };
 
@@ -267,6 +273,30 @@ class Openp41geWorktreeTree extends LitElement {
     }
   };
 
+  // ─── Keep-alive (called by the sidebar via SystemTabController.setVisible) ──
+
+  /** True while this tab is hidden; the tree then does no background work. */
+  private _suspended = false;
+  /** A data change arrived while suspended → reload (in place) on show. */
+  private _suspendDirty = false;
+
+  /** Keep-alive hook: pause background reloads while the tab is hidden. The
+   * browser already stops rendering a display:none subtree; this gates the
+   * document-level listeners/timers display:none cannot stop. On show, reload
+   * only if something changed (dirty flag) and resync the scroll/fill math. */
+  public setVisible(visible: boolean): void {
+    this._suspended = !visible;
+    if (visible) {
+      if (this._suspendDirty) {
+        this._suspendDirty = false;
+        void this._loadRepos();
+      }
+      // Sizes changed while hidden (0-sized boxes, sidebar resize) — resync
+      // without a full reload.
+      requestAnimationFrame(() => this._syncScrollbar());
+    }
+  }
+
   connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener("resize", this._onWindowResize);
@@ -322,6 +352,10 @@ class Openp41geWorktreeTree extends LitElement {
     // Subscribe to openp41ge repoRefs changes from other windows
     this._openp41geRepoUnsub = window.openp41ge.workspaceController.onWorksetRepoRefsChanged(
       async () => {
+        if (this._suspended) {
+          this._suspendDirty = true;
+          return;
+        }
         await this._loadRepos();
       },
     );

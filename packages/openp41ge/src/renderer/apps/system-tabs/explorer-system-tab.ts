@@ -37,4 +37,10 @@ export class ExplorerSystemTabController implements SystemTabController {
       this._viewElement = null;
     }
   }
+
+  /** Keep-alive hook: forward visibility so the worktree tree suspends its
+   * background work (reactive loads / scroll recompute) while hidden. */
+  setVisible(visible: boolean): void {
+    (this._viewElement as unknown as { setVisible?(v: boolean): void } | null)?.setVisible?.(visible);
+  }
 }
