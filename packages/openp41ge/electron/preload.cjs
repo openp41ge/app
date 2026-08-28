@@ -515,12 +515,6 @@ contextBridge.exposeInMainWorld("openp41ge", {
     getAll: () => ipcRenderer.invoke("config:get-all"),
   },
 
-  recentProjects: {
-    list: () => ipcRenderer.invoke("recentProjects:list"),
-    add: (name) => ipcRenderer.invoke("recentProjects:add", name),
-    remove: (name) => ipcRenderer.invoke("recentProjects:remove", name),
-  },
-
   dialog: {
     /** Open native file picker for .openp41ge-workspace files. Returns { filePath, data } or null. */
     openWorkspaceFile: () => ipcRenderer.invoke("dialog:openWorkspaceFile"),
@@ -551,26 +545,6 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** Delete a .openp41ge-workspace file. Optionally also remove its data dir when deleteData is true. */
     deleteWorkspaceFile: (filePath, deleteData) =>
       ipcRenderer.invoke("dialog:deleteWorkspaceFile", filePath, deleteData),
-  },
-
-  project: {
-    list: () => ipcRenderer.invoke("project:list"),
-    listWithInfo: () => ipcRenderer.invoke("project:listWithInfo"),
-    exists: (name) => ipcRenderer.invoke("project:exists", name),
-    create: (name) => ipcRenderer.invoke("project:create", name),
-    delete: (name) => ipcRenderer.invoke("project:delete", name),
-    workspaceStatePath: (name) => ipcRenderer.invoke("project:workspaceStatePath", name),
-    reposDir: (name) => ipcRenderer.invoke("project:reposDir", name),
-    listRepos: (name) => ipcRenderer.invoke("project:listRepos", name),
-    current: () => ipcRenderer.invoke("project:current"),
-    switchTo: (name) => ipcRenderer.invoke("project:switch", name),
-    saveDraftAs: (draftName, newName) =>
-      ipcRenderer.invoke("project:saveDraftAs", draftName, newName),
-    isDraft: (name) => ipcRenderer.invoke("project:isDraft", name),
-    gcDrafts: () => ipcRenderer.invoke("project:gcDrafts"),
-    createDraft: () => ipcRenderer.invoke("project:createDraft"),
-    setRepoOrder: (name, order) => ipcRenderer.invoke("project:setRepoOrder", name, order),
-    rename: (oldName, newName) => ipcRenderer.invoke("project:rename", oldName, newName),
   },
 
   /** Workspace manager git operations (workspace-data/ directory). */

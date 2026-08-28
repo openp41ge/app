@@ -23,7 +23,6 @@ import {
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
 import { ConfigService } from "../src/main/services/config-service.js";
-import { RecentProjectsModel } from "../src/main/services/recent-projects-model.js";
 
 // ─── Window manager ──────────────────────────────────────────────────────
 import {
@@ -45,9 +44,6 @@ import { registerWorkspaceHandlers } from "./ipc-handlers/workspace-handlers.js"
 import { registerGitHandlers } from "./ipc-handlers/git-handlers.js";
 import { registerRepoRefHandlers } from "./ipc-handlers/repo-ref-handlers.js";
 import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
-import { registerProjectHandlers } from "./ipc-handlers/project-handlers.js";
-import { registerRecentProjectsHandlers } from "./ipc-handlers/recent-projects-handlers.js";
-import { ProjectStore } from "../src/main/services/project-store.js";
 
 // ─── Lifecycle manager ──────────────────────────────────────────────────
 import { LifecycleManager, registerLifecycleHandlers } from "./lifecycle-manager.js";
@@ -71,10 +67,17 @@ export class Openp41geApplication {
   private fileSystem!: ElectronFileSystem;
   private workspaceService!: WorkspaceService;
   private workspaceStateStore!: WorkspaceStateStore;
-  private projectStore!: ProjectStore;
-  private recentProjects!: RecentProjectsModel;
   private openp41geDir!: string;
-  private projectName: string | null = null;
+
+  /** Repos live in their own subdirectory of the app data dir. */
+  private get reposDir(): string {
+    return path.join(this.openp41geDir, "repositories");
+  }
+
+  /** The single workspace-state file for this app (persistence is always on). */
+  private get workspaceStatePath(): string {
+    return path.join(this.openp41geDir, "workspace.json");
+  }
 
   // ── Bootstrap ─────────────────────────────────────────────────────────
 
@@ -173,12 +176,6 @@ export class Openp41geApplication {
       process.env.OPENP41GE_E2E_DIR ||
       process.env.OPENP41GE_DIR ||
       path.join(process.env.HOME || process.env.USERPROFILE || "", ".openp41ge");
-
-    // Parse CLI args for --project <name>
-    const projectIndex = process.argv.indexOf("--project");
-    if (projectIndex !== -1 && projectIndex + 1 < process.argv.length) {
-      this.projectName = process.argv[projectIndex + 1];
-    }
   }
 
   private _initChromeFlags(): void {
@@ -200,18 +197,9 @@ export class Openp41geApplication {
   // ── Step 4: Services ──────────────────────────────────────────────────
 
   private _initServices(): void {
-    this.projectStore = new ProjectStore(this.openp41geDir);
-    this.recentProjects = new RecentProjectsModel(this.openp41geDir);
-
-    // Garbage-collect expired drafts on every startup
-    this.projectStore.gcDrafts();
-
-    // When no project is specified, skip auto-creation. The project picker
-    // will prompt the user to create or select a project.
-    // Use a temporary repos dir that won't create persistent artifacts.
-    const reposDir = this.projectName
-      ? this.projectStore.reposDir(this.projectName)
-      : path.join(this.openp41geDir, ".no-project", "repositories");
+    // Fixed app-data root — the per-project store was removed with the
+    // project system. Repos live under ~/.openp41ge/repositories.
+    const reposDir = this.reposDir;
 
     this.dispatcher = new OperationDispatcher();
     this.terminalManager = new TerminalManager();
@@ -240,11 +228,8 @@ export class Openp41geApplication {
       }
     });
     // Wire workspace state persistence: save after every mutation.
-    // When no project is set, nothing is persisted — the picker must run first.
     this.dispatcher.setSaveHandler((ws) => {
-      if (!this.projectName) return;
-      const projectStatePath = this.projectStore.workspaceStatePath(this.projectName);
-      this.workspaceStateStore.save(ws, projectStatePath);
+      this.workspaceStateStore.save(ws, this.workspaceStatePath);
     });
 
     setDispatcher(this.dispatcher);
@@ -259,10 +244,7 @@ export class Openp41geApplication {
    * Drafts that have never been saved simply get a fresh empty workspace.
    */
   private _maybeLoadState(): void {
-    if (!this.projectName) return;
-
-    const statePath = this.projectStore.workspaceStatePath(this.projectName);
-    const saved = this.workspaceStateStore.load(statePath);
+    const saved = this.workspaceStateStore.load(this.workspaceStatePath);
     if (saved) {
       this.dispatcher.setWorkspace(saved);
     }
@@ -280,20 +262,6 @@ export class Openp41geApplication {
     registerGitHandlers(this.gitCommitService, this.gitService);
     registerRepoRefHandlers(this.dispatcher);
     registerConfigHandlers(this.configService);
-    registerProjectHandlers(
-      this.projectStore,
-      this.workspaceStateStore,
-      this.dispatcher,
-      this.workspaceService,
-      this.gitService,
-      this.gitCommitService,
-      () => this.projectName,
-      (name: string | null) => {
-        this.projectName = name;
-        if (name) this.recentProjects.add(name);
-      },
-    );
-    registerRecentProjectsHandlers(this.recentProjects);
     registerLifecycleHandlers(this.lifecycle);
     registerDialogHandlers();
   }
