@@ -34,15 +34,15 @@ export function registerDispatchHandlers(dispatcher: OperationDispatcher): void 
         const newWin = ws.windows.find((w) => !existingIds.has(w.id));
         if (newWin) {
           const src = BrowserWindow.fromWebContents(event.sender);
-          // actionOpenFileInNewWindow may carry dropScreenX/dropScreenY
-          // as the last two positional args after fileName.
+          // actionOpenFileInNewWindow carries [filePath, fileName, sourceWinId,
+          // dropScreenX, dropScreenY] — coords are the last two args (indices 3/4).
           const dropScreenX =
-            fn === "actionOpenFileInNewWindow" && args.length >= 4
-              ? Number(args[2])
+            fn === "actionOpenFileInNewWindow" && args.length >= 5
+              ? Number(args[3])
               : undefined;
           const dropScreenY =
-            fn === "actionOpenFileInNewWindow" && args.length >= 4
-              ? Number(args[3])
+            fn === "actionOpenFileInNewWindow" && args.length >= 5
+              ? Number(args[4])
               : undefined;
           createOpenp41geWindow(
             newWin.id,

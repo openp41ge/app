@@ -93,8 +93,26 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       offsetY,
       dragType,
       filePath,
+      captureRect,
     } = parsed;
-    dragGhost.show(label, screenX, screenY, emoji, tabWidth, tabHeight, offsetX, offsetY);
+
+    // Show the ghost IMMEDIATELY (synchronous, row-styled for files) so even a
+    // very quick drag gets visible feedback. Blocking on capturePage first
+    // meant a fast drag could end (drag.end hides the ghost) before the slow
+    // capture resolved -> no drag element at all.
+    const isFile = dragType === "file";
+    dragGhost.show(
+      label,
+      screenX,
+      screenY,
+      emoji,
+      tabWidth,
+      tabHeight,
+      offsetX,
+      offsetY,
+      isFile,
+      undefined,
+    );
 
     // Track the active drag session for cross-window drops
     const sender = _event.sender;
@@ -115,6 +133,46 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
         };
         break;
       }
+    }
+
+    // Async upgrade: capture a pixel-accurate bitmap of the source row and
+    // swap it into the ghost. Only applies if the drag is still ACTIVE (the
+    // session object identity is unchanged) — otherwise the drag already ended
+    // and we must not resurrect a ghost after drag.end hid it.
+    if (
+      isFile &&
+      captureRect &&
+      typeof captureRect.x === "number" &&
+      typeof captureRect.y === "number" &&
+      typeof captureRect.width === "number" &&
+      typeof captureRect.height === "number" &&
+      !sender.isDestroyed()
+    ) {
+      const session = _activeSession;
+      void (async () => {
+        try {
+          const img = await sender.capturePage({
+            x: Math.round(captureRect.x),
+            y: Math.round(captureRect.y),
+            width: Math.round(captureRect.width),
+            height: Math.round(captureRect.height),
+          });
+          if (!img || img.isEmpty()) return;
+          if (_activeSession === session && !sender.isDestroyed()) {
+            // In-place bitmap swap — the row-style ghost is already visible and
+            // must NOT be destroyed/recreated (that would flicker or vanish on
+            // a fast drag). Just reload this ghost's content with the snapshot.
+            dragGhost.setBitmap(
+              img.toDataURL(),
+              typeof tabWidth === "number" ? tabWidth : Math.round(captureRect.width),
+              typeof tabHeight === "number" ? tabHeight : Math.round(captureRect.height),
+            );
+          }
+        } catch {
+          // capturePage can reject if the window is closing — keep the
+          // row-styled ghost already on screen.
+        }
+      })();
     }
   });
 

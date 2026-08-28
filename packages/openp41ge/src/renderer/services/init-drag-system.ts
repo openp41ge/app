@@ -114,6 +114,8 @@ class SidebarTabDragSource implements IDragSource {
 
 let _orchestrator: DragOrchestrator | null = null;
 let _currentSource: IDragSource | null = null;
+/** File row whose native draggable was disabled for a custom drag gesture (restored on end). */
+let _fileRowSuppressedDrag: HTMLElement | null = null;
 let _ghostManager = new GhostManager();
 
 /** Whether another Electron window has an active drag. */
@@ -127,6 +129,13 @@ let _localFileDragActive = false;
 let _pendingFileDetachPath: string | null = null;
 /** Set to true when a file is successfully dropped on a grid target (via grid-open-tab). */
 let _fileDropHandled = false;
+/**
+ * Set once a file drag engages (threshold met) so the trailing browser `click`
+ * on the source row can be suppressed — otherwise releasing back over the
+ * explorer after a drag is seen as a click and opens the file. Files should
+ * only open on an explicit grid drop.
+ */
+let _suppressFileRowClick = false;
 
 /** Last screen position from POSITION events — used for new-window positioning. */
 let _lastScreenPos = { screenX: 0, screenY: 0 };
@@ -156,6 +165,8 @@ let _pendingFileDragStart: {
   offsetY: number;
   elementWidth: number;
   elementHeight: number;
+  /** Source row rect (viewport coords) for the main-process capturePage snapshot. */
+  captureRect: { x: number; y: number; width: number; height: number };
 } | null = null;
 
 /**
@@ -170,6 +181,18 @@ function _resolveMyWinId(): string {
   if (_myWinId) return _myWinId;
   _myWinId = window.openp41ge.workspace.getWindowId();
   return _myWinId || "";
+}
+
+/** Restore native draggable on the file row disabled for a custom drag gesture. */
+function _restoreFileRowDraggable(): void {
+  if (_fileRowSuppressedDrag) {
+    // Lit may have re-rendered the row (re-adding draggable="true") — only set
+    // "true" if it's currently "false" to avoid clobbering a fresh render state.
+    if (_fileRowSuppressedDrag.getAttribute("draggable") === "false") {
+      _fileRowSuppressedDrag.setAttribute("draggable", "true");
+    }
+    _fileRowSuppressedDrag = null;
+  }
 }
 
 // ─── Dummy drag source for cross-window ghost preview ────────────────────
@@ -251,8 +274,31 @@ export function initDragSystem(): () => void {
 
   // ── Mousedown: initiate file drags from the explorer ─────────────────
   const onFileMouseDown = (e: MouseEvent) => {
-    const fileEl = (e.target as HTMLElement).closest?.("[data-file-path]");
-    if (!fileEl || !(fileEl instanceof HTMLElement)) return;
+    // Only the primary (left) button engages file drags — right/middle clicks
+    // must never start a drag or interrupt an existing one (an active drag is
+    // torn down by the mousedown safety-net above).
+    if (e.button !== 0) return;
+
+    // The uikit <openp41ge-tree> renders its rows in a shadow root, so at the
+    // document boundary e.target retargets to the host. Walk composedPath() to
+    // find the actual file row carrying data-file-path.
+    const fileEl = e
+      .composedPath()
+      .find(
+        (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-file-path"),
+      );
+    if (!fileEl) return;
+
+    // New gesture — clear any unconsumed suppression flag from a previous drag.
+    _suppressFileRowClick = false;
+
+    // Disable native dragging for THIS gesture — the custom pipeline is the sole
+    // owner of file drags. Removing native draggable deterministically stops
+    // Chromium from initiating an OS HTML5 drag that can race the custom gesture
+    // and swallow its mousemove (native draggable rows are the one thing synthetic
+    // tests can't reproduce). Restored in onDragEnd/onMouseUp.
+    _fileRowSuppressedDrag = fileEl;
+    fileEl.setAttribute("draggable", "false");
 
     e.preventDefault();
 
@@ -286,11 +332,57 @@ export function initDragSystem(): () => void {
       offsetY,
       elementWidth,
       elementHeight,
+      captureRect: {
+        x: fileRect.x,
+        y: fileRect.y,
+        width: fileRect.width,
+        height: fileRect.height,
+      },
     };
   };
 
   document.addEventListener("mousedown", onFileMouseDown);
   cleanups.push(() => document.removeEventListener("mousedown", onFileMouseDown));
+
+  // ── Suppress native HTML5 drag for file rows while a custom file drag runs ──
+  // Explorer file rows are natively draggable (uikit <openp41ge-tree>). Once
+  // onFileMouseDown starts the custom orchestrator drag, cancel the native
+  // dragstart for the same gesture so only the custom pipeline runs — otherwise
+  // both systems fire → double ghosts / double opens.
+  const onFileNativeDragStart = (e: DragEvent) => {
+    if (_currentSource?.type !== "file") return;
+    // composedPath() sees through the <openp41ge-tree> shadow root (e.target is
+    // retargeted to the host at this level).
+    const hasFilePath = e
+      .composedPath()
+      .some((el) => el instanceof HTMLElement && el.hasAttribute("data-file-path"));
+    if (hasFilePath) {
+      e.preventDefault();
+    }
+  };
+  document.addEventListener("dragstart", onFileNativeDragStart, true);
+  cleanups.push(() => document.removeEventListener("dragstart", onFileNativeDragStart, true));
+
+  // ── Suppress the trailing click after a file drag ─────────────────────
+  // Once a file drag engages (threshold met -> _suppressFileRowClick true),
+  // the browser may still synthesize a `click` on the source row if press and
+  // release stayed within the click slop. That click would open the file like
+  // a single click. Because it fires in CAPTURE phase before the row's own
+  // @click handler, preventDefault + stopImmediatePropagation blocks the open.
+  // Only file-row-targeted clicks are suppressed, and only once (flag consumed).
+  const onFileRowClickSuppress = (e: MouseEvent) => {
+    if (!_suppressFileRowClick) return;
+    _suppressFileRowClick = false;
+    const hasFileRow = e
+      .composedPath()
+      .some((el) => el instanceof HTMLElement && el.hasAttribute("data-file-path"));
+    if (hasFileRow) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  };
+  document.addEventListener("click", onFileRowClickSuppress, true);
+  cleanups.push(() => document.removeEventListener("click", onFileRowClickSuppress, true));
 
   // ── Mousedown: initiate sidebar tab drags ────────────────────────────
   const onSidebarTabMouseDown = (e: MouseEvent) => {
@@ -383,22 +475,44 @@ export function initDragSystem(): () => void {
       // if the orchestrator drops the file on a valid target.
       if (_localFileDragActive && _pendingFileDetachPath) {
         const filePath = _pendingFileDetachPath;
-        const dropScreenX = _lastScreenPos.screenX;
-        const dropScreenY = _lastScreenPos.screenY;
+        // Use the mouseup event's OWN screen coords — the true OS release
+        // point. On a real drag-out the cursor is over the desktop, so
+        // e.screenX/Y are OUTSIDE the window bounds; _lastScreenPos is the
+        // last in-window POSITION (stale, inside the window) and would
+        // misclassify an outside release as an in-window miss.
+        const dropScreenX =
+          typeof e.screenX === "number" && e.screenX !== 0 && isFinite(e.screenX)
+            ? e.screenX
+            : _lastScreenPos.screenX;
+        const dropScreenY =
+          typeof e.screenY === "number" && e.screenY !== 0 && isFinite(e.screenY)
+            ? e.screenY
+            : _lastScreenPos.screenY;
         _pendingFileDetachPath = null;
         // Use setTimeout(0) to yield to the event loop, allowing any
         // pending IPC messages (endSession from cross-window drops) to
         // be delivered before we decide whether to create a new window.
-        setTimeout(() => {
+        setTimeout(async () => {
           if (!_fileDropHandled) {
-            const fileName = filePath.split("/").filter(Boolean).pop() || "file";
-            window.openp41ge.workspace.dispatch(
-              "actionOpenFileInNewWindow",
-              filePath,
-              fileName,
-              dropScreenX,
-              dropScreenY,
-            );
+            // Only create a new window when the release happened OUTSIDE every
+            // openp41ge window (dragged out onto the desktop / other apps). An
+            // in-window miss — over the sidebar, window chrome, or a non-target
+            // grid area — is a cancelled drop, NOT a new window.
+            const hit = await window.openp41ge.drag
+              .check(dropScreenX, dropScreenY)
+              .catch(() => null);
+            if (!hit) {
+              const fileName = filePath.split("/").filter(Boolean).pop() || "file";
+              const sourceWinId = _resolveMyWinId();
+              window.openp41ge.workspace.dispatch(
+                "actionOpenFileInNewWindow",
+                filePath,
+                fileName,
+                sourceWinId,
+                dropScreenX,
+                dropScreenY,
+              );
+            }
           }
           _fileDropHandled = false;
         }, 0);
@@ -406,6 +520,7 @@ export function initDragSystem(): () => void {
       _localDragActive = false;
       _localFileDragActive = false;
       _currentSource = null;
+      _restoreFileRowDraggable();
       return;
     }
     if (_remoteDragActive) {
@@ -429,6 +544,9 @@ export function initDragSystem(): () => void {
         _dragActivated = true;
         _localDragActive = true;
         _localFileDragActive = !!_pendingFileDragStart;
+        // Drag engaged (threshold met) — suppress the trailing click-on-the-row so
+        // releasing back over the explorer can't open the file as if it were a click.
+        _suppressFileRowClick = !!_pendingFileDragStart;
         if (_pendingFileDragStart) {
           _pendingFileDetachPath = _pendingFileDragStart.filePath;
         }
@@ -454,6 +572,11 @@ export function initDragSystem(): () => void {
           _pendingDragStart = null;
         } else if (_pendingFileDragStart) {
           const p = _pendingFileDragStart;
+          // File ghost: the main process captures a pixel-accurate bitmap of the
+          // source row (capturePage) and renders it in the DragGhostManager window
+          // at the row's exact dimensions, so the ghost looks like the row AND
+          // travels outside the window. Use the source row's dims/offset so the
+          // ghost lines up under the cursor.
           window.openp41ge.drag.start(
             p.label,
             p.screenX,
@@ -468,6 +591,7 @@ export function initDragSystem(): () => void {
             p.offsetY,
             "file",
             p.filePath,
+            p.captureRect,
           );
           _pendingFileDragStart = null;
         }
@@ -477,7 +601,12 @@ export function initDragSystem(): () => void {
   });
 
   // ── Orchestrator end event → hide main-process ghost ─────────────────
-  const onDragEnd = () => {
+  // Full local-drag teardown: hide the main-process ghost, clear the DOM grid
+  // ghost, drop all drag flags and restore the source row's native draggable.
+  // Used by the END event AND the interruption safety-net (any unexpected
+  // mousedown/right-click during a drag) so no interrupted drag can ever leave
+  // a floating ghost behind.
+  const teardownLocalDrag = () => {
     _dragActivated = false;
     _focusedOnEntry = false;
     _lastScreenPos = { screenX: 0, screenY: 0 };
@@ -489,10 +618,30 @@ export function initDragSystem(): () => void {
     _pendingFileDetachPath = null;
     _fileDropHandled = false;
     _currentSource = null;
+    _restoreFileRowDraggable();
+  };
+
+  const onDragEnd = () => {
+    teardownLocalDrag();
   };
 
   document.addEventListener(DRAG_EVENTS.END, onDragEnd);
   cleanups.push(() => document.removeEventListener(DRAG_EVENTS.END, onDragEnd));
+
+  // ── Interruption safety-net ───────────────────────────────────────────
+  // Any new mousedown while a local drag is active is an interruption
+  // (right/middle click, a second gesture, a tab click, …). Fully tear the
+  // drag down (including hiding the main-process ghost) BEFORE any other
+  // handler can react — so no interrupted drag ever leaves a floating ghost.
+  // Capture phase so it runs before the bubble-phase drag/click handlers.
+  const onInterruptMousedown = () => {
+    if (_localDragActive) {
+      _orchestrator?.cancelDrag();
+      teardownLocalDrag();
+    }
+  };
+  document.addEventListener("mousedown", onInterruptMousedown, true);
+  cleanups.push(() => document.removeEventListener("mousedown", onInterruptMousedown, true));
 
   // ── Orchestrator detach event → check cross-window, then create window ──
   const onDetach = async (e: Event) => {
@@ -607,10 +756,12 @@ export function initDragSystem(): () => void {
     _html5FileDragPath = null;
     if (e.dataTransfer?.dropEffect === "none" && !_fileDropHandled) {
       const fileName = filePath.split("/").filter(Boolean).pop() || "file";
+      const sourceWinId = _resolveMyWinId();
       window.openp41ge.workspace.dispatch(
         "actionOpenFileInNewWindow",
         filePath,
         fileName,
+        sourceWinId,
         e.screenX,
         e.screenY,
       );
@@ -660,6 +811,7 @@ export function initDragSystem(): () => void {
     window.openp41ge.drag.end();
     clearGridGhost();
     _currentSource = null;
+    _restoreFileRowDraggable();
   });
 
   return () => {
@@ -1123,10 +1275,23 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
   }
 
   // Normal (non-sidebar) drag: check grid tab bars and grid cells
+  const isFileDrag = _currentSource?.type === "file";
   const tabBarEl = el.closest?.("tab-bar");
   if (tabBarEl instanceof HTMLElement) {
-    const dropTarget = (tabBarEl as HTMLElement & { dropTarget?: IDropTarget }).dropTarget;
-    if (dropTarget) return dropTarget;
+    if (isFileDrag) {
+      // TabBarDropTarget rejects non-tab sources, so a file dropped on a cell's
+      // tab bar must resolve to the enclosing grid — GridDropTarget then computes
+      // the column under the cursor (cell-center/boundary), matching the native
+      // path and cross-window file drops.
+      const gridEl = tabBarEl.closest?.("tab-grid");
+      if (gridEl instanceof HTMLElement) {
+        const gridTarget = (gridEl as HTMLElement & { dropTarget?: IDropTarget }).dropTarget;
+        if (gridTarget) return gridTarget;
+      }
+    } else {
+      const dropTarget = (tabBarEl as HTMLElement & { dropTarget?: IDropTarget }).dropTarget;
+      if (dropTarget) return dropTarget;
+    }
   }
 
   const tabGridEl = el.closest?.("tab-grid");
@@ -1135,21 +1300,25 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
     if (dropTarget) return dropTarget;
   }
 
-  // Check for sidebar tab bar (for non-sidebar drag sources like files)
-  const sidebarBarEl = el.closest?.("[data-sidebar-tab-bar]");
-  if (sidebarBarEl instanceof HTMLElement) {
-    const side = sidebarBarEl.getAttribute("data-sidebar-tab-bar") as "left" | "right";
-    if (side === "left" || side === "right") {
-      return _getSidebarDropTarget(side);
+  // Check for sidebar tab bar (non-sidebar sources). Files are grid-only:
+  // the sidebar must NOT light up as a drop zone for a file drag, and a
+  // release over the sidebar must not be swallowed by a sidebar drop target.
+  if (!isFileDrag) {
+    const sidebarBarEl = el.closest?.("[data-sidebar-tab-bar]");
+    if (sidebarBarEl instanceof HTMLElement) {
+      const side = sidebarBarEl.getAttribute("data-sidebar-tab-bar") as "left" | "right";
+      if (side === "left" || side === "right") {
+        return _getSidebarDropTarget(side);
+      }
     }
-  }
 
-  // Check for sidebar content area
-  const sidebarContentEl = el.closest?.("[data-sidebar-content]");
-  if (sidebarContentEl instanceof HTMLElement) {
-    const side = sidebarContentEl.getAttribute("data-sidebar-content") as "left" | "right";
-    if (side === "left" || side === "right") {
-      return _getSidebarDropTarget(side);
+    // Check for sidebar content area
+    const sidebarContentEl = el.closest?.("[data-sidebar-content]");
+    if (sidebarContentEl instanceof HTMLElement) {
+      const side = sidebarContentEl.getAttribute("data-sidebar-content") as "left" | "right";
+      if (side === "left" || side === "right") {
+        return _getSidebarDropTarget(side);
+      }
     }
   }
 

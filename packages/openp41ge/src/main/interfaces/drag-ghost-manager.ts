@@ -13,6 +13,9 @@ export interface IDragGhostManager {
    * @param tabHeight Height of the source tab element (used for ghost window size).
    * @param offsetX Horizontal offset from cursor to ghost window origin (cursor - tabLeft).
    * @param offsetY Vertical offset from cursor to ghost window origin (cursor - tabTop).
+   * @param isFile Render as an explorer file row (document glyph + name) instead of a tab pill.
+   * @param bitmapDataUrl Optional captured PNG of the actual dragged element; when present it is
+   *   rendered at the element's size and the window adopts those exact dimensions.
    */
   show(
     label: string,
@@ -23,7 +26,12 @@ export interface IDragGhostManager {
     tabHeight?: number,
     offsetX?: number,
     offsetY?: number,
+    isFile?: boolean,
+    bitmapDataUrl?: string,
   ): void;
+
+  /** Swap the ghost content to a captured bitmap in-place (no window recreate). */
+  setBitmap(dataUrl: string, width: number, height: number): void;
 
   /** Move the drag ghost window to a new screen position. */
   move(screenX: number, screenY: number): void;

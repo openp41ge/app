@@ -5,12 +5,11 @@
  */
 
 import type { Workspace } from "./types.js";
-import { createTab, type TabId } from "./types.js";
+import { createTab, createWindow, type TabId } from "./types.js";
 import { registerTab, addTabToCell, addColumnTab } from "./tab-operations.js";
 import { makeTabId, mapGridInWindow } from "./common.js";
 import { resizeGrid, findEmptyCell } from "./grid-operations.js";
 import { openTabInCell } from "./cell-operations.js";
-import { addWindow } from "./window-operations.js";
 
 export function actionAddTab(
   workspace: Workspace,
@@ -168,6 +167,7 @@ export function actionOpenFileInNewWindow(
   workspace: Workspace,
   filePath: string,
   fileName?: string,
+  sourceWinId?: string,
 ): Workspace {
   const tabId = makeTabId();
   const name = fileName || filePath.split("/").filter(Boolean).pop() || "file";
@@ -178,7 +178,33 @@ export function actionOpenFileInNewWindow(
 
   // Create a new window
   const newWinId = `win-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  result = addWindow(result, newWinId);
+
+  // Copy the source window's non-editor chrome — its sidebar tabs (Explorer,
+  // Git, …) and repo list — so the new window feels like the original window.
+  // Only the central grid is per-window: it starts with just the dropped file.
+  const source = sourceWinId
+    ? workspace.windows.find((w) => w.id === sourceWinId)
+    : undefined;
+  const base = createWindow(newWinId);
+  const win = {
+    ...base,
+    ...(source
+      ? {
+          sidebar: source.sidebar
+            ? {
+                ...source.sidebar,
+                leftSidebarTabs: [...(source.sidebar.leftSidebarTabs ?? [])],
+                rightSidebarTabs: [...(source.sidebar.rightSidebarTabs ?? [])],
+              }
+            : base.sidebar,
+          repoRefs: (source.repoRefs ?? []).map((r) => ({
+            ...r,
+            worktrees: [...(r.worktrees ?? [])],
+          })),
+        }
+      : {}),
+  };
+  result = { ...result, windows: [...result.windows, win] };
 
   // Add the tab to the new window's grid
   return addTabToCell(result, newWinId, tab, 0, 0);

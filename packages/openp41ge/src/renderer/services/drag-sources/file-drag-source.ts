@@ -1,7 +1,12 @@
 /**
- * FileDragSource — provides ghost visuals for dragging a file from the explorer.
+ * FileDragSource — drag source for dragging a file from the explorer.
  *
- * Creates a ghost element shaped like a file with the file name.
+ * The visual ghost is a pixel-accurate bitmap of the source row captured by
+ * the main process (webContents.capturePage) at drag threshold and rendered in
+ * the transparent always-on-top DragGhostManager BrowserWindow, which is the
+ * only thing that can follow the cursor OUTSIDE the app window. The in-DOM
+ * ghost is therefore invisible (as with tab drags), and the source row is left
+ * untouched so the captured bitmap is not faded.
  */
 
 import type { IDragSource, DragSourceData, DragResult } from "../../interfaces/drag-handler";
@@ -36,9 +41,10 @@ export class FileDragSource implements IDragSource {
   }
 
   /**
-   * Create an invisible ghost — the visual ghost is rendered by the
-   * main-process DragGhostManager (BrowserWindow overlay), not by
-   * an in-DOM element. This prevents double-ghost rendering.
+   * Create an invisible in-DOM ghost — the visible ghost is the main-process
+   * BrowserWindow overlay (a captured bitmap of the source row), so we don't
+   * render a second in-DOM element that would double up and would be clipped
+   * to this window.
    */
   createGhost(): HTMLElement {
     const ghost = document.createElement("div");
@@ -53,7 +59,9 @@ export class FileDragSource implements IDragSource {
   }
 
   onDragStart(): void {
-    // Nothing special needed for file start
+    // The source row is intentionally NOT dimmed here: the ghost bitmap is
+    // captured from it via capturePage after this fires, so it must stay at
+    // full opacity. The row itself remains in place until a drop/end.
   }
 
   onDragEnd(_result: DragResult): void {

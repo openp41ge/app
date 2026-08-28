@@ -152,7 +152,9 @@ export class DragOrchestrator implements IDragHandler {
     const dx = ev.clientX - s.startX;
     const dy = ev.clientY - s.startY;
 
-    if (!s.thresholdMet && Math.abs(dx) + Math.abs(dy) > 4) {
+    // Drag threshold: start once total (Manhattan) movement exceeds 3px.
+    // Small enough to feel instant, large enough to ignore 1-2px click jitter.
+    if (!s.thresholdMet && Math.abs(dx) + Math.abs(dy) > 3) {
       s.thresholdMet = true;
     }
 
@@ -210,6 +212,10 @@ export class DragOrchestrator implements IDragHandler {
   };
 
   private _onMouseUp = (ev: MouseEvent): void => {
+    // Only the primary (left) button ends a drag — a right-button mouseup must
+    // never be treated as a drop (and must not end a left-button drag).
+    if (ev.button !== 0) return;
+
     document.removeEventListener("mousemove", this._onMouseMove);
     document.removeEventListener("mouseup", this._onMouseUp);
 
