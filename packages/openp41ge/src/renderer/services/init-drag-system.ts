@@ -1569,27 +1569,12 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
     if (dropTarget) return dropTarget;
   }
 
-  // Check for sidebar tab bar (non-sidebar sources). Files are grid-only:
-  // the sidebar must NOT light up as a drop zone for a file drag, and a
-  // release over the sidebar must not be swallowed by a sidebar drop target.
-  if (!isFileDrag) {
-    const sidebarBarEl = el.closest?.("[data-sidebar-tab-bar]");
-    if (sidebarBarEl instanceof HTMLElement) {
-      const side = sidebarBarEl.getAttribute("data-sidebar-tab-bar") as "left" | "right";
-      if (side === "left" || side === "right") {
-        return _getSidebarDropTarget(side);
-      }
-    }
-
-    // Check for sidebar content area
-    const sidebarContentEl = el.closest?.("[data-sidebar-content]");
-    if (sidebarContentEl instanceof HTMLElement) {
-      const side = sidebarContentEl.getAttribute("data-sidebar-content") as "left" | "right";
-      if (side === "left" || side === "right") {
-        return _getSidebarDropTarget(side);
-      }
-    }
-  }
+  // Sidebar surfaces are ONLY targets for sidebar-tab (system-tab) drags, which
+  // are handled exclusively by the sidebar branch above (during moves via the
+  // live source, at the final mouseup via _sidebarTabDragSide). Grid-tab and file
+  // drags must never resolve the sidebar as a drop target — grid tabs can't be
+  // dropped there (SidebarDropTarget rejects non-system-tab sources), so the
+  // sidebar drop indicator must not light up for them.
 
   return null;
 }
