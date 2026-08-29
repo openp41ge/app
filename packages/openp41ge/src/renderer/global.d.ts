@@ -46,7 +46,7 @@ declare global {
         onReset: (callback: () => void) => () => void;
       };
       drag: {
-        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number, dragType?: string, filePath?: string, captureRect?: { x: number; y: number; width: number; height: number }, inset?: number) => void;
+        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number, dragType?: string, filePath?: string, captureRect?: { x: number; y: number; width: number; height: number }, inset?: number, openTabData?: { appType?: string; tabConfig?: Record<string, unknown> }) => void;
         move: (screenX: number, screenY: number) => void;
         end: () => void;
         activate: () => void;
@@ -57,7 +57,8 @@ declare global {
           label: string;
           dragData:
             | { tabId: string; winId: string; worksetId: string; type: "tab"; title?: string }
-            | { type: "file"; filePath: string; fileName?: string };
+            | { type: "file"; filePath: string; fileName?: string }
+            | { type: "open-tab"; appType: string; title?: string; tabConfig?: Record<string, unknown> };
         } | null>;
         endSession: () => void;
         onEndSession: (callback: () => void) => () => void;
@@ -104,6 +105,9 @@ declare global {
 
         /** Get untracked file paths for a repository. */
         getUntrackedFiles: (repoName: string) => Promise<string[]>;
+
+        /** Search commit history (repoName null = across all repos). */
+        searchCommits: (repoName: string | null, options: CommitSearchOptions) => Promise<SearchResultCommit[]>;
 
         // ── Openp41ge repoRefs API (per-openp41ge repo/worktree visibility) ──
 
@@ -302,6 +306,33 @@ declare global {
     added: number;
     deleted: number;
     status: "added" | "modified" | "deleted" | "renamed";
+  }
+
+  /** What part of the commit history to match against (Git sidebar search). */
+  interface SearchResultFile {
+    path: string;
+    additions: number;
+    deletions: number;
+  }
+
+  interface SearchResultCommit {
+    repoName: string;
+    hash: string;
+    shortHash: string;
+    message: string;
+    author: string;
+    date: string;
+    relativeDate: string;
+    files: SearchResultFile[];
+  }
+
+  type CommitSearchScope = "message" | "files" | "all";
+
+  interface CommitSearchOptions {
+    query: string;
+    in: CommitSearchScope;
+    limit?: number;
+    offset?: number;
   }
 
   /** Filters for window.openp41ge.logs.query(). */

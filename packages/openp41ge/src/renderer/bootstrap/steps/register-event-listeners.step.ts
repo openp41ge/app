@@ -30,6 +30,11 @@ export class RegisterEventListenersStep implements IStartupStep {
       context.fileOpenHandler.handleOpenFile(e);
     }) as EventListener);
 
+    // Commit-search preview open events (Git sidebar)
+    document.addEventListener("openp41ge:open-commit", ((e: CustomEvent) => {
+      context.commitOpenHandler.handleOpenCommit(e);
+    }) as EventListener);
+
     // Worktree tab close events
     document.addEventListener("openp41ge:close-worktree-tabs", ((e: CustomEvent) => {
       const detail = e.detail as { pathPrefix: string; repoName: string; branch: string };

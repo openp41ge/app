@@ -4,7 +4,7 @@
 
 import type { SystemTabRegistration } from "../../controllers/types";
 import { ExplorerSystemTabController } from "./explorer-system-tab";
-import { GitSystemTabController } from "./git-system-tab";
+import { CommitSearchSystemTabController } from "./commit-search-system-tab";
 import { SearchSystemTabController } from "./search-system-tab";
 
 export const explorerSystemTabRegistration: SystemTabRegistration = {
@@ -20,9 +20,9 @@ export const gitSystemTabRegistration: SystemTabRegistration = {
   id: "git",
   label: "Git",
   icon: "\u2387",
-  description: "View Git status, branches, and history",
+  description: "Search commits across repositories",
   defaultSide: "right",
-  createController: (tabId: string) => new GitSystemTabController(tabId),
+  createController: (tabId: string) => new CommitSearchSystemTabController(tabId),
 };
 
 export const searchSystemTabRegistration: SystemTabRegistration = {

@@ -30,6 +30,7 @@ import { KeyboardManager } from "../services/keyboard-manager";
 import { ZoomService } from "../services/zoom-service";
 import { ConfigService } from "../services/config-service";
 import { FileOpenHandler } from "../services/file-open-handler";
+import { CommitOpenHandler } from "../services/commit-open-handler";
 import { ContextMenuBuilder } from "../services/context-menu-builder";
 import { QuoteController } from "../services/quote-controller";
 import { FileDropHandler } from "../services/file-drop-handler";
@@ -49,6 +50,7 @@ export class StartupContext {
   readonly zoomService: IZoomService;
   readonly configService: ConfigService;
   readonly fileOpenHandler: IFileOpenHandler;
+  readonly commitOpenHandler: CommitOpenHandler;
   readonly contextMenuBuilder: IContextMenuBuilder;
   readonly quoteController: IQuoteController;
   readonly fileDropHandler: IFileDropHandler;
@@ -92,6 +94,7 @@ export class StartupContext {
     this.zoomService = new ZoomService();
     this.configService = new ConfigService();
     this.fileOpenHandler = new FileOpenHandler();
+    this.commitOpenHandler = new CommitOpenHandler();
     this.contextMenuBuilder = new ContextMenuBuilder();
     this.quoteController = new QuoteController();
     this.fileDropHandler = new FileDropHandler();
@@ -107,6 +110,7 @@ export class StartupContext {
   wireServices(): void {
     this.contextMenuBuilder.init(this.commandBus);
     this.fileOpenHandler.init(this.commandBus, this.workspaceState);
+    this.commitOpenHandler.init(this.commandBus, this.workspaceState);
     this.fileDropHandler.init(this.commandBus);
 
     // Initialize Openp41geTabsEventHandler to handle tab-grid custom events

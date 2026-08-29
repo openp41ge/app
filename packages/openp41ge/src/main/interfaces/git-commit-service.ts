@@ -5,6 +5,8 @@
  * Implementations run in the main (Node.js) process.
  */
 
+import type { CommitSearchOptions, SearchResultCommit } from "openp41ge-git";
+
 export interface CommitEntry {
   hash: string;
   shortHash: string;
@@ -68,4 +70,17 @@ export interface IGitCommitService {
    * and `git ls-files --others --ignored --exclude-standard` for gitignored files.
    */
   getUntrackedFiles(repoName: string): Promise<string[]>;
+
+  /**
+   * Search commit history across all refs of a single repository.
+   *
+   * Scope (`in`):
+   *   - "message" — match against subject/body (`git log --grep`).
+   *   - "files"   — match against changed file paths (path substring).
+   *   - "all"     — either message OR changed-file-path match.
+   *
+   * Returns commits with their per-commit diff stat (changed files + counts),
+   * sliced by offset/limit. Callers iterate repos for cross-repo search.
+   */
+  searchCommits(repoName: string, options: CommitSearchOptions): Promise<SearchResultCommit[]>;
 }

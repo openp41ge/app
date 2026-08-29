@@ -217,6 +217,23 @@ export class GridDropTarget implements IDropTarget {
       return { success: true };
     }
 
+    if (data.type === "open-tab") {
+      // Generic "open a pane of appType with tabConfig" payload — the host
+      // (Openp41geTabsEventHandler) maps `git-repository` to a workspace
+      // dispatch. Boundary drops split a new column exactly like files.
+      this._fire(GRID_EVENTS.OPEN_TAB, {
+        winId: this.winId,
+        tabType: data.appType,
+        tabConfig: data.tabConfig ?? {},
+        targetCol: splitCol,
+        isBoundary: true,
+        splitCol,
+        splitLeft,
+        pinned: true,
+      });
+      return { success: true };
+    }
+
     return { success: false, reason: "boundary drop not supported for this type" };
   }
 
@@ -279,6 +296,17 @@ export class GridDropTarget implements IDropTarget {
         winId: this.winId,
         tabType: "file-viewer",
         tabConfig: { filePath: data.filePath },
+        targetCol,
+        pinned: true,
+      });
+      return { success: true };
+    }
+
+    if (data.type === "open-tab") {
+      this._fire(GRID_EVENTS.OPEN_TAB, {
+        winId: this.winId,
+        tabType: data.appType,
+        tabConfig: data.tabConfig ?? {},
         targetCol,
         pinned: true,
       });

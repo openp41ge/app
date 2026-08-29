@@ -97,13 +97,14 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       filePath,
       captureRect,
       inset,
+      openTabData,
     } = parsed;
 
-    // Show the ghost IMMEDIATELY (synchronous, row-styled for files) so even a
-    // very quick drag gets visible feedback. Blocking on capturePage first
-    // meant a fast drag could end (drag.end hides the ghost) before the slow
-    // capture resolved -> no drag element at all.
-    const isFile = dragType === "file";
+    // Show the ghost IMMEDIATELY (synchronous, row-styled for files / git
+    // entries) so even a very quick drag gets visible feedback. Blocking on
+    // capturePage first meant a fast drag could end (drag.end hides the ghost)
+    // before the slow capture resolved -> no drag element at all.
+    const isRowStyle = dragType === "file" || dragType === "open-tab";
     dragGhost.show(
       label,
       screenX,
@@ -113,7 +114,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       tabHeight,
       offsetX,
       offsetY,
-      isFile,
+      isRowStyle,
       undefined,
     );
 
@@ -132,6 +133,19 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
             type,
             title: label,
             ...(type === "file" && filePath ? { filePath } : {}),
+            // Persist the open-tab payload so a TARGET window's cross-window
+            // drop can resolve appType/tabConfig without seeing the source row.
+            ...(type === "open-tab" && openTabData && typeof openTabData === "object"
+              ? {
+                  appType:
+                    typeof openTabData.appType === "string"
+                      ? openTabData.appType
+                      : "git-repository",
+                  ...(openTabData.tabConfig && typeof openTabData.tabConfig === "object"
+                    ? { tabConfig: openTabData.tabConfig as Record<string, unknown> }
+                    : {}),
+                }
+              : {}),
           },
         };
         break;

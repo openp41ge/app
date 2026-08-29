@@ -13,7 +13,7 @@ const log = createLogger("bootstrap:expose-test-models");
 
 // ── Test models (tree-shaken from production) ──────────────────────────
 import { FileDragSource } from "../../services/drag-sources/file-drag-source";
-import { RepoDragSource } from "../../services/drag-sources/repo-drag-source";
+import { GitEntryDragSource } from "../../services/drag-sources/git-entry-drag-source";
 import { TopBarDropTarget } from "../../services/drop-targets/topbar-drop-target";
 import {
   TestRepoService,
@@ -21,6 +21,7 @@ import {
   TestWorktreeModel,
   TestFileContent,
 } from "../../models/test-models";
+import { IpcCommitSearchModel, TestCommitSearchModel } from "../../models/commit-search-model";
 import {
   resolveFileReferences,
   getUncoveredPaths,
@@ -39,7 +40,9 @@ export class ExposeTestModelsStep implements IStartupStep {
       TestWorktreeModel,
       TestFileContent,
       FileDragSource,
-      RepoDragSource,
+      GitEntryDragSource,
+      IpcCommitSearchModel,
+      TestCommitSearchModel,
       TopBarDropTarget,
       // Scope expansion utilities
       resolveFileReferences,

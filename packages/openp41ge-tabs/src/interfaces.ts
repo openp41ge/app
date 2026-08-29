@@ -12,7 +12,12 @@ export type DragSourceData =
   | { type: "openp41ge-tab"; tabId: string; winId: string; worksetId: string; title?: string }
   | { type: "system-tab"; tabId: string; side: string; winId: string; title?: string }
   | { type: "file"; filePath: string; fileName?: string }
-  | { type: "repo"; repoName: string };
+  | {
+      type: "open-tab";
+      appType: string;
+      title?: string;
+      tabConfig?: Record<string, unknown>;
+    };
 
 // ─── Ghost Factory ─────────────────────────────────────────────────────────
 

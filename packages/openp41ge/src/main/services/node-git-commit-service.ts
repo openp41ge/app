@@ -7,6 +7,7 @@
 
 import { exec } from "child_process";
 import path from "path";
+import type { CommitSearchOptions, SearchResultCommit } from "openp41ge-git";
 import type {
   IGitCommitService,
   CommitEntry,
@@ -422,6 +423,135 @@ export class NodeGitCommitService implements IGitCommitService {
   async deleteLocalBranch(repoName: string, branchName: string, force?: boolean): Promise<void> {
     const flag = force ? "-D" : "-d";
     await this._execGit(["branch", flag, branchName], repoName);
+  }
+
+  // ─── Commit search (Git sidebar — commit search UI) ────────────────────
+
+  /** ASCII record-separator prefix on every commit-format line (0x1E can't
+   * appear in real git data, so it is an unambiguous record boundary). */
+  private static readonly _SEARCH_RECORD_SEP = "\x1e";
+
+  async searchCommits(
+    repoName: string,
+    options: CommitSearchOptions,
+  ): Promise<SearchResultCommit[]> {
+    const query = (options.query ?? "").trim();
+    if (!query) return [];
+    const inMode = options.in ?? "message";
+    const limit = options.limit ?? 100;
+    const offset = options.offset ?? 0;
+
+    // Cap the walk so huge histories don't stream unbounded --numstat output.
+    const maxCount = 5000;
+    const format = `%x1e%H|%h|%an|%aI|%ar|%s`;
+
+    // message mode uses git-native --grep (matches subject + body); files/all
+    // enumerate the walk and filter paths/messages in JS (substring, ci) which
+    // is predictable for a plain search box.
+    const useGrep = inMode === "message";
+    const raw = await this._execGit(
+      useGrep
+        ? [
+            "log",
+            "--all",
+            "--date-order",
+            `--max-count=${maxCount}`,
+            "--regexp-ignore-case",
+            `--grep=${query}`,
+            `--format=${format}`,
+            "--numstat",
+          ]
+        : [
+            "log",
+            "--all",
+            "--date-order",
+            `--max-count=${maxCount}`,
+            `--format=${format}`,
+            "--numstat",
+          ],
+      repoName,
+    );
+
+    if (!raw) return [];
+
+    const qLower = query.toLowerCase();
+    const parsed = this._parseSearchLog(raw);
+    let results: SearchResultCommit[];
+
+    if (inMode === "message") {
+      // Already grep-filtered by git.
+      results = parsed.map((c) => this._toSearchResultCommit(repoName, c));
+    } else if (inMode === "files") {
+      results = parsed
+        .map((c) => this._toSearchResultCommit(repoName, c))
+        .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)));
+    } else {
+      // "all" — message substring match OR changed-file-path match.
+      results = parsed
+        .map((c) => this._toSearchResultCommit(repoName, c))
+        .filter(
+          (c) =>
+            c.message.toLowerCase().includes(qLower) ||
+            c.files.some((f) => f.path.toLowerCase().includes(qLower)),
+        );
+    }
+
+    return results.slice(offset, offset + limit);
+  }
+
+  private _parseSearchLog(output: string): Array<{
+    header: string;
+    files: Array<{ path: string; additions: number; deletions: number }>;
+  }> {
+    const commits: Array<{
+      header: string;
+      files: Array<{ path: string; additions: number; deletions: number }>;
+    }> = [];
+    let cur: {
+      header: string;
+      files: Array<{ path: string; additions: number; deletions: number }>;
+    } | null = null;
+
+    for (const rawLine of output.split("\n")) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      if (line.startsWith(NodeGitCommitService._SEARCH_RECORD_SEP)) {
+        cur = { header: line.slice(NodeGitCommitService._SEARCH_RECORD_SEP.length), files: [] };
+        commits.push(cur);
+        continue;
+      }
+      if (!cur) continue;
+      const parts = line.split("\t");
+      if (parts.length < 3) continue;
+      const add = parts[0].trim();
+      const del = parts[1].trim();
+      cur.files.push({
+        path: parts.slice(2).join("\t"),
+        additions: add === "-" ? 0 : parseInt(add, 10) || 0,
+        deletions: del === "-" ? 0 : parseInt(del, 10) || 0,
+      });
+    }
+    return commits;
+  }
+
+  private _toSearchResultCommit(
+    repoName: string,
+    c: {
+      header: string;
+      files: Array<{ path: string; additions: number; deletions: number }>;
+    },
+  ): SearchResultCommit {
+    const [hash, shortHash, author, date, relativeDate, ...messageParts] = c.header.split("|");
+    return {
+      repoName,
+      hash: hash ?? "",
+      shortHash: shortHash ?? "",
+      message: messageParts.join("|") ?? "",
+      author: author ?? "",
+      date: date ?? "",
+      relativeDate: relativeDate ?? "",
+      files: c.files,
+    };
   }
 
   private _applyFileStatuses(entries: DiffStatEntry[], statusOutput: string): void {

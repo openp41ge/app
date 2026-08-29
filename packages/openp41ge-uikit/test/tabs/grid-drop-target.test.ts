@@ -145,3 +145,84 @@ describe("GridDropTarget file drops", () => {
     expect(detail!.splitLeft).toBe(false);
   });
 });
+
+// ─── open-tab (git-entry) drops ───────────────────────────────────────────
+
+function openTabSource(config: { repoName: string; branch?: string }): IDragSource {
+  const { repoName, branch } = config;
+  return {
+    type: "open-tab",
+    createGhost() {
+      return document.createElement("div");
+    },
+    getDragData() {
+      return {
+        type: "open-tab",
+        appType: "git-repository",
+        title: branch ?? repoName,
+        tabConfig: branch ? { repoName, branch } : { repoName },
+      };
+    },
+    onDragStart() {},
+    onDragEnd() {},
+  } as IDragSource;
+}
+
+async function captureOpenTabDrop(
+  grid: FakeGrid,
+  relX: number,
+  config: { repoName: string; branch?: string },
+): Promise<Record<string, unknown> | null> {
+  let detail: Record<string, unknown> | null = null;
+  const listener = (e: Event) => {
+    detail = (e as CustomEvent).detail as Record<string, unknown>;
+  };
+  grid.addEventListener("grid-open-tab", listener);
+  const target = new GridDropTarget(grid, grid.winId);
+  const result = await target.onDrop(openTabSource(config), relX, 200);
+  grid.removeEventListener("grid-open-tab", listener);
+  if (!result.success) throw new Error(`drop failed: ${JSON.stringify(result)}`);
+  return detail;
+}
+
+describe("GridDropTarget open-tab (git-entry) drops", () => {
+  test.each([
+    { name: "repo row, cell-center", relX: 200, config: { repoName: "acme" }, branch: false },
+    {
+      name: "worktree row, cell-center",
+      relX: 200,
+      config: { repoName: "acme", branch: "main" },
+      branch: true,
+    },
+  ])(
+    "$name fires grid-open-tab with tabType/tabConfig/targetCol",
+    async ({ relX, config, branch }) => {
+      const grid = makeGrid(2);
+      const detail = await captureOpenTabDrop(grid, relX, config);
+
+      expect(detail).not.toBeNull();
+      expect(detail!.winId).toBe("win-1");
+      expect(detail!.tabType).toBe("git-repository");
+      expect(detail!.tabConfig).toEqual(
+        branch ? { repoName: "acme", branch: "main" } : { repoName: "acme" },
+      );
+      expect(detail!.targetCol).toBe(0);
+      expect(detail!.pinned).toBe(true);
+      expect(detail!.isBoundary).toBeUndefined();
+    },
+  );
+
+  test("repo row boundary drop fires grid-open-tab with split info", async () => {
+    const grid = makeGrid(2);
+    // Left-edge boundary (fraction 0.0375 < 0.15)
+    const detail = await captureOpenTabDrop(grid, 30, { repoName: "acme" });
+
+    expect(detail).not.toBeNull();
+    expect(detail!.tabType).toBe("git-repository");
+    expect(detail!.tabConfig).toEqual({ repoName: "acme" });
+    expect(detail!.isBoundary).toBe(true);
+    expect(detail!.splitCol).toBe(0);
+    expect(detail!.splitLeft).toBe(true);
+    expect(detail!.pinned).toBe(true);
+  });
+});

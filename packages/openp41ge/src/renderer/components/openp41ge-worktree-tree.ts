@@ -14,7 +14,7 @@
  *   - All IPC calls go through window.openp41ge.workspaceController.*
  */
 
-import { LitElement, html, nothing, type TemplateResult } from "lit";
+import { LitElement, html, type nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { state, property } from "lit/decorators.js";
 import { toastService } from "./openp41ge-toast";
@@ -174,7 +174,6 @@ class Openp41geWorktreeTree extends LitElement {
 
   // ── Git panel state ───────────────────────────────────────────────────────
   private _gitDisconnected = false;
-  private _repoDropHandler: ((e: Event) => void) | null = null;
   private _onProjectChanged = (): void => {
     if (this._suspended) {
       // Keep alive: a change while hidden just marks the tab dirty; it is
@@ -183,6 +182,35 @@ class Openp41geWorktreeTree extends LitElement {
       return;
     }
     this._loadRepos();
+  };
+
+  /**
+   * Route the explorer-reorder-repos event (fired by ExplorerReorderDropTarget)
+   * to a repo splice + persistence. Mirrors the removed native drop handler.
+   */
+  private _onExplorerReorder = (e: Event): void => {
+    const detail = (e as CustomEvent).detail as {
+      repoName: string;
+      fromIndex: number;
+      dropIndex: number;
+    };
+    if (!detail?.repoName) return;
+
+    const fromIdx =
+      detail.fromIndex >= 0
+        ? detail.fromIndex
+        : this._repos.findIndex((r) => r.name === detail.repoName);
+    if (fromIdx === -1 || fromIdx === detail.dropIndex || detail.dropIndex === fromIdx + 1) {
+      return;
+    }
+    const newRepos = [...this._repos];
+    const [moved] = newRepos.splice(fromIdx, 1);
+    newRepos.splice(detail.dropIndex > fromIdx ? detail.dropIndex - 1 : detail.dropIndex, 0, moved);
+    this._repos = newRepos;
+    // Persist the new order to localStorage (the per-project repo-order store
+    // was removed with the project system)
+    saveRepoOrder(newRepos.map((r) => r.name));
+    document.dispatchEvent(new CustomEvent("project:changed"));
   };
 
   /** Initiate a pointer-event drag to reorder a repo in the explorer tree. */
@@ -194,8 +222,6 @@ class Openp41geWorktreeTree extends LitElement {
   /** Guards against re-entering _loadRepos() from updated() on every Lit cycle. */
   private _hasLoadedOnce = false;
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
-  @state() private _dropIndex: number = -1;
-  @state() private _explorerDragIdx: number = -1;
   constructor() {
     super();
     this._injectStyles();
@@ -363,15 +389,10 @@ class Openp41geWorktreeTree extends LitElement {
     // Reload when the project is switched (e.g. via project picker)
     document.addEventListener("project:changed", this._onProjectChanged);
 
-    // Listen for repo drops from file-tree drag-and-drop
-    this._repoDropHandler = (e: Event) => {
-      if (e.target !== document) return; // Only handle events dispatched on document
-      const ce = e as CustomEvent;
-      if (ce.detail?.repoName) {
-        this._openGitTab(ce.detail.repoName);
-      }
-    };
-    document.addEventListener("repo-open-git", this._repoDropHandler);
+    // Explorer repo reorder — fired by the unified drag pipeline when a repo
+    // row is dropped over the explorer list (ExplorerReorderDropTarget). The
+    // legacy native HTML5 reorder handlers were removed with the native drag.
+    this.addEventListener("explorer-reorder-repos", this._onExplorerReorder);
 
     // Sync open/closed state from the workspace state on initial mount.
     // This is needed because _syncExplorerState is also called from willUpdate
@@ -399,10 +420,7 @@ class Openp41geWorktreeTree extends LitElement {
       this._openp41geRepoUnsub = null;
     }
     document.removeEventListener("project:changed", this._onProjectChanged);
-    if (this._repoDropHandler) {
-      document.removeEventListener("repo-open-git", this._repoDropHandler);
-      this._repoDropHandler = null;
-    }
+    this.removeEventListener("explorer-reorder-repos", this._onExplorerReorder);
     this.removeEventListener("keydown", this._onKeyDown);
     this.removeEventListener("click", this._onPanelClick);
     this.removeEventListener("mousedown", this._onMousedownFocus);
@@ -428,90 +446,12 @@ class Openp41geWorktreeTree extends LitElement {
         class="wt-drawer flex flex-col overflow-hidden flex-1 min-h-0 w-full bg-gutter relative select-none"
       >
         <div class="wt-tree-scroll-wrapper flex-1 relative min-h-0">
-          <div
-            class="wt-tree-scroll absolute inset-0 overflow-y-auto overflow-x-hidden"
-          >
-            <div
-              class="wt-tree-scroll-content"
-              @dragend=${() => {
-                this._explorerDragIdx = -1;
-                this._dropIndex = -1;
-              }}
-              @dragenter=${(e: DragEvent) => {
-                if (e.dataTransfer?.types?.includes("application/x-openp41ge-repo")) {
-                  e.preventDefault();
-                  const dragName = e.dataTransfer!.getData("application/x-openp41ge-repo");
-                  if (dragName) {
-                    const idx = this._repos.findIndex((r) => r.name === dragName);
-                    if (idx >= 0) this._explorerDragIdx = idx;
-                  }
-                }
-              }}
-              @dragover=${(e: DragEvent) => {
-                if (!e.dataTransfer?.types?.includes("application/x-openp41ge-repo")) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                const items = this.renderRoot?.querySelectorAll("openp41ge-repo-tree-item");
-                let idx = this._repos.length;
-                if (items) {
-                  for (let i = 0; i < items.length; i++) {
-                    const rect = items[i].getBoundingClientRect();
-                    if (e.clientY < rect.top + rect.height / 2) {
-                      idx = i;
-                      break;
-                    }
-                  }
-                }
-                this._dropIndex = idx;
-              }}
-              @dragleave=${(e: DragEvent) => {
-                const t = e.currentTarget as HTMLElement;
-                const r = e.relatedTarget as Node | null;
-                if (r && t.contains(r)) return;
-                this._dropIndex = -1;
-              }}
-              @drop=${(e: DragEvent) => {
-                this._dropIndex = -1;
-                this._explorerDragIdx = -1;
-                const dragName = e.dataTransfer?.getData("application/x-openp41ge-repo");
-                if (!dragName) return;
-                e.preventDefault();
-                const items = this.renderRoot?.querySelectorAll("openp41ge-repo-tree-item");
-                let dropIndex = this._repos.length;
-                if (items) {
-                  for (let i = 0; i < items.length; i++) {
-                    const rect = items[i].getBoundingClientRect();
-                    if (e.clientY < rect.top + rect.height / 2) {
-                      dropIndex = i;
-                      break;
-                    }
-                  }
-                }
-                const fromIdx = this._repos.findIndex((r) => r.name === dragName);
-                if (fromIdx === -1 || fromIdx === dropIndex || dropIndex === fromIdx + 1) return;
-                const newRepos = [...this._repos];
-                const [moved] = newRepos.splice(fromIdx, 1);
-                newRepos.splice(dropIndex > fromIdx ? dropIndex - 1 : dropIndex, 0, moved);
-                this._repos = newRepos;
-                // Persist the new order to localStorage (the per-project
-                // repo-order store was removed with the project system)
-                saveRepoOrder(newRepos.map((r) => r.name));
-                document.dispatchEvent(new CustomEvent("project:changed"));
-              }}
-            >
-              ${this._repos.map((repo, idx) => {
+          <div class="wt-tree-scroll absolute inset-0 overflow-y-auto overflow-x-hidden">
+            <div class="wt-tree-scroll-content" data-explorer-drop-zone>
+              ${this._repos.map((repo) => {
                 const worktrees = this._worktreesByRepo.get(repo.name) ?? [];
                 return html`
-                  ${
-                    this._dropIndex === idx
-                      ? html`<div
-                          class="h-0.5 bg-focus shrink-0 m-0"
-                        ></div>`
-                      : nothing
-                  }
-                  <div
-                    class="flex items-stretch w-full ${this._explorerDragIdx === idx ? "opacity-30" : ""}"
-                  >
+                  <div class="flex items-stretch w-full">
                     <openp41ge-repo-tree-item
                       class="flex-1 min-w-0"
                       .repoName=${repo.name}
@@ -527,9 +467,6 @@ class Openp41geWorktreeTree extends LitElement {
                       }}
                       @repo-add-worktree=${(e: CustomEvent) => {
                         this._doAddWorktree(e.detail.repoName, e.detail.branch);
-                      }}
-                      @repo-open-git=${(e: CustomEvent) => {
-                        this._openGitTab(e.detail.repoName);
                       }}
                       @worktree-files-toggle=${(e: CustomEvent) => {
                         const { repoName: rn, branch, expanded } = e.detail;
@@ -577,17 +514,11 @@ class Openp41geWorktreeTree extends LitElement {
                   </div>
                 `;
               })}
-              ${
-                this._dropIndex === this._repos.length
-                  ? html`<div class="h-0.5 bg-focus shrink-0 m-0"></div>`
-                  : nothing
-              }
-              ${
-                (() => {
-                  return _showingAddRepo
-                    ? html`<div
-                        id="wt-addrepo-row"
-                        class="flex items-center h-[30px] pl-3 pr-2 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100"
+              ${(() => {
+                return _showingAddRepo
+                  ? html`<div
+                      id="wt-addrepo-row"
+                      class="flex items-center h-[30px] pl-3 pr-2 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100"
                     >
                       <span class="hidden">${unsafeHTML(plusIconThick(16))}</span
                       ><input
@@ -667,16 +598,12 @@ class Openp41geWorktreeTree extends LitElement {
                         (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                       }}
                     >
-                      <span
-                        class="w-[10px] h-[30px] flex items-center justify-center shrink-0"
+                      <span class="w-[10px] h-[30px] flex items-center justify-center shrink-0"
                         ><span class="-translate-x-px inline-flex"
                           >${unsafeHTML(plusIconThick(11))}</span
                         ></span
-                      ><span
-                        class="add-repo-label ml-1 text-muted flex-1"
-                        >add repository</span
-                      >
-                    </div>`
+                      ><span class="add-repo-label ml-1 text-muted flex-1">add repository</span>
+                    </div>`;
               })()}
             </div>
             <!-- wt-tree-scroll-content -->
@@ -1012,7 +939,8 @@ class Openp41geWorktreeTree extends LitElement {
    * path, :focus-visible) is corrected immediately.
    */
   private _enforceSingleBorder(): void {
-    const cursor = this._navFocusVisible && this._focusedRowEl?.isConnected ? this._focusedRowEl : null;
+    const cursor =
+      this._navFocusVisible && this._focusedRowEl?.isConnected ? this._focusedRowEl : null;
     const walk = (root: ParentNode) => {
       for (const el of Array.from(root.children)) {
         if (!(el instanceof HTMLElement)) continue;
@@ -1071,11 +999,7 @@ class Openp41geWorktreeTree extends LitElement {
     // let the browser's DEFAULT action focus the row, and the uikit's
     // :focus-visible would paint a border inline styles can't clear. Stop
     // that default HERE so DOM focus can never land on a row.
-    if (
-      e
-        .composedPath()
-        .some((p) => p instanceof HTMLElement && this._isExplorerRowOrHost(p))
-    ) {
+    if (e.composedPath().some((p) => p instanceof HTMLElement && this._isExplorerRowOrHost(p))) {
       e.preventDefault();
     }
     const inside = e
@@ -1663,7 +1587,13 @@ class Openp41geWorktreeTree extends LitElement {
       const myWindowId = window.openp41ge?.workspace?.getWindowId?.() ?? "";
       if (myWindowId) {
         window.openp41ge?.workspace?.dispatch?.("openSidebar", myWindowId, "right");
-        window.openp41ge?.workspace?.dispatch?.("openSystemTab", myWindowId, "right", "explorer", "Explorer");
+        window.openp41ge?.workspace?.dispatch?.(
+          "openSystemTab",
+          myWindowId,
+          "right",
+          "explorer",
+          "Explorer",
+        );
       }
       _isOpen = true;
       updateDrawerVisibility();
@@ -1955,7 +1885,8 @@ class Openp41geWorktreeTree extends LitElement {
     // Create progress bar if needed
     if (!this._cloneProgressBar) {
       this._cloneProgressBar = document.createElement("div");
-      this._cloneProgressBar.className = "hidden h-0.5 bg-accent transition-[width] duration-300 ease-[ease]";
+      this._cloneProgressBar.className =
+        "hidden h-0.5 bg-accent transition-[width] duration-300 ease-[ease]";
       this._cloneProgressBar.style.width = "0%";
       this._treeEl?.appendChild(this._cloneProgressBar);
     }
@@ -1979,10 +1910,12 @@ class Openp41geWorktreeTree extends LitElement {
     }
 
     const overlay = document.createElement("div");
-    overlay.className = "fixed inset-0 z-[1000] bg-[rgba(0,0,0,0.5)] flex items-center justify-center";
+    overlay.className =
+      "fixed inset-0 z-[1000] bg-[rgba(0,0,0,0.5)] flex items-center justify-center";
 
     const dialog = document.createElement("div");
-    dialog.className = "bg-bg-tertiary border border-border-color rounded-lg p-6 w-[360px] max-w-[90vw] shadow-[0_8px_32px_rgba(0,0,0,0.4)]";
+    dialog.className =
+      "bg-bg-tertiary border border-border-color rounded-lg p-6 w-[360px] max-w-[90vw] shadow-[0_8px_32px_rgba(0,0,0,0.4)]";
 
     const branchOptions = branches
       .map((b) => `<option value="${b.replace(/"/g, "&quot;")}">${this._escapeHtml(b)}</option>`)
@@ -2091,7 +2024,13 @@ class Openp41geWorktreeTree extends LitElement {
     const myWindowId = window.openp41ge?.workspace?.getWindowId?.() ?? "";
     if (myWindowId) {
       window.openp41ge?.workspace?.dispatch?.("openSidebar", myWindowId, "right");
-      window.openp41ge?.workspace?.dispatch?.("openSystemTab", myWindowId, "right", "explorer", "Explorer");
+      window.openp41ge?.workspace?.dispatch?.(
+        "openSystemTab",
+        myWindowId,
+        "right",
+        "explorer",
+        "Explorer",
+      );
     }
     _isOpen = true;
     updateDrawerVisibility();

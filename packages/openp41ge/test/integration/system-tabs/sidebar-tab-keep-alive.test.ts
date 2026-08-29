@@ -15,7 +15,7 @@ import "../../../src/renderer/components/openp41ge-sidebar";
 import { registerSystemTabType } from "../../../src/renderer/apps/app-registry";
 import type { SystemTabController } from "../../../src/renderer/controllers/types";
 import { ExplorerSystemTabController } from "../../../src/renderer/apps/system-tabs/explorer-system-tab";
-import { GitSystemTabController } from "../../../src/renderer/apps/system-tabs/git-system-tab";
+import { CommitSearchSystemTabController } from "../../../src/renderer/apps/system-tabs/commit-search-system-tab";
 
 /** Minimal controllable SystemTabController for the sidebar keep-alive test. */
 class StubSystemTab implements SystemTabController {
@@ -178,9 +178,7 @@ describe("Sidebar system-tab keep-alive", () => {
     // Hosts remain in the DOM; the active one is hidden (panel is closed).
     expect(sidebar.querySelector('[data-tab-host="t-a"]')).not.toBeNull();
     expect(
-      (sidebar.querySelector('[data-tab-host="t-a"]') as HTMLElement).classList.contains(
-        "visible",
-      ),
+      (sidebar.querySelector('[data-tab-host="t-a"]') as HTMLElement).classList.contains("visible"),
     ).toBe(false);
     expect(ctrlOf(sidebar, "stub-a").mountCount).toBe(1);
 
@@ -188,9 +186,7 @@ describe("Sidebar system-tab keep-alive", () => {
     await sidebar.updateComplete;
 
     expect(
-      (sidebar.querySelector('[data-tab-host="t-a"]') as HTMLElement).classList.contains(
-        "visible",
-      ),
+      (sidebar.querySelector('[data-tab-host="t-a"]') as HTMLElement).classList.contains("visible"),
     ).toBe(true);
     expect(ctrlOf(sidebar, "stub-a").mountCount).toBe(1);
   });
@@ -204,9 +200,7 @@ describe("Sidebar system-tab keep-alive", () => {
     expect(sidebar.querySelector('[data-tab-host="t-b"]')).not.toBeNull();
 
     // Tab B is gone from the window state → reconcile removes it.
-    sidebar.systemTabs = [
-      { id: "t-a", title: "A", appType: "stub-a", pinned: false },
-    ];
+    sidebar.systemTabs = [{ id: "t-a", title: "A", appType: "stub-a", pinned: false }];
     await sidebar.updateComplete;
 
     expect(sidebar.querySelector('[data-tab-host="t-b"]')).toBeNull();
@@ -220,9 +214,7 @@ describe("Sidebar system-tab keep-alive", () => {
     host.appendChild(container);
     const explorer = new ExplorerSystemTabController("t-explorer");
     await explorer.mount(container);
-    const tree = container.querySelector(
-      "openp41ge-worktree-tree",
-    ) as unknown as {
+    const tree = container.querySelector("openp41ge-worktree-tree") as unknown as {
       _suspended: boolean;
       _suspendDirty: boolean;
       setVisible(v: boolean): void;
@@ -247,7 +239,7 @@ describe("Sidebar system-tab keep-alive", () => {
   it("Git tab defers git:refresh while hidden and reloads on return if dirty", async () => {
     const container = document.createElement("div");
     host.appendChild(container);
-    const git = new GitSystemTabController("t-git") as unknown as {
+    const git = new CommitSearchSystemTabController("t-git") as unknown as {
       _suspended: boolean;
       _suspendDirty: boolean;
       setVisible(v: boolean): void;

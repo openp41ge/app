@@ -106,3 +106,34 @@ export interface GitBrowserCallbacks {
   onBranchContextMenu: (branchName: string, x: number, y: number) => void;
   onFileRowClick: (filePath: string) => void;
 }
+
+// ─── Commit search (Git sidebar — commit search UI) ──────────────────────
+
+/** One changed file inside a search-result commit (per-commit diff stat). */
+export interface SearchResultFile {
+  path: string;
+  additions: number;
+  deletions: number;
+}
+
+/** A commit matched by the commit-search query, with its changed files. */
+export interface SearchResultCommit {
+  repoName: string;
+  hash: string;
+  shortHash: string;
+  message: string;
+  author: string;
+  date: string;
+  relativeDate: string;
+  files: SearchResultFile[];
+}
+
+/** What part of the commit history to match against. */
+export type CommitSearchScope = "message" | "files" | "all";
+
+export interface CommitSearchOptions {
+  query: string;
+  in: CommitSearchScope;
+  limit?: number;
+  offset?: number;
+}

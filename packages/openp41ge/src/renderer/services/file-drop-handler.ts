@@ -37,12 +37,8 @@ export class FileDropHandler implements IFileDropHandler {
     e.preventDefault();
 
     const filePath = e.dataTransfer?.getData("text/plain");
-    const repoName = e.dataTransfer?.getData("application/x-openp41ge-repo");
-
     if (filePath) {
       this._handleFileDrop(filePath, gridEl, e);
-    } else if (repoName) {
-      this._handleRepoDrop(repoName, gridEl, e);
     }
   }
 
@@ -65,27 +61,13 @@ export class FileDropHandler implements IFileDropHandler {
     );
   }
 
-  private _handleRepoDrop(repoName: string, gridEl: HTMLElement, _e: DragEvent): void {
-    const winId = this._resolveWinId(gridEl);
-    const targetCol = this._resolveTargetCol(gridEl, _e);
-
-    // Set last focused col so git browser opens in the right column
-    Openp41geTabsEventHandler.lastFocusedCol[winId] = targetCol;
-
-    document.dispatchEvent(
-      new CustomEvent("repo-open-git", {
-        detail: { repoName, winId, targetCol },
-      }),
-    );
-  }
-
   private _isRelevantDrag(e: DragEvent): boolean {
     try {
       const types = e.dataTransfer?.types;
       if (!types) return false;
       for (let i = 0; i < types.length; i++) {
         const t = String(types[i]);
-        if (t === "text/plain" || t === "application/x-openp41ge-repo") return true;
+        if (t === "text/plain") return true;
       }
       return false;
     } catch {

@@ -7,7 +7,6 @@
  * Events (bubbling):
  *   repo-add-worktree  — { repoName: string, branch: string }
  *   repo-toggle-expand — { repoName: string, expanded: boolean }
- *   repo-open-git      — { repoName: string }
  *   worktree-files-toggle  — { repoName: string, branch: string, expanded: boolean }
  *   dir-toggle-expand      — { branch: string, path: string, expanded: boolean }
  *   file-open          — { path: string, name: string, mode: string }
@@ -17,11 +16,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { plusIconThick, refreshIcon } from "../icons";
-import {
-  classifyWorktree,
-  worstOf,
-  worktreeStatusLabel,
-} from "../services/worktree-status";
+import { classifyWorktree, worstOf, worktreeStatusLabel } from "../services/worktree-status";
 import {
   WorktreeFileLoader,
   DirPersistenceService,
@@ -109,7 +104,10 @@ export class Openp41geRepoTreeItem extends LitElement {
         this._branchSync.clear();
         for (const e of entries) {
           if (!e?.name && !e?.shortName) continue;
-          this._branchSync.set(e.shortName ?? e.name, { ahead: e.ahead ?? 0, behind: e.behind ?? 0 });
+          this._branchSync.set(e.shortName ?? e.name, {
+            ahead: e.ahead ?? 0,
+            behind: e.behind ?? 0,
+          });
         }
         this._syncKnown = true;
         this.requestUpdate();
@@ -125,7 +123,11 @@ export class Openp41geRepoTreeItem extends LitElement {
     const info = this._wtSyncInfo(wt);
     if (info.state === "ok" || info.state === "unknown") return nothing;
     return html`
-      <span class="shrink-0 flex items-center" style="color:var(--text-warning,#e5a50a)" title=${worktreeStatusLabel(info)}>
+      <span
+        class="shrink-0 flex items-center"
+        style="color:var(--text-warning,#e5a50a)"
+        title=${worktreeStatusLabel(info)}
+      >
         <openp41ge-icon name="warning" size="11"></openp41ge-icon>
       </span>
     `;
@@ -137,7 +139,11 @@ export class Openp41geRepoTreeItem extends LitElement {
     const worst = worstOf(infos);
     if (worst.state === "ok" || worst.state === "unknown") return nothing;
     return html`
-      <span class="shrink-0 flex items-center" style="color:var(--text-warning,#e5a50a)" title=${`${infos.length} worktree(s): ${worktreeStatusLabel(worst)}`}>
+      <span
+        class="shrink-0 flex items-center"
+        style="color:var(--text-warning,#e5a50a)"
+        title=${`${infos.length} worktree(s): ${worktreeStatusLabel(worst)}`}
+      >
         <openp41ge-icon name="warning" size="11"></openp41ge-icon>
       </span>
     `;
@@ -187,15 +193,6 @@ export class Openp41geRepoTreeItem extends LitElement {
       }),
     );
     this.requestUpdate();
-  }
-
-  private _openGitInfo(): void {
-    this.dispatchEvent(
-      new CustomEvent("repo-open-git", {
-        bubbles: true,
-        detail: { repoName: this.repoName },
-      }),
-    );
   }
 
   private async _toggleWorktreeFiles(branch: string, path: string): Promise<void> {
@@ -282,10 +279,12 @@ export class Openp41geRepoTreeItem extends LitElement {
     const pullDoneTime = this._pullCompleted.get(wt.branch);
     const showGreen = pullDoneTime !== undefined && Date.now() - pullDoneTime < 2500;
     return html`
-      <div
-        class="relative bg-gutter h-[26px] pointer-events-none border-b border-[#232323]"
-      >
+      <div class="relative bg-gutter h-[26px] pointer-events-none border-b border-[#232323]">
         <div
+          draggable="true"
+          data-worktree-row
+          data-repo="${this.repoName}"
+          data-branch="${wt.branch}"
           class="pointer-events-auto flex items-center h-[26px] px-2 pl-7 pr-3 cursor-pointer text-sm text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
           @click=${() => {
             const path = wt.path || `${this.repoName}/${wt.branch}`;
@@ -319,11 +318,12 @@ export class Openp41geRepoTreeItem extends LitElement {
                 : ""
           }
           <span class="text-muted w-[10px] flex items-center justify-center"
-            ><openp41ge-icon name=${isExpanded ? "chevron-down" : "chevron-right"} size="10"></openp41ge-icon></span
-          >
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-            >${wt.branch}</span
-          >
+            ><openp41ge-icon
+              name=${isExpanded ? "chevron-down" : "chevron-right"}
+              size="10"
+            ></openp41ge-icon
+          ></span>
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">${wt.branch}</span>
           ${this._wtWarn(wt)}
           ${
             this._fileLoader.isRefreshingWorktree(wt.branch) ||
@@ -344,7 +344,8 @@ export class Openp41geRepoTreeItem extends LitElement {
                         }),
                       );
                     }}
-                    >${unsafeHTML(refreshIcon(14))}</span>`
+                    >${unsafeHTML(refreshIcon(14))}</span
+                  >`
           }
         </div>
       </div>
@@ -370,9 +371,10 @@ export class Openp41geRepoTreeItem extends LitElement {
           expanded: isExpanded,
           expandable: true,
           status: isUntracked ? ("untracked" as const) : undefined,
-          children: isExpanded && this._fileLoader.dirContents.has(entry.path)
-            ? this._buildFileTreeNodes(branch, entry.path)
-            : undefined,
+          children:
+            isExpanded && this._fileLoader.dirContents.has(entry.path)
+              ? this._buildFileTreeNodes(branch, entry.path)
+              : undefined,
           meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
         };
       }
@@ -552,19 +554,14 @@ export class Openp41geRepoTreeItem extends LitElement {
       </style>
       <div class="select-none">
         <!-- Repo header -->
-        <div
-          class="relative bg-gutter h-[30px] border-b border-[#232323] pointer-events-none"
-        >
+        <div class="relative bg-gutter h-[30px] border-b border-[#232323] pointer-events-none">
           <!-- Inner wrapper: receives all pointer events -->
           <div
             draggable="true"
+            data-repo-row
+            data-repo="${this.repoName}"
             class="pointer-events-auto flex items-center h-[30px] px-2 pl-3 pr-3 cursor-pointer text-sm text-[#ccc] gap-1 transition-colors duration-100 wt-row-header"
             @click=${this._toggleExpand}
-            @dragstart=${(e: DragEvent) => {
-              e.dataTransfer!.setData("application/x-openp41ge-repo", this.repoName);
-              e.dataTransfer!.effectAllowed = "move";
-              e.dataTransfer!.dropEffect = "move";
-            }}
             @contextmenu=${(e: MouseEvent) => {
               e.preventDefault();
               e.stopPropagation();
@@ -581,8 +578,11 @@ export class Openp41geRepoTreeItem extends LitElement {
             }}
           >
             <span class="text-muted w-[10px] flex items-center justify-center"
-              ><openp41ge-icon name=${this._expanded ? "chevron-down" : "chevron-right"} size="10"></openp41ge-icon></span
-            >
+              ><openp41ge-icon
+                name=${this._expanded ? "chevron-down" : "chevron-right"}
+                size="10"
+              ></openp41ge-icon
+            ></span>
             <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
               >${this.repoName}</span
             >
@@ -629,17 +629,19 @@ export class Openp41geRepoTreeItem extends LitElement {
                           ${
                             this._expandedWorktrees.has(wt.branch) &&
                             this._fileLoader.isWorktreeLoaded(wt.branch)
-                              ? html`<div class="wt-expanded-wt-block border-b border-[#232323]"><openp41ge-tree
-                                  style="--tree-font-size:12px;--tree-indent:20px"
-                                  .nodes=${this._buildFileTreeNodes(wt.branch)}
-                                  .renderIcon=${this._renderIcon}
-                                  .onToggle=${this._makeDirToggle(wt.branch)}
-                                  .onExpandedChange=${this._makeDirExpandedChange(wt.branch)}
-                                  depth="0"
-                                  @tree-node-click=${this._onFileClick}
-                                  @tree-node-dblclick=${this._onFileDblClick}
-                                  @tree-node-contextmenu=${this._onFileContextMenu}
-                                ></openp41ge-tree></div>`
+                              ? html`<div class="wt-expanded-wt-block border-b border-[#232323]">
+                                  <openp41ge-tree
+                                    style="--tree-font-size:12px;--tree-indent:20px"
+                                    .nodes=${this._buildFileTreeNodes(wt.branch)}
+                                    .renderIcon=${this._renderIcon}
+                                    .onToggle=${this._makeDirToggle(wt.branch)}
+                                    .onExpandedChange=${this._makeDirExpandedChange(wt.branch)}
+                                    depth="0"
+                                    @tree-node-click=${this._onFileClick}
+                                    @tree-node-dblclick=${this._onFileDblClick}
+                                    @tree-node-contextmenu=${this._onFileContextMenu}
+                                  ></openp41ge-tree>
+                                </div>`
                               : ""
                           }
                         `,

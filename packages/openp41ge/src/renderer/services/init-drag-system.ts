@@ -27,7 +27,9 @@ import { createLogger } from "openp41ge-logger";
 const log = createLogger("cross-window-drag");
 
 import { FileDragSource } from "./drag-sources/file-drag-source";
+import { GitEntryDragSource } from "./drag-sources/git-entry-drag-source";
 import { ClosedSidebarDropTarget } from "./drop-targets/closed-sidebar-drop-target";
+import { ExplorerReorderDropTarget } from "./drop-targets/explorer-reorder-drop-target";
 import {
   SidebarDropTarget,
   setSidebarDropFeedbackSuppressed,
@@ -234,6 +236,38 @@ let _pendingFileDragStart: {
 } | null = null;
 
 /**
+ * Deferred drag:start params for git-entry (repo/worktree row) drags —
+ * captured on mousedown, fired on the first POSITION event exactly like
+ * file/tab backlog. The open-tab payload rides `openTabData` into the main
+ * process so a cross-window drop can resolve appType/tabConfig.
+ */
+let _pendingGitEntryDragStart: {
+  label: string;
+  screenX: number;
+  screenY: number;
+  repoName: string;
+  branch?: string;
+  winId: string;
+  offsetX: number;
+  offsetY: number;
+  elementWidth: number;
+  elementHeight: number;
+  /** Source row rect (viewport coords) for the main-process capturePage snapshot. */
+  captureRect: { x: number; y: number; width: number; height: number };
+} | null = null;
+
+/** Set to true when a git-entry drag engages so the trailing browser `click`
+ * on the source row can be suppressed — otherwise releasing back over the
+ * explorer after a drag is seen as a click and toggles the repo/worktree.
+ * Actions should only happen on an explicit drop (grid open / explorer
+ * reorder / cancel). */
+let _suppressGitEntryRowClick = false;
+
+/** Git-entry (repo/worktree) row whose native draggable was disabled for a
+ * custom drag gesture (restored on end). */
+let _gitEntryRowSuppressedDrag: HTMLElement | null = null;
+
+/**
  * The window ID of this renderer, resolved lazily.
  * Cannot be cached at init time because openp41ge:init (which sets
  * _windowId in the preload) arrives after bootstrap runs. Use
@@ -257,6 +291,93 @@ function _restoreFileRowDraggable(): void {
     }
     _fileRowSuppressedDrag = null;
   }
+}
+
+/** Restore native draggable on the git-entry (repo/worktree) row disabled for
+ * this custom drag gesture — same Lit re-render guard as file rows. */
+function _restoreGitEntryRowDraggable(): void {
+  if (_gitEntryRowSuppressedDrag) {
+    if (_gitEntryRowSuppressedDrag.getAttribute("draggable") === "false") {
+      _gitEntryRowSuppressedDrag.setAttribute("draggable", "true");
+    }
+    _gitEntryRowSuppressedDrag = null;
+  }
+}
+
+// ─── Mousedown: initiate git-entry (repo/worktree row) drags ────────────
+// Module-level so the synthetic Mousedown test hooks can drive it directly.
+function onGitEntryMouseDown(e: MouseEvent): void {
+  // Only the primary (left) button engages drags — right/middle clicks must
+  // never start a drag or interrupt an existing one.
+  if (e.button !== 0) return;
+
+  // Lit repo-tree items render their rows in the light DOM (no shadow root for
+  // the header rows), but composedPath() safely walks any boundary in case the
+  // structure changes later.
+  const row = e
+    .composedPath()
+    .find(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement &&
+        (el.hasAttribute("data-repo-row") || el.hasAttribute("data-worktree-row")),
+    );
+  if (!row) return;
+
+  // Don't initiate a drag on row action buttons (+ add worktree / refresh /
+  // confirm) — those stay click-only.
+  if ((e.target as HTMLElement).closest?.(".repo-header-btn, .wt-row-btn")) return;
+
+  // New gesture — clear any unconsumed suppression flag from a previous drag.
+  _suppressGitEntryRowClick = false;
+
+  // Disable native dragging for THIS gesture — the custom pipeline is the sole
+  // owner of git-entry drags. Restored in onDragEnd/onMouseUp.
+  _gitEntryRowSuppressedDrag = row;
+  row.setAttribute("draggable", "false");
+
+  e.preventDefault();
+
+  const repoName = row.getAttribute("data-repo") || "";
+  const branch = row.getAttribute("data-branch") || undefined;
+  if (!repoName) return;
+  // Worktree tabs are titled by their branch; repo tabs by the repo name.
+  const title = branch || repoName;
+  const winId = _resolveMyWinId();
+
+  // Calculate offset from cursor to element's top-left corner
+  const rect = row.getBoundingClientRect();
+  const elScreenX = window.screenX + rect.left;
+  const elScreenY = window.screenY + rect.top;
+  const offsetX = e.screenX - elScreenX;
+  const offsetY = e.screenY - elScreenY;
+
+  const dragSource = new GitEntryDragSource(repoName, title, branch);
+  dragSource.setOffset(offsetX, offsetY);
+  _currentSource = dragSource;
+  _sidebarTabDragSide = null; // not a sidebar-tab drag
+  _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
+
+  // Defer drag:start until the first POSITION event (after threshold met),
+  // mirroring the file/tab pattern so the main process captures a
+  // pixel-accurate bitmap of the source row.
+  _pendingGitEntryDragStart = {
+    label: title,
+    screenX: e.screenX,
+    screenY: e.screenY,
+    repoName,
+    branch,
+    winId,
+    offsetX,
+    offsetY,
+    elementWidth: row.offsetWidth,
+    elementHeight: row.offsetHeight,
+    captureRect: {
+      x: rect.x + TAB_GHOST_CAPTURE_INSET,
+      y: rect.y + TAB_GHOST_CAPTURE_INSET,
+      width: Math.max(1, rect.width - TAB_GHOST_CAPTURE_INSET * 2),
+      height: Math.max(1, rect.height - TAB_GHOST_CAPTURE_INSET * 2),
+    },
+  };
 }
 
 // ─── Dummy drag source for cross-window ghost preview ────────────────────
@@ -416,6 +537,10 @@ export function initDragSystem(): () => void {
   document.addEventListener("mousedown", onFileMouseDown);
   cleanups.push(() => document.removeEventListener("mousedown", onFileMouseDown));
 
+  // ── Mousedown: initiate git-entry (repo/worktree row) drags ──────────
+  document.addEventListener("mousedown", onGitEntryMouseDown);
+  cleanups.push(() => document.removeEventListener("mousedown", onGitEntryMouseDown));
+
   // ── Suppress native HTML5 drag for file rows while a custom file drag runs ──
   // Explorer file rows are natively draggable (uikit <openp41ge-tree>). Once
   // onFileMouseDown starts the custom orchestrator drag, cancel the native
@@ -434,6 +559,45 @@ export function initDragSystem(): () => void {
   };
   document.addEventListener("dragstart", onFileNativeDragStart, true);
   cleanups.push(() => document.removeEventListener("dragstart", onFileNativeDragStart, true));
+
+  // ── Suppress native HTML5 drag for git-entry rows while a custom drag runs ──
+  const onGitEntryNativeDragStart = (e: DragEvent) => {
+    if (_currentSource?.type !== "open-tab") return;
+    const hasGitRow = e
+      .composedPath()
+      .some(
+        (el) =>
+          el instanceof HTMLElement &&
+          (el.hasAttribute("data-repo-row") || el.hasAttribute("data-worktree-row")),
+      );
+    if (hasGitRow) {
+      e.preventDefault();
+    }
+  };
+  document.addEventListener("dragstart", onGitEntryNativeDragStart, true);
+  cleanups.push(() => document.removeEventListener("dragstart", onGitEntryNativeDragStart, true));
+
+  // ── Suppress the trailing click after a git-entry drag ───────────────
+  // Once a git-entry drag engages (threshold met -> _suppressGitEntryRowClick
+  // true), a release back over the explorer could otherwise be seen as a click
+  // and toggle the repo/worktree row's expansion. Capture phase, consumed once.
+  const onGitEntryRowClickSuppress = (e: MouseEvent) => {
+    if (!_suppressGitEntryRowClick) return;
+    _suppressGitEntryRowClick = false;
+    const hasGitRow = e
+      .composedPath()
+      .some(
+        (el) =>
+          el instanceof HTMLElement &&
+          (el.hasAttribute("data-repo-row") || el.hasAttribute("data-worktree-row")),
+      );
+    if (hasGitRow) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  };
+  document.addEventListener("click", onGitEntryRowClickSuppress, true);
+  cleanups.push(() => document.removeEventListener("click", onGitEntryRowClickSuppress, true));
 
   // ── Suppress the trailing click after a file drag ─────────────────────
   // Once a file drag engages (threshold met -> _suppressFileRowClick true),
@@ -578,6 +742,7 @@ export function initDragSystem(): () => void {
   const onMouseUp = async (e: MouseEvent) => {
     _pendingDragStart = null;
     _pendingFileDragStart = null;
+    _pendingGitEntryDragStart = null;
     if (_localDragActive) {
       clearGridGhost();
 
@@ -634,6 +799,7 @@ export function initDragSystem(): () => void {
       _localFileDragActive = false;
       _currentSource = null;
       _restoreFileRowDraggable();
+      _restoreGitEntryRowDraggable();
       return;
     }
     if (_remoteDragActive) {
@@ -660,6 +826,9 @@ export function initDragSystem(): () => void {
         // Drag engaged (threshold met) — suppress the trailing click-on-the-row so
         // releasing back over the explorer can't open the file as if it were a click.
         _suppressFileRowClick = !!_pendingFileDragStart;
+        // Same suppression for git-entry rows: releasing over the explorer must
+        // not toggle the repo/worktree row as if it were a click.
+        _suppressGitEntryRowClick = !!_pendingGitEntryDragStart;
         if (_pendingFileDragStart) {
           _pendingFileDetachPath = _pendingFileDragStart.filePath;
         }
@@ -758,6 +927,37 @@ export function initDragSystem(): () => void {
             p.captureRect,
           );
           _pendingFileDragStart = null;
+        } else if (_pendingGitEntryDragStart) {
+          const p = _pendingGitEntryDragStart;
+          // Git-entry ghost: identical bitmap treatment to files — the main
+          // process captures the source repo/worktree row and renders it in the
+          // DragGhostManager window at the row's exact dimensions. The open-tab
+          // payload (appType/tabConfig) rides `openTabData` so a TARGET window's
+          // cross-window drop can resolve it without seeing the source row.
+          window.openp41ge.drag.start(
+            p.label,
+            p.screenX,
+            p.screenY,
+            undefined,
+            undefined,
+            p.winId,
+            undefined,
+            p.elementWidth,
+            p.elementHeight,
+            p.offsetX,
+            p.offsetY,
+            "open-tab",
+            undefined,
+            p.captureRect,
+            TAB_GHOST_CAPTURE_INSET,
+            {
+              appType: "git-repository",
+              tabConfig: p.branch
+                ? { repoName: p.repoName, branch: p.branch }
+                : { repoName: p.repoName },
+            },
+          );
+          _pendingGitEntryDragStart = null;
         }
         window.openp41ge.drag.activate();
       }
@@ -782,8 +982,11 @@ export function initDragSystem(): () => void {
     _localFileDragActive = false;
     _pendingFileDetachPath = null;
     _fileDropHandled = false;
+    _pendingGitEntryDragStart = null;
+    _suppressGitEntryRowClick = false;
     _currentSource = null;
     _restoreFileRowDraggable();
+    _restoreGitEntryRowDraggable();
   };
 
   const onDragEnd = () => {
@@ -988,6 +1191,7 @@ export function initDragSystem(): () => void {
     clearGridGhost();
     _currentSource = null;
     _restoreFileRowDraggable();
+    _restoreGitEntryRowDraggable();
   });
 
   return () => {
@@ -1082,6 +1286,66 @@ async function _handleCrossWindowDrop(
         return;
       }
       // filePath was falsy — nothing to handle
+      window.openp41ge.drag.endSession();
+      return;
+    }
+
+    // Handle git-entry (open-tab) drops: open the git-repository pane in the
+    // target window/grid, scoped to the repo (or to the branch for a worktree
+    // row). Mirrors the file branch — boundary splits a new column.
+    if (data.type === "open-tab") {
+      const tabConfig = (data as { tabConfig?: Record<string, unknown> }).tabConfig ?? {};
+      const repoName = (tabConfig as { repoName?: string }).repoName;
+      const branch = (tabConfig as { branch?: string }).branch;
+      const appType = (data as { appType?: string }).appType || "git-repository";
+      if (!repoName) {
+        window.openp41ge.drag.endSession();
+        return;
+      }
+
+      const gridEl = (target as IDropTarget & { element: HTMLElement }).element.closest(
+        "tab-grid",
+      ) as HTMLElement | null;
+      if (gridEl) {
+        const gridRect = gridEl.getBoundingClientRect();
+        const relX = clientX - gridRect.left;
+        const cols = (gridEl as HTMLElement & { cols?: number }).cols || 1;
+        const pos = computeDropTarget(gridEl, relX, gridRect.width, cols);
+        const targetCol = pos.col;
+        const winId = (gridEl as HTMLElement & { winId?: string }).winId || _resolveMyWinId();
+        // Worktree tabs are titled by their branch; repo tabs by the repoName.
+        const tabName = branch || repoName;
+
+        if (pos.isBoundary) {
+          const splitLeft =
+            pos.boundaryIndex === 0
+              ? true
+              : pos.boundaryIndex >= cols
+                ? false
+                : targetCol >= pos.boundaryIndex;
+          const splitCol =
+            pos.boundaryIndex === 0 ? 0 : pos.boundaryIndex >= cols ? cols - 1 : targetCol;
+          window.openp41ge.workspace.dispatch(
+            "splitFileOpen",
+            winId,
+            appType,
+            tabName,
+            repoName,
+            splitCol,
+            splitLeft,
+          );
+        } else {
+          window.openp41ge.workspace.dispatch(
+            "actionOpenFile",
+            winId,
+            appType,
+            tabName,
+            repoName,
+            targetCol,
+            true,
+          );
+        }
+      }
       window.openp41ge.drag.endSession();
       return;
     }
@@ -1297,6 +1561,24 @@ if (typeof window !== "undefined") {
     },
     forceCrossWindowGhostCleanup: () => _hideCrossWindowGhost(),
     gridEl: () => document.querySelector("tab-grid") as HTMLElement | null,
+    getGitEntryPendingStart: () => _pendingGitEntryDragStart,
+    getCurrentDragSourceType: () => _currentSource?.type ?? null,
+    getCurrentDragData: () => _currentSource?.getDragData() ?? null,
+    hasGitEntryRowSuppressed: () => _gitEntryRowSuppressedDrag !== null,
+    restoreGitEntryRowDraggable: () => _restoreGitEntryRowDraggable(),
+    resetTestDragState: () => {
+      _orchestrator?.cancelDrag();
+      _currentSource = null;
+      _pendingDragStart = null;
+      _pendingFileDragStart = null;
+      _pendingSidebarDragStart = null;
+      _pendingGitEntryDragStart = null;
+      _gitEntryRowSuppressedDrag = null;
+      _suppressGitEntryRowClick = false;
+      _localDragActive = false;
+      _localFileDragActive = false;
+      _sidebarTabDragSide = null;
+    },
   };
 }
 
@@ -1413,6 +1695,17 @@ function _hideCrossWindowGhost(): void {
 let _sidebarDropTargetLeft: SidebarDropTarget | null = null;
 let _sidebarDropTargetRight: SidebarDropTarget | null = null;
 
+// Cache the explorer repo-reorder drop target (one per drop-zone element).
+let _explorerReorderTarget: ExplorerReorderDropTarget | null = null;
+
+function _getExplorerReorderTarget(zoneEl: HTMLElement): ExplorerReorderDropTarget {
+  if (_explorerReorderTarget && _explorerReorderTarget.element === zoneEl) {
+    return _explorerReorderTarget;
+  }
+  _explorerReorderTarget = new ExplorerReorderDropTarget(zoneEl);
+  return _explorerReorderTarget;
+}
+
 // Cache the closed-sidebar edge targets (one per side) for the same reason.
 let _closedSidebarEdgeTargetLeft: ClosedSidebarDropTarget | null = null;
 let _closedSidebarEdgeTargetRight: ClosedSidebarDropTarget | null = null;
@@ -1500,6 +1793,9 @@ function _clearSidebarDropTargetCache(): void {
   _sidebarDropTargetRight = null;
   _closedSidebarEdgeTargetLeft = null;
   _closedSidebarEdgeTargetRight = null;
+  // Remove any explorer reorder insertion line still on screen.
+  _explorerReorderTarget?.onLeave();
+  _explorerReorderTarget = null;
 }
 
 export function openp41geTargetResolver(clientX: number, clientY: number): IDropTarget | null {
@@ -1543,8 +1839,20 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
     return _resolveClosedSidebarEdgeTarget(clientX, sidebarDragSide);
   }
 
+  // Git-entry (repo/worktree row) drag: the ACTION is decided by drop
+  // location. Over the explorer list the cursor resolves to the reorder
+  // target; over the grid/tab bar it behaves exactly like a file drop
+  // (grid open via grid-open-tab); anywhere else the drop cancels.
+  if (_currentSource?.type === "open-tab") {
+    const explorerZone = el.closest?.("[data-explorer-drop-zone]");
+    if (explorerZone instanceof HTMLElement) {
+      return _getExplorerReorderTarget(explorerZone);
+    }
+    // Fall through to the normal grid resolution below.
+  }
+
   // Normal (non-sidebar) drag: check grid tab bars and grid cells
-  const isFileDrag = _currentSource?.type === "file";
+  const isFileDrag = _currentSource?.type === "file" || _currentSource?.type === "open-tab";
   const tabBarEl = el.closest?.("tab-bar");
   if (tabBarEl instanceof HTMLElement) {
     if (isFileDrag) {

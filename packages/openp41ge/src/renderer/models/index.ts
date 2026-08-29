@@ -6,6 +6,7 @@ export * from "./file-model";
 export * from "./repository-model";
 export * from "./worktree-model";
 export * from "./repo-service";
+export * from "./commit-search-model";
 export * from "./text-model";
 export * from "./text-edit";
 export * from "./text-model-events";

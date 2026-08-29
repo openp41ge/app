@@ -181,6 +181,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
       filePath,
       captureRect,
       inset,
+      openTabData,
     ) => {
       ipcRenderer.send(
         "openp41ge:drag-start",
@@ -200,6 +201,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
           filePath,
           captureRect,
           inset,
+          openTabData,
         }),
       );
     },
@@ -371,6 +373,10 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
     /** Get untracked file paths for a repository. */
     getUntrackedFiles: (repoName) => ipcRenderer.invoke("workspace:getUntrackedFiles", repoName),
+
+    /** Search commit history (repoName null = across all repos). */
+    searchCommits: (repoName, options) =>
+      ipcRenderer.invoke("workspace:searchCommits", repoName, options),
 
     // ── Openp41ge repoRefs API (per-openp41ge repo/worktree visibility) ──
 
