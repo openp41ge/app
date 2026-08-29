@@ -55,11 +55,30 @@
       highlights once TextMate finishes; deep scroll paints plain with 0
       synchronous tokenize calls during the scroll render and exactly one
       rAF catch-up after — painting/scrolling never blocks on the grammar.
+- [x] **Background tokenization bounded to the viewport window (2026-08-30)** —
+      the last unbounded O(file) main-thread work. `LazyTokenizationManager`
+      pre-tokenized the WHOLE file to EOF in 50-line/50ms batches, forever —
+      for a legal 1M-line file that's ~100-400s of throttled grammar burn on
+      the renderer thread, independent of anything the user does. Now the
+      sweep is bounded to `visibleEnd + backgroundWindow` (default 500) and
+      idles at the ceiling; a deep scroll / large forward edit fast-forwards
+      the sweep to just behind the new visible range (no crawl from line 1),
+      and `backgroundWindow: 0` disables it entirely. Measured: model build
+      at the 50MB cap is 75ms, so chunked loading (Phase 4) is NOT worth
+      its complexity — this bound replaces the wasteful end of Phase 5's
+      motivation. Verified live (editor demo): with visible end 10 and a
+      500-line window the ceiling stays at 510; deep jump to line 90k
+      fast-forwards the sweep to 89500; fake-timer unit tests pin the idle
+      stop deterministically.
 - [ ] **Phase 4/5** — chunked loading + web-worker tokenization. NOT started.
-      Note: the file-size-limit feature (editor.maxFileSize, default 50MB,
-      File Editor Settings overlay tab — 2026-08-29, plan deleted on
-      completion, committed as `6bd4f32`) caps how large an openable file may
-      be, a complementary guardrail on top of Phases 1-3.
+      Note: chunked loading is deliberately skipped (measurement at the 50MB
+      cap: model construction 75ms, full sequential scan 27ms — the work
+      isn't there); worker offload remains a future option if per-frame
+      tokenization of pathological lines ever regresses. The file-size-limit
+      feature (editor.maxFileSize, default 50MB, File Editor Settings overlay
+      tab — 2026-08-29, plan deleted on completion, committed as `6bd4f32`)
+      caps how large an openable file may be, a complementary guardrail on
+      top of Phases 1-3.
 
 ## Problem
 

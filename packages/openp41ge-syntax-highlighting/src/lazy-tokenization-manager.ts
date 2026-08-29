@@ -21,12 +21,23 @@ export interface TokenizationConfig {
   readonly backgroundDelay?: number;
   /** Whether to tokenize all lines immediately (for small files). */
   readonly immediate?: boolean;
+  /**
+   * How many lines AHEAD of the visible range the background tokenizer may
+   * pre-tokenize before idling. 0 disables background tokenization entirely.
+   *
+   * This bounds the background work to a window around whatever the user can
+   * actually see instead of walking the WHOLE file to EOF forever (a legal
+   * 50MB / 1M-line file would otherwise burn unbounded main-thread grammar
+   * work in idle batches).
+   */
+  readonly backgroundWindow?: number;
 }
 
 const DEFAULT_CONFIG: TokenizationConfig = {
   batchSize: 50,
   backgroundDelay: 50,
   immediate: false,
+  backgroundWindow: 500,
 };
 
 /**
@@ -42,6 +53,9 @@ export class LazyTokenizationManager {
   private _isDisposed: boolean = false;
   private _bgTimer: ReturnType<typeof setTimeout> | null = null;
   private _nextBgLine: number = 1;
+  /** Last visible range reported via tokenizeVisibleRange (1-based). */
+  private _visibleStart: number = 1;
+  private _visibleEnd: number = 1;
   /** Callback to get line content for tokenization. Set by ViewModel. */
   private _getLineContent: ((lineNumber: number) => string) | null = null;
 
@@ -111,6 +125,21 @@ export class LazyTokenizationManager {
           prevState = this._stateStacks.get(line) ?? null;
         }
       }
+    }
+
+    // Record the visible range so background tokenization stays inside a
+    // window right ahead of it (see _getBackgroundCeiling / fast-forward).
+    this._visibleStart = Math.max(1, startLine);
+    this._visibleEnd = maxEnd;
+
+    // When the viewport jumps FAR ahead of the background sweep (a deep
+    // scroll or a larger-than-window forward edit), don't crawl the whole
+    // file to reach it. Fast-forward the sweep to just behind the new
+    // visible range — tokenizing far ahead of view is pure waste, and the
+    // nearest cached state (possibly null) is a reasonable best-effort anchor.
+    const window = this._config.backgroundWindow ?? DEFAULT_CONFIG.backgroundWindow ?? 0;
+    if (window > 0 && this._nextBgLine < this._visibleStart - window) {
+      this._nextBgLine = Math.max(1, this._visibleStart - window);
     }
 
     // Schedule background tokenization after visible range is done
@@ -211,6 +240,8 @@ export class LazyTokenizationManager {
     this._tokens.clear();
     this._stateStacks.clear();
     this._nextBgLine = 1;
+    this._visibleStart = 1;
+    this._visibleEnd = 1;
     this._cancelBackgroundTokenization();
   }
 
@@ -253,6 +284,16 @@ export class LazyTokenizationManager {
   }
 
   /**
+   * The highest line number the background sweep may pre-tokenize: the
+   * visible end plus the configured window (capped at EOF). 0 disables bg.
+   */
+  private _getBackgroundCeiling(): number {
+    const window = this._config.backgroundWindow ?? DEFAULT_CONFIG.backgroundWindow ?? 0;
+    if (window <= 0) return 0;
+    return Math.min(this._lineCount, this._visibleEnd + window);
+  }
+
+  /**
    * Schedule background tokenization of off-screen lines.
    */
   private _scheduleBackgroundTokenization(): void {
@@ -260,6 +301,8 @@ export class LazyTokenizationManager {
       this._tokenizeAll();
       return;
     }
+
+    if ((this._config.backgroundWindow ?? DEFAULT_CONFIG.backgroundWindow ?? 0) <= 0) return;
 
     if (this._bgTimer !== null) return; // Already scheduled
 
@@ -289,15 +332,20 @@ export class LazyTokenizationManager {
   }
 
   /**
-   * Tokenize the next batch of off-screen lines.
+   * Tokenize the next batch of off-screen lines, bounded by the visible
+   * range's window. Stops (no reschedule) once the ceiling is reached until
+   * the visible range moves — idling instead of churning to EOF forever.
    */
   private _doBackgroundTokenization(): void {
     if (!this._tokenizer || this._isDisposed) return;
 
     const batchSize = this._config.batchSize ?? 50;
+    const ceiling = this._getBackgroundCeiling();
+    if (this._nextBgLine > ceiling) return; // Window satisfied — idle.
+
     let tokenized = 0;
 
-    for (let line = this._nextBgLine; line <= this._lineCount && tokenized < batchSize; line++) {
+    for (let line = this._nextBgLine; line <= ceiling && tokenized < batchSize; line++) {
       if (this._tokens.hasTokens(line)) {
         // Skip already tokenized lines, but update our position
         if (line > this._nextBgLine) {
@@ -314,8 +362,8 @@ export class LazyTokenizationManager {
       }
     }
 
-    // Schedule next batch if there are more lines
-    if (this._nextBgLine <= this._lineCount && !this._isDisposed) {
+    // Schedule next batch if the window still has more lines
+    if (this._nextBgLine <= ceiling && !this._isDisposed) {
       this._bgTimer = setTimeout(() => {
         this._bgTimer = null;
         this._doBackgroundTokenization();
