@@ -54,6 +54,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _searchToken = 0;
   /** Last search results (cache) — expansion toggles re-render, not refetch. */
   private _lastCommits: SearchResultCommit[] | null = null;
+  /** Query used for the last render — match highlighting + hit context. */
+  private _lastQuery = "";
 
   // Commit-message search is always on; the files icon toggles changed-file-
   // path search on top of it (on = combined 'all', off = messages only).
@@ -247,9 +249,15 @@ export class CommitSearchSystemTabController implements SystemTabController {
     // Hover feedback on every result row (commit + file sub-rows).
     const style = document.createElement("style");
     style.textContent = `
-      [data-system-tab="git"] .commit-result-row:hover,
+      [data-system-tab="git"] .commit-result-head:hover,
       [data-system-tab="git"] .commit-file-row:hover {
         background: var(--bg-hover, #2a2d2e);
+      }
+      [data-system-tab="git"] .search-hit {
+        background: rgba(74, 158, 255, 0.28);
+        color: inherit;
+        border-radius: 2px;
+        padding: 0 1px;
       }
     `;
     wrapper.appendChild(style);
@@ -426,10 +434,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
     if (this._footer) this._footer.textContent = "";
   }
 
-  private _renderResults(commits: SearchResultCommit[], _query: string): void {
+  private _renderResults(commits: SearchResultCommit[], query: string): void {
     const results = this._results;
     if (!results) return;
     results.replaceChildren();
+    this._lastQuery = query;
 
     if (commits.length === 0) {
       results.appendChild(this._message("No matching commits", "var(--text-muted,#777)"));
@@ -453,6 +462,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _commitRow(commit: SearchResultCommit): HTMLElement {
     const key = this._key(commit.repoName, commit.shortHash);
     const expanded = this._expandedCommits.has(key);
+    const query = this._lastQuery;
 
     const row = document.createElement("div");
     row.className = "commit-result-row";
@@ -473,6 +483,12 @@ export class CommitSearchSystemTabController implements SystemTabController {
       userSelect: "none",
       cursor: "pointer",
     });
+
+    // Own hover surface for the two content lines — each file sub-row below is
+    // its own row and highlights independently.
+    const headBlock = document.createElement("div");
+    headBlock.className = "commit-result-head";
+    Object.assign(headBlock.style, { display: "flex", flexDirection: "column" });
 
     // Line 1 — [repo] [commit id] … [meta] with the explorer chevron on the left.
     const head = document.createElement("div");
@@ -534,21 +550,41 @@ export class CommitSearchSystemTabController implements SystemTabController {
       color: "var(--text-muted,#666)",
     });
     head.appendChild(meta);
-    row.appendChild(head);
+    headBlock.appendChild(head);
 
-    // Line 2 — the commit message, still truncated to one line.
+    // Line 2 — the commit message, truncated but positioned to show the match:
+    // a “…”-window either side of the first hit, with the hit highlighted.
     const msgLine = document.createElement("div");
-    msgLine.textContent = commit.message;
     msgLine.title = commit.message;
     Object.assign(msgLine.style, {
-      padding: "1px 10px 4px 26px",
+      padding: "1px 10px 0 26px",
       fontSize: "12px",
       color: "var(--text-primary,#ccc)",
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
     });
-    row.appendChild(msgLine);
+    this._appendMatchedText(msgLine, commit.message, query);
+    headBlock.appendChild(msgLine);
+
+    // Optional line 3 — “+ N more instances” / “matched in file(s)” so the
+    // user knows to open the row (for file-name matches, before expanding).
+    const metaLine = this._matchMeta(commit, query);
+    if (metaLine) {
+      Object.assign(metaLine.style, {
+        padding: "1px 10px 4px 26px",
+        fontSize: "10px",
+        color: "var(--text-muted,#777)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      });
+      headBlock.appendChild(metaLine);
+    } else {
+      msgLine.style.paddingBottom = "4px";
+    }
+
+    row.appendChild(headBlock);
 
     // Click = expand/collapse the commit's file sub-rows (no preview). A drag
     // onto the grid opens the git-commit-search pane; double-click still opens
@@ -636,7 +672,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
       row.appendChild(pad);
 
       const name = document.createElement("span");
-      name.textContent = file.path;
       name.title = file.path;
       Object.assign(name.style, {
         flex: "1",
@@ -645,17 +680,31 @@ export class CommitSearchSystemTabController implements SystemTabController {
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
       });
+      this._appendHighlighted(name, file.path, this._lastQuery);
       row.appendChild(name);
 
+      // Additions / deletions each get their own coloured span.
       const counts = document.createElement("span");
-      counts.textContent = `${file.additions > 0 ? "+" + file.additions : ""}${
-        file.deletions > 0 ? (file.additions > 0 ? " " : "") + "\u2212" + file.deletions : ""
-      }`;
       Object.assign(counts.style, {
         flexShrink: "0",
+        display: "inline-flex",
+        gap: "5px",
         fontSize: "10px",
-        color: "var(--text-muted,#777)",
       });
+      if (file.additions > 0) {
+        const a = document.createElement("span");
+        a.className = "commit-adds";
+        a.textContent = `+${file.additions}`;
+        a.style.color = "#3fb950";
+        counts.appendChild(a);
+      }
+      if (file.deletions > 0) {
+        const d = document.createElement("span");
+        d.className = "commit-dels";
+        d.textContent = `\u2212${file.deletions}`;
+        d.style.color = "#f85149";
+        counts.appendChild(d);
+      }
       row.appendChild(counts);
 
       row.addEventListener("click", (e: MouseEvent) => {
@@ -703,6 +752,91 @@ export class CommitSearchSystemTabController implements SystemTabController {
     return out;
   }
 
+  // ── Match highlighting + hit context ───────────────────────────────────
+
+  /** Optional third line: “+ N more instances” and/or which file(s) matched. */
+  private _matchMeta(commit: SearchResultCommit, query: string): HTMLElement | null {
+    const q = query.trim().toLowerCase();
+    if (!q) return null;
+    const bits: string[] = [];
+    const msgCount = this._countOccurrences(commit.message, q);
+    if (msgCount > 1) {
+      bits.push(`+ ${msgCount - 1} more instance${msgCount - 1 === 1 ? "" : "s"}`);
+    }
+    const matchedPaths = commit.files.map((f) => f.path).filter((p) => p.toLowerCase().includes(q));
+    if (matchedPaths.length > 0) {
+      const shown = matchedPaths.slice(0, 2).join(", ");
+      const more = matchedPaths.length > 2 ? ` +${matchedPaths.length - 2} more` : "";
+      bits.push(`matched file${matchedPaths.length === 1 ? "" : "s"}: ${shown}${more}`);
+    }
+    if (bits.length === 0) return null;
+    const el = document.createElement("div");
+    el.textContent = bits.join(" · ");
+    return el;
+  }
+
+  private _countOccurrences(text: string, q: string): number {
+    if (!q) return 0;
+    const lower = text.toLowerCase();
+    let n = 0;
+    let i = 0;
+    while ((i = lower.indexOf(q, i)) !== -1) {
+      n++;
+      i += q.length;
+    }
+    return n;
+  }
+
+  /** Append a one-line window around the first message hit so the match is
+   * visible (not just the message start), with each hit highlighted. */
+  private _appendMatchedText(parent: HTMLElement, message: string, query: string): void {
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      parent.textContent = message;
+      return;
+    }
+    const lower = message.toLowerCase();
+    const idx = lower.indexOf(q);
+    if (idx === -1) {
+      parent.textContent = message;
+      return;
+    }
+    const LEAD = 14; // chars of context shown before the match
+    const MAX_LEN = 96; // visible window including the match
+    let start = Math.max(0, idx - LEAD);
+    let end = message.length;
+    if (end - start > MAX_LEN) end = start + MAX_LEN;
+    const prefix = start > 0 ? "\u2026" : "";
+    const suffix = end < message.length ? "\u2026" : "";
+    if (prefix) parent.appendChild(document.createTextNode(prefix));
+    this._appendHighlighted(parent, message.slice(start, end), query);
+    if (suffix) parent.appendChild(document.createTextNode(suffix));
+  }
+
+  /** Append text with every case-insensitive match wrapped in a .search-hit. */
+  private _appendHighlighted(parent: HTMLElement, text: string, query: string): void {
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      parent.appendChild(document.createTextNode(text));
+      return;
+    }
+    const lower = text.toLowerCase();
+    let i = 0;
+    while (true) {
+      const at = lower.indexOf(q, i);
+      if (at === -1) {
+        if (i < text.length) parent.appendChild(document.createTextNode(text.slice(i)));
+        break;
+      }
+      if (at > i) parent.appendChild(document.createTextNode(text.slice(i, at)));
+      const mark = document.createElement("mark");
+      mark.className = "search-hit";
+      mark.textContent = text.slice(at, at + q.length);
+      parent.appendChild(mark);
+      i = at + q.length;
+    }
+  }
+
   private _emitOpenCommit(commit: SearchResultCommit, pinned: boolean): void {
     document.dispatchEvent(
       new CustomEvent("openp41ge:open-commit", {
@@ -717,7 +851,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
   /** Rebuild the results in place (e.g. after expand/collapse) without refetching. */
   private _rerender(): void {
-    if (this._lastCommits) this._renderResults(this._lastCommits, "");
+    if (this._lastCommits) this._renderResults(this._lastCommits, this._lastQuery);
   }
 
   // ── Keyboard navigation across top-level commit rows ─────────────────

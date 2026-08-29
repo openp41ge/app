@@ -35,6 +35,23 @@ const fixtures = [
     relativeDate: "12 hours ago",
     files: [{ path: "README.md", additions: 5, deletions: 2 }],
   },
+  {
+    // Long message with TWO message hits + one file-path hit — exercises the
+    // match-context window, the "+ N more instances" meta line, and the
+    // "matched file" indicator.
+    repoName: "innova",
+    hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    shortHash: "bbbbbbb",
+    message:
+      "feat: wiring plus a very long commit subject here to force the window around the engine marker way out here near the tail (engine goes here twice) so the highlighted hit stays visible close to the end plus trailing filler beyond the window plus more filler tails",
+    author: "B",
+    date: "2026-02-01",
+    relativeDate: "1 week ago",
+    files: [
+      { path: "src/engine/core.ts", additions: 3, deletions: 5 },
+      { path: "README.md", additions: 1, deletions: 0 },
+    ],
+  },
 ];
 
 type Events = { openCommit: CustomEvent[]; openFile: CustomEvent[] };
@@ -233,6 +250,52 @@ describe("CommitSearchSystemTabController", () => {
     row = host.querySelector<HTMLElement>("[data-commit-row]")!;
     const icon2 = row.querySelector("openp41ge-icon") as HTMLElement | null;
     expect(icon2?.getAttribute("name")).toBe("chevron-down");
+  });
+
+  it("message line windows around the search hit, highlights it, and shows the +N more / matched-file meta", async () => {
+    const scope = host.querySelector("select") as HTMLSelectElement;
+    scope.value = "innova";
+    await search(controller, "engine");
+
+    // The hit is highlighted inline…
+    const hit = host.querySelector(".commit-result-row .search-hit") as HTMLElement | null;
+    expect(hit).not.toBeNull();
+    expect(hit?.textContent).toBe("engine");
+    // …and the window starts mid-message (leading ellipsis) so the tail hit is
+    // visible rather than only the message's beginning.
+    const row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    expect(row.textContent).toContain("\u2026"); // truncated context either side
+    // Optional third line: repeated hits + a file-path match.
+    expect(row.textContent).toContain("+ 1 more instance");
+    expect(row.textContent).toContain("matched file: src/engine/core.ts");
+  });
+
+  it("file sub-rows get coloured +adds/−dels and highlight the matched path", async () => {
+    const scope = host.querySelector("select") as HTMLSelectElement;
+    scope.value = "innova";
+    await search(controller, "engine");
+    const row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    row.click();
+    await flush();
+
+    const adds = host.querySelector(".commit-adds") as HTMLElement | null;
+    const dels = host.querySelector(".commit-dels") as HTMLElement | null;
+    expect(adds?.textContent).toBe("+3");
+    expect(adds?.style.color).toBe("rgb(63, 185, 80)"); // #3fb950
+    expect(dels?.textContent).toBe("\u22125");
+    expect(dels?.style.color).toBe("rgb(248, 81, 73)"); // #f85149
+
+    // The matched file path is highlighted inside its sub-row.
+    const fileHit = host.querySelector(".commit-file-row .search-hit") as HTMLElement | null;
+    expect(fileHit).not.toBeNull();
+    expect(fileHit?.textContent).toBe("engine");
+  });
+
+  it("hover highlight is per-row: the header block and each file row, not the whole container", () => {
+    const styleText = (host.querySelector("style") as HTMLStyleElement).textContent;
+    expect(styleText).toContain(".commit-result-head:hover");
+    expect(styleText).toContain(".commit-file-row:hover");
+    expect(styleText).not.toContain(".commit-result-row:hover");
   });
 
   it("file sub-row click emits openp41ge:open-file with pinned:false (working-tree preview)", async () => {
