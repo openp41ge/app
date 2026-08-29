@@ -7,6 +7,14 @@
  * 3. Set content and tokens on visible lines
  * 4. Maintain the sliding window of rendered lines via RenderedLinesCollection
  * 5. Create a content wrapper div inside the viewport that holds all lines
+ *
+ * Word wrap (Phase 2 of the large-file-performance plan):
+ * When wrapping is enabled, each model line splits into several *view lines*
+ * (one per wrap segment). The viewport then virtualizes over VIEW lines: only
+ * the visible window is materialised as DOM, keyed by view line number, using
+ * WrappedLineIndex for the view↔model mapping. Model-space accessors
+ * (startLineNumber/endLineNumber/onVisibleRangeChanged) stay in model space so
+ * the gutter and bracket-depth consumers keep working.
  */
 
 import { RenderedLinesCollection } from "./view-layer";
@@ -18,6 +26,7 @@ import { TokenSegmentAdjuster } from "./token-segment-adjuster";
 import type { ITokenSegmentAdjuster } from "./token-segment-adjuster";
 import { ViewportWrapColumnCalculator } from "./wrap-column-calculator";
 import type { IWrapColumnCalculator } from "./wrap-column-calculator";
+import { WrappedLineIndex } from "./wrapped-line-index";
 
 /**
  * Provider for line content and tokens, used by ViewLines when rendering.
@@ -68,6 +77,16 @@ export class ViewLines {
   private _segmentAdjuster: ITokenSegmentAdjuster;
   private _wrapCalculator: IWrapColumnCalculator;
 
+  // ── Word-wrap virtualization (Phase 2) ────────────────────────────────
+
+  /** View-line-keyed DOM window used when word wrap is enabled. */
+  private _wrappedLines: RenderedLinesCollection<ViewLine> =
+    new RenderedLinesCollection<ViewLine>();
+  /** Visible view-line window when wrapped (1-based, view space). */
+  private _wrappedStartViewLine: number = 0;
+  private _wrappedEndViewLine: number = 0;
+  private _wrappedIndex: WrappedLineIndex | null = null;
+
   /**
    * Callback for rendering a line's content with its tokens.
    * Called when a line enters the viewport and needs its content set.
@@ -88,6 +107,7 @@ export class ViewLines {
    * Callback for when the visible range changes due to scrolling.
    * The selection renderer needs this to re-render highlights for the
    * new visible range when the user scrolls after a cross-range selection.
+   * Fired with MODEL line numbers in both modes.
    */
   onVisibleRangeChanged: ((startLine: number, endLine: number) => void) | null = null;
 
@@ -119,14 +139,24 @@ export class ViewLines {
    * Enable or disable word wrap.
    */
   setWordWrap(enabled: boolean, wrapColumn?: number): void {
+    if (wrapColumn !== undefined && wrapColumn !== this._wrapColumn) {
+      this._wrapColumn = wrapColumn;
+      this._wrappedIndex?.setWrapColumn(wrapColumn);
+    }
+    const changed = this._wordWrapEnabled !== enabled;
     this._wordWrapEnabled = enabled;
-    if (wrapColumn !== undefined) this._wrapColumn = wrapColumn;
+    if (changed) {
+      if (!enabled) {
+        // Leaving wrapped mode — clear the wrapped DOM window.
+        this._clearWrappedWindow();
+      } else {
+        // Entering wrapped mode — lazy index used on next render.
+        this._wrappedIndex?.reset();
+      }
+    }
     this._updateScrollHeight();
   }
 
-  /**
-   * Get the total number of visible view lines (accounting for word wrap).
-   */
   /** Compute the effective wrap column from the viewport width. */
   private _computeWrapColumn(): number {
     const charWidth = this._measureCharWidth();
@@ -134,17 +164,13 @@ export class ViewLines {
     return this._wrapCalculator.compute(viewportWidth, 0, 16, charWidth || 8);
   }
 
+  /**
+   * Get the total number of visible view lines (accounting for word wrap).
+   */
   getViewLineCount(): number {
     if (!this._wordWrapEnabled) return this._totalLineCount;
-    const provider = this.lineContentProvider;
-    if (!provider) return this._totalLineCount;
-    let count = 0;
-    const wrapCol = this._wrapColumn > 0 ? this._wrapColumn : this._computeWrapColumn();
-    for (let line = 1; line <= this._totalLineCount; line++) {
-      const content = provider.getLineContent(line);
-      count += computeWrapSegments(content, wrapCol).length;
-    }
-    return count;
+    if (!this.lineContentProvider) return this._totalLineCount;
+    return this.wrappedIndex().totalViewLineCount;
   }
 
   /**
@@ -155,12 +181,7 @@ export class ViewLines {
     if (!this._wordWrapEnabled) return modelLine;
     const provider = this.lineContentProvider;
     if (!provider) return modelLine;
-    const wrapCol = this._wrapColumn > 0 ? this._wrapColumn : this._computeWrapColumn();
-    let acc = 1;
-    for (let i = 1; i < modelLine; i++) {
-      acc += computeWrapSegments(provider.getLineContent(i), wrapCol).length;
-    }
-    return acc;
+    return this.wrappedIndex().getViewLineStart(modelLine);
   }
 
   /**
@@ -168,6 +189,8 @@ export class ViewLines {
    */
   setTotalLineCount(count: number): void {
     this._totalLineCount = count;
+    // Update the wrapped mapping horizon (wraps/shifts line numbers).
+    this._wrappedIndex?.setTotalModelLineCount(count);
     // Update the scroll height of the content wrapper
     this._updateScrollHeight();
   }
@@ -201,9 +224,13 @@ export class ViewLines {
   }
 
   /**
-   * Get a rendered ViewLine by line number.
+   * Get a rendered ViewLine by line number. In wrapped mode the key is a VIEW
+   * line number; otherwise it is a model line number.
    */
   getViewLine(lineNumber: number): ViewLine | undefined {
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      return this._wrappedLines.getLine(lineNumber);
+    }
     return this._collection.getLine(lineNumber);
   }
 
@@ -211,21 +238,45 @@ export class ViewLines {
    * Get all currently rendered ViewLines.
    */
   getRenderedLines(): ViewLine[] {
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      return this._wrappedLines.getLines();
+    }
     return this._collection.getLines();
   }
 
   /**
-   * Get the first visible line number.
+   * The first visible line number. Model space in both modes.
    */
   get startLineNumber(): number {
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      if (!this._wrappedStartViewLine) return 0;
+      return this.wrappedIndex().findViewLine(this._wrappedStartViewLine)?.modelLine ?? 1;
+    }
     return this._collection.startLineNumber;
   }
 
   /**
-   * Get the last visible line number.
+   * The last visible line number. Model space in both modes.
    */
   get endLineNumber(): number {
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      if (!this._wrappedEndViewLine) return 0;
+      return (
+        this.wrappedIndex().findViewLine(this._wrappedEndViewLine)?.modelLine ??
+        this._totalLineCount
+      );
+    }
     return this._collection.endLineNumber;
+  }
+
+  /** First rendered VIEW line (wrapped mode; 0 when empty). */
+  get wrappedStartViewLine(): number {
+    return this._wrappedStartViewLine;
+  }
+
+  /** Last rendered VIEW line (wrapped mode; 0 when empty). */
+  get wrappedEndViewLine(): number {
+    return this._wrappedEndViewLine;
   }
 
   /**
@@ -242,18 +293,20 @@ export class ViewLines {
    * @param viewportHeight - The viewport height in pixels.
    */
   onScroll(scrollTop: number, viewportHeight?: number): void {
-    if (this._wordWrapEnabled) return; // All lines are rendered statically
-
     if (viewportHeight !== undefined) {
       this._viewportHeight = viewportHeight;
     }
-
     this._scrollTop = scrollTop;
 
     const lineHeight = this._config.lineHeight;
     if (lineHeight <= 0) return;
 
-    // Compute which lines should be visible
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      this._scrollWrapped(scrollTop, lineHeight);
+      return;
+    }
+
+    // Non-wrapped mode — compute which lines should be visible.
     // Add some over-rendering (1 line above, 2 lines below) for smooth scrolling
     const overRenderAbove = 1;
     const overRenderBelow = 2;
@@ -271,12 +324,44 @@ export class ViewLines {
     this._visibleStartLine = newStartLine;
     this._visibleEndLine = newEndLine;
 
-    // For now, a simple approach: replace all lines when the visible range changes
-    // TODO: Incremental update (add/remove lines at edges)
     this._rebuildLines(newStartLine, newEndLine);
 
     // Notify listener that the visible range changed
     this.onVisibleRangeChanged?.(newStartLine, newEndLine);
+  }
+
+  /**
+   * Wrapped-mode scroll: virtualize over view lines.
+   */
+  private _scrollWrapped(scrollTop: number, lineHeight: number): void {
+    const index = this.wrappedIndex();
+    const total = index.totalViewLineCount;
+    if (total <= 0) {
+      this._wrappedStartViewLine = 0;
+      this._wrappedEndViewLine = 0;
+      return;
+    }
+
+    const overRenderAbove = 1;
+    const overRenderBelow = 2;
+    const newStart = Math.max(1, Math.floor(scrollTop / lineHeight) - overRenderAbove + 1);
+    const newEnd = Math.min(
+      total,
+      Math.ceil((scrollTop + this._viewportHeight) / lineHeight) + overRenderBelow,
+    );
+
+    if (newStart === this._wrappedStartViewLine && newEnd === this._wrappedEndViewLine) {
+      return; // No change
+    }
+
+    this._wrappedStartViewLine = newStart;
+    this._wrappedEndViewLine = newEnd;
+    this._rebuildWrappedLines(newStart, newEnd);
+
+    // Gutter / selection consumers stay in model space.
+    const modelStart = index.findViewLine(newStart)?.modelLine ?? 1;
+    const modelEnd = index.findViewLine(newEnd)?.modelLine ?? this._totalLineCount;
+    this.onVisibleRangeChanged?.(modelStart, modelEnd);
   }
 
   /**
@@ -286,6 +371,11 @@ export class ViewLines {
     this._lineContentCache.set(lineNumber, content);
     this._lineTokenCache.set(lineNumber, tokens);
 
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      // Wrapped rendering reads live from the provider on rebuild; nothing to
+      // line up by model line here.
+      return;
+    }
     const line = this._collection.getLine(lineNumber);
     if (line) {
       line.setContent(content, tokens, this._config.tabSize);
@@ -299,6 +389,12 @@ export class ViewLines {
     this._lineContentCache.delete(lineNumber);
     this._lineTokenCache.delete(lineNumber);
 
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      // Content changed — the wrap mapping below this line is stale.
+      this._wrappedIndex?.invalidateFrom(lineNumber);
+      this._refreshWrappedWindow();
+      return;
+    }
     const line = this._collection.getLine(lineNumber);
     if (line) {
       // Schedule for re-render
@@ -319,10 +415,16 @@ export class ViewLines {
 
   /**
    * Clear all line content caches (e.g., after file reload).
+   * In wrapped mode the view↔model mapping is also invalidated, because a
+   * content change can alter per-line wrap segment counts.
    */
   clearContentCache(): void {
     this._lineContentCache.clear();
     this._lineTokenCache.clear();
+    if (this._wordWrapEnabled) {
+      // Lazy rebuild on next view-line resolution (see WrappedLineIndex).
+      this._wrappedIndex?.reset();
+    }
   }
 
   /**
@@ -345,6 +447,10 @@ export class ViewLines {
    */
   refresh(): void {
     if (this._disposed) return;
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      this._refreshWrappedWindow();
+      return;
+    }
     this._rebuildLines(this._visibleStartLine, this._visibleEndLine);
   }
 
@@ -353,8 +459,33 @@ export class ViewLines {
    */
   rebuildAll(): void {
     if (this._disposed) return;
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      // Render only the visible VIEW-line window at the current scroll offset.
+      const index = this.wrappedIndex();
+      const total = index.totalViewLineCount;
+      if (total <= 0) {
+        this._clearWrappedWindow();
+        return;
+      }
+      const lineHeight = this._config.lineHeight;
+      const overRenderAbove = 1;
+      const overRenderBelow = 2;
+      const start = Math.max(1, Math.floor(this._scrollTop / lineHeight) - overRenderAbove + 1);
+      const end = Math.min(
+        total,
+        Math.ceil((this._scrollTop + this._viewportHeight) / lineHeight) + overRenderBelow,
+      );
+      this._wrappedStartViewLine = start;
+      this._wrappedEndViewLine = end;
+      this._rebuildWrappedLines(start, end);
+      const modelStart = index.findViewLine(start)?.modelLine ?? 1;
+      const modelEnd = index.findViewLine(end)?.modelLine ?? this._totalLineCount;
+      this.onVisibleRangeChanged?.(modelStart, modelEnd);
+      return;
+    }
+
     if (this._wordWrapEnabled) {
-      // When wrapped, render all lines statically (no virtual scrolling)
+      // Wrapped but no provider — legacy static path (demo only).
       const totalView = this.getViewLineCount();
       this._visibleStartLine = 1;
       this._visibleEndLine = Math.min(totalView, 5000); // cap at 5000 for performance
@@ -367,9 +498,12 @@ export class ViewLines {
   }
 
   /**
-   * Get the rendered line count.
+   * Get the rendered line count. Wrapped mode counts VIEW lines in the window.
    */
   get renderedLineCount(): number {
+    if (this._wordWrapEnabled && this.lineContentProvider) {
+      return this._wrappedLines.count;
+    }
     return this._collection.count;
   }
 
@@ -377,14 +511,18 @@ export class ViewLines {
    * Update the scroll height to accommodate all lines.
    */
   private _updateScrollHeight(): void {
-    const totalLines = this.getViewLineCount();
+    const totalLines = this._wordWrapEnabled
+      ? this.lineContentProvider
+        ? this.wrappedIndex().totalViewLineCount
+        : this._totalLineCount
+      : this._totalLineCount;
     const totalHeight = totalLines * this._config.lineHeight;
     this._linesWrapper.setHeight(totalHeight);
     // The wrapper div inside a naturally-scrolling viewport creates the scroll
   }
 
   /**
-   * Rebuild all visible lines.
+   * Rebuild all visible lines (non-wrapped mode).
    */
   private _rebuildLines(startLine: number, endLine: number): void {
     if (this._disposed) return;
@@ -403,68 +541,141 @@ export class ViewLines {
     const newLines: ViewLine[] = [];
     const lineHeight = this._config.lineHeight;
 
-    if (this._wordWrapEnabled) {
-      // Word wrap: render all wrapped segments statically (no virtual scrolling)
-      const provider = this.lineContentProvider;
-      if (!provider) {
-        for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
-          const top = (lineNum - startLine) * lineHeight;
-          const viewLine = new ViewLine(lineNum, top, lineHeight);
-          if (this.onLineRender) this.onLineRender(lineNum, viewLine);
+    const provider = this.lineContentProvider;
+    if (this._wordWrapEnabled && provider) {
+      // Wrapped mode is normally virtualized via _rebuildWrappedLines; this
+      // branch only runs for the legacy no-provider path.
+      const wrapColumn = this._wrapColumn > 0 ? this._wrapColumn : this._computeWrapColumn();
+      let viewLineNum = 1;
+      const maxViewLines = Math.min(endLine, 5000);
+      for (
+        let modelLine = 1;
+        modelLine <= this._totalLineCount && viewLineNum <= maxViewLines;
+        modelLine++
+      ) {
+        const content = provider.getLineContent(modelLine);
+        const segments = computeWrapSegments(content, wrapColumn);
+        const tokens = provider.getLineTokens(modelLine);
+        for (let s = 0; s < segments.length && viewLineNum <= maxViewLines; s++) {
+          const seg = segments[s];
+          const top = (viewLineNum - 1) * lineHeight;
+          const viewLine = new ViewLine(modelLine, top, lineHeight);
+          const adjustedTokens = this._segmentAdjuster.adjust(
+            tokens,
+            seg.startColumn - 1,
+            seg.text.length,
+          );
+          viewLine.setContent(seg.text, adjustedTokens, provider.tabSize);
           this._linesWrapper.appendChild(viewLine.domNode);
           newLines.push(viewLine);
-        }
-      } else {
-        const wrapColumn = this._wrapColumn > 0 ? this._wrapColumn : this._computeWrapColumn();
-
-        let viewLineNum = 1;
-        // Limit to a reasonable number of view lines to prevent OOM
-        const maxViewLines = Math.min(endLine, 5000);
-        for (
-          let modelLine = 1;
-          modelLine <= this._totalLineCount && viewLineNum <= maxViewLines;
-          modelLine++
-        ) {
-          const content = provider.getLineContent(modelLine);
-          const segments = computeWrapSegments(content, wrapColumn);
-          const tokens = provider.getLineTokens(modelLine);
-          for (let s = 0; s < segments.length && viewLineNum <= maxViewLines; s++) {
-            const seg = segments[s];
-            const top = (viewLineNum - 1) * lineHeight;
-            const viewLine = new ViewLine(modelLine, top, lineHeight);
-            const adjustedTokens = this._segmentAdjuster.adjust(
-              tokens,
-              seg.startColumn - 1,
-              seg.text.length,
-            );
-            viewLine.setContent(seg.text, adjustedTokens, provider.tabSize);
-            this._linesWrapper.appendChild(viewLine.domNode);
-            newLines.push(viewLine);
-            viewLineNum++;
-          }
+          viewLineNum++;
         }
       }
-    } else {
-      for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
-        // Position lines at their absolute scroll position within the viewport.
-        // (lineNum - 1) * lineHeight = top of the line in the document
-        const top = (lineNum - 1) * lineHeight;
-        const viewLine = new ViewLine(lineNum, top, lineHeight);
+      this._collection.replace(startLine, newLines);
+      return;
+    }
 
-        // Always fire the render callback — it fetches fresh content from the model.
-        // Do NOT pre-fill from the lineContentCache: the cache may contain stale
-        // entries after line insertions/deletions (shifted line numbers), and the
-        // onLineRender callback always overwrites it anyway.
-        if (this.onLineRender) {
-          this.onLineRender(lineNum, viewLine);
-        }
+    for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+      const top = (lineNum - 1) * lineHeight;
+      const viewLine = new ViewLine(lineNum, top, lineHeight);
 
-        this._linesWrapper.appendChild(viewLine.domNode);
-        newLines.push(viewLine);
+      if (this.onLineRender) {
+        this.onLineRender(lineNum, viewLine);
       }
+
+      this._linesWrapper.appendChild(viewLine.domNode);
+      newLines.push(viewLine);
     }
 
     this._collection.replace(startLine, newLines);
+  }
+
+  /**
+   * Rebuild the visible VIEW-line window for wrapped mode.
+   */
+  private _rebuildWrappedLines(startViewLine: number, endViewLine: number): void {
+    if (this._disposed) return;
+
+    // Dispose old wrapped lines.
+    const oldLines = this._wrappedLines.getLines();
+    for (const line of oldLines) {
+      if (this.onLineDispose) {
+        this.onLineDispose(line.lineNumber, line);
+      }
+      line.dispose();
+    }
+    this._wrappedLines.clear();
+
+    const provider = this.lineContentProvider;
+    const lineHeight = this._config.lineHeight;
+    const newLines: ViewLine[] = [];
+
+    if (!provider) {
+      // Legacy fallback: one ViewLine per view line, content via onLineRender.
+      for (let viewLineNum = startViewLine; viewLineNum <= endViewLine; viewLineNum++) {
+        const viewLine = new ViewLine(viewLineNum, (viewLineNum - 1) * lineHeight, lineHeight);
+        if (this.onLineRender) this.onLineRender(viewLineNum, viewLine);
+        this._linesWrapper.appendChild(viewLine.domNode);
+        newLines.push(viewLine);
+      }
+      this._wrappedLines.replace(startViewLine, newLines);
+      return;
+    }
+
+    const index = this.wrappedIndex();
+    const wrapColumn = this._wrapColumn > 0 ? this._wrapColumn : this._computeWrapColumn();
+    for (let viewLineNum = startViewLine; viewLineNum <= endViewLine; viewLineNum++) {
+      const info = index.findViewLine(viewLineNum);
+      if (!info) continue;
+      const { modelLine, segmentIndex } = info;
+      const segments = computeWrapSegments(provider.getLineContent(modelLine), wrapColumn);
+      const seg = segments[segmentIndex];
+      if (!seg) continue;
+
+      const viewLine = new ViewLine(viewLineNum, (viewLineNum - 1) * lineHeight, lineHeight);
+      const tokens = provider.getLineTokens(modelLine);
+      const adjustedTokens = this._segmentAdjuster.adjust(
+        tokens,
+        seg.startColumn - 1,
+        seg.text.length,
+      );
+      viewLine.setContent(seg.text, adjustedTokens, provider.tabSize);
+      this._linesWrapper.appendChild(viewLine.domNode);
+      newLines.push(viewLine);
+    }
+
+    this._wrappedLines.replace(startViewLine, newLines);
+  }
+
+  /** Re-render the current wrapped view-line window (used by refresh/invalidate). */
+  private _refreshWrappedWindow(): void {
+    if (!this._wrappedStartViewLine || !this._wrappedEndViewLine) return;
+    if (this._wrappedEndViewLine > this.wrappedIndex().totalViewLineCount) return;
+    this._rebuildWrappedLines(this._wrappedStartViewLine, this._wrappedEndViewLine);
+  }
+
+  /** Drop all wrapped DOM lines and reset the wrapped window. */
+  private _clearWrappedWindow(): void {
+    const oldLines = this._wrappedLines.getLines();
+    for (const line of oldLines) {
+      if (this.onLineDispose) this.onLineDispose(line.lineNumber, line);
+      line.dispose();
+    }
+    this._wrappedLines.clear();
+    this._wrappedStartViewLine = 0;
+    this._wrappedEndViewLine = 0;
+  }
+
+  /** Lazily create the wrapped view↔model index. */
+  private wrappedIndex(): WrappedLineIndex {
+    if (!this._wrappedIndex) {
+      this._wrappedIndex = new WrappedLineIndex(
+        { getLineContent: (ln) => this.lineContentProvider?.getLineContent(ln) ?? "" },
+        this._wrapColumn,
+      );
+    }
+    this._wrappedIndex.setTotalModelLineCount(this._totalLineCount);
+    return this._wrappedIndex;
   }
 
   /**
@@ -508,6 +719,11 @@ export class ViewLines {
       line.dispose();
     }
     this._collection.clear();
+    const wrapped = this._wrappedLines.getLines();
+    for (const line of wrapped) {
+      line.dispose();
+    }
+    this._wrappedLines.clear();
     this._linesWrapper.element.remove();
     this._lineContentCache.clear();
     this._lineTokenCache.clear();

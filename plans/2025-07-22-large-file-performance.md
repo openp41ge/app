@@ -5,13 +5,19 @@
 ## Status (2025-08-29)
 
 - [x] **Phase 1A** — incremental content width: `LazyLineWidthTracker`
-  implemented + wired into `FileEditorElement` (first batch sync, background
-  idle batches, single-line remeasure on edit).
+      implemented + wired into `FileEditorElement` (first batch sync, background
+      idle batches, single-line remeasure on edit).
 - [x] **Phase 1B** — version-based dirty tracking: `VersionBasedDirtyTracker`
-  implemented + wired in; model `undo()/redo()` now restore `beforeVersionId`/
-  `afterVersionId` so undo-to-clean is detected. 6 engine + 27 uikit tests green.
-- [ ] **Phase 2** — lazy DOM for word-wrap mode (virtual scrolling for wrapped
-  lines; `view-lines.ts` `onScroll()` bail-out). NOT started — next.
+      implemented + wired in; model `undo()/redo()` now restore `beforeVersionId`/
+      `afterVersionId` so undo-to-clean is detected. 6 engine + 27 uikit tests green.
+- [x] **Phase 2** — lazy DOM / virtual scrolling for word-wrap mode: `ViewLines`
+      now virtualizes over VIEW lines in wrapped mode, rendering only the visible
+      window (+ over-render) instead of up to 5000 static nodes. New
+      `WrappedLineIndex` provides the O(log n) view↔model mapping (segment-count
+      cache + binary search). Model-space accessors (`startLineNumber`,
+      `onVisibleRangeChanged`) preserved so the gutter stays correct. 16 view tests
+      green. **Not yet verified in the running app**: wrapped gutter scrolling +
+      click-to-caret on virtualized wrapped lines need a manual in-app pass.
 - [ ] **Phase 3/4/5** — async tokenization, chunked loading, workers. NOT started.
 
 ## Problem
