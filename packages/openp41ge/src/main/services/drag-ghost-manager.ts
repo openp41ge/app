@@ -167,15 +167,23 @@ ${nameHtml}</div>`;
    * Swap the ghost's content to a captured bitmap in-place (same window, no
    * destroy/recreate) so the already-visible row-style ghost is upgraded to the
    * pixel-accurate source snapshot without any window-churn flicker.
+   *
+   * `width`/`height` are the ghost's OUTER dimensions (the whole dragged element
+   * bounds); `inset` trims that area by `inset`px on every side and draws the
+   * image inset within the window, so a border/edge clip is excluded while the
+   * ghost keeps aligned with the cursor offset.
    */
-  setBitmap(dataUrl: string, width: number, height: number): void {
+  setBitmap(dataUrl: string, width: number, height: number, inset = 0): void {
     if (!this._ghost || this._ghost.isDestroyed()) return;
-    const w = Math.max(1, Math.round(width));
-    const h = Math.max(1, Math.round(height));
-    this._contentW = w;
-    this._contentH = h;
+    const insetPx = Math.max(0, Math.round(inset) || 0);
+    const outerW = Math.max(1, Math.round(width));
+    const outerH = Math.max(1, Math.round(height));
+    const w = Math.max(1, outerW - insetPx * 2);
+    const h = Math.max(1, outerH - insetPx * 2);
+    this._contentW = outerW;
+    this._contentH = outerH;
     const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:transparent;cursor:grabbing;"><img src="${dataUrl}" alt="" style="display:block;width:${w}px;height:${h}px;" />
+<html><body style="margin:0;padding:0;background:transparent;cursor:grabbing;"><img src="${dataUrl}" alt="" style="display:block;width:${w}px;height:${h}px;margin:${insetPx}px;" />
 </body></html>`;
     this._ghost.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   }

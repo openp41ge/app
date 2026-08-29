@@ -180,6 +180,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
       dragType,
       filePath,
       captureRect,
+      inset,
     ) => {
       ipcRenderer.send(
         "openp41ge:drag-start",
@@ -198,6 +199,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
           dragType,
           filePath,
           captureRect,
+          inset,
         }),
       );
     },
@@ -266,10 +268,19 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
     /**
      * Register callback for drag-state changes broadcast by the main process.
-     * Called with true when a drag starts in another window, false when it ends.
+     * Called with { active } — plus the drag source type when a drag starts in
+     * another window, so a target window can skip previewing (e.g. sidebar tabs
+     * must not light up a central grid).
      */
     onDragState: (callback) => {
-      const handler = (_event, active) => callback(active);
+      const handler = (_event, data) => {
+        try {
+          const p = JSON.parse(data);
+          callback({ active: !!p.active, type: typeof p.type === "string" ? p.type : null });
+        } catch {
+          callback({ active: !!data, type: null });
+        }
+      };
       ipcRenderer.on("openp41ge:drag-state", handler);
     },
   },

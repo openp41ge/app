@@ -31,7 +31,7 @@ export interface IDragGhostManager {
   ): void;
 
   /** Swap the ghost content to a captured bitmap in-place (no window recreate). */
-  setBitmap(dataUrl: string, width: number, height: number): void;
+  setBitmap(dataUrl: string, width: number, height: number, inset?: number): void;
 
   /** Move the drag ghost window to a new screen position. */
   move(screenX: number, screenY: number): void;

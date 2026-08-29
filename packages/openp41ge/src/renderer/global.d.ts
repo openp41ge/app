@@ -46,7 +46,7 @@ declare global {
         onReset: (callback: () => void) => () => void;
       };
       drag: {
-        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number, dragType?: string, filePath?: string, captureRect?: { x: number; y: number; width: number; height: number }) => void;
+        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number, dragType?: string, filePath?: string, captureRect?: { x: number; y: number; width: number; height: number }, inset?: number) => void;
         move: (screenX: number, screenY: number) => void;
         end: () => void;
         activate: () => void;
@@ -65,7 +65,7 @@ declare global {
         ghostHide: (targetWinId: string) => void;
         onGhostShow: (callback: (data: { screenX: number; screenY: number; label: string }) => void) => void;
         onGhostHide: (callback: () => void) => void;
-        onDragState: (callback: (active: boolean) => void) => void;
+        onDragState: (callback: (state: { active: boolean; type: string | null }) => void) => void;
       };
 
       terminal: {

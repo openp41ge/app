@@ -12,15 +12,28 @@
  *   sidebar-tab-drop — { tabId, sourceSide, targetSide, dropIndex, winId }
  */
 
-import type { IDragSource, IDropTarget, DragResult, TargetFeedback } from "../../openp41ge-tabs-adapter";
+import type {
+  IDragSource,
+  IDropTarget,
+  DragResult,
+  TargetFeedback,
+} from "../../openp41ge-tabs-adapter";
 
+// ─── Capture suppression ────────────────────────────────────────────────────
+// While a sidebar-tab drag is capturing its bitmap ghost frame, the sidebar
+// wide ghost overlay / drop indicator must not be painted into the snapshot.
+// The host toggles this with setSidebarDropFeedbackSuppressed() around the
+// capture (onHover would otherwise re-create the overlay synchronously right
+// after the capture-frame cleanup, and capturePage samples it).
+let _feedbackSuppressed = false;
 
-
-
+export function setSidebarDropFeedbackSuppressed(v: boolean): void {
+  _feedbackSuppressed = v;
+}
 
 import { SIDEBAR_DROP_EVENT, SIDEBAR_TAB_BUTTON_SELECTOR } from "openp41ge-constants";
 
-function getTabButtonsInSidebarBar(bar: HTMLElement): HTMLElement[] {
+export function getTabButtonsInSidebarBar(bar: HTMLElement): HTMLElement[] {
   return Array.from(bar.querySelectorAll(SIDEBAR_TAB_BUTTON_SELECTOR)).filter(
     (el): el is HTMLElement => {
       const htmlEl = el as HTMLElement;
@@ -66,8 +79,24 @@ export class SidebarDropTarget implements IDropTarget {
     this.side = side;
   }
 
-  onHover(_source: IDragSource, clientX: number, clientY: number): TargetFeedback | null {
+  onHover(source: IDragSource, clientX: number, clientY: number): TargetFeedback | null {
+    const data = source.getDragData() as { type?: string; side?: string; tabId?: string };
     const dropIndex = getDropIndexInSidebarBar(this.element, clientX);
+
+    // Same-sidebar reorder that would not move the dragged tab: dropping right
+    // before itself (dropIndex === fromIndex) or right after itself
+    // (dropIndex === fromIndex + 1) is a no-op — the drop handler already
+    // refuses it, so the PRECISE vertical bar must not advertise it. The
+    // sidebar-wide overlay still shows, so hovering visibly targets the
+    // sidebar; only the insert-bar is suppressed.
+    const isSameSide =
+      data.type === "system-tab" && data.side === this.side && typeof data.tabId === "string";
+    const fromIndex = isSameSide
+      ? getTabButtonsInSidebarBar(this.element).findIndex(
+          (btn) => btn.getAttribute("data-sidebar-tab-id") === data.tabId,
+        )
+      : -1;
+    const noOpReorder = fromIndex >= 0 && (dropIndex === fromIndex || dropIndex === fromIndex + 1);
 
     // Only show the precise drop indicator when cursor is directly over the
     // tab bar. When hovering the content area below, only the sidebar-wide
@@ -75,7 +104,7 @@ export class SidebarDropTarget implements IDropTarget {
     const barRect = this.element.getBoundingClientRect();
     const isOverTabBar = clientY >= barRect.top && clientY <= barRect.bottom;
 
-    this._showOverlay(dropIndex, isOverTabBar);
+    this._showOverlay(dropIndex, isOverTabBar && !noOpReorder);
     return { indicatorKey: `sidebar-bar-${this.winId}-${this.side}` };
   }
 
@@ -144,6 +173,10 @@ export class SidebarDropTarget implements IDropTarget {
    * - Precise drop indicator line on the tab bar (when `showIndicator` is true)
    */
   private _showOverlay(dropIndex: number, showIndicator: boolean = true): void {
+    // Suppressed while the drag ghost captures its bitmap frame — no overlay or
+    // drop indicator may be painted into the snapshot.
+    if (_feedbackSuppressed) return;
+
     // ── Sidebar-wide ghost overlay ──────────────────────────────────
     const sidebarHost = this._getSidebarHost();
     if (sidebarHost) {

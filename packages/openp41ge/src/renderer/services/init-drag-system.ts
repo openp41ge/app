@@ -27,7 +27,11 @@ import { createLogger } from "openp41ge-logger";
 const log = createLogger("cross-window-drag");
 
 import { FileDragSource } from "./drag-sources/file-drag-source";
-import { SidebarDropTarget } from "./drop-targets/sidebar-drop-target";
+import { ClosedSidebarDropTarget } from "./drop-targets/closed-sidebar-drop-target";
+import {
+  SidebarDropTarget,
+  setSidebarDropFeedbackSuppressed,
+} from "./drop-targets/sidebar-drop-target";
 import { SIDEBAR_DROP_EVENT } from "openp41ge-constants";
 
 // ─── SidebarTabDragSource — drag source for sidebar system tabs ──────────
@@ -41,16 +45,33 @@ class SidebarTabDragSource implements IDragSource {
   private _winId: string;
   private _title: string;
   private _ghost: HTMLElement | null = null;
+  private _ghostFactory?: () => HTMLElement;
 
-  constructor(el: HTMLElement, tabId: string, side: string, winId: string, title: string) {
+  constructor(
+    el: HTMLElement,
+    tabId: string,
+    side: string,
+    winId: string,
+    title: string,
+    ghostFactory?: () => HTMLElement,
+  ) {
     this._el = el;
     this._tabId = tabId;
     this._side = side;
     this._winId = winId;
     this._title = title;
+    this._ghostFactory = ghostFactory;
   }
 
   createGhost(): HTMLElement {
+    // Like grid tabs/files, the in-DOM ghost is invisible — the visible drag
+    // element is the main-process bitmap ghost (DragGhostManager).
+    if (this._ghostFactory) {
+      const ghost = this._ghostFactory();
+      this._ghost = ghost;
+      return ghost;
+    }
+
     const ghost = document.createElement("div");
     ghost.classList.add("openp41ge-drag-ghost");
     const label = document.createElement("span");
@@ -120,6 +141,8 @@ let _ghostManager = new GhostManager();
 
 /** Whether another Electron window has an active drag. */
 let _remoteDragActive = false;
+/** Drag source type of the remote (other-window) drag, from the drag-state broadcast. */
+let _remoteDragType: string | null = null;
 /** Whether our window has an active local drag. */
 let _localDragActive = false;
 
@@ -152,7 +175,48 @@ let _pendingDragStart: {
   tabHeight: number;
   offsetX: number;
   offsetY: number;
+  /** Source tab button rect (viewport coords) for the main-process capturePage snapshot. */
+  captureRect: { x: number; y: number; width: number; height: number };
 } | null = null;
+
+/**
+ * Ghost capture inset (px) applied to the tab-button rect. Trims the tab's 1px
+ * separator border (and any drop-indicator line clipped at the edge) so the
+ * bitmap ghost is a clean copy of the tab interior.
+ */
+const TAB_GHOST_CAPTURE_INSET = 2;
+
+/**
+ * Deferred drag:start params for sidebar tab drags — captured on mousedown,
+ * fired on the first POSITION event (like grid tabs, so the sidebar tab gets
+ * the same pixel-accurate bitmap ghost).
+ */
+let _pendingSidebarDragStart: {
+  label: string;
+  screenX: number;
+  screenY: number;
+  tabId: string;
+  side: string;
+  winId: string;
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+  /** Source sidebar-tab rect (viewport coords), trimmed by TAB_GHOST_CAPTURE_INSET. */
+  captureRect: { x: number; y: number; width: number; height: number };
+} | null = null;
+
+/**
+ * Source sidebar side of the most recent sidebar-tab drag.
+ *
+ * Survives drag teardown: the orchestrator fires DRAG_EVENTS.END (which makes
+ * the host tear down and null _currentSource) BEFORE it resolves the drop
+ * target on mouseup, so the final resolve can't see the live source. This flag
+ * lets the resolver still know the drag was a system-tab (and from which side)
+ * for that final resolve. Cleared when any non-sidebar drag starts (grid tab /
+ * file) or when a drag is interrupted, so it never leaks into another gesture.
+ */
+let _sidebarTabDragSide: "left" | "right" | null = null;
 
 /** Deferred drag:start params for file drags. */
 let _pendingFileDragStart: {
@@ -251,6 +315,7 @@ export function initDragSystem(): () => void {
       return ghost;
     });
     _currentSource = dragSource;
+    _sidebarTabDragSide = null; // not a sidebar-tab drag
     _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
 
     // Defer drag:start until the POSITION event fires (after threshold met).
@@ -266,6 +331,12 @@ export function initDragSystem(): () => void {
       tabHeight,
       offsetX,
       offsetY,
+      captureRect: {
+        x: tabRect.x + TAB_GHOST_CAPTURE_INSET,
+        y: tabRect.y + TAB_GHOST_CAPTURE_INSET,
+        width: Math.max(1, tabRect.width - TAB_GHOST_CAPTURE_INSET * 2),
+        height: Math.max(1, tabRect.height - TAB_GHOST_CAPTURE_INSET * 2),
+      },
     };
   };
 
@@ -319,6 +390,7 @@ export function initDragSystem(): () => void {
     const dragSource = new FileDragSource(filePath, fileName);
     dragSource.setOffset(offsetX, offsetY);
     _currentSource = dragSource;
+    _sidebarTabDragSide = null; // not a sidebar-tab drag
     _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
 
     // Defer drag:start until the POSITION event fires (after threshold met)
@@ -404,9 +476,50 @@ export function initDragSystem(): () => void {
     const sidebarEl = sidebarTab.closest?.("openp41ge-sidebar");
     if (!sidebarEl) return;
 
-    const dragSource = new SidebarTabDragSource(sidebarTab, tabId, side, winId, title);
+    const dragSource = new SidebarTabDragSource(
+      sidebarTab,
+      tabId,
+      side,
+      winId,
+      title,
+      // Invisible in-DOM ghost — the visible drag element is the main-process
+      // bitmap ghost captured from this sidebar tab (captureRect below).
+      () => {
+        const ghost = document.createElement("div");
+        ghost.style.cssText =
+          "position:fixed;pointer-events:none;opacity:0;width:1px;height:1px;z-index:-1;";
+        return ghost;
+      },
+    );
     _currentSource = dragSource;
+    _sidebarTabDragSide = side === "left" || side === "right" ? side : null;
     _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
+
+    // Defer drag:start until the first POSITION event — store the sidebar
+    // tab's dims/offset so the bitmap ghost lines up under the cursor exactly
+    // like the source tab (frame the capture with TAB_GHOST_CAPTURE_INSET to
+    // trim the 1px separator border).
+    const rect = sidebarTab.getBoundingClientRect();
+    const elScreenX = window.screenX + rect.left;
+    const elScreenY = window.screenY + rect.top;
+    _pendingSidebarDragStart = {
+      label: title,
+      screenX: e.screenX,
+      screenY: e.screenY,
+      tabId,
+      side,
+      winId,
+      width: sidebarTab.offsetWidth,
+      height: sidebarTab.offsetHeight,
+      offsetX: e.screenX - elScreenX,
+      offsetY: e.screenY - elScreenY,
+      captureRect: {
+        x: rect.x + TAB_GHOST_CAPTURE_INSET,
+        y: rect.y + TAB_GHOST_CAPTURE_INSET,
+        width: Math.max(1, rect.width - TAB_GHOST_CAPTURE_INSET * 2),
+        height: Math.max(1, rect.height - TAB_GHOST_CAPTURE_INSET * 2),
+      },
+    };
   };
 
   document.addEventListener("mousedown", onSidebarTabMouseDown);
@@ -556,6 +669,16 @@ export function initDragSystem(): () => void {
         // drag-active to other windows.
         if (_pendingDragStart) {
           const p = _pendingDragStart;
+          // Hide any tab-bar drop indicator before the async capturePage run, so
+          // the captured frame is a clean tab (no blue insert line). The
+          // orchestrator re-shows the indicator on the next mousemove's onHover.
+          document.querySelectorAll(".tab-drop-indicator").forEach((el) => {
+            (el as HTMLElement).style.display = "none";
+          });
+          // Tab ghost: like files, the main process captures a pixel-accurate
+          // bitmap of the actual tab button and swaps it into the DragGhostManager
+          // window in-place, so the drag element is an exact copy of the tab — the
+          // pill is only a brief fallback while capture resolves.
           window.openp41ge.drag.start(
             p.label,
             p.screenX,
@@ -568,8 +691,49 @@ export function initDragSystem(): () => void {
             p.tabHeight,
             p.offsetX,
             p.offsetY,
+            "tab",
+            undefined,
+            p.captureRect,
+            TAB_GHOST_CAPTURE_INSET,
           );
           _pendingDragStart = null;
+        } else if (_pendingSidebarDragStart) {
+          const p = _pendingSidebarDragStart;
+          _pendingSidebarDragStart = null;
+          // Suppress the sidebar-wide ghost overlay + drop indicator during the
+          // capture: SidebarDropTarget.onHover re-creates them synchronously later
+          // in the SAME mousemove, so a one-shot removal would be re-added before
+          // capturePage samples — the sidebar wash covers the whole tab interior
+          // and the capture inset can't clip it (unlike the grid's edge line).
+          setSidebarDropFeedbackSuppressed(true);
+          document
+            .querySelectorAll(".sidebar-ghost-overlay, .sidebar-drop-indicator")
+            .forEach((el) => el.remove());
+          document.querySelectorAll(".tab-drop-indicator").forEach((el) => {
+            (el as HTMLElement).style.display = "none";
+          });
+          // Sidebar tab ghost: same pixel-accurate bitmap treatment as grid tabs
+          // — capture the actual sidebar tab and render it in the DragGhostManager
+          // window at the tab's exact size, trimmed by the capture inset.
+          window.openp41ge.drag.start(
+            p.label,
+            p.screenX,
+            p.screenY,
+            undefined,
+            p.tabId,
+            p.winId,
+            p.side,
+            p.width,
+            p.height,
+            p.offsetX,
+            p.offsetY,
+            "sidebar-tab",
+            undefined,
+            p.captureRect,
+            TAB_GHOST_CAPTURE_INSET,
+          );
+          // Re-enable sidebar drop feedback shortly after the capture samples.
+          window.setTimeout(() => setSidebarDropFeedbackSuppressed(false), 60);
         } else if (_pendingFileDragStart) {
           const p = _pendingFileDragStart;
           // File ghost: the main process captures a pixel-accurate bitmap of the
@@ -613,6 +777,7 @@ export function initDragSystem(): () => void {
     window.openp41ge.drag.end();
     clearGridGhost();
     _clearSidebarDropTargetCache();
+    setSidebarDropFeedbackSuppressed(false);
     _localDragActive = false;
     _localFileDragActive = false;
     _pendingFileDetachPath = null;
@@ -638,6 +803,9 @@ export function initDragSystem(): () => void {
     if (_localDragActive) {
       _orchestrator?.cancelDrag();
       teardownLocalDrag();
+      // Interrupted (no pending drop resolve) — clear the remembered side so it
+      // can't leak into a subsequent drag.
+      _sidebarTabDragSide = null;
     }
   };
   document.addEventListener("mousedown", onInterruptMousedown, true);
@@ -772,8 +940,15 @@ export function initDragSystem(): () => void {
 
   // ── Incoming ghost position from main process poll ───────────────────
   // The main process polls screen.getCursorScreenPoint() at ~20fps during
+  // an active drag and broadcasts to ALL windows — including the SOURCE
+  // window. A source window is already dragging locally (main-process bitmap
+  // ghost + local updateGridGhost preview), so it must ignore these poll
+  // updates; otherwise it would set _remoteDragActive and paint a grid ghost
+  // via _updateCrossWindowGhost based purely on grid-relative coords (which
+  // even extend under an overlaid sidebar).
   type GhostShowData = { screenX: number; screenY: number; label?: string };
   window.openp41ge.drag.onGhostShow((data: GhostShowData) => {
+    if (_localDragActive) return;
     const screenX = data.screenX;
     const screenY = data.screenY;
     if (typeof screenX !== "number" || typeof screenY !== "number") return;
@@ -789,9 +964,10 @@ export function initDragSystem(): () => void {
 
   // ── Remote drag state tracking ───────────────────────────────────────
   // Main process broadcasts drag-state (active/inactive) to all windows.
-  window.openp41ge.drag.onDragState((active: boolean) => {
-    _remoteDragActive = active;
-    if (!active) {
+  window.openp41ge.drag.onDragState((state) => {
+    _remoteDragActive = state.active;
+    _remoteDragType = state.active ? state.type : null;
+    if (!state.active) {
       _hideCrossWindowGhost();
     }
   });
@@ -906,6 +1082,15 @@ async function _handleCrossWindowDrop(
         return;
       }
       // filePath was falsy — nothing to handle
+      window.openp41ge.drag.endSession();
+      return;
+    }
+
+    // Any other drag type (e.g. sidebar-tab) must not trigger a grid tab
+    // move/split cross-window — sidebar tabs are window-local. End the remote
+    // session and ignore, matching the pre-bitmap behaviour where a sidebar
+    // drag had no session to act on.
+    if (data.type !== "tab") {
       window.openp41ge.drag.endSession();
       return;
     }
@@ -1141,6 +1326,13 @@ let _crossWindowGridCols = 1;
  * split/cell-center classification via computeDropTarget.
  */
 function _updateCrossWindowGhost(clientX: number, clientY: number): void {
+  // Sidebar-tab drags are sidebar-only — they must never light up a central
+  // grid as a drop zone, so skip the grid ghost preview entirely.
+  if (_remoteDragType === "sidebar-tab") {
+    _hideCrossWindowGhost();
+    return;
+  }
+
   // Find and cache the grid ONCE
   if (!_crossWindowGrid || !document.contains(_crossWindowGrid)) {
     _crossWindowGrid = document.querySelector("tab-grid") as HTMLElement | null;
@@ -1221,6 +1413,71 @@ function _hideCrossWindowGhost(): void {
 let _sidebarDropTargetLeft: SidebarDropTarget | null = null;
 let _sidebarDropTargetRight: SidebarDropTarget | null = null;
 
+// Cache the closed-sidebar edge targets (one per side) for the same reason.
+let _closedSidebarEdgeTargetLeft: ClosedSidebarDropTarget | null = null;
+let _closedSidebarEdgeTargetRight: ClosedSidebarDropTarget | null = null;
+
+/**
+ * How close (in viewport px) the cursor must be to the app-window edge on the
+ * closed side before the closed-sidebar edge drop indicator appears.
+ */
+const CLOSED_SIDEBAR_EDGE_THRESHOLD = 160;
+
+function _isSidebarOpen(side: "left" | "right"): boolean {
+  const host = document.querySelector(`openp41ge-sidebar[side="${side}"]`);
+  return (
+    host instanceof HTMLElement &&
+    host.offsetHeight > 0 &&
+    !host.classList.contains("sidebar-element-hidden")
+  );
+}
+
+function _getClosedSidebarDropTarget(side: "left" | "right"): ClosedSidebarDropTarget | null {
+  if (side === "left" && _closedSidebarEdgeTargetLeft) return _closedSidebarEdgeTargetLeft;
+  if (side === "right" && _closedSidebarEdgeTargetRight) return _closedSidebarEdgeTargetRight;
+
+  const hostEl = document.querySelector(`openp41ge-sidebar[side="${side}"]`);
+  if (!(hostEl instanceof HTMLElement)) return null;
+  const barEl = document.querySelector(`[data-sidebar-tab-bar="${side}"]`);
+  const target = new ClosedSidebarDropTarget(
+    hostEl,
+    _resolveMyWinId(),
+    side,
+    barEl instanceof HTMLElement ? barEl : null,
+  );
+  if (side === "left") _closedSidebarEdgeTargetLeft = target;
+  else _closedSidebarEdgeTargetRight = target;
+  return target;
+}
+
+/**
+ * When the cursor is within CLOSED_SIDEBAR_EDGE_THRESHOLD of the app-window
+ * edge on the CLOSED other side, resolve to the closed-sidebar edge target — a
+ * vertical-line drop indicator at the window edge; dropping moves the tab to
+ * that sidebar (auto-opening it). Returns null when the cursor is elsewhere or
+ * the other sidebar is open.
+ */
+function _resolveClosedSidebarEdgeTarget(clientX: number, sourceSide: string): IDropTarget | null {
+  if (sourceSide !== "left" && sourceSide !== "right") return null;
+
+  const otherSide: "left" | "right" = sourceSide === "left" ? "right" : "left";
+
+  // If the other sidebar is open, its tab bar is the drop surface — the edge
+  // line must never show for an open sidebar.
+  if (_isSidebarOpen(otherSide)) return null;
+
+  const nearLeft = clientX <= CLOSED_SIDEBAR_EDGE_THRESHOLD;
+  const nearRight = clientX >= window.innerWidth - CLOSED_SIDEBAR_EDGE_THRESHOLD;
+
+  if (otherSide === "left") {
+    if (!nearLeft) return null;
+  } else if (!nearRight) {
+    return null;
+  }
+
+  return _getClosedSidebarDropTarget(otherSide);
+}
+
 function _getSidebarDropTarget(side: "left" | "right"): SidebarDropTarget | null {
   if (side === "left" && _sidebarDropTargetLeft) return _sidebarDropTargetLeft;
   if (side === "right" && _sidebarDropTargetRight) return _sidebarDropTargetRight;
@@ -1236,26 +1493,35 @@ function _getSidebarDropTarget(side: "left" | "right"): SidebarDropTarget | null
 }
 
 function _clearSidebarDropTargetCache(): void {
+  // Any live edge indicator must be removed before the cached targets are dropped.
+  _closedSidebarEdgeTargetLeft?.onLeave();
+  _closedSidebarEdgeTargetRight?.onLeave();
   _sidebarDropTargetLeft = null;
   _sidebarDropTargetRight = null;
-}
-
-/**
- * Check if the current drag source is a sidebar tab (system tab).
- * Sidebar tabs should only be droppable on sidebar tab bars, not on
- * editor grid cells or grid tab bars.
- */
-function _isDraggingSidebarTab(): boolean {
-  return _currentSource?.type === "sidebar-tab";
+  _closedSidebarEdgeTargetLeft = null;
+  _closedSidebarEdgeTargetRight = null;
 }
 
 export function openp41geTargetResolver(clientX: number, clientY: number): IDropTarget | null {
   const el = document.elementFromPoint(clientX, clientY);
   if (!el || !(el instanceof HTMLElement)) return null;
 
-  // When dragging a sidebar tab, only sidebar tab bars are valid targets.
+  // The sidebar side of the current drag, if it is a sidebar-tab drag. Read from
+  // the live source during moves, or from _sidebarTabDragSide for the final
+  // mouseup resolve (the orchestrator fires DRAG_EVENTS.END — host teardown
+  // nulls _currentSource — BEFORE it resolves the drop target). Both must agree
+  // so the drop indicator and the drop land on the same target.
+  let sidebarDragSide: string | null = null;
+  if (_currentSource) {
+    const d = _currentSource.getDragData() as { side?: string };
+    sidebarDragSide = d.side === "left" || d.side === "right" ? d.side : null;
+  } else {
+    sidebarDragSide = _sidebarTabDragSide;
+  }
+
+  // When dragging a sidebar tab, only sidebar surfaces are valid targets.
   // Skip grid tab bars and grid cells entirely.
-  if (_isDraggingSidebarTab()) {
+  if (sidebarDragSide) {
     const sidebarBarEl = el.closest?.("[data-sidebar-tab-bar]");
     if (sidebarBarEl instanceof HTMLElement) {
       const side = sidebarBarEl.getAttribute("data-sidebar-tab-bar") as "left" | "right";
@@ -1271,7 +1537,10 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
         return _getSidebarDropTarget(side);
       }
     }
-    return null;
+    // No real sidebar surface under the cursor. If the OTHER sidebar is closed
+    // and the cursor is close enough to that window edge, resolve to the
+    // closed-sidebar edge target so the drop can still land there.
+    return _resolveClosedSidebarEdgeTarget(clientX, sidebarDragSide);
   }
 
   // Normal (non-sidebar) drag: check grid tab bars and grid cells

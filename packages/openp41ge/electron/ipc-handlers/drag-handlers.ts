@@ -67,10 +67,12 @@ function _stopCursorPoll(): void {
 
 /** Broadcast drag-active/inactive to all windows except the sender. */
 function _broadcastDragState(active: boolean, exclude: WebContents | null): void {
+  const type = _activeSession?.dragData?.type ?? null;
+  const payload = JSON.stringify({ active, type });
   for (const [, bw] of openp41geWindows) {
     if (bw.isDestroyed()) continue;
     if (exclude && bw.webContents === exclude) continue;
-    bw.webContents.send("openp41ge:drag-state", active);
+    bw.webContents.send("openp41ge:drag-state", payload);
   }
 }
 
@@ -94,6 +96,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       dragType,
       filePath,
       captureRect,
+      inset,
     } = parsed;
 
     // Show the ghost IMMEDIATELY (synchronous, row-styled for files) so even a
@@ -135,12 +138,11 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       }
     }
 
-    // Async upgrade: capture a pixel-accurate bitmap of the source row and
-    // swap it into the ghost. Only applies if the drag is still ACTIVE (the
-    // session object identity is unchanged) — otherwise the drag already ended
-    // and we must not resurrect a ghost after drag.end hid it.
+    // Async upgrade: capture a pixel-accurate bitmap of the source element (file
+    // row or tab button) and swap it into the ghost in-place — only if the drag is
+    // still ACTIVE (the session object identity is unchanged), otherwise the drag
+    // already ended and we must not resurrect a ghost after drag.end hid it.
     if (
-      isFile &&
       captureRect &&
       typeof captureRect.x === "number" &&
       typeof captureRect.y === "number" &&
@@ -166,6 +168,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
               img.toDataURL(),
               typeof tabWidth === "number" ? tabWidth : Math.round(captureRect.width),
               typeof tabHeight === "number" ? tabHeight : Math.round(captureRect.height),
+              typeof inset === "number" ? inset : 0,
             );
           }
         } catch {
