@@ -445,55 +445,65 @@ export class NodeGitCommitService implements IGitCommitService {
     const maxCount = 5000;
     const format = `%x1e%H|%h|%an|%aI|%ar|%s`;
 
-    // message mode uses git-native --grep (matches subject + body); files/all
-    // enumerate the walk and filter paths/messages in JS (substring, ci) which
-    // is predictable for a plain search box.
-    const useGrep = inMode === "message";
-    const raw = await this._execGit(
-      useGrep
-        ? [
-            "log",
-            "--all",
-            "--date-order",
-            `--max-count=${maxCount}`,
-            "--regexp-ignore-case",
-            `--grep=${query}`,
-            `--format=${format}`,
-            "--numstat",
-          ]
-        : [
-            "log",
-            "--all",
-            "--date-order",
-            `--max-count=${maxCount}`,
-            `--format=${format}`,
-            "--numstat",
-          ],
-      repoName,
-    );
-
-    if (!raw) return [];
-
+    // message/all use git-native --grep (matches subject + body, ci); files
+    // enumerates the raw walk and filters paths in JS (substring, ci) which is
+    // predictable for a plain search box.
+    const grepArgs = (): string[] => [
+      "log",
+      "--all",
+      "--date-order",
+      `--max-count=${maxCount}`,
+      "--regexp-ignore-case",
+      `--grep=${query}`,
+      `--format=${format}`,
+      "--numstat",
+    ];
+    const walkArgs = (): string[] => [
+      "log",
+      "--all",
+      "--date-order",
+      `--max-count=${maxCount}`,
+      `--format=${format}`,
+      "--numstat",
+    ];
     const qLower = query.toLowerCase();
-    const parsed = this._parseSearchLog(raw);
-    let results: SearchResultCommit[];
 
+    let results: SearchResultCommit[] = [];
     if (inMode === "message") {
-      // Already grep-filtered by git.
-      results = parsed.map((c) => this._toSearchResultCommit(repoName, c));
+      const raw = await this._execGit(grepArgs(), repoName);
+      results = raw
+        ? this._parseSearchLog(raw).map((c) => this._toSearchResultCommit(repoName, c))
+        : [];
     } else if (inMode === "files") {
-      results = parsed
-        .map((c) => this._toSearchResultCommit(repoName, c))
-        .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)));
+      const raw = await this._execGit(walkArgs(), repoName);
+      results = raw
+        ? this._parseSearchLog(raw)
+            .map((c) => this._toSearchResultCommit(repoName, c))
+            .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)))
+        : [];
     } else {
-      // "all" — message substring match OR changed-file-path match.
-      results = parsed
-        .map((c) => this._toSearchResultCommit(repoName, c))
-        .filter(
-          (c) =>
-            c.message.toLowerCase().includes(qLower) ||
-            c.files.some((f) => f.path.toLowerCase().includes(qLower)),
-        );
+      // "all" — git-native message hit (subject + body) OR changed-file-path
+      // hit. Run both walks and union by hash (newest first). This guarantees
+      // files-inclusive results are always a superset of message-only results.
+      const [msgRaw, fileRaw] = await Promise.all([
+        this._execGit(grepArgs(), repoName),
+        this._execGit(walkArgs(), repoName),
+      ]);
+      const fileHits = fileRaw
+        ? this._parseSearchLog(fileRaw)
+            .map((c) => this._toSearchResultCommit(repoName, c))
+            .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)))
+        : [];
+      const byHash = new Map<string, SearchResultCommit>();
+      for (const c of msgRaw
+        ? this._parseSearchLog(msgRaw).map((c) => this._toSearchResultCommit(repoName, c))
+        : []) {
+        byHash.set(c.hash, c);
+      }
+      for (const c of fileHits) {
+        if (!byHash.has(c.hash)) byHash.set(c.hash, c);
+      }
+      results = [...byHash.values()];
     }
 
     return results.slice(offset, offset + limit);

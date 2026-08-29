@@ -244,6 +244,16 @@ export class CommitSearchSystemTabController implements SystemTabController {
     // Autofocus the search input on open (clone-dialog pattern).
     requestAnimationFrame(() => input.focus());
 
+    // Hover feedback on every result row (commit + file sub-rows).
+    const style = document.createElement("style");
+    style.textContent = `
+      [data-system-tab="git"] .commit-result-row:hover,
+      [data-system-tab="git"] .commit-file-row:hover {
+        background: var(--bg-hover, #2a2d2e);
+      }
+    `;
+    wrapper.appendChild(style);
+
     this._renderEmptyQuery();
   }
 

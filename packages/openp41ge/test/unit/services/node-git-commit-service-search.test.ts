@@ -60,6 +60,14 @@ describe("NodeGitCommitService.searchCommits", () => {
     git(srcRepo, ["add", "."]);
     git(srcRepo, ["commit", "-qm", "cleanup: remove cruft"]);
 
+    // A commit whose BODY (not subject) contains the search token — used to
+    // prove all-scope keeps git-native body matches that message-scope finds.
+    fs.writeFileSync(path.join(srcRepo, "c.txt"), "widget\n");
+    git(srcRepo, ["add", "."]);
+    git(srcRepo, [
+      "commit", "-qm", "chore: install widget", "-m", "Fixes the thingamajig zorple",
+    ]);
+
     // Tag the commits for stable assertions (oldest → newest).
     const logs = git(srcRepo, ["log", "--oneline", "--reverse"]).split("\n").filter(Boolean);
     logs.forEach((line, i) => {
@@ -116,6 +124,19 @@ describe("NodeGitCommitService.searchCommits", () => {
     // A query matching only a file path (not any message) still hits via all.
     const pathOnly = await svc.searchCommits(repoName, { query: "readme", in: "all" });
     expect(pathOnly.map((r) => r.shortHash)).toEqual([shortHash.c3]);
+  });
+
+  it("all scope returns body-only message matches (superset of message scope, never fewer)", async () => {
+    // "zorple" appears only in the commit BODY. message-scope (--grep)
+    // matches subject + body → finds it. all-scope must keep that hit (files
+    // on should only add results, never drop message matches).
+    const messageScope = await svc.searchCommits(repoName, { query: "zorple", in: "message" });
+    expect(messageScope).toHaveLength(1);
+    expect(messageScope[0].shortHash).toBe(shortHash.c4);
+
+    const allScope = await svc.searchCommits(repoName, { query: "zorple", in: "all" });
+    expect(allScope).toHaveLength(1);
+    expect(allScope[0].shortHash).toBe(shortHash.c4);
   });
 
   it("an empty query returns no results", async () => {
