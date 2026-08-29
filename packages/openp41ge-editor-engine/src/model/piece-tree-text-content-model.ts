@@ -489,7 +489,7 @@ export class PieceTreeTextContentModel {
       }
     }
 
-    this._versionId++;
+    this._versionId = element.beforeVersionId;
 
     this._onDidChangeContent.fire({
       changes: element.changes.map((c) => {
@@ -532,7 +532,7 @@ export class PieceTreeTextContentModel {
       }
     }
 
-    this._versionId++;
+    this._versionId = element.afterVersionId;
 
     this._onDidChangeContent.fire({
       changes: element.changes.map((c) => {
