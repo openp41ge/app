@@ -28,6 +28,7 @@ import { ViewLines } from "openp41ge-editor-engine/view/view-lines";
 import { computeWrapSegments } from "openp41ge-editor-engine/view/word-wrap-helper";
 import { ViewportWrapColumnCalculator } from "openp41ge-editor-engine/view/wrap-column-calculator";
 import type { IWrapColumnCalculator } from "openp41ge-editor-engine/view/wrap-column-calculator";
+import type { IToken } from "openp41ge-syntax-highlighting/line-tokens";
 import { ScrollManager } from "openp41ge-editor-engine/view/scroll-manager";
 import { CursorController } from "openp41ge-editor-engine/cursor/cursor-controller";
 import { TextAreaInput } from "openp41ge-editor-engine/input/text-area-input";
@@ -82,6 +83,16 @@ export class FileEditorElement extends LitElement {
   /** Display info for the "file is too large to open" message pane. */
   private _tooLargeInfo: { fileName: string; sizeBytes: number; limitBytes: number } | null =
     null;
+
+  /**
+   * True when the most recent render drew at least one visible line with no
+   * cached tokens (plain text). The rAF catch-up tokenizes the visible range
+   * and re-renders, then clears this flag.
+   */
+  private _renderHadUncachedTokens = false;
+
+  /** rAF handle for the async tokenize-then-highlight pass (debounced). */
+  private _tokenizeFrame: number | null = null;
 
   /**
    * Content-width tracker (injectable, SOLID DIP). The scrollbar is exact from
@@ -445,7 +456,14 @@ export class FileEditorElement extends LitElement {
 
     this._state = "loading";
 
-    await this._textMateInitPromise;
+    // Do NOT block first paint on the TextMate WASM bootstrap (~500KB decode).
+    // Kick it off (memoized module-wide) and render plain lines immediately;
+    // when it resolves, _applyLanguageToCurrentModel() highlights the visible
+    // range. For all files after the first, the registry is already warm.
+    if (!this._textMateInitPromise) {
+      this._textMateInitPromise = this._initTextMateOnce();
+    }
+    void this._textMateInitPromise;
 
     // Model must be set externally by the platform via textContentModel.
     // The platform's ModelRegistry creates and shares models across tabs.
@@ -534,10 +552,99 @@ export class FileEditorElement extends LitElement {
     try {
       const { registry } = await initTextMate(this._theme.rawTheme);
       _tokenRegistryInstance = new TokenRegistry(registry);
+      // A file may have been opened (and rendered plain) while WASM was still
+      // bootstrapping — highlight it now that the grammar machinery is ready.
+      this._applyLanguageToCurrentModel();
     } catch (err) {
       console.warn("[file-editor] TextMate init failed, tokenization disabled:", err);
       // Don't set a broken TokenRegistry — _initWithModel checks for null
       _tokenRegistryInstance = null as any;
+    }
+  }
+
+  /**
+   * Apply the language grammar for this.filePath to the current model.
+   *
+   * Detects the language from the file name and, when a grammar is ready,
+   * applies it (tokenizing the top of the file and re-rendering the visible
+   * range so it highlights). Called from `_initWithModel` (grammar already
+   * bootstrapped) and from TextMate init completion (WASM was still loading
+   * when the file opened and rendered plain).
+   */
+  private _applyLanguageToCurrentModel(): void {
+    if (!this._viewModel) return;
+    const tokenRegistry = this.tokenRegistry ?? _tokenRegistryInstance;
+    if (!tokenRegistry) return;
+    // A grammar is already applied for this model — don't restart it.
+    if (this._viewModel.hasTokenizer) return;
+
+    const fileName = this.filePath.split("/").filter(Boolean).pop() || "";
+    const parts = fileName.split(".");
+    const hasExt = parts.length > 1;
+    const rawExt = hasExt ? parts[parts.length - 1].toLowerCase() : fileName.toLowerCase();
+    const tryExt = (ext: string) => tokenRegistry.getLanguageId(ext);
+    const langId =
+      tryExt(rawExt) ||
+      (hasExt ? tryExt(parts.slice(0, -1).join(".").toLowerCase()) : undefined) ||
+      tryExt(fileName.toLowerCase());
+    if (!langId) return;
+
+    tokenRegistry.getTokenizer(langId).then((tokenizer) => {
+      if (!this._viewModel || !this._viewLines) return; // torn down meanwhile
+      this._viewModel.setTokenizer(tokenizer);
+      const count = this._viewModel.lineCount;
+      this._viewModel.tokenizeVisibleRange(1, Math.min(100, count));
+      this._viewLines.clearContentCache();
+      this._bracketDepths = null;
+      this._bracketRangeStart = 0;
+      this._bracketRangeEnd = 0;
+      this._computeBracketDepths(
+        this._viewLines.startLineNumber || 1,
+        this._viewLines.endLineNumber || Math.min(50, count),
+      );
+      this._viewLines.refresh();
+    });
+  }
+
+  /**
+   * Debounce-schedule the async tokenize-then-highlight pass. Runs a single
+   * rAF after any render that left visible lines without cached tokens, then
+   * tokenizes the visible range OFF the paint path and re-renders it.
+   *
+   * No-ops when every rendered line had tokens (flag not set) or when no
+   * grammar is ready yet (the grammar-load path triggers its own pass).
+   */
+  private _scheduleAsyncTokenize(): void {
+    if (!this._renderHadUncachedTokens) return;
+    if (!this._viewModel?.hasTokenizer) {
+      // Grammar not ready — nothing to catch up yet; the grammar-load path
+      // re-renders and will flag any still-un-tokenized visible lines.
+      this._renderHadUncachedTokens = false;
+      return;
+    }
+    if (this._tokenizeFrame !== null) return; // already scheduled
+    this._tokenizeFrame = requestAnimationFrame(() => {
+      this._tokenizeFrame = null;
+      this._asyncTokenizeVisible();
+    });
+  }
+
+  /** Tokenize the current visible range and re-render it once tokens exist. */
+  private _asyncTokenizeVisible(): void {
+    if (!this._viewModel || !this._viewLines) return;
+    const start = this._viewLines.startLineNumber || 1;
+    const end = Math.min(
+      this._viewModel.lineCount,
+      this._viewLines.endLineNumber || Math.min(50, this._viewModel.lineCount),
+    );
+    // Synchronous here, but runs one frame AFTER paint and covers only the
+    // visible window (dozens of lines), so the UI never blocks on TextMate.
+    this._viewModel.tokenizeVisibleRange(start, end);
+    if (this._renderHadUncachedTokens) {
+      this._renderHadUncachedTokens = false;
+      // Lines now have cached tokens — rebuild the visible window so the
+      // token spans appear. refresh() bypasses the onScroll no-change guard.
+      this._viewLines.refresh();
     }
   }
 
@@ -558,45 +665,7 @@ export class FileEditorElement extends LitElement {
     //   2. For extensionless files ("Dockerfile"): use the full lowercase basename.
     //   3. For hidden files (".eslintrc.json"): skip leading dot, use extension.
     //   4. For compound names ("Dockerfile.prod"): try extension first, then prefix.
-    const tokenRegistry = this.tokenRegistry ?? _tokenRegistryInstance;
-    const fileName = this.filePath.split("/").filter(Boolean).pop() || "";
-    const parts = fileName.split(".");
-    // Normal case: "file.ts" → parts = ["file", "ts"], last part is "ts"
-    // Hidden file: ".eslintrc.json" → parts = ["", "eslintrc", "json"], last part is "json"
-    const hasExt = parts.length > 1;
-    const rawExt = hasExt ? parts[parts.length - 1].toLowerCase() : fileName.toLowerCase();
-    if (tokenRegistry) {
-      const tryExt = (ext: string) => tokenRegistry.getLanguageId(ext);
-      const langId =
-        tryExt(rawExt) ||
-        // For compound names like "Dockerfile.prod", try the prefix
-        (hasExt ? tryExt(parts.slice(0, -1).join(".").toLowerCase()) : undefined) ||
-        // Fallback: full basename (for "Dockerfile" with no extension)
-        tryExt(fileName.toLowerCase());
-      if (langId) {
-        tokenRegistry.getTokenizer(langId).then((tokenizer) => {
-          this._viewModel?.setTokenizer(tokenizer);
-          // Re-tokenize and force-rebuild lines now that the grammar is loaded.
-          // Use refresh() instead of _renderVisibleLines() to bypass the
-          // no-change guard in onScroll — the visible range is unchanged but
-          // lines need new DOM with token spans.
-          if (this._viewModel && this._viewLines) {
-            const count = this._viewModel.lineCount;
-            this._viewModel.tokenizeVisibleRange(1, Math.min(100, count));
-            this._viewLines.clearContentCache();
-            // Recompute bracket depths with fresh tokens before re-rendering
-            this._bracketDepths = null;
-            this._bracketRangeStart = 0;
-            this._bracketRangeEnd = 0;
-            this._computeBracketDepths(
-              this._viewLines.startLineNumber || 1,
-              this._viewLines.endLineNumber || Math.min(50, count),
-            );
-            this._viewLines.refresh();
-          }
-        });
-      }
-    }
+    this._applyLanguageToCurrentModel();
 
     // Create ViewLines (rendering layer)
     this._viewLines = new ViewLines(this._viewportEl, {
@@ -606,7 +675,13 @@ export class FileEditorElement extends LitElement {
     this._viewLines.setTotalLineCount(model.lineCount);
     this._viewLines.lineContentProvider = {
       getLineContent: (ln) => this._viewModel?.getLineContent(ln) ?? "",
-      getLineTokens: (ln) => this._viewModel?.getLineTokens(ln) ?? null,
+      getLineTokens: (ln) => {
+        // Cache-only access: never tokenize synchronously inside the render
+        // loop. Uncached lines draw plain; the async catch-up highlights them.
+        const tokens = this._viewModel?.getLineTokensIfCached(ln) ?? null;
+        this._noteRenderedLineTokens(tokens);
+        return tokens;
+      },
       tabSize: 4,
     };
 
@@ -815,8 +890,9 @@ export class FileEditorElement extends LitElement {
       this._renderLineContent(lineNumber, viewLine);
     };
 
-    // Initial render: tokenize and render visible range
-    this._viewModel.tokenizeVisibleRange(1, Math.min(100, model.lineCount));
+    // Initial render is intentionally token-free: paint plain lines now and
+    // let the rAF catch-up tokenize the visible range (never block first paint
+    // on TextMate — see _asyncTokenizeVisible and _applyLanguageToCurrentModel).
 
     // Record the saved version for dirty-state detection (no full-string copy).
     this._dirtyTracker.reset();
@@ -906,7 +982,10 @@ export class FileEditorElement extends LitElement {
       lines.push({
         lineNumber: ln,
         text: this._viewModel.getLineContent(ln),
-        tokens: this._viewModel.getLineTokens(ln),
+        // Cache-only: never tokenize inside the render path. Lines still
+        // awaiting tokens contribute plain-text heuristics; once the async
+        // catch-up tokenizes them this map is recomputed before re-render.
+        tokens: this._viewModel.getLineTokensIfCached(ln),
       });
     }
 
@@ -919,8 +998,24 @@ export class FileEditorElement extends LitElement {
     if (!this._viewModel) return;
 
     const content = this._viewModel.getLineContent(lineNumber);
-    const tokens = this._viewModel.getLineTokens(lineNumber);
+    // Cache-only access so painting never blocks on TextMate; uncached lines
+    // draw as plain text and are highlighted by the async catch-up pass.
+    const tokens = this._viewModel.getLineTokensIfCached(lineNumber);
+    this._noteRenderedLineTokens(tokens);
     viewLine.setContent(content, tokens, this._viewModel.tabSize, this._bracketDepths);
+  }
+
+  /**
+   * Called whenever a rendered line's tokens were read. Flags lines that are
+   * not yet tokenized and schedules the async highlight pass for them (both
+   * wrapped and non-wrapped render paths funnel through this).
+   */
+  private _noteRenderedLineTokens(tokens: IToken[] | null): void {
+    if (tokens !== null || !this._viewModel?.hasTokenizer) return;
+    if (!this._renderHadUncachedTokens) {
+      this._renderHadUncachedTokens = true;
+      this._scheduleAsyncTokenize();
+    }
   }
 
   private _renderVisibleLines(): void {

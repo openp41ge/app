@@ -89,6 +89,11 @@ export class ViewModel {
     return this._coordinatesConverter;
   }
 
+  /** Whether a language grammar (tokenizer) is ready for this model. */
+  get hasTokenizer(): boolean {
+    return this._tokenizer.tokenizer != null;
+  }
+
   /**
    * The tokenization manager.
    */
@@ -137,6 +142,16 @@ export class ViewModel {
    */
   getLineTokens(lineNumber: number): IToken[] | null {
     return this._tokenizer.tokenizeLine(lineNumber);
+  }
+
+  /**
+   * Get the tokens for a line WITHOUT tokenizing. Returns null when the line
+   * is not yet tokenized. The render loop uses this so painting never blocks
+   * on TextMate; uncached lines render plain and are highlighted afterwards by
+   * the async catch-up pass.
+   */
+  getLineTokensIfCached(lineNumber: number): IToken[] | null {
+    return this._tokenizer.tokenizeLineIfCached(lineNumber);
   }
 
   /**

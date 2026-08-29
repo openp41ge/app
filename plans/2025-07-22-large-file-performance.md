@@ -40,11 +40,26 @@
       when a wrapped document was replaced). - **CoordinatesConverter cache**: `ViewModel._handleModelChange` calls
       `converter.markDirty()` on every content change, fixing click-to-caret + `getTotalViewLineCount` after a wrapped reload. - **Infinite-loop guard**: `computeWrapSegments` clamps `wrapColumn < 1`
       so a 0/negative column can't wedge the editor main thread.
-- [ ] **Phase 3/4/5** — async tokenization, chunked loading, workers. NOT started.
+- [x] **Phase 3 (2026-08-30)** — async tokenization, render path never blocks
+      on TextMate (Monaco-style "paint plain, highlight after"): - `LazyTokenizationManager.tokenizeLineIfCached(line)` — cache-only peek
+      that NEVER invokes the grammar (syntax-highlighting unit tests). - `ViewModel.getLineTokensIfCached(line)` + `ViewModel.hasTokenizer`
+      (engine unit tests, incl. tail-beyond-top-100 case). - `file-editor`: `loadFile` no longer awaits TextMate WASM bootstrap
+      (deferred `_initTextMateOnce`); `_applyLanguageToCurrentModel()`
+      applies the grammar — and re-renders — once WASM is ready, so a file
+      that opened (and painted plain) cold still gets highlighted. - Render path uses cache-only tokens everywhere (`_renderLineContent` AND
+      the wrapped line provider); `_noteRenderedLineTokens` flags uncached
+      lines and schedules a single rAF catch-up (`_scheduleAsyncTokenize` /
+      `_asyncTokenizeVisible`) that tokenizes the visible window and
+      re-renders. Removed the synchronous init `tokenizeVisibleRange(1,100)`. - In-app verified (editor demo): plain-first-paint then one-frame
+      highlight on content change (wrapped + non-wrapped); cold reload
+      highlights once TextMate finishes; deep scroll paints plain with 0
+      synchronous tokenize calls during the scroll render and exactly one
+      rAF catch-up after — painting/scrolling never blocks on the grammar.
+- [ ] **Phase 4/5** — chunked loading + web-worker tokenization. NOT started.
       Note: the file-size-limit feature (editor.maxFileSize, default 50MB,
       File Editor Settings overlay tab — 2026-08-29, plan deleted on
       completion, committed as `6bd4f32`) caps how large an openable file may
-      be, a complementary guardrail on top of Phases 1-2.
+      be, a complementary guardrail on top of Phases 1-3.
 
 ## Problem
 
@@ -646,7 +661,18 @@ mount a real `file-editor` with a `PieceTreeTextContentModel`:
 - a large model (e.g. 20k lines) mounts without scanning all lines synchronously
   (spy that the width measure function is not called once per line on load)
 
-### Manual
+#- `packages/openp41ge-syntax-highlighting/test/lazy-tokenization-manager.test.ts` —
+`tokenizeLineIfCached` returns cached tokens or null WITHOUT invoking the
+grammar; null for out-of-range; reflects only the lines `tokenizeVisibleRange`
+produced synchronously. (Phase 3)
+
+- `packages/openp41ge-editor-engine/test/unit/model/view-model-tokens.test.ts` —
+  `hasTokenizer` false before a grammar; `setTokenizer` flags it and tokenizes
+  the top 100; `getLineTokensIfCached` returns null beyond the tokenized window
+  without invoking the grammar; returns cached tokens after `tokenizeVisibleRange`.
+  (Phase 3)
+
+## Manual
 
 1. Open a 2.9MB file:
    - Verify the editor loads within 2 seconds (milliseconds for the first

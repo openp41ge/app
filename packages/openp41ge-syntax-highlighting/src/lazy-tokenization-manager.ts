@@ -118,6 +118,19 @@ export class LazyTokenizationManager {
   }
 
   /**
+   * Peek at cached tokens for a line WITHOUT tokenizing.
+   *
+   * Returns null when the line has no cached tokens. This is the render-path-
+   * safe accessor: the render loop may never block on TextMate, so uncached
+   * lines are drawn as plain text and highlighted by the async catch-up pass
+   * (see tokenizeVisibleRange called from a requestAnimationFrame).
+   */
+  tokenizeLineIfCached(lineNumber: number): IToken[] | null {
+    if (lineNumber < 1 || lineNumber > this._lineCount) return null;
+    return this._tokens.getTokens(lineNumber);
+  }
+
+  /**
    * Tokenize a single line immediately and return its tokens.
    * Useful for lines that newly entered the viewport.
    */
