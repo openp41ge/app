@@ -144,17 +144,19 @@ describe("CommitSearchSystemTabController", () => {
     expect(repoFilter.parentElement === inputRow).toBe(false);
 
     // Depth-limit options: a fixed row next to the filter icon where exactly
-    // one is active. 5K (5000) is the default — white; the rest are grey.
+    // one is active — ascending numerical order; 5K (5000) default white.
     const limitOpts = host.querySelectorAll<HTMLButtonElement>("[data-limit-option]");
     expect(Array.from(limitOpts).map((b) => Number(b.dataset.limitOption))).toEqual([
-      5000, 10000, 3000, 2000, 1000,
+      1000, 2000, 3000, 5000, 10000,
     ]);
-    expect(limitOpts[0].style.color).toBe("rgb(227, 227, 227)"); // 5K active
-    for (const b of Array.from(limitOpts).slice(1)) {
+    const fiveK = host.querySelector<HTMLButtonElement>('[data-limit-option="5000"]')!;
+    expect(fiveK.style.color).toBe("rgb(227, 227, 227)"); // 5K active
+    for (const b of Array.from(limitOpts)) {
+      if (b === fiveK) continue;
       expect(b.style.color).toBe("var(--text-secondary,#888)"); // inactive grey
     }
     // The limit options share the icon row with the filter icon.
-    expect(repoFilterIcon.parentElement).toBe(limitOpts[0].parentElement);
+    expect(repoFilterIcon.parentElement).toBe(fiveK.parentElement);
     expect(repoFilterIcon.parentElement?.querySelectorAll("[data-limit-option]").length).toBe(5);
   });
 

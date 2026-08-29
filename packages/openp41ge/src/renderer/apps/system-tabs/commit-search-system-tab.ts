@@ -216,11 +216,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
     // Search-depth limit options: a fixed row (not a toggle) where exactly one
     // is active. Active = white SVG, inactive = grey.
     const LIMIT_OPTIONS: Array<{ label: string; value: number; svg: string }> = [
+      { label: "1K", value: 1000, svg: ICON_1K },
+      { label: "2K", value: 2000, svg: ICON_2K },
+      { label: "3K", value: 3000, svg: ICON_3K },
       { label: "5K", value: 5000, svg: ICON_5K },
       { label: "10K", value: 10000, svg: ICON_10K },
-      { label: "3K", value: 3000, svg: ICON_3K },
-      { label: "2K", value: 2000, svg: ICON_2K },
-      { label: "1K", value: 1000, svg: ICON_1K },
     ];
     const makeLimitOption = (o: (typeof LIMIT_OPTIONS)[number]): HTMLButtonElement => {
       const btn = document.createElement("button");
