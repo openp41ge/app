@@ -61,7 +61,7 @@ import { VersionBasedDirtyTracker } from "./dirty-state-tracker";
 import type { IDirtyStateTracker } from "./dirty-state-tracker";
 import type { IFormatterRegistry } from "openp41ge-editor-engine/interfaces/formatter-registry";
 
-export type FileEditorState = "loading" | "ready" | "error" | "empty";
+export type FileEditorState = "loading" | "ready" | "error" | "empty" | "too-large";
 
 @customElement("file-editor")
 export class FileEditorElement extends LitElement {
@@ -78,6 +78,10 @@ export class FileEditorElement extends LitElement {
 
   @state()
   private _state: FileEditorState = "empty";
+
+  /** Display info for the "file is too large to open" message pane. */
+  private _tooLargeInfo: { fileName: string; sizeBytes: number; limitBytes: number } | null =
+    null;
 
   /**
    * Content-width tracker (injectable, SOLID DIP). The scrollbar is exact from
@@ -211,6 +215,38 @@ export class FileEditorElement extends LitElement {
   // ── Lit template (shell only — no viewport) ──
 
   render() {
+    const tooLarge = this._tooLargeInfo;
+    if (this._state === "too-large" && tooLarge) {
+      return html`
+        <div
+          class="fe-root"
+          style="display:flex;flex-direction:column;width:100%;height:100%;background:var(--fe-bg, #161616);overflow:hidden;"
+        >
+          <div class="fe-too-large" style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;overflow:auto;">
+            <div
+              class="fe-too-large-icon"
+              style="font-size:28px;line-height:1;opacity:0.7;"
+            >\u26A0</div>
+            <div
+              class="fe-too-large-title"
+              style="font-size:16px;font-weight:600;color:var(--fe-text, #d4d4d4);"
+            >
+              This file is too large to open in the editor.
+            </div>
+            <div
+              class="fe-too-large-detail"
+              style="font-size:13px;color:var(--fe-text-secondary, #9d9d9d);max-width:520px;"
+            >
+              ${tooLarge.fileName} (${this._formatBytes(tooLarge.sizeBytes)}) exceeds the
+              ${this._formatBytes(tooLarge.limitBytes)} editor limit. Adjust the limit in
+              File Editor Settings to open larger files.
+            </div>
+          </div>
+          <fe-status-bar></fe-status-bar>
+        </div>
+      `;
+    }
+
     return html`
       <div
         class="fe-root"
@@ -383,6 +419,25 @@ export class FileEditorElement extends LitElement {
   }
 
   // ── Public API ──
+
+  /**
+   * Show the VSCode-style "file is too large to open" message pane instead of
+   * loading content. Sets the editor to the "too-large" state; nothing is read
+   * into a model and no view lines are created.
+   *
+   * @param filePath - The disk path of the file (used to derive a display name).
+   * @param sizeBytes - The file's actual size in bytes.
+   * @param limitBytes - The configured editor.maxFileSize limit in bytes.
+   */
+  showTooLarge(filePath: string, sizeBytes: number, limitBytes: number): void {
+    const name = filePath.split("/").filter(Boolean).pop() || filePath;
+    this.filePath = filePath;
+    this.fileName = name;
+    this._tooLargeInfo = { fileName: name, sizeBytes, limitBytes };
+    this._state = "too-large";
+    this._isDirty = false;
+    this.requestUpdate();
+  }
 
   async loadFile(path: string, fileName?: string): Promise<void> {
     this.filePath = path;
@@ -1016,6 +1071,20 @@ export class FileEditorElement extends LitElement {
       if (text.charCodeAt(i) === 10 /* \n */) count++;
     }
     return count;
+  }
+
+  /** Human-readable byte size (KB/MB/GB) for the too-large message. */
+  private _formatBytes(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024;
+      unit++;
+    }
+    const digits = Math.round(value) === value ? 0 : 1;
+    return `${value.toFixed(digits)} ${units[unit]}`;
   }
 
   /** Toggle word wrap on/off and persist preference. */

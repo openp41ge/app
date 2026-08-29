@@ -38,6 +38,7 @@ describe("ConfigService (main process)", () => {
     expect(parsed.appTheme).toBe("dark");
     expect(parsed.editor.lineHeight).toBe(20);
     expect(parsed.editor.fontSize).toBe(14);
+    expect(parsed.editor.maxFileSize).toBe(50 * 1024 * 1024);
     expect(parsed.syntaxThemes).toEqual({});
   });
 
@@ -64,6 +65,25 @@ describe("ConfigService (main process)", () => {
     const themes = configService.get("syntaxThemes") as Record<string, string>;
     expect(themes[".ts"]).toBe("monokai");
     // Theme no longer has per-extension defaults; only what user set
+  });
+
+  test("init() back-fills the maxFileSize default for legacy config files", () => {
+    // A config written before editor.maxFileSize existed must get the 50MB
+    // default via deepMerge rather than a missing/undefined value.
+    const configDir = path.join(tmpDir, ".config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "config.json"),
+      JSON.stringify({
+        version: 1,
+        appTheme: "dark",
+        editor: { lineHeight: 20, fontSize: 14, fontFamily: "monospace" },
+      }),
+      "utf-8",
+    );
+
+    configService.init();
+    expect(configService.get("editor.maxFileSize")).toBe(50 * 1024 * 1024);
   });
 
   test("init() deep-merges existing config with defaults", () => {

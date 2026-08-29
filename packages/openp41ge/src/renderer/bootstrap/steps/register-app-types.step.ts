@@ -25,6 +25,7 @@ import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
 import { WorkspaceManagerModal } from "../../apps/system-tabs/workspace-manager-system-tab";
 import { LogsSystemTab } from "../../apps/system-tabs/logs-overlay-tab";
+import { FileEditorSettingsSystemTab } from "../../apps/system-tabs/file-editor-settings-system-tab";
 import { explorerPlugin } from "../../apps/system-tabs/explorer-plugin";
 import { gitPlugin } from "../../apps/system-tabs/git-plugin";
 import { workspaceData } from "../../services/workspace-data";
@@ -73,6 +74,12 @@ export class RegisterAppTypesStep implements IStartupStep {
       id: "logs",
       label: "Logs",
       createController: (tabId: string) => new LogsSystemTab(tabId),
+    });
+    systemOverlayService.registerTab({
+      id: "file-editor-settings",
+      label: "File Editor Settings",
+      icon: "\u2699",
+      createController: (tabId: string) => new FileEditorSettingsSystemTab(tabId),
     });
 
     // ── Register built-in plugins through PluginRegistry ──────────────

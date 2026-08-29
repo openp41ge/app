@@ -12,6 +12,7 @@
 import { createLogger } from "openp41ge-logger";
 import { BaseController } from "../../controllers/base-controller";
 import type { FileViewerController } from "../../controllers/types";
+import { shouldOpenFile, DEFAULT_EDITOR_MAX_FILE_SIZE } from "../../models/file-size-gate";
 
 const log = createLogger("FileEditorController");
 
@@ -140,6 +141,17 @@ export class FileEditorController extends BaseController implements FileViewerCo
       // Ensure the editor's Lit lifecycle has completed (firstUpdated)
       // so _viewportEl is available before loadFile() is called.
       await this._awaitEditorReady();
+
+      // Size gate BEFORE any read: files over editor.maxFileSize open the tab
+      // with a "too large" message instead of loading content into a model.
+      // No bytes are read for oversized files, so the renderer never blocks on
+      // a huge readRange.
+      const limit = appServices.configService.get("editor.maxFileSize") as number | undefined;
+      const stat = window.openp41ge?.file?.stat ? await window.openp41ge.file.stat(path) : null;
+      if (!shouldOpenFile(stat?.size, limit)) {
+        this._editor.showTooLarge(path, stat!.size, limit ?? DEFAULT_EDITOR_MAX_FILE_SIZE);
+        return;
+      }
 
       const model = await appServices.modelRegistry.getOrCreate(path);
       if (!this._editor) return; // Already unmounted

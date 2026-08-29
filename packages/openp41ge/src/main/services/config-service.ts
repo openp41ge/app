@@ -28,9 +28,14 @@ export interface UserConfig {
     lineHeight: number;
     fontSize: number;
     fontFamily: string;
+    /** Max file size in bytes the editor will open (larger files show a "too large" message). */
+    maxFileSize: number;
   };
   syntaxThemes: Record<string, string>;
 }
+
+/** Default max file size the editor opens: 50 MB (VSCode's files.maxFileSize default). */
+export const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 const DEFAULT_CONFIG: UserConfig = {
   version: 1,
@@ -39,6 +44,7 @@ const DEFAULT_CONFIG: UserConfig = {
     lineHeight: 20,
     fontSize: 14,
     fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
+    maxFileSize: DEFAULT_MAX_FILE_SIZE,
   },
   syntaxThemes: {},
 };

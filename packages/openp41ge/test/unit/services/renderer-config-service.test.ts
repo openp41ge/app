@@ -14,6 +14,7 @@ const mockConfig = {
     lineHeight: 20,
     fontSize: 14,
     fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
+    maxFileSize: 50 * 1024 * 1024,
   },
   syntaxThemes: {},
 };
@@ -104,6 +105,24 @@ describe("ConfigService (renderer)", () => {
     await configService.load();
     expect(configService.get("editor.lineHeight")).toBe(20);
     expect(configService.get("editor.fontSize")).toBe(14);
+  });
+
+  test("get('editor.maxFileSize') reads the stored byte limit", async () => {
+    await configService.load();
+    expect(configService.get("editor.maxFileSize")).toBe(50 * 1024 * 1024);
+  });
+
+  test("set('editor.maxFileSize', n) round-trips the byte value and emits config-changed", async () => {
+    await configService.load();
+    await configService.set("editor.maxFileSize", 20 * 1024 * 1024);
+    expect(setCallKey).toBe("editor.maxFileSize");
+    expect(setCallValue).toBe(20 * 1024 * 1024);
+    expect(configService.get("editor.maxFileSize")).toBe(20 * 1024 * 1024);
+    const evt = dispatchedEvents.find((e) => e.type === "openp41ge:config-changed");
+    expect(evt?.detail).toEqual({
+      key: "editor.maxFileSize",
+      value: 20 * 1024 * 1024,
+    });
   });
 
   test("get() returns undefined for unknown keys", async () => {

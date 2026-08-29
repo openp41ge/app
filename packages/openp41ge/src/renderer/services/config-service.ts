@@ -19,6 +19,8 @@ export interface UserConfig {
     lineHeight: number;
     fontSize: number;
     fontFamily: string;
+    /** Max file size in bytes the editor will open (larger files show a "too large" message). */
+    maxFileSize: number;
   };
 }
 
