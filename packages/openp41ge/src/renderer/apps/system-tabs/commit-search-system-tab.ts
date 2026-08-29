@@ -42,8 +42,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
   private _viewElement: HTMLElement | null = null;
   private _input: HTMLInputElement | null = null;
-  private _scopeSelect: HTMLSelectElement | null = null;
   private _filesToggle: HTMLButtonElement | null = null;
+  // Filter box (below the search box): icon toggles → optional config rows.
+  private _repoFilterActive = true;
+  private _repoFilterIcon: HTMLButtonElement | null = null;
+  private _repoFilterRow: HTMLElement | null = null;
+  private _repoFilter: HTMLInputElement | null = null;
+  private _repoOptions: HTMLElement | null = null;
+  private _repoActiveIndex = -1;
   private _results: HTMLElement | null = null;
   private _footer: HTMLElement | null = null;
 
@@ -81,7 +87,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
       overflow: "hidden",
     });
 
-    // ── Search header: icon toggles (above) + full-width input + scope ──
+    // ── Search header: icon toggles (above) + full-width input + filters ──
     const searchBox = document.createElement("div");
     Object.assign(searchBox.style, {
       padding: "8px 10px",
@@ -146,23 +152,95 @@ export class CommitSearchSystemTabController implements SystemTabController {
     searchInputRow.appendChild(input);
     searchInputRow.appendChild(filesToggle);
     searchBox.appendChild(searchInputRow);
+    wrapper.appendChild(searchBox);
 
-    const scope = document.createElement("select");
-    Object.assign(scope.style, {
+    // ── Filter box: icon toggles on top; each on-filter adds a config row ──
+    const filterBox = document.createElement("div");
+    Object.assign(filterBox.style, {
+      padding: "6px 10px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "6px",
+      flexShrink: "0",
+      borderBottom: "1px solid var(--divider,#2a2a2a)",
+    });
+
+    const FILTER_ICON =
+      '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></svg>';
+
+    const makeFilterToggle = (key: string, icon: string, title: string): HTMLButtonElement => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.filterIcon = key;
+      btn.title = title;
+      btn.innerHTML = icon; // SVG uses currentColor — grey off, white on.
+      Object.assign(btn.style, {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "18px",
+        height: "18px",
+        padding: "0",
+        cursor: "pointer",
+        background: "transparent",
+        border: "1px solid transparent",
+        borderRadius: "4px",
+        color: "var(--text-secondary,#888)",
+      });
+      return btn;
+    };
+    const repoFilterIcon = makeFilterToggle("repo", FILTER_ICON, "Repo filter");
+    const filterIconRow = document.createElement("div");
+    Object.assign(filterIconRow.style, { display: "flex", gap: "4px" });
+    filterIconRow.appendChild(repoFilterIcon);
+    filterBox.appendChild(filterIconRow);
+
+    // Repo filter config row — shown while the funnel icon is on.
+    const repoFilterRow = document.createElement("div");
+    Object.assign(repoFilterRow.style, {
+      position: "relative",
+      display: this._repoFilterActive ? "flex" : "none",
+    });
+
+    const repoFilter = document.createElement("input");
+    repoFilter.type = "text";
+    repoFilter.placeholder = "Filter by repo…";
+    repoFilter.setAttribute("spellcheck", "false");
+    repoFilter.setAttribute("autocomplete", "off");
+    repoFilter.dataset.repoFilter = "";
+    Object.assign(repoFilter.style, {
       width: "100%",
       boxSizing: "border-box",
       height: "24px",
+      padding: "0 8px",
       fontSize: "11px",
-      color: "var(--text-secondary,#aaa)",
+      color: "var(--text-primary,#ccc)",
       background: "var(--bg-secondary,#252526)",
       border: "1px solid var(--divider,#333)",
       borderRadius: "4px",
       outline: "none",
-      textOverflow: "ellipsis",
     });
-    searchBox.appendChild(scope);
+    repoFilterRow.appendChild(repoFilter);
 
-    wrapper.appendChild(searchBox);
+    const repoOptions = document.createElement("div");
+    repoOptions.dataset.repoOptions = "";
+    Object.assign(repoOptions.style, {
+      display: "none",
+      position: "absolute",
+      top: "100%",
+      left: "0",
+      right: "0",
+      zIndex: "20",
+      maxHeight: "180px",
+      overflowY: "auto",
+      background: "var(--bg-secondary,#252526)",
+      border: "1px solid var(--divider,#333)",
+      borderRadius: "4px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+    });
+    repoFilterRow.appendChild(repoOptions);
+    filterBox.appendChild(repoFilterRow);
+    wrapper.appendChild(filterBox);
 
     // ── Results list ──────────────────────────────────────────────────
     const results = document.createElement("div");
@@ -195,8 +273,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
     container.appendChild(wrapper);
     this._viewElement = wrapper;
     this._input = input;
-    this._scopeSelect = scope;
     this._filesToggle = filesToggle;
+    this._repoFilterIcon = repoFilterIcon;
+    this._repoFilterRow = repoFilterRow;
+    this._repoFilter = repoFilter;
+    this._repoOptions = repoOptions;
     this._results = results;
     this._footer = footer;
 
@@ -222,15 +303,51 @@ export class CommitSearchSystemTabController implements SystemTabController {
         this._moveFocus(e.key === "ArrowDown" ? 1 : -1, e);
       }
     });
-    scope.addEventListener("change", () => this._debounce());
     filesToggle.addEventListener("click", () => this._toggleSearch());
+    repoFilterIcon.addEventListener("click", () => this._toggleRepoFilter());
+    repoFilter.addEventListener("input", () => {
+      this._renderRepoSuggestions();
+      this._debounce();
+    });
+    repoFilter.addEventListener("focus", () => this._renderRepoSuggestions());
+    repoFilter.addEventListener("blur", () => {
+      window.setTimeout(() => this._hideRepoSuggestions(), 120);
+    });
+    repoFilter.addEventListener("keydown", (e: KeyboardEvent) => {
+      const n = this._repoOptions?.children.length ?? 0;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        this._repoActiveIndex = n === 0 ? 0 : (this._repoActiveIndex + 1) % n;
+        this._renderRepoSuggestions();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        this._repoActiveIndex = n === 0 ? 0 : Math.max(0, this._repoActiveIndex - 1);
+        this._renderRepoSuggestions();
+      } else if (e.key === "Enter") {
+        const box = this._repoOptions;
+        const item =
+          box && box.style.display !== "none"
+            ? (box.children[this._repoActiveIndex] as HTMLElement | undefined)
+            : undefined;
+        if (item?.dataset.repoOption) {
+          e.preventDefault();
+          this._selectRepo(item.dataset.repoOption);
+        } else if (this._input?.value.trim()) {
+          e.preventDefault();
+          this._debounce();
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this._hideRepoSuggestions();
+      }
+    });
 
     // Both icons default on → render them white (enabled) immediately.
     this._applyToggleStyles();
+    this._applyFilterIconStyle();
 
-    this._renderScopeOptions();
-
-    // Load repoNames for the scope select, then render states.
+    // Load repoNames for the repo-filter autocomplete, then render states.
     void this._loadRepos();
 
     // Live refreshes (workspace/git changes) — deferred while hidden.
@@ -280,8 +397,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
     }
     this._viewElement = null;
     this._input = null;
-    this._scopeSelect = null;
     this._filesToggle = null;
+    this._repoFilterIcon = null;
+    this._repoFilterRow = null;
+    this._repoFilter = null;
+    this._repoOptions = null;
     this._results = null;
     this._footer = null;
   }
@@ -301,36 +421,98 @@ export class CommitSearchSystemTabController implements SystemTabController {
     try {
       const repos = (await window.openp41ge.workspaceController.listRepos()) as RepoOption[];
       this._repos = repos;
-      this._renderScopeOptions();
       // Repo availability changed the empty-state hint — re-render it once
       // repos arrive (they load asynchronously after first paint).
       if (!this._input?.value.trim()) {
         this._renderEmptyQuery();
       }
     } catch {
-      // Non-fatal — the "All repos" scope still works.
+      // Non-fatal — an empty repo filter means "all repos".
       this._repos = [];
     }
   }
 
-  private _renderScopeOptions(): void {
-    const scope = this._scopeSelect;
-    if (!scope) return;
-    const previous = scope.value;
-    scope.replaceChildren();
-    const all = document.createElement("option");
-    all.value = "";
-    all.textContent = "All repos";
-    scope.appendChild(all);
-    for (const repo of this._repos) {
-      const opt = document.createElement("option");
-      opt.value = repo.name;
+  // ── Repo filter (text input + autocomplete) ────────────────────────────
+
+  /** Current repo scope: an exactly-typed repo name, or null = all repos. */
+  private _repoScope(): string | null {
+    if (!this._repoFilterActive) return null;
+    const v = this._repoFilter?.value.trim() ?? "";
+    if (!v) return null;
+    return this._repos.some((r) => r.name === v) ? v : null;
+  }
+
+  private _toggleRepoFilter(): void {
+    this._repoFilterActive = !this._repoFilterActive;
+    this._applyFilterIconStyle();
+    if (this._repoFilterRow) {
+      this._repoFilterRow.style.display = this._repoFilterActive ? "flex" : "none";
+    }
+    if (!this._repoFilterActive) this._hideRepoSuggestions();
+    if (this._input?.value.trim()) {
+      this._debounce();
+    } else {
+      this._renderEmptyQuery();
+    }
+  }
+
+  private _applyFilterIconStyle(): void {
+    const btn = this._repoFilterIcon;
+    if (!btn) return;
+    // Grey when off, white (enabled) when on — the SVG uses currentColor.
+    btn.style.color = this._repoFilterActive ? "#e3e3e3" : "var(--text-secondary,#888)";
+  }
+
+  private _renderRepoSuggestions(): void {
+    const input = this._repoFilter;
+    const box = this._repoOptions;
+    if (!input || !box) return;
+    box.replaceChildren();
+    const q = input.value.trim().toLowerCase();
+    const matches = q ? this._repos.filter((r) => r.name.toLowerCase().includes(q)) : this._repos;
+    const shown = matches.slice(0, 8);
+    if (shown.length === 0) {
+      box.style.display = "none";
+      this._repoActiveIndex = -1;
+      return;
+    }
+    this._repoActiveIndex = Math.max(0, this._repoActiveIndex < 0 ? 0 : this._repoActiveIndex);
+    shown.forEach((repo, i) => {
+      const opt = document.createElement("div");
+      opt.dataset.repoOption = repo.name;
       opt.textContent = repo.name;
-      scope.appendChild(opt);
+      Object.assign(opt.style, {
+        padding: "3px 8px",
+        fontSize: "11px",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        color: "var(--text-primary,#ccc)",
+      });
+      if (i === this._repoActiveIndex) opt.style.background = "var(--bg-hover,#2a2d2e)";
+      opt.addEventListener("mousedown", (e: MouseEvent) => {
+        e.preventDefault(); // keep focus in the input
+        this._selectRepo(repo.name);
+      });
+      box.appendChild(opt);
+    });
+    box.style.display = "block";
+  }
+
+  private _selectRepo(name: string): void {
+    if (this._repoFilter) this._repoFilter.value = name;
+    this._hideRepoSuggestions();
+    if (this._input?.value.trim()) {
+      this._debounce();
+    } else {
+      this._renderEmptyQuery();
     }
-    if (previous && this._repos.some((r) => r.name === previous)) {
-      scope.value = previous;
-    }
+  }
+
+  private _hideRepoSuggestions(): void {
+    if (this._repoOptions) this._repoOptions.style.display = "none";
+    this._repoActiveIndex = -1;
   }
 
   // ── Search-into toggles ───────────────────────────────────────────────
@@ -380,7 +562,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     }
 
     const token = ++this._searchToken;
-    const repoName = this._scopeSelect?.value || null;
+    const repoName = this._repoScope();
     // Commits (messages) are always searched; files add the changed-file-path
     // dimension when the toggle is on.
     const mode = this._searchFiles ? "all" : "message";

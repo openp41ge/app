@@ -64,6 +64,7 @@ function installBridge(): { events: Events } {
       listRepos: vi.fn().mockResolvedValue([
         { path: "/w/acme", name: "acme", url: "git@example.com:acme.git" },
         { path: "/w/globex", name: "globex", url: "git@example.com:globex.git" },
+        { path: "/w/innova", name: "innova", url: "git@example.com:innova.git" },
       ]),
       searchCommits: vi.fn(),
     },
@@ -111,25 +112,70 @@ describe("CommitSearchSystemTabController", () => {
     document.removeEventListener("openp41ge:open-commit", () => {});
   });
 
-  it("mounts the search UI: one files icon toggle (on by default), scope options (All repos + each repo), focused full-width input, no header", async () => {
+  it("mounts the search UI: main input + files toggle on one row, a filter box with a repo icon + text-filter input (no select), focused main input", async () => {
     await flush();
     await new Promise((r) => requestAnimationFrame(r));
     expect(host.textContent).not.toContain("SEARCH COMMITS");
+    // The "All repos" <select> is gone — the repo scope is a text input
+    // with an autocompletion dropdown.
+    expect(host.querySelector("select")).toBeNull();
+
+    // Main search row: the full-width input beside the single files toggle.
     const toggles = host.querySelectorAll<HTMLButtonElement>("[data-search-into]");
-    // The commits toggle is gone — only the files icon remains.
     expect(toggles.length).toBe(1);
     expect(toggles[0].dataset.searchInto).toBe("files");
     // Files on by default → icon rendered white (enabled); jsdom normalises #e3e3e3.
     expect(toggles[0].style.color).toBe("rgb(227, 227, 227)");
-    const scope = host.querySelector("select") as HTMLSelectElement;
-    const options = Array.from(scope.options).map((o) => o.value);
-    expect(options).toEqual(["", "acme", "globex"]);
-    const input = host.querySelector("input") as HTMLInputElement;
+
+    const input = host.querySelector("input[placeholder^='Search']") as HTMLInputElement;
     expect(document.activeElement).toBe(input);
-    // input shares a row with the files toggle; the scope select sits below in searchBox
     const inputRow = input.parentElement as HTMLElement;
     expect(inputRow.querySelectorAll("[data-search-into]").length).toBe(1);
-    expect(inputRow !== scope.parentElement).toBe(true);
+
+    // Filter box below the search box: the funnel icon (on by default) exposes
+    // a repo-filter row with a text input for autocompletion.
+    const repoFilterIcon = host.querySelector<HTMLButtonElement>('[data-filter-icon="repo"]')!;
+    expect(repoFilterIcon).not.toBeNull();
+    expect(repoFilterIcon.style.color).toBe("rgb(227, 227, 227)");
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    expect(repoFilter).not.toBeNull();
+    expect(repoFilter.placeholder).toBe("Filter by repo…");
+    // The repo filter lives in the filter box, not on the main input row.
+    expect(repoFilter.parentElement === inputRow).toBe(false);
+  });
+
+  it("repo filter autocompletes from the workspace repos and scopes the search", async () => {
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    repoFilter.value = "ac";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
+    const opts = Array.from(
+      host.querySelectorAll<HTMLElement>("[data-repo-options] [data-repo-option]"),
+    );
+    expect(opts.map((o) => o.dataset.repoOption)).toEqual(["acme"]);
+
+    // Selecting a suggestion fills the input and scopes the search.
+    opts[0].dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(repoFilter.value).toBe("acme");
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.at(-1)?.repoName).toBe("acme");
+  });
+
+  it("toggling the repo filter icon off hides the row and searches all repos", async () => {
+    const repoFilterIcon = host.querySelector<HTMLButtonElement>('[data-filter-icon="repo"]')!;
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    repoFilter.value = "acme";
+
+    repoFilterIcon.click();
+    expect(repoFilterIcon.style.color).toBe("var(--text-secondary,#888)"); // grey = off
+    expect(repoFilter.parentElement?.style.display).toBe("none");
+
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.at(-1)?.repoName).toBeNull(); // all repos
+
+    repoFilterIcon.click();
+    expect(repoFilter.parentElement?.style.display).toBe("flex");
   });
 
   it("runs a search on Enter and renders hierarchical commit rows", async () => {
@@ -253,9 +299,11 @@ describe("CommitSearchSystemTabController", () => {
   });
 
   it("message line windows around the search hit, highlights it, and shows the +N more / matched-file meta", async () => {
-    const scope = host.querySelector("select") as HTMLSelectElement;
-    scope.value = "innova";
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    repoFilter.value = "innova";
     await search(controller, "engine");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.at(-1)?.repoName).toBe("innova"); // scoped via the repo filter
 
     // The hit is highlighted inline…
     const hit = host.querySelector(".commit-result-row .search-hit") as HTMLElement | null;
@@ -271,8 +319,8 @@ describe("CommitSearchSystemTabController", () => {
   });
 
   it("file sub-rows get coloured +adds/−dels and highlight the matched path", async () => {
-    const scope = host.querySelector("select") as HTMLSelectElement;
-    scope.value = "innova";
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    repoFilter.value = "innova";
     await search(controller, "engine");
     const row = host.querySelector<HTMLElement>("[data-commit-row]")!;
     row.click();
