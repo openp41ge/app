@@ -94,23 +94,24 @@ describe("CommitSearchSystemTabController", () => {
     document.removeEventListener("openp41ge:open-commit", () => {});
   });
 
-  it("mounts the search UI: icon toggles (both on by default), scope options (All repos + each repo), focused full-width input, no header", async () => {
+  it("mounts the search UI: one files icon toggle (on by default), scope options (All repos + each repo), focused full-width input, no header", async () => {
     await flush();
     await new Promise((r) => requestAnimationFrame(r));
     expect(host.textContent).not.toContain("SEARCH COMMITS");
     const toggles = host.querySelectorAll<HTMLButtonElement>("[data-search-into]");
-    expect(toggles.length).toBe(2);
-    // Both on by default → icons rendered white (enabled); jsdom normalises #e3e3e3.
+    // The commits toggle is gone — only the files icon remains.
+    expect(toggles.length).toBe(1);
+    expect(toggles[0].dataset.searchInto).toBe("files");
+    // Files on by default → icon rendered white (enabled); jsdom normalises #e3e3e3.
     expect(toggles[0].style.color).toBe("rgb(227, 227, 227)");
-    expect(toggles[1].style.color).toBe("rgb(227, 227, 227)");
     const scope = host.querySelector("select") as HTMLSelectElement;
     const options = Array.from(scope.options).map((o) => o.value);
     expect(options).toEqual(["", "acme", "globex"]);
     const input = host.querySelector("input") as HTMLInputElement;
     expect(document.activeElement).toBe(input);
-    // input shares a row with the icon toggles; the scope select sits below in searchBox
+    // input shares a row with the files toggle; the scope select sits below in searchBox
     const inputRow = input.parentElement as HTMLElement;
-    expect(inputRow.querySelectorAll("[data-search-into]").length).toBe(2);
+    expect(inputRow.querySelectorAll("[data-search-into]").length).toBe(1);
     expect(inputRow !== scope.parentElement).toBe(true);
   });
 
@@ -118,7 +119,7 @@ describe("CommitSearchSystemTabController", () => {
     await search(controller, "readme");
     const model = controller["_searchModel"] as TestCommitSearchModel;
     expect(model.calls.length).toBe(1);
-    // Both toggles on by default → combined search.
+    // Files toggle on by default (commit messages always searched) → combined search.
     expect(model.calls[0].options.in).toBe("all");
     expect(host.querySelector("[data-commit-row]")).not.toBeNull();
     expect(host.textContent).toContain("globex");
@@ -135,46 +136,30 @@ describe("CommitSearchSystemTabController", () => {
     expect(host.querySelector("[data-commit-row]")).not.toBeNull();
   });
 
-  it("defaults both search-into toggles on — search runs in combined mode ('all')", async () => {
+  it("the files toggle is on by default — searches run in combined message + file mode ('all')", async () => {
     await search(controller, "readme");
     const model = controller["_searchModel"] as TestCommitSearchModel;
     expect(model.calls.length).toBe(1);
     expect(model.calls[0].options.in).toBe("all");
   });
 
-  it("toggling the Commits icon off restricts the next search to files only", async () => {
-    const commitsBtn = host.querySelector<HTMLButtonElement>('[data-search-into="message"]')!;
-    commitsBtn.click();
-    expect(commitsBtn.style.color).toBe("var(--text-secondary,#888)"); // grey = off
+  it("toggling the Files icon off restricts search to commit messages only; back on restores combined", async () => {
+    const filesBtn = host.querySelector<HTMLButtonElement>('[data-search-into="files"]')!;
+    // Only the files toggle exists — commit-message search can't be switched off.
+    expect(host.querySelectorAll("[data-search-into]").length).toBe(1);
+
     await search(controller, "readme");
     const model = controller["_searchModel"] as TestCommitSearchModel;
-    expect(model.calls[model.calls.length - 1].options.in).toBe("files");
-  });
+    expect(model.calls[model.calls.length - 1].options.in).toBe("all");
 
-  it("toggling the Files icon off restricts the next search to messages only", async () => {
-    const filesBtn = host.querySelector<HTMLButtonElement>('[data-search-into="files"]')!;
+    filesBtn.click();
+    expect(filesBtn.style.color).toBe("var(--text-secondary,#888)"); // grey = off
+    await search(controller, "readme");
+    expect(model.calls[model.calls.length - 1].options.in).toBe("message");
+
     filesBtn.click();
     await search(controller, "readme");
-    const model = controller["_searchModel"] as TestCommitSearchModel;
-    expect(model.calls[model.calls.length - 1].options.in).toBe("message");
-  });
-
-  it("toggling both icons off is a no-op that shows the nothing-to-search message", async () => {
-    const toggles = host.querySelectorAll<HTMLButtonElement>("[data-search-into]");
-    for (const btn of Array.from(toggles)) btn.click();
-    expect(host.textContent).toContain("Nothing to search");
-    await search(controller, "readme");
-    const model = controller["_searchModel"] as TestCommitSearchModel;
-    expect(model.calls.length).toBe(0); // never hit the model
-    expect(host.textContent).toContain("Nothing to search");
-    expect(host.querySelector("[data-commit-row]")).toBeNull();
-
-    // Re-enabling one icon makes searching live again (single dimension).
-    const commitsBtn = host.querySelector<HTMLButtonElement>('[data-search-into="message"]')!;
-    commitsBtn.click();
-    await search(controller, "readme");
-    expect(model.calls.length).toBe(1);
-    expect(model.calls[0].options.in).toBe("message");
+    expect(model.calls[model.calls.length - 1].options.in).toBe("all");
   });
 
   it("single-click on a commit emits openp41ge:open-commit with pinned:false (preview)", async () => {
