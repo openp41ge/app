@@ -108,8 +108,10 @@ describe("CommitSearchSystemTabController", () => {
     expect(options).toEqual(["", "acme", "globex"]);
     const input = host.querySelector("input") as HTMLInputElement;
     expect(document.activeElement).toBe(input);
-    // search field is full width (no sibling in the same row); scope sits below it
-    expect(scope.parentElement === input.parentElement).toBe(true);
+    // input shares a row with the icon toggles; the scope select sits below in searchBox
+    const inputRow = input.parentElement as HTMLElement;
+    expect(inputRow.querySelectorAll("[data-search-into]").length).toBe(2);
+    expect(inputRow !== scope.parentElement).toBe(true);
   });
 
   it("runs a search on Enter and renders hierarchical commit rows", async () => {

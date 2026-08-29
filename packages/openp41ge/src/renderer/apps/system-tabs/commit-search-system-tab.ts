@@ -93,8 +93,13 @@ export class CommitSearchSystemTabController implements SystemTabController {
       borderBottom: "1px solid var(--divider,#2a2a2a)",
     });
 
-    const iconRow = document.createElement("div");
-    Object.assign(iconRow.style, { display: "flex", gap: "4px", justifyContent: "flex-end" });
+    // Single row: full-width input with the icon toggles right-aligned beside it.
+    const searchInputRow = document.createElement("div");
+    Object.assign(searchInputRow.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+    });
 
     const SEARCH_ICONS: Record<"commits" | "files", string> = {
       commits:
@@ -134,16 +139,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
       "Search commit messages",
     );
     const filesToggle = makeIconToggle("files", SEARCH_ICONS.files, "Search changed file paths");
-    iconRow.appendChild(filesToggle);
-    iconRow.appendChild(messagesToggle);
-    searchBox.appendChild(iconRow);
 
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "Search commits…";
     input.setAttribute("spellcheck", "false");
     Object.assign(input.style, {
-      width: "100%",
+      flex: "1",
+      minWidth: "0",
       boxSizing: "border-box",
       height: "26px",
       padding: "0", // searchBox's own padding supplies the horizontal space
@@ -153,7 +156,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
       border: "none",
       outline: "none",
     });
-    searchBox.appendChild(input);
+
+    searchInputRow.appendChild(input);
+    searchInputRow.appendChild(filesToggle);
+    searchInputRow.appendChild(messagesToggle);
+    searchBox.appendChild(searchInputRow);
 
     const scope = document.createElement("select");
     Object.assign(scope.style, {
