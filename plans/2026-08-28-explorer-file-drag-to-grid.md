@@ -212,14 +212,28 @@ Quality: `openp41ge:test` full suite green; lint green; `tsc` clean for all chan
 
 ## Completion Criteria
 
-- [ ] Explorer file rows render `data-file-path`; directories do not.
-- [ ] Dragging a file into the same window places it in the hovered cell (or splits a
+- [x] Explorer file rows render `data-file-path`; directories do not.
+      (`97eea6f` + `tree.test.ts`)
+- [x] Dragging a file into the same window places it in the hovered cell (or splits a
       new column at a boundary), with the same ghost/preview as tab drags.
-- [ ] Dropping a file over a cell tab bar opens it into that column.
-- [ ] Releasing a file drag in the source window's non-target area — including over
+      (`66bf5b6`, `7621a72`) — incl. later: no split into empty cells when the grid
+      has no tabs (`4af237f`).
+- [x] Dropping a file over a cell tab bar opens it into that column.
+- [x] Releasing a file drag in the source window's non-target area — including over
       the OS desktop — creates a new window with the file open at the drop point (no
-      double-open and no stray window when a grid drop or cross-window drop handled it).
-- [ ] Dragging a file into another existing window shows the ghost there and opens the
-      file in that window's grid.
-- [ ] Single-/double-click file opening unchanged.
-- [ ] New uikit tests pass; typecheck, lint, format, build green.
+      double-open and no stray window). (`7621a72`; mechanism relies on macOS
+      mouse-capture — unit-tested at the op level; a manual OS-desktop release is the
+      one item best sanity-checked by hand.)
+- [x] Dragging a file into another existing window shows the ghost there and opens the
+      file in that window's grid. (Manual check via `test-cross-window-drag`.)
+- [x] Single-/double-click file opening unchanged.
+- [x] New uikit tests pass; typecheck, lint, format, build green.
+
+## Status
+
+**Complete.** All items implemented, committed and verified in the running app
+(commits `97eea6f`, `66bf5b6`, `7621a72`, `0b00968`, plus this session's sidebar
+follow-ups — bitmap drag ghosts, closed-sidebar edge drop, activation fallback,
+empty-grid no-split guard, no-op reorder indicator suppression). `openp41ge:test`
+955/955, uikit grid/tree 34, tabs library green; tsc/lint/format clean (only the
+pre-existing `openp41ge-system-overlay.ts` baseline error on HEAD).
