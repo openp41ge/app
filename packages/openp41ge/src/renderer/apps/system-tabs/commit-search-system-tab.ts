@@ -56,8 +56,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
   /** Last search results (cache) — expansion toggles re-render, not refetch. */
   private _lastCommits: SearchResultCommit[] | null = null;
 
-  // Persisted search-into mode ("message" | "files" | "all").
-  private _mode: "message" | "files" | "all" = "message";
+  // Independent search-into toggles (icon buttons above the input). Both on by
+  // default → combined message + file-path search; a single one restricts to
+  // that dimension; none on is an allowed but no-op state.
+  private _searchMessages = true;
+  private _searchFiles = true;
 
   /** Keep-alive (SystemTabController.setVisible). */
   private _suspended = false;
@@ -79,23 +82,10 @@ export class CommitSearchSystemTabController implements SystemTabController {
       overflow: "hidden",
     });
 
-    // ── Section header ────────────────────────────────────────────────
-    const header = document.createElement("div");
-    header.textContent = "SEARCH COMMITS";
-    Object.assign(header.style, {
-      padding: "8px 10px 6px",
-      fontSize: "11px",
-      fontWeight: 600,
-      letterSpacing: "0.05em",
-      color: "var(--text-secondary,#999)",
-      flexShrink: "0",
-    });
-    wrapper.appendChild(header);
-
-    // ── Search header: input + scope + search-into toggles ──────────────
+    // ── Search header: icon toggles (above) + full-width input + scope ──
     const searchBox = document.createElement("div");
     Object.assign(searchBox.style, {
-      padding: "0 10px 8px",
+      padding: "8px 10px",
       display: "flex",
       flexDirection: "column",
       gap: "6px",
@@ -103,16 +93,58 @@ export class CommitSearchSystemTabController implements SystemTabController {
       borderBottom: "1px solid var(--divider,#2a2a2a)",
     });
 
-    const inputRow = document.createElement("div");
-    Object.assign(inputRow.style, { display: "flex", gap: "6px" });
+    const iconRow = document.createElement("div");
+    Object.assign(iconRow.style, { display: "flex", gap: "4px" });
+
+    const SEARCH_ICONS: Record<"commits" | "files", string> = {
+      commits:
+        '<svg xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M352.5-325.5Q298-371 284-440H80v-80h204q14-69 68.5-114.5T480-680q73 0 127.5 45.5T676-520h204v80H676q-14 69-68.5 114.5T480-280q-73 0-127.5-45.5ZM480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>',
+      files:
+        '<svg xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M200-800v241-1 400-640 200-200Zm0 720q-33 0-56.5-23.5T120-160v-640q0-33 23.5-56.5T200-880h320l240 240v100q-19-8-39-12.5t-41-6.5v-41H480v-200H200v640h241q16 24 36 44.5T521-80H200Zm531-149q29-29 29-71t-29-71q-29-29-71-29t-71 29q-29 29-29 71t29 71q29 29 71 29t71-29ZM864-40 756-148q-21 14-45.5 21t-50.5 7q-75 0-127.5-52.5T480-300q0-75 52.5-127.5T660-480q75 0 127.5 52.5T840-300q0 26-7 50.5T812-204L920-96l-56 56Z"/></svg>',
+    };
+
+    const makeIconToggle = (
+      key: "message" | "files",
+      icon: string,
+      title: string,
+    ): HTMLButtonElement => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.searchInto = key;
+      btn.title = title;
+      btn.innerHTML = icon; // SVG uses currentColor — grey off, white on.
+      Object.assign(btn.style, {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "24px",
+        height: "24px",
+        padding: "0",
+        cursor: "pointer",
+        background: "transparent",
+        border: "1px solid transparent",
+        borderRadius: "4px",
+        color: "var(--text-secondary,#888)",
+      });
+      return btn;
+    };
+    const messagesToggle = makeIconToggle(
+      "message",
+      SEARCH_ICONS.commits,
+      "Search commit messages",
+    );
+    const filesToggle = makeIconToggle("files", SEARCH_ICONS.files, "Search changed file paths");
+    iconRow.appendChild(messagesToggle);
+    iconRow.appendChild(filesToggle);
+    searchBox.appendChild(iconRow);
 
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "Search commits…";
     input.setAttribute("spellcheck", "false");
     Object.assign(input.style, {
-      flex: "1",
-      minWidth: "0",
+      width: "100%",
+      boxSizing: "border-box",
       height: "26px",
       padding: "0 8px",
       fontSize: "12px",
@@ -121,53 +153,23 @@ export class CommitSearchSystemTabController implements SystemTabController {
       border: "1px solid var(--divider,#333)",
       borderRadius: "4px",
       outline: "none",
-      boxSizing: "border-box",
     });
-    Object.assign(input.style as CSSStyleDeclaration, {});
+    searchBox.appendChild(input);
 
     const scope = document.createElement("select");
     Object.assign(scope.style, {
-      flexShrink: "0",
-      height: "26px",
+      width: "100%",
+      boxSizing: "border-box",
+      height: "24px",
       fontSize: "11px",
       color: "var(--text-secondary,#aaa)",
       background: "var(--bg-secondary,#252526)",
       border: "1px solid var(--divider,#333)",
       borderRadius: "4px",
       outline: "none",
-      maxWidth: "120px",
       textOverflow: "ellipsis",
     });
-    inputRow.appendChild(input);
-    inputRow.appendChild(scope);
-    searchBox.appendChild(inputRow);
-
-    const toggleRow = document.createElement("div");
-    Object.assign(toggleRow.style, { display: "flex", gap: "4px" });
-
-    const makeToggle = (label: string, key: "message" | "files"): HTMLButtonElement => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = label;
-      btn.dataset.searchInto = key;
-      Object.assign(btn.style, {
-        flex: "1",
-        height: "22px",
-        fontSize: "11px",
-        cursor: "pointer",
-        border: "1px solid var(--divider,#333)",
-        background: "var(--bg-secondary,#252526)",
-        color: "var(--text-secondary,#aaa)",
-        borderRadius: "4px",
-        padding: "0 6px",
-      });
-      return btn;
-    };
-    const messagesToggle = makeToggle("Messages", "message");
-    const filesToggle = makeToggle("Files", "files");
-    toggleRow.appendChild(messagesToggle);
-    toggleRow.appendChild(filesToggle);
-    searchBox.appendChild(toggleRow);
+    searchBox.appendChild(scope);
 
     wrapper.appendChild(searchBox);
 
@@ -231,8 +233,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
       }
     });
     scope.addEventListener("change", () => this._debounce());
-    messagesToggle.addEventListener("click", () => this._setMode("message"));
-    filesToggle.addEventListener("click", () => this._setMode("files"));
+    messagesToggle.addEventListener("click", () => this._toggleSearch("message"));
+    filesToggle.addEventListener("click", () => this._toggleSearch("files"));
+
+    // Both icons default on → render them white (enabled) immediately.
+    this._applyToggleStyles();
 
     this._renderScopeOptions();
 
@@ -326,10 +331,10 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
   // ── Search-into toggles ───────────────────────────────────────────────
 
-  private _setMode(mode: "message" | "files" | "all"): void {
-    const next = this._mode === mode ? "all" : mode;
-    this._mode = next;
-    this._applyModeStyles();
+  private _toggleSearch(key: "message" | "files"): void {
+    if (key === "message") this._searchMessages = !this._searchMessages;
+    else this._searchFiles = !this._searchFiles;
+    this._applyToggleStyles();
     if (this._input?.value.trim()) {
       this._debounce();
     } else {
@@ -337,17 +342,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
     }
   }
 
-  private _applyModeStyles(): void {
+  private _applyToggleStyles(): void {
     const styleFor = (btn: HTMLButtonElement | null, on: boolean): void => {
       if (!btn) return;
-      Object.assign(btn.style, {
-        background: on ? "rgba(74,158,255,0.14)" : "var(--bg-secondary,#252526)",
-        color: on ? "var(--accent,#4a9eff)" : "var(--text-secondary,#aaa)",
-        borderColor: on ? "var(--accent,#4a9eff)" : "var(--divider,#333)",
-      });
+      // Grey when off, white (enabled) when on — the SVG uses currentColor.
+      btn.style.color = on ? "#e3e3e3" : "var(--text-secondary,#888)";
     };
-    styleFor(this._messagesToggle, this._mode === "message" || this._mode === "all");
-    styleFor(this._filesToggle, this._mode === "files" || this._mode === "all");
+    styleFor(this._messagesToggle, this._searchMessages);
+    styleFor(this._filesToggle, this._searchFiles);
   }
 
   // ── Search execution ──────────────────────────────────────────────────
@@ -376,10 +378,20 @@ export class CommitSearchSystemTabController implements SystemTabController {
       this._renderEmptyQuery();
       return;
     }
+    if (!this._searchMessages && !this._searchFiles) {
+      // Allowed state but a no-op — there is nothing to search into.
+      this._renderEmptyQuery();
+      return;
+    }
 
     const token = ++this._searchToken;
     const repoName = this._scopeSelect?.value || null;
-    const mode = this._mode;
+    const mode =
+      this._searchMessages && this._searchFiles
+        ? "all"
+        : this._searchMessages
+          ? "message"
+          : "files";
 
     results.replaceChildren(this._message("Searching…", "var(--text-secondary,#999)"));
     if (this._footer) {
@@ -417,7 +429,15 @@ export class CommitSearchSystemTabController implements SystemTabController {
     const results = this._results;
     if (!results) return;
     results.replaceChildren();
-    if (this._repos.length === 0) {
+    if (!this._searchMessages && !this._searchFiles) {
+      // Allowed but disabled-by-user — guide them back to an enabled icon.
+      results.appendChild(
+        this._message(
+          "Nothing to search — enable the Commits or Files icon",
+          "var(--text-secondary,#999)",
+        ),
+      );
+    } else if (this._repos.length === 0) {
       results.appendChild(this._message("No repos", "var(--text-secondary,#999)"));
     } else {
       results.appendChild(

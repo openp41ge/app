@@ -94,23 +94,85 @@ describe("CommitSearchSystemTabController", () => {
     document.removeEventListener("openp41ge:open-commit", () => {});
   });
 
-  it("mounts the search UI: header, scope options (All repos + each repo), and a focused input", async () => {
+  it("mounts the search UI: icon toggles (both on by default), scope options (All repos + each repo), focused full-width input, no header", async () => {
     await flush();
     await new Promise((r) => requestAnimationFrame(r));
-    expect(host.textContent).toContain("SEARCH COMMITS");
+    expect(host.textContent).not.toContain("SEARCH COMMITS");
+    const toggles = host.querySelectorAll<HTMLButtonElement>("[data-search-into]");
+    expect(toggles.length).toBe(2);
+    // Both on by default → icons rendered white (enabled); jsdom normalises #e3e3e3.
+    expect(toggles[0].style.color).toBe("rgb(227, 227, 227)");
+    expect(toggles[1].style.color).toBe("rgb(227, 227, 227)");
     const scope = host.querySelector("select") as HTMLSelectElement;
     const options = Array.from(scope.options).map((o) => o.value);
     expect(options).toEqual(["", "acme", "globex"]);
     const input = host.querySelector("input") as HTMLInputElement;
     expect(document.activeElement).toBe(input);
+    // search field is full width (no sibling in the same row); scope sits below it
+    expect(scope.parentElement === input.parentElement).toBe(true);
   });
 
   it("runs a search on Enter and renders hierarchical commit rows", async () => {
     await search(controller, "readme");
-    expect((controller["_searchModel"] as TestCommitSearchModel).calls.length).toBe(1);
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.length).toBe(1);
+    // Both toggles on by default → combined search.
+    expect(model.calls[0].options.in).toBe("all");
     expect(host.querySelector("[data-commit-row]")).not.toBeNull();
     expect(host.textContent).toContain("globex");
     expect(host.textContent).toContain("docs: update readme");
+  });
+
+  it("combined ('all') search returns a commit when only a file path matches (not the message)", async () => {
+    // "helper.ts" appears only as a file path, never in a message — combined
+    // mode must still surface the commit.
+    await search(controller, "helper.ts");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls[0].options.in).toBe("all");
+    expect(host.textContent).toContain("resolve crash on open");
+    expect(host.querySelector("[data-commit-row]")).not.toBeNull();
+  });
+
+  it("defaults both search-into toggles on — search runs in combined mode ('all')", async () => {
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.length).toBe(1);
+    expect(model.calls[0].options.in).toBe("all");
+  });
+
+  it("toggling the Commits icon off restricts the next search to files only", async () => {
+    const commitsBtn = host.querySelector<HTMLButtonElement>('[data-search-into="message"]')!;
+    commitsBtn.click();
+    expect(commitsBtn.style.color).toBe("var(--text-secondary,#888)"); // grey = off
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls[model.calls.length - 1].options.in).toBe("files");
+  });
+
+  it("toggling the Files icon off restricts the next search to messages only", async () => {
+    const filesBtn = host.querySelector<HTMLButtonElement>('[data-search-into="files"]')!;
+    filesBtn.click();
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls[model.calls.length - 1].options.in).toBe("message");
+  });
+
+  it("toggling both icons off is a no-op that shows the nothing-to-search message", async () => {
+    const toggles = host.querySelectorAll<HTMLButtonElement>("[data-search-into]");
+    for (const btn of Array.from(toggles)) btn.click();
+    expect(host.textContent).toContain("Nothing to search");
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.length).toBe(0); // never hit the model
+    expect(host.textContent).toContain("Nothing to search");
+    expect(host.querySelector("[data-commit-row]")).toBeNull();
+
+    // Re-enabling one icon makes searching live again (single dimension).
+    const commitsBtn = host.querySelector<HTMLButtonElement>('[data-search-into="message"]')!;
+    commitsBtn.click();
+    await search(controller, "readme");
+    expect(model.calls.length).toBe(1);
+    expect(model.calls[0].options.in).toBe("message");
   });
 
   it("single-click on a commit emits openp41ge:open-commit with pinned:false (preview)", async () => {
