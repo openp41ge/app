@@ -142,6 +142,9 @@ export class FileEditorElement extends LitElement {
   // @ts-expect-error unused
   private _mouseDownCol = 0;
   private _isMouseDown: boolean = false;
+
+  /** Whether this editor's textarea is focused — only a focused editor shows carets. */
+  private _isFocused: boolean = false;
   private _onDocumentMouseMove: ((e: MouseEvent) => void) | null = null;
   private _onDocumentMouseUp: (() => void) | null = null;
 
@@ -596,9 +599,11 @@ export class FileEditorElement extends LitElement {
         return this._clipboardHandler?.onCopy() || "";
       },
       onFocus: () => {
+        this._isFocused = true;
         this._cursorRenderer?.show();
       },
       onBlur: () => {
+        this._isFocused = false;
         this._cursorRenderer?.hide();
       },
       onPaste: (text) => {
@@ -1125,7 +1130,14 @@ export class FileEditorElement extends LitElement {
       const y = (viewLine - 1) * this._lineHeight;
       this._cursorRenderer.positionAt(x, y, this._lineHeight, i);
     }
-    this._cursorRenderer.show();
+    // Only the focused editor may show carets. A view sync must never resurrect
+    // them while this editor is blurred (e.g. initial render, a cursor move or
+    // model change in a background tab) — onBlur hid them; refocus re-shows via
+    // onFocus. This preserves multi-carets: they stay created/positioned and are
+    // only shown/hidden as a group.
+    if (this._isFocused) {
+      this._cursorRenderer.show();
+    }
 
     // Dispatch cursor position for the app bottom bar (primary cursor)
     const pos = this._cursorController.position;
