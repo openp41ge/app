@@ -29,9 +29,22 @@
       `_collection` lines before building the wrapped window, so DOM node
       count == rendered-line count after toggling (was: ~70 stale nodes vs 34
       rendered).
-- [ ] **Phase 2 in-app verification** — wrapped gutter scrolling, click-to-caret
-      on virtualized wrapped lines, and horizontal-scrollbar-correct-from-start
-      need a manual in-app pass in the running demo before Phase 3/4/5.
+- [x] **Phase 2 in-app verification (2026-08-29)** — completed in the running
+      editor demo: 2000-line doc wraps to 8000 view lines with only ~35 DOM
+      nodes; scroll-to-bottom reaches the true end (model 2000 visible);
+      wrapped gutter shows the correct model-space range; click-to-caret maps
+      wrapped view lines to the right model line. Two more stale-cache bugs
+      surfaced and fixed during the pass: - **Scrollbar-height ordering**: `_onViewModelChange` now invalidates the
+      wrap index BEFORE `setTotalLineCount`, so `_updateScrollHeight` re-
+      measures against the new content (was 7787 view lines instead of 8000
+      when a wrapped document was replaced). - **CoordinatesConverter cache**: `ViewModel._handleModelChange` calls
+      `converter.markDirty()` on every content change, fixing click-to-caret + `getTotalViewLineCount` after a wrapped reload. - **Infinite-loop guard**: `computeWrapSegments` clamps `wrapColumn < 1`
+      so a 0/negative column can't wedge the editor main thread.
+- [ ] **Phase 3/4/5** — async tokenization, chunked loading, workers. NOT started.
+      Note: the file-size-limit feature (editor.maxFileSize, default 50MB,
+      File Editor Settings overlay tab — 2026-08-29, plan deleted on
+      completion, committed as `6bd4f32`) caps how large an openable file may
+      be, a complementary guardrail on top of Phases 1-2.
 
 ## Problem
 
