@@ -98,9 +98,9 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
     const SEARCH_ICONS: Record<"commits" | "files", string> = {
       commits:
-        '<svg xmlns="http://www.w3.org/2000/svg" height="10" viewBox="0 -960 960 960" width="10" fill="currentColor"><path d="M352.5-325.5Q298-371 284-440H80v-80h204q14-69 68.5-114.5T480-680q73 0 127.5 45.5T676-520h204v80H676q-14 69-68.5 114.5T480-280q-73 0-127.5-45.5ZM480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>',
+        '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="M352.5-325.5Q298-371 284-440H80v-80h204q14-69 68.5-114.5T480-680q73 0 127.5 45.5T676-520h204v80H676q-14 69-68.5 114.5T480-280q-73 0-127.5-45.5ZM480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>',
       files:
-        '<svg xmlns="http://www.w3.org/2000/svg" height="10" viewBox="0 -960 960 960" width="10" fill="currentColor"><path d="M200-800v241-1 400-640 200-200Zm0 720q-33 0-56.5-23.5T120-160v-640q0-33 23.5-56.5T200-880h320l240 240v100q-19-8-39-12.5t-41-6.5v-41H480v-200H200v640h241q16 24 36 44.5T521-80H200Zm531-149q29-29 29-71t-29-71q-29-29-71-29t-71 29q-29 29-29 71t29 71q29 29 71 29t71-29ZM864-40 756-148q-21 14-45.5 21t-50.5 7q-75 0-127.5-52.5T480-300q0-75 52.5-127.5T660-480q75 0 127.5 52.5T840-300q0 26-7 50.5T812-204L920-96l-56 56Z"/></svg>',
+        '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="M200-800v241-1 400-640 200-200Zm0 720q-33 0-56.5-23.5T120-160v-640q0-33 23.5-56.5T200-880h320l240 240v100q-19-8-39-12.5t-41-6.5v-41H480v-200H200v640h241q16 24 36 44.5T521-80H200Zm531-149q29-29 29-71t-29-71q-29-29-71-29t-71 29q-29 29-29 71t29 71q29 29 71 29t71-29ZM864-40 756-148q-21 14-45.5 21t-50.5 7q-75 0-127.5-52.5T480-300q0-75 52.5-127.5T660-480q75 0 127.5 52.5T840-300q0 26-7 50.5T812-204L920-96l-56 56Z"/></svg>',
     };
 
     const makeIconToggle = (
@@ -117,8 +117,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: "14px",
-        height: "14px",
+        width: "18px",
+        height: "18px",
         padding: "0",
         cursor: "pointer",
         background: "transparent",
@@ -146,12 +146,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
       width: "100%",
       boxSizing: "border-box",
       height: "26px",
-      padding: "0 8px",
+      padding: "0", // searchBox's own padding supplies the horizontal space
       fontSize: "12px",
       color: "var(--text-primary,#ccc)",
-      background: "var(--bg-secondary,#252526)",
-      border: "1px solid var(--divider,#333)",
-      borderRadius: "4px",
+      background: "transparent", // no field chrome — flush with the header padding
+      border: "none",
       outline: "none",
     });
     searchBox.appendChild(input);
