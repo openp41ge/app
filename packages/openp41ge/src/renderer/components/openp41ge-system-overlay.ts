@@ -12,7 +12,7 @@
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
-import type { EditorSystemTabController } from "../../controllers/types";
+import type { EditorSystemTabController } from "../controllers/types";
 import { systemOverlayService } from "../services/system-overlay-service";
 
 class Openp41geSystemOverlay extends LitElement {
