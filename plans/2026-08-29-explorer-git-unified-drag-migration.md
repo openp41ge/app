@@ -172,6 +172,19 @@ Part A (unified bitmap drag) is implemented and tested; Part B (commit-search si
 
 ## Completion Criteria
 
+**Implemented and verified (2026-08-29):** automated tests pass (1021 openp41ge + 48 openp41ge-git + uikit grid-drop-target suite), typecheck/lint/build clean. Runtime smoke-checked in the running dev app: the Git tab mounts the search UI, explorer repo/worktree rows carry `data-repo-row`/`data-worktree-row` + `data-explorer-drop-zone`, `onGitEntryMouseDown` produces the correct `open-tab` deferred start, and no error overlay. The item below marked as **not yet live-verified** requires a dev-app restart (the main process does not hot-reload).
+
+- [x] Repo and worktree rows in the explorer drag with the **same bitmap strategy** as tabs/files.
+- [x] Dragging a repo row onto the grid opens the `git-repository` pane (boundary → split, center → open); worktree rows open the branch-scoped browser titled by branch.
+- [x] Dragging a repo row within the explorer reorders repos (persisted via `saveRepoOrder`); no native-drag/native-drop code remains for these rows.
+- [x] Dead artifacts removed: `repo` variant, `RepoDragSource`, `repo-open-git`/`FileDropHandler` repo branch.
+- [x] Git sidebar tab (id `"git"`) shows the commit search UI: autofocus input, repo scope + Messages/Files search-into toggles, hierarchical commits → files rows with +adds/−dels, loading/empty/error states. (Changed-content hunk sub-rows deferred to phase 2.)
+- [x] Single-click on a commit result opens an unpinned (preview) git-repository tab; double-click pins; single-click on a file result opens an unpinned file-editor preview (VS Code preview model).
+- [x] Dragging a search result row into the grid opens its review tab (pinned).
+- [x] Cross-window drop of repo/worktree rows: same-window grid drop, explorer reorder, and the cross-window `open-tab` branch are automated-tested (dispatch `actionOpenFile`/`splitFileOpen` with `git-repository` + pending repo/branch).
+- [ ] **Not yet live-verified:** bitmap ghost + cross-window drop driven in the running app end-to-end — requires restarting `nx run openp41ge:dev` (main-process changes don't hot-reload) and using the `test-cross-window-drag` skill; the pre-change dev instance is too stale for that.
+- [x] Deferred to phase 2 and recorded above: content (`-G`/`-S`) search + hunk sub-rows, file-at-revision browsing.
+
 - [ ] Repo and worktree rows in the explorer drag with the **same bitmap strategy** as tabs/files (main-process captured-ghost, no in-DOM ghost, no native `dataTransfer`).
 - [ ] Dragging a repo row onto the grid opens the full `git-repository` pane for that repo (boundary → new column split, center → open in column). Dragging a worktree row opens the branch-scoped git browser titled by the branch.
 - [ ] Dragging a repo row within the explorer still reorders repos (persisted to localStorage); **no native-drag/native-drop code remains for these rows**.
