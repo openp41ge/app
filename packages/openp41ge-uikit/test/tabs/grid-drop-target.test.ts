@@ -25,7 +25,7 @@ interface FakeGrid extends HTMLElement {
   getBoundingClientRect(): DOMRect;
 }
 
-function makeGrid(cols: number, width = 800, winId = "win-1"): FakeGrid {
+function makeGrid(cols: number, width = 800, winId = "win-1", seedTabs = true): FakeGrid {
   const grid = document.createElement("div") as FakeGrid;
   grid.winId = winId;
   grid.pageData = {
@@ -34,7 +34,9 @@ function makeGrid(cols: number, width = 800, winId = "win-1"): FakeGrid {
       cols,
       placements: Array.from({ length: cols }, (_, col) => ({
         position: { row: 0, col },
-        tabIds: [],
+        // A populated grid carries a tab per column (realistic); an empty grid
+        // (seedTabs=false) has none and must not be splittable.
+        tabIds: seedTabs ? [`tab-${col}`] : [],
       })),
     },
   };
@@ -107,6 +109,28 @@ describe("GridDropTarget file drops", () => {
     expect(detail!.splitCol).toBe(0);
     expect(detail!.splitLeft).toBe(true);
     expect(detail!.pinned).toBe(true);
+  });
+
+  test("empty grid: hover at the right edge shows a cell highlight, never a split ghost", () => {
+    const grid = makeGrid(1, 800, "win-1", false);
+    const target = new GridDropTarget(grid, grid.winId);
+    const feedback = target.onHover(fileSource("/a.ts"), 780, 200);
+
+    expect(feedback).not.toBeNull();
+    expect(feedback!.showGhost).toBe(true);
+    // No split preview on an empty grid — nothing exists to split against
+    expect(feedback!.ghostConfig?.type).toBe("cell-highlight");
+    expect(feedback!.ghostConfig?.col).toBe(0);
+  });
+
+  test("empty grid: file drop on the right boundary opens in col 0 without splitting", async () => {
+    const grid = makeGrid(1, 800, "win-1", false);
+    // relX = 780 → far right boundary of the single column
+    const detail = await captureDrop(grid, 780);
+
+    expect(detail).not.toBeNull();
+    expect(detail!.isBoundary).toBeUndefined();
+    expect(detail!.targetCol).toBe(0);
   });
 
   test("boundary drop on the right edge splits to the last column", async () => {

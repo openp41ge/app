@@ -61,7 +61,9 @@ export function actionOpenFile(
     const win = result.windows.find((w) => w.id === windowId);
     if (win) {
       for (const pl of win.grid.placements) {
-        const hasFileViewer = pl.tabIds.some((tid) => result.editorTabs[tid]?.appType === "file-viewer");
+        const hasFileViewer = pl.tabIds.some(
+          (tid) => result.editorTabs[tid]?.appType === "file-viewer",
+        );
         if (hasFileViewer) {
           targetCol = pl.position.col;
           break;
@@ -105,6 +107,14 @@ export function splitFileOpen(
 ): Workspace {
   const win = workspace.windows.find((w) => w.id === windowId);
   if (!win) return workspace;
+
+  // An empty grid has nothing to split against — a boundary drop must simply
+  // fill the single full-width column at col 0, not create an empty adjacent
+  // cell (e.g. the file landing in a new right column beside a blank left one).
+  const hasTabs = win.grid.placements.some((p) => p.tabIds.length > 0);
+  if (!hasTabs) {
+    return actionOpenFile(workspace, windowId, appType, fileName, filePath, 0, true);
+  }
 
   const col = splitCol ?? 0;
   const left = splitLeft ?? true;
@@ -182,9 +192,7 @@ export function actionOpenFileInNewWindow(
   // Copy the source window's non-editor chrome — its sidebar tabs (Explorer,
   // Git, …) and repo list — so the new window feels like the original window.
   // Only the central grid is per-window: it starts with just the dropped file.
-  const source = sourceWinId
-    ? workspace.windows.find((w) => w.id === sourceWinId)
-    : undefined;
+  const source = sourceWinId ? workspace.windows.find((w) => w.id === sourceWinId) : undefined;
   const base = createWindow(newWinId);
   const win = {
     ...base,

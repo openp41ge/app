@@ -20,6 +20,40 @@ function buildSourceWs() {
   return result;
 }
 
+describe("splitFileOpen empty-grid guard", () => {
+  test("fills column 0 full-width without creating an empty cell on an empty grid", () => {
+    const ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+    // empty grid has no placements
+    expect(ws.windows[0].grid.placements).toEqual([]);
+
+    // boundary drop on the right side of the empty grid (splitCol 0, splitLeft false)
+    const result = ops.splitFileOpen(ws, winId, "file-viewer", "app.ts", "/src/app.ts", 0, false);
+
+    const grid = result.windows[0].grid;
+    // No split: still a single full-width column (no empty neighbour)
+    expect(grid.cols).toBe(1);
+    expect(grid.placements).toHaveLength(1);
+    const p = grid.placements[0];
+    expect(p.position.col).toBe(0);
+    expect(p.tabIds).toHaveLength(1);
+    const tab = result.editorTabs[p.tabIds[0] as string];
+    expect(tab?.appType).toBe("file-viewer");
+    expect(tab?.config?.filePath).toBe("/src/app.ts");
+  });
+
+  test("still splits when the target grid already has tabs", () => {
+    const ws = types.createWorkspace("ws1");
+    let r = ops.addTabToCell(ws, ws.windows[0].id, types.createTab("p1", "terminal", "t"), 0, 0);
+    r = ops.splitFileOpen(r, ws.windows[0].id, "file-viewer", "app.ts", "/src/app.ts", 0, false);
+    const grid = r.windows[0].grid;
+    expect(grid.cols).toBe(2);
+    expect(grid.placements).toHaveLength(2);
+    expect(grid.placements.some((pl) => pl.position.col === 0)).toBe(true);
+    expect(grid.placements.some((pl) => pl.position.col === 1)).toBe(true);
+  });
+});
+
 describe("actionOpenFileInNewWindow", () => {
   test("creates a new window in the same workspace with the file in its grid", () => {
     const src = buildSourceWs();

@@ -30,6 +30,16 @@ export const GRID_EVENTS = {
   OPEN_TAB: "grid-open-tab",
 } as const;
 
+/**
+ * True when the grid has at least one tab anywhere. An empty grid (no
+ * placements, or placements all with empty tabIds) has nothing to split
+ * against, so drops must fill column 0 instead of creating an empty cell.
+ */
+function _gridHasTabs(pageData: GridElementLike["pageData"]): boolean {
+  if (!pageData) return false;
+  return pageData.grid.placements.some((p) => p.tabIds.length > 0);
+}
+
 export interface WorkspaceLike {
   tabs: Record<string, { config?: { filePath?: string } }>;
 }
@@ -71,6 +81,15 @@ export class GridDropTarget implements IDropTarget {
     const pageData = gridEl.pageData;
     if (!pageData) return null;
 
+    // An empty grid cannot be split — a drop simply fills the single column.
+    // Never preview a split here, or the ghost would predict an empty cell.
+    if (!_gridHasTabs(pageData)) {
+      return {
+        showGhost: true,
+        ghostConfig: { type: "cell-highlight", col: 0, cols: pageData.grid.cols },
+      };
+    }
+
     const rect = this.element.getBoundingClientRect();
     const relX = clientX - rect.left;
     const cols = pageData.grid.cols;
@@ -110,10 +129,18 @@ export class GridDropTarget implements IDropTarget {
     const pageData = gridEl.pageData;
     if (!pageData) return { success: false, reason: "no page data" };
 
+    const data = source.getDragData();
+
+    // An empty grid cannot be split — a drop on any part (incl. the right
+    // boundary) fills the single column at col 0 instead of creating an empty
+    // adjacent cell.
+    if (!_gridHasTabs(pageData)) {
+      return this._handleCellDrop(data, 0, gridEl);
+    }
+
     const rect = this.element.getBoundingClientRect();
     const relX = clientX - rect.left;
     const cols = pageData.grid.cols;
-    const data = source.getDragData();
     const pos = computeDropTarget(this.element, relX, rect.width, cols);
 
     if (pos.isBoundary) {
@@ -130,7 +157,6 @@ export class GridDropTarget implements IDropTarget {
   private _fire(type: string, detail: Record<string, unknown>): void {
     this.element.dispatchEvent(new CustomEvent(type, { bubbles: true, detail }));
   }
-
   private _handleBoundaryDrop(
     data: DragSourceData,
     boundaryIndex: number,
