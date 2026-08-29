@@ -659,6 +659,13 @@ export class FileEditorElement extends LitElement {
     tokenRegistry.getTokenizer(langId).then((tokenizer) => {
       if (!this._viewModel || !this._viewLines) return; // torn down meanwhile
       this._viewModel.setTokenizer(tokenizer);
+      if (this._paused) {
+        // Hidden tab — a grammar just became ready. Apply it to the model but
+        // skip the DOM rebuild (wasted on a hidden editor); mark the view stale
+        // so resume re-renders and picks the tokens up.
+        this._pausedContentChanged = true;
+        return;
+      }
       const count = this._viewModel.lineCount;
       this._viewModel.tokenizeVisibleRange(1, Math.min(100, count));
       this._viewLines.clearContentCache();
@@ -1086,6 +1093,7 @@ export class FileEditorElement extends LitElement {
   }
 
   private _renderVisibleLines(): void {
+    if (this._paused) return; // suspended — never render a hidden editor
     if (!this._viewLines || !this._viewModel) return;
 
     const viewportEl = this._viewportEl;

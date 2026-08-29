@@ -74,6 +74,24 @@ describe("pause inactive file editors", () => {
     expect(firstLineText(el)).toBe("line one;");
   });
 
+  test("grammar load completing while hidden does not re-render the editor (regression)", async () => {
+    const el = await mountEditor();
+
+    // Pause immediately and change the content. The async TextMate grammar
+    // load (module-wide, resolves in jsdom/Node) may complete any time after
+    // mount; its completion refresh must never touch a paused editor's DOM.
+    el.setActive(false);
+    el.textContentModel.setValue(CHANGED);
+    await new Promise((r) => setTimeout(r, 300));
+
+    expect(firstLineText(el)).toBe("line one;"); // still stale
+    expect(el.getState().isDirty).toBe(true);
+
+    el.setActive(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(firstLineText(el)).toBe("changed first;");
+  });
+
   test("pause and resume are idempotent", async () => {
     const el = await mountEditor();
     el.setActive(false);
