@@ -247,6 +247,11 @@ let _pendingGitEntryDragStart: {
   screenY: number;
   repoName: string;
   branch?: string;
+  /** Search-result rows drag the git-commit-search app (placeholder); others
+   * the git-repository browser. Defaults to git-repository on the wire. */
+  appType?: string;
+  /** Full commit hash for search-result rows. */
+  hash?: string;
   winId: string;
   offsetX: number;
   offsetY: number;
@@ -339,9 +344,16 @@ function onGitEntryMouseDown(e: MouseEvent): void {
 
   const repoName = row.getAttribute("data-repo") || "";
   const branch = row.getAttribute("data-branch") || undefined;
+  // Commit-search result rows are flagged so their drop opens the new
+  // git-commit-search app instead of the git-repository browser.
+  const isSearchResult = row.hasAttribute("data-git-search-result");
+  const hash = row.getAttribute("data-hash") || undefined;
   if (!repoName) return;
-  // Worktree tabs are titled by their branch; repo tabs by the repo name.
-  const title = branch || repoName;
+  // Worktree tabs are titled by their branch; repo tabs by the repo name;
+  // commit-search result rows by their short hash.
+  const title = isSearchResult
+    ? row.getAttribute("data-short-hash") || (hash ? hash.slice(0, 7) : repoName)
+    : branch || repoName;
   const winId = _resolveMyWinId();
 
   // Calculate offset from cursor to element's top-left corner
@@ -351,7 +363,10 @@ function onGitEntryMouseDown(e: MouseEvent): void {
   const offsetX = e.screenX - elScreenX;
   const offsetY = e.screenY - elScreenY;
 
-  const dragSource = new GitEntryDragSource(repoName, title, branch);
+  const dragSource = new GitEntryDragSource(repoName, title, branch, {
+    searchResult: isSearchResult,
+    hash,
+  });
   dragSource.setOffset(offsetX, offsetY);
   _currentSource = dragSource;
   _sidebarTabDragSide = null; // not a sidebar-tab drag
@@ -366,6 +381,8 @@ function onGitEntryMouseDown(e: MouseEvent): void {
     screenY: e.screenY,
     repoName,
     branch,
+    appType: isSearchResult ? "git-commit-search" : "git-repository",
+    hash,
     winId,
     offsetX,
     offsetY,
@@ -951,10 +968,13 @@ export function initDragSystem(): () => void {
             p.captureRect,
             TAB_GHOST_CAPTURE_INSET,
             {
-              appType: "git-repository",
-              tabConfig: p.branch
-                ? { repoName: p.repoName, branch: p.branch }
-                : { repoName: p.repoName },
+              appType: p.appType ?? "git-repository",
+              tabConfig:
+                p.appType === "git-commit-search"
+                  ? { repoName: p.repoName, hash: p.hash }
+                  : p.branch
+                    ? { repoName: p.repoName, branch: p.branch }
+                    : { repoName: p.repoName },
             },
           );
           _pendingGitEntryDragStart = null;
@@ -1303,6 +1323,14 @@ async function _handleCrossWindowDrop(
         return;
       }
 
+      // Commit-search drops carry the full hash; encode it (with the repo) into
+      // the dispatch's config slot (a string) so the target window's controller
+      // can restore it. Git-repository drops pass the plain repo name.
+      const configSlot =
+        appType === "git-commit-search"
+          ? JSON.stringify({ repoName, hash: tabConfig.hash })
+          : repoName;
+
       const gridEl = (target as IDropTarget & { element: HTMLElement }).element.closest(
         "tab-grid",
       ) as HTMLElement | null;
@@ -1313,8 +1341,13 @@ async function _handleCrossWindowDrop(
         const pos = computeDropTarget(gridEl, relX, gridRect.width, cols);
         const targetCol = pos.col;
         const winId = (gridEl as HTMLElement & { winId?: string }).winId || _resolveMyWinId();
-        // Worktree tabs are titled by their branch; repo tabs by the repoName.
-        const tabName = branch || repoName;
+        // Worktree tabs are titled by their branch; repo tabs by the repoName;
+        // commit-search result tabs by their short hash.
+        const tabName =
+          appType === "git-commit-search"
+            ? ((tabConfig as { shortHash?: string }).shortHash ??
+              String(tabConfig.hash ?? "").slice(0, 7))
+            : branch || repoName;
 
         if (pos.isBoundary) {
           const splitLeft =
@@ -1330,7 +1363,7 @@ async function _handleCrossWindowDrop(
             winId,
             appType,
             tabName,
-            repoName,
+            configSlot,
             splitCol,
             splitLeft,
           );
@@ -1340,7 +1373,7 @@ async function _handleCrossWindowDrop(
             winId,
             appType,
             tabName,
-            repoName,
+            configSlot,
             targetCol,
             true,
           );

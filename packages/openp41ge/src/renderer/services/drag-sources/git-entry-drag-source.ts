@@ -25,24 +25,49 @@ export interface GitEntryDragData {
   title: string;
 }
 
+export interface GitEntryDragSourceOptions {
+  /** The row is a commit-search result — the drop opens the git-commit-search
+   * app (placeholder) instead of the git-repository browser. */
+  searchResult?: boolean;
+  /** Full commit hash for search-result rows (carried in tabConfig). */
+  hash?: string;
+}
+
 export class GitEntryDragSource implements IDragSource {
   readonly type = "open-tab";
 
   private _repoName: string;
   private _title: string;
   private _branch?: string;
+  private _searchResult: boolean;
+  private _hash?: string;
   /** Offset from cursor to element top-left, set via setOffset(). */
   private _offsetX = 0;
   private _offsetY = 0;
   private _ghost: HTMLElement | null = null;
 
-  constructor(repoName: string, title: string, branch?: string) {
+  constructor(
+    repoName: string,
+    title: string,
+    branch?: string,
+    opts: GitEntryDragSourceOptions = {},
+  ) {
     this._repoName = repoName;
     this._title = title;
     this._branch = branch;
+    this._searchResult = opts.searchResult ?? false;
+    this._hash = opts.hash;
   }
 
   getDragData(): DragSourceData {
+    if (this._searchResult) {
+      return {
+        type: "open-tab",
+        appType: "git-commit-search",
+        title: this._title,
+        tabConfig: { repoName: this._repoName, hash: this._hash },
+      };
+    }
     return {
       type: "open-tab",
       appType: "git-repository",

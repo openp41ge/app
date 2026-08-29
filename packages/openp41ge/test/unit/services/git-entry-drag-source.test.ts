@@ -35,6 +35,19 @@ describe("GitEntryDragSource", () => {
     });
   });
 
+  test("commit-search result row: getDragData opens the git-commit-search app scoped to the commit", () => {
+    const source = new GitEntryDragSource("acme", "abdef01", undefined, {
+      searchResult: true,
+      hash: "af".repeat(20),
+    });
+    expect(source.getDragData()).toEqual({
+      type: "open-tab",
+      appType: "git-commit-search",
+      title: "abdef01",
+      tabConfig: { repoName: "acme", hash: "af".repeat(20) },
+    });
+  });
+
   test("createGhost returns an invisible, pointer-inert element (visual is the BrowserWindow bitmap)", () => {
     const source = new GitEntryDragSource("acme", "acme");
     const ghost = source.createGhost();

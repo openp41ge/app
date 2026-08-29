@@ -162,15 +162,19 @@ describe("CommitSearchSystemTabController", () => {
     expect(model.calls[model.calls.length - 1].options.in).toBe("all");
   });
 
-  it("single-click on a commit emits openp41ge:open-commit with pinned:false (preview)", async () => {
+  it("single-click on a commit toggles its file sub-rows open/closed (no preview event)", async () => {
     await search(controller, "readme");
-    const row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    let row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    expect(host.querySelectorAll(".commit-file-row").length).toBe(0);
     row.click();
-    expect(events.openCommit).toHaveLength(1);
-    expect(events.openCommit[0].detail).toMatchObject({
-      repoName: "globex",
-      pinned: false,
-    });
+    await flush();
+    expect(host.querySelectorAll(".commit-file-row").length).toBeGreaterThan(0);
+    expect(events.openCommit).toHaveLength(0); // click expands, it no longer previews
+
+    row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    row.click();
+    await flush();
+    expect(host.querySelectorAll(".commit-file-row").length).toBe(0);
   });
 
   it("double-click on a commit emits openp41ge:open-commit with pinned:true", async () => {
@@ -181,15 +185,14 @@ describe("CommitSearchSystemTabController", () => {
     expect(events.openCommit[0].detail.pinned).toBe(true);
   });
 
-  it("chevron expands file sub-rows with +adds/−dels", async () => {
+  it("clicking a commit row expands file sub-rows with +adds/−dels", async () => {
     await search(controller, "a");
-    const row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    let row = host.querySelector<HTMLElement>("[data-commit-row]")!;
     expect(host.querySelectorAll(".commit-file-row").length).toBe(0);
 
-    // Click the chevron (first span inside the head).
-    const chevron = row.querySelector("span") as HTMLSpanElement;
-    chevron.click();
+    row.click();
     await flush();
+    row = host.querySelector<HTMLElement>("[data-commit-row]")!;
 
     expect(host.querySelectorAll(".commit-file-row").length).toBe(2);
     expect(host.textContent).toContain("src/app.ts");
@@ -197,11 +200,47 @@ describe("CommitSearchSystemTabController", () => {
     expect(host.textContent).toContain("−1");
   });
 
+  it("commit rows carry drag markers (git-commit-search scoped to the commit) and a two-line layout", async () => {
+    await search(controller, "readme");
+    const row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    // Distinct from explorer repo rows so the drop opens git-commit-search.
+    expect(row.getAttribute("data-git-search-result")).not.toBeNull();
+    expect(row.getAttribute("data-repo-row")).not.toBeNull();
+    expect(row.getAttribute("data-repo")).toBe("globex");
+    expect(row.getAttribute("data-hash")).toBe("cccccccccccccccccccccccccccccccccccccccc");
+    expect(row.getAttribute("data-short-hash")).toBe("ccccccc");
+    // [repo] [commit id] on top and the message on its own (truncated) line.
+    expect(host.textContent).toContain("globex");
+    expect(host.textContent).toContain("ccccccc");
+    expect(host.textContent).toContain("docs: update readme");
+
+    // Falling counter: the file sub-row also carries the search markers.
+    row.click();
+    await flush();
+    const fileRow = host.querySelector<HTMLElement>(".commit-file-row")!;
+    expect(fileRow.getAttribute("data-git-search-result")).not.toBeNull();
+    expect(fileRow.getAttribute("data-hash")).toBe("cccccccccccccccccccccccccccccccccccccccc");
+  });
+
+  it("commit rows use the explorer chevrons (chevron-right folded, chevron-down expanded)", async () => {
+    await search(controller, "readme");
+    let row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    const icon = (row.querySelector("openp41ge-icon") as HTMLElement | null)!;
+    expect(icon.getAttribute("name")).toBe("chevron-right");
+
+    row.click();
+    await flush();
+    row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    const icon2 = row.querySelector("openp41ge-icon") as HTMLElement | null;
+    expect(icon2?.getAttribute("name")).toBe("chevron-down");
+  });
+
   it("file sub-row click emits openp41ge:open-file with pinned:false (working-tree preview)", async () => {
     await search(controller, "a");
-    const row = host.querySelector<HTMLElement>("[data-commit-row]")!;
-    (row.querySelector("span") as HTMLSpanElement).click();
+    let row = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    row.click();
     await flush();
+    row = host.querySelector<HTMLElement>("[data-commit-row]")!;
 
     const fileRow = host.querySelector<HTMLElement>(".commit-file-row")!;
     fileRow.click();

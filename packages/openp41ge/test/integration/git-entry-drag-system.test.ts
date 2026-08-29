@@ -48,6 +48,21 @@ function makeRow(tag: "repo" | "worktree", repoName: string, branch?: string): H
   return row;
 }
 
+/** A commit-search result row — drags the git-commit-search app, not the
+ * git-repository browser. */
+function makeSearchRow(repoName: string, hash: string, shortHash: string): HTMLElement {
+  const row = document.createElement("div");
+  row.setAttribute("draggable", "true");
+  row.setAttribute("data-repo-row", "");
+  row.setAttribute("data-git-search-result", "");
+  row.setAttribute("data-repo", repoName);
+  row.setAttribute("data-hash", hash);
+  row.setAttribute("data-short-hash", shortHash);
+  row.textContent = shortHash;
+  document.body.appendChild(row);
+  return row;
+}
+
 function mouseDown(el: HTMLElement, opts: { x?: number; y?: number; button?: number } = {}) {
   el.dispatchEvent(
     new MouseEvent("mousedown", {
@@ -294,6 +309,107 @@ describe("git-entry drag wiring (init-drag-system)", () => {
       "git-repository",
       "main",
       "acme",
+      0,
+      true,
+    );
+    expect(openp41ge.drag.endSession).toHaveBeenCalled();
+
+    delete (document as unknown as { elementFromPoint?: unknown }).elementFromPoint;
+    grid.remove();
+  });
+
+  it("mousedown on a commit-search result row defers an open-tab start for the git-commit-search app", () => {
+    const row = makeSearchRow("acme", "af".repeat(20), "abdef01");
+    mouseDown(row);
+
+    expect(hooks().getCurrentDragData()).toEqual({
+      type: "open-tab",
+      appType: "git-commit-search",
+      title: "abdef01",
+      tabConfig: { repoName: "acme", hash: "af".repeat(20) },
+    });
+    const pending = hooks().getGitEntryPendingStart() as {
+      appType?: string;
+      hash?: string;
+    };
+    expect(pending.appType).toBe("git-commit-search");
+    expect(pending.hash).toBe("af".repeat(20));
+    expect(row.getAttribute("draggable")).toBe("false");
+  });
+
+  it("first POSITION for a search row fires drag.start with git-commit-search openTabData", () => {
+    makeSearchRow("acme", "af".repeat(20), "abdef01");
+    const row = document.querySelector("[data-git-search-result]") as HTMLElement;
+    mouseDown(row);
+    firstPosition();
+
+    expect(dragStart).toHaveBeenCalledTimes(1);
+    const args = dragStart.mock.calls[0];
+    expect(args[11]).toBe("open-tab");
+    expect(args[15]).toEqual({
+      appType: "git-commit-search",
+      tabConfig: { repoName: "acme", hash: "af".repeat(20) },
+    });
+  });
+
+  it("cross-window open-tab drop of a git-commit-search row opens the placeholder app scoped to repo + commit", async () => {
+    const grid = document.createElement("tab-grid");
+    (grid as HTMLElement & { winId: string; cols: number }).winId = "win-2";
+    (grid as HTMLElement & { winId: string; cols: number }).cols = 2;
+    const rect = {
+      left: 0,
+      top: 0,
+      right: 800,
+      bottom: 400,
+      width: 800,
+      height: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect;
+    grid.getBoundingClientRect = () => rect;
+    Object.defineProperty(grid, "dropTarget", {
+      value: {
+        type: "grid",
+        element: grid,
+        onHover: () => null,
+        onDrop: () => Promise.resolve({ success: true as const }),
+        onLeave: () => {},
+      },
+      configurable: true,
+      writable: true,
+    });
+    document.body.appendChild(grid);
+    (
+      document as unknown as { elementFromPoint: (x: number, y: number) => HTMLElement }
+    ).elementFromPoint = () => grid;
+
+    const openp41ge = window.openp41ge as unknown as {
+      drag: { getActive: () => Promise<unknown>; endSession: () => void };
+      workspace: { dispatch: ReturnType<typeof vi.fn> };
+    };
+    openp41ge.drag.getActive = vi.fn().mockResolvedValue({
+      sourceWinId: "win-1",
+      label: "abdef01",
+      dragData: {
+        type: "open-tab",
+        appType: "git-commit-search",
+        title: "abdef01",
+        tabConfig: { repoName: "acme", hash: "af".repeat(20), shortHash: "abdef01" },
+      },
+    });
+    const dispatch = openp41ge.workspace.dispatch as ReturnType<typeof vi.fn>;
+    openp41ge.drag.endSession = vi.fn();
+
+    const hooks = (window as unknown as { __openp41geTestHooks: any }).__openp41geTestHooks;
+    await hooks.callHandleCrossWindowDrop(200, 200, 200, 200);
+
+    expect(dispatch).toHaveBeenCalledWith(
+      "actionOpenFile",
+      "win-2",
+      "git-commit-search",
+      "abdef01",
+      JSON.stringify({ repoName: "acme", hash: "af".repeat(20) }),
       0,
       true,
     );

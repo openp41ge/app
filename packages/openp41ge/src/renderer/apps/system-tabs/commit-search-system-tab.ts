@@ -459,7 +459,12 @@ export class CommitSearchSystemTabController implements SystemTabController {
     row.tabIndex = 0;
     row.setAttribute("data-commit-row", "");
     row.setAttribute("data-repo-row", ""); // unified bitmap drag surface
+    // Distinct from explorer repo rows: dropping THIS row opens the new
+    // git-commit-search app (placeholder) scoped to the commit.
+    row.setAttribute("data-git-search-result", "");
     row.setAttribute("data-repo", commit.repoName);
+    row.setAttribute("data-hash", commit.hash);
+    row.setAttribute("data-short-hash", commit.shortHash);
     row.setAttribute("draggable", "true");
 
     Object.assign(row.style, {
@@ -469,43 +474,42 @@ export class CommitSearchSystemTabController implements SystemTabController {
       cursor: "pointer",
     });
 
+    // Line 1 — [repo] [commit id] … [meta] with the explorer chevron on the left.
     const head = document.createElement("div");
     Object.assign(head.style, {
       display: "flex",
       alignItems: "center",
       gap: "6px",
-      height: "28px",
-      padding: "0 10px 0 6px",
+      height: "20px",
+      padding: "4px 10px 0 6px",
       fontSize: "12px",
       color: "var(--text-primary,#ccc)",
     });
 
-    // The chevron toggles the file sub-rows; the rest of the row opens the
-    // preview git tab (single-click unpinned, double-click pinned).
-    const chevron = document.createElement("span");
-    chevron.textContent = expanded ? "\u25BE" : "\u25B8";
-    Object.assign(chevron.style, {
+    const chevron = document.createElement("openp41ge-icon");
+    chevron.setAttribute("name", expanded ? "chevron-down" : "chevron-right");
+    chevron.setAttribute("size", "10");
+    const chevronWrap = document.createElement("span");
+    Object.assign(chevronWrap.style, {
       width: "14px",
       flexShrink: "0",
-      fontSize: "10px",
-      color: "var(--text-secondary,#888)",
-      textAlign: "center",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
     });
-    chevron.addEventListener("click", (e: MouseEvent) => {
-      e.stopPropagation();
-      if (this._expandedCommits.has(key)) this._expandedCommits.delete(key);
-      else {
-        this._expandedCommits.add(key);
-        this._expandedFiles.delete(key);
-      }
-      this._rerender();
-    });
-    head.appendChild(chevron);
+    chevronWrap.appendChild(chevron);
+    head.appendChild(chevronWrap);
 
     const repo = document.createElement("span");
     repo.textContent = commit.repoName;
+    repo.title = commit.repoName;
     Object.assign(repo.style, {
-      flexShrink: "0",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      maxWidth: "50%",
+      minWidth: "0",
+      flexShrink: "1",
       fontSize: "10px",
       color: "var(--text-secondary,#888)",
     });
@@ -513,6 +517,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
     const hash = document.createElement("span");
     hash.textContent = commit.shortHash;
+    hash.title = commit.hash;
     Object.assign(hash.style, {
       flexShrink: "0",
       fontSize: "10px",
@@ -520,35 +525,38 @@ export class CommitSearchSystemTabController implements SystemTabController {
     });
     head.appendChild(hash);
 
-    const message = document.createElement("span");
-    message.textContent = commit.message;
-    message.title = commit.message;
-    Object.assign(message.style, {
-      flex: "1",
-      minWidth: "0",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      color: "var(--text-primary,#ccc)",
-    });
-    head.appendChild(message);
-
     const meta = document.createElement("span");
     meta.textContent = commit.relativeDate || commit.date || commit.author;
     Object.assign(meta.style, {
+      marginLeft: "auto",
       flexShrink: "0",
       fontSize: "10px",
       color: "var(--text-muted,#666)",
     });
     head.appendChild(meta);
-
     row.appendChild(head);
 
-    // Click: single = preview (unpinned), double = pin. Space/Enter = preview.
-    // File sub-rows stopPropagation so they never trigger the commit open.
+    // Line 2 — the commit message, still truncated to one line.
+    const msgLine = document.createElement("div");
+    msgLine.textContent = commit.message;
+    msgLine.title = commit.message;
+    Object.assign(msgLine.style, {
+      padding: "1px 10px 4px 26px",
+      fontSize: "12px",
+      color: "var(--text-primary,#ccc)",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    });
+    row.appendChild(msgLine);
+
+    // Click = expand/collapse the commit's file sub-rows (no preview). A drag
+    // onto the grid opens the git-commit-search pane; double-click still opens
+    // the commit preview (pinned). File sub-rows stopPropagation so they never
+    // collapse the commit row.
     row.addEventListener("click", (e: MouseEvent) => {
       e.stopPropagation();
-      this._emitOpenCommit(commit, false);
+      this._toggleCommitExpanded(key);
     });
     row.addEventListener("dblclick", (e: MouseEvent) => {
       e.stopPropagation();
@@ -557,7 +565,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     row.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        this._emitOpenCommit(commit, e.key === "Enter");
+        this._toggleCommitExpanded(key);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         if (this._expandedCommits.has(key)) return;
@@ -586,6 +594,16 @@ export class CommitSearchSystemTabController implements SystemTabController {
     return row;
   }
 
+  /** Toggle a commit's file sub-rows (single-click / Enter / Space). */
+  private _toggleCommitExpanded(key: string): void {
+    if (this._expandedCommits.has(key)) this._expandedCommits.delete(key);
+    else {
+      this._expandedCommits.add(key);
+      this._expandedFiles.delete(key);
+    }
+    this._rerender();
+  }
+
   private _fileRows(commit: SearchResultCommit): HTMLElement[] {
     const out: HTMLElement[] = [];
     for (const file of commit.files) {
@@ -593,8 +611,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
       row.className = "commit-file-row";
       row.tabIndex = 0;
       row.setAttribute("data-worktree-row", ""); // unified bitmap drag surface
+      row.setAttribute("data-git-search-result", "");
       row.setAttribute("data-repo", commit.repoName);
       row.setAttribute("data-branch", commit.shortHash);
+      row.setAttribute("data-hash", commit.hash);
+      row.setAttribute("data-short-hash", commit.shortHash);
       row.setAttribute("draggable", "true");
 
       Object.assign(row.style, {

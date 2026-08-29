@@ -148,7 +148,13 @@ export class Openp41geTabsEventHandler {
       } = detail as {
         winId?: string;
         tabType: string;
-        tabConfig: { filePath: string; repoName?: string; branch?: string };
+        tabConfig: {
+          filePath: string;
+          repoName?: string;
+          branch?: string;
+          hash?: string;
+          shortHash?: string;
+        };
         targetCol: number;
         isBoundary?: boolean;
         splitCol?: number;
@@ -167,8 +173,7 @@ export class Openp41geTabsEventHandler {
         // GitRepositoryController to pick up on mount.
         (window as unknown as Record<string, unknown>).__pendingGitRepo = repoName;
         if (tabConfig.branch) {
-          (window as unknown as Record<string, unknown>).__pendingGitWorktree =
-            tabConfig.branch;
+          (window as unknown as Record<string, unknown>).__pendingGitWorktree = tabConfig.branch;
         } else {
           (window as unknown as Record<string, unknown>).__pendingGitWorktree = null;
         }
@@ -201,6 +206,54 @@ export class Openp41geTabsEventHandler {
             repoName,
             targetCol,
             true,
+          );
+        }
+        return;
+      }
+
+      // ── Git commit-search result drop ─────────────────────
+      // Opens the new git-commit-search app (currently a placeholder panel for
+      // the eventual commit-search-result UI). repoName + hash ride the config
+      // slot (JSON string, like the cross-window path) so the controller can
+      // restore them; the pending flag covers the first (fresh) mount.
+      if (_tabType === "git-commit-search") {
+        const repoName = tabConfig.repoName;
+        const hash = tabConfig.hash;
+        if (!repoName || !hash) return;
+
+        (window as unknown as Record<string, unknown>).__pendingGitCommitSearch = {
+          repoName,
+          hash,
+        };
+        const tabName = tabConfig.shortHash || hash.slice(0, 7);
+
+        const focusCol = isBoundary
+          ? (splitLeft ?? true)
+            ? (splitCol ?? targetCol)
+            : (splitCol ?? targetCol) + 1
+          : targetCol;
+        Openp41geTabsEventHandler.lastFocusedCol[winId] = focusCol;
+
+        const configSlot = JSON.stringify({ repoName, hash });
+        if (isBoundary) {
+          this._dispatch(
+            "splitFileOpen",
+            winId,
+            "git-commit-search",
+            tabName,
+            configSlot,
+            splitCol ?? targetCol,
+            splitLeft ?? true,
+          );
+        } else {
+          this._dispatch(
+            "actionOpenFile",
+            winId,
+            "git-commit-search",
+            tabName,
+            configSlot,
+            targetCol,
+            pinned ?? true,
           );
         }
         return;
@@ -282,7 +335,6 @@ export class Openp41geTabsEventHandler {
       if (!winId) return;
       this._dispatch("removeTabFromCell", winId, tabId);
     });
-
   }
 
   /**
@@ -310,8 +362,6 @@ export class Openp41geTabsEventHandler {
     document.addEventListener("click", listener);
     this._cleanups.push(() => document.removeEventListener("click", listener));
   }
-
-
 
   private _dispatch(fn: string, ...args: unknown[]): void {
     this._commandBus?.dispatch(fn, ...args);
