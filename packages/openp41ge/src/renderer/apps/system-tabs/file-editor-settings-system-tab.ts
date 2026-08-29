@@ -3,8 +3,9 @@
  * settings surface (<openp41ge-file-editor-settings>).
  *
  * Registered in RegisterAppTypesStep as the "file-editor-settings" overlay
- * tab. The first (and currently only) setting is `editor.maxFileSize` — the
- * cap above which files open as a VSCode-style "too large" message.
+ * tab (labelled "Editor"). The first (and currently only) setting is
+ * `editor.maxFileSize` — the cap above which files open as a VSCode-style
+ * "too large" message.
  */
 
 import { html, type TemplateResult } from "lit";
@@ -14,7 +15,7 @@ import "../../components/openp41ge-file-editor-settings";
 export class FileEditorSettingsSystemTab implements EditorSystemTabController {
   readonly id: string;
   readonly appType = "file-editor-settings";
-  readonly title = "File Editor Settings";
+  readonly title = "Editor";
 
   constructor(tabId: string) {
     this.id = tabId;

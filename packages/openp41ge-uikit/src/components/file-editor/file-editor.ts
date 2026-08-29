@@ -263,7 +263,7 @@ export class FileEditorElement extends LitElement {
             >
               ${tooLarge.fileName} (${this._formatBytes(tooLarge.sizeBytes)}) exceeds the
               ${this._formatBytes(tooLarge.limitBytes)} editor limit. Adjust the limit in
-              File Editor Settings to open larger files.
+              Editor to open larger files.
             </div>
           </div>
           <fe-status-bar></fe-status-bar>

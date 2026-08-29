@@ -77,8 +77,7 @@ export class RegisterAppTypesStep implements IStartupStep {
     });
     systemOverlayService.registerTab({
       id: "file-editor-settings",
-      label: "File Editor Settings",
-      icon: "\u2699",
+      label: "Editor",
       createController: (tabId: string) => new FileEditorSettingsSystemTab(tabId),
     });
 
