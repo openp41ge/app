@@ -90,6 +90,17 @@ if (typeof requestAnimationFrame === "undefined") {
   };
 }
 
+// ── Stub cancelAnimationFrame (jsdom lacks it) ─────────────────────────
+//
+// FileEditorElement._pauseWork cancels a pending tokenize rAF when a tab is
+// hidden; without a no-op stub that call would throw in jsdom.
+
+if (typeof cancelAnimationFrame === "undefined") {
+  (
+    globalThis as unknown as { cancelAnimationFrame: typeof cancelAnimationFrame }
+  ).cancelAnimationFrame = () => {};
+}
+
 // ── Suppress Lit ChildPart errors from innerHTML cleanup ──────────────
 
 // When tests clear document.body.innerHTML = "", Lit's internal marker

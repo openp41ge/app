@@ -180,8 +180,14 @@ export class FileEditorController extends BaseController implements FileViewerCo
     this._lastDispatchedTitle = "";
   }
 
-  setVisible(_visible: boolean): void {
-    // No special visibility handling needed
+  setVisible(visible: boolean): void {
+    // Forward tab activation/deactivation to the editor element. An inactive
+    // file editor pauses all rendering work (see FileEditorElement.setActive);
+    // it resumes with a refresh when the tab becomes active again. Streaming/
+    // terminal tab types keep their own (or no-op) visibility handling.
+    if (this._editor) {
+      this._editor.setActive(visible);
+    }
   }
 
   snapshot(): Record<string, unknown> {

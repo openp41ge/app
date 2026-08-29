@@ -95,6 +95,19 @@ export class FileEditorElement extends LitElement {
   private _tokenizeFrame: number | null = null;
 
   /**
+   * True while this editor's tab is inactive (hidden behind another tab in
+   * its cell). Suspended editors skip all re-render work — see setActive().
+   */
+  private _paused: boolean = false;
+
+  /**
+   * True when the model content changed while the editor was paused. Resume
+   * refreshes the visible window (and the exact scrollbar width, which is not
+   * tracked while hidden) only when this is set.
+   */
+  private _pausedContentChanged: boolean = false;
+
+  /**
    * Content-width tracker (injectable, SOLID DIP). The scrollbar is exact from
    * the start: measured synchronously on load, re-measured only on edited
    * lines. Tests may swap in a spy-wrapped instance before the editor loads.
@@ -543,6 +556,60 @@ export class FileEditorElement extends LitElement {
       state: this._state,
       isDirty: this._isDirty,
     };
+  }
+
+  /**
+   * Called by the platform when the tab hosting this editor is shown/hidden.
+   * Hidden editors suspend all rendering work (re-render on model changes,
+   * resize handling, async tokenize catch-up) and refresh the visible window
+   * when shown again if the content changed while hidden.
+   *
+   * Only file editors need this — streaming/terminal tab types never re-render
+   * hidden stale content, so they don't forward visibility to their content.
+   */
+  setActive(visible: boolean): void {
+    if (visible) {
+      this._resumeWork();
+    } else {
+      this._pauseWork();
+    }
+  }
+
+  /** Suspend rendering while this editor's tab is inactive. */
+  private _pauseWork(): void {
+    if (this._paused) return;
+    this._paused = true;
+    // Cancel any pending async tokenize catch-up pass.
+    if (this._tokenizeFrame !== null) {
+      cancelAnimationFrame(this._tokenizeFrame);
+      this._tokenizeFrame = null;
+    }
+    this._renderHadUncachedTokens = false;
+    // Stop observing resize — re-rendering on resize of a hidden editor is wasted.
+    this._viewportResizeObserver?.disconnect();
+  }
+
+  /** Resume rendering when this editor's tab becomes active again. */
+  private _resumeWork(): void {
+    if (!this._paused) return;
+    this._paused = false;
+    if (!this._viewModel || !this._viewLines) return;
+
+    // Re-observe resize so future resizes update the visible range again.
+    if (this._viewportResizeObserver && this._viewportEl && typeof ResizeObserver !== "undefined") {
+      this._viewportResizeObserver.observe(this._viewportEl);
+    }
+
+    // If the model changed while hidden, bring the view up to date: re-measure
+    // the scrollbar width (skipped while hidden) and re-render the visible window.
+    if (this._pausedContentChanged) {
+      this._pausedContentChanged = false;
+      this._lineWidthTracker.reset();
+      this._lineWidthTracker.measureRange(1, this._viewModel.lineCount);
+      this._reRenderAll();
+      this._refreshContentWidth();
+      this._syncCursorView();
+    }
   }
 
   // ── Private ──
@@ -1254,7 +1321,12 @@ export class FileEditorElement extends LitElement {
     }
   }
 
-  private _onViewModelChange(_event: ViewModelEvent): void {
+  /**
+   * Force a full re-render of the visible window from the current model state.
+   * Shares one code path across the normal content-change handler and resume
+   * after being hidden (see setActive / _resumeWork).
+   */
+  private _reRenderAll(): void {
     if (!this._viewLines || !this._viewModel) return;
 
     // Clear content caches FIRST. In wrapped mode this resets the wrap index;
@@ -1271,14 +1343,6 @@ export class FileEditorElement extends LitElement {
     // Update line count (this also updates scroll height)
     this._viewLines.setTotalLineCount(this._viewModel.lineCount);
 
-    // Recalculate the visible range based on the new total line count.
-    // When lines are deleted, the previous visible end may extend beyond the
-    // new line count (e.g., end=5 on a 5-line file that now has 4 lines).
-    // onScroll() recomputes the range using the updated _totalLineCount, then
-    // builds lines and fires onVisibleRangeChanged (which updates line numbers
-    // and selection highlights). If the range hasn't changed numerically (e.g.,
-    // content was modified without adding/removing lines), the guard in
-    // onScroll() fires and skips the rebuild — refresh() handles that case.
     // Pre-compute bracket depths BEFORE rendering so they're available
     // when onLineRender fires during onScroll/refresh.
     this._computeBracketDepths(
@@ -1307,6 +1371,18 @@ export class FileEditorElement extends LitElement {
         this._viewLines.endLineNumber,
       );
     }
+  }
+
+  private _onViewModelChange(event: ViewModelEvent): void {
+    if (this._paused) {
+      // Suspended (hidden tab): content changed — remember it so _resumeWork
+      // refreshes the visible window when the tab is shown again. Skipping the
+      // re-render here is the core of the pause: hidden editors stop paying the
+      // full per-edit render cost while another tab edits the shared model.
+      if (event.contentChanged) this._pausedContentChanged = true;
+      return;
+    }
+    this._reRenderAll();
   }
 
   private _onCursorChange(event: any): void {
@@ -1350,6 +1426,14 @@ export class FileEditorElement extends LitElement {
 
     // Update file size display
     this._updateStatusBarSize();
+
+    // Hidden editors don't measure/re-render, but they must still track dirty
+    // state (tab handle dot, close confirmation) and record that the content
+    // changed so the view refreshes when the tab is shown again.
+    if (this._paused) {
+      this._pausedContentChanged = true;
+      return;
+    }
 
     // Incrementally update content width — only the affected lines are
     // re-measured; line insert/delete hands the rescan to the background.
