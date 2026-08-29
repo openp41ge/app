@@ -2,12 +2,70 @@
 
 # Performance: Large file loading and rendering causes UI freezes
 
+## Status (2025-08-29)
+
+- [x] **Phase 1A** — incremental content width: `LazyLineWidthTracker`
+  implemented + wired into `FileEditorElement` (first batch sync, background
+  idle batches, single-line remeasure on edit).
+- [x] **Phase 1B** — version-based dirty tracking: `VersionBasedDirtyTracker`
+  implemented + wired in; model `undo()/redo()` now restore `beforeVersionId`/
+  `afterVersionId` so undo-to-clean is detected. 6 engine + 27 uikit tests green.
+- [ ] **Phase 2** — lazy DOM for word-wrap mode (virtual scrolling for wrapped
+  lines; `view-lines.ts` `onScroll()` bail-out). NOT started — next.
+- [ ] **Phase 3/4/5** — async tokenization, chunked loading, workers. NOT started.
+
 ## Problem
 
 Opening a 2.9MB file causes significant UI slowdown — the application freezes
 during load and remains sluggish during editing. This is caused by several
 blocking O(n) operations that process the entire file content synchronously
 on the renderer thread.
+
+## Path Update (2025-08-29) — files have moved
+
+Since this plan was written the editor was split into packages. The plan's
+`file-editor.ts` references now resolve to:
+
+| Old path (this plan)               | Current path                                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------------- |
+| `file-editor.ts`                   | `packages/openp41ge-uikit/src/components/file-editor/file-editor.ts`          |
+| `view-lines.ts`                    | `packages/openp41ge-editor-engine/src/view/view-lines.ts`                     |
+| `piece-tree-text-content-model.ts` | `packages/openp41ge-editor-engine/src/model/piece-tree-text-content-model.ts` |
+| `electron-file-system.ts`          | `packages/openp41ge/src/main/services/electron-file-system.ts`                |
+| `lazy-tokenization-manager.ts`     | `packages/openp41ge-syntax-highlighting/src/lazy-tokenization-manager.ts`     |
+
+Line numbers in the step-by-step review below are approximate against the
+original layout and will drift — verify each spot before editing.
+
+**Confirmed still present (2025-08-29):**
+
+- `_updateContentWidth()` still scans ALL lines on load + every edit
+  (`file-editor.ts` ~`:905`).
+- `_savedContent` full-string dirty tracking still live
+  (`file-editor.ts` ~`:79`, compare at ~`:1082`).
+- Word-wrap `onScroll` bail-out + up-to-5000-node statically rendered lines
+  (`view-lines.ts:~245`, `~:356`).
+
+**New discovery — Phase 1B needs a model change:** the plan assumed
+`versionId === _savedVersionId` becomes true after undo-to-clean, because the
+model "already has" `versionId`/`alternativeVersionId`. That assumption is
+WRONG against the current implementation:
+
+- `undo()` and `redo()` in `piece-tree-text-content-model.ts` do
+  `this._versionId++` — they NEVER restore the pre-edit version.
+- So `versionId` is a monotonic counter of edits (Monaco's restores it from
+  the edit element's `beforeVersionId`/`afterVersionId`). After save at v=5,
+  edit twice (v=7), undo twice (v=9) — the document equals the saved content
+  but `versionId` is 9, not 5. A comparison-based tracker would report dirty
+  forever.
+- `alternativeVersionId` is only the `afterVersionId` of the top undo
+  element — not usable for undo-to-clean detection.
+- **Fix (prerequisite for Phase 1B):** make `undo()` set
+  `_versionId = element.beforeVersionId` and `redo()` set
+  `_versionId = element.afterVersionId` (Monaco semantics). Then
+  `VersionBasedDirtyTracker` is correct. This is a small, contained change
+  to the shared editor-engine model with no current test coverage — so it
+  gets its own regression tests.
 
 ## Review of the Loading Pipeline
 
@@ -474,32 +532,35 @@ thread, blocking the UI.
 
 ### High Impact
 
-| File             | Change                                                                           |
-| ---------------- | -------------------------------------------------------------------------------- |
-| `file-editor.ts` | Incremental `_updateContentWidth()` — scan first 1000 lines, background for rest |
-| `file-editor.ts` | Version-based dirty tracking instead of full string copy                         |
-| `file-editor.ts` | Remove `_savedContent` field, add `_savedVersionId: number`                      |
-| `view-lines.ts`  | Remove `if (this._wordWrapEnabled) return;` guard in `onScroll()`                |
-| `view-lines.ts`  | Implement virtual scrolling for word wrap mode (incremental line creation)       |
-| `file-editor.ts` | Split `_initWithModel` init into sync/async phases for initial paint             |
+| File                                                                 | Change                                                                           |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `openp41ge-uikit/src/components/file-editor/file-editor.ts`          | Incremental `_updateContentWidth()` — scan first 1000 lines, background for rest |
+| `openp41ge-uikit/src/components/file-editor/file-editor.ts`          | Version-based dirty tracking instead of full string copy                         |
+| `openp41ge-uikit/src/components/file-editor/file-editor.ts`          | Remove `_savedContent` field, wire `VersionBasedDirtyTracker`                    |
+| `openp41ge-uikit/src/components/file-editor/line-width-tracker.ts`   | NEW — `ILineWidthTracker` + `LazyLineWidthTracker` (injectable, idle-batched)    |
+| `openp41ge-uikit/src/components/file-editor/dirty-state-tracker.ts`  | NEW — `IDirtyStateTracker` + `VersionBasedDirtyTracker` (injectable)             |
+| `openp41ge-editor-engine/src/view/view-lines.ts`                     | Remove `if (this._wordWrapEnabled) return;` guard in `onScroll()`                |
+| `openp41ge-editor-engine/src/view/view-lines.ts`                     | Implement virtual scrolling for word wrap mode (incremental line creation)       |
+| `openp41ge-editor-engine/src/model/piece-tree-text-content-model.ts` | Restore `_versionId` on `undo()`/`redo()` — Phase 1B prerequisite                |
+| `openp41ge-uikit/src/components/file-editor/file-editor.ts`          | Split `_initWithModel` init into sync/async phases for initial paint             |
 
 ### Medium Impact
 
-| File             | Change                                                               |
-| ---------------- | -------------------------------------------------------------------- |
-| `file-editor.ts` | Add batch-based initial rendering with `requestIdleCallback`         |
-| `file-editor.ts` | Show loading progress in status bar                                  |
-| various          | Add `isLoading` state management to prevent interactions during load |
+| File                                                        | Change                                                               |
+| ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| `openp41ge-uikit/src/components/file-editor/file-editor.ts` | Add batch-based initial rendering with `requestIdleCallback`         |
+| `openp41ge-uikit/src/components/file-editor/file-editor.ts` | Show loading progress in status bar                                  |
+| various                                                     | Add `isLoading` state management to prevent interactions during load |
 
 ### Lower Impact
 
-| File                               | Change                                                    |
-| ---------------------------------- | --------------------------------------------------------- |
-| `electron-file-system.ts`          | Add streaming/chunked `readRange` support for large files |
-| `file-editor.ts`                   | Use chunked reads for files > 1MB                         |
-| `piece-tree-text-content-model.ts` | Support incremental buffer appending                      |
-| New file                           | Web worker for TextMate tokenization                      |
-| `lazy-tokenization-manager.ts`     | Accept worker-based tokenizer                             |
+| File                                                                 | Change                                                    |
+| -------------------------------------------------------------------- | --------------------------------------------------------- |
+| `openp41ge/src/main/services/electron-file-system.ts`                | Add streaming/chunked `readRange` support for large files |
+| `openp41ge-uikit/src/components/file-editor/file-editor.ts`          | Use chunked reads for files > 1MB                         |
+| `openp41ge-editor-engine/src/model/piece-tree-text-content-model.ts` | Support incremental buffer appending                      |
+| New file                                                             | Web worker for TextMate tokenization                      |
+| `openp41ge-syntax-highlighting/src/lazy-tokenization-manager.ts`     | Accept worker-based tokenizer                             |
 
 ## Non-Goal for This Plan
 
@@ -512,6 +573,40 @@ This plan does NOT address:
   support" feature).
 
 ## Test Plan
+
+### Automated (Vitest, written first)
+
+**`openp41ge-editor-engine/test/unit/model/version-id.test.ts`** — undo/redo must
+restore `_versionId` (Monaco semantics), enabling undo-to-clean detection:
+
+- edit increments `versionId`; `undo()` restores to the batch's `beforeVersionId`;
+  `redo()` restores to `afterVersionId`
+- `markClean()` at v, edit, undo → document equals saved state and
+  `versionId === savedVersionId`
+
+**`openp41ge-uikit/test/components/file-editor/line-width-tracker.test.ts`** —
+`LazyLineWidthTracker` unit tests:
+
+- `init` measures only the first batch synchronously; `maxColumns` reflects them
+- background scan (injected idle scheduler) eventually measures all remaining
+  lines in batches without blocking
+- `measure(line)` re-measures just one line and raises `maxColumns`
+- `invalidateFrom(n)` drops shifted lines; `reset()` clears everything
+- `dispose()` cancels pending background scans
+
+**`openp41ge-uikit/test/components/file-editor/dirty-state-tracker.test.ts`** —
+`VersionBasedDirtyTracker` unit tests: dirty after change, clean after
+`markSaved`, clean when undo returns to the saved version.
+
+**`openp41ge-uikit/test/components/file-editor/performance-trackers.integration.test.ts`** —
+mount a real `file-editor` with a `PieceTreeTextContentModel`:
+
+- typing → `_isDirty` true; save → false; **undo-to-clean → false** (regression
+  guard for the `_savedContent` replacement)
+- a large model (e.g. 20k lines) mounts without scanning all lines synchronously
+  (spy that the width measure function is not called once per line on load)
+
+### Manual
 
 1. Open a 2.9MB file:
    - Verify the editor loads within 2 seconds (milliseconds for the first

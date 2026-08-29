@@ -55,6 +55,10 @@ import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
 import { checkAutoClose, shouldSkipClose } from "openp41ge-editor-engine/input/auto-closing-pairs";
 import "./openp41ge-bottom-bar";
 import type { FeStatusBar } from "./openp41ge-bottom-bar";
+import { LazyLineWidthTracker } from "./line-width-tracker";
+import type { ILineWidthTracker } from "./line-width-tracker";
+import { VersionBasedDirtyTracker } from "./dirty-state-tracker";
+import type { IDirtyStateTracker } from "./dirty-state-tracker";
 import type { IFormatterRegistry } from "openp41ge-editor-engine/interfaces/formatter-registry";
 
 export type FileEditorState = "loading" | "ready" | "error" | "empty";
@@ -75,8 +79,21 @@ export class FileEditorElement extends LitElement {
   @state()
   private _state: FileEditorState = "empty";
 
-  /** Content at last save or load — used to detect undo-to-clean. */
-  private _savedContent: string = "";
+  /**
+   * Content-width tracker (injectable, SOLID DIP). Measures only the first
+   * batch on load and refines in background idle batches — replaces the
+   * old O(all lines) scan on every load/edit. Tests may swap in a
+   * spy-wrapped instance before the editor loads.
+   */
+  _lineWidthTracker: ILineWidthTracker = new LazyLineWidthTracker((line) =>
+    this._measureLineColumns(line),
+  );
+
+  /**
+   * Dirty-state tracker (injectable, SOLID DIP). O(1) version comparison
+   * instead of the old `_savedContent` full-string compare on every keystroke.
+   */
+  _dirtyTracker: IDirtyStateTracker = new VersionBasedDirtyTracker();
   private _statusBar: FeStatusBar | null = null;
   private _viewportResizeObserver: ResizeObserver | null = null;
 
@@ -416,8 +433,9 @@ export class FileEditorElement extends LitElement {
 
     this._isDirty = false;
     this.textContentModel.markClean();
-    // Record the current content so undo-to-clean is correctly detected
-    this._savedContent = content;
+    // Record the current document version so undo-to-clean is correctly detected
+    // (O(1), no full-string copy).
+    this._dirtyTracker.markSaved(this.textContentModel.versionId);
     this._dispatchDirtyChanged(false);
     this._dispatchFileSaved();
     if (this._statusBar) {
@@ -746,8 +764,9 @@ export class FileEditorElement extends LitElement {
     // Initial render: tokenize and render visible range
     this._viewModel.tokenizeVisibleRange(1, Math.min(100, model.lineCount));
 
-    // Record the saved content for undo-to-clean detection
-    this._savedContent = model.getValue();
+    // Record the saved version for dirty-state detection (no full-string copy).
+    this._dirtyTracker.reset();
+    this._dirtyTracker.markSaved(model.versionId);
 
     // Set initial status bar state
     this._updateStatusBarSize();
@@ -769,7 +788,9 @@ export class FileEditorElement extends LitElement {
 
     // Listen for model content changes (edits, undo, redo)
     model.onDidChangeContent((event: TextContentChangeEvent) => {
-      if (event.versionId > 0) {
+      // An undo/redo back to the pristine document fires with versionId 0;
+      // still process it so dirty state stays correct.
+      if (event.versionId > 0 || event.isUndoing || event.isRedoing) {
         this._onModelContentChange(event);
       }
     });
@@ -786,18 +807,22 @@ export class FileEditorElement extends LitElement {
         return;
       }
       // Model was marked clean by a save in this or another tab.
-      // Update saved content to the current value so future edits correctly
-      // detect clean state against the persisted baseline.
+      // Record the current version so future edits correctly detect clean
+      // state against the persisted baseline.
       this._isDirty = false;
-      this._savedContent = model.getValue();
+      this._dirtyTracker.markSaved(model.versionId);
       this._dispatchDirtyChanged(false);
       if (this._statusBar) {
         this._statusBar.setDirty(false);
       }
     });
 
-    // Compute content width from ALL lines and set it once
-    this._updateContentWidth();
+    // Set up incremental content-width tracking: measure the first batch
+    // synchronously, then refine the scrollbar in background idle batches.
+    this._lineWidthTracker.reset();
+    this._lineWidthTracker.init(model.lineCount);
+    this._lineWidthTracker.scheduleBackgroundScan(() => this._refreshContentWidth());
+    this._refreshContentWidth();
 
     // Do NOT focus the textarea here. Opening a file (e.g. from the Explorer)
     // must not steal focus or place a caret — the user keeps focus where it
@@ -898,35 +923,105 @@ export class FileEditorElement extends LitElement {
   }
 
   /**
-   * Compute the maximum content width across ALL lines and update the viewport.
-   * This ensures the horizontal scrollbar correctly reflects the entire file
-   * content, not just the currently visible lines.
+   * Refresh the viewport's content (horizontal scrollbar) width from the
+   * line-width tracker. O(1) per call: the tracker measures only the first
+   * batch on load and refines in background idle batches, so this never scans
+   * every line synchronously (see large-file-performance plan, Phase 1A).
    */
-  private _updateContentWidth(): void {
+  private _refreshContentWidth(): void {
     if (!this._viewModel || !this._viewLines) return;
 
-    const tabSize = this._viewModel.tabSize;
     const lineCount = this._viewModel.lineCount;
-    const charWidth = this._measureCharWidth();
-
     if (lineCount === 0) {
       this._viewLines.setContentWidth(this._viewportEl.getBoundingClientRect().width);
       return;
     }
 
-    // Scan all lines to find the max visible column count
-    let maxCols = 0;
-    for (let i = 1; i <= lineCount; i++) {
-      const content = this._viewModel.getLineContent(i);
-      const cols = this._computeVisibleColumns(content, tabSize);
-      if (cols > maxCols) maxCols = cols;
+    const charWidth = this._charWidth > 0 ? this._charWidth : this._measureCharWidth();
+    if (charWidth > 0) this._charWidth = charWidth;
+
+    const maxCols = this._lineWidthTracker.maxColumns;
+    if (maxCols > 0) {
+      // Convert to pixel width: cols * charWidth + left offset (8px) + right gap (8px).
+      // While the background scan is pending, maxCols is approximate and the
+      // scrollbar refines as batches complete.
+      this._viewLines.setContentWidth(Math.ceil(maxCols * charWidth + 16));
+    } else {
+      // Nothing measured yet — fall back to the viewport width.
+      this._viewLines.setContentWidth(this._viewportEl.getBoundingClientRect().width);
+    }
+  }
+
+  /** Width of a single line in visible columns — the tracker's measure function. */
+  private _measureLineColumns(lineNumber: number): number {
+    if (!this._viewModel) return 0;
+    const content = this._viewModel.getLineContent(lineNumber);
+    return this._computeVisibleColumns(content, this._viewModel.tabSize);
+  }
+
+  /**
+   * Update the width tracker after a model content change. Same-line edits
+   * re-measure only the edited line(s); line insert/delete invalidates every
+   * cached entry from the first affected line onward and hands the rescan to
+   * the background idle scan. Never scans the whole file synchronously.
+   */
+  private _handleContentWidthChange(event: TextContentChangeEvent): void {
+    if (!this._viewModel) return;
+    this._lineWidthTracker.setLineCount(this._viewModel.lineCount);
+
+    let structural = false; // any change that inserted/removed lines
+    let minLine = Infinity;
+    for (const change of event.changes) {
+      const start = change.range.startLineNumber;
+      const added = this._countInsertedLines(change.text);
+      if (change.range.endLineNumber - start !== added) structural = true;
+      if (start < minLine) minLine = start;
     }
 
-    // Convert to pixel width: cols * charWidth + left offset (8px) + right gap (8px)
-    // Cache for cursor positioning
-    this._charWidth = charWidth;
-    const pixelWidth = Math.ceil(maxCols * charWidth + 16);
-    this._viewLines.setContentWidth(pixelWidth);
+    if (minLine === Infinity) {
+      // Degenerate event without usable range info — rescan from the top.
+      this._lineWidthTracker.scheduleBackgroundScan(() => this._refreshContentWidth(), 1);
+      this._refreshContentWidth();
+      return;
+    }
+
+    if (structural) {
+      // Everything from minLine shifted — drop those lines and rescan in the
+      // background; the edited region is remeasured synchronously below so the
+      // visible area is correct immediately.
+      this._lineWidthTracker.invalidateFrom(minLine);
+      this._lineWidthTracker.scheduleBackgroundScan(() => this._refreshContentWidth(), minLine);
+      for (const change of event.changes) {
+        const start = change.range.startLineNumber;
+        const added = this._countInsertedLines(change.text);
+        for (let line = start; line <= start + added; line++) {
+          this._lineWidthTracker.measure(line);
+        }
+      }
+    } else {
+      // Same-line edit(s): only the touched lines change, so re-measure just
+      // those. If a touched line was the running max and may have shrunk,
+      // recompute the max from the cache.
+      for (const change of event.changes) {
+        const start = change.range.startLineNumber;
+        for (let line = start; line <= start + this._countInsertedLines(change.text); line++) {
+          const wasMaxCandidate =
+            (this._lineWidthTracker.get(line) ?? -1) >= this._lineWidthTracker.maxColumns;
+          this._lineWidthTracker.measure(line);
+          if (wasMaxCandidate) this._lineWidthTracker.recomputeMax();
+        }
+      }
+    }
+
+    this._refreshContentWidth();
+  }
+
+  private _countInsertedLines(text: string): number {
+    let count = 0;
+    for (let i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) === 10 /* \n */) count++;
+    }
+    return count;
   }
 
   /** Toggle word wrap on/off and persist preference. */
@@ -963,8 +1058,9 @@ export class FileEditorElement extends LitElement {
     if (this._viewLines) {
       this._viewLines.setWordWrap(this._wordWrapEnabled, wrapColumn);
       this._viewLines.rebuildAll();
-      // Re-render with fresh content from the view model
-      this._updateContentWidth();
+      // Refresh the scrollbar from the width tracker (already measured or
+      // being measured in the background).
+      this._refreshContentWidth();
       this._syncCursorView();
     }
     // Update line numbers for word wrap positioning
@@ -1073,15 +1169,15 @@ export class FileEditorElement extends LitElement {
     this._scrollToRevealCursor();
   }
 
-  private _onModelContentChange(_event: TextContentChangeEvent): void {
-    // Track dirty state by comparing current content against last saved content.
-    // This handles edits, undo, and redo — any operation that restores the
-    // document to the saved state is correctly detected as clean.
+  private _onModelContentChange(event: TextContentChangeEvent): void {
+    // Dirty state via O(1) version comparison (no full-string compare).
+    // Correct because the model restores versionId on undo/redo, so undoing
+    // back to the saved document version reports clean.
     const model = this.textContentModel;
     if (model) {
-      const isClean = model.getValue() === this._savedContent;
+      const isDirty = this._dirtyTracker.notifyContentChanged(model.versionId);
       const wasDirty = this._isDirty;
-      this._isDirty = !isClean;
+      this._isDirty = isDirty;
       if (wasDirty !== this._isDirty) {
         this._dispatchDirtyChanged(this._isDirty);
         if (this._statusBar) {
@@ -1093,9 +1189,9 @@ export class FileEditorElement extends LitElement {
     // Update file size display
     this._updateStatusBarSize();
 
-    // Recompute content width — scanning all lines on every change
-    // is fine for typical file sizes; can be optimized later if needed
-    this._updateContentWidth();
+    // Incrementally update content width — only the affected lines are
+    // re-measured; line insert/delete hands the rescan to the background.
+    this._handleContentWidthChange(event);
   }
 
   /**
@@ -1481,6 +1577,7 @@ export class FileEditorElement extends LitElement {
     this._viewModel = null;
     this._cursorController?.dispose();
     this._cursorController = null;
+    this._lineWidthTracker?.dispose();
     this._keyboardHandler = null;
   }
 
