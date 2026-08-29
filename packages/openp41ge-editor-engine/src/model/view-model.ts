@@ -191,6 +191,13 @@ export class ViewModel {
    * Handle a model content change event.
    */
   private _handleModelChange(event: TextContentChangeEvent): void {
+    // Invalidate the coordinates converter's wrap cache: per-line wrap segment
+    // counts from the previous content would otherwise make view<->model
+    // conversion and getTotalViewLineCount stale (e.g. after a wrapped
+    // document is replaced with a different one, click-to-caret and the total
+    // view-line count stay short by the old lines' segment-count delta).
+    this._coordinatesConverter.markDirty();
+
     // Collect affected lines
     const changedLines = new Set<number>();
 

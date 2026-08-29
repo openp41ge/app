@@ -26,6 +26,12 @@ export interface WrapSegment {
  * @returns Array of wrap segments.
  */
 export function computeWrapSegments(lineContent: string, wrapColumn: number): WrapSegment[] {
+  // Defensive: a column < 1 would make findWrapPoint return `start` and loop
+  // forever (`start = end`), wedging the whole editor on the main thread.
+  // Callers (ViewportWrapColumnCalculator) guarantee >= 10, but clamp to a
+  // minimum of 1 so termination is guaranteed no matter what is passed.
+  if (wrapColumn < 1) wrapColumn = 1;
+
   if (lineContent.length <= wrapColumn) {
     return [
       {

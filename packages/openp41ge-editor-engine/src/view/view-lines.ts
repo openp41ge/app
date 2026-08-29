@@ -147,10 +147,14 @@ export class ViewLines {
     this._wordWrapEnabled = enabled;
     if (changed) {
       if (!enabled) {
-        // Leaving wrapped mode — clear the wrapped DOM window.
+        // Leaving wrapped mode — clear the wrapped DOM window AND any stale
+        // non-wrapped line nodes that could have accumulated before wrapping.
         this._clearWrappedWindow();
+        this._clearCollection();
       } else {
-        // Entering wrapped mode — lazy index used on next render.
+        // Entering wrapped mode — drop the non-wrapped DOM window and reset
+        // the lazy index (used on next render).
+        this._clearCollection();
         this._wrappedIndex?.reset();
       }
     }
@@ -652,6 +656,16 @@ export class ViewLines {
     if (!this._wrappedStartViewLine || !this._wrappedEndViewLine) return;
     if (this._wrappedEndViewLine > this.wrappedIndex().totalViewLineCount) return;
     this._rebuildWrappedLines(this._wrappedStartViewLine, this._wrappedEndViewLine);
+  }
+
+  /** Drop all non-wrapped DOM lines and reset the collection. */
+  private _clearCollection(): void {
+    const oldLines = this._collection.getLines();
+    for (const line of oldLines) {
+      if (this.onLineDispose) this.onLineDispose(line.lineNumber, line);
+      line.dispose();
+    }
+    this._collection.clear();
   }
 
   /** Drop all wrapped DOM lines and reset the wrapped window. */

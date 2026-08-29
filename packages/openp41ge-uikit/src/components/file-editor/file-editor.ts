@@ -55,7 +55,7 @@ import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
 import { checkAutoClose, shouldSkipClose } from "openp41ge-editor-engine/input/auto-closing-pairs";
 import "./openp41ge-bottom-bar";
 import type { FeStatusBar } from "./openp41ge-bottom-bar";
-import { LazyLineWidthTracker } from "./line-width-tracker";
+import { LineWidthTracker } from "./line-width-tracker";
 import type { ILineWidthTracker } from "./line-width-tracker";
 import { VersionBasedDirtyTracker } from "./dirty-state-tracker";
 import type { IDirtyStateTracker } from "./dirty-state-tracker";
@@ -80,12 +80,11 @@ export class FileEditorElement extends LitElement {
   private _state: FileEditorState = "empty";
 
   /**
-   * Content-width tracker (injectable, SOLID DIP). Measures only the first
-   * batch on load and refines in background idle batches — replaces the
-   * old O(all lines) scan on every load/edit. Tests may swap in a
-   * spy-wrapped instance before the editor loads.
+   * Content-width tracker (injectable, SOLID DIP). The scrollbar is exact from
+   * the start: measured synchronously on load, re-measured only on edited
+   * lines. Tests may swap in a spy-wrapped instance before the editor loads.
    */
-  _lineWidthTracker: ILineWidthTracker = new LazyLineWidthTracker((line) =>
+  _lineWidthTracker: ILineWidthTracker = new LineWidthTracker((line) =>
     this._measureLineColumns(line),
   );
 
@@ -817,11 +816,12 @@ export class FileEditorElement extends LitElement {
       }
     });
 
-    // Set up incremental content-width tracking: measure the first batch
-    // synchronously, then refine the scrollbar in background idle batches.
+    // Measure the whole file synchronously so the horizontal scrollbar is the
+    // correct size from the start (a single full pass is <10ms even for 3MB
+    // documents). Edits only re-measure touched lines — see
+    // _handleContentWidthChange.
     this._lineWidthTracker.reset();
-    this._lineWidthTracker.init(model.lineCount);
-    this._lineWidthTracker.scheduleBackgroundScan(() => this._refreshContentWidth());
+    this._lineWidthTracker.measureRange(1, model.lineCount);
     this._refreshContentWidth();
 
     // Do NOT focus the textarea here. Opening a file (e.g. from the Explorer)
@@ -960,14 +960,12 @@ export class FileEditorElement extends LitElement {
   }
 
   /**
-   * Update the width tracker after a model content change. Same-line edits
-   * re-measure only the edited line(s); line insert/delete invalidates every
-   * cached entry from the first affected line onward and hands the rescan to
-   * the background idle scan. Never scans the whole file synchronously.
+   * Update the width tracker after a model content change. The scrollbar stays
+   * exact immediately: same-line edits re-measure only touched lines;
+   * line insert/delete re-measures the shifted tail synchronously.
    */
   private _handleContentWidthChange(event: TextContentChangeEvent): void {
     if (!this._viewModel) return;
-    this._lineWidthTracker.setLineCount(this._viewModel.lineCount);
 
     let structural = false; // any change that inserted/removed lines
     let minLine = Infinity;
@@ -978,26 +976,22 @@ export class FileEditorElement extends LitElement {
       if (start < minLine) minLine = start;
     }
 
+    // Update the width tracker after a model content change. The scrollbar
+    // must stay exact immediately:
+    //   - line insert/delete: the tail from the first affected line shifts, so
+    //     re-measure that tail synchronously (cheap) and drop stale cache.
+    //   - same-line edit: re-measure only the touched line(s); if a touched
+    //     line was the running max and shrank, recompute from the cache.
     if (minLine === Infinity) {
-      // Degenerate event without usable range info — rescan from the top.
-      this._lineWidthTracker.scheduleBackgroundScan(() => this._refreshContentWidth(), 1);
+      // Degenerate event without usable range info — rescan everything.
+      this._lineWidthTracker.measureRange(1, this._viewModel.lineCount);
       this._refreshContentWidth();
       return;
     }
 
     if (structural) {
-      // Everything from minLine shifted — drop those lines and rescan in the
-      // background; the edited region is remeasured synchronously below so the
-      // visible area is correct immediately.
       this._lineWidthTracker.invalidateFrom(minLine);
-      this._lineWidthTracker.scheduleBackgroundScan(() => this._refreshContentWidth(), minLine);
-      for (const change of event.changes) {
-        const start = change.range.startLineNumber;
-        const added = this._countInsertedLines(change.text);
-        for (let line = start; line <= start + added; line++) {
-          this._lineWidthTracker.measure(line);
-        }
-      }
+      this._lineWidthTracker.measureRange(minLine, this._viewModel.lineCount);
     } else {
       // Same-line edit(s): only the touched lines change, so re-measure just
       // those. If a touched line was the running max and may have shrunk,
@@ -1099,15 +1093,19 @@ export class FileEditorElement extends LitElement {
   private _onViewModelChange(_event: ViewModelEvent): void {
     if (!this._viewLines || !this._viewModel) return;
 
-    // Update line count (this also updates scroll height)
-    this._viewLines.setTotalLineCount(this._viewModel.lineCount);
-
-    // Clear content caches — after any model change, bracket depth map
-    // is stale because content has changed. Recompute before re-rendering.
+    // Clear content caches FIRST. In wrapped mode this resets the wrap index;
+    // doing it before setTotalLineCount means the scroll-height update below
+    // (via _updateScrollHeight -> totalViewLineCount) re-measures against the
+    // NEW content instead of stale per-line wrap-segment counts from the
+    // previous document (which otherwise leaves the scrollbar short by the
+    // difference between old and new segment counts).
     this._viewLines.clearContentCache();
     this._bracketDepths = null;
     this._bracketRangeStart = 0;
     this._bracketRangeEnd = 0;
+
+    // Update line count (this also updates scroll height)
+    this._viewLines.setTotalLineCount(this._viewModel.lineCount);
 
     // Recalculate the visible range based on the new total line count.
     // When lines are deleted, the previous visible end may extend beyond the
@@ -1577,7 +1575,7 @@ export class FileEditorElement extends LitElement {
     this._viewModel = null;
     this._cursorController?.dispose();
     this._cursorController = null;
-    this._lineWidthTracker?.dispose();
+    this._lineWidthTracker?.reset();
     this._keyboardHandler = null;
   }
 

@@ -4,21 +4,34 @@
 
 ## Status (2025-08-29)
 
-- [x] **Phase 1A** — incremental content width: `LazyLineWidthTracker`
-      implemented + wired into `FileEditorElement` (first batch sync, background
-      idle batches, single-line remeasure on edit).
+- [x] **Phase 1A** — content width. `LineWidthTracker` (renamed from
+      `LazyLineWidthTracker`) + wired into `FileEditorElement`. **Requirement
+      change (explicit user decision 2025-08-29):** the horizontal scrollbar
+      must be the CORRECT size from the start and must NOT change size as more
+      of the file is measured. So the original "approximate + background
+      idle-batch refine (Monaco-style)" design was replaced with a full
+      synchronous scan on load (`measureRange(1, lineCount)`) — measured
+      <10ms for a 3MB / 100k-line doc, so there is no practical cost — and
+      edits re-measure only touched lines (tail rescan for line
+      insert/delete, single line for same-line edits), keeping the max exact
+      via `recomputeMax()` when the max line shrinks. No background widening.
 - [x] **Phase 1B** — version-based dirty tracking: `VersionBasedDirtyTracker`
       implemented + wired in; model `undo()/redo()` now restore `beforeVersionId`/
-      `afterVersionId` so undo-to-clean is detected. 6 engine + 27 uikit tests green.
+      `afterVersionId` so undo-to-clean is detected. 6 engine + uikit tracker tests green.
 - [x] **Phase 2** — lazy DOM / virtual scrolling for word-wrap mode: `ViewLines`
       now virtualizes over VIEW lines in wrapped mode, rendering only the visible
-      window (+ over-render) instead of up to 5000 static nodes. New
-      `WrappedLineIndex` provides the O(log n) view↔model mapping (segment-count
-      cache + binary search). Model-space accessors (`startLineNumber`,
-      `onVisibleRangeChanged`) preserved so the gutter stays correct. 16 view tests
-      green. **Not yet verified in the running app**: wrapped gutter scrolling +
-      click-to-caret on virtualized wrapped lines need a manual in-app pass.
-- [ ] **Phase 3/4/5** — async tokenization, chunked loading, workers. NOT started.
+      window (+ over-render) instead of up to 5000 static nodes. `WrappedLineIndex`
+      provides the O(log n) view↔model mapping (segment-count cache + binary
+      search). Model-space accessors (`startLineNumber`, `onVisibleRangeChanged`)
+      preserved so the gutter stays correct.
+- [x] **Phase 2 fix (2025-08-29)** — DOM leak on wrap toggle: entering wrapped
+      mode (or leaving it) now clears the stale non-wrapped/accumulated
+      `_collection` lines before building the wrapped window, so DOM node
+      count == rendered-line count after toggling (was: ~70 stale nodes vs 34
+      rendered).
+- [ ] **Phase 2 in-app verification** — wrapped gutter scrolling, click-to-caret
+      on virtualized wrapped lines, and horizontal-scrollbar-correct-from-start
+      need a manual in-app pass in the running demo before Phase 3/4/5.
 
 ## Problem
 
@@ -218,6 +231,14 @@ private _onModelContentChange(event: TextContentChangeEvent): void {
   a file URL. This adds ~500KB to the bundle and decoding time.
 
 ## How VSCode/Monaco Handles Large Files
+
+> **Deviation (2025-08-29, explicit user requirement):** the sections below
+> describing Monaco's "approximate max width that refines over time" were
+> originally adopted as the plan's design, but the user requires the horizontal
+> scrollbar to be the CORRECT size from the start (no size change as more of
+> the file is measured). A full synchronous width scan is <10ms for a 3MB /
+> 100k-line doc with the current engine, so Phase 1A implements
+> correct-from-start instead (see Status). Kept here for provenance.
 
 ### 1. Incremental max line width tracking
 

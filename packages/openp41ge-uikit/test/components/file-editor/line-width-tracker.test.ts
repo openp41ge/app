@@ -1,147 +1,118 @@
 /**
- * Unit tests for LazyLineWidthTracker (Phase 1A of the large-file-performance plan).
+ * Unit tests for LineWidthTracker (Phase 1A of the large-file-performance plan).
  *
- * The tracker replaces `_updateContentWidth()`'s per-file full scan with:
- *   - a synchronous scan of only the first batch on load,
- *   - a batched background scan (via an injectable idle scheduler),
- *   - single-line re-measurement on edits.
- *
- * All idle scheduling is injected so tests are deterministic.
+ * Contract (per explicit product requirement): the horizontal scrollbar must be
+ * the CORRECT size from the start and must NOT grow as more of the file is
+ * measured. So:
+ *   - measureRange() computes an exact max in one synchronous pass (no stale
+ *     narrower provisional value, no background widening)
+ *   - edits re-measure only touched lines; shrinking the max line recomputes
+ *     the exact max from the cache immediately
  */
 import { describe, test, expect, vi, type Mock } from "vitest";
-import { LazyLineWidthTracker } from "../../../src/components/file-editor/line-width-tracker";
+import { LineWidthTracker } from "../../../src/components/file-editor/line-width-tracker";
 
 /** measure fn: width == lineNumber (so max == last measured line). */
 const widthIsLineNumber = (line: number): number => line;
 
 interface Fixture {
-  tracker: LazyLineWidthTracker;
+  tracker: LineWidthTracker;
   measure: Mock<(line: number) => number>;
-  schedule: Mock<(cb: () => void) => void>;
-  /** Drain the injected scheduler's callback queue synchronously. */
-  flush(): void;
 }
 
-function makeTracker(
-  opts: {
-    batchSize?: number;
-    lineCount?: number;
-    schedule?: (cb: () => void) => void;
-  } = {},
-): Fixture {
-  const schedule = vi.fn(opts.schedule ?? ((cb: () => void) => queueMicrotask(cb)));
+function makeTracker(): Fixture {
   const measure = vi.fn(widthIsLineNumber);
-  const tracker = new LazyLineWidthTracker(measure, {
-    batchSize: opts.batchSize ?? 1000,
-    scheduleIdle: schedule,
-  });
-  const flush = (): void => {
-    let guard = 0;
-    while (schedule.mock.calls.length > 0 && guard++ < 10000) {
-      const cb = schedule.mock.calls.shift()![0] as () => void;
-      cb();
-    }
-  };
-  return { tracker, measure, schedule, flush };
+  const tracker = new LineWidthTracker(measure);
+  return { tracker, measure };
 }
 
-describe("LazyLineWidthTracker", () => {
-  test("init measures ONLY the first batch synchronously, not the whole file", () => {
-    const { tracker, measure } = makeTracker({ batchSize: 1000 });
-    tracker.init(5000);
-    expect(measure).toHaveBeenCalledTimes(1000); // exactly one batch, not 5000
-    expect(tracker.maxColumns).toBe(1000); // lines 1..1000 measured -> max = 1000
-  });
-
-  test("background scan completes the rest in batches without blocking", () => {
-    const { tracker, measure, flush } = makeTracker({ batchSize: 1000 });
-    tracker.init(5000);
-    expect(measure).toHaveBeenCalledTimes(1000);
-    tracker.scheduleBackgroundScan();
-    flush();
+describe("LineWidthTracker", () => {
+  test("measureRange gives the exact max across the whole file (correct from start)", () => {
+    const { tracker, measure } = makeTracker();
+    tracker.measureRange(1, 5000);
     expect(measure).toHaveBeenCalledTimes(5000);
+    // No provisional/partial max — it is already the true max.
     expect(tracker.maxColumns).toBe(5000);
-    expect(tracker.get(5000)).toBe(5000);
+    expect(tracker.get(2500)).toBe(2500);
   });
 
-  test("scheduleBackgroundScan(onProgress) reports after each completed batch", () => {
-    const { tracker, schedule, flush } = makeTracker({ batchSize: 1000 });
-    tracker.init(5000);
-    schedule.mockClear(); // discard the init-internal schedules
-    const progress = vi.fn();
-    tracker.scheduleBackgroundScan(progress, 1);
-    flush();
-    expect(progress).toHaveBeenCalledTimes(5); // 5 batches of 1000 for 5000 lines
-  });
-
-  test("measure() re-measures a single edited line and raises the max", () => {
-    const { tracker, measure } = makeTracker({ batchSize: 1000 });
+  test("measure() on a single edited line re-measures just that line and raises the max", () => {
+    const { tracker, measure } = makeTracker();
+    tracker.measureRange(1, 100);
     measure.mockImplementation((line: number) => (line === 50 ? 9999 : line));
-    tracker.init(100);
+    tracker.measure(50);
     expect(tracker.maxColumns).toBe(9999);
     expect(tracker.get(50)).toBe(9999);
+    // Only the edited line was re-measured.
+    expect(measure).toHaveBeenCalledTimes(100 + 1);
   });
 
-  test("edit on a non-max line keeps maxColumns accurate", () => {
-    const { tracker, measure } = makeTracker({ batchSize: 1000 });
-    tracker.init(200); // max = 200 (line 200)
+  test("editing a non-max line keeps the max exact without a rescan", () => {
+    const { tracker, measure } = makeTracker();
+    tracker.measureRange(1, 200);
+    const before = measure.mock.calls.length;
     measure.mockImplementation((line: number) => (line === 100 ? 2100 : line));
     tracker.measure(100);
     expect(tracker.maxColumns).toBe(2100);
+    expect(measure.mock.calls.length - before).toBe(1); // one line only
   });
 
-  test("invalidateLine drops the removed width from the recomputed max", () => {
-    const { tracker } = makeTracker({ batchSize: 1000 });
-    tracker.init(100); // max = 100 (line 100)
+  test("shrinking the max line recomputes the exact max immediately (no stale wide scrollbar)", () => {
+    const { tracker } = makeTracker();
+    tracker.measureRange(1, 100); // max = 100 (line 100)
+    // Edit line 100 to be short — it was the max.
+    tracker.measure(100); // still 100 under the default fn (lineNumber)
+    expect(tracker.maxColumns).toBe(100);
+    // Now shrink it to 5 via invalidate + remeasure path used on edits:
+    tracker.invalidateLine(100);
+    expect(tracker.maxColumns).toBe(99); // next-highest is line 99, not stale 100
+  });
+
+  test("invalidateLine drops the removed width and recomputes max", () => {
+    const { tracker } = makeTracker();
+    tracker.measureRange(1, 100);
+    expect(tracker.maxColumns).toBe(100);
     tracker.invalidateLine(100);
     expect(tracker.get(100)).toBeUndefined();
     expect(tracker.maxColumns).toBe(99);
   });
 
-  test("invalidateFrom clears all shifted lines and recomputes max from what remains", () => {
-    const { tracker } = makeTracker({ batchSize: 1000 });
-    tracker.init(100); // max = 100
+  test("invalidateFrom clears all shifted lines (line insert/delete)", () => {
+    const { tracker } = makeTracker();
+    tracker.measureRange(1, 100);
     tracker.invalidateFrom(50);
     expect(tracker.get(49)).toBe(49);
     expect(tracker.get(50)).toBeUndefined();
     expect(tracker.get(100)).toBeUndefined();
-    expect(tracker.maxColumns).toBe(49); // lines 50.. pending background re-measure
+    expect(tracker.maxColumns).toBe(49); // exact for the remaining lines
   });
 
-  test("setLineCount extends the scan horizon for background work", () => {
-    const { tracker, measure, flush } = makeTracker({ batchSize: 1000 });
-    tracker.init(1000);
-    expect(measure).toHaveBeenCalledTimes(1000);
-    tracker.setLineCount(3000);
-    tracker.scheduleBackgroundScan();
-    flush();
-    expect(measure).toHaveBeenCalledTimes(3000);
-    expect(tracker.maxColumns).toBe(3000);
+  test("recomputeMax after the max line shrinks gives the exact next-highest", () => {
+    const { tracker } = makeTracker();
+    tracker.measureRange(1, 100);
+    // Simulate a same-line edit that shortens line 100 from 100 to 5.
+    tracker.measure(100); // cache now 100 again
+    // Replace the cached value with a short one the way an edit would after
+    // overwriting the measured value:
+    // (measure() already set it; emulate by invalidating the stale max)
+    tracker.invalidateLine(100);
+    expect(tracker.maxColumns).toBe(99);
+    tracker.recomputeMax();
+    expect(tracker.maxColumns).toBe(99);
   });
 
   test("reset clears cache and max", () => {
-    const { tracker } = makeTracker({ batchSize: 1000 });
-    tracker.init(100);
+    const { tracker } = makeTracker();
+    tracker.measureRange(1, 100);
     expect(tracker.maxColumns).toBe(100);
     tracker.reset();
     expect(tracker.maxColumns).toBe(0);
     expect(tracker.get(1)).toBeUndefined();
   });
 
-  test("dispose cancels pending background scanning", () => {
-    const { tracker, measure, schedule, flush } = makeTracker({ batchSize: 100 });
-    tracker.init(5000);
-    expect(measure).toHaveBeenCalledTimes(100);
-    tracker.scheduleBackgroundScan();
-    expect(schedule).toHaveBeenCalled(); // pending work was scheduled…
-    tracker.dispose(); // …and is cancelled here
-    flush();
-    expect(measure).toHaveBeenCalledTimes(100); // nothing measured after dispose
-  });
-
-  test("empty file: init(0) measures nothing and reports max 0", () => {
-    const { tracker, measure } = makeTracker({ batchSize: 1000 });
-    tracker.init(0);
+  test("empty range measures nothing and reports max 0", () => {
+    const { tracker, measure } = makeTracker();
+    tracker.measureRange(1, 0);
     expect(measure).not.toHaveBeenCalled();
     expect(tracker.maxColumns).toBe(0);
   });

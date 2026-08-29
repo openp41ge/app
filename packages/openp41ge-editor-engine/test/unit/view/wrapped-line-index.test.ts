@@ -20,6 +20,20 @@ function makeProvider(contents: string[]) {
 }
 
 describe("WrappedLineIndex", () => {
+  test("computeWrapSegments never loops forever on a wrapColumn < 1 (regression)", () => {
+    // A column < 1 previously made findWrapPoint return `start`, so
+    // `start = end` never advanced — an infinite loop that wedges the editor
+    // main thread. It must clamp to a minimum of 1 and terminate.
+    const contents = ["hello world", "x".repeat(50)];
+    for (const badColumn of [0, -1, -100]) {
+      for (const c of contents) {
+        const segs = computeWrapSegments(c, badColumn);
+        expect(segs.length).toBeGreaterThan(0);
+        expect(segs.map((s) => s.text).join("")).toBe(c); // full coverage, no dup
+      }
+    }
+  });
+
   test("totalViewLineCount equals brute-force sum of wrap segments", () => {
     const contents = [
       "short",
