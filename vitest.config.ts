@@ -108,6 +108,11 @@ export default defineConfig({
       // Source alias so unit tests import openp41ge-tabs source (its dist has
       // declarations only), mirroring the main app's dev-mode aliasing.
       "openp41ge-tabs": path.resolve(__dirname, "./packages/openp41ge-tabs/src"),
+      "openp41ge-editor-engine": path.resolve(__dirname, "./packages/openp41ge-editor-engine/src"),
+      "openp41ge-syntax-highlighting": path.resolve(
+        __dirname,
+        "./packages/openp41ge-syntax-highlighting/src",
+      ),
     },
   },
 });
