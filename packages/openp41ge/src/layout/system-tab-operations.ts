@@ -59,10 +59,10 @@ export function openSystemTab(
   // When called via dispatch, JS doesn't have overloading — the function
   // receives the raw positional args. If `side` looks like an appType
   // (not a known side), treat it as the appType.
-  const actualSide = (side === "left" || side === "right") ? side : null;
+  const actualSide = side === "left" || side === "right" ? side : null;
   const actualAppType = actualSide ? (appType ?? "") : (side ?? "");
   const actualTitle = actualSide ? (title ?? "") : (appType ?? "");
-  const actualPinned = actualSide ? pinned : (typeof appType === "boolean" ? appType : false);
+  const actualPinned = actualSide ? pinned : typeof appType === "boolean" ? appType : false;
 
   // Look up default side from type
   const resolvedSide = actualSide ?? DEFAULT_SYSTEM_TAB_SIDES[actualAppType] ?? "right";
@@ -85,8 +85,10 @@ export function openSystemTab(
     if (existingTab && existingTab.appType === actualAppType) {
       // Already exists — activate its current sidebar
       const existingSide = leftSidebarTabs.includes(tabId as SystemTabId) ? "left" : "right";
-      const activeKey = existingSide === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
-      const openKey = existingSide === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
+      const activeKey =
+        existingSide === "left" ? ("activeLeftTab" as const) : ("activeRightTab" as const);
+      const openKey =
+        existingSide === "left" ? ("leftSidebarOpen" as const) : ("rightSidebarOpen" as const);
       let result = mapWindow(workspace, winId, (w) => ({
         ...w,
         sidebar: {
@@ -102,7 +104,7 @@ export function openSystemTab(
           return r;
         })();
       }
-      return result;
+      return touchSystemTab(result, tabId);
     }
   }
 
@@ -112,14 +114,18 @@ export function openSystemTab(
   let result = registerSystemTab(workspace, tab);
 
   // Add to ALL windows' sidebar tab lists on the resolved side
-  const tabsKey = resolvedSide === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
-  const activeKey = resolvedSide === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
-  const openKey = resolvedSide === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
+  const tabsKey =
+    resolvedSide === "left" ? ("leftSidebarTabs" as const) : ("rightSidebarTabs" as const);
+  const activeKey =
+    resolvedSide === "left" ? ("activeLeftTab" as const) : ("activeRightTab" as const);
+  const openKey =
+    resolvedSide === "left" ? ("leftSidebarOpen" as const) : ("rightSidebarOpen" as const);
 
   for (const w of result.windows) {
-    const currentTabs = resolvedSide === "left"
-      ? (w.sidebar?.leftSidebarTabs ?? [])
-      : (w.sidebar?.rightSidebarTabs ?? []);
+    const currentTabs =
+      resolvedSide === "left"
+        ? (w.sidebar?.leftSidebarTabs ?? [])
+        : (w.sidebar?.rightSidebarTabs ?? []);
 
     const updatedSidebar = {
       ...w.sidebar,
@@ -140,16 +146,17 @@ export function openSystemTab(
     return w;
   })();
 
-  return result;
+  return touchSystemTab(result, tabId);
 }
-
-// ─── Tab Groups ─────────────────────────────────────────────────────────
 
 /**
  * Create a TabGroup for a parent tab and add it to the workspace.
  * The group starts with no children.
  */
-export function createTabGroup(workspace: Workspace, parentTabId: string): { workspace: Workspace; groupId: TabGroupId } {
+export function createTabGroup(
+  workspace: Workspace,
+  parentTabId: string,
+): { workspace: Workspace; groupId: TabGroupId } {
   const groupId = `tg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` as TabGroupId;
   return {
     workspace: {
@@ -166,7 +173,11 @@ export function createTabGroup(workspace: Workspace, parentTabId: string): { wor
 /**
  * Add a child tab ID to an existing tab group.
  */
-export function addToTabGroup(workspace: Workspace, groupId: string, childTabId: string): Workspace {
+export function addToTabGroup(
+  workspace: Workspace,
+  groupId: string,
+  childTabId: string,
+): Workspace {
   const gid = groupId as TabGroupId;
   const group = workspace.tabGroups[gid];
   if (!group) return workspace;
@@ -187,7 +198,11 @@ export function addToTabGroup(workspace: Workspace, groupId: string, childTabId:
  * Add a child tab to the group whose parent tab matches hostTabId.
  * If no group exists, creates one. Returns the updated workspace.
  */
-export function addChildToParentTab(workspace: Workspace, hostTabId: string, childTabId: string): Workspace {
+export function addChildToParentTab(
+  workspace: Workspace,
+  hostTabId: string,
+  childTabId: string,
+): Workspace {
   let result = workspace;
   const gid = _getTabGroupIdByParent(result, hostTabId);
   if (gid) {
@@ -295,8 +310,8 @@ export function closeSystemTab(
   force: boolean = false,
 ): Workspace {
   const sid = tabId as SystemTabId;
-  const tabsKey = side === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
-  const activeKey = side === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
+  const tabsKey = side === "left" ? ("leftSidebarTabs" as const) : ("rightSidebarTabs" as const);
+  const activeKey = side === "left" ? ("activeLeftTab" as const) : ("activeRightTab" as const);
 
   const systemTab = workspace.systemTabs[sid];
   if (!systemTab) return workspace;
@@ -306,18 +321,26 @@ export function closeSystemTab(
   if (systemTab.pinned) {
     // Remove from ALL windows
     for (const win of result.windows) {
-      const sidebarTabs = side === "left" ? (win.sidebar?.leftSidebarTabs ?? []) : (win.sidebar?.rightSidebarTabs ?? []);
+      const sidebarTabs =
+        side === "left"
+          ? (win.sidebar?.leftSidebarTabs ?? [])
+          : (win.sidebar?.rightSidebarTabs ?? []);
       const filtered = sidebarTabs.filter((id: string) => id !== tabId);
       const hadTab = filtered.length !== sidebarTabs.length;
       if (hadTab) {
-        const newActive = (activeKey === "activeLeftTab" ? win.sidebar?.activeLeftTab : win.sidebar?.activeRightTab);
+        const newActive =
+          activeKey === "activeLeftTab" ? win.sidebar?.activeLeftTab : win.sidebar?.activeRightTab;
         const activeNeedsReset = newActive === tabId;
         result = mapWindow(result, win.id, (w) => ({
           ...w,
           sidebar: {
             ...w.sidebar!,
             [tabsKey]: filtered,
-            [activeKey]: activeNeedsReset ? null : (activeKey === "activeLeftTab" ? w.sidebar?.activeLeftTab : w.sidebar?.activeRightTab),
+            [activeKey]: activeNeedsReset
+              ? null
+              : activeKey === "activeLeftTab"
+                ? w.sidebar?.activeLeftTab
+                : w.sidebar?.activeRightTab,
           },
         }));
       }
@@ -328,19 +351,25 @@ export function closeSystemTab(
     result = { ...result, systemTabs: remainingSysTabs };
   } else {
     // Remove only from this window
-    const sidebarTabs = side === "left"
-      ? (result.windows.find((w) => w.id === winId)?.sidebar?.leftSidebarTabs ?? [])
-      : (result.windows.find((w) => w.id === winId)?.sidebar?.rightSidebarTabs ?? []);
+    const sidebarTabs =
+      side === "left"
+        ? (result.windows.find((w) => w.id === winId)?.sidebar?.leftSidebarTabs ?? [])
+        : (result.windows.find((w) => w.id === winId)?.sidebar?.rightSidebarTabs ?? []);
     const filtered = sidebarTabs.filter((id: string) => id !== tabId);
     const win = result.windows.find((w) => w.id === winId);
-    const activeNeedsReset = (side === "left" ? win?.sidebar?.activeLeftTab : win?.sidebar?.activeRightTab) === tabId;
+    const activeNeedsReset =
+      (side === "left" ? win?.sidebar?.activeLeftTab : win?.sidebar?.activeRightTab) === tabId;
 
     result = mapWindow(result, winId, (w) => ({
       ...w,
       sidebar: {
         ...w.sidebar!,
         [tabsKey]: filtered,
-        [activeKey]: activeNeedsReset ? null : (side === "left" ? w.sidebar?.activeLeftTab : w.sidebar?.activeRightTab),
+        [activeKey]: activeNeedsReset
+          ? null
+          : side === "left"
+            ? w.sidebar?.activeLeftTab
+            : w.sidebar?.activeRightTab,
       },
     }));
 
@@ -365,7 +394,8 @@ export function closeSystemTab(
     const gid = _getTabGroupIdByParent(result, tabId);
     if (gid) {
       const group = result.tabGroups[gid];
-      const hasChildren = group && group.childTabIds.some((cid) => result.editorTabs[cid as unknown as TabId]);
+      const hasChildren =
+        group && group.childTabIds.some((cid) => result.editorTabs[cid as unknown as TabId]);
       if (hasChildren) {
         return workspace;
       }
@@ -387,11 +417,7 @@ export function closeSystemTab(
  * Toggle the pinned state of a system tab. When pinned, the tab propagates
  * to all windows' same-sidebar tab lists. When unpinned, it becomes per-window.
  */
-export function pinSystemTab(
-  workspace: Workspace,
-  tabId: string,
-  pinned: boolean,
-): Workspace {
+export function pinSystemTab(workspace: Workspace, tabId: string, pinned: boolean): Workspace {
   const sid = tabId as SystemTabId;
   const tab = workspace.systemTabs[sid];
   if (!tab) return workspace;
@@ -410,15 +436,24 @@ export function pinSystemTab(
     // Propagate to all windows (add to all same-sidebar lists)
     const side = _findSystemTabSide(result, tabId);
     if (side) {
-      const tabsKey = side === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
+      const tabsKey =
+        side === "left" ? ("leftSidebarTabs" as const) : ("rightSidebarTabs" as const);
       for (const win of result.windows) {
-        const sidebarTabs = side === "left" ? (win.sidebar?.leftSidebarTabs ?? []) : (win.sidebar?.rightSidebarTabs ?? []);
+        const sidebarTabs =
+          side === "left"
+            ? (win.sidebar?.leftSidebarTabs ?? [])
+            : (win.sidebar?.rightSidebarTabs ?? []);
         if (!sidebarTabs.includes(sid)) {
           result = mapWindow(result, win.id, (w) => ({
             ...w,
             sidebar: {
               ...w.sidebar!,
-              [tabsKey]: [...(side === "left" ? (w.sidebar?.leftSidebarTabs ?? []) : (w.sidebar?.rightSidebarTabs ?? [])), sid],
+              [tabsKey]: [
+                ...(side === "left"
+                  ? (w.sidebar?.leftSidebarTabs ?? [])
+                  : (w.sidebar?.rightSidebarTabs ?? [])),
+                sid,
+              ],
             },
           }));
         }
@@ -453,11 +488,15 @@ export function reorderSystemTab(
   tabId: string,
   newIndex: number,
 ): Workspace {
-  const tabsKey = side === "left" ? "leftSidebarTabs" as const : "rightSidebarTabs" as const;
+  const tabsKey = side === "left" ? ("leftSidebarTabs" as const) : ("rightSidebarTabs" as const);
   const win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
 
-  const sidebarTabs = [...(side === "left" ? (win.sidebar?.leftSidebarTabs ?? []) : (win.sidebar?.rightSidebarTabs ?? []))] as SystemTabId[];
+  const sidebarTabs = [
+    ...(side === "left"
+      ? (win.sidebar?.leftSidebarTabs ?? [])
+      : (win.sidebar?.rightSidebarTabs ?? [])),
+  ] as SystemTabId[];
   const oldIndex = sidebarTabs.indexOf(tabId as SystemTabId);
   if (oldIndex === -1) return workspace;
 
@@ -477,6 +516,55 @@ export function reorderSystemTab(
 // ─── Activate ─────────────────────────────────────────────────────────────
 
 /**
+ * Record that a system tab was just made active (last-accessed timestamp).
+ * Used by the activation fallback when the active tab leaves a sidebar.
+ */
+function touchSystemTab(
+  workspace: Workspace,
+  tabId: string,
+  at: string = new Date().toISOString(),
+): Workspace {
+  const sid = tabId as SystemTabId;
+  const tab = workspace.systemTabs[sid];
+  if (!tab) return workspace;
+  return {
+    ...workspace,
+    systemTabs: { ...workspace.systemTabs, [sid]: { ...tab, lastAccessedAt: at } },
+  };
+}
+
+/**
+ * Pick the tab to activate next from `tabIds` after the current active tab
+ * leaves a sidebar: the remaining tab with the most recent `lastAccessedAt`.
+ * Tabs without a timestamp (legacy data) score lowest; if none have one, the
+ * first tab in the list is used. Returns null when `tabIds` is empty.
+ */
+function mostRecentlyAccessedSystemTab(
+  workspace: Workspace,
+  tabIds: Array<SystemTabId | string>,
+): SystemTabId | null {
+  if (tabIds.length === 0) return null;
+
+  const parsed = (tabId: SystemTabId | string): number => {
+    const last = workspace.systemTabs[tabId as SystemTabId]?.lastAccessedAt;
+    if (!last) return -1;
+    const n = Date.parse(last);
+    return Number.isNaN(n) ? -1 : n;
+  };
+
+  let best = tabIds[0] as SystemTabId;
+  let bestTime = -1;
+  for (const tabId of tabIds) {
+    const time = parsed(tabId);
+    if (time > bestTime) {
+      bestTime = time;
+      best = tabId as SystemTabId;
+    }
+  }
+  return best;
+}
+
+/**
  * Activate a system tab in a sidebar (set it as the active tab).
  */
 export function activateSystemTab(
@@ -485,15 +573,17 @@ export function activateSystemTab(
   side: "left" | "right",
   tabId: string,
 ): Workspace {
-  const activeKey = side === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
+  const activeKey = side === "left" ? ("activeLeftTab" as const) : ("activeRightTab" as const);
 
-  return mapWindow(workspace, winId, (w) => ({
+  const result = mapWindow(workspace, winId, (w) => ({
     ...w,
     sidebar: {
       ...w.sidebar!,
       [activeKey]: tabId as SystemTabId,
     },
   }));
+
+  return touchSystemTab(result, tabId);
 }
 
 // ─── Toggle Sidebar ───────────────────────────────────────────────────────
@@ -507,14 +597,18 @@ export function toggleSidebar(
   winId: string,
   side: "left" | "right",
 ): Workspace {
-  const openKey = side === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
-  const activeKey = side === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
+  const openKey = side === "left" ? ("leftSidebarOpen" as const) : ("rightSidebarOpen" as const);
+  const activeKey = side === "left" ? ("activeLeftTab" as const) : ("activeRightTab" as const);
 
   const win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
 
-  const isOpen = side === "left" ? (win.sidebar?.leftSidebarOpen ?? false) : (win.sidebar?.rightSidebarOpen ?? false);
-  const sidebarTabs = side === "left" ? (win.sidebar?.leftSidebarTabs ?? []) : (win.sidebar?.rightSidebarTabs ?? []);
+  const isOpen =
+    side === "left"
+      ? (win.sidebar?.leftSidebarOpen ?? false)
+      : (win.sidebar?.rightSidebarOpen ?? false);
+  const sidebarTabs =
+    side === "left" ? (win.sidebar?.leftSidebarTabs ?? []) : (win.sidebar?.rightSidebarTabs ?? []);
   const activeTab = side === "left" ? win.sidebar?.activeLeftTab : win.sidebar?.activeRightTab;
 
   const newIsOpen = !isOpen;
@@ -545,15 +639,16 @@ export function openSidebar(
   side: "left" | "right",
   tabId?: string,
 ): Workspace {
-  const openKey = side === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
-  const activeKey = side === "left" ? "activeLeftTab" as const : "activeRightTab" as const;
+  const openKey = side === "left" ? ("leftSidebarOpen" as const) : ("rightSidebarOpen" as const);
+  const activeKey = side === "left" ? ("activeLeftTab" as const) : ("activeRightTab" as const);
 
   const win = workspace.windows.find((w) => w.id === winId);
   if (!win) return workspace;
 
-  const sidebarTabs = side === "left" ? (win.sidebar?.leftSidebarTabs ?? []) : (win.sidebar?.rightSidebarTabs ?? []);
+  const sidebarTabs =
+    side === "left" ? (win.sidebar?.leftSidebarTabs ?? []) : (win.sidebar?.rightSidebarTabs ?? []);
 
-  let activeTab: SystemTabId | null = tabId ? tabId as SystemTabId : null;
+  let activeTab: SystemTabId | null = tabId ? (tabId as SystemTabId) : null;
   if (!activeTab && sidebarTabs.length > 0) {
     activeTab = sidebarTabs[0] as SystemTabId;
   }
@@ -576,7 +671,7 @@ export function closeSidebar(
   winId: string,
   side: "left" | "right",
 ): Workspace {
-  const openKey = side === "left" ? "leftSidebarOpen" as const : "rightSidebarOpen" as const;
+  const openKey = side === "left" ? ("leftSidebarOpen" as const) : ("rightSidebarOpen" as const);
 
   return mapWindow(workspace, winId, (w) => ({
     ...w,
@@ -612,8 +707,14 @@ export function moveSystemTabToSidebar(
   for (const win of workspace.windows) {
     const leftTabs = win.sidebar?.leftSidebarTabs ?? [];
     const rightTabs = win.sidebar?.rightSidebarTabs ?? [];
-    if (leftTabs.includes(sid)) { sourceSide = "left"; break; }
-    if (rightTabs.includes(sid)) { sourceSide = "right"; break; }
+    if (leftTabs.includes(sid)) {
+      sourceSide = "left";
+      break;
+    }
+    if (rightTabs.includes(sid)) {
+      sourceSide = "right";
+      break;
+    }
   }
   if (!sourceSide) return workspace;
 
@@ -639,18 +740,29 @@ export function moveSystemTabToSidebar(
     const clampedIndex = Math.max(0, Math.min(dropIndex, targetList.length));
     targetList.splice(clampedIndex, 0, sid);
 
+    // If the moved tab was the ACTIVE tab on the source side, activate the most
+    // recently accessed remaining tab instead of leaving the sidebar blank.
+    const wSidebar = win.sidebar;
+    const movedWasActive =
+      (sourceSide === "left" && wSidebar?.activeLeftTab === sid) ||
+      (sourceSide === "right" && wSidebar?.activeRightTab === sid);
+    const sourceTabsAfter = (sourceSide === "left" ? newLeftTabs : newRightTabs) as Array<
+      SystemTabId | string
+    >;
+    const nextActive = movedWasActive
+      ? mostRecentlyAccessedSystemTab(result, sourceTabsAfter)
+      : null;
+
     result = mapWindow(result, win.id, (w) => ({
       ...w,
       sidebar: {
         ...w.sidebar!,
         leftSidebarTabs: newLeftTabs,
         rightSidebarTabs: newRightTabs,
-        // Clear active tab on source side if it was the moved tab
-        ...(sourceSide === "left" && w.sidebar?.activeLeftTab === sid
-          ? { activeLeftTab: null }
-          : {}),
-        ...(sourceSide === "right" && w.sidebar?.activeRightTab === sid
-          ? { activeRightTab: null }
+        // Activate the most recently accessed remaining tab on the source side
+        // when the moved tab was active; otherwise leave the source active as-is.
+        ...(movedWasActive
+          ? { [sourceSide === "left" ? "activeLeftTab" : "activeRightTab"]: nextActive }
           : {}),
         // Set active tab on target side and ensure it's open
         [targetSide === "left" ? "activeLeftTab" : "activeRightTab"]: sid,
@@ -659,5 +771,5 @@ export function moveSystemTabToSidebar(
     }));
   }
 
-  return result;
+  return touchSystemTab(result, sid);
 }

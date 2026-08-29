@@ -187,10 +187,17 @@ export const SidebarTabSchema = z.object({
   appType: z.string(),
   title: z.string(),
   pinned: z.boolean().default(false),
+  /** ISO-8601 timestamp of the last time this tab was the active tab in its sidebar. */
+  lastAccessedAt: z.string().nullable().default(null),
 });
 export type SidebarTab = z.infer<typeof SidebarTabSchema>;
 
-export function createSidebarTab(id: string, appType: string, title: string, pinned: boolean = false): SidebarTab {
+export function createSidebarTab(
+  id: string,
+  appType: string,
+  title: string,
+  pinned: boolean = false,
+): SidebarTab {
   return SidebarTabSchema.parse({ id, appType, title, pinned });
 }
 
@@ -290,11 +297,16 @@ export const WorkspaceSchema = z.object({
   editorTabs: z.record(TabId, TabSchema).default({}),
   /** System tabs (sidebar panels), keyed by system tab ID. */
   systemTabs: z.record(SystemTabId, SystemTabSchema).default({}),
-  tabGroups: z.record(TabGroupId, z.object({
-    id: TabGroupId,
-    parentTabId: z.string(),
-    childTabIds: z.array(z.string()),
-  })).default({}),
+  tabGroups: z
+    .record(
+      TabGroupId,
+      z.object({
+        id: TabGroupId,
+        parentTabId: z.string(),
+        childTabIds: z.array(z.string()),
+      }),
+    )
+    .default({}),
   scopedFolders: z.array(z.string()).default([]),
 });
 export type Workspace = z.infer<typeof WorkspaceSchema>;
