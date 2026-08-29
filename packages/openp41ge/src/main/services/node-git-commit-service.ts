@@ -441,69 +441,93 @@ export class NodeGitCommitService implements IGitCommitService {
     const limit = options.limit ?? 100;
     const offset = options.offset ?? 0;
 
-    // Cap the walk so huge histories don't stream unbounded --numstat output.
-    const maxCount = 5000;
+    // Cap the walk so huge histories don't stream unbounded --numstat output
+    // and so the selectable depth limit is honored.
+    const maxCount = options.maxCount ?? 5000;
     const format = `%x1e%H|%h|%an|%aI|%ar|%s`;
-
-    // message/all use git-native --grep (matches subject + body, ci); files
-    // enumerates the raw walk and filters paths in JS (substring, ci) which is
-    // predictable for a plain search box.
-    const grepArgs = (): string[] => [
-      "log",
-      "--all",
-      "--date-order",
-      `--max-count=${maxCount}`,
-      "--regexp-ignore-case",
-      `--grep=${query}`,
-      `--format=${format}`,
-      "--numstat",
-    ];
-    const walkArgs = (): string[] => [
-      "log",
-      "--all",
-      "--date-order",
-      `--max-count=${maxCount}`,
-      `--format=${format}`,
-      "--numstat",
-    ];
     const qLower = query.toLowerCase();
 
+    // Depth cap: the newest `maxCount` commits. A plain log --max-count counts
+    // walked commits — a true depth cap. The --grep pass cannot be capped that
+    // way (with a filter git keeps walking until it finds matches, so
+    // --max-count only limits its output). So message/all first pin the newest
+    // maxCount commits by hash, then run git-native --grep over exactly that
+    // walk.
+    const pinNewestN = async (): Promise<string[]> => {
+      const raw = await this._execGit(
+        ["log", "--all", "--date-order", `--max-count=${maxCount + 1}`, "--format=%H"],
+        repoName,
+      );
+      return raw ? raw.trim().split(/\s+/).filter(Boolean) : [];
+    };
+    const grepRaw = async (hashes: string[]): Promise<string> => {
+      if (hashes.length === 0) return "";
+      const revs =
+        hashes.length > maxCount
+          ? [hashes[0], `^${hashes[maxCount]}`] // newest maxCount exactly
+          : [hashes[0]]; // whole history is within the cap
+      return this._execGit(
+        [
+          "log",
+          ...revs,
+          "--date-order",
+          "--regexp-ignore-case",
+          `--grep=${query}`,
+          `--format=${format}`,
+          "--numstat",
+        ],
+        repoName,
+      );
+    };
+    // Files enumerates the raw depth-capped walk and filters paths in JS
+    // (substring, ci) — deterministic for a plain search box.
+    const walkRaw = (): Promise<string> =>
+      this._execGit(
+        [
+          "log",
+          "--all",
+          "--date-order",
+          `--max-count=${maxCount}`,
+          `--format=${format}`,
+          "--numstat",
+        ],
+        repoName,
+      );
+
     let results: SearchResultCommit[] = [];
-    if (inMode === "message") {
-      const raw = await this._execGit(grepArgs(), repoName);
-      results = raw
-        ? this._parseSearchLog(raw).map((c) => this._toSearchResultCommit(repoName, c))
+    if (inMode === "message" || inMode === "all") {
+      const [hashes, fileRaw] = await Promise.all([
+        // Walking newest-N is the same for message and all, and file hits reuse
+        // the same capped walk — share the I/O.
+        pinNewestN(),
+        inMode === "all" ? walkRaw() : Promise.resolve(""),
+      ]);
+      const [msgRaw] = await Promise.all([grepRaw(hashes)]);
+      const msgHits = msgRaw
+        ? this._parseSearchLog(msgRaw).map((c) => this._toSearchResultCommit(repoName, c))
         : [];
-    } else if (inMode === "files") {
-      const raw = await this._execGit(walkArgs(), repoName);
+      if (inMode === "message") {
+        results = msgHits;
+      } else {
+        const fileHits = fileRaw
+          ? this._parseSearchLog(fileRaw)
+              .map((c) => this._toSearchResultCommit(repoName, c))
+              .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)))
+          : [];
+        // Union by hash (newest first) — guarantees files-inclusive results are
+        // always a superset of message-only results.
+        const byHash = new Map<string, SearchResultCommit>();
+        for (const c of msgHits) byHash.set(c.hash, c);
+        for (const c of fileHits) if (!byHash.has(c.hash)) byHash.set(c.hash, c);
+        results = [...byHash.values()];
+      }
+    } else {
+      const raw = await walkRaw();
       results = raw
         ? this._parseSearchLog(raw)
             .map((c) => this._toSearchResultCommit(repoName, c))
             .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)))
         : [];
-    } else {
-      // "all" — git-native message hit (subject + body) OR changed-file-path
-      // hit. Run both walks and union by hash (newest first). This guarantees
-      // files-inclusive results are always a superset of message-only results.
-      const [msgRaw, fileRaw] = await Promise.all([
-        this._execGit(grepArgs(), repoName),
-        this._execGit(walkArgs(), repoName),
-      ]);
-      const fileHits = fileRaw
-        ? this._parseSearchLog(fileRaw)
-            .map((c) => this._toSearchResultCommit(repoName, c))
-            .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)))
-        : [];
-      const byHash = new Map<string, SearchResultCommit>();
-      for (const c of msgRaw
-        ? this._parseSearchLog(msgRaw).map((c) => this._toSearchResultCommit(repoName, c))
-        : []) {
-        byHash.set(c.hash, c);
-      }
-      for (const c of fileHits) {
-        if (!byHash.has(c.hash)) byHash.set(c.hash, c);
-      }
-      results = [...byHash.values()];
     }
 
     return results.slice(offset, offset + limit);

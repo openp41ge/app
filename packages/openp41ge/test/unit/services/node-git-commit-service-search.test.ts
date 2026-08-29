@@ -64,9 +64,7 @@ describe("NodeGitCommitService.searchCommits", () => {
     // prove all-scope keeps git-native body matches that message-scope finds.
     fs.writeFileSync(path.join(srcRepo, "c.txt"), "widget\n");
     git(srcRepo, ["add", "."]);
-    git(srcRepo, [
-      "commit", "-qm", "chore: install widget", "-m", "Fixes the thingamajig zorple",
-    ]);
+    git(srcRepo, ["commit", "-qm", "chore: install widget", "-m", "Fixes the thingamajig zorple"]);
 
     // Tag the commits for stable assertions (oldest → newest).
     const logs = git(srcRepo, ["log", "--oneline", "--reverse"]).split("\n").filter(Boolean);
@@ -98,6 +96,25 @@ describe("NodeGitCommitService.searchCommits", () => {
     // Case-insensitive
     const upper = await svc.searchCommits(repoName, { query: "XYZ ALPHA", in: "message" });
     expect(upper).toHaveLength(1);
+  });
+
+  it("maxCount caps the walked history, dropping older commits", async () => {
+    // "add feature xyz alpha" (c1) is an old commit — reachable within the
+    // default walk.
+    const deep = await svc.searchCommits(repoName, {
+      query: "xyz alpha",
+      in: "message",
+    });
+    expect(deep.map((r) => r.shortHash)).toEqual([shortHash.c1]);
+
+    // With maxCount 1 only the newest commit is examined, so the old match
+    // disappears entirely.
+    const shallow = await svc.searchCommits(repoName, {
+      query: "xyz alpha",
+      in: "message",
+      maxCount: 1,
+    });
+    expect(shallow).toHaveLength(0);
   });
 
   it("files scope matches changed-file paths", async () => {

@@ -182,6 +182,7 @@ Part A (unified bitmap drag) is implemented and tested; Part B (commit-search si
 - [x] Single-click on a commit result opens an unpinned (preview) git-repository tab; double-click pins; single-click on a file result opens an unpinned file-editor preview (VS Code preview model).
 - [x] Dragging a search result row into the grid opens its review tab (pinned).
 - [x] Cross-window drop of repo/worktree rows: same-window grid drop, explorer reorder, and the cross-window `open-tab` branch are automated-tested (dispatch `actionOpenFile`/`splitFileOpen` with `git-repository` + pending repo/branch).
+- [x] Selectable search-depth limit in the filter box: exclusive 5K/10K/3K/2K/1K icon options (default 5K) wired end-to-end via `CommitSearchOptions.maxCount`. The service honors it by pinning the newest N commits by hash before the git-native `--grep` pass (a plain `--max-count` only caps grep *output*, not walk depth — fixed here so old matches genuinely drop out). Renderer verified live; the main-process path of the running dev instance is live once dev is restarted (main does not hot-reload).
 - [ ] **Not yet live-verified:** bitmap ghost + cross-window drop driven in the running app end-to-end — requires restarting `nx run openp41ge:dev` (main-process changes don't hot-reload) and using the `test-cross-window-drag` skill; the pre-change dev instance is too stale for that.
 - [x] Deferred to phase 2 and recorded above: content (`-G`/`-S`) search + hunk sub-rows, file-at-revision browsing.
 

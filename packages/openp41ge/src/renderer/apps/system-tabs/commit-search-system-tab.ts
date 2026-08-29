@@ -50,6 +50,9 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _repoFilter: HTMLInputElement | null = null;
   private _repoOptions: HTMLElement | null = null;
   private _repoActiveIndex = -1;
+  // Search depth limit — one active option among the icon row (default 5K).
+  private _maxCount = 5000;
+  private _limitOptions: HTMLButtonElement[] = [];
   private _results: HTMLElement | null = null;
   private _footer: HTMLElement | null = null;
 
@@ -167,6 +170,25 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
     const FILTER_ICON =
       '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></svg>';
+    // Depth-limit option icons (the number is drawn into the SVG). Repainted
+    // to currentColor so the active option renders white and the rest grey.
+    const limitSvg = (p: string): string =>
+      `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="${p}"/></svg>`;
+    const ICON_5K = limitSvg(
+      "M520-360h60v-90l70 90h73l-93-120 93-120h-73l-70 90v-90h-60v240Zm-260 0h140q17 0 28.5-11.5T440-400v-60q0-17-11.5-28.5T400-500h-80v-40h120v-60H260v140h120v40H260v60Zm-60 240q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z",
+    );
+    const ICON_10K = limitSvg(
+      "M240-360h60v-240H200v60h40v180Zm140 0h100q17 0 28.5-11.5T520-400v-160q0-17-11.5-28.5T480-600H380q-17 0-28.5 11.5T340-560v160q0 17 11.5 28.5T380-360Zm20-60v-120h60v120h-60Zm157 60h60v-90l70 90h73l-93-120 93-120h-73l-70 90v-90h-60v240ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z",
+    );
+    const ICON_3K = limitSvg(
+      "M520-360h60v-90l70 90h73l-93-120 93-120h-73l-70 90v-90h-60v240Zm-260 0h140q17 0 28.5-11.5T440-400v-160q0-17-11.5-28.5T400-600H260v60h120v40h-80v40h80v40H260v60Zm-60 240q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z",
+    );
+    const ICON_2K = limitSvg(
+      "M520-360h60v-90l70 90h73l-93-120 93-120h-73l-70 90v-90h-60v240Zm-260 0h180v-60H320v-40h80q17 0 28.5-11.5T440-500v-60q0-17-11.5-28.5T400-600H260v60h120v40h-80q-17 0-28.5 11.5T260-460v100Zm-60 240q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z",
+    );
+    const ICON_1K = limitSvg(
+      "M480-360h60v-90l70 90h73l-93-120 93-120h-73l-70 90v-90h-60v240Zm-140 0h60v-240H280v60h60v180ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z",
+    );
 
     const makeFilterToggle = (key: string, icon: string, title: string): HTMLButtonElement => {
       const btn = document.createElement("button");
@@ -190,9 +212,47 @@ export class CommitSearchSystemTabController implements SystemTabController {
       return btn;
     };
     const repoFilterIcon = makeFilterToggle("repo", FILTER_ICON, "Repo filter");
+
+    // Search-depth limit options: a fixed row (not a toggle) where exactly one
+    // is active. Active = white SVG, inactive = grey.
+    const LIMIT_OPTIONS: Array<{ label: string; value: number; svg: string }> = [
+      { label: "5K", value: 5000, svg: ICON_5K },
+      { label: "10K", value: 10000, svg: ICON_10K },
+      { label: "3K", value: 3000, svg: ICON_3K },
+      { label: "2K", value: 2000, svg: ICON_2K },
+      { label: "1K", value: 1000, svg: ICON_1K },
+    ];
+    const makeLimitOption = (o: (typeof LIMIT_OPTIONS)[number]): HTMLButtonElement => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.limitOption = String(o.value);
+      btn.title = `Depth limit: ${o.label} newest commits`;
+      btn.innerHTML = o.svg; // currentColor — grey idle, white when active.
+      Object.assign(btn.style, {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "18px",
+        height: "18px",
+        padding: "0",
+        cursor: "pointer",
+        background: "transparent",
+        border: "1px solid transparent",
+        borderRadius: "4px",
+        color: "var(--text-secondary,#888)",
+      });
+      btn.addEventListener("click", () => {
+        if (o.value === this._maxCount) return;
+        this._maxCount = o.value;
+        this._applyLimitStyles();
+        if (this._input?.value.trim()) this._debounce();
+      });
+      return btn;
+    };
     const filterIconRow = document.createElement("div");
-    Object.assign(filterIconRow.style, { display: "flex", gap: "4px" });
+    Object.assign(filterIconRow.style, { display: "flex", gap: "4px", alignItems: "center" });
     filterIconRow.appendChild(repoFilterIcon);
+    for (const o of LIMIT_OPTIONS) filterIconRow.appendChild(makeLimitOption(o));
     filterBox.appendChild(filterIconRow);
 
     // Repo filter config row — shown while the funnel icon is on.
@@ -275,6 +335,9 @@ export class CommitSearchSystemTabController implements SystemTabController {
     this._input = input;
     this._filesToggle = filesToggle;
     this._repoFilterIcon = repoFilterIcon;
+    this._limitOptions = Array.from(
+      filterIconRow.querySelectorAll<HTMLButtonElement>("[data-limit-option]"),
+    );
     this._repoFilterRow = repoFilterRow;
     this._repoFilter = repoFilter;
     this._repoOptions = repoOptions;
@@ -346,6 +409,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     // Both icons default on → render them white (enabled) immediately.
     this._applyToggleStyles();
     this._applyFilterIconStyle();
+    this._applyLimitStyles();
 
     // Load repoNames for the repo-filter autocomplete, then render states.
     void this._loadRepos();
@@ -402,6 +466,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     this._repoFilterRow = null;
     this._repoFilter = null;
     this._repoOptions = null;
+    this._limitOptions = [];
     this._results = null;
     this._footer = null;
   }
@@ -461,6 +526,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
     if (!btn) return;
     // Grey when off, white (enabled) when on — the SVG uses currentColor.
     btn.style.color = this._repoFilterActive ? "#e3e3e3" : "var(--text-secondary,#888)";
+  }
+
+  /** Exactly one depth-limit option is active — the rest are greyed out. */
+  private _applyLimitStyles(): void {
+    for (const btn of this._limitOptions) {
+      const value = btn.dataset.limitOption ? Number(btn.dataset.limitOption) : 0;
+      btn.style.color = value === this._maxCount ? "#e3e3e3" : "var(--text-secondary,#888)";
+    }
   }
 
   private _renderRepoSuggestions(): void {
@@ -563,6 +636,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
     const token = ++this._searchToken;
     const repoName = this._repoScope();
+    const maxCount = this._maxCount;
     // Commits (messages) are always searched; files add the changed-file-path
     // dimension when the toggle is on.
     const mode = this._searchFiles ? "all" : "message";
@@ -573,7 +647,12 @@ export class CommitSearchSystemTabController implements SystemTabController {
     }
 
     try {
-      const commits = await this._searchModel.search(repoName, { query, in: mode, limit: 100 });
+      const commits = await this._searchModel.search(repoName, {
+        query,
+        in: mode,
+        limit: 100,
+        maxCount,
+      });
       if (token !== this._searchToken) return; // a newer search superseded this one
       this._lastCommits = commits;
       this._renderResults(commits, query);

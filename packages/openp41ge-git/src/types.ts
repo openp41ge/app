@@ -136,4 +136,6 @@ export interface CommitSearchOptions {
   in: CommitSearchScope;
   limit?: number;
   offset?: number;
+  /** How many of the newest commits to walk for matches (default 5000). */
+  maxCount?: number;
 }

@@ -142,6 +142,35 @@ describe("CommitSearchSystemTabController", () => {
     expect(repoFilter.placeholder).toBe("Filter by repo…");
     // The repo filter lives in the filter box, not on the main input row.
     expect(repoFilter.parentElement === inputRow).toBe(false);
+
+    // Depth-limit options: a fixed row next to the filter icon where exactly
+    // one is active. 5K (5000) is the default — white; the rest are grey.
+    const limitOpts = host.querySelectorAll<HTMLButtonElement>("[data-limit-option]");
+    expect(Array.from(limitOpts).map((b) => Number(b.dataset.limitOption))).toEqual([
+      5000, 10000, 3000, 2000, 1000,
+    ]);
+    expect(limitOpts[0].style.color).toBe("rgb(227, 227, 227)"); // 5K active
+    for (const b of Array.from(limitOpts).slice(1)) {
+      expect(b.style.color).toBe("var(--text-secondary,#888)"); // inactive grey
+    }
+    // The limit options share the icon row with the filter icon.
+    expect(repoFilterIcon.parentElement).toBe(limitOpts[0].parentElement);
+    expect(repoFilterIcon.parentElement?.querySelectorAll("[data-limit-option]").length).toBe(5);
+  });
+
+  it("depth-limit options are exclusive: clicking one activates it and searches with that maxCount", async () => {
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.at(-1)?.options.maxCount).toBe(5000); // default 5K
+
+    const threeK = host.querySelector<HTMLButtonElement>('[data-limit-option="3000"]')!;
+    threeK.click();
+    expect(threeK.style.color).toBe("rgb(227, 227, 227)");
+    const fiveK = host.querySelector<HTMLButtonElement>('[data-limit-option="5000"]')!;
+    expect(fiveK.style.color).toBe("var(--text-secondary,#888)");
+
+    await search(controller, "readme");
+    expect(model.calls.at(-1)?.options.maxCount).toBe(3000);
   });
 
   it("repo filter autocompletes from the workspace repos and scopes the search", async () => {
