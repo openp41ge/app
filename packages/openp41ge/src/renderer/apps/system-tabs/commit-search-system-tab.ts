@@ -134,8 +134,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
       "Search commit messages",
     );
     const filesToggle = makeIconToggle("files", SEARCH_ICONS.files, "Search changed file paths");
-    iconRow.appendChild(messagesToggle);
     iconRow.appendChild(filesToggle);
+    iconRow.appendChild(messagesToggle);
     searchBox.appendChild(iconRow);
 
     const input = document.createElement("input");
