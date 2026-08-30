@@ -282,6 +282,32 @@ export class NodeGitService implements IGitService {
       return { branch, path: worktreePath, exists: true };
     }
 
+    /**
+     * git worktree add, tolerating stale registrations: if the path is already
+     * registered in the bare repo's metadata but the folder is gone (folder
+     * deleted behind git's back — "<name> is a missing but already registered
+     * worktree"), prune then retry once. Mirrors WorktreeStore.checkoutWorktreeBranch.
+     */
+    const addWt = async (): Promise<void> => {
+      try {
+        await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/already registered|missing but already registered|add -f|already used by worktree|already checked out/i.test(msg)) {
+          try {
+            await this._execGit(["worktree", "prune"], repoName);
+            if (!fs.existsSync(worktreePath)) {
+              await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
+            }
+            return;
+          } catch (err2) {
+            throw err2;
+          }
+        }
+        throw err;
+      }
+    };
+
     // Check if branch exists locally.
     let branchExists = false;
     try {
@@ -294,7 +320,7 @@ export class NodeGitService implements IGitService {
     try {
       if (branchExists) {
         // Local branch exists — create worktree directly.
-        await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
+        await addWt();
         return { branch, path: worktreePath, exists: true };
       }
 
@@ -313,7 +339,7 @@ export class NodeGitService implements IGitService {
       if (remoteExists) {
         // Remote branch exists — fetch it, create local tracking branch, then worktree.
         await this._execGit(["fetch", "origin", `${branch}:${branch}`], repoName);
-        await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
+        await addWt();
         return { branch, path: worktreePath, exists: true };
       }
 
@@ -327,7 +353,7 @@ export class NodeGitService implements IGitService {
         const msg = err instanceof Error ? err.message : String(err);
         if (!/already exists/i.test(msg)) throw err;
       }
-      await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
+      await addWt();
       return { branch, path: worktreePath, exists: true };
     } catch (err) {
       // Another window may have checked out this branch's worktree concurrently

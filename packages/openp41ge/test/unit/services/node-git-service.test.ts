@@ -126,4 +126,19 @@ describe("NodeGitService.checkoutWorktree", () => {
       }
     }
   });
+
+  it("re-creates a worktree after its folder was deleted (prunes stale registration)", async () => {
+    // Regression: a declared worktree whose folder was removed behind git's back
+    // leaves '... is a missing but already registered worktree' metadata, which
+    // used to THROW out of workspace:checkoutWorktree → blocking error overlay on
+    // activation. checkoutWorktree must prune + retry once instead.
+    const b = "feat/of-7";
+    const dir = path.join(reposDir, repoName, wtDir(b));
+    await expect(svc.checkoutWorktree(repoName, b)).resolves.toMatchObject({ exists: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+    expect(fs.existsSync(dir)).toBe(false);
+
+    await expect(svc.checkoutWorktree(repoName, b)).resolves.toMatchObject({ exists: true });
+    expect(fs.existsSync(dir)).toBe(true);
+  });
 });
