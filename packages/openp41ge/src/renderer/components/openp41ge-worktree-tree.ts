@@ -263,15 +263,14 @@ class Openp41geWorktreeTree extends LitElement {
       .wt-tree-scroll-wrapper .wt-scrollbar-thumb:hover {
         background: rgba(255,255,255,0.35);
       }
-      /* VS Code-style keyboard/click selection for repo & worktree rows.
-         Two-class specificity keeps it above the row :hover highlight.
-         - .wt-row-focused: faded bg + outline (the arrow-focus row)
-         - .wt-row-selected: faded bg only (the last-clicked row) */
-      .wt-row-header.wt-row-focused, .wt-row-header.wt-row-selected {
-        background: var(--tree-selected-bg, rgba(74,158,255,0.12));
-      }
-      .wt-row-header.wt-row-focused {
-        box-shadow: inset 0 0 0 1px var(--tree-focus, #4a9eff);
+      /* VS Code-style keyboard/click selection is FILE/FOLDER-only now (the
+         uikit <openp41ge-tree> nodes). Repo/worktree header rows never take the
+         cursor: arrows traverse only tree nodes, and clicking a worktree/repo
+         just expands it without painting a highlight. The tree nodes' selected
+         background uses a light grey derived from the border color; the
+         arrow-focused cursor keeps its blue border + blue background. */
+      .wt-tree-scroll openp41ge-tree {
+        --tree-selected-bg: color-mix(in srgb, var(--border-divider, #2d2d2d) 60%, transparent);
       }
       /* Rows already have padding-right:8px in their inline styles, so
          the overlay scrollbar sits in the padded area — content text/buttons
@@ -1130,25 +1129,21 @@ class Openp41geWorktreeTree extends LitElement {
 
   private _onPanelClick = (e: Event) => {
     // composedPath() crosses the <openp41ge-tree> shadow boundary so we can
-    // adopt selection of clicked file/folder rows too.
+    // adopt selection of clicked FILE/FOLDER rows (tree nodes). Repo and
+    // worktree headers are containers that expand on their own click and do
+    // NOT take selection/focus — only files/folders get the highlight.
     const node = e
       .composedPath()
       .find(
         (p): p is HTMLElement => p instanceof HTMLElement && p.classList?.contains("tree-node"),
       );
-    const row = e
-      .composedPath()
-      .find(
-        (p): p is HTMLElement => p instanceof HTMLElement && p.classList?.contains("wt-row-header"),
-      );
-    const target = node ?? row;
-    if (target) {
-      // Clicking selects AND focuses the row: it keeps a faded-blue
-      // background (selection) while the arrow focus adds the outline and
-      // can move away without stealing it.
+    if (node) {
+      // Clicking selects AND focuses the row: it keeps a faded background
+      // (selection) while the arrow focus adds the outline and can move away
+      // without stealing it.
       this._navFocusVisible = true;
-      this._selectedRowEl = target;
-      this._setFocusedRow(target);
+      this._selectedRowEl = node;
+      this._setFocusedRow(node);
     }
   };
 
@@ -1212,6 +1207,10 @@ class Openp41geWorktreeTree extends LitElement {
    * (.tree-node), so this walks both. Hidden levels aren't in the DOM at all,
    * so the walk naturally yields: repo → worktrees → each worktree's file
    * tree (recursively) → next repo.
+   *
+   * Only FILE/FOLDER rows (.tree-node) are navigable: repo and worktree
+   * headers are containers that expand via their own click handler and never
+   * take the arrow cursor (VS Code-style selection is file/folder only).
    */
   private _navigableRows(): HTMLElement[] {
     const out: HTMLElement[] = [];
@@ -1222,7 +1221,7 @@ class Openp41geWorktreeTree extends LitElement {
           const root2 = (el as unknown as HTMLElement & { shadowRoot?: ShadowRoot | null })
             .shadowRoot;
           if (root2) walk(root2);
-        } else if (el.classList.contains("wt-row-header") || el.classList.contains("tree-node")) {
+        } else if (el.classList.contains("tree-node")) {
           out.push(el);
         } else {
           // Recurse into containers, <openp41ge-repo-tree-item>, nested wrappers.
@@ -1269,12 +1268,17 @@ class Openp41geWorktreeTree extends LitElement {
    * Paint the VS Code-style two-tier selection on `el` (or clear it when
    * null). Everything is re-painted from scratch on every change so nothing
    * can linger:
-   *   - clicked row (_selectedRowEl): faded-blue BACKGROUND only,
-   *   - arrow-focused row (_focusedRowEl): faded background + blue OUTLINE.
-   * Header rows use CSS classes; file/folder rows use inline styles because
-   * they live in shadow roots that global CSS cannot reach.
+   *   - clicked row (_selectedRowEl): light-grey BACKGROUND only,
+   *   - arrow-focused row (_focusedRowEl): blue background + blue OUTLINE.
+   * Selection/focus is FILE/FOLDER (.tree-node) only — repo/worktree headers
+   * never carry the cursor or a selection highlight. File/folder rows use
+   * inline styles because they live in shadow roots that global CSS cannot
+   * reach.
    */
   private _setFocusedRow(el: HTMLElement | null): void {
+    // Containers (repo/worktree headers) never take focus; ArrowLeft's
+    // "move to parent" may resolve to a header, which we skip.
+    if (el && !el.classList.contains("tree-node")) el = null;
     if (this._focusedRowEl === el) return;
     this._focusedRowEl = el;
     this._repaintSelection();
@@ -1311,23 +1315,35 @@ class Openp41geWorktreeTree extends LitElement {
 
   /** Paint fade-only (focused=false) or fade + outline (focused=true) on el. */
   private _paintRow(el: HTMLElement, focused: boolean): void {
-    if (el.classList.contains("tree-node")) {
-      // closest() does not cross the shadow boundary — resolve the owning
-      // <openp41ge-tree> host through getRootNode() instead. The clicked
-      // AND the arrow-focused row both count as the tree's selection, so
-      // the uikit tree's selectedId follows either of them.
-      const root = el.getRootNode();
-      const host = (root instanceof ShadowRoot ? root.host : null) as
-        (HTMLElement & { selectedId: string | null }) | null;
-      if (host && host.tagName === "OPENP41GE-TREE")
-        host.selectedId = el.getAttribute("data-node-id");
-      el.style.background = "var(--tree-selected-bg, rgba(74,158,255,0.12))";
-      el.style.boxShadow = focused ? "inset 0 0 0 1px var(--tree-focus, #4a9eff)" : "";
-    } else {
-      el.classList.remove(focused ? "wt-row-selected" : "wt-row-focused");
-      el.classList.add(focused ? "wt-row-focused" : "wt-row-selected");
+    if (!el.classList.contains("tree-node")) {
+      // Only file/folder rows can carry a highlight. Defensive clear for any
+      // stray header that never should have been painted.
+      el.classList.remove("wt-row-focused");
+      el.classList.remove("wt-row-selected");
       el.style.boxShadow = "";
       el.style.background = "";
+      return;
+    }
+    // closest() does not cross the shadow boundary — resolve the owning
+    // <openp41ge-tree> host through getRootNode() instead. The clicked
+    // AND the arrow-focused row both count as the tree's selection, so
+    // the uikit tree's selectedId follows either of them.
+    const root = el.getRootNode();
+    const host = (root instanceof ShadowRoot ? root.host : null) as
+      (HTMLElement & { selectedId: string | null }) | null;
+    if (host && host.tagName === "OPENP41GE-TREE")
+      host.selectedId = el.getAttribute("data-node-id");
+    if (focused) {
+      // Arrow cursor: keep the blue background + blue outline (unchanged).
+      el.style.background = "rgba(74,158,255,0.12)";
+      el.style.boxShadow = "inset 0 0 0 1px var(--tree-focus, #4a9eff)";
+    } else {
+      // Clicked/active-file row: light grey background derived from the
+      // border color, no outline — the cursor paint above already covers
+      // the coincide case.
+      el.style.background =
+        "color-mix(in srgb, var(--border-divider, #2d2d2d) 60%, transparent)";
+      el.style.boxShadow = "";
     }
   }
 

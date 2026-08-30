@@ -187,4 +187,79 @@ describe("ExplorerSystemTabController", () => {
     expect(nodeB.style.boxShadow).toBe(""); // cursor hidden with the row
     expect(nodeB.style.background).not.toBe(""); // clicked-row fade persists
   });
+
+  it("selection/focus is file-folder-only: header rows never take the cursor", async () => {
+    const tree = document.createElement("openp41ge-worktree-tree") as unknown as {
+      _focusedRowEl: HTMLElement | null;
+      _navFocusVisible: boolean;
+      _navigableRows(): HTMLElement[];
+      _setFocusedRow(el: HTMLElement | null): void;
+      _clearAllTreeSelections(): void;
+      _onPanelClick(e: Event): void;
+    };
+    tree._repoService = new TestRepoService();
+    (tree._repoService as TestRepoService).createRepo("test-repo");
+    host.appendChild(tree);
+    await (tree as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
+
+    const el = tree as unknown as HTMLElement;
+    // Repo + worktree headers are .wt-row-header rows.
+    const repoHeader = document.createElement("div");
+    repoHeader.className = "wt-row-header";
+    repoHeader.setAttribute("data-repo", "github.com/x/y");
+    const wtHeader = document.createElement("div");
+    wtHeader.className = "wt-row-header";
+    wtHeader.setAttribute("data-worktree-row", "");
+    el.appendChild(repoHeader);
+    el.appendChild(wtHeader);
+    // File rows live inside the uikit <openp41ge-tree> shadow root.
+    const fileTree = document.createElement("openp41ge-tree");
+    const sr = fileTree.attachShadow({ mode: "open" });
+    const node = document.createElement("div");
+    node.className = "tree-node";
+    node.dataset.nodeId = "/repo/a.ts";
+    sr.appendChild(node);
+    el.appendChild(fileTree);
+
+    // Arrow navigation must only traverse file/folder rows — headers excluded.
+    expect(tree._navigableRows().map((r) => r.className)).toEqual(["tree-node"]);
+
+    // Clicking a repo or worktree header must NOT paint a cursor/selection.
+    tree._onPanelClick(new MouseEvent("click", { bubbles: true }));
+    repoHeader.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    expect(tree._focusedRowEl).toBeNull();
+    wtHeader.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    expect(tree._focusedRowEl).toBeNull();
+
+    // Header rows never gain a highlight class either.
+    expect(repoHeader.classList.contains("wt-row-focused")).toBe(false);
+    expect(repoHeader.classList.contains("wt-row-selected")).toBe(false);
+
+    // Clicking a file row still focuses it (blue cursor on the coincident
+    // sel+focus row), then arrowing away leaves the ORIGINAL row with the
+    // new light-grey (border-derived) selection background.
+    const nodeB = document.createElement("div");
+    nodeB.className = "tree-node";
+    nodeB.dataset.nodeId = "/repo/b.ts";
+    sr.appendChild(nodeB);
+    // Simulate the click path: selection adopts the row, then focus follows.
+    (tree as unknown as { _selectedRowEl: HTMLElement | null })._selectedRowEl = node;
+    tree._setFocusedRow(node);
+    expect(tree._focusedRowEl).toBe(node);
+    expect(node.style.background).toContain("74, 158, 255"); // blue cursor
+    expect(node.style.boxShadow).toContain("4a9eff"); // blue cursor outline
+
+    // Arrow away: station-kept row goes grey (border color), cursor row is blue.
+    tree._setFocusedRow(nodeB);
+    expect(node.style.background).toContain("color-mix"); // border-derived grey
+    expect(node.style.background).not.toContain("74, 158, 255"); // no longer blue
+    expect(node.style.boxShadow).toBe("");
+    expect(nodeB.style.background).toContain("74, 158, 255"); // blue cursor
+    expect(nodeB.style.boxShadow).toContain("4a9eff");
+
+    // Repo/worktree headers stay clean even after a repaint sweep.
+    tree._clearAllTreeSelections();
+    expect(repoHeader.classList.contains("wt-row-focused")).toBe(false);
+    expect(repoHeader.classList.contains("wt-row-selected")).toBe(false);
+  });
 });
