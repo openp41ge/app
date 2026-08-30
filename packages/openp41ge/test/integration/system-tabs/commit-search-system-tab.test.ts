@@ -177,43 +177,34 @@ describe("CommitSearchSystemTabController", () => {
     expect(model.calls.at(-1)?.options.maxCount).toBe(3000);
   });
 
-  it("disables the panel with no workspace, then re-enables when one opens", async () => {
+  it("replaces the whole UI with a select-a-workspace prompt when none is open, then rebuilds the search UI once one opens", async () => {
     const model = controller["_searchModel"] as TestCommitSearchModel;
 
-    // Simulate closing the workspace (top-bar picker → null file path).
+    // Closing the workspace swaps the built search UI for a single prompt.
     workspaceFileService.activeFilePath = null;
     document.dispatchEvent(new CustomEvent("workspace-file-changed"));
     await flush();
 
-    const input = host.querySelector("input[placeholder^='Open']") as HTMLInputElement;
-    expect(input).not.toBeNull();
-    expect(input.disabled).toBe(true);
-    expect(host.textContent).toContain("Open a workspace to search commits");
-    const disabledControls = host.querySelectorAll<HTMLElement>(
-      "[data-search-into], [data-filter-icon], [data-limit-option]",
-    );
-    for (const b of Array.from(disabledControls)) {
-      expect((b as HTMLButtonElement).disabled).toBe(true);
-    }
+    const tab = host.querySelector('[data-system-tab="git"]') as HTMLElement;
+    expect(tab).not.toBeNull();
+    expect(tab.textContent).toContain("Select a workspace to search commits");
+    // The search UI is not built at all in this state.
+    expect(host.querySelector("input")).toBeNull();
+    expect(host.querySelector("[data-search-into]")).toBeNull();
+    expect(host.querySelector("[data-repo-filter]")).toBeNull();
+    expect(host.querySelector("[data-limit-option]")).toBeNull();
+    // No input exists, so a search cannot even be attempted.
+    expect(model.calls.length).toBe(0);
 
-    // Enter must not start a search while disabled.
-    const before = model.calls.length;
-    input.value = "readme";
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-    );
-    await flush();
-    expect(model.calls.length).toBe(before);
-
-    // Opening a workspace re-enables the panel and search works again.
+    // Opening a workspace rebuilds the full UI and search works again.
     workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
     document.dispatchEvent(new CustomEvent("workspace-file-changed"));
     await flush();
-    expect(input.disabled).toBe(false);
-    expect(
-      (host.querySelector<HTMLButtonElement>("[data-search-into]") as HTMLButtonElement).disabled,
-    ).toBe(false);
 
+    const input = host.querySelector("input[placeholder^='Search']") as HTMLInputElement;
+    expect(input).not.toBeNull();
+    expect(host.querySelector("[data-repo-filter]")).not.toBeNull();
+    expect(host.querySelector("[data-limit-option]")).not.toBeNull();
     await search(controller, "readme");
     expect(model.calls.at(-1)?.options.query).toBe("readme");
   });

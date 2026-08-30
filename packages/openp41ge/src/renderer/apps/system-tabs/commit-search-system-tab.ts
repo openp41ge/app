@@ -58,9 +58,10 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _footer: HTMLElement | null = null;
 
   private _repos: RepoOption[] = [];
-  // Gate: without a selected workspace the whole panel is disabled.
+  // Gate: without a selected workspace the panel shows a single placeholder.
   private _hasWorkspace = workspaceFileService.activeFilePath != null;
   private _unsubscribeWorkspace: (() => void) | null = null;
+  private _container: HTMLElement | null = null;
   private _expandedCommits = new Set<string>(); // "repoName<sep>shortHash"
   private _expandedFiles = new Set<string>(); // "repoName<sep>shortHash<sep>path"
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -84,6 +85,18 @@ export class CommitSearchSystemTabController implements SystemTabController {
   }
 
   mount(container: HTMLElement): Promise<void> | void {
+    this._container = container;
+    if (this._hasWorkspace) {
+      this._buildSearchUI(container);
+    } else {
+      this._renderPlaceholder(container);
+    }
+    // React when a workspace opens/closes (the top-bar picker drives this).
+    this._unsubscribeWorkspace = workspaceFileService.onChange(() => this._updateWorkspaceGate());
+  }
+
+  /** Build the full search UI. Only called while a workspace is selected. */
+  private _buildSearchUI(container: HTMLElement): void {
     const wrapper = document.createElement("div");
     wrapper.dataset.systemTab = "git";
     Object.assign(wrapper.style, {
@@ -246,7 +259,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
         color: "var(--text-secondary,#888)",
       });
       btn.addEventListener("click", () => {
-        if (!this._hasWorkspace) return;
         if (o.value === this._maxCount) return;
         this._maxCount = o.value;
         this._applyLimitStyles();
@@ -429,12 +441,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
     };
     document.addEventListener("git:refresh", this._onGitRefresh);
 
-    // Disable the panel while no workspace is selected; react when one opens
-    // or closes (the top-bar workspace picker drives this).
-    this._unsubscribeWorkspace = workspaceFileService.onChange(() => this._updateWorkspaceGate());
-
     // Autofocus the search input on open (clone-dialog pattern).
-    if (this._hasWorkspace) requestAnimationFrame(() => input.focus());
+    requestAnimationFrame(() => input.focus());
 
     // Hover feedback on every result row (commit + file sub-rows).
     const style = document.createElement("style");
@@ -452,36 +460,16 @@ export class CommitSearchSystemTabController implements SystemTabController {
     `;
     wrapper.appendChild(style);
 
-    this._applyWorkspaceDisabled();
+    this._renderEmptyQuery();
   }
 
   unmount(): void {
-    if (this._debounceTimer) {
-      clearTimeout(this._debounceTimer);
-      this._debounceTimer = null;
-    }
-    if (this._onGitRefresh) {
-      document.removeEventListener("git:refresh", this._onGitRefresh);
-      this._onGitRefresh = null;
-    }
     if (this._unsubscribeWorkspace) {
       this._unsubscribeWorkspace();
       this._unsubscribeWorkspace = null;
     }
-    this._searchToken += 1;
-    if (this._viewElement && this._viewElement.parentNode) {
-      this._viewElement.remove();
-    }
-    this._viewElement = null;
-    this._input = null;
-    this._filesToggle = null;
-    this._repoFilterIcon = null;
-    this._repoFilterRow = null;
-    this._repoFilter = null;
-    this._repoOptions = null;
-    this._limitOptions = [];
-    this._results = null;
-    this._footer = null;
+    this._teardownView();
+    this._container = null;
   }
 
   /** Keep-alive: pause background work (reloads/debounce) while hidden. */
@@ -521,7 +509,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
   }
 
   private _toggleRepoFilter(): void {
-    if (!this._hasWorkspace) return;
     this._repoFilterActive = !this._repoFilterActive;
     this._applyFilterIconStyle();
     if (this._repoFilterRow) {
@@ -605,7 +592,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
   // ── Search-into toggles ───────────────────────────────────────────────
 
   private _toggleSearch(): void {
-    if (!this._hasWorkspace) return;
     this._searchFiles = !this._searchFiles;
     this._applyToggleStyles();
     if (this._input?.value.trim()) {
@@ -625,7 +611,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
   // ── Search execution ──────────────────────────────────────────────────
 
   private _debounce(): void {
-    if (!this._hasWorkspace) return;
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(() => {
       this._debounceTimer = null;
@@ -641,7 +626,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
   }
 
   private async _runSearch(): Promise<void> {
-    if (!this._hasWorkspace) return;
     const input = this._input;
     const results = this._results;
     if (!input || !results) return;
@@ -699,11 +683,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     const results = this._results;
     if (!results) return;
     results.replaceChildren();
-    if (!this._hasWorkspace) {
-      results.appendChild(
-        this._message("Open a workspace to search commits", "var(--text-muted,#777)"),
-      );
-    } else if (this._repos.length === 0) {
+    if (this._repos.length === 0) {
       results.appendChild(this._message("No repos", "var(--text-secondary,#999)"));
     } else {
       results.appendChild(
@@ -716,50 +696,71 @@ export class CommitSearchSystemTabController implements SystemTabController {
     if (this._footer) this._footer.textContent = "";
   }
 
-  /** Toggle the whole panel between enabled and a workspace-less disabled state. */
-  private _applyWorkspaceDisabled(): void {
-    const off = !this._hasWorkspace;
-    if (this._input) {
-      this._input.disabled = off;
-      this._input.value = "";
-      this._input.placeholder = off ? "Open a workspace to search commits" : "Search commits…";
+  /** Remove the current view (placeholder or full UI) and release its wiring. */
+  private _teardownView(): void {
+    if (this._debounceTimer) {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = null;
     }
-    if (this._repoFilter) {
-      this._repoFilter.disabled = off;
-      this._repoFilter.value = "";
-    }
-    for (const el of [this._filesToggle, this._repoFilterIcon]) {
-      if (el) el.disabled = off;
-    }
-    for (const el of this._limitOptions) el.disabled = off;
-    if (off) {
-      const grey = "var(--text-secondary,#888)";
-      if (this._filesToggle) this._filesToggle.style.color = grey;
-      if (this._repoFilterIcon) this._repoFilterIcon.style.color = grey;
-      for (const el of this._limitOptions) el.style.color = grey;
-    } else {
-      this._applyToggleStyles();
-      this._applyFilterIconStyle();
-      this._applyLimitStyles();
+    if (this._onGitRefresh) {
+      document.removeEventListener("git:refresh", this._onGitRefresh);
+      this._onGitRefresh = null;
     }
     this._searchToken += 1; // cancel any in-flight search
-    this._renderEmptyQuery();
+    if (this._viewElement && this._viewElement.parentNode) {
+      this._viewElement.parentNode.removeChild(this._viewElement);
+    }
+    this._viewElement = null;
+    this._input = null;
+    this._filesToggle = null;
+    this._repoFilterIcon = null;
+    this._repoFilterRow = null;
+    this._repoFilter = null;
+    this._repoOptions = null;
+    this._limitOptions = [];
+    this._results = null;
+    this._footer = null;
   }
 
-  /** Re-evaluate the workspace gate when the workspace file changes. */
+  /** No workspace selected → the tab shows a single selection prompt, nothing else. */
+  private _renderPlaceholder(container: HTMLElement): void {
+    const el = document.createElement("div");
+    el.dataset.systemTab = "git";
+    Object.assign(el.style, {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: "100%",
+      height: "100%",
+      boxSizing: "border-box",
+      padding: "16px",
+    });
+    const msg = document.createElement("div");
+    msg.textContent = "Select a workspace to search commits";
+    Object.assign(msg.style, {
+      fontSize: "12px",
+      lineHeight: "1.4",
+      textAlign: "center",
+      color: "var(--text-muted,#777)",
+      userSelect: "none",
+    });
+    el.appendChild(msg);
+    container.appendChild(el);
+    this._viewElement = el;
+  }
+
+  /** Re-evaluate the workspace gate — swap the whole view in place. */
   private _updateWorkspaceGate(): void {
     const has = workspaceFileService.activeFilePath != null;
     if (has === this._hasWorkspace) return;
     this._hasWorkspace = has;
+    const container = this._container;
+    if (!container) return;
+    this._teardownView();
     if (has) {
-      this._searchToken += 1;
-      this._repoFilterActive = true;
-      if (this._repoFilterRow) this._repoFilterRow.style.display = "flex";
-      this._applyWorkspaceDisabled();
-      void this._loadRepos(); // repoNames for the filter autocomplete
+      this._buildSearchUI(container);
     } else {
-      this._repos = [];
-      this._applyWorkspaceDisabled();
+      this._renderPlaceholder(container);
     }
   }
 
