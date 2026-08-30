@@ -22,7 +22,7 @@ import { BaseController } from "../../controllers/base-controller";
 // diff document renders through the real editor (read-only diff mode).
 import "openp41ge-file-editor";
 import type { FileEditorElement } from "openp41ge-file-editor";
-import { hunksToDiffDocument, type DiffDocument } from "openp41ge-git";
+import { buildInlineDiffDocument, type DiffDocument } from "openp41ge-git";
 
 interface CommitFileContext {
   repoName?: string;
@@ -42,8 +42,9 @@ export class CommitFileDiffController extends BaseController {
   private _bodyHost: HTMLElement | null = null;
   private _mountToken = 0;
 
-  /** @internal test seam — overridable diff fetch (jsdom has no IPC). */
-  _fetchDiff: (() => Promise<unknown[]>) | null = null;
+  /** @internal test seam — overridable diff fetch (jsdom has no IPC).
+   * Returns [content, hunks] like the real dual IPC fetch. */
+  _fetchDiff: (() => Promise<[string | null, unknown[]]>) | null = null;
 
   mount(container: HTMLElement): void {
     this.container = container;
@@ -146,29 +147,32 @@ export class CommitFileDiffController extends BaseController {
   }
 
   private async _fetchAndRender(editor: FileEditorElement, token: number): Promise<void> {
+    let content: string | null = null;
     let hunks: unknown[] = [];
     try {
       if (this._fetchDiff) {
-        hunks = await this._fetchDiff();
-      } else if (window.openp41ge?.workspaceController?.getCommitFileHunks) {
-        hunks = await window.openp41ge.workspaceController.getCommitFileHunks(
-          this._repoName,
-          this._hash,
-          this._path,
-          "",
-          { regex: false, caseSensitive: false },
-        );
+        [content, hunks] = await this._fetchDiff();
+      } else if (window.openp41ge?.workspaceController) {
+        const wc = window.openp41ge.workspaceController;
+        [content, hunks] = await Promise.all([
+          wc.getCommitFileContent(this._repoName, this._hash, this._path),
+          wc.getCommitFileHunks(this._repoName, this._hash, this._path, "", {
+            regex: false,
+            caseSensitive: false,
+          }),
+        ]);
       }
     } catch {
+      content = null;
       hunks = [];
     }
     if (token !== this._mountToken || !this.container || this._editor !== editor) return;
 
-    if (hunks.length === 0) {
-      this._showEmpty(editor, "No textual diff for this file at this commit");
+    if (content === null) {
+      this._showEmpty(editor, "No textual content for this file at this commit");
       return;
     }
-    this._diff = hunksToDiffDocument(hunks as Parameters<typeof hunksToDiffDocument>[0]);
+    this._diff = buildInlineDiffDocument(content, hunks as Parameters<typeof buildInlineDiffDocument>[1]);
     editor.setDiffDocument(this._diff);
   }
 

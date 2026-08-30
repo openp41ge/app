@@ -109,4 +109,11 @@ export interface IGitCommitService {
     query: string,
     options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
   ): Promise<SearchHunk[]>;
+
+  /**
+   * Full content of `path` at `hash` (`git show <hash>:<path>`), or null for
+   * an unknown commit/file. Used with getCommitFileHunks to render the whole
+   * file with the commit's additions/deletions injected inline.
+   */
+  getCommitFileContent(repoName: string, hash: string, path: string): Promise<string | null>;
 }

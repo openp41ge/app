@@ -461,4 +461,18 @@ describe("NodeGitCommitService.getCommitFileHunks", () => {
       svc.getCommitFileHunks("github.com/example/missing", c0, "app.txt", "hello", {}),
     ).resolves.toEqual([]);
   });
+
+  it("getCommitFileContent returns the file at that revision, null when unknown", async () => {
+    const c0Content = await svc.getCommitFileContent(repoName, c0, "app.txt");
+    expect(c0Content).toContain("hello world");
+
+    const c1 = git(srcRepo, ["rev-parse", "HEAD"]);
+    const c1Content = await svc.getCommitFileContent(repoName, c1, "app.txt");
+    expect(c1Content).toContain("hello brave world");
+    expect(c1Content).toContain("line four"); // second commit added a 4th line
+
+    // Unknown hash / file → null (not a throw).
+    await expect(svc.getCommitFileContent(repoName, "deadbeef", "app.txt")).resolves.toBeNull();
+    await expect(svc.getCommitFileContent(repoName, c1, "nope.ts")).resolves.toBeNull();
+  });
 });

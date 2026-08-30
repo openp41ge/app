@@ -36,6 +36,14 @@ export function registerGitHandlers(
     },
   );
 
+  ipcMain.handle("workspace:getCommitFileContent", async (_event, repoName, hash, path) => {
+    try {
+      return await gitCommitService.getCommitFileContent(repoName, hash, path);
+    } catch {
+      return null;
+    }
+  });
+
   ipcMain.handle("workspace:getUntrackedFiles", async (_event, repoName) => {
     return gitCommitService.getUntrackedFiles(repoName);
   });

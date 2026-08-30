@@ -752,7 +752,8 @@ export class NodeGitCommitService implements IGitCommitService {
     }
   }
 
-  /** Parse `git show <hash> --format= -- <path>` patch output into hunks. */
+  /**
+   * Parse `git show <hash> --format= -- <path>` patch output into hunks. */
   private _parseHunks(output: string): SearchHunk[] {
     const hunks: SearchHunk[] = [];
     let cur: SearchHunk | null = null;
@@ -769,6 +770,23 @@ export class NodeGitCommitService implements IGitCommitService {
       else cur.lines.push({ type: " ", text: line });
     }
     return hunks;
+  }
+
+  /**
+   * Full content of `path` at `hash` (git show <hash>:<path>), or null for an
+   * unknown commit/file. Best-effort — errors resolve null, never throw.
+   */
+  async getCommitFileContent(
+    repoName: string,
+    hash: string,
+    path: string,
+  ): Promise<string | null> {
+    if (!hash || !path) return null;
+    try {
+      return await this._execGit(["show", `${hash}:${path}`], repoName);
+    } catch {
+      return null;
+    }
   }
 
   private _applyFileStatuses(entries: DiffStatEntry[], statusOutput: string): void {

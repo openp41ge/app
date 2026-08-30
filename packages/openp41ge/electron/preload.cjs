@@ -372,6 +372,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.invoke("workspace:getCommitMessage", repoName, hash),
     getCommitFileHunks: (repoName, hash, path, query, options) =>
       ipcRenderer.invoke("workspace:getCommitFileHunks", repoName, hash, path, query, options),
+    getCommitFileContent: (repoName, hash, path) =>
+      ipcRenderer.invoke("workspace:getCommitFileContent", repoName, hash, path),
     deleteLocalBranch: (repoName, branchName, force) =>
       ipcRenderer.invoke("workspace:deleteLocalBranch", repoName, branchName, force),
 

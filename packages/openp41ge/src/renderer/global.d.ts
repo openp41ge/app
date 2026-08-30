@@ -110,6 +110,12 @@ declare global {
           query: string,
           options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
         ) => Promise<SearchHunk[]>;
+        /** Full content of `path` at `hash`, or null (unknown commit/file). */
+        getCommitFileContent: (
+          repoName: string,
+          hash: string,
+          path: string,
+        ) => Promise<string | null>;
         /** Delete a local branch. */
         deleteLocalBranch: (repoName: string, branchName: string, force?: boolean) => Promise<void>;
 

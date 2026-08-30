@@ -3,19 +3,25 @@
  * when a file result in the Git sidebar commit search is activated.
  *
  * Covers:
- *   - fresh mount fetches hunks, converts them (hunksToDiffDocument) and shows
- *     them through the `<file-editor>` READ-ONLY diff mode (added/removed rows),
+ *   - fresh mount fetches the full file content AND hunks, merges them with
+ *     buildInlineDiffDocument and shows the ENTIRE file through the
+ *     `<file-editor>` READ-ONLY diff mode (additions/deletions injected),
  *   - restore-with-cached-diff renders instantly without a refetch,
- *   - an empty fetch shows the no-textual-diff fallback,
+ *   - a null content fetch shows the no-textual-content fallback,
  *   - mount without repo/hash/path shows the unavailable prompt.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CommitFileDiffController } from "../../src/renderer/apps/commit-file-diff/commit-file-diff-controller";
-import { hunksToDiffDocument } from "openp41ge-git";
+import { buildInlineDiffDocument } from "openp41ge-git";
 
 type AsyncMock = (() => Promise<unknown>) & ReturnType<typeof vi.fn>;
 
-type MockBridge = { workspaceController: { getCommitFileHunks: AsyncMock } };
+type MockBridge = {
+  workspaceController: {
+    getCommitFileHunks: AsyncMock;
+    getCommitFileContent: AsyncMock;
+  };
+};
 
 function bridge(): MockBridge {
   return (window as unknown as { openp41ge: MockBridge }).openp41ge;
@@ -23,13 +29,24 @@ function bridge(): MockBridge {
 
 function installBridge(): void {
   (window as unknown as { openp41ge: MockBridge }).openp41ge = {
-    workspaceController: { getCommitFileHunks: vi.fn() },
+    workspaceController: {
+      getCommitFileHunks: vi.fn(),
+      getCommitFileContent: vi.fn(),
+    },
   };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 60));
 
 const HASH = "af".repeat(20);
+/** Full post-commit file content (line 2 changed). */
+const CONTENT = [
+  "import { crashy } from 'old'",
+  "export function openHook() {",
+  "return commitText();",
+  "after",
+  "final",
+].join("\n") + "\n";
 const HUNKS = [
   {
     header: "@@ -1,2 +1,3 @@",
@@ -41,6 +58,10 @@ const HUNKS = [
     ],
   },
 ];
+
+function ctx(): { repoName: string; hash: string; path: string } {
+  return { repoName: "github.com/example/demo", hash: HASH, path: "src/app.ts" };
+}
 
 describe("CommitFileDiffController", () => {
   let host: HTMLElement;
@@ -60,18 +81,14 @@ describe("CommitFileDiffController", () => {
     (window as unknown as Record<string, unknown>).__openp41geTestHooks = undefined;
   });
 
-  it("fetches hunks, converts to a diff document and renders it in the READ-ONLY file editor", async () => {
-    controller._fetchDiff = async () => HUNKS;
-    (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = {
-      repoName: "github.com/example/demo",
-      hash: HASH,
-      path: "src/app.ts",
-    };
+  it("merges full file content + hunks and renders the WHOLE file in the read-only editor diff", async () => {
+    controller._fetchDiff = async () => [CONTENT, HUNKS];
+    (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = ctx();
 
     controller.mount(host);
     await flush();
 
-    const doc = hunksToDiffDocument(HUNKS);
+    const doc = buildInlineDiffDocument(CONTENT, HUNKS);
     const editor = host.querySelector("file-editor") as HTMLElement & {
       isReadOnly?: boolean;
       isDiffMode?: boolean;
@@ -83,27 +100,26 @@ describe("CommitFileDiffController", () => {
     const diffHost = host.querySelector('[data-commit-diff]');
     expect(diffHost).not.toBeNull();
     const rows = diffHost ? [...diffHost.querySelectorAll("[data-diff-line]")] : [];
-
-    // Header + 1 context + 1 removed + 2 added.
     const types = rows.map((r) => r.getAttribute("data-diff-line"));
-    expect(types).toEqual(["header", "context", "removed", "added", "added"]);
+    expect(types).toEqual([
+      "header", "context", "removed", "added", "added", "context", "context",
+    ]);
 
-    const textOf = (t: string) =>
-      rows
-        .filter((r) => r.getAttribute("data-diff-line") === t)
-        .map((r) => r.textContent ?? "");
-    expect(textOf("added")[1]).toContain("return commitText();");
-    expect(textOf("removed")[0]).toContain("export function open() {");
+    // The ENTIRE file is present — lines outside the hunk are included too.
+    const texts = rows.map((r) => r.textContent ?? "");
+    expect(texts.some((t) => t.includes("after"))).toBe(true);
+    expect(texts.some((t) => t.includes("final"))).toBe(true);
+    expect(rows.filter((r) => r.getAttribute("data-diff-line") === "context")).toHaveLength(3);
 
-    // Line numbers are assigned: context 1|1 (both starts), removed old=2,
-    // added new=2/3.
-    const context = rows.find((r) => r.getAttribute("data-diff-line") === "context");
-    expect(context?.textContent).toContain("1 1");
-    expect(context?.textContent).toContain("crashy");
+    // Numbers: context 1|1, removed old=2, added new=2/3, tail new=4/5.
+    const context = rows.find((r) => r.getAttribute("data-diff-line") === "context")!;
+    expect(context.textContent).toContain("1 1");
     const added0 = rows.find(
       (r) => r.getAttribute("data-diff-line") === "added" && (r.textContent ?? "").includes("openHook"),
-    );
-    expect(added0?.textContent).toContain("2");
+    )!;
+    expect(added0.textContent).toContain("2");
+    const tailRow = rows.find((r) => (r.textContent ?? "").includes("after"))!;
+    expect(tailRow.textContent).toContain("4");
 
     // Read-only diff — no textarea, no caret surface.
     expect(host.querySelector("textarea")).toBeNull();
@@ -113,12 +129,8 @@ describe("CommitFileDiffController", () => {
     const fetch = bridge().workspaceController.getCommitFileHunks;
     const controller2 = new CommitFileDiffController("diff-tab-2", "commit-file-diff");
     controller2.restore({
-      filePath: JSON.stringify({
-        repoName: "github.com/example/demo",
-        hash: HASH,
-        path: "src/app.ts",
-      }),
-      diff: hunksToDiffDocument(HUNKS),
+      filePath: JSON.stringify(ctx()),
+      diff: buildInlineDiffDocument(CONTENT, HUNKS),
     });
     const host2 = document.createElement("div");
     document.body.appendChild(host2);
@@ -132,16 +144,15 @@ describe("CommitFileDiffController", () => {
     host2.remove();
   });
 
-  it("shows the no-textual-diff fallback when the fetch returns nothing", async () => {
-    controller._fetchDiff = async () => [];
+  it("shows the no-textual-content fallback when the content fetch returns null", async () => {
+    controller._fetchDiff = async () => [null, []];
     (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = {
-      repoName: "github.com/example/demo",
-      hash: HASH,
+      ...ctx(),
       path: "assets/blob.bin",
     };
     controller.mount(host);
     await flush();
-    expect(host.textContent).toContain("No textual diff for this file at this commit");
+    expect(host.textContent).toContain("No textual content for this file at this commit");
   });
 
   it("shows the unavailable prompt without repo/hash/path", () => {
@@ -149,17 +160,13 @@ describe("CommitFileDiffController", () => {
     expect(host.textContent).toContain("File diff unavailable");
   });
 
-  it("a throwing fetch falls back to the empty state (no crash)", async () => {
+  it("a throwing fetch falls back to the fallback state (no crash)", async () => {
     controller._fetchDiff = async () => {
       throw new Error("boom");
     };
-    (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = {
-      repoName: "github.com/example/demo",
-      hash: HASH,
-      path: "src/app.ts",
-    };
+    (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = ctx();
     controller.mount(host);
     await flush();
-    expect(host.textContent).toContain("No textual diff for this file at this commit");
+    expect(host.textContent).toContain("No textual content for this file at this commit");
   });
 });

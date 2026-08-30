@@ -25,10 +25,11 @@ export type {
 } from "./types";
 
 // Commit-file diff view conversion
-// git hunks → VS Code-style diff document for the read-only file editor.
+// git hunks + file content → VS Code-style full-file diff for the read-only
+// file editor (additions/deletions injected inline).
 export {
-  hunksToDiffDocument,
-} from "./hunks-to-diff-document";
+  buildInlineDiffDocument,
+} from "./build-inline-diff-document";
 
 // Git browser DOM renderer
 export { gitBrowserRenderer } from "./git-browser-renderer";
