@@ -471,10 +471,10 @@ class Openp41geWorktreeTree extends LitElement {
     if (!this._hasWorkspace) {
       return html`
         <div
-          class="wt-drawer flex flex-col items-center justify-center flex-1 min-h-0 w-full bg-gutter relative select-none"
+          style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;box-sizing:border-box;padding:16px;"
         >
           <div
-            style="opacity:.55;font-size:12px;color:var(--text-muted,#777);text-align:center;padding:0 16px;"
+            style="font-size:12px;line-height:1.4;text-align:center;color:var(--text-muted,#777);user-select:none;"
           >
             Select a workspace to get started
           </div>
