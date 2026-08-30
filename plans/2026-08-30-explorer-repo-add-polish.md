@@ -1,5 +1,14 @@
 2026-08-30
 
+> **Status: DONE (committed `87f6ffb`, then overlay wiring #3/#4 + store unification below).**
+> This turn's addition: the Workspaces overlay's `workspaceData:*` git ops are re-rooted to the
+> **shared repositories store** (extracted to `src/main/services/worktree-store.ts`, same layout as
+> `NodeGitService`), `checkWorktreeBranch` returns `missing` for a declared worktree whose folder is
+> absent, the warning icon opens the overlay focused on that repo (fixed an async retry dedupe bug),
+> and the overlay's Create/Re-create action re-materializes the folder (local → remote → from-HEAD
+> fallback + prune of stale registrations). Live-verified via CDP: warning row → click → overlay
+> "1 of 20 need attention" → Create → folder recreated on the shared store → explorer warning clears.
+
 # Explorer repos become workspace-backed + reuse Workspaces overlay repo status
 
 ## Goal
@@ -122,12 +131,35 @@ repo-status bar).
 
 ## Completion Criteria
 
-- [ ] Add-repo input shows no blue ring on focus (row ring preserved; screenshot-verified).
-- [ ] Explorer add-repo clones bare only; zero worktrees/phantom rows until a branch is added.
-- [ ] Explorer-added repo appears in the Workspaces overlay (same `repos` list); overlay edits
+- [x] Add-repo input shows no blue ring on focus (row ring preserved; screenshot-verified).
+- [x] Explorer add-repo clones bare only; zero worktrees/phantom rows until a branch is added.
+- [x] Explorer-added repo appears in the Workspaces overlay (same `repos` list); overlay edits
       reflect back in the explorer.
-- [ ] Warning icon click opens the Workspaces overlay at that repo's status bar.
-- [ ] Overlay repo status bar has a re-materialize action for missing worktrees.
-- [ ] All repoRefs/workset* code removed (layout, IPC, preload, global.d.ts, explorer);
+- [x] Warning icon click opens the Workspaces overlay at that repo's status bar.
+- [x] Overlay repo status bar has a re-materialize action for missing worktrees.
+- [x] All repoRefs/workset* code removed (layout, IPC, preload, global.d.ts, explorer);
       serialization tolerates legacy files.
-- [ ] `nx run-many -t typecheck test`, `nx lint`, `nx format:check` clean; build green.
+- [x] `nx run-many -t typecheck test`, `nx lint`, `nx format:check` clean; build green.
+
+## This Turn (post-commit) — Overlay wiring + store unification
+
+- **Single store**: extracted the repositories-layout helpers + git ops into
+  `src/main/services/worktree-store.ts` (`createWorktreeStore(reposRootDir)` — testable, no electron
+  imports). `workspace-handlers.ts` now delegates `workspaceData:*` to it; default root
+  `~/.openp41ge/repositories` matches `NodeGitService.reposDir`. Legacy `workspaces-data` clones are
+  no longer touched by these ops.
+- **`missing` status**: `checkWorktreeBranch` returns `{ status: "missing" }` when a cloned repo's
+  declared worktree folder is absent (checked after `ensureRemoteRefs`).
+- **Re-materialize**: `_detailRecreateWorktree` (Create/Re-create) → `checkoutWorktree` on the shared
+  store, ported to match `NodeGitService.checkoutWorktree` (local branch → remote fetch →
+  create-from-HEAD) + prune stale `git worktree` registrations when a deleted folder left metadata
+  behind (collision: "already registered" → `worktree prune` → retry once).
+- **Warning → overlay focus**: `openp41ge:focus-workspace-repo` → `focusRepoInWorkspaces` → opens
+  detail view of the ACTIVE workspace + expands/flash-highlights the repo card. Fix: moved the
+  600ms dedupe out of `_focusRepo` into `_consumeFocusRepo` so the post-load retry isn't swallowed.
+- **Tests**: `test/unit/services/worktree-store.test.ts` (derivation parity, missing status,
+  create local/from-HEAD, idempotent, prune-retry after folder deletion). 1040/1040 green (+8).
+- **Live-verified (CDP)**: activate Two → declared `feat/remat-test` (folder deleted) warns in
+  explorer only → click → overlay detail "1 of 20 worktrees need attention" + Create → click →
+  folder materialized on `repositories/.../feat--remat-test` → explorer reload clears the warning,
+  all 20 clean. Artifacts cleaned up (branches + folders removed, `git worktree prune`).

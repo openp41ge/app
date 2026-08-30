@@ -3,22 +3,39 @@
  *
  * The workspace store (createWorkspace, addRepo, etc.) has been removed
  * — it was superseded by the project system (~/.openp41ge/<project>/).
- * Git operations delegate to WorkspaceService → NodeGitService.
+ *
+ * Git operations for the Workspaces overlay (workspaceData:*) delegate to
+ * WorktreeStore — the single repositories layout shared with the Explorer
+ * (NodeGitService), so repos added/edited in the overlay act on the SAME
+ * on-disk store the Explorer reads (repos belong to the workspace; one store).
  */
 
 import { ipcMain } from "electron";
-import { execFile } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
 import type { WorkspaceService } from "../../src/main/services/workspace-service.js";
 import type { OperationDispatcher } from "../../src/main/services/operation-dispatcher.js";
 import { createWorkspace } from "../../src/layout/types.js";
+import {
+  createWorktreeStore,
+  runGit,
+  type WorktreeStore,
+} from "../../src/main/services/worktree-store.js";
+
+/**
+ * Default on-disk repositories store (~/.openp41ge/repositories), matching
+ * NodeGitService.reposDir so the Workspaces overlay and Explorer share the
+ * same layout (bare .git/ + sibling worktree folders).
+ */
+const store: WorktreeStore = createWorktreeStore(
+  path.join(os.homedir(), ".openp41ge", "repositories"),
+);
 
 /**
  * Encode a repo URL into a filesystem-safe directory name (legacy).
  * Kept only for `workspaceData:getDir`; repo operations use the
- * repositories store (see getRepoDir/getWorktreePath).
+ * repositories store (see WorktreeStore).
  */
 function encodeRepoUrl(url: string): string {
   return url
@@ -28,81 +45,11 @@ function encodeRepoUrl(url: string): string {
 }
 
 /**
- * Root of the per-repo store shared with the Explorer/NodeGitService:
- *   ~/.openp41ge/repositories/<deriveRepoName(url)>/
- * with a bare .git/ and sibling worktree folders — the same layout the
- * Explorer side panels use. Re-rooted here so the Workspaces overlay's
- * repo status/verify/materialize operations act on the SAME repos the
- * Explorer manages (repos belong to the workspace; one store).
- */
-function getReposDir(): string {
-  return path.join(os.homedir(), ".openp41ge", "repositories");
-}
-
-/**
- * Derive the repository directory name from a git URL, matching
- * NodeGitService._deriveRepoName so both surfaces land on the same repo.
- */
-function deriveRepoDirName(url: string): string {
-  const cleaned = url
-    .replace(/^https?:\/\//, "")
-    .replace(/^git@/, "")
-    .replace(/\.git$/, "");
-  const parts = cleaned.split(/[/:]/);
-  const provider = parts[0];
-  const repoName = parts[parts.length - 1];
-  const orgPath = parts.slice(1, -1).join("/");
-  return orgPath ? `${provider}/${orgPath}/${repoName}` : `${provider}/${repoName}`;
-}
-
-/** Bare .git directory for a repo URL. */
-function getRepoDir(url: string): string {
-  return path.join(getReposDir(), deriveRepoDirName(url), ".git");
-}
-
-/** Parent directory of a repo URL (holds .git/ and the worktree folders). */
-function getRepoParent(url: string): string {
-  return path.join(getReposDir(), deriveRepoDirName(url));
-}
-
-/** Worktree folder for a repo URL + branch (sibling of .git/, like NodeGitService). */
-function getWorktreePath(url: string, branch: string): string {
-  return path.join(getRepoParent(url), branch.replace(/\//g, "--"));
-}
-
-/**
  * Legacy workspaces-data base dir (only used by workspaceData:getDir; the
  * per-repo clones here were superseded by the repositories store).
  */
 function getWorkspaceDataDir(): string {
   return path.join(os.homedir(), ".openp41ge", "workspaces-data");
-}
-
-/**
- * Run a git command and return { stdout, stderr } or throw on non-zero exit.
- */
-function runGit(
-  args: string[],
-  cwd?: string,
-  timeout = 30_000,
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    execFile("git", args, { cwd, timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) {
-        reject(new Error(stderr.trim() || err.message));
-      } else {
-        resolve({ stdout, stderr });
-      }
-    });
-  });
-}
-
-/**
- * Check if a repo is already cloned (bare repo exists).
- */
-function repoAlreadyCloned(url: string): boolean {
-  const gitDir = getRepoDir(url);
-  return fs.existsSync(gitDir) && fs.statSync(gitDir).isDirectory();
 }
 
 /**
@@ -118,7 +65,7 @@ async function getWorkspaceStats(
   let untracked = 0;
   for (const repo of repos ?? []) {
     for (const branch of repo.worktrees ?? []) {
-      const wtDir = getWorktreePath(repo.url, branch);
+      const wtDir = store.getWorktreePath(repo.url, branch);
       if (!fs.existsSync(wtDir)) continue;
       try {
         const numstat = await runGit(["diff", "HEAD", "--numstat"], wtDir);
@@ -144,249 +91,6 @@ async function getWorkspaceStats(
     }
   }
   return { filesChanged, added, deleted, untracked };
-}
-
-// ── Workspace-data remote verification helpers ───────────────────────────
-
-/**
- * Check if a remote URL is accessible via git ls-remote.
- * Returns { ok: true } or { ok: false, error: string }.
- */
-async function checkRepoAccess(url: string): Promise<{ ok: boolean; error?: string }> {
-  try {
-    await runGit(["ls-remote", "--heads", url]);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
-}
-
-/**
- * Ensure a workspace-data bare repo fetches remote-tracking refs
- * (refs/remotes/origin/*) so ahead/behind divergence checks work.
- * Bare clones don't get a fetch refspec by default, which silently
- * disables sync-status detection.
- */
-async function ensureRemoteRefs(gitDir: string): Promise<void> {
-  let fetchSpec = "";
-  try {
-    const { stdout } = await runGit(["config", "--get", "remote.origin.fetch"], gitDir);
-    fetchSpec = stdout.trim();
-  } catch {
-    // Key missing — fetchSpec stays empty and we set it below.
-  }
-  if (fetchSpec !== "+refs/heads/*:refs/remotes/origin/*") {
-    await runGit(["config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"], gitDir);
-  }
-  await runGit(["fetch", "origin", "--quiet"], gitDir);
-}
-
-/**
- * Check a worktree branch for existence and divergence.
- *
- * If the repo isn't cloned yet, checks via ls-remote.
- * If cloned, fetches then checks local/remote divergence.
- *
- * Returns:
- *   { status: "success", warning? } | { status: "failure", error } | { status: "diverged", error } | { status: "needs-sync", error } | { status: "missing" }
- */
-async function checkWorktreeBranch(
-  wsDir: string,
-  url: string,
-  branch: string,
-  _isDetail = false,
-): Promise<{
-  status: "success" | "failure" | "diverged" | "needs-sync" | "missing";
-  error?: string;
-  warning?: string;
-}> {
-  const gitDir = getRepoDir(url);
-  const cloned = fs.existsSync(gitDir);
-
-  if (!cloned) {
-    // Repo not cloned yet — check if branch exists on remote via ls-remote
-    try {
-      const { stdout } = await runGit(["ls-remote", "--heads", url, "refs/heads/" + branch]);
-      if (stdout.trim()) {
-        return { status: "success" };
-      }
-      // Also check if the ref is the default branch (HEAD)
-      const { stdout: headStdout } = await runGit(["ls-remote", "--symref", url, "HEAD"]);
-      const headMatch = headStdout.match(/ref: refs\/heads\/(\S+)\tHEAD/);
-      if (headMatch && headMatch[1] === branch) {
-        return { status: "success" };
-      }
-      return {
-        status: "success",
-        warning: `Branch "${branch}" not found on remote — will be created locally`,
-      };
-    } catch (e) {
-      return { status: "failure", error: (e as Error).message };
-    }
-  }
-
-  // Repo is cloned — fetch to get latest remote state
-  try {
-    await ensureRemoteRefs(gitDir);
-  } catch {
-    // Fetch is best-effort — proceed with what we have
-  }
-
-  // Declared worktree whose folder hasn't been materialized yet (e.g. the
-  // bare repo was added but the user hasn't created the worktree, or the
-  // folder was deleted). Surface it as "missing" so the Workspaces overlay
-  // can offer a create/re-create (re-materialize) action.
-  const wtDir = getWorktreePath(url, branch);
-  if (!fs.existsSync(wtDir)) {
-    return { status: "missing" };
-  }
-
-  // Check if branch exists locally
-  try {
-    const { stdout: localBranches } = await runGit(["branch", "--list", branch], gitDir);
-    const existsLocally = localBranches.trim().length > 0;
-
-    // Check if branch exists on remote
-    let existsRemotely = false;
-    try {
-      const { stdout: remoteBranches } = await runGit(
-        ["branch", "--list", "-r", "origin/" + branch],
-        gitDir,
-      );
-      existsRemotely = remoteBranches.trim().length > 0;
-    } catch {
-      // If remote check fails, proceed with local-only check
-    }
-
-    if (!existsLocally && !existsRemotely) {
-      return {
-        status: "success",
-        warning: `Branch "${branch}" does not exist yet — will be created locally on checkout`,
-      };
-    }
-
-    if (existsLocally && existsRemotely) {
-      // Check divergence: git rev-list --left-right --count
-      try {
-        const { stdout: counts } = await runGit(
-          ["rev-list", "--left-right", "--count", `origin/${branch}...${branch}`],
-          gitDir,
-        );
-        const trimmed = counts.trim();
-        const parts = trimmed.split(/\s+/);
-        if (parts.length === 2) {
-          const behindRemote = parseInt(parts[0], 10);
-          const aheadRemote = parseInt(parts[1], 10);
-          if (behindRemote > 0 && aheadRemote > 0) {
-            return {
-              status: "diverged",
-              error: `Local and remote branches have diverged (${aheadRemote} ahead, ${behindRemote} behind). Resolve before checking out.`,
-            };
-          }
-          if (behindRemote > 0 || aheadRemote > 0) {
-            return {
-              status: "needs-sync",
-              error: `Branch is ${aheadRemote > 0 ? aheadRemote + " ahead" : ""}${aheadRemote > 0 && behindRemote > 0 ? ", " : ""}${behindRemote > 0 ? behindRemote + " behind" : ""} remote. Sync to continue.`,
-            };
-          }
-        }
-      } catch {
-        // Divergence check is best-effort
-      }
-    }
-
-    return { status: "success" };
-  } catch (e) {
-    return { status: "failure", error: (e as Error).message };
-  }
-}
-
-/**
- * Clone a bare repo into the workspace data directory.
- */
-/**
- * Resync a worktree branch to match its remote: fetch, then reset the local
- * branch (and checked-out worktree, if any) to origin/<branch>.
- * Discards local-only commits on that branch.
- */
-async function syncWorktreeBranch(
-  url: string,
-  branch: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const gitDir = getRepoDir(url);
-  const wtDir = getWorktreePath(url, branch);
-  if (!fs.existsSync(gitDir)) {
-    return { ok: false, error: "Repository not cloned yet. Clone before syncing." };
-  }
-  try {
-    await ensureRemoteRefs(gitDir);
-    const { stdout: remoteBranches } = await runGit(
-      ["branch", "--list", "-r", "origin/" + branch],
-      gitDir,
-    );
-    if (!remoteBranches.trim()) {
-      return { ok: false, error: `Branch "${branch}" does not exist on remote.` };
-    }
-    if (fs.existsSync(wtDir)) {
-      // Worktree checked out — reset it in place (also moves the branch ref).
-      await runGit(["reset", "--hard", "origin/" + branch], wtDir);
-    } else {
-      // No worktree — move the local branch ref to match remote.
-      await runGit(["update-ref", "refs/heads/" + branch, "refs/remotes/origin/" + branch], gitDir);
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
-}
-
-/**
- * Clone a bare repo for the given URL.
- */
-async function cloneBareRepo(url: string): Promise<{ ok: boolean; error?: string }> {
-  const repoParentDir = path.dirname(getRepoDir(url));
-  const gitDir = getRepoDir(url);
-
-  if (fs.existsSync(gitDir)) {
-    return { ok: true }; // Already exists
-  }
-
-  try {
-    fs.mkdirSync(repoParentDir, { recursive: true });
-    await runGit(["clone", "--bare", url, gitDir]);
-    // Ensure future fetches build remote-tracking refs for sync-status checks.
-    await runGit(["config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"], gitDir);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
-}
-
-/**
- * Checkout a worktree for a given repo URL and branch.
- */
-async function checkoutWorktreeBranch(
-  url: string,
-  branch: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const gitDir = getRepoDir(url);
-  const wtDir = getWorktreePath(url, branch);
-
-  if (!fs.existsSync(gitDir)) {
-    return { ok: false, error: "Repository not cloned yet. Clone before checking out worktrees." };
-  }
-
-  if (fs.existsSync(wtDir)) {
-    return { ok: true }; // Already exists
-  }
-
-  try {
-    fs.mkdirSync(path.dirname(wtDir), { recursive: true });
-    await runGit(["worktree", "add", wtDir, branch], gitDir);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
 }
 
 export function registerWorkspaceHandlers(
@@ -450,13 +154,10 @@ export function registerWorkspaceHandlers(
 
   // ── Workspace-data git operations (used by workspace manager) ────────────
 
-  /**
-   * Check if a repo URL is accessible (git ls-remote).
-   */
+  /** Check if a repo URL is accessible (git ls-remote). */
   ipcMain.handle("workspaceData:checkRepoAccess", async (_event, url: string) => {
     try {
-      const result = await checkRepoAccess(url);
-      return result;
+      return await store.checkRepoAccess(url);
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
@@ -469,55 +170,44 @@ export function registerWorkspaceHandlers(
   ipcMain.handle(
     "workspaceData:checkWorktreeBranch",
     async (_event, _wsDir: string, url: string, branch: string) => {
-      return checkWorktreeBranch(_wsDir, url, branch);
+      return store.checkWorktreeBranch(_wsDir, url, branch);
     },
   );
 
-  /**
-   * Check if a repo is already cloned for the given URL.
-   */
+  /** Check if a repo is already cloned for the given URL. */
   ipcMain.handle("workspaceData:repoAlreadyCloned", async (_event, url: string) => {
-    return repoAlreadyCloned(url);
+    return store.repoAlreadyCloned(url);
   });
 
-  /**
-   * Clone a bare repo into workspace-data for the given URL.
-   * Returns { ok: true } or { ok: false, error }.
-   */
+  /** Resync a worktree branch to its remote. Returns { ok, error? }. */
   ipcMain.handle("workspaceData:syncWorktree", async (_event, url: string, branch: string) => {
-    return syncWorktreeBranch(url, branch);
+    return store.syncWorktreeBranch(url, branch);
   });
 
+  /** Clone a bare repo for the given URL. Returns { ok, error? }. */
   ipcMain.handle("workspaceData:cloneBareRepo", async (_event, url: string) => {
-    return cloneBareRepo(url);
+    return store.cloneBareRepo(url);
   });
 
   /**
-   * Checkout a worktree branch for a given URL.
+   * Checkout (create or re-create) a worktree for a given URL + branch.
    * Returns { ok: true } or { ok: false, error }.
    */
   ipcMain.handle("workspaceData:checkoutWorktree", async (_event, url: string, branch: string) => {
-    return checkoutWorktreeBranch(url, branch);
+    return store.checkoutWorktreeBranch(url, branch);
   });
 
-  /**
-   * Encode a repo URL into a filesystem-safe directory name.
-   * Useful for the renderer to compute display paths.
-   */
+  /** Encode a repo URL into a filesystem-safe directory name. */
   ipcMain.handle("workspaceData:encodeRepoUrl", async (_event, url: string) => {
     return encodeRepoUrl(url);
   });
 
-  /**
-   * Get the workspace-data directory path.
-   */
+  /** Get the workspace-data directory path. */
   ipcMain.handle("workspaceData:getDir", async () => {
     return getWorkspaceDataDir();
   });
 
-  /**
-   * Aggregate working-tree change stats (edits) for a saved workspace's worktrees.
-   */
+  /** Aggregate working-tree change stats (edits) for a saved workspace's worktrees. */
   ipcMain.handle(
     "workspaceData:getWorkspaceStats",
     async (_event, repos: Array<{ url: string; worktrees?: string[] }>) => {

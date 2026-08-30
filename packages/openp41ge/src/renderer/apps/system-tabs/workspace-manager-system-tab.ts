@@ -912,10 +912,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
    */
   private _focusRepo(repoName: string): void {
     if (!repoName) return;
-    const now = Date.now();
-    if (this._lastFocusRepo === repoName && now - this._lastFocusAt < 600) return;
-    this._lastFocusRepo = repoName;
-    this._lastFocusAt = now;
 
     const activePath = workspaceFileService.activeFilePath;
     if (!activePath) return;
@@ -926,7 +922,6 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     } else {
       // Workspace list not loaded yet — retry once the load finishes.
       void this._loadWorkspaces().then(() => {
-        if (this._focusedRepoAfterMount) return;
         this._focusRepo(repoName);
       });
       return;
@@ -957,6 +952,10 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _consumeFocusRepo(repoName: string | null): void {
     if (!repoName || this._focusedRepoAfterMount) return;
     this._focusedRepoAfterMount = true;
+    const now = Date.now();
+    if (this._lastFocusRepo === repoName && now - this._lastFocusAt < 600) return;
+    this._lastFocusRepo = repoName;
+    this._lastFocusAt = now;
     this._focusRepo(repoName);
   }
 
