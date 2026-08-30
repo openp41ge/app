@@ -113,6 +113,7 @@ export default defineConfig({
         __dirname,
         "./packages/openp41ge-uikit/src/file-editor",
       ),
+      "openp41ge-git": path.resolve(__dirname, "./packages/openp41ge-git/src"),
       "openp41ge-syntax-highlighting": path.resolve(
         __dirname,
         "./packages/openp41ge-syntax-highlighting/src",

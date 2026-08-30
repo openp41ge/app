@@ -1,18 +1,23 @@
 /**
- * Integration tests for CommitFileDiffController — the read-only pane opened
- * when a file result in the Git sidebar commit search is activated.
+ * Integration tests for CommitFileDiffController — the pane opened when a
+ * file result in the Git sidebar commit search is activated.
+ *
+ * Fetches the file's full content + hunks at that commit, merges them with
+ * buildInlineDiffFile, LOADS the result as a real read-only buffer in a
+ * `<file-editor>` and decorates it as an inline diff: added rows green,
+ * re-injected deleted rows red, the whole file present (nothing cropped), no
+ * @@ headers, and (via the loader) full syntax highlighting.
  *
  * Covers:
- *   - fresh mount fetches the full file content AND hunks, merges them with
- *     buildInlineDiffDocument and shows the ENTIRE file through the
- *     `<file-editor>` READ-ONLY diff mode (additions/deletions injected),
- *   - restore-with-cached-diff renders instantly without a refetch,
+ *   - fresh mount fetches BOTH content + hunks, shows the whole file inline,
+ *   - restore-with-cached text/rows renders instantly without a refetch,
  *   - a null content fetch shows the no-textual-content fallback,
- *   - mount without repo/hash/path shows the unavailable prompt.
+ *   - mount without repo/hash/path shows the unavailable prompt,
+ *   - a throwing fetch falls back (no crash).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CommitFileDiffController } from "../../src/renderer/apps/commit-file-diff/commit-file-diff-controller";
-import { buildInlineDiffDocument } from "openp41ge-git";
+import { buildInlineDiffFile } from "openp41ge-git";
 
 type AsyncMock = (() => Promise<unknown>) & ReturnType<typeof vi.fn>;
 
@@ -36,26 +41,15 @@ function installBridge(): void {
   };
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 60));
+const flush = () => new Promise((r) => setTimeout(r, 120));
 
 const HASH = "af".repeat(20);
-/** Full post-commit file content (line 2 changed). */
-const CONTENT = [
-  "import { crashy } from 'old'",
-  "export function openHook() {",
-  "return commitText();",
-  "after",
-  "final",
-].join("\n") + "\n";
+/** Full post-commit file content (old line 1 "old" became "new"). */
+const CONTENT = ["new", "after", "final"].join("\n") + "\n";
 const HUNKS = [
   {
-    header: "@@ -1,2 +1,3 @@",
-    lines: [
-      { type: " ", text: "import { crashy } from 'old'" },
-      { type: "-", text: "export function open() {" },
-      { type: "+", text: "export function openHook() {" },
-      { type: "+", text: "return commitText();" },
-    ],
+    header: "@@ -1,1 +1,1 @@",
+    lines: [{ type: "-", text: "old" }, { type: "+", text: "new" }],
   },
 ];
 
@@ -81,67 +75,91 @@ describe("CommitFileDiffController", () => {
     (window as unknown as Record<string, unknown>).__openp41geTestHooks = undefined;
   });
 
-  it("merges full file content + hunks and renders the WHOLE file in the read-only editor diff", async () => {
+  it("merges full file + hunks, loads the WHOLE file read-only and inlines the changes", async () => {
     controller._fetchDiff = async () => [CONTENT, HUNKS];
     (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = ctx();
 
     controller.mount(host);
     await flush();
 
-    const doc = buildInlineDiffDocument(CONTENT, HUNKS);
     const editor = host.querySelector("file-editor") as HTMLElement & {
       isReadOnly?: boolean;
-      isDiffMode?: boolean;
+      hasInlineDiff?: boolean;
+      textContentModel?: { getValue(): string; lineCount: number };
     };
     expect(editor).not.toBeNull();
-    expect(editor.isReadOnly).toBe(true); // nothing can be changed in a commit
-    expect(editor.isDiffMode).toBe(true);
+    expect(editor.isReadOnly).toBe(true); // nothing can change in a commit
+    expect(editor.hasInlineDiff).toBe(true); // real buffer + inline decorations
 
-    const diffHost = host.querySelector('[data-commit-diff]');
-    expect(diffHost).not.toBeNull();
-    const rows = diffHost ? [...diffHost.querySelectorAll("[data-diff-line]")] : [];
-    const types = rows.map((r) => r.getAttribute("data-diff-line"));
-    expect(types).toEqual([
-      "header", "context", "removed", "added", "added", "context", "context",
-    ]);
+    // The merged document IS the editor's model: the removed line is spliced
+    // back in, and the full file (tail lines beyond the hunk) is present.
+    const merged = buildInlineDiffFile(CONTENT, HUNKS);
+    expect(editor.textContentModel?.getValue()).toBe(merged.text);
+    expect(editor.textContentModel?.getValue()).toContain("old"); // spliced removal
+    expect(editor.textContentModel?.getValue()).toContain("after");
+    expect(editor.textContentModel?.getValue()).toContain("final");
+    expect(editor.textContentModel?.lineCount).toBe(merged.rows.length);
 
-    // The ENTIRE file is present — lines outside the hunk are included too.
-    const texts = rows.map((r) => r.textContent ?? "");
-    expect(texts.some((t) => t.includes("after"))).toBe(true);
-    expect(texts.some((t) => t.includes("final"))).toBe(true);
-    expect(rows.filter((r) => r.getAttribute("data-diff-line") === "context")).toHaveLength(3);
+    // No @@ section headers anywhere in the rendered view.
+    const viewportText = [...(host.querySelectorAll(".view-line") ?? [])]
+      .map((v) => v.textContent ?? "")
+      .join("\n");
+    expect(viewportText).not.toContain("@@");
 
-    // Numbers: context 1|1, removed old=2, added new=2/3, tail new=4/5.
-    const context = rows.find((r) => r.getAttribute("data-diff-line") === "context")!;
-    expect(context.textContent).toContain("1 1");
-    const added0 = rows.find(
-      (r) => r.getAttribute("data-diff-line") === "added" && (r.textContent ?? "").includes("openHook"),
-    )!;
-    expect(added0.textContent).toContain("2");
-    const tailRow = rows.find((r) => (r.textContent ?? "").includes("after"))!;
-    expect(tailRow.textContent).toContain("4");
+    // Red/green row tints painted for the visible band (lines 1-2 in jsdom).
+    expect(host.querySelectorAll(".fe-inline-diff-removed").length).toBeGreaterThanOrEqual(1);
+    expect(host.querySelectorAll(".fe-inline-diff-added").length).toBeGreaterThanOrEqual(1);
 
-    // Read-only diff — no textarea, no caret surface.
-    expect(host.querySelector("textarea")).toBeNull();
+    // Gutter shows the FILE's real numbers: deleted row blank, added row 1.
+    // (jsdom paints only the visible band.)
+    const labels = [
+      ...(host.querySelectorAll(".fe-gutter .line-number") ?? []),
+    ].map((n) => n.textContent ?? "");
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toBe(""); // removed
+    expect(labels[1]).toBe("1"); // added replacement keeps its real number
   });
 
-  it("restore with a cached diff doc paints instantly without refetching", async () => {
-    const fetch = bridge().workspaceController.getCommitFileHunks;
+  it("restore with cached text/rows paints instantly without refetching", async () => {
+    const merged = buildInlineDiffFile(CONTENT, HUNKS);
     const controller2 = new CommitFileDiffController("diff-tab-2", "commit-file-diff");
     controller2.restore({
       filePath: JSON.stringify(ctx()),
-      diff: buildInlineDiffDocument(CONTENT, HUNKS),
+      text: merged.text,
+      rows: merged.rows,
     });
     const host2 = document.createElement("div");
     document.body.appendChild(host2);
     controller2.mount(host2);
     await flush();
 
-    expect(fetch).not.toHaveBeenCalled();
-    expect(host2.querySelector('[data-commit-diff]')).not.toBeNull();
-    expect(host2.querySelector('[data-diff-line="added"]')).not.toBeNull();
+    expect(bridge().workspaceController.getCommitFileHunks).not.toHaveBeenCalled();
+    expect(bridge().workspaceController.getCommitFileContent).not.toHaveBeenCalled();
+    const editor = host2.querySelector("file-editor") as HTMLElement & {
+      hasInlineDiff?: boolean;
+    };
+    expect(editor).not.toBeNull();
+    expect(editor.hasInlineDiff).toBe(true);
+    expect(host2.querySelectorAll(".fe-inline-diff-added").length).toBeGreaterThanOrEqual(1);
     controller2.unmount();
     host2.remove();
+  });
+
+  it("fetches both content and hunks in parallel", async () => {
+    controller._fetchDiff = null; // exercise the real dual-IPC path
+    bridge().workspaceController.getCommitFileContent.mockResolvedValue(CONTENT);
+    bridge().workspaceController.getCommitFileHunks.mockResolvedValue(HUNKS);
+    (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = ctx();
+
+    controller.mount(host);
+    await flush();
+
+    expect(bridge().workspaceController.getCommitFileContent).toHaveBeenCalledWith(
+      "github.com/example/demo",
+      HASH,
+      "src/app.ts",
+    );
+    expect(bridge().workspaceController.getCommitFileHunks).toHaveBeenCalled();
   });
 
   it("shows the no-textual-content fallback when the content fetch returns null", async () => {

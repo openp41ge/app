@@ -47,6 +47,11 @@ export interface LineNumbersOverlayConfig {
   mode?: LineNumberMode;
   /** The cursor line number for relative mode. */
   activeLineNumber?: number;
+  /** Overrides the label shown for a line: return a string to replace the
+   * number ("" blanks it), or null to use the default. Used by inline-diff
+   * views where synthetic rows (deleted lines) show no number and context/
+   * added rows show their real file number. */
+  getLabelOverride?: (lineNumber: number) => string | null;
   /** Callback when a line number is clicked. Receives the 1-based line number. */
   onLineClick?: (lineNumber: number) => void;
   /** When true, line numbers adjust for word wrap. */
@@ -191,7 +196,12 @@ export class LineNumbersOverlay {
           entry.label.classList.remove("active-line-number");
         }
       } else {
-        entry.label.textContent = String(lineNum);
+        const labelOverride = this._config.getLabelOverride?.(lineNum);
+        if (labelOverride === undefined || labelOverride === null) {
+          entry.label.textContent = String(lineNum);
+        } else {
+          entry.label.textContent = labelOverride;
+        }
         entry.label.classList.remove("active-line-number");
       }
     }

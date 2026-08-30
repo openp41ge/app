@@ -20,16 +20,17 @@ export type {
   CommitSearchScope,
   CommitSearchOptions,
   SearchHunk,
-  DiffLine,
-  DiffDocument,
 } from "./types";
 
 // Commit-file diff view conversion
-// git hunks + file content → VS Code-style full-file diff for the read-only
-// file editor (additions/deletions injected inline).
+// git hunks + full file content → ONE inline-diff document loaded into the
+// file editor as a real buffer with additions/deletions decorated in place
+// (green adds / red deleted lines, real gutter numbers — no @@ headers).
 export {
-  buildInlineDiffDocument,
-} from "./build-inline-diff-document";
+  buildInlineDiffFile,
+  type InlineDiffRow,
+  type InlineDiffFile,
+} from "./build-inline-diff-file";
 
 // Git browser DOM renderer
 export { gitBrowserRenderer } from "./git-browser-renderer";

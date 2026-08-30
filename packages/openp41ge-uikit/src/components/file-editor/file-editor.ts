@@ -58,7 +58,10 @@ import {
   generateGlobalEditorCSS,
 } from "openp41ge-editor-engine/themes";
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
-import type { DiffDocument } from "openp41ge-git";
+import {
+  InlineDiffHighlightsRenderer,
+  type InlineDiffRow,
+} from "./inline-diff-highlights";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
 import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
@@ -245,123 +248,60 @@ export class FileEditorElement extends LitElement {
     this.requestUpdate();
   }
 
-  // ── Read-only diff document mode (VS Code-style rendered file diff) ──
+  // ── Inline commit-diff decorations (real buffer + colored rows) ──
   //
-  // When setDiffDocument() is called this editor stops rendering a text buffer
-  // and instead paints an ordered list of diff rows (context/added/removed/
-  // header) with per-row backgrounds, gutter line numbers and +/− glyphs —
-  // exactly how a commit's file diff reads in an editor. It is read-only by
-  // construction: no caret, no textarea, no model/tokenizer involvement.
+  // An inline diff is a NORMAL loaded buffer — the file at the commit with its
+  // removed lines spliced back in — PLUS per-row decorations:
+  //   - added rows   → green full-width background,
+  //   - removed rows → the re-injected deleted lines, red background, and the
+  //                    gutter blanks their number,
+  //   - context rows → unchanged.
+  // Because it is a real buffer, the file keeps full syntax highlighting, real
+  // line numbers (the gutter is overridden to the file's true numbers) and
+  // normal scroll/find/selection — there are NO @@ section headers.
 
-  /** Active diff document, or null when rendering a normal file buffer. */
-  private _diffDocument: DiffDocument | null = null;
-  /** Wrapper (inside the viewport) that holds the absolutely-placed diff rows. */
-  private _diffHost: HTMLElement | null = null;
-  /** Read-only state to restore when leaving diff mode. */
-  private _diffPrevReadOnly = false;
+  /** Per-buffer-row decorations, or null when showing a plain buffer. */
+  private _inlineRows: readonly InlineDiffRow[] | null = null;
+  /** Paints the red/green row bands inside the viewport. */
+  private _inlineHighlights: InlineDiffHighlightsRenderer | null = null;
 
-  /** True while the editor is showing a diff document. */
-  get isDiffMode(): boolean {
-    return this._diffDocument !== null;
-  }
-
-  get diffDocument(): DiffDocument | null {
-    return this._diffDocument;
+  /** True while the editor is showing an inline commit diff. */
+  get hasInlineDiff(): boolean {
+    return this._inlineRows !== null;
   }
 
   /**
-   * Switch this editor into a read-only VS Code-style diff view of `doc`. Pass
-   * null (or call clearDiffDocument) to return to normal file-buffer mode.
-   * Safe to call before the viewport exists (firstUpdated) — the render is
-   * postponed until then.
+   * Decorate the currently-loaded buffer as an inline commit diff. Pass null to
+   * clear the decorations. `rows` must have exactly one entry per buffer line.
+   * Safe to call after loadFile/paint — the gutter labels and row tints refresh.
    */
-  setDiffDocument(doc: DiffDocument | null): void {
-    if (this._diffDocument === doc) return;
-    if (doc !== null) {
-      // Remember the prior read-only state so clearing restores it exactly.
-      this._diffPrevReadOnly = this._readOnly;
-      this._diffDocument = doc;
-      this.setReadOnly(true);
-      if (this._viewportEl) {
-        this._renderDiffRows();
-      }
-    } else {
-      this.clearDiffDocument();
+  setInlineDiff(rows: readonly InlineDiffRow[] | null): void {
+    this._inlineRows = rows ? [...rows] : null;
+    if (this._viewModel && this._inlineRows && this._viewModel.lineCount !== this._inlineRows.length) {
+      // The buffer was replaced meanwhile — decorations no longer align.
+      this._inlineRows = null;
     }
+    // Re-paint the gutter: existing labels were already numbered by buffer
+    // line; the override now shows the real file numbers (blank on removals).
+    if (this._viewLines && this._viewModel) {
+      this._lineNumbersOverlay?.setVisibleRange(
+        this._viewLines.startLineNumber || 1,
+        this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount),
+      );
+    }
+    this._updateInlineHighlights();
   }
 
-  /** Leave diff mode and return to normal (potentially editable) rendering. */
-  clearDiffDocument(): void {
-    if (!this._diffDocument) return;
-    this._diffDocument = null;
-    this._destroyDiffRows();
-    if (this._gutterEl) this._gutterEl.style.display = "";
-    if (this._statusBar) this._statusBar.style.display = "";
-    this.setReadOnly(this._diffPrevReadOnly);
-    this.requestUpdate();
-  }
-
-  /** Paint the diff rows (old|new numbers, glyph, text) into the viewport. */
-  private _renderDiffRows(): void {
-    if (!this._viewportEl) return;
-    const doc = this._diffDocument;
-    if (!doc) return;
-
-    this._destroyDiffRows();
-    const lineHeight = this._lineHeight;
-    const lines = doc.lines ?? [];
-
-    const host = document.createElement("div");
-    host.style.cssText = "position:relative;overflow:hidden;";
-    host.style.height = `${lines.length * lineHeight}px`;
-    host.setAttribute("data-commit-diff", "");
-    this._diffHost = host;
-
-    const gutterWidth = 76; // old | new line numbers (VS Code style)
-    for (let i = 0; i < lines.length; i++) {
-      const row = lines[i];
-      const el = document.createElement("div");
-      el.style.cssText = `position:absolute;left:0;right:0;top:${i * lineHeight}px;height:${lineHeight}px;`;
-      el.className = `fe-diff-line fe-diff-${row.type}`;
-      el.setAttribute("data-diff-line", row.type);
-
-      const nums = document.createElement("span");
-      nums.className = "fe-diff-gutter";
-      nums.style.cssText = `display:inline-block;width:${gutterWidth}px;text-align:right;padding-right:8px;`;
-      const oldStr = row.oldLine !== undefined ? String(row.oldLine) : "";
-      const newStr = row.newLine !== undefined ? String(row.newLine) : "";
-      if (oldStr || newStr) nums.textContent = oldStr + (oldStr && newStr ? " " : "") + newStr;
-      el.appendChild(nums);
-
-      const glyph = document.createElement("span");
-      glyph.className = "fe-diff-glyph";
-      glyph.style.cssText = "display:inline-block;width:16px;text-align:center;";
-      glyph.textContent = row.type === "added" ? "+" : row.type === "removed" ? "−" : "";
-      el.appendChild(glyph);
-
-      const text = document.createElement("span");
-      text.className = "fe-diff-text";
-      text.style.whiteSpace = "pre";
-      text.textContent = row.text;
-      el.appendChild(text);
-
-      host.appendChild(el);
+  /** (Re)paint the red/green row bands for the visible window. */
+  private _updateInlineHighlights(): void {
+    if (!this._inlineHighlights) return;
+    if (!this._viewLines || !this._viewModel || !this._inlineRows) {
+      this._inlineHighlights.render(null, 0, 0, this._lineHeight);
+      return;
     }
-
-    // Hide normal-mode gutter/status bar so they don't paint stale info.
-    if (this._gutterEl) this._gutterEl.style.display = "none";
-    if (this._statusBar) this._statusBar.style.display = "none";
-    this._currentLineHighlight?.hide();
-
-    this._viewportEl.appendChild(host);
-    this._viewportEl.scrollTop = 0;
-  }
-
-  private _destroyDiffRows(): void {
-    if (this._diffHost && this._diffHost.parentNode) {
-      this._diffHost.parentNode.removeChild(this._diffHost);
-    }
-    this._diffHost = null;
+    const start = this._viewLines.startLineNumber || 1;
+    const end = this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount);
+    this._inlineHighlights.render(this._inlineRows, start, end, this._lineHeight);
   }
 
   /** Current syntax theme object. */
@@ -535,17 +475,10 @@ export class FileEditorElement extends LitElement {
       .find-match-active {
         background: var(--fe-find-match-bg, rgba(255, 158, 0, 0.6));
       }
-      /* Read-only diff document rows (VS Code-style: green add / red remove). */
-      .fe-diff-line { display: flex; align-items: center; }
-      .fe-diff-added   { background: ${isLight ? "rgba(46,160,67,0.14)" : "rgba(46,160,67,0.16)"}; }
-      .fe-diff-removed { background: ${isLight ? "rgba(248,81,73,0.13)" : "rgba(248,81,73,0.16)"}; }
-      .fe-diff-header  { background: ${isLight ? "rgba(120,120,120,0.10)" : "rgba(120,120,120,0.14)"}; }
-      .fe-diff-added   .fe-diff-gutter, .fe-diff-added .fe-diff-glyph { color: #3fb950; }
-      .fe-diff-removed .fe-diff-gutter, .fe-diff-removed .fe-diff-glyph { color: #f85149; }
-      .fe-diff-header, .fe-diff-header .fe-diff-text, .fe-diff-header .fe-diff-gutter { color: ${c.cmt}; }
-      .fe-diff-context .fe-diff-gutter { color: ${c.cmt}; }
-      .fe-diff-text { color: ${c.default}; }
-      .fe-diff-context .fe-diff-text { color: ${c.default}; }
+      /* Inline commit-diff row tints (red/deleted, green/added) — painted
+         behind the (syntax-highlighted) text rows so tokens stay legible. */
+      .fe-inline-diff-added   { background: ${isLight ? "rgba(46,160,67,0.14)" : "rgba(46,160,67,0.16)"}; }
+      .fe-inline-diff-removed { background: ${isLight ? "rgba(248,81,73,0.13)" : "rgba(248,81,73,0.16)"}; }
       ${scopeCSS}
       ${globalCSS}
     `;
@@ -588,11 +521,6 @@ export class FileEditorElement extends LitElement {
     viewportContainer.appendChild(this._viewportEl);
 
     this._gutterEl = content.querySelector(".fe-gutter") as HTMLElement;
-
-    // If a diff document was queued before the viewport existed, paint it now.
-    if (this._diffDocument) {
-      this._renderDiffRows();
-    }
 
     // Prevent mousedown from bubbling to grid drag handler
     const root = this.renderRoot.querySelector(".fe-root") as HTMLElement;
@@ -1115,6 +1043,9 @@ export class FileEditorElement extends LitElement {
     // Create CurrentLineHighlight
     this._currentLineHighlight = new CurrentLineHighlight(this._viewportEl);
 
+    // Create inline-diff row-tint renderer (red/removed, green/added)
+    this._inlineHighlights = new InlineDiffHighlightsRenderer(this._viewportEl);
+
     // Create IndentationGuides
     this._indentationGuides = new IndentationGuides({
       tabSize: 4,
@@ -1128,6 +1059,14 @@ export class FileEditorElement extends LitElement {
       lineHeight: this._lineHeight,
       onLineClick: (lineNumber: number) => {
         this._cursorController?.selectLine(lineNumber);
+      },
+      // Inline commit-diff: show the file's REAL line numbers (deleted rows
+      // are blanked); null leaves the default buffer number.
+      getLabelOverride: (lineNumber: number) => {
+        const row = this._inlineRows?.[lineNumber - 1];
+        if (!row) return null;
+        if (row.kind === "removed") return "";
+        return row.fileLine != null ? String(row.fileLine) : null;
       },
       wordWrapEnabled: this._wordWrapEnabled,
       getViewLineStart: (modelLine: number) =>
@@ -1190,6 +1129,8 @@ export class FileEditorElement extends LitElement {
       );
       // Keep search-result highlights in sync with the visible band.
       this._renderFindHighlights();
+      // Keep inline-diff row tints in sync with the visible band.
+      this._updateInlineHighlights();
     };
 
     // Wire up formatter to status bar
@@ -1341,7 +1282,6 @@ export class FileEditorElement extends LitElement {
   }
 
   private _renderVisibleLines(): void {
-    if (this._diffDocument) return; // diff mode owns the viewport content
     if (this._paused) return; // suspended — never render a hidden editor
     if (!this._viewLines || !this._viewModel) return;
 
@@ -1364,6 +1304,8 @@ export class FileEditorElement extends LitElement {
     this._computeBracketDepths(estimatedStart, estimatedEnd);
 
     this._viewLines.onScroll(scrollTop, viewportHeight);
+    // Keep the inline-diff row tints aligned with the newly visible band.
+    this._updateInlineHighlights();
   }
 
   /**
@@ -2128,7 +2070,6 @@ export class FileEditorElement extends LitElement {
   }
 
   private _onViewportMouseDown = (e: MouseEvent): void => {
-    if (this._diffDocument) return; // read-only diff — no cursor positioning
     if (!this._viewModel || !this._cursorController || !this._textAreaInput) return;
 
     // Get click position relative to viewport
@@ -2256,6 +2197,8 @@ export class FileEditorElement extends LitElement {
     this._selectionRenderer = null;
     this._currentLineHighlight?.dispose();
     this._currentLineHighlight = null;
+    this._inlineHighlights?.dispose();
+    this._inlineHighlights = null;
     this._indentationGuides?.dispose();
     this._indentationGuides = null;
     this._lineNumbersOverlay?.dispose();
