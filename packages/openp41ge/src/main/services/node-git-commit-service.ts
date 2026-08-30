@@ -445,7 +445,20 @@ export class NodeGitCommitService implements IGitCommitService {
     // and so the selectable depth limit is honored.
     const maxCount = options.maxCount ?? 5000;
     const format = `%x1e%H|%h|%an|%aI|%ar|%s`;
+    const caseSensitive = options.caseSensitive ?? false;
+    const regexMode = options.regex ?? false;
     const qLower = query.toLowerCase();
+    // Path matcher honours the case + regex toggles (regex in JS flavour).
+    const fileMatches = (path: string): boolean => {
+      if (regexMode) {
+        try {
+          return new RegExp(query, caseSensitive ? "" : "i").test(path);
+        } catch {
+          return false;
+        }
+      }
+      return caseSensitive ? path.includes(query) : path.toLowerCase().includes(qLower);
+    };
 
     // Depth cap: the newest `maxCount` commits. A plain log --max-count counts
     // walked commits — a true depth cap. The --grep pass cannot be capped that
@@ -471,7 +484,8 @@ export class NodeGitCommitService implements IGitCommitService {
           "log",
           ...revs,
           "--date-order",
-          "--regexp-ignore-case",
+          ...(regexMode ? [] : ["--fixed-strings"]),
+          ...(caseSensitive ? [] : ["--regexp-ignore-case"]),
           `--grep=${query}`,
           `--format=${format}`,
           "--numstat",
@@ -512,7 +526,7 @@ export class NodeGitCommitService implements IGitCommitService {
         const fileHits = fileRaw
           ? this._parseSearchLog(fileRaw)
               .map((c) => this._toSearchResultCommit(repoName, c))
-              .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)))
+              .filter((c) => c.files.some((f) => fileMatches(f.path)))
           : [];
         // Union by hash (newest first) — guarantees files-inclusive results are
         // always a superset of message-only results.
@@ -526,7 +540,7 @@ export class NodeGitCommitService implements IGitCommitService {
       results = raw
         ? this._parseSearchLog(raw)
             .map((c) => this._toSearchResultCommit(repoName, c))
-            .filter((c) => c.files.some((f) => f.path.toLowerCase().includes(qLower)))
+            .filter((c) => c.files.some((f) => fileMatches(f.path)))
         : [];
     }
 

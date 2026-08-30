@@ -138,4 +138,8 @@ export interface CommitSearchOptions {
   offset?: number;
   /** How many of the newest commits to walk for matches (default 5000). */
   maxCount?: number;
+  /** Match case-sensitive (default false = case-insensitive). */
+  caseSensitive?: boolean;
+  /** Treat the query as a regular expression (default false = literal). */
+  regex?: boolean;
 }

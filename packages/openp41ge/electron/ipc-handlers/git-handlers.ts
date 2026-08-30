@@ -25,15 +25,18 @@ export function registerGitHandlers(
     return gitCommitService.getUntrackedFiles(repoName);
   });
 
-  ipcMain.handle("workspace:searchCommits", async (_event, repoName, options) => {
-    // repoName null → aggregate a cross-repo search over every repo in the
-    // repos dir, isolating per-repo failures so one bad repo can't kill the
-    // whole search.
-    if (repoName && typeof repoName === "string") {
-      return gitCommitService.searchCommits(repoName, options);
-    }
+  ipcMain.handle("workspace:searchCommits", async (_event, repoNames, options) => {
+    // repoNames: string[] | string | null → scope, per-repo isolation so one
+    // bad repo can't kill the whole search. null/empty → every repo in the
+    // repos dir is searched.
     try {
-      const repos = await gitService.listRepos();
+      const names: string[] = Array.isArray(repoNames)
+        ? repoNames
+        : repoNames && typeof repoNames === "string"
+          ? [repoNames]
+          : [];
+      const repos =
+        names.length > 0 ? names.map((n) => ({ name: n })) : await gitService.listRepos();
       const out: unknown[] = [];
       for (const repo of repos) {
         try {

@@ -98,6 +98,41 @@ describe("NodeGitCommitService.searchCommits", () => {
     expect(upper).toHaveLength(1);
   });
 
+  it("caseSensitive true excludes case-mismatched message matches", async () => {
+    // The fixture message is lowercase "add feature xyz alpha".
+    const ci = await svc.searchCommits(repoName, { query: "XYZ ALPHA", in: "message" });
+    expect(ci).toHaveLength(1);
+    const cs = await svc.searchCommits(repoName, {
+      query: "XYZ ALPHA",
+      in: "message",
+      caseSensitive: true,
+    });
+    expect(cs).toHaveLength(0);
+  });
+
+  it("regex option toggles regex vs literal matching", async () => {
+    // "xyz*" never appears literally, but as a regex (xy + zero-or-more z) it
+    // matches "add feature xyz alpha" (c1).
+    const literal = await svc.searchCommits(repoName, { query: "xyz*", in: "message" });
+    expect(literal).toHaveLength(0);
+    const regex = await svc.searchCommits(repoName, {
+      query: "xyz*",
+      in: "message",
+      regex: true,
+    });
+    expect(regex.map((r) => r.shortHash)).toContain(shortHash.c1);
+  });
+
+  it("caseSensitive + regex combine", async () => {
+    const mixed = await svc.searchCommits(repoName, {
+      query: "xyz*",
+      in: "message",
+      regex: true,
+      caseSensitive: true,
+    });
+    expect(mixed.map((r) => r.shortHash)).toContain(shortHash.c1);
+  });
+
   it("maxCount caps the walked history, dropping older commits", async () => {
     // "add feature xyz alpha" (c1) is an old commit — reachable within the
     // default walk.

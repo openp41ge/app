@@ -81,19 +81,19 @@ describe("TestCommitSearchModel", () => {
     expect(results[0].repoName).toBe("globex");
   });
 
-  it("repoName narrows to a single repo", async () => {
-    const results = await model.search("acme", { query: "a", in: "all" });
+  it("repoNames narrow to a set of repos", async () => {
+    const results = await model.search(["acme", "globex"], { query: "a", in: "all" });
     expect(results.length).toBeGreaterThan(0);
-    expect(results.every((c) => c.repoName === "acme")).toBe(true);
+    expect(results.every((c) => c.repoName === "acme" || c.repoName === "globex")).toBe(true);
   });
 
   it("records every call (scope + options) for controller assertions", async () => {
-    await model.search("acme", { query: "fix", in: "message", limit: 10 });
+    await model.search(["acme"], { query: "fix", in: "message", limit: 10 });
     await model.search(null, { query: "docs", in: "files" });
 
     expect(model.calls).toEqual([
-      { repoName: "acme", options: { query: "fix", in: "message", limit: 10 } },
-      { repoName: null, options: { query: "docs", in: "files" } },
+      { repoNames: ["acme"], options: { query: "fix", in: "message", limit: 10 } },
+      { repoNames: null, options: { query: "docs", in: "files" } },
     ]);
   });
 

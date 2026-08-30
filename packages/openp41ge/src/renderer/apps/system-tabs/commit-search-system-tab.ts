@@ -30,6 +30,15 @@ import type { SearchResultCommit } from "openp41ge-git";
 /** 250ms input debounce — search as you type without spamming IPC per key. */
 const DEBOUNCE_MS = 250;
 
+// Search-row toggle icons. The case icon swaps between its ON/OFF variants
+// so the glyph reflects the current state.
+const REGEX_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="M197-199q-56-57-86.5-130T80-482q0-80 30-153t87-130l57 57q-46 45-70 103.5T160-482q0 64 24.5 122.5T254-256l-57 57Zm140.5-58.5Q320-275 320-300t17.5-42.5Q355-360 380-360t42.5 17.5Q440-325 440-300t-17.5 42.5Q405-240 380-240t-42.5-17.5ZM519-440v-71l-61 36-40-70 61-35-61-35 40-70 61 36v-71h80v71l61-36 40 70-61 35 61 35-40 70-61-36v71h-80Zm244 241-57-57q46-45 70-103.5T800-482q0-64-24.5-122.5T706-708l57-57q56 57 86.5 130T880-482q0 80-30 153t-87 130Z"/></svg>';
+const CASE_ON_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="m131-252 165-440h79l165 440h-76l-39-112H247l-40 112h-76Zm139-176h131l-64-182h-4l-63 182Zm395 186q-51 0-81-27.5T554-342q0-44 34.5-72.5T677-443q23 0 45 4t38 11v-12q0-29-20.5-47T685-505q-23 0-42 9.5T610-468l-47-35q24-29 54.5-43t68.5-14q69 0 103 32.5t34 97.5v178h-63v-37h-4q-14 23-38 35t-53 12Zm12-54q35 0 59.5-24t24.5-56q-14-8-33.5-12.5T689-393q-32 0-50 14t-18 37q0 20 16 33t40 13Z"/></svg>';
+const CASE_OFF_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="m131-252 127-338L56-792l56-56 736 736-56 56-286-286 34 90h-76l-39-112H247l-40 112h-76Zm178-287-39 111h131l-10-29-82-82Zm436 210q8-10 12-22t4-25q-14-8-33.5-12.5T689-393h-8l-45-45q10-2 20-3.5t21-1.5q23 0 45 4t38 11v-12q0-29-20.5-47T685-505q-23 0-42 9.5T610-468l-43-39q23-27 52.5-40t66.5-13q69 0 103 32.5t34 97.5v179l-78-78Z"/></svg>';
+
 interface RepoOption {
   name: string;
 }
@@ -44,6 +53,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _viewElement: HTMLElement | null = null;
   private _input: HTMLInputElement | null = null;
   private _filesToggle: HTMLButtonElement | null = null;
+  private _regexToggle: HTMLButtonElement | null = null;
+  private _caseToggle: HTMLButtonElement | null = null;
   // Filter box (below the search box): icon toggles → optional config rows.
   private _repoFilterActive = true;
   private _repoFilterIcon: HTMLButtonElement | null = null;
@@ -52,8 +63,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _repoSelectLabel: HTMLElement | null = null;
   private _repoOptions: HTMLElement | null = null;
   private _repoActiveIndex = -1;
-  // Repo scope: null = all repos, otherwise a workspace repo name.
-  private _selectedRepo: string | null = null;
+  // Repo scope: empty set = all repos, otherwise the selected repo names.
+  private _selectedRepos = new Set<string>();
   private _repoMenuOpen = false;
   private _onRepoDocPointerDown: ((ev: PointerEvent) => void) | null = null;
   // Search depth limit — one active option among the icon row (default 5K).
@@ -79,6 +90,10 @@ export class CommitSearchSystemTabController implements SystemTabController {
   // Commit-message search is always on; the files icon toggles changed-file-
   // path search on top of it (on = combined 'all', off = messages only).
   private _searchFiles = true;
+  // Regex mode: treat the query as a regular expression.
+  private _searchRegex = false;
+  // Case-sensitive matching.
+  private _searchCase = false;
 
   /** Keep-alive (SystemTabController.setVisible). */
   private _suspended = false;
@@ -134,10 +149,15 @@ export class CommitSearchSystemTabController implements SystemTabController {
     const FILES_ICON =
       '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="M200-800v241-1 400-640 200-200Zm0 720q-33 0-56.5-23.5T120-160v-640q0-33 23.5-56.5T200-880h320l240 240v100q-19-8-39-12.5t-41-6.5v-41H480v-200H200v640h241q16 24 36 44.5T521-80H200Zm531-149q29-29 29-71t-29-71q-29-29-71-29t-71 29q-29 29-29 71t29 71q29 29 71 29t71-29ZM864-40 756-148q-21 14-45.5 21t-50.5 7q-75 0-127.5-52.5T480-300q0-75 52.5-127.5T660-480q75 0 127.5 52.5T840-300q0 26-7 50.5T812-204L920-96l-56 56Z"/></svg>';
 
-    const makeIconToggle = (icon: string, title: string): HTMLButtonElement => {
+    const makeIconToggle = (
+      icon: string,
+      title: string,
+      key: string,
+      value = "",
+    ): HTMLButtonElement => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.dataset.searchInto = "files";
+      (btn.dataset as Record<string, string>)[key] = value; // camelCase → data-kebab attr
       btn.title = title;
       btn.innerHTML = icon; // SVG uses currentColor — grey off, white on.
       Object.assign(btn.style, {
@@ -155,7 +175,16 @@ export class CommitSearchSystemTabController implements SystemTabController {
       });
       return btn;
     };
-    const filesToggle = makeIconToggle(FILES_ICON, "Search changed file paths");
+    // Changed-file-path search lives in the filter box below; the search row
+    // ends with the regex + match-case toggles.
+    const filesToggle = makeIconToggle(
+      FILES_ICON,
+      "Search changed file paths",
+      "searchInto",
+      "files",
+    );
+    const regexToggle = makeIconToggle(REGEX_ICON, "Regex search", "searchRegex");
+    const caseToggle = makeIconToggle(CASE_ON_ICON, "Match case (case-sensitive)", "searchCase");
 
     const input = document.createElement("input");
     input.type = "text";
@@ -175,7 +204,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
     });
 
     searchInputRow.appendChild(input);
-    searchInputRow.appendChild(filesToggle);
+    searchInputRow.appendChild(regexToggle);
+    searchInputRow.appendChild(caseToggle);
     searchBox.appendChild(searchInputRow);
     wrapper.appendChild(searchBox);
 
@@ -274,6 +304,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
     const filterIconRow = document.createElement("div");
     Object.assign(filterIconRow.style, { display: "flex", gap: "4px", alignItems: "center" });
     filterIconRow.appendChild(repoFilterIcon);
+    // Changed-file-path search is a config toggle like the filter icon.
+    filterIconRow.appendChild(filesToggle);
 
     // A vertical divider between the repo icon and the depth-limit group —
     // only the middle 50% of the row height, vertically centred.
@@ -388,6 +420,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
     this._viewElement = wrapper;
     this._input = input;
     this._filesToggle = filesToggle;
+    this._regexToggle = regexToggle;
+    this._caseToggle = caseToggle;
     this._repoFilterIcon = repoFilterIcon;
     this._limitOptions = Array.from(
       filterIconRow.querySelectorAll<HTMLButtonElement>("[data-limit-option]"),
@@ -422,6 +456,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
       }
     });
     filesToggle.addEventListener("click", () => this._toggleSearch());
+    regexToggle.addEventListener("click", () => this._toggleRegex());
+    caseToggle.addEventListener("click", () => this._toggleCase());
     repoFilterIcon.addEventListener("click", () => this._toggleRepoFilter());
     repoFilter.addEventListener("click", () => this._toggleRepoMenu());
     repoFilter.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -448,7 +484,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
             ? (box.children[this._repoActiveIndex] as HTMLElement | undefined)
             : undefined;
           if (item?.dataset.repoOption !== undefined) {
-            this._selectRepo(item.dataset.repoOption);
+            this._toggleRepo(item.dataset.repoOption);
           }
         }
       } else if (e.key === "Escape") {
@@ -472,6 +508,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
     // Both icons default on → render them white (enabled) immediately.
     this._applyToggleStyles();
+    this._applySearchToggleStyles();
     this._applyFilterIconStyle();
     this._applyLimitStyles();
 
@@ -534,9 +571,9 @@ export class CommitSearchSystemTabController implements SystemTabController {
     try {
       const repos = (await window.openp41ge.workspaceController.listRepos()) as RepoOption[];
       this._repos = repos;
-      // Drop the scope if the selected repo is no longer present.
-      if (this._selectedRepo && !this._repos.some((r) => r.name === this._selectedRepo)) {
-        this._selectedRepo = null;
+      // Drop selected repos that are no longer present (empty set = all).
+      for (const name of [...this._selectedRepos]) {
+        if (!this._repos.some((r) => r.name === name)) this._selectedRepos.delete(name);
       }
       this._updateRepoSelectLabel();
       // Repo availability changed the empty-state hint — re-render it once
@@ -547,17 +584,17 @@ export class CommitSearchSystemTabController implements SystemTabController {
     } catch {
       // Non-fatal — "All repos" scope still works.
       this._repos = [];
-      this._selectedRepo = null;
+      this._selectedRepos.clear();
       this._updateRepoSelectLabel();
     }
   }
 
-  // ── Repo filter (custom select: trigger + dropdown) ──────────────────
+  // ── Repo filter (custom multi-select: trigger + dropdown) ────────────
 
-  /** Current repo scope: a picked repo name, or null = all repos. */
-  private _repoScope(): string | null {
+  /** Current repo scope: the picked repo names, or null = all repos. */
+  private _repoScope(): string[] | null {
     if (!this._repoFilterActive) return null;
-    return this._selectedRepo;
+    return this._selectedRepos.size > 0 ? [...this._selectedRepos] : null;
   }
 
   private _toggleRepoFilter(): void {
@@ -608,15 +645,12 @@ export class CommitSearchSystemTabController implements SystemTabController {
       this._repoActiveIndex = -1;
       return;
     }
-    // Open on the currently selected option.
-    this._repoActiveIndex = Math.max(
-      0,
-      items.findIndex((it) => it.value === this._selectedRepo),
-    );
+    this._repoActiveIndex = 0;
     items.forEach((item, i) => {
       const opt = document.createElement("div");
       opt.dataset.repoOption = item.value;
-      opt.textContent = item.label;
+      const selected = item.value !== "" && this._selectedRepos.has(item.value);
+      opt.textContent = selected ? `✓ ${item.label}` : item.label;
       Object.assign(opt.style, {
         padding: "3px 8px",
         fontSize: "11px",
@@ -626,24 +660,28 @@ export class CommitSearchSystemTabController implements SystemTabController {
         textOverflow: "ellipsis",
         color: "var(--text-primary,#ccc)",
       });
-      if (item.value === this._selectedRepo) {
-        opt.textContent = `✓ ${item.label}`;
-        opt.style.color = "#4a9eff";
-      }
+      if (selected) opt.style.color = "#4a9eff";
       if (i === this._repoActiveIndex) opt.style.background = "var(--bg-hover,#2a2d2e)";
       opt.addEventListener("mousedown", (e: MouseEvent) => {
         e.preventDefault(); // keep focus on the trigger
-        this._selectRepo(item.value);
+        this._toggleRepo(item.value);
       });
       box.appendChild(opt);
     });
     box.style.display = "block";
   }
 
-  private _selectRepo(value: string): void {
-    this._selectedRepo = value || null; // "" → all repos
+  /** Toggle a repo in/out of the selected set; "" clears back to All repos. */
+  private _toggleRepo(value: string): void {
+    if (value === "") {
+      this._selectedRepos.clear();
+      this._hideRepoMenu();
+    } else if (this._selectedRepos.has(value)) {
+      this._selectedRepos.delete(value);
+    } else {
+      this._selectedRepos.add(value);
+    }
     this._updateRepoSelectLabel();
-    this._hideRepoMenu();
     if (this._input?.value.trim()) {
       this._debounce();
     } else {
@@ -652,8 +690,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
   }
 
   private _updateRepoSelectLabel(): void {
-    if (this._repoSelectLabel)
-      this._repoSelectLabel.textContent = this._selectedRepo ?? "All repos";
+    if (!this._repoSelectLabel) return;
+    const names = [...this._selectedRepos];
+    this._repoSelectLabel.textContent =
+      names.length === 0
+        ? "All repos"
+        : names.length <= 2
+          ? names.join(", ")
+          : `${names[0]}, ${names[1]} +${names.length - 2}`;
   }
 
   private _applyFilterIconStyle(): void {
@@ -690,6 +734,38 @@ export class CommitSearchSystemTabController implements SystemTabController {
     btn.style.color = this._searchFiles ? "#e3e3e3" : "var(--text-secondary,#888)";
   }
 
+  private _toggleRegex(): void {
+    this._searchRegex = !this._searchRegex;
+    this._applySearchToggleStyles();
+    if (this._input?.value.trim()) {
+      this._debounce();
+    } else {
+      this._renderEmptyQuery();
+    }
+  }
+
+  private _toggleCase(): void {
+    this._searchCase = !this._searchCase;
+    this._applySearchToggleStyles();
+    if (this._input?.value.trim()) {
+      this._debounce();
+    } else {
+      this._renderEmptyQuery();
+    }
+  }
+
+  private _applySearchToggleStyles(): void {
+    if (this._regexToggle) {
+      this._regexToggle.style.color = this._searchRegex ? "#e3e3e3" : "var(--text-secondary,#888)";
+    }
+    if (this._caseToggle) {
+      // Swap between the 'match case on' and 'match case off' glyphs.
+      this._caseToggle.innerHTML = this._searchCase ? CASE_ON_ICON : CASE_OFF_ICON;
+      this._caseToggle.style.color = this._searchCase ? "#e3e3e3" : "var(--text-secondary,#888)";
+      this._caseToggle.title = this._searchCase ? "Match case (on)" : "Match case (off)";
+    }
+  }
+
   // ── Search execution ──────────────────────────────────────────────────
 
   private _debounce(): void {
@@ -718,7 +794,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     }
 
     const token = ++this._searchToken;
-    const repoName = this._repoScope();
+    const repoNames = this._repoScope();
     const maxCount = this._maxCount;
     // Commits (messages) are always searched; files add the changed-file-path
     // dimension when the toggle is on.
@@ -730,11 +806,13 @@ export class CommitSearchSystemTabController implements SystemTabController {
     }
 
     try {
-      const commits = await this._searchModel.search(repoName, {
+      const commits = await this._searchModel.search(repoNames, {
         query,
         in: mode,
         limit: 100,
         maxCount,
+        caseSensitive: this._searchCase,
+        regex: this._searchRegex,
       });
       if (token !== this._searchToken) return; // a newer search superseded this one
       this._lastCommits = commits;
@@ -799,12 +877,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
     this._viewElement = null;
     this._input = null;
     this._filesToggle = null;
+    this._regexToggle = null;
+    this._caseToggle = null;
     this._repoFilterIcon = null;
     this._repoFilterRow = null;
     this._repoFilter = null;
     this._repoSelectLabel = null;
     this._repoOptions = null;
-    this._selectedRepo = null;
+    this._selectedRepos.clear();
     this._limitOptions = [];
     this._results = null;
     this._footer = null;
@@ -880,7 +960,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _commitRow(commit: SearchResultCommit): HTMLElement {
     const key = this._key(commit.repoName, commit.shortHash);
     const expanded = this._expandedCommits.has(key);
-    const query = this._lastQuery;
 
     const row = document.createElement("div");
     row.className = "commit-result-row";
@@ -982,12 +1061,12 @@ export class CommitSearchSystemTabController implements SystemTabController {
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
     });
-    this._appendMatchedText(msgLine, commit.message, query);
+    this._appendMatchedText(msgLine, commit.message);
     headBlock.appendChild(msgLine);
 
     // Optional line 3 — “+ N more instances” / “matched in file(s)” so the
     // user knows to open the row (for file-name matches, before expanding).
-    const metaLine = this._matchMeta(commit, query);
+    const metaLine = this._matchMeta(commit);
     if (metaLine) {
       Object.assign(metaLine.style, {
         padding: "1px 10px 4px 26px",
@@ -1098,7 +1177,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
       });
-      this._appendHighlighted(name, file.path, this._lastQuery);
+      this._appendHighlighted(name, file.path);
       row.appendChild(name);
 
       // Additions / deletions each get their own coloured span.
@@ -1173,15 +1252,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
   // ── Match highlighting + hit context ───────────────────────────────────
 
   /** Optional third line: “+ N more instances” and/or which file(s) matched. */
-  private _matchMeta(commit: SearchResultCommit, query: string): HTMLElement | null {
-    const q = query.trim().toLowerCase();
-    if (!q) return null;
+  private _matchMeta(commit: SearchResultCommit): HTMLElement | null {
+    if (!this._lastQuery.trim()) return null;
     const bits: string[] = [];
-    const msgCount = this._countOccurrences(commit.message, q);
+    const msgCount = this._hits(commit.message).length;
     if (msgCount > 1) {
       bits.push(`+ ${msgCount - 1} more instance${msgCount - 1 === 1 ? "" : "s"}`);
     }
-    const matchedPaths = commit.files.map((f) => f.path).filter((p) => p.toLowerCase().includes(q));
+    const matchedPaths = commit.files.map((f) => f.path).filter((p) => this._hits(p).length > 0);
     if (matchedPaths.length > 0) {
       const shown = matchedPaths.slice(0, 2).join(", ");
       const more = matchedPaths.length > 2 ? ` +${matchedPaths.length - 2} more` : "";
@@ -1193,32 +1271,51 @@ export class CommitSearchSystemTabController implements SystemTabController {
     return el;
   }
 
-  private _countOccurrences(text: string, q: string): number {
-    if (!q) return 0;
-    const lower = text.toLowerCase();
-    let n = 0;
-    let i = 0;
-    while ((i = lower.indexOf(q, i)) !== -1) {
-      n++;
-      i += q.length;
+  /** All [start,end) spans where the query hits `text`, honouring the regex
+   * and match-case toggles. Empty when none / no query / an invalid regex. */
+  private _hits(text: string): Array<[number, number]> {
+    const q = this._lastQuery.trim();
+    if (!q) return [];
+    if (this._searchRegex) {
+      let re: RegExp;
+      try {
+        re = new RegExp(q, this._searchCase ? "g" : "gi");
+      } catch {
+        return [];
+      }
+      re.lastIndex = 0;
+      const out: Array<[number, number]> = [];
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        if (m[0].length === 0) {
+          if (re.lastIndex >= text.length) break;
+          re.lastIndex += 1; // avoid zero-width infinite loop
+          continue;
+        }
+        out.push([m.index, m.index + m[0].length]);
+      }
+      return out;
     }
-    return n;
+    const needle = this._searchCase ? q : q.toLowerCase();
+    const hay = this._searchCase ? text : text.toLowerCase();
+    const out: Array<[number, number]> = [];
+    let i = hay.indexOf(needle);
+    while (i !== -1) {
+      out.push([i, i + needle.length]);
+      i = hay.indexOf(needle, i + needle.length);
+    }
+    return out;
   }
 
   /** Append a one-line window around the first message hit so the match is
    * visible (not just the message start), with each hit highlighted. */
-  private _appendMatchedText(parent: HTMLElement, message: string, query: string): void {
-    const q = query.trim().toLowerCase();
-    if (!q) {
+  private _appendMatchedText(parent: HTMLElement, message: string): void {
+    const hits = this._hits(message);
+    if (hits.length === 0) {
       parent.textContent = message;
       return;
     }
-    const lower = message.toLowerCase();
-    const idx = lower.indexOf(q);
-    if (idx === -1) {
-      parent.textContent = message;
-      return;
-    }
+    const idx = hits[0][0];
     const LEAD = 14; // chars of context shown before the match
     const MAX_LEN = 96; // visible window including the match
     let start = Math.max(0, idx - LEAD);
@@ -1227,32 +1324,27 @@ export class CommitSearchSystemTabController implements SystemTabController {
     const prefix = start > 0 ? "\u2026" : "";
     const suffix = end < message.length ? "\u2026" : "";
     if (prefix) parent.appendChild(document.createTextNode(prefix));
-    this._appendHighlighted(parent, message.slice(start, end), query);
+    this._appendHighlighted(parent, message.slice(start, end));
     if (suffix) parent.appendChild(document.createTextNode(suffix));
   }
 
-  /** Append text with every case-insensitive match wrapped in a .search-hit. */
-  private _appendHighlighted(parent: HTMLElement, text: string, query: string): void {
-    const q = query.trim().toLowerCase();
-    if (!q) {
+  /** Append text with every match wrapped in a .search-hit (mode-aware). */
+  private _appendHighlighted(parent: HTMLElement, text: string): void {
+    const hits = this._hits(text);
+    if (hits.length === 0) {
       parent.appendChild(document.createTextNode(text));
       return;
     }
-    const lower = text.toLowerCase();
     let i = 0;
-    while (true) {
-      const at = lower.indexOf(q, i);
-      if (at === -1) {
-        if (i < text.length) parent.appendChild(document.createTextNode(text.slice(i)));
-        break;
-      }
-      if (at > i) parent.appendChild(document.createTextNode(text.slice(i, at)));
+    for (const [s, e] of hits) {
+      if (s > i) parent.appendChild(document.createTextNode(text.slice(i, s)));
       const mark = document.createElement("mark");
       mark.className = "search-hit";
-      mark.textContent = text.slice(at, at + q.length);
+      mark.textContent = text.slice(s, e);
       parent.appendChild(mark);
-      i = at + q.length;
+      i = e;
     }
+    if (i < text.length) parent.appendChild(document.createTextNode(text.slice(i)));
   }
 
   private _emitOpenCommit(commit: SearchResultCommit, pinned: boolean): void {

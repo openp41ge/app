@@ -19,20 +19,20 @@ import type { CommitSearchOptions, SearchResultCommit } from "openp41ge-git";
 /** Narrow read-only search contract (ISP — read only, no write ops). */
 export interface CommitSearchModel {
   /**
-   * Search commits across one repo (repoName set) or all repos (null).
+   * Search commits across the given repos, or all repos (null/empty list).
    * Returns commits with their changed files, ordered most-recent-first.
    */
-  search(repoName: string | null, options: CommitSearchOptions): Promise<SearchResultCommit[]>;
+  search(repoNames: string[] | null, options: CommitSearchOptions): Promise<SearchResultCommit[]>;
 }
 
 // ─── Production: IPC-backed ───────────────────────────────────────────────
 
 export class IpcCommitSearchModel implements CommitSearchModel {
   async search(
-    repoName: string | null,
+    repoNames: string[] | null,
     options: CommitSearchOptions,
   ): Promise<SearchResultCommit[]> {
-    return window.openp41ge.workspaceController.searchCommits(repoName, options);
+    return window.openp41ge.workspaceController.searchCommits(repoNames, options);
   }
 }
 
@@ -46,7 +46,7 @@ export class IpcCommitSearchModel implements CommitSearchModel {
 export class TestCommitSearchModel implements CommitSearchModel {
   fixtures: SearchResultCommit[] = [];
   /** Record of every search() call, for asserting scope + options. */
-  calls: Array<{ repoName: string | null; options: CommitSearchOptions }> = [];
+  calls: Array<{ repoNames: string[] | null; options: CommitSearchOptions }> = [];
 
   constructor(fixtures: SearchResultCommit[] = []) {
     this.fixtures = fixtures;
@@ -57,10 +57,10 @@ export class TestCommitSearchModel implements CommitSearchModel {
   }
 
   async search(
-    repoName: string | null,
+    repoNames: string[] | null,
     options: CommitSearchOptions,
   ): Promise<SearchResultCommit[]> {
-    this.calls.push({ repoName, options });
+    this.calls.push({ repoNames, options });
 
     const query = (options.query ?? "").trim().toLowerCase();
     if (!query) return [];
@@ -68,7 +68,10 @@ export class TestCommitSearchModel implements CommitSearchModel {
     const limit = options.limit ?? 100;
     const offset = options.offset ?? 0;
 
-    const scoped = repoName ? this.fixtures.filter((c) => c.repoName === repoName) : this.fixtures;
+    const scoped =
+      repoNames && repoNames.length > 0
+        ? this.fixtures.filter((c) => repoNames.includes(c.repoName))
+        : this.fixtures;
 
     const inMode = options.in ?? "message";
     const matched = scoped.filter((c) => {

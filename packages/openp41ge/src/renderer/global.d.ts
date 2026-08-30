@@ -107,7 +107,10 @@ declare global {
         getUntrackedFiles: (repoName: string) => Promise<string[]>;
 
         /** Search commit history (repoName null = across all repos). */
-        searchCommits: (repoName: string | null, options: CommitSearchOptions) => Promise<SearchResultCommit[]>;
+        searchCommits: (
+          repoNames: string[] | null,
+          options: CommitSearchOptions,
+        ) => Promise<SearchResultCommit[]>;
 
         // ── Openp41ge repoRefs API (per-openp41ge repo/worktree visibility) ──
 
