@@ -102,30 +102,4 @@ export class GitService {
   async getUntrackedFiles(repoName: string): Promise<string[]> {
     return this._adapter.getUntrackedFiles(repoName);
   }
-
-  // ── Openp41ge repoRefs ──
-
-  async worksetAddRepo(name: string, url: string, worktrees?: string[]): Promise<boolean> {
-    return this._adapter.worksetAddRepo(name, url, worktrees);
-  }
-
-  async worksetRemoveRepo(name: string): Promise<boolean> {
-    return this._adapter.worksetRemoveRepo(name);
-  }
-
-  async worksetHasRepo(name: string): Promise<boolean> {
-    return this._adapter.worksetHasRepo(name);
-  }
-
-  async worksetAddWorktreeToRepo(repoName: string, branch: string): Promise<boolean> {
-    return this._adapter.worksetAddWorktreeToRepo(repoName, branch);
-  }
-
-  async worksetGetRepoRefs(): Promise<string> {
-    return this._adapter.worksetGetRepoRefs();
-  }
-
-  onWorksetRepoRefsChanged(callback: () => void): () => void {
-    return this._adapter.onWorksetRepoRefsChanged(callback);
-  }
 }

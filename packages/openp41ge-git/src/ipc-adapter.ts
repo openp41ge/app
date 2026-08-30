@@ -36,12 +36,6 @@ interface WorkspaceController {
   getDiffStat(repoName: string, commitHash?: string): Promise<DiffStatEntry[]>;
   deleteLocalBranch(repoName: string, branchName: string, force?: boolean): Promise<void>;
   getUntrackedFiles(repoName: string): Promise<string[]>;
-  worksetAddRepo(name: string, url: string, worktrees?: string[]): Promise<boolean>;
-  worksetRemoveRepo(name: string): Promise<boolean>;
-  worksetHasRepo(name: string): Promise<boolean>;
-  worksetAddWorktreeToRepo(repoName: string, branch: string): Promise<boolean>;
-  worksetGetRepoRefs(): Promise<string>;
-  onWorksetRepoRefsChanged(callback: () => void): () => void;
 }
 
 function getWC(): WorkspaceController {
@@ -125,29 +119,5 @@ export class IpcGitAdapter implements GitAdapter {
 
   async getUntrackedFiles(repoName: string): Promise<string[]> {
     return getWC().getUntrackedFiles(repoName);
-  }
-
-  async worksetAddRepo(name: string, url: string, worktrees?: string[]): Promise<boolean> {
-    return getWC().worksetAddRepo(name, url, worktrees);
-  }
-
-  async worksetRemoveRepo(name: string): Promise<boolean> {
-    return getWC().worksetRemoveRepo(name);
-  }
-
-  async worksetHasRepo(name: string): Promise<boolean> {
-    return getWC().worksetHasRepo(name);
-  }
-
-  async worksetAddWorktreeToRepo(repoName: string, branch: string): Promise<boolean> {
-    return getWC().worksetAddWorktreeToRepo(repoName, branch);
-  }
-
-  async worksetGetRepoRefs(): Promise<string> {
-    return getWC().worksetGetRepoRefs();
-  }
-
-  onWorksetRepoRefsChanged(callback: () => void): () => void {
-    return getWC().onWorksetRepoRefsChanged(callback);
   }
 }

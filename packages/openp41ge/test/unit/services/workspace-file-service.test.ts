@@ -54,9 +54,7 @@ describe("workspaceMatchesQuery", () => {
     version: 1,
     createdAt: "",
     dataDir: "",
-    repos: [
-      { url: "https://github.com/acme/widget.git", worktrees: ["main", "feature/xyz"] },
-    ],
+    repos: [{ url: "https://github.com/acme/widget.git", worktrees: ["main", "feature/xyz"] }],
     ...overrides,
   });
 
@@ -90,46 +88,43 @@ describe("WorkspaceFileService.materializeActiveRepos / deriveRepoName", () => {
     wtError?: string;
   }): {
     clone: ReturnType<typeof vi.fn>;
-    worksetAddRepo: ReturnType<typeof vi.fn>;
     checkoutWorktree: ReturnType<typeof vi.fn>;
-    worksetAddWorktreeToRepo: ReturnType<typeof vi.fn>;
   } {
     const clone = vi.fn().mockImplementation((_url: string) => ({
       promise: Promise.resolve({ success: mocks.cloneOk ?? true, error: mocks.cloneError }),
       onProgress: () => () => {},
       destroy: () => {},
     }));
-    const worksetAddRepo = vi.fn().mockResolvedValue(true);
     const checkoutWorktree = vi
       .fn()
       .mockImplementation(() =>
-        mocks.wtOk === false ? Promise.reject(new Error(mocks.wtError ?? "wt fail")) : Promise.resolve({ branch: "", path: "", exists: true }),
+        mocks.wtOk === false
+          ? Promise.reject(new Error(mocks.wtError ?? "wt fail"))
+          : Promise.resolve({ branch: "", path: "", exists: true }),
       );
-    const worksetAddWorktreeToRepo = vi.fn().mockResolvedValue(true);
-    (window as unknown as { openp41ge: { workspaceController: unknown } }).openp41ge.workspaceController = {
+    (
+      window as unknown as { openp41ge: { workspaceController: unknown } }
+    ).openp41ge.workspaceController = {
       clone,
-      worksetAddRepo,
       checkoutWorktree,
-      worksetAddWorktreeToRepo,
     };
-    return { clone, worksetAddRepo, checkoutWorktree, worksetAddWorktreeToRepo };
+    return { clone, checkoutWorktree };
   }
 
   const repo = (url: string, worktrees: string[]) => ({ url, worktrees });
 
   it("returns [] and calls nothing when there is no active data or repos", async () => {
-    const { clone, worksetAddRepo, checkoutWorktree } = installBridge({});
+    const { clone, checkoutWorktree } = installBridge({});
     const svc = new WorkspaceFileService();
     svc.activeData = { id: "1", version: 1, createdAt: "", dataDir: "", repos: [] };
 
     expect(await svc.materializeActiveRepos()).toEqual([]);
     expect(clone).not.toHaveBeenCalled();
-    expect(worksetAddRepo).not.toHaveBeenCalled();
     expect(checkoutWorktree).not.toHaveBeenCalled();
   });
 
   it("clones the bare repo, registers it, and checks out each worktree", async () => {
-    const { clone, worksetAddRepo, checkoutWorktree, worksetAddWorktreeToRepo } = installBridge({});
+    const { clone, checkoutWorktree } = installBridge({});
     const svc = new WorkspaceFileService();
     svc.activeData = {
       id: "1",
@@ -142,11 +137,9 @@ describe("WorkspaceFileService.materializeActiveRepos / deriveRepoName", () => {
     const outcomes = await svc.materializeActiveRepos();
 
     expect(clone).toHaveBeenCalledWith("https://github.com/acme/widget.git");
-    expect(worksetAddRepo).toHaveBeenCalledWith("github.com/acme/widget", "https://github.com/acme/widget.git", ["main", "feature/x"]);
     expect(checkoutWorktree).toHaveBeenCalledTimes(2);
     expect(checkoutWorktree).toHaveBeenCalledWith("github.com/acme/widget", "main");
     expect(checkoutWorktree).toHaveBeenCalledWith("github.com/acme/widget", "feature/x");
-    expect(worksetAddWorktreeToRepo).toHaveBeenCalledTimes(2);
     expect(outcomes).toEqual([
       {
         url: "https://github.com/acme/widget.git",
@@ -161,7 +154,7 @@ describe("WorkspaceFileService.materializeActiveRepos / deriveRepoName", () => {
   });
 
   it("marks the repo failed (and skips worktrees) when the clone fails", async () => {
-    const { clone, checkoutWorktree, worksetAddRepo } = installBridge({ cloneOk: false, cloneError: "auth" });
+    const { clone, checkoutWorktree } = installBridge({ cloneOk: false, cloneError: "auth" });
     const svc = new WorkspaceFileService();
     svc.activeData = {
       id: "1",
@@ -174,9 +167,13 @@ describe("WorkspaceFileService.materializeActiveRepos / deriveRepoName", () => {
     const outcomes = await svc.materializeActiveRepos();
 
     expect(clone).toHaveBeenCalledWith("https://github.com/acme/widget.git");
-    expect(worksetAddRepo).not.toHaveBeenCalled();
     expect(checkoutWorktree).not.toHaveBeenCalled();
-    expect(outcomes[0]).toMatchObject({ url: "https://github.com/acme/widget.git", ok: false, error: "auth", worktrees: [] });
+    expect(outcomes[0]).toMatchObject({
+      url: "https://github.com/acme/widget.git",
+      ok: false,
+      error: "auth",
+      worktrees: [],
+    });
   });
 
   it("captures worktree checkout failures without failing the whole run", async () => {
@@ -283,7 +280,9 @@ describe("WorkspaceFileService activation recency stamping", () => {
     let sent: WorkspaceFileData | undefined;
     (
       window as unknown as {
-        openp41ge: { dialog: { saveWorkspaceFile: (d: WorkspaceFileData) => Promise<string | null> } };
+        openp41ge: {
+          dialog: { saveWorkspaceFile: (d: WorkspaceFileData) => Promise<string | null> };
+        };
       }
     ).openp41ge.dialog.saveWorkspaceFile = vi
       .fn()
@@ -296,5 +295,59 @@ describe("WorkspaceFileService activation recency stamping", () => {
     expect(saved).toBe("~/.openp41ge/workspaces/new.openp41ge-workspace");
     expect(sent?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
     expect(write).not.toHaveBeenCalled(); // saveAs writes via the save dialog, not writeWorkspaceFile
+  });
+});
+
+describe("WorkspaceFileService.active-repo list helpers", () => {
+  let svc: WorkspaceFileService;
+
+  beforeEach(() => {
+    svc = new WorkspaceFileService();
+    svc.activeData = wsData();
+  });
+
+  it("addRepoToActive appends a bare repo entry and returns true", () => {
+    expect(svc.addRepoToActive("https://github.com/acme/widget.git")).toBe(true);
+    expect(svc.activeData!.repos).toEqual([
+      { url: "https://github.com/acme/widget.git", worktrees: [] },
+    ]);
+  });
+
+  it("addRepoToActive is idempotent by URL (false when already present)", () => {
+    svc.addRepoToActive("https://github.com/acme/widget.git");
+    expect(svc.addRepoToActive("https://github.com/acme/widget.git")).toBe(false);
+    expect(svc.activeData!.repos).toHaveLength(1);
+  });
+
+  it("addRepoToActive is a no-op without an active workspace", () => {
+    svc.activeData = null;
+    expect(svc.addRepoToActive("https://github.com/acme/widget.git")).toBe(false);
+  });
+
+  it("addWorktreeToActive adds a branch to the matching repo (by derived name)", () => {
+    svc.activeData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: [] }];
+    expect(svc.addWorktreeToActive("github.com/acme/widget", "main")).toBe(true);
+    expect(svc.activeData!.repos[0].worktrees).toEqual(["main"]);
+  });
+
+  it("addWorktreeToActive does not duplicate a branch", () => {
+    svc.activeData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: ["main"] }];
+    expect(svc.addWorktreeToActive("github.com/acme/widget", "main")).toBe(false);
+    expect(svc.activeData!.repos[0].worktrees).toEqual(["main"]);
+  });
+
+  it("addWorktreeToActive ignores unknown repos", () => {
+    svc.activeData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: [] }];
+    expect(svc.addWorktreeToActive("github.com/acme/other", "main")).toBe(false);
+    expect(svc.addWorktreeToActive("github.com/acme/widget", "")).toBe(false);
+  });
+
+  it("removeWorktreeFromActive drops a branch from the matching repo", () => {
+    svc.activeData!.repos = [
+      { url: "https://github.com/acme/widget.git", worktrees: ["main", "dev"] },
+    ];
+    expect(svc.removeWorktreeFromActive("github.com/acme/widget", "main")).toBe(true);
+    expect(svc.activeData!.repos[0].worktrees).toEqual(["dev"]);
+    expect(svc.removeWorktreeFromActive("github.com/acme/widget", "main")).toBe(false);
   });
 });

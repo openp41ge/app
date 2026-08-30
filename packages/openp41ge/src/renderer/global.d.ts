@@ -113,26 +113,6 @@ declare global {
           repoNames: string[] | null,
           options: CommitSearchOptions,
         ) => Promise<SearchResultCommit[]>;
-
-        // ── Openp41ge repoRefs API (per-openp41ge repo/worktree visibility) ──
-
-        /** Add a repo to the active openp41ge's repoRefs. */
-        worksetAddRepo: (name: string, url: string, worktrees?: string[]) => Promise<boolean>;
-
-        /** Remove a repo from the active openp41ge's repoRefs. */
-        worksetRemoveRepo: (name: string) => Promise<boolean>;
-
-        /** Check if a repo is in the active openp41ge's repoRefs. */
-        worksetHasRepo: (name: string) => Promise<boolean>;
-
-        /** Add a worktree to a repo in the active openp41ge's repoRefs. */
-        worksetAddWorktreeToRepo: (repoName: string, branch: string) => Promise<boolean>;
-
-        /** Get the active openp41ge's repoRefs (JSON string). */
-        worksetGetRepoRefs: () => Promise<string>;
-
-        /** Subscribe to openp41ge repoRefs changes from other windows. */
-        onWorksetRepoRefsChanged: (callback: () => void) => () => void;
       };
 
       dialog: {
@@ -170,7 +150,7 @@ declare global {
         checkRepoAccess: (url: string) => Promise<{ ok: boolean; error?: string }>;
         /** Check branch existence and divergence for a worktree. */
         checkWorktreeBranch: (wsDir: string, url: string, branch: string) => Promise<{
-          status: "success" | "failure" | "diverged" | "needs-sync";
+          status: "success" | "failure" | "diverged" | "needs-sync" | "missing";
           error?: string;
           warning?: string;
         }>;

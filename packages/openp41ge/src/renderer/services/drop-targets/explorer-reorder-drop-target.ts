@@ -12,7 +12,7 @@
  * onHover draws the same thin-focus insertion line the native block used
  * (a 2px accent bar between repo rows). On drop it fires
  * `explorer-reorder-repos` { repoName, fromIndex, dropIndex }, which the
- * host routes to splice + saveRepoOrder.
+ * host routes to reorder the active workspace's `repos` array.
  */
 
 import type {

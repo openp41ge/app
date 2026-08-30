@@ -132,7 +132,6 @@ describe("Serialization round-trip", () => {
                   dividers: { columns: [0.5], rows: [] },
                 },
                 sidebar: { activeViewId: null, width: 280 },
-                repoRefs: [],
               },
             ],
           },
@@ -161,7 +160,6 @@ describe("Serialization round-trip", () => {
       expect(win.grid.placements[0].tabIds).toContain("t1");
       expect(win.sidebar).toBeDefined();
       expect(win.sidebar.activeViewId).toBeNull();
-      expect(win.repoRefs).toEqual([]);
     });
 
     it("handles empty worksets gracefully", () => {
@@ -186,7 +184,6 @@ describe("Serialization round-trip", () => {
       expect(win.grid).toBeDefined();
       expect(win.grid.placements).toHaveLength(0);
       expect(win.sidebar).toBeDefined();
-      expect(win.repoRefs).toEqual([]);
     });
 
     it("handles window with no worksets and no grid (should create empty grid)", () => {

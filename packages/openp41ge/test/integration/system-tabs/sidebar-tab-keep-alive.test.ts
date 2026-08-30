@@ -63,7 +63,6 @@ describe("Sidebar system-tab keep-alive", () => {
         readFile: async () => ({ content: "", error: null }),
       },
       workspaceController: {
-        onWorksetRepoRefsChanged: () => () => {},
         loadStore: async () => ({ workspaces: [], lastActiveId: null }),
         listRepos: async () => [],
         listWorktrees: async () => [],

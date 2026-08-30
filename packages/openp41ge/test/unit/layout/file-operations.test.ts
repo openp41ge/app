@@ -88,21 +88,6 @@ describe("actionOpenFileInNewWindow", () => {
     expect(newWin.sidebar.rightSidebarTabs).not.toBe(srcWin.sidebar.rightSidebarTabs);
   });
 
-  test("copies the source window's repo refs", () => {
-    const src = buildSourceWs();
-    const srcWin = src.windows[0];
-    srcWin.repoRefs = [{ name: "repo1", url: "github.com/repo1", worktrees: ["main", "dev"] }];
-
-    const result = ops.actionOpenFileInNewWindow(src, "/a.ts", "a.ts", srcWin.id);
-    const newWin = result.windows.find((w) => w.id !== srcWin.id);
-
-    expect(newWin.repoRefs).toEqual([
-      { name: "repo1", url: "github.com/repo1", worktrees: ["main", "dev"] },
-    ]);
-    expect(newWin.repoRefs).not.toBe(srcWin.repoRefs);
-    expect(newWin.repoRefs[0].worktrees).not.toBe(srcWin.repoRefs[0].worktrees);
-  });
-
   test("without a source window the new window has an empty default sidebar", () => {
     const src = buildSourceWs();
     const srcWin = src.windows[0];
@@ -111,6 +96,5 @@ describe("actionOpenFileInNewWindow", () => {
     const newWin = result.windows.find((w) => w.id !== srcWin.id);
 
     expect(newWin.sidebar.rightSidebarTabs).toEqual([]);
-    expect(newWin.repoRefs).toEqual([]);
   });
 });

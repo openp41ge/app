@@ -16,6 +16,7 @@ import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { wireResetListener } from "../../app";
 import { workspaceFileService } from "../../services/workspace-file-service";
 import { systemOverlayService } from "../../services/system-overlay-service";
+import { focusRepoInWorkspaces } from "../../apps/system-tabs/workspace-manager-system-tab";
 
 export class RegisterIpcListenersStep implements IStartupStep {
   readonly name = "register-ipc-listeners";
@@ -75,6 +76,12 @@ export class RegisterIpcListenersStep implements IStartupStep {
     window.openp41ge.onOpenLogs(() => {
       systemOverlayService.open("list", "logs");
     });
+
+    // ── Explorer worktree warning icon → Workspaces overlay at that repo ──
+    document.addEventListener("openp41ge:focus-workspace-repo", ((e: Event) => {
+      const repoName = (e as CustomEvent<{ repoName?: string }>).detail?.repoName;
+      if (repoName) focusRepoInWorkspaces(repoName);
+    }) as EventListener);
 
     log.info("IPC listeners registered");
   }

@@ -10,7 +10,8 @@ import { html, nothing, type TemplateResult } from "lit";
 import type { EditorSystemTabController } from "../../controllers/types";
 import type { WorkspaceFileData } from "../../../layout/types";
 import { sortWorkspacesByLastActivated } from "../../../layout/workspace-sort";
-import { workspaceFileService, workspaceMatchesQuery } from "../../services/workspace-file-service";
+import { workspaceFileService, workspaceMatchesQuery, deriveRepoName } from "../../services/workspace-file-service";
+import { systemOverlayService } from "../../services/system-overlay-service";
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { toastService } from "../../components/openp41ge-toast";
 import { emitOpenSystemTab } from "../../components/openp41ge-worktree-controller";
@@ -18,16 +19,36 @@ import { emitOpenSystemTab } from "../../components/openp41ge-worktree-controlle
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bridge = (): any => window.openp41ge;
 
+/** A repo whose worktree warning was clicked in the explorer (consumed on mount). */
+let _pendingFocusRepo: string | null = null;
+
+/**
+ * Open the Workspaces overlay and focus a repo in the active workspace's
+ * detail view. Used by the Explorer's worktree warning icon — the repo
+ * status bar lives in this overlay, so the warning just navigates here.
+ */
+export function focusRepoInWorkspaces(repoName: string): void {
+  _pendingFocusRepo = repoName;
+  systemOverlayService.openTab("workspaces");
+}
+
+/** Consume (and clear) a pending repo-focus requested by focusRepoInWorkspaces. */
+function takePendingFocusRepo(): string | null {
+  const repoName = _pendingFocusRepo;
+  _pendingFocusRepo = null;
+  return repoName;
+}
+
 interface WorktreeEntry {
   name: string;
-  status: "unverified" | "validating" | "success" | "failure" | "diverged" | "needs-sync";
+  status: "unverified" | "validating" | "success" | "failure" | "diverged" | "needs-sync" | "missing";
   errorMessage?: string;
   warningMessage?: string;
 }
 
 interface CreateRepoEntry {
   url: string;
-  status: "unverified" | "validating" | "success" | "failure" | "diverged" | "needs-sync";
+  status: "unverified" | "validating" | "success" | "failure" | "diverged" | "needs-sync" | "missing";
   errorMessage?: string;
   expanded: boolean;
   worktrees: WorktreeEntry[];
@@ -68,6 +89,15 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** Active view of the modal ('list' | 'detail'). */
   get view(): View { return this._view; }
   private _selected: { filePath: string; data: WorkspaceFileData } | null = null;
+
+  /** Last repo focused via the explorer warning (dedupes rapid re-open). */
+  private _lastFocusRepo = "";
+  private _lastFocusAt = 0;
+  private _focusedRepoAfterMount = false;
+  private _onFocusRepoDoc = (e: Event): void => {
+    const repoName = (e as CustomEvent<{ repoName?: string }>).detail?.repoName;
+    if (repoName) this._consumeFocusRepo(repoName);
+  };
 
   /** Width of the workspaces column (drag the divider to resize). */
   private _leftColWidth = parseInt(localStorage.getItem("openp41ge:workspaces-col-left") ?? "200", 10);
@@ -132,10 +162,16 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     window.addEventListener("resize", this._syncLeftFill);
     // Focus the overlay search input once the pane is in the DOM.
     setTimeout(() => this._focusSearch(), 0);
+    // Repo warning clicked in the explorer → open straight into this repo's
+    // status (already-open overlay case listens here; pending covers the
+    // not-yet-mounted case).
+    document.addEventListener("openp41ge:focus-workspace-repo", this._onFocusRepoDoc);
+    queueMicrotask(() => this._consumeFocusRepo(takePendingFocusRepo()));
   }
 
   unmount(): void {
     window.removeEventListener("resize", this._syncLeftFill);
+    document.removeEventListener("openp41ge:focus-workspace-repo", this._onFocusRepoDoc);
     this._endColDrag();
   }
 
@@ -508,7 +544,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   /** Status list for a single worktree row: one line per state with its action. */
   private _worktreeStatusContent(
     repoIndex: number,
-    _wtIndex: number,
+    wtIndex: number,
     wt: WorktreeEntry,
     onVerify: () => void,
     onSync: () => void,
@@ -518,6 +554,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     switch (wt.status) {
       case 'success':
         items.push({ tone: 'ok', text: 'In sync with remote', detail: wt.warningMessage });
+        break;
+      case 'missing':
+        items.push({ tone: 'warn', text: 'Worktree not created', detail: wt.errorMessage || 'The worktree folder for this branch is missing — re-create it when ready.', action: { label: 'Create', title: 'Materialize the worktree folder for this branch', onClick: () => { void this._detailRecreateWorktree(repoIndex, wtIndex); } } });
         break;
       case 'needs-sync':
         items.push({ tone: 'warn', text: 'Needs sync', detail: wt.errorMessage || 'ahead/behind remote', action: { label: 'Sync', title: 'Fetch and reset branch to remote', onClick: onSync } });
@@ -582,6 +621,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         trouble.push({ tone: 'error', wt, label: 'Resync', title: 'Fetch and reset branch to remote (discards local commits)', onClick: () => { this._detailSyncWorktree(i, wtIndex); } });
       } else if (wt.status === 'failure') {
         trouble.push({ tone: 'error', wt, label: 'Retry', title: 'Re-check branch status', onClick: () => { this._forceVerifyWorktree(i, wtIndex); } });
+      } else if (wt.status === 'missing') {
+        trouble.push({ tone: 'warn', wt, label: 'Create', title: 'Materialize the worktree folder for this branch', onClick: () => { void this._detailRecreateWorktree(i, wtIndex); } });
       } else if (wt.status === 'validating') {
         validating += 1;
       } else if (wt.status === 'unverified') {
@@ -862,6 +903,61 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     for (let i = 0; i < this._detailRepos.length; i++) {
       void this._detailVerifyAll(i);
     }
+  }
+
+  /**
+   * Focus a repo: open the ACTIVE workspace's detail view, expand the repo
+   * card, and flash-highlight it (status bar is already there). The explorer's
+   * worktree warning icon drives this via focusRepoInWorkspaces.
+   */
+  private _focusRepo(repoName: string): void {
+    if (!repoName) return;
+    const now = Date.now();
+    if (this._lastFocusRepo === repoName && now - this._lastFocusAt < 600) return;
+    this._lastFocusRepo = repoName;
+    this._lastFocusAt = now;
+
+    const activePath = workspaceFileService.activeFilePath;
+    if (!activePath) return;
+
+    const entry = this._workspaces.find((w) => w.filePath === activePath);
+    if (entry) {
+      if (this._selected?.filePath !== activePath) this._showDetail(entry);
+    } else {
+      // Workspace list not loaded yet — retry once the load finishes.
+      void this._loadWorkspaces().then(() => {
+        if (this._focusedRepoAfterMount) return;
+        this._focusRepo(repoName);
+      });
+      return;
+    }
+
+    const idx = this._detailRepos.findIndex((r) => deriveRepoName(r.url) === repoName);
+    if (idx === -1) return;
+    this._detailExpanded[idx] = true;
+    const targetUrl = this._detailRepos[idx].url;
+    this._emitUpdate();
+
+    // Scroll to + flash the repo card after the expanded render paints.
+    requestAnimationFrame(() => {
+      const wrappers = Array.from(
+        document.querySelectorAll<HTMLElement>(".wm-right .repo-wrapper"),
+      );
+      const row = wrappers.find(
+        (w) => w.querySelector<HTMLElement>(".wm-repo-name")?.dataset.full === targetUrl,
+      );
+      if (row) {
+        row.scrollIntoView({ block: "nearest" });
+        row.classList.add("focus-flash");
+        window.setTimeout(() => row.classList.remove("focus-flash"), 1800);
+      }
+    });
+  }
+
+  private _consumeFocusRepo(repoName: string | null): void {
+    if (!repoName || this._focusedRepoAfterMount) return;
+    this._focusedRepoAfterMount = true;
+    this._focusRepo(repoName);
   }
 
   private _showList(): void {
@@ -1280,6 +1376,37 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     this._emitUpdate();
   }
 
+  /**
+   * Re-materialize a declared worktree whose folder is missing: create the
+   * worktree folder for the branch, then re-verify its status.
+   */
+  private async _detailRecreateWorktree(repoIndex: number, wtIndex: number): Promise<void> {
+    const repo = this._detailRepos[repoIndex];
+    if (!repo) return;
+    const wt = repo.worktrees[wtIndex];
+    if (!wt) return;
+    wt.status = "validating";
+    wt.errorMessage = undefined;
+    this._emitUpdate();
+    try {
+      const created = await this._bridge.workspaceData.checkoutWorktree(repo.url, wt.name);
+      if (created?.ok) {
+        const result = await this._bridge.workspaceData.checkWorktreeBranch("", repo.url, wt.name);
+        wt.status = result.status;
+        if (result.error) wt.errorMessage = result.error;
+        wt.warningMessage = result.warning || undefined;
+        if (result.status === "success") await this._syncDetailReposToFile();
+      } else {
+        wt.status = "failure";
+        wt.errorMessage = created?.error || "Failed to create worktree";
+      }
+    } catch (e) {
+      wt.status = "failure";
+      wt.errorMessage = (e as Error).message || "Failed to create worktree";
+    }
+    this._emitUpdate();
+  }
+
   /** Re-verify every worktree of a repo, bypassing the existing status. */
   private async _detailVerifyAll(repoIndex: number): Promise<void> {
     const repo = this._detailRepos[repoIndex];
@@ -1425,6 +1552,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
         .wm-wrap { display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; position:relative; }
         .cr-row { outline:none; }
         .cr-row:focus-visible { outline:2px solid var(--accent,#007acc); outline-offset:-2px; }
+        /* Repo-wrapper flash when jumped to from the Explorer's warning icon. */
+        .repo-wrapper.focus-flash {
+          box-shadow: 0 0 0 2px var(--accent,#007acc);
+          border-radius:6px;
+        }
 
         /* Overlay top bar — left-aligned configuration tabs + close button.
            Tabs are feature switches (NOT draggable); the bar is reusable

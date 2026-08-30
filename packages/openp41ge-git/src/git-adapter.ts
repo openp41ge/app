@@ -43,12 +43,4 @@ export interface GitAdapter {
   getDiffStat(repoName: string, commitHash?: string): Promise<DiffStatEntry[]>;
   deleteLocalBranch(repoName: string, branchName: string, force?: boolean): Promise<void>;
   getUntrackedFiles(repoName: string): Promise<string[]>;
-
-  // Openp41ge repoRefs API
-  worksetAddRepo(name: string, url: string, worktrees?: string[]): Promise<boolean>;
-  worksetRemoveRepo(name: string): Promise<boolean>;
-  worksetHasRepo(name: string): Promise<boolean>;
-  worksetAddWorktreeToRepo(repoName: string, branch: string): Promise<boolean>;
-  worksetGetRepoRefs(): Promise<string>;
-  onWorksetRepoRefsChanged(callback: () => void): () => void;
 }

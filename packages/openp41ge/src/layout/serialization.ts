@@ -12,6 +12,9 @@ import { removeEmptyPlacements } from "./grid-operations.js";
  * Old format (pre-2025-07):
  *   window: { id, bounds, monitor, worksets: [{ id, name, grid, sidebar, repoRefs }] }
  *
+ * Legacy per-window `repoRefs` (per-window repo visibility) was removed in
+ * 2026-08; leftover repoRefs fields in old files are stripped by the schema.
+ *
  * Old field name (pre-2026-07):
  *   workspace.tabs → workspace.editorTabs
  */
@@ -46,7 +49,6 @@ function migrateWorkspace(obj: Record<string, unknown>): Record<string, unknown>
             dividers: { columns: [], rows: [] },
           },
           sidebar: first.sidebar ?? { activeViewId: null, width: 280 },
-          repoRefs: first.repoRefs ?? [],
         };
       }
 
@@ -62,7 +64,6 @@ function migrateWorkspace(obj: Record<string, unknown>): Record<string, unknown>
           dividers: { columns: [], rows: [] },
         },
         sidebar: { activeViewId: null, width: 280 },
-        repoRefs: [],
       };
     });
   }
@@ -155,11 +156,11 @@ export function stripPreviewTabs(workspace: Workspace): Workspace {
         activeLeftTab:
           win.sidebar?.activeLeftTab && systemTabsToStrip.has(win.sidebar.activeLeftTab as string)
             ? null
-            : win.sidebar?.activeLeftTab ?? null,
+            : (win.sidebar?.activeLeftTab ?? null),
         activeRightTab:
           win.sidebar?.activeRightTab && systemTabsToStrip.has(win.sidebar.activeRightTab as string)
             ? null
-            : win.sidebar?.activeRightTab ?? null,
+            : (win.sidebar?.activeRightTab ?? null),
       },
     }));
 

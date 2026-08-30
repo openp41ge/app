@@ -379,32 +379,6 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** Search commit history (repoName null = across all repos). */
     searchCommits: (repoName, options) =>
       ipcRenderer.invoke("workspace:searchCommits", repoName, options),
-
-    // ── Openp41ge repoRefs API (per-openp41ge repo/worktree visibility) ──
-
-    /** Add a repo to the active openp41ge's repoRefs. */
-    worksetAddRepo: (name, url, worktrees) =>
-      ipcRenderer.invoke("workset:addRepo", JSON.stringify({ name, url, worktrees })),
-
-    /** Remove a repo from the active openp41ge's repoRefs. */
-    worksetRemoveRepo: (name) => ipcRenderer.invoke("workset:removeRepo", JSON.stringify({ name })),
-
-    /** Check if a repo is in the active openp41ge's repoRefs. */
-    worksetHasRepo: (name) => ipcRenderer.invoke("workset:hasRepo", JSON.stringify({ name })),
-
-    /** Add a worktree to a repo in the active openp41ge's repoRefs. */
-    worksetAddWorktreeToRepo: (repoName, branch) =>
-      ipcRenderer.invoke("workset:addWorktreeToRepo", JSON.stringify({ repoName, branch })),
-
-    /** Get the active openp41ge's repoRefs (JSON string). */
-    worksetGetRepoRefs: () => ipcRenderer.invoke("workset:getRepoRefs"),
-
-    /** Subscribe to openp41ge repoRefs changes from other windows. */
-    onWorksetRepoRefsChanged: (callback) => {
-      const handler = () => callback();
-      ipcRenderer.on("workset:repo-refs-changed", handler);
-      return () => ipcRenderer.removeListener("workset:repo-refs-changed", handler);
-    },
   },
 
   file: {

@@ -935,67 +935,6 @@ describe("system tab operations", () => {
   });
 });
 
-// ─── repoRefs management ──────────────────────────────────────────────────
-
-describe("repoRefs management", () => {
-  test("addRepoRef adds a repo ref to the window", () => {
-    const ws = types.createWorkspace("ws1");
-    const winId = ws.windows[0].id;
-
-    const result = ops.addRepoRef(
-      ws,
-      winId,
-      "test-org/repo",
-      "https://github.com/test-org/repo.git",
-    );
-
-    const repoRefs = result.windows[0].repoRefs;
-    expect(repoRefs).toHaveLength(1);
-    expect(repoRefs[0].name).toBe("test-org/repo");
-  });
-
-  test("addRepoRef does not duplicate existing repo", () => {
-    const ws = types.createWorkspace("ws1");
-    const winId = ws.windows[0].id;
-
-    let r = ops.addRepoRef(ws, winId, "test-org/repo", "url");
-    const result = ops.addRepoRef(r, winId, "test-org/repo", "url");
-
-    expect(result.windows[0].repoRefs).toHaveLength(1);
-  });
-
-  test("removeRepoRef removes a repo ref from the window", () => {
-    const ws = types.createWorkspace("ws1");
-    const winId = ws.windows[0].id;
-
-    let r = ops.addRepoRef(ws, winId, "test-org/repo", "url");
-    const result = ops.removeRepoRef(r, winId, "test-org/repo");
-
-    expect(result.windows[0].repoRefs).toHaveLength(0);
-  });
-
-  test("addWorktreeToRepoRef adds a worktree to a repo ref", () => {
-    const ws = types.createWorkspace("ws1");
-    const winId = ws.windows[0].id;
-
-    let r = ops.addRepoRef(ws, winId, "test-org/repo", "url");
-    const result = ops.addWorktreeToRepoRef(r, winId, "test-org/repo", "main");
-
-    const repoRef = result.windows[0].repoRefs[0];
-    expect(repoRef.worktrees).toContain("main");
-  });
-
-  test("hasRepoInWindow returns true when repo exists", () => {
-    const ws = types.createWorkspace("ws1");
-    const winId = ws.windows[0].id;
-
-    let r = ops.addRepoRef(ws, winId, "test-org/repo", "url");
-
-    expect(ops.hasRepoInWindow(r, winId, "test-org/repo")).toBe(true);
-    expect(ops.hasRepoInWindow(r, winId, "other-repo")).toBe(false);
-  });
-});
-
 // ─── findEmptyCell / compactGrid ──────────────────────────────────────────
 
 describe("findEmptyCell", () => {

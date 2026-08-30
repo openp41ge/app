@@ -30,7 +30,6 @@ describe("ExplorerSystemTabController", () => {
       ...(ORIG_OPENP41GE as Record<string, unknown>),
       workspace: { getWindowId: () => "test-win" },
       workspaceController: {
-        onWorksetRepoRefsChanged: () => () => {},
         loadStore: async () => ({ workspaces: [], lastActiveId: null }),
         createWorkspace: async () => ({ id: "w", title: "Workspace" }),
         listRepos: async () => [],

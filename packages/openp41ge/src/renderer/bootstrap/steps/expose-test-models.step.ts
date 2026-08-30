@@ -22,13 +22,6 @@ import {
   TestFileContent,
 } from "../../models/test-models";
 import { IpcCommitSearchModel, TestCommitSearchModel } from "../../models/commit-search-model";
-import {
-  resolveFileReferences,
-  getUncoveredPaths,
-  isFileScopedTab,
-  parentDirForVisibility,
-} from "../../services/scope-expansion-utils";
-import { Openp41geScopeExpandModal } from "../../components/openp41ge-scope-expand-modal";
 
 export class ExposeTestModelsStep implements IStartupStep {
   readonly name = "expose-test-models";
@@ -44,12 +37,6 @@ export class ExposeTestModelsStep implements IStartupStep {
       IpcCommitSearchModel,
       TestCommitSearchModel,
       TopBarDropTarget,
-      // Scope expansion utilities
-      resolveFileReferences,
-      getUncoveredPaths,
-      isFileScopedTab,
-      parentDirForVisibility,
-      Openp41geScopeExpandModal,
     };
     log.info("test models exposed");
   }

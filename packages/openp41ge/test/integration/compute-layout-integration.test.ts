@@ -31,7 +31,6 @@ function makeWindow(grid: types.Grid, overlays: types.Overlay[] = []): types.Win
     monitor: 0,
     grid,
     sidebar: { activeViewId: null, width: 280 },
-    repoRefs: [],
     overlays,
   };
 }

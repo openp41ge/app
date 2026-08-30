@@ -282,62 +282,6 @@ describe("GitService", () => {
     });
   });
 
-  // ── Workset API ──
-
-  describe("workset API", () => {
-    it("worksetAddRepo returns true", async () => {
-      const ok = await service.worksetAddRepo("my-repo", "url");
-      expect(ok).toBe(true);
-    });
-
-    it("worksetAddRepo accepts optional worktrees", async () => {
-      const ok = await service.worksetAddRepo("my-repo", "url", ["main", "develop"]);
-      expect(ok).toBe(true);
-    });
-
-    it("worksetRemoveRepo returns true", async () => {
-      const ok = await service.worksetRemoveRepo("my-repo");
-      expect(ok).toBe(true);
-    });
-
-    it("worksetHasRepo returns true", async () => {
-      const ok = await service.worksetHasRepo("my-repo");
-      expect(ok).toBe(true);
-    });
-
-    it("worksetAddWorktreeToRepo returns true", async () => {
-      const ok = await service.worksetAddWorktreeToRepo("my-repo", "main");
-      expect(ok).toBe(true);
-    });
-
-    it("worksetGetRepoRefs returns JSON string", async () => {
-      adapter.repoRefs = JSON.stringify([{ name: "repo1", url: "url1", worktrees: ["main"] }]);
-      const refs = await service.worksetGetRepoRefs();
-      expect(refs).toBe(JSON.stringify([{ name: "repo1", url: "url1", worktrees: ["main"] }]));
-    });
-  });
-
-  // ── onWorksetRepoRefsChanged ──
-
-  describe("onWorksetRepoRefsChanged", () => {
-    it("calls callback when triggered via adapter", () => {
-      const cb = vi.fn();
-      const unsub = service.onWorksetRepoRefsChanged(cb);
-      // Trigger the adapter's refs changed callbacks
-      adapter._refsChanged.forEach((fn) => fn());
-      expect(cb).toHaveBeenCalledTimes(1);
-      unsub();
-    });
-
-    it("unsubscribe stops receiving callbacks", () => {
-      const cb = vi.fn();
-      const unsub = service.onWorksetRepoRefsChanged(cb);
-      unsub();
-      adapter._refsChanged.forEach((fn) => fn());
-      expect(cb).not.toHaveBeenCalled();
-    });
-  });
-
   // ── Integration ──
 
   describe("integration", () => {

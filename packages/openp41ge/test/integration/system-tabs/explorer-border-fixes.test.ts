@@ -51,7 +51,6 @@ describe("Explorer sidebar border fixes", () => {
         readFile: async () => ({ content: "", error: null }),
       },
       workspaceController: {
-        onWorksetRepoRefsChanged: () => () => {},
         loadStore: async () => ({ workspaces: [], lastActiveId: null }),
         listRepos: async () => [],
         getBranches: async () => [],
@@ -122,9 +121,7 @@ describe("Explorer sidebar border fixes", () => {
   // ── Issue 2: single separator below an open worktree's file block ────────
 
   function makeItem(repoName: string, worktrees: WorktreeData[]): PrivItem {
-    const el = document.createElement(
-      "openp41ge-repo-tree-item",
-    ) as unknown as PrivItem;
+    const el = document.createElement("openp41ge-repo-tree-item") as unknown as PrivItem;
     el.repoName = repoName;
     el.worktrees = worktrees;
     host.appendChild(el);

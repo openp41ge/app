@@ -19,9 +19,6 @@ import type {
   TargetFeedback,
 } from "../../interfaces/drag-handler";
 import { isOpenp41geTopbar } from "../../interfaces/element-guards";
-import { getWorkspace } from "../../app";
-import { resolveFileReferences, getUncoveredPaths } from "../scope-expansion-utils";
-import { showScopeExpandModal } from "../../components/openp41ge-scope-expand-modal";
 
 /**
  * Visual state for hover zones on a workset bar item.
@@ -189,23 +186,6 @@ export class TopBarDropTarget implements IDropTarget {
 
     // ── Center zone drop: insert tab into the targeted workset's grid ──────
     if (wasCenter && targetWorksetId) {
-      // ── Scope expansion check ────────────────────────────────────────
-      // If the tab is file-scoped and the target workset doesn't show
-      // the referenced files, show the expand modal before proceeding.
-      if (targetWorksetId !== pageData.worksetId) {
-        const scopeConfirmed = await this._handleCrossOpenp41geScopeCheck(
-          pageData.winId,
-          pageData.worksetId,
-          targetWorksetId,
-          pageData.tabId,
-        );
-
-        if (!scopeConfirmed) {
-          // User cancelled — abort the move
-          return { success: false, reason: "scope expansion cancelled" };
-        }
-      }
-
       this._commandBus.dispatch(
         "moveTabBetweenCells",
         pageData.winId,
@@ -229,76 +209,6 @@ export class TopBarDropTarget implements IDropTarget {
     this._commandBus.dispatch("createWorksetWithTab", pageData.winId, pageData.tabId, "", dropIdx);
 
     return { success: true };
-  }
-
-  /**
-   * Handle scope expansion check for cross-openp41ge tab drag.
-   * Returns true if the move should proceed, false if cancelled.
-   */
-  private async _handleCrossOpenp41geScopeCheck(
-    _windowId: string,
-    sourceWorksetId: string,
-    targetWorksetId: string,
-    draggedTabId: string,
-  ): Promise<boolean> {
-    if (targetWorksetId === sourceWorksetId) return true;
-
-    const ws = getWorkspace();
-    if (!ws) return true;
-
-    const tab = ws.editorTabs[draggedTabId as keyof typeof ws.editorTabs];
-    if (!tab) return true;
-
-    const referencedPaths = resolveFileReferences(tab);
-    if (referencedPaths.length === 0) {
-      // Unscoped tab — no check needed
-      return true;
-    }
-
-    // Get destination window's repoRefs
-    const destWin = ws.windows.find((w) => w.id === targetWorksetId);
-    if (!destWin) return true;
-
-    const repoRefs = destWin.repoRefs ?? [];
-
-    // Check which paths are not visible
-    const uncoveredPaths = getUncoveredPaths(referencedPaths, repoRefs);
-    if (uncoveredPaths.length === 0) return true;
-
-    const tabTypeLabel = this._getTabTypeLabel(tab.appType);
-
-    const confirmed = await showScopeExpandModal({
-      proposedAdditions: uncoveredPaths,
-      tabType: tabTypeLabel,
-    });
-
-    if (confirmed) {
-      for (const path of uncoveredPaths) {
-        const repoName = path.split("/").filter(Boolean).pop() ?? "unknown";
-        try {
-          await window.openp41ge.workspaceController.worksetAddRepo(repoName, "");
-        } catch {
-          // Proceed with move even if API call fails
-        }
-      }
-      return true;
-    }
-
-    return false;
-  }
-
-  private _getTabTypeLabel(appType: string): string {
-    switch (appType) {
-      case "file-viewer":
-      case "openp41ge-file-viewer":
-        return "File Editor";
-      case "agent-chat":
-        return "Agent Chat";
-      case "git-repository":
-        return "Git Repository";
-      default:
-        return "Tab";
-    }
   }
 
   onLeave(): void {

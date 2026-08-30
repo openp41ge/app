@@ -22,8 +22,7 @@ import { repoTreeRenderer } from "../services/repo-tree-renderer";
 import { plusIconThick } from "../icons";
 import { showConfirmModal } from "./openp41ge-confirm-modal";
 import "./openp41ge-repo-tree-item";
-import { saveRepoOrder, applyRepoOrder } from "../repo-order-cache";
-import { workspaceFileService } from "../services/workspace-file-service";
+import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import "./openp41ge-clone-dialog";
 import "./openp41ge-add-worktree-dialog";
 import { appServices } from "../app";
@@ -154,7 +153,6 @@ class Openp41geWorktreeTree extends LitElement {
   @property() worksetId = "";
   private _prevWorksetId = "";
   @state() private _editMode = false;
-  private _openp41geRepoUnsub: (() => void) | null = null;
   private _selectedPath = "";
   private _worktreesByRepo: Map<string, Array<{ branch: string; path: string; exists: boolean }>> =
     new Map();
@@ -187,30 +185,31 @@ class Openp41geWorktreeTree extends LitElement {
 
   /**
    * Route the explorer-reorder-repos event (fired by ExplorerReorderDropTarget)
-   * to a repo splice + persistence. Mirrors the removed native drop handler.
+   * to a reorder of the ACTIVE WORKSPACE's `repos` array + persistence. Repos
+   * belong to the workspace, so the order is shared with the Workspaces overlay.
    */
-  private _onExplorerReorder = (e: Event): void => {
+  private _onExplorerReorder = async (e: Event): Promise<void> => {
     const detail = (e as CustomEvent).detail as {
       repoName: string;
       fromIndex: number;
       dropIndex: number;
     };
     if (!detail?.repoName) return;
+    const data = workspaceFileService.activeData;
+    if (!data) return;
 
+    const repos = [...(data.repos ?? [])];
     const fromIdx =
       detail.fromIndex >= 0
         ? detail.fromIndex
-        : this._repos.findIndex((r) => r.name === detail.repoName);
+        : repos.findIndex((r) => deriveRepoName(r.url) === detail.repoName);
     if (fromIdx === -1 || fromIdx === detail.dropIndex || detail.dropIndex === fromIdx + 1) {
       return;
     }
-    const newRepos = [...this._repos];
-    const [moved] = newRepos.splice(fromIdx, 1);
-    newRepos.splice(detail.dropIndex > fromIdx ? detail.dropIndex - 1 : detail.dropIndex, 0, moved);
-    this._repos = newRepos;
-    // Persist the new order to localStorage (the per-project repo-order store
-    // was removed with the project system)
-    saveRepoOrder(newRepos.map((r) => r.name));
+    const [moved] = repos.splice(fromIdx, 1);
+    repos.splice(detail.dropIndex > fromIdx ? detail.dropIndex - 1 : detail.dropIndex, 0, moved);
+    data.repos = repos;
+    await workspaceFileService.save();
     document.dispatchEvent(new CustomEvent("project:changed"));
   };
 
@@ -283,6 +282,14 @@ class Openp41geWorktreeTree extends LitElement {
       .wt-tree-scroll.full .wt-tree-scroll-content > :last-child { border-bottom: 0; }
       #wt-addrepo-row:focus-within,
       #wt-addwt-row:focus-within { outline: 2px solid #4a9eff; outline-offset: -2px; }
+      /* The add-repo/add-worktree inputs must never paint their own focus ring —
+         only the row's :focus-within outline is allowed. */
+      #wt-addrepo-input:focus, #wt-addrepo-input:focus-visible,
+      #wt-addwt-input:focus, #wt-addwt-input:focus-visible,
+      #ws-add-input:focus, #ws-add-input:focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+      }
       #wt-addwt-input::placeholder,
       #wt-addrepo-input::placeholder,
       #ws-add-input::placeholder { font-style:italic; }
@@ -380,17 +387,6 @@ class Openp41geWorktreeTree extends LitElement {
     this.addEventListener("tree-node-dblclick", this._onTreeNodeActivated as EventListener);
     this.addEventListener("tree-node-toggle", this._onTreeNodeActivated as EventListener);
 
-    // Subscribe to openp41ge repoRefs changes from other windows
-    this._openp41geRepoUnsub = window.openp41ge.workspaceController.onWorksetRepoRefsChanged(
-      async () => {
-        if (this._suspended) {
-          this._suspendDirty = true;
-          return;
-        }
-        await this._loadRepos();
-      },
-    );
-
     // Reload when the project is switched (e.g. via project picker)
     document.addEventListener("project:changed", this._onProjectChanged);
 
@@ -441,10 +437,6 @@ class Openp41geWorktreeTree extends LitElement {
       this._scrollResizeObserved = false;
     }
 
-    if (this._openp41geRepoUnsub) {
-      this._openp41geRepoUnsub();
-      this._openp41geRepoUnsub = null;
-    }
     document.removeEventListener("project:changed", this._onProjectChanged);
     this.removeEventListener("explorer-reorder-repos", this._onExplorerReorder);
     this.removeEventListener("keydown", this._onKeyDown);
@@ -536,6 +528,8 @@ class Openp41geWorktreeTree extends LitElement {
                               repo.name,
                               branch,
                             );
+                            workspaceFileService.removeWorktreeFromActive(repo.name, branch);
+                            await workspaceFileService.save();
                             await this._loadRepos();
                           } catch {
                             /* ignore */
@@ -1410,6 +1404,7 @@ class Openp41geWorktreeTree extends LitElement {
     if (!this._hasWorkspace) {
       this._repos = [];
       this._worktreesByRepo.clear();
+      this._renderTree();
       return;
     }
     // If tree DOM refs aren't ready yet, queue the load for the next updated() cycle
@@ -1423,100 +1418,58 @@ class Openp41geWorktreeTree extends LitElement {
     this._loadingRepos = true;
 
     try {
+      const wsRepos = workspaceFileService.activeData?.repos ?? [];
       const repoModels = await this._repoService.listRepos();
-      this._repos = repoModels.map((rm) => ({
-        path: "",
-        name: rm.name,
-        url: rm.url,
-      }));
-      if (_showingAddRepo) return;
+      const byUrl = new Map(repoModels.map((rm) => [rm.url, rm]));
+      const byName = new Map(repoModels.map((rm) => [rm.name, rm]));
 
-      // Load worktrees for all repos via model
-      this._worktreesByRepo.clear();
-      for (const rm of repoModels) {
-        try {
-          const wts = await rm.listWorktrees();
-          this._worktreesByRepo.set(
-            rm.name,
-            wts.map((wt) => ({
-              branch: wt.branch,
-              path: wt.path,
-              exists: wt.exists,
-            })),
-          );
-        } catch {
-          this._worktreesByRepo.set(rm.name, []);
-        }
+      // Repos the workspace declares, in workspace order, resolved to their
+      // on-disk clone. Workspace repos that aren't cloned yet are handled by
+      // the Workspaces overlay (unverified row), not by the explorer.
+      const entries: Array<{ path: string; name: string; url: string }> = [];
+      for (const wsRepo of wsRepos) {
+        const rm = byUrl.get(wsRepo.url) ?? byName.get(deriveRepoName(wsRepo.url));
+        if (!rm) continue;
+        entries.push({ path: "", name: rm.name, url: rm.url });
       }
+
+      // Worktrees = declared in the workspace (repos[].worktrees); disk truth
+      // (folder exists) comes from listWorktrees. A declared worktree whose
+      // folder is missing stays as an exists:false warning row — the warning
+      // opens the Workspaces overlay where it can be re-materialized.
+      // Built BEFORE _repos is assigned: the worktree map is not reactive, so
+      // assigning _repos must happen only once worktrees are ready or the
+      // render that _repos triggers would show empty worktree lists.
+      const wtsByRepo = new Map<string, Array<{ branch: string; path: string; exists: boolean }>>();
+      const declaredByUrl = new Map(wsRepos.map((r) => [r.url, r.worktrees ?? []]));
+      for (const repo of entries) {
+        const declared = declaredByUrl.get(repo.url) ?? [];
+        const rm = byUrl.get(repo.url) ?? byName.get(repo.name);
+        let disk: Array<{ branch: string; path: string; exists: boolean }> = [];
+        try {
+          disk = ((await rm?.listWorktrees()) ?? []).map((wt) => ({
+            branch: wt.branch,
+            path: wt.path,
+            exists: wt.exists,
+          }));
+        } catch {
+          disk = [];
+        }
+        const existing = new Map(disk.filter((w) => w.exists).map((w) => [w.branch, w]));
+        const wts = declared.map((branch) => {
+          const d = existing.get(branch);
+          return { branch, path: d?.path ?? "", exists: d !== undefined };
+        });
+        wtsByRepo.set(repo.name, wts);
+      }
+      this._worktreesByRepo = wtsByRepo;
+      this._repos = entries;
 
       this._loadingRepos = false;
-
-      // Filter repos by the active openp41ge's repoRefs.
-      // First, ensure filesystem repos are in the openp41ge's repoRefs.
-      await this._syncReposToOpenp41ge();
-
-      if (this._repos.length === 0) {
-        this._renderTree();
-        return;
-      }
-
       this._renderTree();
     } catch {
       this._loadingRepos = false;
       this.requestUpdate();
-    }
-  }
-
-  /**
-   * Sync filesystem repos with the active openp41ge's repoRefs.
-   * Auto-adds repos that exist on disk but aren't in repoRefs.
-   * Filters out repos that aren't in repoRefs (unless edit mode is on).
-   */
-  private async _syncReposToOpenp41ge(): Promise<void> {
-    try {
-      const repoRefsJson = await window.openp41ge.workspaceController.worksetGetRepoRefs();
-      const repoRefs: Array<{
-        name: string;
-        url: string;
-        worktrees: string[];
-      }> = JSON.parse(repoRefsJson);
-
-      // Auto-add filesystem repos that don't exist in repoRefs yet
-      for (const repo of this._repos) {
-        if (!repoRefs.some((r) => r.name === repo.name)) {
-          await window.openp41ge.workspaceController.worksetAddRepo(repo.name, repo.url);
-          repoRefs.push({
-            name: repo.name,
-            url: repo.url,
-            worktrees: [],
-          });
-        }
-      }
-
-      // Filter repos to only show ones in repoRefs (unless edit mode)
-      if (!this._editMode) {
-        this._repos = this._repos.filter((r) => repoRefs.some((ref) => ref.name === r.name));
-      }
-
-      // Restore the persisted drag-reorder (localStorage; no per-project store)
-      this._repos = applyRepoOrder(this._repos);
-
-      // Also rebuild _worktreesByRepo from repoRef worktree lists
-      for (const repoRef of repoRefs) {
-        if (repoRef.worktrees.length > 0) {
-          const existing = this._worktreesByRepo.get(repoRef.name) ?? [];
-          // Add worktrees from repoRef that are missing from worktreesByRepo
-          const existingBranches = new Set(existing.map((wt) => wt.branch));
-          for (const branch of repoRef.worktrees) {
-            if (!existingBranches.has(branch)) {
-              existing.push({ branch, path: ``, exists: false });
-            }
-          }
-          this._worktreesByRepo.set(repoRef.name, existing);
-        }
-      }
-    } catch {
-      // If repoRefs API is unavailable, just show all repos
     }
   }
 
@@ -1605,6 +1558,10 @@ class Openp41geWorktreeTree extends LitElement {
           }
         }
         toastService.show("Repository cloned successfully", "success");
+        // Repos belong to the active workspace — register the bare clone there
+        // so it appears in both the explorer and the Workspaces overlay.
+        workspaceFileService.addRepoToActive(url);
+        await workspaceFileService.save();
         // Clear the flag so _loadRepos() can render the tree
         _showingCloneInput = false;
         // Brief delay so the check icon is visible before tree reloads
@@ -1870,7 +1827,10 @@ class Openp41geWorktreeTree extends LitElement {
         await window.openp41ge.workspaceController.checkoutWorktree(repoName, branch);
       }
       toastService.show(`Worktree "${branch}" created`, "success");
-      await window.openp41ge.workspaceController.worksetAddWorktreeToRepo(repoName, branch);
+      // Declare the worktree in the active workspace (repos belong to the
+      // workspace — the overlay reflects this too).
+      workspaceFileService.addWorktreeToActive(repoName, branch);
+      await workspaceFileService.save();
       await this._loadRepos();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -2047,6 +2007,8 @@ class Openp41geWorktreeTree extends LitElement {
       try {
         await this._gitService.addWorktree(repoName, branch);
         toastService.show(`Worktree "${branch}" created`, "success");
+        workspaceFileService.addWorktreeToActive(repoName, branch);
+        await workspaceFileService.save();
         await this._loadRepos();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);

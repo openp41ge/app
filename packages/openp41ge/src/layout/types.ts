@@ -240,15 +240,6 @@ export const SidebarStateSchema = z.object({
 });
 export type SidebarState = z.infer<typeof SidebarStateSchema>;
 
-// ─── RepoRef ────────────────────────────────────────────────────────────────────
-
-export const RepoRefSchema = z.object({
-  name: z.string(),
-  url: z.string(),
-  worktrees: z.array(z.string()).default([]),
-});
-export type RepoRef = z.infer<typeof RepoRefSchema>;
-
 // ─── Window ────────────────────────────────────────────────────────────────
 
 export const WindowSchema = z.object({
@@ -256,7 +247,6 @@ export const WindowSchema = z.object({
   bounds: BoundsSchema,
   monitor: z.number().int().nonnegative().default(0),
   grid: GridSchema,
-  repoRefs: z.array(RepoRefSchema).default([]),
   sidebar: SidebarStateSchema.optional().default({ activeViewId: null, width: 280 }),
   overlays: z.array(OverlaySchema).default([]),
   /** Editor-area system tabs (override the grid when open). */
@@ -282,7 +272,6 @@ export function createWindow(id: string, bounds?: Bounds, monitor?: number): Win
     bounds: bounds ?? { x: 0, y: 0, width: 1280, height: 800 },
     monitor: monitor ?? 0,
     grid,
-    repoRefs: [],
     sidebar: { activeViewId: null, width: 280 },
     overlays: [],
     bottomPaneGrid: bpGrid,

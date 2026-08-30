@@ -16,8 +16,6 @@ export class TestGitAdapter implements GitAdapter {
   repos: Map<string, RepoInfo> = new Map();
   worktrees: Map<string, WorktreeInfo[]> = new Map();
   branches: Map<string, string[]> = new Map();
-  repoRefs: string = "[]";
-  private _refsChanged: Array<() => void> = [];
 
   // ── Helpers for test setup ──
 
@@ -155,32 +153,5 @@ export class TestGitAdapter implements GitAdapter {
 
   async getUntrackedFiles(_repoName: string): Promise<string[]> {
     return [];
-  }
-
-  async worksetAddRepo(_name: string, _url: string, _worktrees?: string[]): Promise<boolean> {
-    return true;
-  }
-
-  async worksetRemoveRepo(_name: string): Promise<boolean> {
-    return true;
-  }
-
-  async worksetHasRepo(_name: string): Promise<boolean> {
-    return true;
-  }
-
-  async worksetAddWorktreeToRepo(_repoName: string, _branch: string): Promise<boolean> {
-    return true;
-  }
-
-  async worksetGetRepoRefs(): Promise<string> {
-    return this.repoRefs;
-  }
-
-  onWorksetRepoRefsChanged(callback: () => void): () => void {
-    this._refsChanged.push(callback);
-    return () => {
-      this._refsChanged = this._refsChanged.filter((c) => c !== callback);
-    };
   }
 }

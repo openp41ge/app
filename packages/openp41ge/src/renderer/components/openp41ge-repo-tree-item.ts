@@ -124,13 +124,29 @@ export class Openp41geRepoTreeItem extends LitElement {
     if (info.state === "ok" || info.state === "unknown") return nothing;
     return html`
       <span
-        class="shrink-0 flex items-center"
+        class="shrink-0 flex items-center cursor-pointer wt-warn"
         style="color:var(--text-warning,#e5a50a)"
         title=${worktreeStatusLabel(info)}
+        @click=${(e: MouseEvent) => this._warnClick(e)}
       >
         <openp41ge-icon name="warning" size="11"></openp41ge-icon>
       </span>
     `;
+  }
+
+  /**
+   * Warning icon → open the Workspaces overlay at this repo's status bar. The
+   * repo-status UI (divergence, missing worktree re-create) lives there; the
+   * explorer just navigates. Stopping propagation keeps the row's own click
+   * (expand files / toggle repo) from firing.
+   */
+  private _warnClick(e: Event): void {
+    e.stopPropagation();
+    document.dispatchEvent(
+      new CustomEvent("openp41ge:focus-workspace-repo", {
+        detail: { repoName: this.repoName },
+      }),
+    );
   }
 
   /** Aggregate warning indicator shown on the repo header row. */
@@ -140,9 +156,10 @@ export class Openp41geRepoTreeItem extends LitElement {
     if (worst.state === "ok" || worst.state === "unknown") return nothing;
     return html`
       <span
-        class="shrink-0 flex items-center"
+        class="shrink-0 flex items-center cursor-pointer wt-warn"
         style="color:var(--text-warning,#e5a50a)"
         title=${`${infos.length} worktree(s): ${worktreeStatusLabel(worst)}`}
+        @click=${(e: MouseEvent) => this._warnClick(e)}
       >
         <openp41ge-icon name="warning" size="11"></openp41ge-icon>
       </span>

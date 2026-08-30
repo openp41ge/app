@@ -207,10 +207,6 @@ export function actionOpenFileInNewWindow(
                 rightSidebarTabs: [...(source.sidebar.rightSidebarTabs ?? [])],
               }
             : base.sidebar,
-          repoRefs: (source.repoRefs ?? []).map((r) => ({
-            ...r,
-            worktrees: [...(r.worktrees ?? [])],
-          })),
         }
       : {}),
   };

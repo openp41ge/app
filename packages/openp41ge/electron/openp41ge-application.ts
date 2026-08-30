@@ -45,7 +45,6 @@ import { registerDragHandlers } from "./ipc-handlers/drag-handlers.js";
 import { registerTerminalHandlers } from "./ipc-handlers/terminal-handlers.js";
 import { registerWorkspaceHandlers } from "./ipc-handlers/workspace-handlers.js";
 import { registerGitHandlers } from "./ipc-handlers/git-handlers.js";
-import { registerRepoRefHandlers } from "./ipc-handlers/repo-ref-handlers.js";
 import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
 import { registerLogHandlers } from "./ipc-handlers/log-handlers.js";
 
@@ -271,7 +270,6 @@ export class Openp41geApplication {
     registerTerminalHandlers(this.terminalManager);
     registerWorkspaceHandlers(this.workspaceService, this.dispatcher);
     registerGitHandlers(this.gitCommitService, this.gitService);
-    registerRepoRefHandlers(this.dispatcher);
     registerConfigHandlers(this.configService);
     registerLogHandlers(this.logStore);
     registerLifecycleHandlers(this.lifecycle);

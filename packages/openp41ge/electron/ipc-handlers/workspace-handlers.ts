@@ -16,7 +16,9 @@ import type { OperationDispatcher } from "../../src/main/services/operation-disp
 import { createWorkspace } from "../../src/layout/types.js";
 
 /**
- * Encode a repo URL into a filesystem-safe directory name.
+ * Encode a repo URL into a filesystem-safe directory name (legacy).
+ * Kept only for `workspaceData:getDir`; repo operations use the
+ * repositories store (see getRepoDir/getWorktreePath).
  */
 function encodeRepoUrl(url: string): string {
   return url
@@ -26,24 +28,54 @@ function encodeRepoUrl(url: string): string {
 }
 
 /**
- * Get the workspace data directory.
+ * Root of the per-repo store shared with the Explorer/NodeGitService:
+ *   ~/.openp41ge/repositories/<deriveRepoName(url)>/
+ * with a bare .git/ and sibling worktree folders — the same layout the
+ * Explorer side panels use. Re-rooted here so the Workspaces overlay's
+ * repo status/verify/materialize operations act on the SAME repos the
+ * Explorer manages (repos belong to the workspace; one store).
+ */
+function getReposDir(): string {
+  return path.join(os.homedir(), ".openp41ge", "repositories");
+}
+
+/**
+ * Derive the repository directory name from a git URL, matching
+ * NodeGitService._deriveRepoName so both surfaces land on the same repo.
+ */
+function deriveRepoDirName(url: string): string {
+  const cleaned = url
+    .replace(/^https?:\/\//, "")
+    .replace(/^git@/, "")
+    .replace(/\.git$/, "");
+  const parts = cleaned.split(/[/:]/);
+  const provider = parts[0];
+  const repoName = parts[parts.length - 1];
+  const orgPath = parts.slice(1, -1).join("/");
+  return orgPath ? `${provider}/${orgPath}/${repoName}` : `${provider}/${repoName}`;
+}
+
+/** Bare .git directory for a repo URL. */
+function getRepoDir(url: string): string {
+  return path.join(getReposDir(), deriveRepoDirName(url), ".git");
+}
+
+/** Parent directory of a repo URL (holds .git/ and the worktree folders). */
+function getRepoParent(url: string): string {
+  return path.join(getReposDir(), deriveRepoDirName(url));
+}
+
+/** Worktree folder for a repo URL + branch (sibling of .git/, like NodeGitService). */
+function getWorktreePath(url: string, branch: string): string {
+  return path.join(getRepoParent(url), branch.replace(/\//g, "--"));
+}
+
+/**
+ * Legacy workspaces-data base dir (only used by workspaceData:getDir; the
+ * per-repo clones here were superseded by the repositories store).
  */
 function getWorkspaceDataDir(): string {
   return path.join(os.homedir(), ".openp41ge", "workspaces-data");
-}
-
-/**
- * Get the bare repo directory for a given URL.
- */
-function getRepoDir(url: string): string {
-  return path.join(getWorkspaceDataDir(), encodeRepoUrl(url), ".git");
-}
-
-/**
- * Get the worktrees directory for a given URL.
- */
-function getWorktreesDir(url: string): string {
-  return path.join(getWorkspaceDataDir(), encodeRepoUrl(url), "worktrees");
 }
 
 /**
@@ -86,7 +118,7 @@ async function getWorkspaceStats(
   let untracked = 0;
   for (const repo of repos ?? []) {
     for (const branch of repo.worktrees ?? []) {
-      const wtDir = path.join(getWorktreesDir(repo.url), branch.replace(/\//g, "--"));
+      const wtDir = getWorktreePath(repo.url, branch);
       if (!fs.existsSync(wtDir)) continue;
       try {
         const numstat = await runGit(["diff", "HEAD", "--numstat"], wtDir);
@@ -156,7 +188,7 @@ async function ensureRemoteRefs(gitDir: string): Promise<void> {
  * If cloned, fetches then checks local/remote divergence.
  *
  * Returns:
- *   { status: "success", warning? } | { status: "failure", error } | { status: "diverged", error } | { status: "needs-sync", error }
+ *   { status: "success", warning? } | { status: "failure", error } | { status: "diverged", error } | { status: "needs-sync", error } | { status: "missing" }
  */
 async function checkWorktreeBranch(
   wsDir: string,
@@ -164,7 +196,7 @@ async function checkWorktreeBranch(
   branch: string,
   _isDetail = false,
 ): Promise<{
-  status: "success" | "failure" | "diverged" | "needs-sync";
+  status: "success" | "failure" | "diverged" | "needs-sync" | "missing";
   error?: string;
   warning?: string;
 }> {
@@ -198,6 +230,15 @@ async function checkWorktreeBranch(
     await ensureRemoteRefs(gitDir);
   } catch {
     // Fetch is best-effort — proceed with what we have
+  }
+
+  // Declared worktree whose folder hasn't been materialized yet (e.g. the
+  // bare repo was added but the user hasn't created the worktree, or the
+  // folder was deleted). Surface it as "missing" so the Workspaces overlay
+  // can offer a create/re-create (re-materialize) action.
+  const wtDir = getWorktreePath(url, branch);
+  if (!fs.existsSync(wtDir)) {
+    return { status: "missing" };
   }
 
   // Check if branch exists locally
@@ -273,7 +314,7 @@ async function syncWorktreeBranch(
   branch: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const gitDir = getRepoDir(url);
-  const wtDir = path.join(getWorktreesDir(url), branch.replace(/\//g, "--"));
+  const wtDir = getWorktreePath(url, branch);
   if (!fs.existsSync(gitDir)) {
     return { ok: false, error: "Repository not cloned yet. Clone before syncing." };
   }
@@ -329,7 +370,7 @@ async function checkoutWorktreeBranch(
   branch: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const gitDir = getRepoDir(url);
-  const wtDir = path.join(getWorktreesDir(url), branch.replace(/\//g, "--"));
+  const wtDir = getWorktreePath(url, branch);
 
   if (!fs.existsSync(gitDir)) {
     return { ok: false, error: "Repository not cloned yet. Clone before checking out worktrees." };

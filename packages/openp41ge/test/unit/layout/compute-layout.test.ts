@@ -15,7 +15,6 @@ function makeWindow(grid: any, overlays: any[] = [], width = 1280, height = 800)
     monitor: 0,
     grid,
     sidebar: { activeViewId: null, width: 280 },
-    repoRefs: [],
     overlays,
   };
 }

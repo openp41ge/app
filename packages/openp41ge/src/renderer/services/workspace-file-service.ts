@@ -106,7 +106,10 @@ export class WorkspaceFileService {
    */
   async save(): Promise<boolean> {
     if (!this.activeFilePath || !this.activeData) return false;
-    const ok = await window.openp41ge.dialog.writeWorkspaceFile(this.activeFilePath, this.activeData);
+    const ok = await window.openp41ge.dialog.writeWorkspaceFile(
+      this.activeFilePath,
+      this.activeData,
+    );
     return ok;
   }
 
@@ -222,6 +225,54 @@ export class WorkspaceFileService {
     }
   }
 
+  // ── Active workspace repo list ───────────────────────────
+
+  /**
+   * Append a repo (its bare-clone URL) to the active workspace's `repos` list
+   * if not already present. Returns true when a new entry was added.
+   * Persist with `save()`. Repos belong to the active workspace — the
+   * explorer and the Workspaces overlay share this single list.
+   */
+  addRepoToActive(url: string): boolean {
+    if (!this.activeData) return false;
+    const repo = url.trim();
+    if (!repo) return false;
+    if ((this.activeData.repos ?? []).some((r) => r.url === repo)) return false;
+    this.activeData.repos = [...(this.activeData.repos ?? []), { url: repo, worktrees: [] }];
+    this._emitChanged();
+    return true;
+  }
+
+  /**
+   * Add a worktree branch to a repo in the active workspace (by its derived
+   * name). Returns true when the list actually changed. Persist with `save()`.
+   */
+  addWorktreeToActive(repoName: string, branch: string): boolean {
+    if (!this.activeData) return false;
+    if (!branch) return false;
+    const entry = this.activeData.repos?.find((r) => deriveRepoName(r.url) === repoName);
+    if (!entry) return false;
+    if ((entry.worktrees ?? []).includes(branch)) return false;
+    entry.worktrees = [...(entry.worktrees ?? []), branch];
+    this._emitChanged();
+    return true;
+  }
+
+  /**
+   * Remove a worktree branch from a repo in the active workspace (by its
+   * derived name). Returns true when the list actually changed. Persist with
+   * `save()`.
+   */
+  removeWorktreeFromActive(repoName: string, branch: string): boolean {
+    if (!this.activeData) return false;
+    const entry = this.activeData.repos?.find((r) => deriveRepoName(r.url) === repoName);
+    if (!entry) return false;
+    if (!(entry.worktrees ?? []).includes(branch)) return false;
+    entry.worktrees = (entry.worktrees ?? []).filter((b) => b !== branch);
+    this._emitChanged();
+    return true;
+  }
+
   // ── Change data dir ─────────────────────────────────
 
   /**
@@ -237,8 +288,8 @@ export class WorkspaceFileService {
 
   /**
    * Best-effort clone of the active workspace's repos into the project
-   * repositories dir + registration in the window's repoRefs, and checkout
-   * of their worktrees, so the Explorer/Git sidebar panels can list them.
+   * repositories dir, and checkout of their worktrees, so the Explorer/Git
+   * sidebar panels can list them.
    *
    * Uses the workspaceController APIs (the same path normal repo-add uses),
    * which clone into the directory the sidebar panels scan. All operations
@@ -262,13 +313,10 @@ export class WorkspaceFileService {
           outcomes.push(out);
           continue;
         }
-        // Register the repo in the window's repoRefs so sidebar panels show it.
-        await window.openp41ge.workspaceController.worksetAddRepo(name, repo.url, repo.worktrees ?? []);
 
         for (const branch of repo.worktrees ?? []) {
           try {
             await window.openp41ge.workspaceController.checkoutWorktree(name, branch);
-            await window.openp41ge.workspaceController.worksetAddWorktreeToRepo(name, branch);
             out.worktrees.push({ branch, ok: true });
           } catch (wtErr) {
             out.worktrees.push({
