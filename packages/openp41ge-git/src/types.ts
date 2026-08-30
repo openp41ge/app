@@ -128,6 +128,23 @@ export interface SearchHunk {
   lines: Array<{ type: "+" | "-" | " "; text: string }>;
 }
 
+// ─── Diff document (VS Code-style rendered diff for the file editor) ────
+
+/** One rendered row of a diff document. Numbers are 1-based; undefined where
+ * that side has no line (added rows have no old line, removed no new line). */
+export type DiffLine = {
+  type: "context" | "added" | "removed" | "header";
+  /** Line text WITHOUT the +/-/ space prefix (the raw content). */
+  text: string;
+  oldLine?: number;
+  newLine?: number;
+};
+
+/** A renderable file diff: an ordered list of header/context/added/removed rows. */
+export interface DiffDocument {
+  lines: DiffLine[];
+}
+
 /** A commit matched by the commit-search query, with its changed files. */
 export interface SearchResultCommit {
   repoName: string;

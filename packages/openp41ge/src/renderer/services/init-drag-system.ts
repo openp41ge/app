@@ -356,8 +356,14 @@ function onGitEntryMouseDown(e: MouseEvent): void {
     : branch || repoName;
   const winId = _resolveMyWinId();
 
-  // Calculate offset from cursor to element's top-left corner
-  const rect = row.getBoundingClientRect();
+  // Calculate offset from cursor to element's top-left corner. For commit-search
+  // result rows the FILE sub-rows are children of the row, so the full
+  // boundingRect would capture them in the drag ghost bitmap. Capture only the
+  // row's own header band (the compact commit header line) instead.
+  const captureEl: HTMLElement = isSearchResult
+    ? (row.querySelector<HTMLElement>(".commit-result-head") ?? row)
+    : row;
+  const rect = captureEl.getBoundingClientRect();
   const elScreenX = window.screenX + rect.left;
   const elScreenY = window.screenY + rect.top;
   const offsetX = e.screenX - elScreenX;
@@ -386,8 +392,8 @@ function onGitEntryMouseDown(e: MouseEvent): void {
     winId,
     offsetX,
     offsetY,
-    elementWidth: row.offsetWidth,
-    elementHeight: row.offsetHeight,
+    elementWidth: captureEl.offsetWidth,
+    elementHeight: captureEl.offsetHeight,
     captureRect: {
       x: rect.x + TAB_GHOST_CAPTURE_INSET,
       y: rect.y + TAB_GHOST_CAPTURE_INSET,

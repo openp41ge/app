@@ -2,23 +2,27 @@
  * CommitFileDiffController — app type `"commit-file-diff"`.
  *
  * Opened when a FILE result in the Git sidebar commit search is activated
- * (single-click preview, double-click/Enter pinned). Renders the commit's
- * diff for that file in a read-only view: `@@` hunk headers muted, `+` lines
- * green, `-` lines red, context lines grey. Nothing is editable — the view has
- * no textarea at all.
+ * (single-click preview, double-click/Enter pinned). Fetches the file's hunks
+ * at that commit via `workspace:getCommitFileHunks` (empty query → the full
+ * diff), converts them with `hunksToDiffDocument`, and shows them in a
+ * READ-ONLY `<file-editor>` diff view — VS Code-style green additions / red
+ * deletions with old|new line numbers, +/− glyphs and `@@` header rows.
+ * Nothing is editable: the editor is in read-only diff mode (no caret).
  *
  * Context arrives two ways (mirrors GitCommitSearchController):
  *   - first mount:  window.__pendingCommitFileDiff set by the open-commit-file
  *                   handler; OR restore() already parsed the serialised config
  *   - re-mount:     restore() gets the tab's config slot (JSON string
- *                   `{ repoName, hash, path }`) and any cached hunks, so the
- *                   diff paints instantly without a refetch.
- *
- * First-mount fetching uses the `workspace:getCommitFileHunks` IPC via
- * window.openp41ge.workspaceController (empty query → the full file diff).
+ *                   `{ repoName, hash, path }`) and the cached `diff` document,
+ *                   so the diff paints instantly without a refetch.
  */
 
 import { BaseController } from "../../controllers/base-controller";
+// Import the file-editor component (side-effect: defines <file-editor>) so the
+// diff document renders through the real editor (read-only diff mode).
+import "openp41ge-file-editor";
+import type { FileEditorElement } from "openp41ge-file-editor";
+import { hunksToDiffDocument, type DiffDocument } from "openp41ge-git";
 
 interface CommitFileContext {
   repoName?: string;
@@ -31,12 +35,19 @@ export class CommitFileDiffController extends BaseController {
   private _hash = "";
   private _path = "";
 
-  /** Cached hunks for instant re-mount render (undefined = not fetched yet). */
-  private _hunks: { header: string; lines: Array<{ type: "+" | "-" | " "; text: string }> }[] | null =
-    null;
+  /** Cached diff document for instant re-mount render (null = not fetched yet). */
+  private _diff: DiffDocument | null = null;
+
+  private _editor: FileEditorElement | null = null;
+  private _bodyHost: HTMLElement | null = null;
+  private _mountToken = 0;
+
+  /** @internal test seam — overridable diff fetch (jsdom has no IPC). */
+  _fetchDiff: (() => Promise<unknown[]>) | null = null;
 
   mount(container: HTMLElement): void {
     this.container = container;
+    const token = ++this._mountToken;
 
     // Fresh mount: the handler set the pending context for this window.
     const pending = (window as unknown as Record<string, unknown>).__pendingCommitFileDiff as
@@ -67,23 +78,26 @@ export class CommitFileDiffController extends BaseController {
     shell.appendChild(this._buildHeader());
 
     this._bodyHost = document.createElement("div");
-    this._bodyHost.style.cssText = "flex:1;min-height:0;overflow:auto;";
+    this._bodyHost.style.cssText = "flex:1;min-height:0;position:relative;";
     shell.appendChild(this._bodyHost);
-
     container.appendChild(shell);
 
-    if (this._hunks !== null) {
-      this._renderHunks();
+    const editor = document.createElement("file-editor") as FileEditorElement;
+    editor.style.cssText = "width:100%;height:100%;display:block;";
+    editor.setReadOnly(true);
+    this._bodyHost.appendChild(editor);
+    this._editor = editor;
+
+    if (this._diff !== null) {
+      editor.setDiffDocument(this._diff);
     } else {
-      void this._fetchAndRender();
+      void this._fetchAndRender(editor, token);
     }
   }
 
-  private _bodyHost: HTMLElement | null = null;
-  private _mountToken = 0;
-
   unmount(): void {
     this._mountToken += 1;
+    this._editor = null;
     this._bodyHost = null;
     this.container = null;
   }
@@ -92,7 +106,7 @@ export class CommitFileDiffController extends BaseController {
     return {
       ...this.state,
       filePath: JSON.stringify({ repoName: this._repoName, hash: this._hash, path: this._path }),
-      hunks: this._hunks,
+      diff: this._diff,
     };
   }
 
@@ -105,11 +119,14 @@ export class CommitFileDiffController extends BaseController {
     this._repoName = (state.repoName as string) || parsed?.repoName || "";
     this._hash = (state.hash as string) || parsed?.hash || "";
     this._path = (state.path as string) || parsed?.path || "";
-    this._hunks = Array.isArray(state.hunks) ? (state.hunks as typeof this._hunks) : this._hunks;
+    if (
+      state.diff &&
+      typeof state.diff === "object" &&
+      Array.isArray((state.diff as DiffDocument).lines)
+    ) {
+      this._diff = state.diff as DiffDocument;
+    }
   }
-
-  /** @internal test seam — overridable diff fetch (jsdom has no IPC). */
-  _fetchDiff: (() => Promise<unknown[]>) | null = null;
 
   /** Header: repo — file path — short hash. */
   private _buildHeader(): HTMLElement {
@@ -128,8 +145,7 @@ export class CommitFileDiffController extends BaseController {
     return header;
   }
 
-  private async _fetchAndRender(): Promise<void> {
-    const token = ++this._mountToken;
+  private async _fetchAndRender(editor: FileEditorElement, token: number): Promise<void> {
     let hunks: unknown[] = [];
     try {
       if (this._fetchDiff) {
@@ -146,61 +162,27 @@ export class CommitFileDiffController extends BaseController {
     } catch {
       hunks = [];
     }
-    if (token !== this._mountToken || !this.container) return; // unmounted meanwhile
-    this._hunks = hunks as typeof this._hunks;
-    this._renderHunks();
-  }
+    if (token !== this._mountToken || !this.container || this._editor !== editor) return;
 
-  private _renderHunks(): void {
-    const host = this._bodyHost;
-    if (!host || !this.container) return;
-    host.innerHTML = "";
-    const hunks = this._hunks ?? [];
     if (hunks.length === 0) {
-      const msg = document.createElement("div");
-      msg.textContent = "No textual diff for this file at this commit";
-      msg.style.cssText =
-        "display:flex;width:100%;height:100%;align-items:center;justify-content:center;" +
-        "font-size:12px;color:var(--text-muted,#777);font-style:italic;padding:16px;text-align:center;";
-      host.appendChild(msg);
+      this._showEmpty(editor, "No textual diff for this file at this commit");
       return;
     }
-    const pre = document.createElement("pre");
-    pre.style.cssText =
-      "margin:0;padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" +
-      "font-size:12px;line-height:1.5;color:var(--text-secondary,#aaa);white-space:pre;overflow:visible;";
-    pre.setAttribute("data-commit-diff", "");
-    for (const h of hunks) {
-      pre.appendChild(this._hunkBlock(h));
-    }
-    host.appendChild(pre);
+    this._diff = hunksToDiffDocument(hunks as Parameters<typeof hunksToDiffDocument>[0]);
+    editor.setDiffDocument(this._diff);
   }
 
-  private _hunkBlock(h: {
-    header: string;
-    lines: Array<{ type: "+" | "-" | " "; text: string }>;
-  }): HTMLElement {
-    const block = document.createElement("div");
-    const head = document.createElement("div");
-    head.setAttribute("data-diff-header", "");
-    head.textContent = h.header;
-    head.style.cssText = "color:var(--text-muted,#777);user-select:text;";
-    block.appendChild(head);
-    for (const line of h.lines) {
-      const el = document.createElement("div");
-      el.textContent = (line.type === " " ? " " : line.type) + line.text;
-      Object.assign(el.style, {
-        color:
-          line.type === "+"
-            ? "#3fb950"
-            : line.type === "-"
-              ? "#f85149"
-              : "var(--text-secondary,#aaa)",
-        userSelect: "text",
-      });
-      block.appendChild(el);
-    }
-    return block;
+  private _showEmpty(editor: FileEditorElement, text: string): void {
+    if (!editor.parentElement) return;
+    editor.remove();
+    this._editor = null;
+    const host = this._bodyHost ?? editor.parentElement;
+    const msg = document.createElement("div");
+    msg.textContent = text;
+    msg.style.cssText =
+      "display:flex;width:100%;height:100%;align-items:center;justify-content:center;" +
+      "font-size:12px;color:var(--text-muted,#777);font-style:italic;padding:16px;text-align:center;";
+    host.appendChild(msg);
   }
 }
 

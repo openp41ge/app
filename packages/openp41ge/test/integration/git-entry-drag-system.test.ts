@@ -352,6 +352,46 @@ describe("git-entry drag wiring (init-drag-system)", () => {
     });
   });
 
+  it("an expanded commit-search row captures ONLY its header band, never the sub-rows", () => {
+    const row = document.createElement("div");
+    row.setAttribute("draggable", "true");
+    row.setAttribute("data-repo-row", "");
+    row.setAttribute("data-git-search-result", "");
+    row.setAttribute("data-repo", "acme");
+    row.setAttribute("data-hash", "af".repeat(20));
+    row.setAttribute("data-short-hash", "abdef01");
+
+    const head = document.createElement("div");
+    head.className = "commit-result-head";
+    head.style.height = "24px"; // the compact commit header line
+    head.textContent = "acme abdef01 fix: the thing";
+    const sub = document.createElement("div");
+    sub.className = "commit-file-row";
+    sub.style.height = "40px"; // a file sub-row — must NOT be in the bitmap
+    sub.textContent = "src/app.ts";
+    row.appendChild(head);
+    row.appendChild(sub);
+    document.body.appendChild(row);
+
+    // jsdom has no layout, so stub the rects to prove the bitmap is sized to
+    // the HEAD band (y=20, h=24), never the full row (which would include the
+    // 40px sub-row and sit at y=0).
+    head.getBoundingClientRect = () =>
+      ({ x: 0, y: 20, width: 300, height: 24, top: 20, left: 0, right: 300, bottom: 44 } as DOMRect);
+    row.getBoundingClientRect = () =>
+      ({ x: 0, y: 0, width: 300, height: 64, top: 0, left: 0, right: 300, bottom: 64 } as DOMRect);
+
+    mouseDown(row);
+    const pending = hooks().getGitEntryPendingStart() as {
+      elementHeight?: number;
+      captureRect?: { x: number; y: number; width: number; height: number };
+    };
+
+    expect(pending.elementHeight).toBe(head.offsetHeight);
+    expect((pending.captureRect as { height: number } | undefined)?.height).toBe(24 - 4);
+    expect((pending.captureRect as { y: number } | undefined)?.y).toBe(22); // head top + inset
+  });
+
   it("cross-window open-tab drop of a git-commit-search row opens the placeholder app scoped to repo + commit", async () => {
     const grid = document.createElement("tab-grid");
     (grid as HTMLElement & { winId: string; cols: number }).winId = "win-2";

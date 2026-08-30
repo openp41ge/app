@@ -58,6 +58,7 @@ import {
   generateGlobalEditorCSS,
 } from "openp41ge-editor-engine/themes";
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
+import type { DiffDocument } from "openp41ge-git";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
 import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
@@ -244,6 +245,125 @@ export class FileEditorElement extends LitElement {
     this.requestUpdate();
   }
 
+  // ── Read-only diff document mode (VS Code-style rendered file diff) ──
+  //
+  // When setDiffDocument() is called this editor stops rendering a text buffer
+  // and instead paints an ordered list of diff rows (context/added/removed/
+  // header) with per-row backgrounds, gutter line numbers and +/− glyphs —
+  // exactly how a commit's file diff reads in an editor. It is read-only by
+  // construction: no caret, no textarea, no model/tokenizer involvement.
+
+  /** Active diff document, or null when rendering a normal file buffer. */
+  private _diffDocument: DiffDocument | null = null;
+  /** Wrapper (inside the viewport) that holds the absolutely-placed diff rows. */
+  private _diffHost: HTMLElement | null = null;
+  /** Read-only state to restore when leaving diff mode. */
+  private _diffPrevReadOnly = false;
+
+  /** True while the editor is showing a diff document. */
+  get isDiffMode(): boolean {
+    return this._diffDocument !== null;
+  }
+
+  get diffDocument(): DiffDocument | null {
+    return this._diffDocument;
+  }
+
+  /**
+   * Switch this editor into a read-only VS Code-style diff view of `doc`. Pass
+   * null (or call clearDiffDocument) to return to normal file-buffer mode.
+   * Safe to call before the viewport exists (firstUpdated) — the render is
+   * postponed until then.
+   */
+  setDiffDocument(doc: DiffDocument | null): void {
+    if (this._diffDocument === doc) return;
+    if (doc !== null) {
+      // Remember the prior read-only state so clearing restores it exactly.
+      this._diffPrevReadOnly = this._readOnly;
+      this._diffDocument = doc;
+      this.setReadOnly(true);
+      if (this._viewportEl) {
+        this._renderDiffRows();
+      }
+    } else {
+      this.clearDiffDocument();
+    }
+  }
+
+  /** Leave diff mode and return to normal (potentially editable) rendering. */
+  clearDiffDocument(): void {
+    if (!this._diffDocument) return;
+    this._diffDocument = null;
+    this._destroyDiffRows();
+    if (this._gutterEl) this._gutterEl.style.display = "";
+    if (this._statusBar) this._statusBar.style.display = "";
+    this.setReadOnly(this._diffPrevReadOnly);
+    this.requestUpdate();
+  }
+
+  /** Paint the diff rows (old|new numbers, glyph, text) into the viewport. */
+  private _renderDiffRows(): void {
+    if (!this._viewportEl) return;
+    const doc = this._diffDocument;
+    if (!doc) return;
+
+    this._destroyDiffRows();
+    const lineHeight = this._lineHeight;
+    const lines = doc.lines ?? [];
+
+    const host = document.createElement("div");
+    host.style.cssText = "position:relative;overflow:hidden;";
+    host.style.height = `${lines.length * lineHeight}px`;
+    host.setAttribute("data-commit-diff", "");
+    this._diffHost = host;
+
+    const gutterWidth = 76; // old | new line numbers (VS Code style)
+    for (let i = 0; i < lines.length; i++) {
+      const row = lines[i];
+      const el = document.createElement("div");
+      el.style.cssText = `position:absolute;left:0;right:0;top:${i * lineHeight}px;height:${lineHeight}px;`;
+      el.className = `fe-diff-line fe-diff-${row.type}`;
+      el.setAttribute("data-diff-line", row.type);
+
+      const nums = document.createElement("span");
+      nums.className = "fe-diff-gutter";
+      nums.style.cssText = `display:inline-block;width:${gutterWidth}px;text-align:right;padding-right:8px;`;
+      const oldStr = row.oldLine !== undefined ? String(row.oldLine) : "";
+      const newStr = row.newLine !== undefined ? String(row.newLine) : "";
+      if (oldStr || newStr) nums.textContent = oldStr + (oldStr && newStr ? " " : "") + newStr;
+      el.appendChild(nums);
+
+      const glyph = document.createElement("span");
+      glyph.className = "fe-diff-glyph";
+      glyph.style.cssText = "display:inline-block;width:16px;text-align:center;";
+      glyph.textContent = row.type === "added" ? "+" : row.type === "removed" ? "−" : "";
+      el.appendChild(glyph);
+
+      const text = document.createElement("span");
+      text.className = "fe-diff-text";
+      text.style.whiteSpace = "pre";
+      text.textContent = row.text;
+      el.appendChild(text);
+
+      host.appendChild(el);
+    }
+
+    // Hide normal-mode gutter/status bar so they don't paint stale info.
+    if (this._gutterEl) this._gutterEl.style.display = "none";
+    if (this._statusBar) this._statusBar.style.display = "none";
+    this._currentLineHighlight?.hide();
+
+    this._viewportEl.appendChild(host);
+    this._viewportEl.scrollTop = 0;
+  }
+
+  private _destroyDiffRows(): void {
+    if (this._diffHost && this._diffHost.parentNode) {
+      this._diffHost.parentNode.removeChild(this._diffHost);
+    }
+    this._diffHost = null;
+  }
+
   /** Current syntax theme object. */
   private _theme: SyntaxTheme = getThemeById("openp41ge-dark");
 
@@ -415,6 +535,17 @@ export class FileEditorElement extends LitElement {
       .find-match-active {
         background: var(--fe-find-match-bg, rgba(255, 158, 0, 0.6));
       }
+      /* Read-only diff document rows (VS Code-style: green add / red remove). */
+      .fe-diff-line { display: flex; align-items: center; }
+      .fe-diff-added   { background: ${isLight ? "rgba(46,160,67,0.14)" : "rgba(46,160,67,0.16)"}; }
+      .fe-diff-removed { background: ${isLight ? "rgba(248,81,73,0.13)" : "rgba(248,81,73,0.16)"}; }
+      .fe-diff-header  { background: ${isLight ? "rgba(120,120,120,0.10)" : "rgba(120,120,120,0.14)"}; }
+      .fe-diff-added   .fe-diff-gutter, .fe-diff-added .fe-diff-glyph { color: #3fb950; }
+      .fe-diff-removed .fe-diff-gutter, .fe-diff-removed .fe-diff-glyph { color: #f85149; }
+      .fe-diff-header, .fe-diff-header .fe-diff-text, .fe-diff-header .fe-diff-gutter { color: ${c.cmt}; }
+      .fe-diff-context .fe-diff-gutter { color: ${c.cmt}; }
+      .fe-diff-text { color: ${c.default}; }
+      .fe-diff-context .fe-diff-text { color: ${c.default}; }
       ${scopeCSS}
       ${globalCSS}
     `;
@@ -457,6 +588,11 @@ export class FileEditorElement extends LitElement {
     viewportContainer.appendChild(this._viewportEl);
 
     this._gutterEl = content.querySelector(".fe-gutter") as HTMLElement;
+
+    // If a diff document was queued before the viewport existed, paint it now.
+    if (this._diffDocument) {
+      this._renderDiffRows();
+    }
 
     // Prevent mousedown from bubbling to grid drag handler
     const root = this.renderRoot.querySelector(".fe-root") as HTMLElement;
@@ -1205,6 +1341,7 @@ export class FileEditorElement extends LitElement {
   }
 
   private _renderVisibleLines(): void {
+    if (this._diffDocument) return; // diff mode owns the viewport content
     if (this._paused) return; // suspended — never render a hidden editor
     if (!this._viewLines || !this._viewModel) return;
 
@@ -1991,6 +2128,7 @@ export class FileEditorElement extends LitElement {
   }
 
   private _onViewportMouseDown = (e: MouseEvent): void => {
+    if (this._diffDocument) return; // read-only diff — no cursor positioning
     if (!this._viewModel || !this._cursorController || !this._textAreaInput) return;
 
     // Get click position relative to viewport

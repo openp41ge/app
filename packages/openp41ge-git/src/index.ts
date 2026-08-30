@@ -20,7 +20,15 @@ export type {
   CommitSearchScope,
   CommitSearchOptions,
   SearchHunk,
+  DiffLine,
+  DiffDocument,
 } from "./types";
+
+// Commit-file diff view conversion
+// git hunks → VS Code-style diff document for the read-only file editor.
+export {
+  hunksToDiffDocument,
+} from "./hunks-to-diff-document";
 
 // Git browser DOM renderer
 export { gitBrowserRenderer } from "./git-browser-renderer";
