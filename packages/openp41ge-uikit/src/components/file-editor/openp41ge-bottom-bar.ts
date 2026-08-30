@@ -25,8 +25,8 @@ const ICON_REGEX =
   '<svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><text x="0.5" y="11" font-size="11" font-family="Consolas,monospace" font-weight="600">.*</text></svg>';
 const ICON_CASE =
   '<svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><text x="0.5" y="10.5" font-size="10.5" font-family="sans-serif" font-weight="700">Aa</text></svg>';
-const ICON_CONFIG =
-  '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1.5 3.5h9M1.5 6.5h9M1.5 9.5h9"></path><circle cx="4" cy="3.5" r="1"></circle><circle cx="8" cy="6.5" r="1"></circle><circle cx="5.5" cy="9.5" r="1"></circle></svg>';
+const ICON_WORD =
+  '<svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><rect x="1" y="2" width="11" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1"/><text x="6.5" y="10" text-anchor="middle" font-size="7.5" font-family="sans-serif" font-weight="700">ab</text></svg>';
 
 export interface BottomBarButton {
   id: string;
@@ -123,7 +123,6 @@ class FeStatusBar extends LitElement {
   @state() private _findRegex = false;
   @state() private _findCase = false;
   @state() private _findWholeWord = false;
-  @state() private _configOpen = false;
 
   /** User clicked the (closed-state) find entry icon. */
   onFindOpen: (() => void) | null = null;
@@ -137,12 +136,10 @@ class FeStatusBar extends LitElement {
 
   openFind(): void {
     this._findOpen = true;
-    this._configOpen = false;
   }
 
   closeFind(): void {
     this._findOpen = false;
-    this._configOpen = false;
   }
 
   focusFind(): void {
@@ -201,10 +198,6 @@ class FeStatusBar extends LitElement {
     this.onFindWholeWord?.(this._findWholeWord);
   };
 
-  private _toggleConfig = (): void => {
-    this._configOpen = !this._configOpen;
-  };
-
   /** One icon toggle for the find strip (regex / case) — Git-sidebar style. */
   private _findToggle(
     icon: string,
@@ -241,58 +234,12 @@ class FeStatusBar extends LitElement {
         ${
           this._findOpen
             ? html`
-                ${
-                  this._configOpen
-                    ? html`
-                        <div
-                          class="fe-find-strip"
-                          style="display:flex;flex-shrink:0;align-items:center;gap:14px;height:26px;padding:0 8px;background:var(--fe-gutter-bg,#1e1e1e);border-top:1px solid var(--fe-border-color,#2a2a2a);border-bottom:1px solid var(--fe-border-color,#2a2a2a);font-size:11px;color:var(--fe-secondary-color,#888);"
-                        >
-                          <div
-                            data-testid="fe-find-scope-row"
-                            style="display:flex;align-items:center;gap:6px;"
-                          >
-                            <span>Search in:</span>
-                            <span style="color:var(--fe-primary-color,#ccc);">Current file</span>
-                          </div>
-                          <div
-                            data-testid="fe-find-whole-word"
-                            role="button"
-                            title="Match whole words only"
-                            style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--fe-primary-color,#ccc);user-select:none;"
-                            @click=${this._toggleWholeWord}
-                          >
-                            <span
-                              style="width:10px;height:10px;border:1px solid #666;border-radius:2px;display:inline-flex;align-items:center;justify-content:center;color:#4a9eff;"
-                              >${this._findWholeWord ? "✓" : ""}</span
-                            >
-                            <span>Whole word</span>
-                          </div>
-                          <div
-                            style="display:flex;align-items:center;gap:6px;opacity:0.45;"
-                            title="Coming soon"
-                          >
-                            <span style="width:10px;height:10px;display:inline-block;"></span>
-                            <span>Open tabs (soon)</span>
-                          </div>
-                          <div
-                            style="display:flex;align-items:center;gap:6px;opacity:0.45;"
-                            title="Coming soon"
-                          >
-                            <span style="width:10px;height:10px;display:inline-block;"></span>
-                            <span>Folder (soon)</span>
-                          </div>
-                        </div>
-                      `
-                    : ""
-                }
                 <div
                   class="fe-find-bar"
-                  style="position:relative;display:flex;flex-shrink:0;align-items:center;gap:8px;height:28px;padding:0 8px;background:var(--fe-gutter-bg,#1e1e1e);border-top:0;border-bottom:1px solid var(--fe-border-color,#2a2a2a);font-size:11px;color:var(--fe-secondary-color,#888);"
+                  style="position:relative;display:flex;flex-shrink:0;align-items:center;gap:8px;height:28px;padding:0 8px;background:var(--fe-gutter-bg,#1e1e1e);border-top:1px solid var(--fe-border-color,#2a2a2a);font-size:11px;color:var(--fe-secondary-color,#888);"
                 >
                   <!-- The find field lives HERE — a second bar just above the
                        status bar — and spans the full editor width (flex:1). -->
-                  <!-- Search options open a THIRD bar further up (fe-find-strip) -->
                   <input
                     class="fe-find-input"
                     data-testid="fe-find-input"
@@ -315,7 +262,7 @@ class FeStatusBar extends LitElement {
                   }
                   ${this._findToggle(ICON_REGEX, "Regex search", this._findRegex, "fe-find-regex", this._toggleRegex)}
                   ${this._findToggle(ICON_CASE, "Match case", this._findCase, "fe-find-case", this._toggleCase)}
-                  ${this._findToggle(ICON_CONFIG, "Search options", this._configOpen, "fe-find-config", this._toggleConfig)}
+                  ${this._findToggle(ICON_WORD, "Whole word", this._findWholeWord, "fe-find-whole-word", this._toggleWholeWord)}
                 </div>
               `
             : ""

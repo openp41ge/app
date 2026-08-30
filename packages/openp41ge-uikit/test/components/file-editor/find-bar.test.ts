@@ -160,6 +160,8 @@ describe("file-editor find + external highlight", () => {
     const bar = input.closest(".fe-find-bar") as HTMLElement;
     const row = el.querySelector(".sbb-row") as HTMLElement;
     expect(bar.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The find bar has its top border (separating it from the editor above).
+    expect(bar.style.borderTop).toContain("1px solid");
     // Span-all-the-way-across: the input is the flex-grow child.
     expect(input.style.flex).toContain("1");
   });
@@ -198,26 +200,37 @@ describe("file-editor find + external highlight", () => {
     expect(input.style.padding).toBe("0px");
   });
 
-  test("filter button opens the filter bar ABOVE the find bar (not a dropdown); toggles closed", async () => {
+  test("whole word is a toggle icon at the end of the search bar (no filter strip/dropdown)", async () => {
     const el = await mountEditor();
     (el.querySelector("[data-testid=fe-find-entry]") as HTMLElement).click();
     await tick();
-    // Filter bar hidden until the options toggle is clicked.
-    expect(el.querySelector(".fe-find-strip")).toBeNull();
 
-    (el.querySelector("[data-testid=fe-find-config]") as HTMLElement).click();
-    await tick();
-    const strip = el.querySelector(".fe-find-strip") as HTMLElement;
-    const bar = el.querySelector(".fe-find-bar") as HTMLElement;
-    expect(strip).not.toBeNull();
-    expect(strip.textContent).toContain("Whole word");
-    expect(strip.textContent).toContain("Search in:");
-    // The filter bar sits ABOVE the find bar (precedes it in DOM order).
-    expect(strip.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    // Same toggle closes it again.
-    (el.querySelector("[data-testid=fe-find-config]") as HTMLElement).click();
-    await tick();
+    // The inline filter strip / options dropdown are gone entirely.
     expect(el.querySelector(".fe-find-strip")).toBeNull();
+    expect(el.querySelector("[data-testid=fe-find-config]")).toBeNull();
+
+    // Whole-word lives at the END of the search-bar toggles (after regex + case).
+    const regexBtn = el.querySelector("[data-testid=fe-find-regex]") as HTMLElement;
+    const caseBtn = el.querySelector("[data-testid=fe-find-case]") as HTMLElement;
+    const wordBtn = el.querySelector("[data-testid=fe-find-whole-word]") as HTMLElement;
+    expect(wordBtn).not.toBeNull();
+    expect(wordBtn.closest(".fe-find-bar")).not.toBeNull();
+    expect(
+      regexBtn.compareDocumentPosition(wordBtn) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      caseBtn.compareDocumentPosition(wordBtn) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // Toggling it narrows matches: "han" is a substring of "handled", not a word.
+    const input = el.querySelector("[data-testid=fe-find-input]") as HTMLInputElement;
+    input.value = "han";
+    input.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true }));
+    await tick();
+    expect(el._findMatches.length).toBeGreaterThan(0);
+
+    wordBtn.click();
+    await tick();
+    expect(el._findMatches.length).toBe(0);
   });
 });

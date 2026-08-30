@@ -250,3 +250,13 @@ The find input lost its border + background so the full-width find bar reads as
 the input container. The search-options toggle now opens a THIRD stacked bar
 (fe-find-strip) ABOVE the find bar (whole-word / open-tabs / folder), replacing
 the floating dropdown.
+
+---
+
+## 2026-08-30 (4) — Editor: filter strip removed; whole-word becomes a search-bar toggle
+
+The stacked filter strip was deleted entirely. The only kept option — Whole word —
+is now an icon toggle at the end of the find bar (after regex and case), driven by
+`_toggleWholeWord` / `fe-find-whole-word`. The search-options toggle, `_configOpen`
+state, ICON_CONFIG and the dropdown were removed. The find bar regained its top
+border (it previously dropped it while the strip sat above).
