@@ -736,7 +736,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
       padding: "16px",
     });
     const msg = document.createElement("div");
-    msg.textContent = "Select a workspace to search commits";
+    msg.textContent = "Select a workspace to get started";
     Object.assign(msg.style, {
       fontSize: "12px",
       lineHeight: "1.4",

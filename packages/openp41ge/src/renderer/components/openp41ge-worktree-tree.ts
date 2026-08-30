@@ -476,7 +476,7 @@ class Openp41geWorktreeTree extends LitElement {
           <div
             style="opacity:.55;font-size:12px;color:var(--text-muted,#777);text-align:center;padding:0 16px;"
           >
-            Open a workspace to browse files
+            Select a workspace to get started
           </div>
         </div>
       `;

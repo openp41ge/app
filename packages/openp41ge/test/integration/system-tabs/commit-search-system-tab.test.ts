@@ -187,7 +187,7 @@ describe("CommitSearchSystemTabController", () => {
 
     const tab = host.querySelector('[data-system-tab="git"]') as HTMLElement;
     expect(tab).not.toBeNull();
-    expect(tab.textContent).toContain("Select a workspace to search commits");
+    expect(tab.textContent).toContain("Select a workspace to get started");
     // The search UI is not built at all in this state.
     expect(host.querySelector("input")).toBeNull();
     expect(host.querySelector("[data-search-into]")).toBeNull();

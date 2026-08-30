@@ -95,13 +95,13 @@ describe("ExplorerSystemTabController", () => {
 
     const tree = sidebar.querySelector("openp41ge-worktree-tree") as HTMLElement | null;
     expect(tree).not.toBeNull();
-    expect(tree!.textContent).toContain("Open a workspace to browse files");
+    expect(tree!.textContent).toContain("Select a workspace to get started");
 
     // Selecting a workspace swaps the placeholder for the tree skeleton.
     workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
     document.dispatchEvent(new CustomEvent("workspace-file-changed", { bubbles: true }));
     await (tree as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
-    expect(tree!.textContent).not.toContain("Open a workspace to browse files");
+    expect(tree!.textContent).not.toContain("Select a workspace to get started");
   });
 
   it("adopts a clicked file node as the focused row (overwrites arrow focus)", async () => {
