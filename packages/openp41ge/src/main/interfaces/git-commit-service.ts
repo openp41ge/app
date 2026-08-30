@@ -5,7 +5,11 @@
  * Implementations run in the main (Node.js) process.
  */
 
-import type { CommitSearchOptions, SearchResultCommit } from "openp41ge-git";
+import type {
+  CommitSearchOptions,
+  SearchHunk,
+  SearchResultCommit,
+} from "openp41ge-git";
 
 export interface CommitEntry {
   hash: string;
@@ -85,8 +89,25 @@ export interface IGitCommitService {
    *   - "files"   — match against changed file paths (path substring).
    *   - "all"     — either message OR changed-file-path match.
    *
+   * `options.content` adds an orthogonal dimension: commits whose CHANGED
+   * LINES contain the query (git -G pickaxe); results are unioned by hash.
+   *
    * Returns commits with their per-commit diff stat (changed files + counts),
    * sliced by offset/limit. Callers iterate repos for cross-repo search.
    */
   searchCommits(repoName: string, options: CommitSearchOptions): Promise<SearchResultCommit[]>;
+
+  /**
+   * Lazy content-search helper: the changed hunks of ONE commit+file that
+   * contain the query (git show <hash> -- <path>, hunks filtered). Used by the
+   * commit-search sidebar to show matching hunk sub-rows under an expanded
+   * file row. Returns [] for unknown commit/file or no matches.
+   */
+  getCommitFileHunks(
+    repoName: string,
+    hash: string,
+    path: string,
+    query: string,
+    options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
+  ): Promise<SearchHunk[]>;
 }

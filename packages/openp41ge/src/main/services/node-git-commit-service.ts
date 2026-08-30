@@ -7,7 +7,7 @@
 
 import { exec } from "child_process";
 import path from "path";
-import type { CommitSearchOptions, SearchResultCommit } from "openp41ge-git";
+import type { CommitSearchOptions, SearchHunk, SearchResultCommit } from "openp41ge-git";
 import type {
   IGitCommitService,
   CommitEntry,
@@ -604,6 +604,50 @@ export class NodeGitCommitService implements IGitCommitService {
         : [];
     }
 
+    // Content dimension (git -G pickaxe): commits whose CHANGED LINES match
+    // the query. Literal queries are regex-escaped so `a+b` means "a+b" not
+    // "a..b"; regex mode passes the raw pattern. Case handled via -i (the
+    // --regexp-ignore-case option applies to -G pickaxe). Union by hash with
+    // whatever message/files already matched; a content-pass failure (e.g. a
+    // malformed regex) must NEVER drop the other scopes' hits.
+    if (options.content) {
+      const pat = regexMode ? query : NodeGitCommitService._escapeRegex(query);
+      if (pat) {
+        try {
+          const hashes = await pinNewestN();
+          if (hashes.length > 0) {
+            const revs =
+              hashes.length > maxCount
+                ? [hashes[0], `^${hashes[maxCount]}`]
+                : [hashes[0]];
+            const contentRaw = await this._execGit(
+              [
+                "log",
+                ...revs,
+                "--date-order",
+                `-G${pat}`,
+                ...(caseSensitive ? [] : ["-i"]),
+                `--format=${format}`,
+                "--numstat",
+              ],
+              repoName,
+            );
+            if (contentRaw) {
+              const contentHits = this._parseSearchLog(contentRaw).map((c) =>
+                this._toSearchResultCommit(repoName, c),
+              );
+              const byHash = new Map<string, SearchResultCommit>();
+              for (const c of results) byHash.set(c.hash, c);
+              for (const c of contentHits) if (!byHash.has(c.hash)) byHash.set(c.hash, c);
+              results = [...byHash.values()];
+            }
+          }
+        } catch {
+          // Content match is best-effort — keep message/files hits.
+        }
+      }
+    }
+
     return results.slice(offset, offset + limit);
   }
 
@@ -660,6 +704,69 @@ export class NodeGitCommitService implements IGitCommitService {
       relativeDate: relativeDate ?? "",
       files: c.files,
     };
+  }
+
+  /** Escape a literal query so it can be passed to git -G as a fixed pattern. */
+  private static _escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  /**
+   * Lazy content-search helper: changed hunks of ONE commit+file whose lines
+   * contain the query. Best-effort — returns [] for unknown commit/file or
+   * any git error (the sidebar shows an empty state, never a throw).
+   */
+  async getCommitFileHunks(
+    repoName: string,
+    hash: string,
+    path: string,
+    query: string,
+    options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
+  ): Promise<SearchHunk[]> {
+    const q = (query ?? "").trim();
+    if (!q || !hash || !path) return [];
+    const regexMode = options?.regex ?? false;
+    const caseSensitive = options?.caseSensitive ?? false;
+    const qLower = q.toLowerCase();
+    const matches = (text: string): boolean => {
+      if (regexMode) {
+        try {
+          return new RegExp(q, caseSensitive ? "" : "i").test(text);
+        } catch {
+          return false;
+        }
+      }
+      return caseSensitive ? text.includes(q) : text.toLowerCase().includes(qLower);
+    };
+    try {
+      const out = await this._execGit(
+        ["show", hash, "--format=", "--unified=3", "--", path],
+        repoName,
+      );
+      if (!out) return [];
+      return this._parseHunks(out).filter((h) => h.lines.some((l) => matches(l.text)));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Parse `git show <hash> --format= -- <path>` patch output into hunks. */
+  private _parseHunks(output: string): SearchHunk[] {
+    const hunks: SearchHunk[] = [];
+    let cur: SearchHunk | null = null;
+    for (const rawLine of output.split("\n")) {
+      const line = rawLine;
+      if (line.startsWith("@@")) {
+        cur = { header: line, lines: [] };
+        hunks.push(cur);
+        continue;
+      }
+      if (!cur) continue;
+      if (line.startsWith("+")) cur.lines.push({ type: "+", text: line.slice(1) });
+      else if (line.startsWith("-")) cur.lines.push({ type: "-", text: line.slice(1) });
+      else cur.lines.push({ type: " ", text: line });
+    }
+    return hunks;
   }
 
   private _applyFileStatuses(entries: DiffStatEntry[], statusOutput: string): void {

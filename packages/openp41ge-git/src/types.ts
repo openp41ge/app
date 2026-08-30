@@ -114,6 +114,18 @@ export interface SearchResultFile {
   path: string;
   additions: number;
   deletions: number;
+  /** Matching changed hunks, populated lazily on request (content search). */
+  hunks?: SearchHunk[];
+}
+
+/**
+ * One changed hunk inside a file, as returned by the lazy content-hunk fetch
+ * (git show --unified). `lines` keeps the +/-/context lines of the hunk.
+ */
+export interface SearchHunk {
+  /** The raw `@@ -oldStart,count +newStart,count @@` header (with suffix). */
+  header: string;
+  lines: Array<{ type: "+" | "-" | " "; text: string }>;
 }
 
 /** A commit matched by the commit-search query, with its changed files. */
@@ -142,4 +154,10 @@ export interface CommitSearchOptions {
   caseSensitive?: boolean;
   /** Treat the query as a regular expression (default false = literal). */
   regex?: boolean;
+  /**
+   * Also match commits whose CHANGED LINES contain the query (git -G
+   * pickaxe). Orthogonal union dimension on top of `in` — a hit in any
+   * enabled dimension matches. Literal queries are regex-escaped.
+   */
+  content?: boolean;
 }

@@ -227,4 +227,230 @@ describe("NodeGitCommitService.searchCommits", () => {
       svc.searchCommits("github.com/example/missing", { query: "abc", in: "message" }),
     ).rejects.toThrow();
   });
+
+  // ── Content dimension (git -G pickaxe) ────────────────────────────────
+
+  it("content on finds commits by their changed LINES even when no message matches", async () => {
+    // "sample" appears only in b.txt's changed lines (c2), never in a message.
+    const without = await svc.searchCommits(repoName, { query: "sample", in: "message" });
+    expect(without).toEqual([]);
+
+    const withContent = await svc.searchCommits(repoName, {
+      query: "sample",
+      in: "message",
+      content: true,
+    });
+    expect(withContent.map((r) => r.shortHash)).toEqual([shortHash.c2]);
+    expect(withContent[0].files).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: "b.txt" })]),
+    );
+  });
+
+  it("content pass unions by hash and never drops message-only hits", async () => {
+    // "hello" hits BOTH messages (c0 subject "initial commit" has none, but
+    // c1 body "add feature xyz alpha" — no). c0's message is "initial
+    // commit" (no hello). So hello enters via CONTENT only for c0 and c1.
+    const msgOnly = await svc.searchCommits(repoName, { query: "hello", in: "message" });
+    expect(msgOnly).toEqual([]);
+
+    const withContent = await svc.searchCommits(repoName, {
+      query: "hello",
+      in: "message",
+      content: true,
+    });
+    const hashes = withContent.map((r) => r.shortHash);
+    expect(hashes.length).toBeGreaterThanOrEqual(2);
+    expect(hashes).toEqual([shortHash.c1, shortHash.c0]); // newest first
+
+    // Message-scope + content behind it: "xyz alpha" matches the message of
+    // c1; content also matches c1's changed lines — still one unique commit.
+    const union = await svc.searchCommits(repoName, {
+      query: "xyz alpha",
+      in: "message",
+      content: true,
+    });
+    expect(union.map((r) => r.shortHash)).toEqual([shortHash.c1]);
+  });
+
+  it("content with in:files/all keeps file-path hits alongside line hits", async () => {
+    // a.txt as a path matches c0+c1 irrespective of content; the file path
+    // "readme" matches c3.
+    const all = await svc.searchCommits(repoName, { query: "readme", in: "all", content: true });
+    expect(all.map((r) => r.shortHash)).toEqual([shortHash.c3]);
+
+    const files = await svc.searchCommits(repoName, { query: "readme", in: "files", content: true });
+    expect(files.map((r) => r.shortHash)).toEqual([shortHash.c3]);
+  });
+
+  it("content is case-insensitive unless caseSensitive is set", async () => {
+    const lower = await svc.searchCommits(repoName, {
+      query: "SAMPLE",
+      in: "message",
+      content: true,
+    });
+    expect(lower.map((r) => r.shortHash)).toEqual([shortHash.c2]);
+
+    const cs = await svc.searchCommits(repoName, {
+      query: "SAMPLE",
+      in: "message",
+      content: true,
+      caseSensitive: true,
+    });
+    expect(cs).toEqual([]);
+  });
+
+  it("literal content queries are regex-escaped; regex mode passes the pattern through", async () => {
+    // As a literal the dot is escaped → "sample content" is not hit by
+    // "sample.". As a regex "sample." means "sample" + any char → matches.
+    const literal = await svc.searchCommits(repoName, {
+      query: "sample.",
+      in: "message",
+      content: true,
+    });
+    expect(literal).toEqual([]);
+
+    const regex = await svc.searchCommits(repoName, {
+      query: "sample.",
+      in: "message",
+      content: true,
+      regex: true,
+    });
+    expect(regex.map((r) => r.shortHash)).toEqual([shortHash.c2]);
+  });
+
+  it("a failing -G content pass is swallowed and message results survive", async () => {
+    // Force only the content `-G` invocation to fail; message `--grep` calls
+    // pass through to the real git. The content failure must be swallowed and
+    // the message-only hit (zorple in c4's body) must still be returned.
+    const real = (svc as unknown as {
+      _execGit: (args: string[], repo?: string) => Promise<string>;
+    })._execGit.bind(svc);
+    (svc as unknown as { _execGit: (a: string[], r?: string) => Promise<string> })._execGit = (
+      args: string[],
+      repo?: string,
+    ) => (args.some((a) => a.startsWith("-G")) ? Promise.reject(new Error("boom")) : real(args, repo));
+    try {
+      const good = await svc.searchCommits(repoName, {
+        query: "zorple",
+        in: "message",
+        content: true,
+      });
+      expect(good.map((r) => r.shortHash)).toEqual([shortHash.c4]);
+    } finally {
+      (svc as unknown as { _execGit: (a: string[], r?: string) => Promise<string> })._execGit = real;
+    }
+  });
+
+  it("content maxCount applies the same depth cap as message search", async () => {
+    // "hello" is in c0+c1 changed lines. With maxCount 1 only the newest
+    // commit is in the capped walk → no hit. With maxCount 4 (newest 4) the
+    // walk includes c1 → hit, but c0 (5th) drops out.
+    const capped = await svc.searchCommits(repoName, {
+      query: "hello",
+      in: "message",
+      content: true,
+      maxCount: 1,
+    });
+    expect(capped).toEqual([]);
+
+    const broad = await svc.searchCommits(repoName, {
+      query: "hello",
+      in: "message",
+      content: true,
+      maxCount: 4,
+    });
+    expect(broad.map((r) => r.shortHash)).toEqual([shortHash.c1]);
+  });
+});
+
+describe("NodeGitCommitService.getCommitFileHunks", () => {
+  let root: string;
+  let srcRepo: string;
+  let reposDir: string;
+  let svc: NodeGitCommitService;
+  const repoName = "github.com/example/hunks";
+  let c0: string;
+
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "openp41ge-hunks-test-"));
+    srcRepo = path.join(root, "src");
+    fs.mkdirSync(srcRepo, { recursive: true });
+    git(srcRepo, ["init", "-q", "-b", "main", "."]);
+
+    fs.writeFileSync(path.join(srcRepo, "app.txt"), "line one\nline two\nhello world\n");
+    git(srcRepo, ["add", "."]);
+    git(srcRepo, ["commit", "-qm", "add app.txt with hello"]);
+    c0 = git(srcRepo, ["rev-parse", "HEAD"]);
+
+    // Second commit edits app.txt — keeps a hunk with a removal and an add.
+    fs.writeFileSync(
+      path.join(srcRepo, "app.txt"),
+      "line one\nline two\nhello brave world\nline four\n",
+    );
+    git(srcRepo, ["add", "."]);
+    git(srcRepo, ["commit", "-qm", "expand app.txt"]);
+
+    reposDir = path.join(root, "repos");
+    fs.mkdirSync(reposDir, { recursive: true });
+    git(reposDir, ["clone", "--bare", "--quiet", srcRepo, path.join(reposDir, repoName, ".git")]);
+    svc = new NodeGitCommitService(reposDir);
+  });
+
+  afterAll(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("returns [] for an empty query", async () => {
+    await expect(
+      svc.getCommitFileHunks(repoName, c0, "app.txt", "  ", {}),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns [] for an unknown hash or file", async () => {
+    await expect(
+      svc.getCommitFileHunks(repoName, c0, "nope.ts", "hello", {}),
+    ).resolves.toEqual([]);
+    await expect(
+      svc.getCommitFileHunks(repoName, "deadbeef", "app.txt", "hello", {}),
+    ).resolves.toEqual([]);
+  });
+
+  it("parses hunks and filters to those whose lines contain the query", async () => {
+    const c1 = git(srcRepo, ["rev-parse", "HEAD"]);
+    const hunks = await svc.getCommitFileHunks(repoName, c1, "app.txt", "brave", {});
+    expect(hunks.length).toBeGreaterThan(0);
+    // Every returned hunk has a line mentioning the token.
+    for (const h of hunks) {
+      expect(h.header).toMatch(/^@@/);
+      expect(h.lines.some((l) => l.text.includes("brave"))).toBe(true);
+    }
+    const minus = hunks.flatMap((h) => h.lines).filter((l) => l.type === "-");
+    expect(minus.map((l) => l.text)).toContain("hello world");
+  });
+
+  it("honours query/caseSensitive/regex match rules", async () => {
+    const c1 = git(srcRepo, ["rev-parse", "HEAD"]);
+    // The added line is "hello brave world" (lowercase b).
+    const csMismatch = await svc.getCommitFileHunks(repoName, c1, "app.txt", "BRAVE", {
+      caseSensitive: true,
+    });
+    expect(csMismatch).toEqual([]);
+    const ci = await svc.getCommitFileHunks(repoName, c1, "app.txt", "BRAVE", {});
+    expect(ci.length).toBeGreaterThan(0);
+
+    // Regex: "world" alternation matches the added line; literal "world"
+    // also matches it, so use a token that regex-only matches.
+    const regexOnly = await svc.getCommitFileHunks(repoName, c1, "app.txt", "br.ve", {
+      regex: true,
+    });
+    expect(regexOnly.length).toBeGreaterThan(0);
+    const literalDot = await svc.getCommitFileHunks(repoName, c1, "app.txt", "br.ve", {});
+    expect(literalDot).toEqual([]);
+  });
+
+  it("missing repo is tolerated with []", async () => {
+    await expect(
+      svc.getCommitFileHunks("github.com/example/missing", c0, "app.txt", "hello", {}),
+    ).resolves.toEqual([]);
+  });
 });

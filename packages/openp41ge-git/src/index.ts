@@ -19,6 +19,7 @@ export type {
   SearchResultCommit,
   CommitSearchScope,
   CommitSearchOptions,
+  SearchHunk,
 } from "./types";
 
 // Git browser DOM renderer

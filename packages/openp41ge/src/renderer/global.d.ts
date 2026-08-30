@@ -102,6 +102,14 @@ declare global {
         getDiffStat: (repoName: string, commitHash?: string) => Promise<DiffStatEntry[]>;
         /** Get a single commit's full data (incl. complete message) by hash, or null. */
         getCommitMessage: (repoName: string, hash: string) => Promise<CommitEntry | null>;
+        /** Lazy content-search helper: hunks of one commit+file containing the query. */
+        getCommitFileHunks: (
+          repoName: string,
+          hash: string,
+          path: string,
+          query: string,
+          options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
+        ) => Promise<SearchHunk[]>;
         /** Delete a local branch. */
         deleteLocalBranch: (repoName: string, branchName: string, force?: boolean) => Promise<void>;
 

@@ -25,6 +25,17 @@ export function registerGitHandlers(
     return gitCommitService.getCommitMessage(repoName, hash);
   });
 
+  ipcMain.handle(
+    "workspace:getCommitFileHunks",
+    async (_event, repoName, hash, path, query, options) => {
+      try {
+        return await gitCommitService.getCommitFileHunks(repoName, hash, path, query, options);
+      } catch {
+        return [];
+      }
+    },
+  );
+
   ipcMain.handle("workspace:getUntrackedFiles", async (_event, repoName) => {
     return gitCommitService.getUntrackedFiles(repoName);
   });

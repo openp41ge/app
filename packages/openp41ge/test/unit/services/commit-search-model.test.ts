@@ -28,7 +28,22 @@ function makeCommits() {
       date: "2026-01-01",
       relativeDate: "2 days ago",
       files: [
-        { path: "src/app.ts", additions: 4, deletions: 1 },
+        {
+          path: "src/app.ts",
+          additions: 4,
+          deletions: 1,
+          hunks: [
+            {
+              header: "@@ -1,5 +1,8 @@",
+              lines: [
+                { type: "-", text: "import { crashy } from 'old'" },
+                { type: "+", text: "import { stable } from 'new'" },
+                { type: " ", text: "export function open() {" },
+                { type: "+", text: "  // widget wiring" },
+              ],
+            },
+          ],
+        },
         { path: "src/util/helper.ts", additions: 2, deletions: 0 },
       ],
     },
@@ -109,9 +124,58 @@ describe("TestCommitSearchModel", () => {
     const results = await model.search(null, { query: "   ", in: "all" });
     expect(results).toEqual([]);
   });
+
+  it("content on finds commits by changed LINES when no message/path matches", async () => {
+    // "widget" appears only in aaa1's changed line — never in a message or
+    // file path.
+    const without = await model.search(null, { query: "widget", in: "message" });
+    expect(without).toEqual([]);
+
+    const withContent = await model.search(null, {
+      query: "widget",
+      in: "message",
+      content: true,
+    });
+    expect(withContent.map((r) => r.shortHash)).toEqual(["aaa1"]);
+  });
+
+  it("content adds to (never replaces) message/path hits in every scope", async () => {
+    // "crash" matches aaa1's MESSAGE too; content must not drop it nor the
+    // path-only globex "README.md" hit in all scope.
+    const all = await model.search(null, { query: "readme", in: "all", content: true });
+    expect(all.map((r) => r.shortHash)).toEqual(["ccc3"]);
+
+    const msg = await model.search(null, { query: "crash", in: "message", content: true });
+    expect(msg.map((r) => r.shortHash)).toEqual(["aaa1"]);
+  });
+
+  it("fileHunks returns only hunks whose lines contain the query (lazy fetch shape)", async () => {
+    const hunks = await model.fileHunks("acme", "aaa1", "src/app.ts", "widget", {});
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0].lines.some((l) => l.text.includes("widget"))).toBe(true);
+    expect(model.hunkCalls).toEqual([
+      {
+        repoName: "acme",
+        hash: "aaa1",
+        path: "src/app.ts",
+        query: "widget",
+        options: {},
+      },
+    ]);
+  });
+
+  it("fileHunks returns [] for unknown commit/file or empty query", async () => {
+    await expect(model.fileHunks("acme", "aaa1", "nope.ts", "widget", {})).resolves.toEqual([]);
+    await expect(model.fileHunks("acme", "zzz", "src/app.ts", "widget", {})).resolves.toEqual([]);
+    await expect(model.fileHunks("acme", "aaa1", "src/app.ts", "   ", {})).resolves.toEqual([]);
+  });
 });
 
 describe("IpcCommitSearchModel", () => {
+  beforeEach(() => {
+    (window as unknown as { openp41ge: any }).openp41ge = undefined;
+  });
+
   it("delegates to window.openp41ge.workspaceController.searchCommits", async () => {
     const stub = vi.fn().mockResolvedValue([{ shortHash: "x" }]);
     (window as unknown as { openp41ge: any }).openp41ge = {
@@ -123,5 +187,24 @@ describe("IpcCommitSearchModel", () => {
 
     expect(stub).toHaveBeenCalledWith("acme", { query: "fix", in: "message" });
     expect(out).toEqual([{ shortHash: "x" }]);
+  });
+
+  it("fileHunks delegates to getCommitFileHunks with the query and options", async () => {
+    const stub = vi.fn().mockResolvedValue([{ header: "@@ -1 +1 @@", lines: [] }]);
+    (window as unknown as { openp41ge: any }).openp41ge = {
+      workspaceController: { getCommitFileHunks: stub },
+    };
+
+    const model: CommitSearchModel = new IpcCommitSearchModel();
+    const out = await model.fileHunks("acme", "aaa1", "src/app.ts", "widget", {
+      regex: false,
+      caseSensitive: true,
+    });
+
+    expect(stub).toHaveBeenCalledWith("acme", "aaa1", "src/app.ts", "widget", {
+      regex: false,
+      caseSensitive: true,
+    });
+    expect(out).toHaveLength(1);
   });
 });

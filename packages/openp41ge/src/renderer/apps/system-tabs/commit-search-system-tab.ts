@@ -25,7 +25,7 @@ import type { SystemTabController } from "../../controllers/types";
 import type { CommitSearchModel } from "../../models/commit-search-model";
 import { IpcCommitSearchModel } from "../../models/commit-search-model";
 import { workspaceFileService } from "../../services/workspace-file-service";
-import type { SearchResultCommit } from "openp41ge-git";
+import type { SearchHunk, SearchResultCommit } from "openp41ge-git";
 
 /** 250ms input debounce — search as you type without spamming IPC per key. */
 const DEBOUNCE_MS = 250;
@@ -38,6 +38,9 @@ const CASE_ON_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="m131-252 165-440h79l165 440h-76l-39-112H247l-40 112h-76Zm139-176h131l-64-182h-4l-63 182Zm395 186q-51 0-81-27.5T554-342q0-44 34.5-72.5T677-443q23 0 45 4t38 11v-12q0-29-20.5-47T685-505q-23 0-42 9.5T610-468l-47-35q24-29 54.5-43t68.5-14q69 0 103 32.5t34 97.5v178h-63v-37h-4q-14 23-38 35t-53 12Zm12-54q35 0 59.5-24t24.5-56q-14-8-33.5-12.5T689-393q-32 0-50 14t-18 37q0 20 16 33t40 13Z"/></svg>';
 const CASE_OFF_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="m131-252 127-338L56-792l56-56 736 736-56 56-286-286 34 90h-76l-39-112H247l-40 112h-76Zm178-287-39 111h131l-10-29-82-82Zm436 210q8-10 12-22t4-25q-14-8-33.5-12.5T689-393h-8l-45-45q10-2 20-3.5t21-1.5q23 0 45 4t38 11v-12q0-29-20.5-47T685-505q-23 0-42 9.5T610-468l-43-39q23-27 52.5-40t66.5-13q69 0 103 32.5t34 97.5v179l-78-78Z"/></svg>';
+// Search changed CONTENT lines (git -G pickaxe). A document with a magnifier.
+const CONTENT_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="M180-120q-25 0-42.5-17.5T120-180v-600q0-25 17.5-42.5T180-840h600q25 0 42.5 17.5T840-780v600q0 25-17.5 42.5T780-120H180Zm0-80h600v-600H180v600Zm80-120h200v-60H260v60Zm0-120h200v-60H260v60Zm0-160h360v-60H260v60Zm360 320q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29ZM620-120l-74-74q-20 11-42.5 17.5T457-170q-75 0-127.5-52.5T277-350q0-75 52.5-127.5T457-530q75 0 127.5 52.5T637-350q0 30-9 57t-24 48l74 74-58 51Z"/></svg>';
 
 interface RepoOption {
   name: string;
@@ -53,6 +56,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _viewElement: HTMLElement | null = null;
   private _input: HTMLInputElement | null = null;
   private _filesToggle: HTMLButtonElement | null = null;
+  private _contentToggle: HTMLButtonElement | null = null;
   private _regexToggle: HTMLButtonElement | null = null;
   private _caseToggle: HTMLButtonElement | null = null;
   // Filter box (below the search box): icon toggles → optional config rows.
@@ -88,12 +92,19 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _lastQuery = "";
 
   // Commit-message search is always on; the files icon toggles changed-file-
-  // path search on top of it (on = combined 'all', off = messages only).
+  // path search on top of it (on = combined 'all', off = messages only). The
+  // content icon additionally enables the git -G content-lines dimension.
   private _searchFiles = true;
+  private _searchContent = false;
   // Regex mode: treat the query as a regular expression.
   private _searchRegex = false;
   // Case-sensitive matching.
   private _searchCase = false;
+
+  // Per-file hunk expansion for content search. Keys: repo:shortHash:path.
+  private _expandedFileHunks = new Set<string>();
+  /** Lazy hunk cache: key — repo:shortHash:path → rows | "pending" | "error". */
+  private _hunkCache = new Map<string, SearchHunk[] | "pending" | "error">();
 
   /** Keep-alive (SystemTabController.setVisible). */
   private _suspended = false;
@@ -182,6 +193,12 @@ export class CommitSearchSystemTabController implements SystemTabController {
       "Search changed file paths",
       "searchInto",
       "files",
+    );
+    const contentToggle = makeIconToggle(
+      CONTENT_ICON,
+      "Search changed content lines",
+      "searchInto",
+      "content",
     );
     const regexToggle = makeIconToggle(REGEX_ICON, "Regex search", "searchRegex");
     const caseToggle = makeIconToggle(CASE_ON_ICON, "Match case (case-sensitive)", "searchCase");
@@ -306,6 +323,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
     filterIconRow.appendChild(repoFilterIcon);
     // Changed-file-path search is a config toggle like the filter icon.
     filterIconRow.appendChild(filesToggle);
+    // Content search (git -G pickaxe on changed lines) is the third dimension.
+    filterIconRow.appendChild(contentToggle);
 
     // A vertical divider between the repo icon and the depth-limit group —
     // only the middle 50% of the row height, vertically centred.
@@ -420,6 +439,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     this._viewElement = wrapper;
     this._input = input;
     this._filesToggle = filesToggle;
+    this._contentToggle = contentToggle;
     this._regexToggle = regexToggle;
     this._caseToggle = caseToggle;
     this._repoFilterIcon = repoFilterIcon;
@@ -456,6 +476,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
       }
     });
     filesToggle.addEventListener("click", () => this._toggleSearch());
+    contentToggle.addEventListener("click", () => this._toggleContent());
     regexToggle.addEventListener("click", () => this._toggleRegex());
     caseToggle.addEventListener("click", () => this._toggleCase());
     repoFilterIcon.addEventListener("click", () => this._toggleRepoFilter());
@@ -734,6 +755,22 @@ export class CommitSearchSystemTabController implements SystemTabController {
     btn.style.color = this._searchFiles ? "#e3e3e3" : "var(--text-secondary,#888)";
   }
 
+  private _toggleContent(): void {
+    this._searchContent = !this._searchContent;
+    this._applyContentToggleStyle();
+    if (this._input?.value.trim()) {
+      this._debounce();
+    } else {
+      this._renderEmptyQuery();
+    }
+  }
+
+  private _applyContentToggleStyle(): void {
+    const btn = this._contentToggle;
+    if (!btn) return;
+    btn.style.color = this._searchContent ? "#e3e3e3" : "var(--text-secondary,#888)";
+  }
+
   private _toggleRegex(): void {
     this._searchRegex = !this._searchRegex;
     this._applySearchToggleStyles();
@@ -797,8 +834,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
     const repoNames = this._repoScope();
     const maxCount = this._maxCount;
     // Commits (messages) are always searched; files add the changed-file-path
-    // dimension when the toggle is on.
+    // dimension when the toggle is on; content the git -G content-lines pass.
     const mode = this._searchFiles ? "all" : "message";
+    // A new search invalidates the per-file hunk expansion/cache.
+    this._expandedFileHunks.clear();
+    this._hunkCache.clear();
 
     results.replaceChildren(this._message("Searching…", "var(--text-secondary,#999)"));
     if (this._footer) {
@@ -813,6 +853,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
         maxCount,
         caseSensitive: this._searchCase,
         regex: this._searchRegex,
+        content: this._searchContent,
       });
       if (token !== this._searchToken) return; // a newer search superseded this one
       this._lastCommits = commits;
@@ -877,6 +918,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     this._viewElement = null;
     this._input = null;
     this._filesToggle = null;
+    this._contentToggle = null;
     this._regexToggle = null;
     this._caseToggle = null;
     this._repoFilterIcon = null;
@@ -1163,10 +1205,36 @@ export class CommitSearchSystemTabController implements SystemTabController {
         userSelect: "none",
       });
 
-      const pad = document.createElement("span");
-      pad.textContent = "";
-      Object.assign(pad.style, { width: "14px", flexShrink: "0" });
-      row.appendChild(pad);
+      const fKey = this._fileHunkKey(commit.repoName, commit.shortHash, file.path);
+      const contentOn = this._searchContent;
+      const chev = document.createElement("button");
+      chev.type = "button";
+      Object.assign(chev.style, {
+        width: "14px",
+        flexShrink: "0",
+        border: "none",
+        background: "transparent",
+        padding: "0",
+        cursor: contentOn ? "pointer" : "default",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--text-muted,#666)",
+      });
+      const fExpanded = this._expandedFileHunks.has(fKey);
+      chev.innerHTML = `<openp41ge-icon name="${fExpanded ? "chevron-down" : "chevron-right"}" size="10"></openp41ge-icon>`;
+      chev.title = contentOn
+        ? fExpanded
+          ? "Collapse matching hunks"
+          : "Show matching hunks"
+        : "";
+      chev.addEventListener("click", (ce: MouseEvent) => {
+        ce.stopPropagation();
+        if (!this._searchContent) return;
+        this._toggleFileHunks(fKey);
+      });
+      row.appendChild(chev);
+      if (!contentOn) chev.style.opacity = "0"; // reserve the 14px slot
 
       const name = document.createElement("span");
       name.title = file.path;
@@ -1244,12 +1312,133 @@ export class CommitSearchSystemTabController implements SystemTabController {
               },
             }),
           );
+          return;
+        }
+        if (this._searchContent && e.key === "ArrowRight") {
+          e.preventDefault();
+          this._expandFileHunks(fKey);
+          return;
+        }
+        if (this._searchContent && e.key === "ArrowLeft" && this._expandedFileHunks.has(fKey)) {
+          e.preventDefault();
+          this._collapseFileHunks(fKey);
         }
       });
 
       out.push(row);
+      if (this._expandedFileHunks.has(fKey)) {
+        const hunkContainer = document.createElement("div");
+        hunkContainer.className = "commit-hunk-block";
+        out.push(hunkContainer);
+        void this._renderFileHunks(hunkContainer, commit, fKey, file.path);
+      }
     }
     return out;
+  }
+
+  private _fileHunkKey(repoName: string, shortHash: string, path: string): string {
+    return `${repoName}:${shortHash}:${path}`;
+  }
+
+  private _toggleFileHunks(fKey: string): void {
+    if (this._expandedFileHunks.has(fKey)) this._collapseFileHunks(fKey);
+    else this._expandFileHunks(fKey);
+  }
+
+  private _expandFileHunks(fKey: string): void {
+    this._expandedFileHunks.add(fKey);
+    this._rerender();
+  }
+
+  private _collapseFileHunks(fKey: string): void {
+    this._expandedFileHunks.delete(fKey);
+    this._rerender();
+  }
+
+  /**
+   * Render the lazy hunk sub-rows for an expanded file row into `container`.
+   * Cached in _hunkCache (rows | "pending" | "error"); a re-render paints the
+   * cache synchronously, so collapsing/expanding again never refetches.
+   */
+  private async _renderFileHunks(
+    container: HTMLElement,
+    commit: SearchResultCommit,
+    fKey: string,
+    path: string,
+  ): Promise<void> {
+    const render = (rows: SearchHunk[] | "error", empty: boolean): void => {
+      container.replaceChildren();
+      if (rows === "error") {
+        container.appendChild(this._message("Couldn't load hunks", "var(--text-muted,#777)"));
+      } else if (empty) {
+        container.appendChild(this._message("No matching hunks", "var(--text-muted,#777)"));
+      } else {
+        for (const h of rows as SearchHunk[]) container.appendChild(this._hunkRow(h));
+      }
+    };
+    const cached = this._hunkCache.get(fKey);
+    if (cached === "error") {
+      render("error", false);
+      return;
+    }
+    if (cached && cached !== "pending") {
+      render(cached as SearchHunk[], cached.length === 0);
+      return;
+    }
+    this._hunkCache.set(fKey, "pending");
+    container.replaceChildren(this._message("Loading…", "var(--text-muted,#777)"));
+    const query = this._lastQuery.trim();
+    if (!query) {
+      this._hunkCache.set(fKey, []);
+      render([], true);
+      return;
+    }
+    try {
+      const hunks = await this._searchModel.fileHunks(commit.repoName, commit.hash, path, query, {
+        regex: this._searchRegex,
+        caseSensitive: this._searchCase,
+      });
+      if (this._hunkCache.get(fKey) !== "pending") return; // superseded
+      this._hunkCache.set(fKey, hunks);
+      render(hunks, hunks.length === 0);
+    } catch {
+      if (this._hunkCache.get(fKey) !== "pending") return;
+      this._hunkCache.set(fKey, "error");
+      render("error", false);
+    }
+  }
+
+  /** One matching hunk as a block of monospace rows (header + lines). */
+  private _hunkRow(h: SearchHunk): HTMLElement {
+    const wrap = document.createElement("div");
+    Object.assign(wrap.style, {
+      padding: "1px 10px 2px 36px",
+      fontSize: "11px",
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+      userSelect: "text",
+    });
+    const header = document.createElement("div");
+    header.textContent = h.header;
+    Object.assign(header.style, {
+      color: "var(--text-muted,#666)",
+      whiteSpace: "pre",
+    });
+    wrap.appendChild(header);
+    for (const ln of h.lines) {
+      const line = document.createElement("div");
+      line.textContent = (ln.type === " " ? " " : ln.type) + ln.text;
+      Object.assign(line.style, {
+        color:
+          ln.type === "+"
+            ? "#3fb950"
+            : ln.type === "-"
+              ? "#f85149"
+              : "var(--text-secondary,#aaa)",
+        whiteSpace: "pre",
+      });
+      wrap.appendChild(line);
+    }
+    return wrap;
   }
 
   // ── Match highlighting + hit context ───────────────────────────────────

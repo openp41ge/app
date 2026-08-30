@@ -22,7 +22,21 @@ const fixtures = [
     date: "2026-01-01",
     relativeDate: "2 days ago",
     files: [
-      { path: "src/app.ts", additions: 4, deletions: 1 },
+      {
+        path: "src/app.ts",
+        additions: 4,
+        deletions: 1,
+        hunks: [
+          {
+            header: "@@ -1 +1 @@",
+            lines: [
+              { type: "-", text: "import { crashy } from 'old'" },
+              { type: "+", text: "import { stable } from 'new'" },
+              { type: " ", text: "export function open() {" },
+            ],
+          },
+        ],
+      },
       { path: "src/util/helper.ts", additions: 2, deletions: 0 },
     ],
   },
@@ -123,12 +137,15 @@ describe("CommitSearchSystemTabController", () => {
     expect(host.querySelector("select")).toBeNull();
 
     // Main search row: the full-width input plus the regex + match-case
-    // toggles at the end. The changed-file-path toggle moved to the filter box.
+    // toggles at the end. The search-into toggles (files + content) live in
+    // the filter box.
     const toggles = host.querySelectorAll<HTMLButtonElement>("[data-search-into]");
-    expect(toggles.length).toBe(1);
+    expect(toggles.length).toBe(2);
     expect(toggles[0].dataset.searchInto).toBe("files");
-    // Files on by default → icon rendered white (enabled); jsdom normalises #e3e3e3.
+    expect(toggles[1].dataset.searchInto).toBe("content");
+    // Files on by default → icon rendered white (enabled); content off → grey.
     expect(toggles[0].style.color).toBe("rgb(227, 227, 227)");
+    expect(toggles[1].style.color).toBe("var(--text-secondary,#888)");
 
     const input = host.querySelector("input[placeholder^='Search']") as HTMLInputElement;
     expect(document.activeElement).toBe(input);
@@ -178,14 +195,15 @@ describe("CommitSearchSystemTabController", () => {
     const iconRow = repoFilterIcon.parentElement as HTMLElement;
     expect(iconRow).toBe(fiveK.parentElement);
     expect(iconRow.querySelectorAll("[data-limit-option]").length).toBe(5);
+    expect(iconRow.querySelectorAll("[data-search-into]").length).toBe(2);
     expect(iconRow.querySelector("[data-search-into]")).toBe(toggles[0]);
-    // A vertical separator sits between the config toggles (filter + files)
-    // and the limit group — only the middle 50% of the row height, centred.
+    // A vertical separator sits between the config toggles (filter + files +
+    // content) and the limit group — only the middle 50% of the row height.
     const sep = iconRow.querySelector<HTMLElement>("[data-icon-separator]");
     expect(sep).not.toBeNull();
     expect(sep!.style.height).toBe("50%");
     expect(sep!.style.alignSelf).toBe("center");
-    expect(sep!.previousElementSibling).toBe(toggles[0]); // files toggle before the divider
+    expect(sep!.previousElementSibling).toBe(toggles[1]); // content toggle before the divider
     expect(sep!.nextElementSibling?.hasAttribute("data-limit-option")).toBe(true);
   });
 
@@ -341,8 +359,9 @@ describe("CommitSearchSystemTabController", () => {
 
   it("toggling the Files icon off restricts search to commit messages only; back on restores combined", async () => {
     const filesBtn = host.querySelector<HTMLButtonElement>('[data-search-into="files"]')!;
-    // Only the files toggle exists — commit-message search can't be switched off.
-    expect(host.querySelectorAll("[data-search-into]").length).toBe(1);
+    // Only the files+content toggles exist — commit-message search can't be
+    // switched off; content only adds a third dimension.
+    expect(host.querySelectorAll("[data-search-into]").length).toBe(2);
 
     await search(controller, "readme");
     const model = controller["_searchModel"] as TestCommitSearchModel;
@@ -541,5 +560,81 @@ describe("CommitSearchSystemTabController", () => {
     document.dispatchEvent(new CustomEvent("git:refresh", { bubbles: true }));
     await flush();
     expect(host.children.length).toBe(0);
+  });
+
+  it("content toggle sends content:true on the next search; file rows stay non-expandable when off", async () => {
+    const toggle = host.querySelector<HTMLButtonElement>('[data-search-into="content"]')!;
+    expect(toggle).not.toBeNull();
+    expect(toggle.style.color).toBe("var(--text-secondary,#888)"); // off
+
+    // Off → search runs WITHOUT the content dimension.
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.at(-1)?.options.content).toBeFalsy();
+
+    // Content OFF → file rows show an inert chevron (opacity 0); clicking it
+    // does nothing (no hunk block, no preview event).
+    let commitRow = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    commitRow.click();
+    await flush();
+    const fileRow = [...host.querySelectorAll<HTMLElement>(".commit-file-row")].find((r) =>
+      r.textContent?.includes("README.md"),
+    )!;
+    const inertChev = fileRow.querySelector("button")!;
+    expect(inertChev.style.opacity).toBe("0");
+    inertChev.click();
+    await flush();
+    expect(host.querySelector(".commit-hunk-block")).toBeNull();
+    expect(events.openFile).toHaveLength(0);
+
+    // Toggle on → grey becomes white; a re-search carries content:true.
+    toggle.click();
+    expect(toggle.style.color).toBe("rgb(227, 227, 227)");
+    await search(controller, "readme");
+    expect(model.calls.at(-1)?.options).toMatchObject({ content: true });
+  });
+
+  it("content on: expanding a file row fetches and renders matching hunks (chevron + arrow keys)", async () => {
+    const toggle = host.querySelector<HTMLButtonElement>('[data-search-into="content"]')!;
+    toggle.click();
+    // "stable" is a changed LINE (added in app.ts) — no message/path mentions
+    // it, so the hit arrives via the content dimension.
+    await search(controller, "stable");
+    const commitRow = host.querySelector<HTMLElement>("[data-commit-row]")!;
+    commitRow.click();
+    await flush();
+
+    const fileRow = [...host.querySelectorAll<HTMLElement>(".commit-file-row")].find((r) =>
+      r.textContent?.includes("src/app.ts"),
+    )!;
+    expect(fileRow.querySelector("button")!.style.opacity).not.toBe("0"); // active chevron
+    fileRow.querySelector("button")!.click();
+    await flush();
+
+    // The hunk block appears with the matching hunk header + green added line.
+    const block = host.querySelector(".commit-hunk-block");
+    expect(block).not.toBeNull();
+    expect(block!.textContent).toContain("@@ -1 +1 @@");
+    expect(block!.textContent).toContain("+import { stable } from 'new'");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.hunkCalls.map((c) => c.path)).toEqual(["src/app.ts"]);
+
+    // Collapse removes the block; expanding again reuses the cache (no refetch).
+    fileRow.querySelector("button")!.click();
+    await flush();
+    expect(host.querySelector(".commit-hunk-block")).toBeNull();
+    const callsBefore = model.hunkCalls.length;
+    fileRow.querySelector("button")!.click();
+    await flush();
+    expect(host.querySelector(".commit-hunk-block")).not.toBeNull();
+    expect(model.hunkCalls.length).toBe(callsBefore); // cache hit, no refetch
+
+    // ArrowLeft collapses; ArrowRight re-expands — no hunk refetch either.
+    fileRow.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    await flush();
+    expect(host.querySelector(".commit-hunk-block")).toBeNull();
+    fileRow.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    await flush();
+    expect(host.querySelector(".commit-hunk-block")).not.toBeNull();
   });
 });
