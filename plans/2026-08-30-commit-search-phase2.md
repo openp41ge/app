@@ -166,4 +166,7 @@ lazily fetched only when a file row is expanded.
 - [x] Expanding a file row lazily fetches + renders its matching hunks (colours, monospace), caches,
       and shows inline loading/error/empty states.
 - [x] Unit + integration suites green; typecheck/lint/build clean (openp41ge 1061/1061 incl. +19 new).
-- [ ] Live-verified in the running dev app (MAIN-PROCESS change — restart dev, then CDP), error overlay clear.
+- [x] Live-verified in the running dev app (main-process restart + CDP): content toggle drives
+      a `-G` search; expanding a file row fetches + renders real hunks for `public/app.js` in
+      `ascii-drawing-tool` (header muted, context grey, 34 green/red diff lines), hunk
+      collapse/re-expand cache-reused; 0 captured errors.
