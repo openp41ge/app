@@ -712,9 +712,10 @@ export class NodeGitCommitService implements IGitCommitService {
   }
 
   /**
-   * Lazy content-search helper: changed hunks of ONE commit+file whose lines
-   * contain the query. Best-effort — returns [] for unknown commit/file or
-   * any git error (the sidebar shows an empty state, never a throw).
+   * Lazy diff helper: the hunks of ONE commit+file, best-effort. Returns []
+   * for unknown commit/file or any git error; with a non-empty query only the
+   * hunks whose lines contain the query are kept. An empty/whitespace query
+   * returns ALL hunks (the commit-file diff viewer asks for the full diff).
    */
   async getCommitFileHunks(
     repoName: string,
@@ -724,11 +725,12 @@ export class NodeGitCommitService implements IGitCommitService {
     options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
   ): Promise<SearchHunk[]> {
     const q = (query ?? "").trim();
-    if (!q || !hash || !path) return [];
+    if (!hash || !path) return [];
     const regexMode = options?.regex ?? false;
     const caseSensitive = options?.caseSensitive ?? false;
     const qLower = q.toLowerCase();
     const matches = (text: string): boolean => {
+      if (!q) return true; // no query → keep everything
       if (regexMode) {
         try {
           return new RegExp(q, caseSensitive ? "" : "i").test(text);

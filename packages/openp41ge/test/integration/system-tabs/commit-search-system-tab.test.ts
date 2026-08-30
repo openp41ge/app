@@ -69,10 +69,10 @@ const fixtures = [
   },
 ];
 
-type Events = { openCommit: CustomEvent[]; openFile: CustomEvent[] };
+type Events = { openCommit: CustomEvent[]; openFile: CustomEvent[]; openCommitFile: CustomEvent[] };
 
 function installBridge(): { events: Events } {
-  const events: Events = { openCommit: [], openFile: [] };
+  const events: Events = { openCommit: [], openFile: [], openCommitFile: [] };
   (window as unknown as { openp41ge: unknown }).openp41ge = {
     workspace: { getWindowId: () => "win-1" },
     workspaceController: {
@@ -90,6 +90,9 @@ function installBridge(): { events: Events } {
   }) as EventListener);
   document.addEventListener("openp41ge:open-file", ((e: CustomEvent) => {
     events.openFile.push(e);
+  }) as EventListener);
+  document.addEventListener("openp41ge:open-commit-file", ((e: CustomEvent) => {
+    events.openCommitFile.push(e);
   }) as EventListener);
   return { events };
 }
@@ -504,7 +507,7 @@ describe("CommitSearchSystemTabController", () => {
     expect(styleText).not.toContain(".commit-result-row:hover");
   });
 
-  it("file sub-row click emits openp41ge:open-file with pinned:false (working-tree preview)", async () => {
+  it("file sub-row click emits openp41ge:open-commit-file (preview) — file at the revision, never working-tree", async () => {
     await search(controller, "a");
     let row = host.querySelector<HTMLElement>("[data-commit-row]")!;
     row.click();
@@ -513,8 +516,31 @@ describe("CommitSearchSystemTabController", () => {
 
     const fileRow = host.querySelector<HTMLElement>(".commit-file-row")!;
     fileRow.click();
-    expect(events.openFile).toHaveLength(1);
-    expect(events.openFile[0].detail).toMatchObject({ path: "src/app.ts", pinned: false });
+    expect(events.openCommitFile).toHaveLength(1);
+    expect(events.openCommitFile[0].detail).toMatchObject({
+      repoName: "acme",
+      hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      path: "src/app.ts",
+      pinned: false,
+    });
+    // The old working-tree open-file path is NOT used for git search files.
+    expect(events.openFile).toHaveLength(0);
+    // No hunk content is ever rendered below the file row in the sidebar.
+    expect(host.querySelector(".commit-hunk-block")).toBeNull();
+  });
+
+  it("file sub-row double-click / Enter emit openp41ge:open-commit-file pinned", async () => {
+    await search(controller, "a");
+    (host.querySelector<HTMLElement>("[data-commit-row]")!).click();
+    await flush();
+    const fileRow = host.querySelector<HTMLElement>(".commit-file-row")!;
+
+    fileRow.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(events.openCommitFile.at(-1)?.detail.pinned).toBe(true);
+
+    fileRow.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(events.openCommitFile.at(-1)?.detail.pinned).toBe(true);
+    expect(events.openCommitFile.at(-1)?.detail.path).toBe("src/app.ts");
   });
 
   it("renders a no-results message when nothing matches", async () => {
@@ -562,7 +588,7 @@ describe("CommitSearchSystemTabController", () => {
     expect(host.children.length).toBe(0);
   });
 
-  it("content toggle sends content:true on the next search; file rows stay non-expandable when off", async () => {
+  it("content toggle sends content:true on the next search; sidebar never renders hunk content", async () => {
     const toggle = host.querySelector<HTMLButtonElement>('[data-search-into="content"]')!;
     expect(toggle).not.toBeNull();
     expect(toggle.style.color).toBe("var(--text-secondary,#888)"); // off
@@ -572,69 +598,25 @@ describe("CommitSearchSystemTabController", () => {
     const model = controller["_searchModel"] as TestCommitSearchModel;
     expect(model.calls.at(-1)?.options.content).toBeFalsy();
 
-    // Content OFF → file rows show an inert chevron (opacity 0); clicking it
-    // does nothing (no hunk block, no preview event).
-    let commitRow = host.querySelector<HTMLElement>("[data-commit-row]")!;
-    commitRow.click();
+    // Expand a commit and activate a file — the sidebar must only ever hold
+    // the search results; no diff/hunk content is rendered below the rows.
+    (host.querySelector<HTMLElement>("[data-commit-row]")!).click();
     await flush();
     const fileRow = [...host.querySelectorAll<HTMLElement>(".commit-file-row")].find((r) =>
       r.textContent?.includes("README.md"),
     )!;
-    const inertChev = fileRow.querySelector("button")!;
-    expect(inertChev.style.opacity).toBe("0");
-    inertChev.click();
+    fileRow.click();
     await flush();
+    expect(events.openCommitFile.at(-1)?.detail.path).toBe("README.md");
     expect(host.querySelector(".commit-hunk-block")).toBeNull();
-    expect(events.openFile).toHaveLength(0);
 
-    // Toggle on → grey becomes white; a re-search carries content:true.
+    // Toggle on → grey becomes white; a re-search carries content:true. The
+    // content dimension only affects WHICH commits match — still no sidebar
+    // hunk content, and activation still opens the reverse diff pane.
     toggle.click();
     expect(toggle.style.color).toBe("rgb(227, 227, 227)");
     await search(controller, "readme");
     expect(model.calls.at(-1)?.options).toMatchObject({ content: true });
-  });
-
-  it("content on: expanding a file row fetches and renders matching hunks (chevron + arrow keys)", async () => {
-    const toggle = host.querySelector<HTMLButtonElement>('[data-search-into="content"]')!;
-    toggle.click();
-    // "stable" is a changed LINE (added in app.ts) — no message/path mentions
-    // it, so the hit arrives via the content dimension.
-    await search(controller, "stable");
-    const commitRow = host.querySelector<HTMLElement>("[data-commit-row]")!;
-    commitRow.click();
-    await flush();
-
-    const fileRow = [...host.querySelectorAll<HTMLElement>(".commit-file-row")].find((r) =>
-      r.textContent?.includes("src/app.ts"),
-    )!;
-    expect(fileRow.querySelector("button")!.style.opacity).not.toBe("0"); // active chevron
-    fileRow.querySelector("button")!.click();
-    await flush();
-
-    // The hunk block appears with the matching hunk header + green added line.
-    const block = host.querySelector(".commit-hunk-block");
-    expect(block).not.toBeNull();
-    expect(block!.textContent).toContain("@@ -1 +1 @@");
-    expect(block!.textContent).toContain("+import { stable } from 'new'");
-    const model = controller["_searchModel"] as TestCommitSearchModel;
-    expect(model.hunkCalls.map((c) => c.path)).toEqual(["src/app.ts"]);
-
-    // Collapse removes the block; expanding again reuses the cache (no refetch).
-    fileRow.querySelector("button")!.click();
-    await flush();
     expect(host.querySelector(".commit-hunk-block")).toBeNull();
-    const callsBefore = model.hunkCalls.length;
-    fileRow.querySelector("button")!.click();
-    await flush();
-    expect(host.querySelector(".commit-hunk-block")).not.toBeNull();
-    expect(model.hunkCalls.length).toBe(callsBefore); // cache hit, no refetch
-
-    // ArrowLeft collapses; ArrowRight re-expands — no hunk refetch either.
-    fileRow.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    await flush();
-    expect(host.querySelector(".commit-hunk-block")).toBeNull();
-    fileRow.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    await flush();
-    expect(host.querySelector(".commit-hunk-block")).not.toBeNull();
   });
 });

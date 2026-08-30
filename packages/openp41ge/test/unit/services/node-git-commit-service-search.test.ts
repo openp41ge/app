@@ -400,10 +400,18 @@ describe("NodeGitCommitService.getCommitFileHunks", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("returns [] for an empty query", async () => {
-    await expect(
-      svc.getCommitFileHunks(repoName, c0, "app.txt", "  ", {}),
-    ).resolves.toEqual([]);
+  it("returns ALL hunks for an empty query (commit-file diff viewer contract)", async () => {
+    const c1 = git(srcRepo, ["rev-parse", "HEAD"]);
+    const all = await svc.getCommitFileHunks(repoName, c1, "app.txt", "  ", {});
+    expect(all.length).toBeGreaterThan(0);
+    // Includes both the removed "hello world" line and the added "hello
+    // brave world" line (a query would filter them, empty keeps everything).
+    const texts = all.flatMap((h) => h.lines.map((l) => ({ t: l.type, x: l.text })));
+    expect(texts).toContainEqual({ t: "-", x: "hello world" });
+    expect(texts).toContainEqual({
+      t: "+",
+      x: "hello brave world",
+    });
   });
 
   it("returns [] for an unknown hash or file", async () => {

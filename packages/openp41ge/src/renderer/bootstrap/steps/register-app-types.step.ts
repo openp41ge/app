@@ -23,6 +23,7 @@ import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
 import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { gitCommitSearchAppRegistration } from "../../apps/git-commit-search/index";
+import { commitFileDiffAppRegistration } from "../../apps/commit-file-diff/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
 import { WorkspaceManagerModal } from "../../apps/system-tabs/workspace-manager-system-tab";
 import { LogsSystemTab } from "../../apps/system-tabs/logs-overlay-tab";
@@ -45,6 +46,7 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(logViewerAppRegistration);
     registerAppType(gitRepositoryAppRegistration);
     registerAppType(gitCommitSearchAppRegistration);
+    registerAppType(commitFileDiffAppRegistration);
 
     // Register system tab types for sidebars
     for (const reg of allSystemTabRegistrations) {

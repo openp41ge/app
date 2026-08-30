@@ -14,7 +14,7 @@
 
 /* eslint-disable max-classes-per-file */
 
-import type { CommitSearchOptions, SearchHunk, SearchResultCommit } from "openp41ge-git";
+import type { CommitSearchOptions, SearchResultCommit } from "openp41ge-git";
 
 /** Narrow read-only search contract (ISP — read only, no write ops). */
 export interface CommitSearchModel {
@@ -23,18 +23,6 @@ export interface CommitSearchModel {
    * Returns commits with their changed files, ordered most-recent-first.
    */
   search(repoNames: string[] | null, options: CommitSearchOptions): Promise<SearchResultCommit[]>;
-
-  /**
-   * Lazy content-search helper: hunks of ONE commit+file whose lines contain
-   * the query. Returns [] for unknown commit/file or no matching hunks.
-   */
-  fileHunks(
-    repoName: string,
-    hash: string,
-    path: string,
-    query: string,
-    options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
-  ): Promise<SearchHunk[]>;
 }
 
 // ─── Production: IPC-backed ───────────────────────────────────────────────
@@ -45,22 +33,6 @@ export class IpcCommitSearchModel implements CommitSearchModel {
     options: CommitSearchOptions,
   ): Promise<SearchResultCommit[]> {
     return window.openp41ge.workspaceController.searchCommits(repoNames, options);
-  }
-
-  async fileHunks(
-    repoName: string,
-    hash: string,
-    path: string,
-    query: string,
-    options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
-  ): Promise<SearchHunk[]> {
-    return window.openp41ge.workspaceController.getCommitFileHunks(
-      repoName,
-      hash,
-      path,
-      query,
-      options,
-    );
   }
 }
 
@@ -118,32 +90,4 @@ export class TestCommitSearchModel implements CommitSearchModel {
 
     return matched.slice(offset, offset + limit);
   }
-
-  async fileHunks(
-    repoName: string,
-    hash: string,
-    path: string,
-    query: string,
-    options: Pick<CommitSearchOptions, "regex" | "caseSensitive">,
-  ): Promise<SearchHunk[]> {
-    this.hunkCalls.push({ repoName, hash, path, query, options });
-    const q = (query ?? "").trim();
-    if (!q) return [];
-    const commit = this.fixtures.find((c) => c.repoName === repoName && c.hash === hash);
-    const file = commit && commit.files.find((f) => f.path === path);
-    if (!file) return [];
-    const qLower = q.toLowerCase();
-    return (file.hunks ?? []).filter((h) =>
-      h.lines.some((l) => l.text.toLowerCase().includes(qLower)),
-    );
-  }
-
-  /** Record of every fileHunks() call, for asserting lazy fetch behaviour. */
-  hunkCalls: Array<{
-    repoName: string;
-    hash: string;
-    path: string;
-    query: string;
-    options: Pick<CommitSearchOptions, "regex" | "caseSensitive">;
-  }> = [];
 }

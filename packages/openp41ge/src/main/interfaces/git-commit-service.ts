@@ -98,10 +98,9 @@ export interface IGitCommitService {
   searchCommits(repoName: string, options: CommitSearchOptions): Promise<SearchResultCommit[]>;
 
   /**
-   * Lazy content-search helper: the changed hunks of ONE commit+file that
-   * contain the query (git show <hash> -- <path>, hunks filtered). Used by the
-   * commit-search sidebar to show matching hunk sub-rows under an expanded
-   * file row. Returns [] for unknown commit/file or no matches.
+   * Lazy diff helper: the hunks of ONE commit+file. Empty query → all hunks
+   * (the commit-file diff viewer); a non-empty query keeps only hunks whose
+   * lines match. Returns [] for unknown commit/file.
    */
   getCommitFileHunks(
     repoName: string,

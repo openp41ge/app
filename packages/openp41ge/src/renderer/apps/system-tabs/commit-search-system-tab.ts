@@ -10,8 +10,10 @@
  * Interactions:
  *   - Enter / auto-debounced input runs the search; Escape clears then blurs.
  *   - Single-click a commit → openp41ge:open-commit (unpinned preview git tab);
- *     double-click pins. File sub-rows open the working-tree file (unpinned
- *     preview), identical to explorer file single-click.
+ *     double-click pins. File sub-rows open the file AT that commit in a
+ *     read-only diff pane (openp41ge:open-commit-file: unpinned preview, or
+ *     pinned on double-click/Enter) — see the commit-file-diff app type. The
+ *     sidebar never renders diff content below the file rows.
  *   - Rows are draggable via the unified bitmap pipeline (GitEntryDragSource):
  *     dropping on the grid opens the repo's git-content pane (action by drop
  *     location).
@@ -25,7 +27,7 @@ import type { SystemTabController } from "../../controllers/types";
 import type { CommitSearchModel } from "../../models/commit-search-model";
 import { IpcCommitSearchModel } from "../../models/commit-search-model";
 import { workspaceFileService } from "../../services/workspace-file-service";
-import type { SearchHunk, SearchResultCommit } from "openp41ge-git";
+import type { SearchResultCommit } from "openp41ge-git";
 
 /** 250ms input debounce — search as you type without spamming IPC per key. */
 const DEBOUNCE_MS = 250;
@@ -100,11 +102,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _searchRegex = false;
   // Case-sensitive matching.
   private _searchCase = false;
-
-  // Per-file hunk expansion for content search. Keys: repo:shortHash:path.
-  private _expandedFileHunks = new Set<string>();
-  /** Lazy hunk cache: key — repo:shortHash:path → rows | "pending" | "error". */
-  private _hunkCache = new Map<string, SearchHunk[] | "pending" | "error">();
 
   /** Keep-alive (SystemTabController.setVisible). */
   private _suspended = false;
@@ -836,9 +833,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
     // Commits (messages) are always searched; files add the changed-file-path
     // dimension when the toggle is on; content the git -G content-lines pass.
     const mode = this._searchFiles ? "all" : "message";
-    // A new search invalidates the per-file hunk expansion/cache.
-    this._expandedFileHunks.clear();
-    this._hunkCache.clear();
 
     results.replaceChildren(this._message("Searching…", "var(--text-secondary,#999)"));
     if (this._footer) {
@@ -1205,37 +1199,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
         userSelect: "none",
       });
 
-      const fKey = this._fileHunkKey(commit.repoName, commit.shortHash, file.path);
-      const contentOn = this._searchContent;
-      const chev = document.createElement("button");
-      chev.type = "button";
-      Object.assign(chev.style, {
-        width: "14px",
-        flexShrink: "0",
-        border: "none",
-        background: "transparent",
-        padding: "0",
-        cursor: contentOn ? "pointer" : "default",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "var(--text-muted,#666)",
-      });
-      const fExpanded = this._expandedFileHunks.has(fKey);
-      chev.innerHTML = `<openp41ge-icon name="${fExpanded ? "chevron-down" : "chevron-right"}" size="10"></openp41ge-icon>`;
-      chev.title = contentOn
-        ? fExpanded
-          ? "Collapse matching hunks"
-          : "Show matching hunks"
-        : "";
-      chev.addEventListener("click", (ce: MouseEvent) => {
-        ce.stopPropagation();
-        if (!this._searchContent) return;
-        this._toggleFileHunks(fKey);
-      });
-      row.appendChild(chev);
-      if (!contentOn) chev.style.opacity = "0"; // reserve the 14px slot
-
       const name = document.createElement("span");
       name.title = file.path;
       Object.assign(name.style, {
@@ -1272,192 +1235,42 @@ export class CommitSearchSystemTabController implements SystemTabController {
       }
       row.appendChild(counts);
 
-      row.addEventListener("click", (e: MouseEvent) => {
-        e.stopPropagation();
-        // Working-tree file preview (v1) — file-at-revision is an open question.
+      // Activate the file at this commit in a read-only diff pane. Content
+      // never renders below in the sidebar — it appears in the editor grid.
+      const openFileDiff = (pinned: boolean): void => {
         document.dispatchEvent(
-          new CustomEvent("openp41ge:open-file", {
+          new CustomEvent("openp41ge:open-commit-file", {
             detail: {
+              repoName: commit.repoName,
+              hash: commit.hash,
               path: file.path,
               name: file.path.split("/").pop() ?? file.path,
-              pinned: false,
-              search: this._searchPayload(),
+              pinned,
             },
           }),
         );
+      };
+      row.addEventListener("click", (e: MouseEvent) => {
+        e.stopPropagation();
+        openFileDiff(false);
       });
       row.addEventListener("dblclick", (e: MouseEvent) => {
         e.stopPropagation();
-        document.dispatchEvent(
-          new CustomEvent("openp41ge:open-file", {
-            detail: {
-              path: file.path,
-              name: file.path.split("/").pop() ?? file.path,
-              pinned: true,
-              search: this._searchPayload(),
-            },
-          }),
-        );
+        openFileDiff(true);
       });
       row.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (e.key === "Enter") {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          document.dispatchEvent(
-            new CustomEvent("openp41ge:open-file", {
-              detail: {
-                path: file.path,
-                name: file.path.split("/").pop() ?? file.path,
-                pinned: true,
-                search: this._searchPayload(),
-              },
-            }),
-          );
-          return;
-        }
-        if (this._searchContent && e.key === "ArrowRight") {
-          e.preventDefault();
-          this._expandFileHunks(fKey);
-          return;
-        }
-        if (this._searchContent && e.key === "ArrowLeft" && this._expandedFileHunks.has(fKey)) {
-          e.preventDefault();
-          this._collapseFileHunks(fKey);
+          openFileDiff(true);
         }
       });
 
       out.push(row);
-      if (this._expandedFileHunks.has(fKey)) {
-        const hunkContainer = document.createElement("div");
-        hunkContainer.className = "commit-hunk-block";
-        out.push(hunkContainer);
-        void this._renderFileHunks(hunkContainer, commit, fKey, file.path);
-      }
     }
     return out;
   }
 
-  private _fileHunkKey(repoName: string, shortHash: string, path: string): string {
-    return `${repoName}:${shortHash}:${path}`;
-  }
-
-  private _toggleFileHunks(fKey: string): void {
-    if (this._expandedFileHunks.has(fKey)) this._collapseFileHunks(fKey);
-    else this._expandFileHunks(fKey);
-  }
-
-  private _expandFileHunks(fKey: string): void {
-    this._expandedFileHunks.add(fKey);
-    this._rerender();
-  }
-
-  private _collapseFileHunks(fKey: string): void {
-    this._expandedFileHunks.delete(fKey);
-    this._rerender();
-  }
-
-  /**
-   * Render the lazy hunk sub-rows for an expanded file row into `container`.
-   * Cached in _hunkCache (rows | "pending" | "error"); a re-render paints the
-   * cache synchronously, so collapsing/expanding again never refetches.
-   */
-  private async _renderFileHunks(
-    container: HTMLElement,
-    commit: SearchResultCommit,
-    fKey: string,
-    path: string,
-  ): Promise<void> {
-    const render = (rows: SearchHunk[] | "error", empty: boolean): void => {
-      container.replaceChildren();
-      if (rows === "error") {
-        container.appendChild(this._message("Couldn't load hunks", "var(--text-muted,#777)"));
-      } else if (empty) {
-        container.appendChild(this._message("No matching hunks", "var(--text-muted,#777)"));
-      } else {
-        for (const h of rows as SearchHunk[]) container.appendChild(this._hunkRow(h));
-      }
-    };
-    const cached = this._hunkCache.get(fKey);
-    if (cached === "error") {
-      render("error", false);
-      return;
-    }
-    if (cached && cached !== "pending") {
-      render(cached as SearchHunk[], cached.length === 0);
-      return;
-    }
-    this._hunkCache.set(fKey, "pending");
-    container.replaceChildren(this._message("Loading…", "var(--text-muted,#777)"));
-    const query = this._lastQuery.trim();
-    if (!query) {
-      this._hunkCache.set(fKey, []);
-      render([], true);
-      return;
-    }
-    try {
-      const hunks = await this._searchModel.fileHunks(commit.repoName, commit.hash, path, query, {
-        regex: this._searchRegex,
-        caseSensitive: this._searchCase,
-      });
-      if (this._hunkCache.get(fKey) !== "pending") return; // superseded
-      this._hunkCache.set(fKey, hunks);
-      render(hunks, hunks.length === 0);
-    } catch {
-      if (this._hunkCache.get(fKey) !== "pending") return;
-      this._hunkCache.set(fKey, "error");
-      render("error", false);
-    }
-  }
-
-  /** One matching hunk as a block of monospace rows (header + lines). */
-  private _hunkRow(h: SearchHunk): HTMLElement {
-    const wrap = document.createElement("div");
-    Object.assign(wrap.style, {
-      padding: "1px 10px 2px 36px",
-      fontSize: "11px",
-      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-      userSelect: "text",
-    });
-    const header = document.createElement("div");
-    header.textContent = h.header;
-    Object.assign(header.style, {
-      color: "var(--text-muted,#666)",
-      whiteSpace: "pre",
-    });
-    wrap.appendChild(header);
-    for (const ln of h.lines) {
-      const line = document.createElement("div");
-      line.textContent = (ln.type === " " ? " " : ln.type) + ln.text;
-      Object.assign(line.style, {
-        color:
-          ln.type === "+"
-            ? "#3fb950"
-            : ln.type === "-"
-              ? "#f85149"
-              : "var(--text-secondary,#aaa)",
-        whiteSpace: "pre",
-      });
-      wrap.appendChild(line);
-    }
-    return wrap;
-  }
-
   // ── Match highlighting + hit context ───────────────────────────────────
-
-  /**
-   * The sidebar's current search as an external highlight payload for files
-   * opened from a result row — the file editor highlights these matches.
-   */
-  private _searchPayload():
-    | {
-        query: string;
-        regex: boolean;
-        caseSensitive: boolean;
-      }
-    | undefined {
-    const q = this._lastQuery.trim();
-    if (!q) return undefined;
-    return { query: q, regex: this._searchRegex, caseSensitive: this._searchCase };
-  }
 
   /** Optional third line: “+ N more instances” and/or which file(s) matched. */
   private _matchMeta(commit: SearchResultCommit): HTMLElement | null {

@@ -133,4 +133,124 @@ describe("CommitOpenHandler", () => {
     handler.handleOpenCommit(new CustomEvent("openp41ge:open-commit", { detail: {} }));
     expect(dispatch).not.toHaveBeenCalled();
   });
+
+  // ── open-commit-file (file-at-revision diff pane) ────────────────────
+
+  it("opens a commit-file-diff preview with repo/hash/path in the config slot", () => {
+    workspace = makeWorkspace({});
+    handler.init({ dispatch: dispatch as never }, { getWorkspace: () => workspace } as never);
+
+    handler.handleOpenCommitFile(
+      new CustomEvent("openp41ge:open-commit-file", {
+        detail: {
+          repoName: "acme",
+          hash: "abcdef1234567890",
+          path: "src/app.ts",
+          pinned: false,
+        },
+      }),
+    );
+
+    const pending = (window as unknown as { __pendingCommitFileDiff: unknown })
+      .__pendingCommitFileDiff;
+    expect(pending).toEqual({ repoName: "acme", hash: "abcdef1234567890", path: "src/app.ts" });
+    expect(dispatch).toHaveBeenCalledWith(
+      "actionOpenFile",
+      "win-1",
+      "commit-file-diff",
+      "app.ts — abcdef1",
+      JSON.stringify({ repoName: "acme", hash: "abcdef1234567890", path: "src/app.ts" }),
+      0,
+      false,
+    );
+  });
+
+  it("pinned open sends pinned:true in actionOpenFile", () => {
+    workspace = makeWorkspace({});
+    handler.init({ dispatch: dispatch as never }, { getWorkspace: () => workspace } as never);
+
+    handler.handleOpenCommitFile(
+      new CustomEvent("openp41ge:open-commit-file", {
+        detail: {
+          repoName: "acme",
+          hash: "abcdef1234567890",
+          path: "src/app.ts",
+          pinned: true,
+        },
+      }),
+    );
+    expect(dispatch).toHaveBeenCalledWith(
+      "actionOpenFile",
+      "win-1",
+      "commit-file-diff",
+      expect.any(String),
+      expect.any(String),
+      0,
+      true,
+    );
+  });
+
+  it("activates an existing commit-file-diff tab for the same repo/hash/path", () => {
+    workspace = makeWorkspace({
+      t1: {
+        appType: "commit-file-diff",
+        config: {
+          filePath: JSON.stringify({
+            repoName: "acme",
+            hash: "abcdef1234567890",
+            path: "src/app.ts",
+          }),
+        },
+      },
+    });
+    handler.init({ dispatch: dispatch as never }, { getWorkspace: () => workspace } as never);
+
+    handler.handleOpenCommitFile(
+      new CustomEvent("openp41ge:open-commit-file", {
+        detail: {
+          repoName: "acme",
+          hash: "abcdef1234567890",
+          path: "src/app.ts",
+          pinned: false,
+        },
+      }),
+    );
+    expect(dispatch).toHaveBeenCalledWith("activateTabInCell", "win-1", "t1");
+    expect(dispatch).not.toHaveBeenCalledWith(expect.stringContaining("actionOpenFile"));
+  });
+
+  it("a different path for the same hash opens a new tab (not dedupe)", () => {
+    workspace = makeWorkspace({
+      t1: {
+        appType: "commit-file-diff",
+        config: { filePath: JSON.stringify({ repoName: "acme", hash: "abc", path: "x.ts" }) },
+      },
+    });
+    handler.init({ dispatch: dispatch as never }, { getWorkspace: () => workspace } as never);
+
+    handler.handleOpenCommitFile(
+      new CustomEvent("openp41ge:open-commit-file", {
+        detail: { repoName: "acme", hash: "abc", path: "y.ts", pinned: false },
+      }),
+    );
+    expect(dispatch).toHaveBeenCalledWith(
+      "actionOpenFile",
+      expect.any(String),
+      "commit-file-diff",
+      expect.any(String),
+      expect.any(String),
+      0,
+      false,
+    );
+  });
+
+  it("ignores open-commit-file events missing repo/hash/path", () => {
+    workspace = makeWorkspace({});
+    handler.init({ dispatch: dispatch as never }, { getWorkspace: () => workspace } as never);
+
+    handler.handleOpenCommitFile(
+      new CustomEvent("openp41ge:open-commit-file", { detail: { repoName: "acme" } }),
+    );
+    expect(dispatch).not.toHaveBeenCalled();
+  });
 });

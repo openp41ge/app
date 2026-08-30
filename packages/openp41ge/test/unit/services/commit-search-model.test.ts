@@ -148,27 +148,6 @@ describe("TestCommitSearchModel", () => {
     const msg = await model.search(null, { query: "crash", in: "message", content: true });
     expect(msg.map((r) => r.shortHash)).toEqual(["aaa1"]);
   });
-
-  it("fileHunks returns only hunks whose lines contain the query (lazy fetch shape)", async () => {
-    const hunks = await model.fileHunks("acme", "aaa1", "src/app.ts", "widget", {});
-    expect(hunks).toHaveLength(1);
-    expect(hunks[0].lines.some((l) => l.text.includes("widget"))).toBe(true);
-    expect(model.hunkCalls).toEqual([
-      {
-        repoName: "acme",
-        hash: "aaa1",
-        path: "src/app.ts",
-        query: "widget",
-        options: {},
-      },
-    ]);
-  });
-
-  it("fileHunks returns [] for unknown commit/file or empty query", async () => {
-    await expect(model.fileHunks("acme", "aaa1", "nope.ts", "widget", {})).resolves.toEqual([]);
-    await expect(model.fileHunks("acme", "zzz", "src/app.ts", "widget", {})).resolves.toEqual([]);
-    await expect(model.fileHunks("acme", "aaa1", "src/app.ts", "   ", {})).resolves.toEqual([]);
-  });
 });
 
 describe("IpcCommitSearchModel", () => {
@@ -187,24 +166,5 @@ describe("IpcCommitSearchModel", () => {
 
     expect(stub).toHaveBeenCalledWith("acme", { query: "fix", in: "message" });
     expect(out).toEqual([{ shortHash: "x" }]);
-  });
-
-  it("fileHunks delegates to getCommitFileHunks with the query and options", async () => {
-    const stub = vi.fn().mockResolvedValue([{ header: "@@ -1 +1 @@", lines: [] }]);
-    (window as unknown as { openp41ge: any }).openp41ge = {
-      workspaceController: { getCommitFileHunks: stub },
-    };
-
-    const model: CommitSearchModel = new IpcCommitSearchModel();
-    const out = await model.fileHunks("acme", "aaa1", "src/app.ts", "widget", {
-      regex: false,
-      caseSensitive: true,
-    });
-
-    expect(stub).toHaveBeenCalledWith("acme", "aaa1", "src/app.ts", "widget", {
-      regex: false,
-      caseSensitive: true,
-    });
-    expect(out).toHaveLength(1);
   });
 });

@@ -99,6 +99,106 @@ export class CommitOpenHandler {
     g.__pendingGitWorktree = branch ?? null;
   }
 
+  /**
+   * Open a read-only diff of one file at a commit (git sidebar file rows).
+   * Single-click → unpinned preview; double-click/second click → pinned. An
+   * existing commit-file-diff tab for (repo, hash, path) in the cell is
+   * activated instead of duplicating.
+   */
+  handleOpenCommitFile(e: CustomEvent): void {
+    const detail = (e.detail ?? {}) as {
+      repoName?: string;
+      hash?: string;
+      path?: string;
+      name?: string;
+      pinned?: boolean;
+      mode?: string;
+      col?: number;
+    };
+    const { repoName, hash, path } = detail;
+    if (!repoName || !hash || !path) return;
+
+    let pinned: boolean;
+    if (typeof detail.pinned === "boolean") {
+      pinned = detail.pinned;
+    } else {
+      pinned = (detail.mode || "preview") !== "preview";
+    }
+
+    const myWindowId = window.openp41ge.workspace.getWindowId();
+    if (!myWindowId) {
+      log.warn("open-commit-file skipped — no window context");
+      return;
+    }
+    const targetCol = detail.col !== undefined ? detail.col : this._getLastActiveCellCol();
+
+    // Activate (or promote) an existing commit-file-diff tab for this file.
+    const existingTabId = this._findCommitFileTabInCell(repoName, hash, path, targetCol);
+    if (existingTabId) {
+      const tab = this._getTab(existingTabId);
+      if (tab && tab.isPreview && pinned) {
+        log.info("pin commit-file diff via second click", existingTabId);
+        this._commandBus!.dispatch("pinTabInCell", myWindowId, targetCol, existingTabId);
+      } else {
+        log.info("activate existing commit-file diff", existingTabId);
+        this._commandBus!.dispatch("activateTabInCell", myWindowId, existingTabId);
+      }
+      return;
+    }
+
+    const title = `${path.split("/").pop() ?? path} — ${hash.slice(0, 7)}`;
+    const config = JSON.stringify({ repoName, hash, path });
+    (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = {
+      repoName,
+      hash,
+      path,
+    };
+    log.info("open commit-file diff", title, pinned ? "pinned" : "unpinned");
+    this._commandBus!.dispatch(
+      "actionOpenFile",
+      myWindowId,
+      "commit-file-diff",
+      title,
+      config,
+      targetCol,
+      pinned,
+    );
+  }
+
+  /** Find a commit-file-diff tab in the cell whose JSON config matches. */
+  private _findCommitFileTabInCell(
+    repoName: string,
+    hash: string,
+    path: string,
+    col: number,
+  ): string | null {
+    const ws = this._workspaceState?.getWorkspace();
+    if (!ws) return null;
+    const myWindowId = window.openp41ge.workspace.getWindowId();
+    const win = ws.windows.find((w) => w.id === myWindowId);
+    if (!win) return null;
+
+    const pl = win.grid.placements.find((p) => p.position.row === 0 && p.position.col === col);
+    if (!pl) return null;
+
+    const tabs = ws.editorTabs as Record<string, Tab | undefined>;
+    for (const tabId of pl.tabIds) {
+      const tab = tabs[tabId];
+      if (tab && tab.appType === "commit-file-diff" && typeof tab.config?.filePath === "string") {
+        const cfg = safeParseJson(tab.config.filePath);
+        if (
+          cfg &&
+          cfg.repoName === repoName &&
+          cfg.hash === hash &&
+          cfg.path === path
+        ) {
+          return tabId;
+        }
+      }
+    }
+    return null;
+  }
+
   private _getLastActiveCellCol(): number {
     const myWindowId = window.openp41ge.workspace.getWindowId();
     if (!myWindowId) return 0;
@@ -146,5 +246,16 @@ export class CommitOpenHandler {
     if (!ws) return null;
     const tabs = ws.editorTabs as Record<string, Tab | undefined>;
     return tabs[tabId] ?? null;
+  }
+}
+
+function safeParseJson(
+  json: string,
+): { repoName?: string; hash?: string; path?: string } | null {
+  try {
+    const v = JSON.parse(json) as { repoName?: string; hash?: string; path?: string };
+    return v && typeof v === "object" ? v : null;
+  } catch {
+    return null;
   }
 }
