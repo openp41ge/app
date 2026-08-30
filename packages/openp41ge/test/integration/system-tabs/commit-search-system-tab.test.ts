@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CommitSearchSystemTabController } from "../../../src/renderer/apps/system-tabs/commit-search-system-tab";
 import { TestCommitSearchModel } from "../../../src/renderer/models/commit-search-model";
+import { workspaceFileService } from "../../../src/renderer/services/workspace-file-service";
 
 const fixtures = [
   {
@@ -110,6 +111,7 @@ describe("CommitSearchSystemTabController", () => {
     controller.unmount();
     host.remove();
     document.removeEventListener("openp41ge:open-commit", () => {});
+    workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
   });
 
   it("mounts the search UI: main input + files toggle on one row, a filter box with a repo icon + text-filter input (no select), focused main input", async () => {
@@ -173,6 +175,47 @@ describe("CommitSearchSystemTabController", () => {
 
     await search(controller, "readme");
     expect(model.calls.at(-1)?.options.maxCount).toBe(3000);
+  });
+
+  it("disables the panel with no workspace, then re-enables when one opens", async () => {
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+
+    // Simulate closing the workspace (top-bar picker → null file path).
+    workspaceFileService.activeFilePath = null;
+    document.dispatchEvent(new CustomEvent("workspace-file-changed"));
+    await flush();
+
+    const input = host.querySelector("input[placeholder^='Open']") as HTMLInputElement;
+    expect(input).not.toBeNull();
+    expect(input.disabled).toBe(true);
+    expect(host.textContent).toContain("Open a workspace to search commits");
+    const disabledControls = host.querySelectorAll<HTMLElement>(
+      "[data-search-into], [data-filter-icon], [data-limit-option]",
+    );
+    for (const b of Array.from(disabledControls)) {
+      expect((b as HTMLButtonElement).disabled).toBe(true);
+    }
+
+    // Enter must not start a search while disabled.
+    const before = model.calls.length;
+    input.value = "readme";
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    await flush();
+    expect(model.calls.length).toBe(before);
+
+    // Opening a workspace re-enables the panel and search works again.
+    workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
+    document.dispatchEvent(new CustomEvent("workspace-file-changed"));
+    await flush();
+    expect(input.disabled).toBe(false);
+    expect(
+      (host.querySelector<HTMLButtonElement>("[data-search-into]") as HTMLButtonElement).disabled,
+    ).toBe(false);
+
+    await search(controller, "readme");
+    expect(model.calls.at(-1)?.options.query).toBe("readme");
   });
 
   it("repo filter autocompletes from the workspace repos and scopes the search", async () => {

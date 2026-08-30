@@ -23,6 +23,7 @@ import { plusIconThick } from "../icons";
 import { showConfirmModal } from "./openp41ge-confirm-modal";
 import "./openp41ge-repo-tree-item";
 import { saveRepoOrder, applyRepoOrder } from "../repo-order-cache";
+import { workspaceFileService } from "../services/workspace-file-service";
 import "./openp41ge-clone-dialog";
 import "./openp41ge-add-worktree-dialog";
 import { appServices } from "../app";
@@ -221,6 +222,10 @@ class Openp41geWorktreeTree extends LitElement {
   private _pendingLoadAfterTreeReady = false;
   /** Guards against re-entering _loadRepos() from updated() on every Lit cycle. */
   private _hasLoadedOnce = false;
+
+  /** Gate: without a selected workspace the explorer shows a disabled hint. */
+  private _hasWorkspace = workspaceFileService.activeFilePath != null;
+  private _workspaceUnsub: (() => void) | null = null;
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
   constructor() {
     super();
@@ -400,6 +405,22 @@ class Openp41geWorktreeTree extends LitElement {
     // (worksetId is often "" when the tree is first created).
     this._syncExplorerState();
 
+    // Workspace gate: show a disabled hint until a workspace is selected. When
+    // the selection changes (top-bar workspace picker) revalidate in place.
+    this._workspaceUnsub = workspaceFileService.onChange(() => {
+      const has = workspaceFileService.activeFilePath != null;
+      if (has === this._hasWorkspace) return;
+      this._hasWorkspace = has;
+      if (has) {
+        this.requestUpdate();
+        this._loadRepos();
+      } else {
+        this._repos = [];
+        this._worktreesByRepo.clear();
+        this.requestUpdate();
+      }
+    });
+
     // Initial load
     this._loadRepos();
   }
@@ -408,6 +429,11 @@ class Openp41geWorktreeTree extends LitElement {
     super.disconnectedCallback();
     window.removeEventListener("resize", this._onWindowResize);
     this._gitDisconnected = true;
+
+    if (this._workspaceUnsub) {
+      this._workspaceUnsub();
+      this._workspaceUnsub = null;
+    }
 
     if (this._scrollResizeObserver) {
       this._scrollResizeObserver.disconnect();
@@ -441,6 +467,20 @@ class Openp41geWorktreeTree extends LitElement {
    * _renderTree() is still called for async data loading.
    */
   render(): TemplateResult | typeof nothing {
+    // No workspace selected → a disabled placeholder instead of the tree.
+    if (!this._hasWorkspace) {
+      return html`
+        <div
+          class="wt-drawer flex flex-col items-center justify-center flex-1 min-h-0 w-full bg-gutter relative select-none"
+        >
+          <div
+            style="opacity:.55;font-size:12px;color:var(--text-muted,#777);text-align:center;padding:0 16px;"
+          >
+            Open a workspace to browse files
+          </div>
+        </div>
+      `;
+    }
     return html`
       <div
         class="wt-drawer flex flex-col overflow-hidden flex-1 min-h-0 w-full bg-gutter relative select-none"
@@ -1366,6 +1406,12 @@ class Openp41geWorktreeTree extends LitElement {
   // ── Load repos ────────────────────────────────────────────────────────
 
   private async _loadRepos(): Promise<void> {
+    // Disabled while no workspace is selected — repos belong to the workspace.
+    if (!this._hasWorkspace) {
+      this._repos = [];
+      this._worktreesByRepo.clear();
+      return;
+    }
     // If tree DOM refs aren't ready yet, queue the load for the next updated() cycle
     if (!this._treeEl) {
       this._pendingLoadAfterTreeReady = true;

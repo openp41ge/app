@@ -15,6 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import "../../../src/renderer/components/openp41ge-worktree-tree";
 import { TestRepoService } from "../../../src/renderer/models/test-models";
 import { ExplorerSystemTabController } from "../../../src/renderer/apps/system-tabs/explorer-system-tab";
+import { workspaceFileService } from "../../../src/renderer/services/workspace-file-service";
 
 describe("ExplorerSystemTabController", () => {
   let host: HTMLElement;
@@ -52,6 +53,7 @@ describe("ExplorerSystemTabController", () => {
     (window as unknown as { openp41ge: unknown }).openp41ge = ORIG_OPENP41GE;
     controller.unmount();
     host.remove();
+    workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
   });
 
   /** Mount the controller as an Explorer tab of a (fake) sidebar — the real
@@ -83,6 +85,23 @@ describe("ExplorerSystemTabController", () => {
     const sidebar = await mountInSidebar();
     controller.unmount();
     expect(sidebar.querySelector("openp41ge-worktree-tree")).toBeNull();
+  });
+
+  it("shows a disabled placeholder with no workspace, and the tree once one is selected", async () => {
+    workspaceFileService.activeFilePath = null; // no workspace selected
+    const sidebar = document.createElement("openp41ge-sidebar");
+    host.appendChild(sidebar);
+    await controller.mount(sidebar);
+
+    const tree = sidebar.querySelector("openp41ge-worktree-tree") as HTMLElement | null;
+    expect(tree).not.toBeNull();
+    expect(tree!.textContent).toContain("Open a workspace to browse files");
+
+    // Selecting a workspace swaps the placeholder for the tree skeleton.
+    workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
+    document.dispatchEvent(new CustomEvent("workspace-file-changed", { bubbles: true }));
+    await (tree as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
+    expect(tree!.textContent).not.toContain("Open a workspace to browse files");
   });
 
   it("adopts a clicked file node as the focused row (overwrites arrow focus)", async () => {
