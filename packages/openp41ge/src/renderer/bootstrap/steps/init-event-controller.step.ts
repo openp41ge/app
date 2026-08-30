@@ -99,19 +99,30 @@ export class InitEventControllerStep implements IStartupStep {
     initDebugAPI(appState, workspaceData, graph, logBuffer, pluginRegistry, workspaceFileService);
 
     // 10. Listen for workspace file changes to add/remove sidebar tabs
+    // Open explorer + git sidebar tabs only when the ACTIVE workspace FILE
+    // PATH actually changes (a workspace is loaded/activated) — NOT on every
+    // edit/save. The Explorer's add-repo/add-worktree/reorder calls
+    // workspaceFileService.save(), which emits this event, and opening both
+    // tabs here would re-activate the git tab and yank the user out of the
+    // Explorer sidebar mid-work.
+    let lastOpenedFilePath: string | null | undefined;
+    const openSidebarTabsForActiveWorkspace = (): void => {
+      const path_ = workspaceFileService.activeFilePath;
+      if (!workspaceFileService.activeData || !path_) return;
+      if (path_ === lastOpenedFilePath) return;
+      lastOpenedFilePath = path_;
+      const ws = context.workspaceState.getWorkspace();
+      const winId = ws?.windows?.[0]?.id;
+      if (winId) {
+        emitOpenSystemTab(winId, "explorer", "Explorer");
+        emitOpenSystemTab(winId, "git", "Git");
+      }
+    };
     document.addEventListener("workspace-file-changed", () => {
-      // When a workspace file is loaded, open explorer and git sidebar tabs
-      // (direct dispatch — the DOM-event route drops args). Explorer/git use
-      // their default right sidebar and open it, so the files panel shows.
+      openSidebarTabsForActiveWorkspace();
+      // Materialise the workspace's repos (clone + checkout) so Explorer and
+      // Git panels can list them; refresh both after the clones land.
       if (workspaceFileService.activeData) {
-        const ws = context.workspaceState.getWorkspace();
-        const winId = ws?.windows?.[0]?.id;
-        if (winId) {
-          emitOpenSystemTab(winId, "explorer", "Explorer");
-          emitOpenSystemTab(winId, "git", "Git");
-        }
-        // Materialise the workspace's repos (clone + checkout) so Explorer and
-        // Git panels can list them; refresh both after the clones land.
         void workspaceFileService.materializeActiveRepos().then(() => {
           document.dispatchEvent(new CustomEvent("git:refresh", { bubbles: true }));
           document.dispatchEvent(new CustomEvent("project:changed", { bubbles: true }));
@@ -122,14 +133,7 @@ export class InitEventControllerStep implements IStartupStep {
     // Also check on initial load (the workspace state may not be ready yet,
     // so try again after a short delay during which the state subscription step runs)
     setTimeout(() => {
-      if (workspaceFileService.activeData) {
-        const ws = context.workspaceState.getWorkspace();
-        const winId = ws?.windows?.[0]?.id;
-        if (winId) {
-          emitOpenSystemTab(winId, "explorer", "Explorer");
-          emitOpenSystemTab(winId, "git", "Git");
-        }
-      }
+      openSidebarTabsForActiveWorkspace();
     }, 100);
 
     // Store references on the context for other steps/services to use
