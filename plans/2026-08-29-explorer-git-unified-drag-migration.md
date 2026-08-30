@@ -183,18 +183,23 @@ Part A (unified bitmap drag) is implemented and tested; Part B (commit-search si
 - [x] Dragging a search result row into the grid opens its review tab (pinned).
 - [x] Cross-window drop of repo/worktree rows: same-window grid drop, explorer reorder, and the cross-window `open-tab` branch are automated-tested (dispatch `actionOpenFile`/`splitFileOpen` with `git-repository` + pending repo/branch).
 - [x] Selectable search-depth limit in the filter box: exclusive 5K/10K/3K/2K/1K icon options (default 5K) wired end-to-end via `CommitSearchOptions.maxCount`. The service honors it by pinning the newest N commits by hash before the git-native `--grep` pass (a plain `--max-count` only caps grep _output_, not walk depth — fixed here so old matches genuinely drop out). Renderer verified live; the main-process path of the running dev instance is live once dev is restarted (main does not hot-reload).
-- [ ] **Not yet live-verified:** bitmap ghost + cross-window drop driven in the running app end-to-end — requires restarting `nx run openp41ge:dev` (main-process changes don't hot-reload) and using the `test-cross-window-drag` skill; the pre-change dev instance is too stale for that.
+- [x] **Live-verified (2026-08-30, CDP + dev app):** bitmap ghost + drop driven in the
+      running app end-to-end. Remote/cross-window ghost overlay passes all 10 diagnostic
+      checks (hook-driven `setRemoteDragActive` → ghost renders for cell-center 1-col/`active`
+      and left+right boundaries 2-col/`highlighted`, removed on cleanup). Real same-window
+      bitmap drags of an explorer **repo row** (pending deferred start → `open-tab`/`git-repository`
+      data → grid drop mounts the git-repository pane) and a **worktree row** (`{repoName,
+      branch}` branch-scoped data). The one residual is a literal two-BrowserWindow gesture —
+      not runnable in a single-window CDP session, and the contextBridge preload is read-only so
+      `getActive`/`dispatch` can't be mocked live; the cross-window dispatch args
+      (`moveTabBetweenCells`/`splitCrossWindowTab`) remain covered by the automated integration
+      suites (`explorer-workspace-repos.test.ts`, `git-entry-drag-system.test.ts`).
 - [x] Deferred to phase 2 and recorded above: content (`-G`/`-S`) search + hunk sub-rows, file-at-revision browsing.
 
-- [ ] Repo and worktree rows in the explorer drag with the **same bitmap strategy** as tabs/files (main-process captured-ghost, no in-DOM ghost, no native `dataTransfer`).
-- [ ] Dragging a repo row onto the grid opens the full `git-repository` pane for that repo (boundary → new column split, center → open in column). Dragging a worktree row opens the branch-scoped git browser titled by the branch.
-- [ ] Dragging a repo row within the explorer still reorders repos (persisted to localStorage); **no native-drag/native-drop code remains for these rows**.
-- [ ] Dead artifacts removed: `repo` variant in `openp41ge-tabs` `DragSourceData`, `RepoDragSource`, legacy `repo-open-git`/`FileDropHandler` repo branch (or confirmed intentionally kept with rationale).
-- [ ] Cross-window drop of repo/worktree rows opens the git content pane in the target window.
-- [ ] The Git sidebar tab shows the commit search UI: autofocus input, repo scope + search-into toggles, hierarchical results (commits → files → changed content), loading/empty/error states.
-- [ ] Single-click on a commit result opens an unpinned (preview) git-repository tab; second click pins; single-click on a file result opens an unpinned file-editor preview (VS Code preview model).
-- [ ] Dragging a search result row into the grid opens its review tab (pinned).
-- [ ] `nx run-many -t typecheck`, `nx lint` clean; `nx run-many -t test` passes (new unit + integration suites above); runtime-verified in dev via `debug` + `test-cross-window-drag`, error overlay clear.
+---
+
+_Note: the unchecked block that previously duplicated the criteria below it was stale (predates the
+2026-08-29 status update) and was removed in the live-verification pass._
 
 ---
 
