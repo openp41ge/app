@@ -241,3 +241,12 @@ Included in the same pass: the uncommitted in-editor Find work (FindMatchRendere
 bottom-bar find strip, carried git-search-query highlight onto opened files via
 openTabData `search` payload + `actionOpenFile` extraConfig) which the user has
 been iterating on and was left uncommitted in the working tree.
+
+---
+
+## 2026-08-30 (3) — Editor: borderless find input; filter content as a stacked bar
+
+The find input lost its border + background so the full-width find bar reads as
+the input container. The search-options toggle now opens a THIRD stacked bar
+(fe-find-strip) ABOVE the find bar (whole-word / open-tabs / folder), replacing
+the floating dropdown.

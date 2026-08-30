@@ -185,4 +185,39 @@ describe("file-editor find + external highlight", () => {
     expect(span).not.toBeNull();
     expect(getComputedStyle(span).borderRadius).toBe("3px");
   });
+
+  test("find input is borderless/transparent so the whole bar reads as the input container", async () => {
+    const el = await mountEditor();
+    (el.querySelector("[data-testid=fe-find-entry]") as HTMLElement).click();
+    await tick();
+    const input = el.querySelector("[data-testid=fe-find-input]") as HTMLInputElement;
+    const cs = getComputedStyle(input);
+    expect(cs.borderStyle).toBe("none");
+    expect(["rgba(0, 0, 0, 0)", "transparent"]).toContain(cs.backgroundColor);
+    // Input fills the bar (no height/padding inset) — the bar box is the box.
+    expect(input.style.padding).toBe("0px");
+  });
+
+  test("filter button opens the filter bar ABOVE the find bar (not a dropdown); toggles closed", async () => {
+    const el = await mountEditor();
+    (el.querySelector("[data-testid=fe-find-entry]") as HTMLElement).click();
+    await tick();
+    // Filter bar hidden until the options toggle is clicked.
+    expect(el.querySelector(".fe-find-strip")).toBeNull();
+
+    (el.querySelector("[data-testid=fe-find-config]") as HTMLElement).click();
+    await tick();
+    const strip = el.querySelector(".fe-find-strip") as HTMLElement;
+    const bar = el.querySelector(".fe-find-bar") as HTMLElement;
+    expect(strip).not.toBeNull();
+    expect(strip.textContent).toContain("Whole word");
+    expect(strip.textContent).toContain("Search in:");
+    // The filter bar sits ABOVE the find bar (precedes it in DOM order).
+    expect(strip.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Same toggle closes it again.
+    (el.querySelector("[data-testid=fe-find-config]") as HTMLElement).click();
+    await tick();
+    expect(el.querySelector(".fe-find-strip")).toBeNull();
+  });
 });

@@ -241,12 +241,58 @@ class FeStatusBar extends LitElement {
         ${
           this._findOpen
             ? html`
+                ${
+                  this._configOpen
+                    ? html`
+                        <div
+                          class="fe-find-strip"
+                          style="display:flex;flex-shrink:0;align-items:center;gap:14px;height:26px;padding:0 8px;background:var(--fe-gutter-bg,#1e1e1e);border-top:1px solid var(--fe-border-color,#2a2a2a);border-bottom:1px solid var(--fe-border-color,#2a2a2a);font-size:11px;color:var(--fe-secondary-color,#888);"
+                        >
+                          <div
+                            data-testid="fe-find-scope-row"
+                            style="display:flex;align-items:center;gap:6px;"
+                          >
+                            <span>Search in:</span>
+                            <span style="color:var(--fe-primary-color,#ccc);">Current file</span>
+                          </div>
+                          <div
+                            data-testid="fe-find-whole-word"
+                            role="button"
+                            title="Match whole words only"
+                            style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--fe-primary-color,#ccc);user-select:none;"
+                            @click=${this._toggleWholeWord}
+                          >
+                            <span
+                              style="width:10px;height:10px;border:1px solid #666;border-radius:2px;display:inline-flex;align-items:center;justify-content:center;color:#4a9eff;"
+                              >${this._findWholeWord ? "✓" : ""}</span
+                            >
+                            <span>Whole word</span>
+                          </div>
+                          <div
+                            style="display:flex;align-items:center;gap:6px;opacity:0.45;"
+                            title="Coming soon"
+                          >
+                            <span style="width:10px;height:10px;display:inline-block;"></span>
+                            <span>Open tabs (soon)</span>
+                          </div>
+                          <div
+                            style="display:flex;align-items:center;gap:6px;opacity:0.45;"
+                            title="Coming soon"
+                          >
+                            <span style="width:10px;height:10px;display:inline-block;"></span>
+                            <span>Folder (soon)</span>
+                          </div>
+                        </div>
+                      `
+                    : ""
+                }
                 <div
                   class="fe-find-bar"
-                  style="position:relative;display:flex;flex-shrink:0;align-items:center;gap:8px;height:28px;padding:0 8px;background:var(--fe-gutter-bg,#1e1e1e);border-top:1px solid var(--fe-border-color,#2a2a2a);font-size:11px;color:var(--fe-secondary-color,#888);"
+                  style="position:relative;display:flex;flex-shrink:0;align-items:center;gap:8px;height:28px;padding:0 8px;background:var(--fe-gutter-bg,#1e1e1e);border-top:0;border-bottom:1px solid var(--fe-border-color,#2a2a2a);font-size:11px;color:var(--fe-secondary-color,#888);"
                 >
                   <!-- The find field lives HERE — a second bar just above the
                        status bar — and spans the full editor width (flex:1). -->
+                  <!-- Search options open a THIRD bar further up (fe-find-strip) -->
                   <input
                     class="fe-find-input"
                     data-testid="fe-find-input"
@@ -254,7 +300,7 @@ class FeStatusBar extends LitElement {
                     placeholder="Find in file"
                     spellcheck="false"
                     .value=${this._findValue}
-                    style="flex:1 1 auto;min-width:0;height:18px;padding:0 6px;box-sizing:border-box;background:var(--fe-bg,#161616);border:1px solid var(--fe-border-color,#3a3a3a);border-radius:3px;color:var(--fe-primary-color,#ccc);font-size:12px;font-family:inherit;outline:none;"
+                    style="flex:1 1 auto;min-width:0;height:100%;padding:0;box-sizing:border-box;background:transparent;border:none;border-radius:0;color:var(--fe-primary-color,#ccc);font-size:12px;font-family:inherit;outline:none;"
                     @input=${this._onInput}
                     @keydown=${this._onKeyDown}
                   />
@@ -270,52 +316,6 @@ class FeStatusBar extends LitElement {
                   ${this._findToggle(ICON_REGEX, "Regex search", this._findRegex, "fe-find-regex", this._toggleRegex)}
                   ${this._findToggle(ICON_CASE, "Match case", this._findCase, "fe-find-case", this._toggleCase)}
                   ${this._findToggle(ICON_CONFIG, "Search options", this._configOpen, "fe-find-config", this._toggleConfig)}
-                  ${
-                    this._configOpen
-                      ? html`
-                          <div
-                            class="fe-find-config"
-                            data-testid="fe-find-config"
-                            style="position:absolute;top:calc(100% + 2px);left:8px;z-index:50;display:flex;flex-direction:column;gap:4px;min-width:172px;padding:6px;background:var(--fe-gutter-bg,#1e1e1e);border:1px solid var(--fe-border-color,#2a2a2a);border-radius:4px;font-size:11px;color:var(--fe-secondary-color,#888);box-shadow:0 6px 18px rgba(0,0,0,0.4);"
-                          >
-                            <div
-                              data-testid="fe-find-scope-row"
-                              style="display:flex;align-items:center;gap:6px;"
-                            >
-                              <span>Search in:</span>
-                              <span style="color:var(--fe-primary-color,#ccc);">Current file</span>
-                            </div>
-                            <div
-                              data-testid="fe-find-whole-word"
-                              role="button"
-                              title="Match whole words only"
-                              style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--fe-primary-color,#ccc);user-select:none;"
-                              @click=${this._toggleWholeWord}
-                            >
-                              <span
-                                style="width:10px;height:10px;border:1px solid #666;border-radius:2px;display:inline-flex;align-items:center;justify-content:center;color:#4a9eff;"
-                                >${this._findWholeWord ? "✓" : ""}</span
-                              >
-                              <span>Whole word</span>
-                            </div>
-                            <div
-                              style="display:flex;align-items:center;gap:6px;opacity:0.45;"
-                              title="Coming soon"
-                            >
-                              <span style="width:10px;height:10px;display:inline-block;"></span>
-                              <span>Open tabs (soon)</span>
-                            </div>
-                            <div
-                              style="display:flex;align-items:center;gap:6px;opacity:0.45;"
-                              title="Coming soon"
-                            >
-                              <span style="width:10px;height:10px;display:inline-block;"></span>
-                              <span>Folder (soon)</span>
-                            </div>
-                          </div>
-                        `
-                      : ""
-                  }
                 </div>
               `
             : ""
