@@ -227,3 +227,17 @@ Replace the `git-commit-search` placeholder pane (opened by dragging a commit-se
 
 - [ ] All tests green (uikit + openp41ge), typecheck/lint/build clean.
 - [ ] Live (dev restart — main-process IPC change): drag a search result → pane opens with header + read-only editor showing the commit message; typing does nothing, caret absent, text selectable.
+
+---
+
+## 2026-08-30 (2) — Editor: full-width find bar above the status bar; rounded search highlights
+
+The `<file-editor>` find strip moved OUT of the bottom status bar into its own
+full-width bar that sits ABOVE the status bar at the bottom of the editor. The
+status bar now carries only the find icon (which toggles the bar). Search-match
+highlight spans are now rounded (3px) to match the text-selection highlight.
+
+Included in the same pass: the uncommitted in-editor Find work (FindMatchRenderer,
+bottom-bar find strip, carried git-search-query highlight onto opened files via
+openTabData `search` payload + `actionOpenFile` extraConfig) which the user has
+been iterating on and was left uncommitted in the working tree.

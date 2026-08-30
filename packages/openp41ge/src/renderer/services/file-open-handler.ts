@@ -41,6 +41,11 @@ export class FileOpenHandler implements IFileOpenHandler {
       pinned = (detail.mode || "preview") !== "preview";
     }
     const col = detail.col;
+    // Optional externally-provided search highlight (e.g. the Git sidebar's
+    // current query) — carried on the new tab's config and applied by the file
+    // editor after its buffer loads.
+    const search = (detail.search ?? undefined) as
+      { query?: string; regex?: boolean; caseSensitive?: boolean } | undefined;
     log.info("open", filePath, pinned ? "pinned" : "unpinned");
 
     const myWindowId = window.openp41ge.workspace.getWindowId();
@@ -82,6 +87,7 @@ export class FileOpenHandler implements IFileOpenHandler {
           filePath,
           targetCol,
           false,
+          search ? { search } : undefined,
         );
         return;
       }
@@ -97,6 +103,7 @@ export class FileOpenHandler implements IFileOpenHandler {
       filePath,
       targetCol,
       pinned,
+      search ? { search } : undefined,
     );
   }
 

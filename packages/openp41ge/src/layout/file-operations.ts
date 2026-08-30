@@ -53,6 +53,7 @@ export function actionOpenFile(
   filePath?: string,
   targetCol?: number,
   pinned: boolean = true,
+  extraConfig?: Record<string, unknown>,
 ): Workspace {
   let result = workspace;
 
@@ -81,6 +82,7 @@ export function actionOpenFile(
       filePath,
       targetCol,
       pinned,
+      extraConfig,
     );
   }
 

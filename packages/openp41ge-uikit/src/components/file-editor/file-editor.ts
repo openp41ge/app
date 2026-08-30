@@ -35,6 +35,10 @@ import { TextAreaInput } from "openp41ge-editor-engine/input/text-area-input";
 import { KeyboardHandler } from "openp41ge-editor-engine/input/keyboard-handler";
 import { CursorRenderer } from "openp41ge-editor-engine/rendering/cursor-renderer";
 import { SelectionRenderer } from "openp41ge-editor-engine/rendering/selection-renderer";
+import { FindMatchRenderer, toFindViewSpans } from "openp41ge-editor-engine/rendering";
+import type { IFindViewConverter } from "openp41ge-editor-engine/rendering";
+import { FindInEditor } from "openp41ge-editor-engine/input";
+import type { FindMatch } from "openp41ge-editor-engine/input";
 import { LineNumbersOverlay } from "openp41ge-editor-engine/rendering/line-numbers-overlay";
 import { CurrentLineHighlight } from "openp41ge-editor-engine/rendering/current-line-highlight";
 import { IndentationGuides } from "openp41ge-editor-engine/rendering/indentation-guides";
@@ -160,6 +164,23 @@ export class FileEditorElement extends LitElement {
   private _keyboardHandler: KeyboardHandler | null = null;
   private _cursorRenderer: CursorRenderer | null = null;
   private _selectionRenderer: SelectionRenderer | null = null;
+  private _findRenderer: FindMatchRenderer | null = null;
+
+  // In-editor find state (Cmd/Ctrl+F) — the built-in search.
+  private _findOpen = false;
+  private _findQuery = "";
+  private _findRegex = false;
+  private _findCase = false;
+  private _findWholeWord = false;
+  private _findMatches: FindMatch[] = [];
+  private _findActiveIndex = -1;
+  /** Externally provided highlight source (e.g. the Git sidebar's query). */
+  private _externalHighlight: {
+    query: string;
+    regex?: boolean;
+    caseSensitive?: boolean;
+    wholeWord?: boolean;
+  } | null = null;
   private _lineNumbersOverlay: LineNumbersOverlay | null = null;
   private _currentLineHighlight: CurrentLineHighlight | null = null;
   private _indentationGuides: IndentationGuides | null = null;
@@ -380,6 +401,19 @@ export class FileEditorElement extends LitElement {
       fe-status-bar {
         --sbb-bg: var(--fe-gutter-bg);
         --sbb-color: ${c.default};
+      }
+      /* Search-match highlights (built-in find + external highlight sources) —
+         rounded corners match the selection highlight (3px, see themes). */
+      .find-match,
+      .find-match-active {
+        pointer-events: none;
+        border-radius: 3px;
+      }
+      .find-match {
+        background: var(--fe-find-match-bg, rgba(234, 140, 0, 0.32));
+      }
+      .find-match-active {
+        background: var(--fe-find-match-bg, rgba(255, 158, 0, 0.6));
       }
       ${scopeCSS}
       ${globalCSS}
@@ -878,6 +912,19 @@ export class FileEditorElement extends LitElement {
         return this._clipboardHandler?.onCut() || "";
       },
       onKey: (e) => {
+        // In-editor find + navigation (Cmd/Ctrl+F, Cmd/Ctrl+G). These are
+        // handled here (like Cmd+A below) so they work in both edit and
+        // read-only modes.
+        if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "F")) {
+          e.preventDefault();
+          this._openFind();
+          return true;
+        }
+        if ((e.metaKey || e.ctrlKey) && (e.key === "g" || e.key === "G")) {
+          e.preventDefault();
+          this._findNext(e.shiftKey ? -1 : 1);
+          return true;
+        }
         if (this._readOnly) {
           // Read-only: allow navigation/selection/copy but never model edits.
           // Plain-char typing arrives via onType (already gated); undo/redo
@@ -924,6 +971,10 @@ export class FileEditorElement extends LitElement {
 
     // Create SelectionRenderer
     this._selectionRenderer = new SelectionRenderer(this._viewportEl, this._cursorController);
+
+    // Create FindMatchRenderer (search-result highlights; empty until a find or
+    // external highlight source provides matches)
+    this._findRenderer = new FindMatchRenderer(this._viewportEl);
 
     // Create CurrentLineHighlight
     this._currentLineHighlight = new CurrentLineHighlight(this._viewportEl);
@@ -1001,10 +1052,14 @@ export class FileEditorElement extends LitElement {
           positionColumn: c.position.column,
         })),
       );
+      // Keep search-result highlights in sync with the visible band.
+      this._renderFindHighlights();
     };
 
     // Wire up formatter to status bar
     this._wireFormatter();
+    // Wire up the in-editor find bar to the status bar
+    this._wireFind();
 
     // Wire up ViewModel events → ViewLines
     this._viewModel.onDidChange.event((event: ViewModelEvent) => {
@@ -1386,6 +1441,195 @@ export class FileEditorElement extends LitElement {
     }
   }
 
+  // ═══ In-editor find (Cmd/Ctrl+F) + external highlight source ────────────
+
+  /**
+   * The winning search source: an ACTIVE built-in find wins; otherwise an
+   * external highlight source (e.g. the Git sidebar's current query) applies.
+   * One owner prevents built-in and external highlights fighting over the
+   * single FindMatchRenderer.
+   */
+  private _activeSourceQuery(): {
+    query: string;
+    regex: boolean;
+    caseSensitive: boolean;
+    wholeWord: boolean;
+  } {
+    if (this._findOpen && this._findQuery.trim()) {
+      return {
+        query: this._findQuery,
+        regex: this._findRegex,
+        caseSensitive: this._findCase,
+        wholeWord: this._findWholeWord,
+      };
+    }
+    if (this._externalHighlight && this._externalHighlight.query.trim()) {
+      return {
+        query: this._externalHighlight.query,
+        regex: this._externalHighlight.regex ?? false,
+        caseSensitive: this._externalHighlight.caseSensitive ?? false,
+        wholeWord: this._externalHighlight.wholeWord ?? false,
+      };
+    }
+    return { query: "", regex: false, caseSensitive: false, wholeWord: false };
+  }
+
+  private _openFind(): void {
+    this._findOpen = true;
+    this._statusBar?.openFind();
+    // Recompute (re-opens with the last query, if any) and refresh the count.
+    this._refreshFindMatches();
+    // Focus AFTER Lit has rendered the find input (openFind just marks state;
+    // the DOM node exists on the next tick).
+    setTimeout(() => this._statusBar?.focusFind(), 0);
+  }
+
+  private _closeFind(): void {
+    this._findOpen = false;
+    this._statusBar?.closeFind();
+    this._statusBar?.setFindCount("");
+    // Re-derive the winning source: an external highlight (if any) resumes,
+    // otherwise the highlight is dropped while the query itself is kept in the
+    // status bar so Cmd+F re-opens with it.
+    this._refreshFindMatches();
+  }
+
+  /**
+   * External highlight source API — highlights matches from OUTSIDE the
+   * built-in find without opening the bar (e.g. the Git sidebar commit search
+   * carries its query onto an opened file). Call again to refresh, or pass an
+   * empty query to clear.
+   */
+  setSearchHighlight(
+    query: string,
+    options?: { regex?: boolean; caseSensitive?: boolean; wholeWord?: boolean },
+  ): void {
+    this._externalHighlight = query.trim()
+      ? {
+          query,
+          regex: options?.regex ?? false,
+          caseSensitive: options?.caseSensitive ?? false,
+          wholeWord: options?.wholeWord ?? false,
+        }
+      : null;
+    this._refreshFindMatches();
+  }
+
+  clearSearchHighlight(): void {
+    this._externalHighlight = null;
+    this._refreshFindMatches();
+  }
+
+  private _wireFind(): void {
+    if (!this._statusBar) return;
+    const bar = this._statusBar;
+    bar.onFindOpen = () => this._openFind();
+    bar.onFindInput = (value) => {
+      this._findQuery = value;
+      this._refreshFindMatches();
+    };
+    bar.onFindNext = () => this._findNext(1);
+    bar.onFindPrev = () => this._findNext(-1);
+    bar.onFindClose = () => this._closeFind();
+    bar.onFindRegex = (on) => {
+      this._findRegex = on;
+      this._refreshFindMatches();
+    };
+    bar.onFindCase = (on) => {
+      this._findCase = on;
+      this._refreshFindMatches();
+    };
+    bar.onFindWholeWord = (on) => {
+      this._findWholeWord = on;
+      this._refreshFindMatches();
+    };
+  }
+
+  /** Recompute the active source's matches and re-render. */
+  private _refreshFindMatches(): void {
+    const source = this._activeSourceQuery();
+    if (!source.query.trim() || !this._viewModel) {
+      this._findMatches = [];
+      this._findActiveIndex = -1;
+      this._statusBar?.setFindCount("");
+      this._renderFindHighlights();
+      return;
+    }
+    const finder = new FindInEditor(this._viewModel.model);
+    const matches = finder.find(source.query, {
+      regex: source.regex,
+      caseSensitive: source.caseSensitive,
+      wholeWord: source.wholeWord,
+    });
+    this._findMatches = matches;
+    this._findActiveIndex = matches.length > 0 ? 0 : -1;
+    if (this._findOpen) {
+      this._statusBar?.setFindCount(
+        matches.length > 0 ? `${this._findActiveIndex + 1}/${matches.length}` : "no results",
+      );
+    }
+    this._renderFindHighlights();
+  }
+
+  /** Move to the next/previous match (wraps) and reveal it. */
+  private _findNext(direction: number): void {
+    if (this._findMatches.length === 0) return;
+    this._findActiveIndex =
+      (this._findActiveIndex + direction + this._findMatches.length) % this._findMatches.length;
+    if (this._findOpen) {
+      this._statusBar?.setFindCount(`${this._findActiveIndex + 1}/${this._findMatches.length}`);
+    }
+    this._renderFindHighlights();
+    const current = this._findMatches[this._findActiveIndex];
+    if (current) this._scrollToMatch(current);
+  }
+
+  private _scrollToMatch(match: FindMatch): void {
+    if (!this._viewModel || !this._viewportEl) return;
+    const viewLine = this._wordWrapEnabled
+      ? this._viewModel.coordinatesConverter.convertModelToViewPosition(
+          match.lineNumber,
+          match.column,
+        ).lineNumber
+      : match.lineNumber;
+    const top = (viewLine - 1) * this._lineHeight;
+    const viewTop = this._viewportEl.scrollTop;
+    const viewBottom = viewTop + this._viewportEl.clientHeight;
+    if (top < viewTop || top + this._lineHeight > viewBottom) {
+      this._viewportEl.scrollTop = Math.max(
+        0,
+        top - this._viewportEl.clientHeight / 2 + this._lineHeight / 2,
+      );
+    }
+  }
+
+  /** Paint the matched spans for the visible band (word-wrap aware). */
+  private _renderFindHighlights(): void {
+    if (!this._findRenderer || !this._viewLines || !this._viewModel) return;
+    if (this._findMatches.length === 0) {
+      this._findRenderer.clear();
+      return;
+    }
+    const startLine = this._viewLines.startLineNumber || 1;
+    const endLine = this._viewLines.endLineNumber || Math.min(50, this._viewModel.lineCount);
+    const cw = this._charWidth > 0 ? this._charWidth : 8;
+    const leftOffset = 8;
+    const converter = this._wordWrapEnabled
+      ? (this._viewModel.coordinatesConverter as IFindViewConverter)
+      : null;
+    const spans = toFindViewSpans(this._findMatches, converter, this._findActiveIndex);
+    this._findRenderer.renderFind({
+      spans,
+      visibleStartLine: startLine,
+      visibleEndLine: endLine,
+      lineHeight: this._lineHeight,
+      getColumnPixel: (_line, column) => {
+        const lx = leftOffset + (column - 1) * cw;
+        return { x: lx, width: cw };
+      },
+    });
+  }
+
   /**
    * Force a full re-render of the visible window from the current model state.
    * Shares one code path across the normal content-change handler and resume
@@ -1503,6 +1747,9 @@ export class FileEditorElement extends LitElement {
     // Incrementally update content width — only the affected lines are
     // re-measured; line insert/delete hands the rescan to the background.
     this._handleContentWidthChange(event);
+
+    // Content changed → previously computed search matches are stale.
+    this._refreshFindMatches();
   }
 
   /**
@@ -1861,6 +2108,10 @@ export class FileEditorElement extends LitElement {
   }
 
   private _teardownPipeline(): void {
+    this._findRenderer?.dispose();
+    this._findRenderer = null;
+    this._findMatches = [];
+    this._findActiveIndex = -1;
     this._cursorRenderer?.dispose();
     this._cursorRenderer = null;
     this._selectionRenderer?.dispose();

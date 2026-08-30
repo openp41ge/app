@@ -162,9 +162,27 @@ export class FileEditorController extends BaseController implements FileViewerCo
       // The editor's _initWithModel already subscribes to model content changes.
 
       await this._editor.loadFile(path, fileName);
+
+      // Apply any externally-provided search highlight carried on the tab
+      // config (e.g. the Git sidebar's current query).
+      this._applyConfiguredHighlight();
     } catch (err) {
       log.error("Failed to mount file:", err);
     }
+  }
+
+  /**
+   * If the tab was opened with a `search` payload (git commit search), tell the
+   * editor to highlight matches of that query in the just-loaded buffer.
+   */
+  private _applyConfiguredHighlight(): void {
+    const search = (this.state.search ?? undefined) as
+      { query?: string; regex?: boolean; caseSensitive?: boolean } | undefined;
+    if (!search?.query || !this._editor) return;
+    this._editor.setSearchHighlight(search.query, {
+      regex: search.regex,
+      caseSensitive: search.caseSensitive,
+    });
   }
 
   unmount(): void {
@@ -214,10 +232,12 @@ export class FileEditorController extends BaseController implements FileViewerCo
     this.state.filePath = path;
 
     if (path !== prevPath) {
-      // Release the previous model
+      // Release the previous model, and drop any search highlight that belonged
+      // to the previous buffer (a different file must not show stale matches).
       if (prevPath) {
         appServices.modelRegistry.release(prevPath);
       }
+      this._editor?.clearSearchHighlight();
 
       queueMicrotask(() => {
         try {

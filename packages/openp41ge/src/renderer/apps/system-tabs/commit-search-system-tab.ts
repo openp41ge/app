@@ -1213,6 +1213,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
               path: file.path,
               name: file.path.split("/").pop() ?? file.path,
               pinned: false,
+              search: this._searchPayload(),
             },
           }),
         );
@@ -1225,6 +1226,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
               path: file.path,
               name: file.path.split("/").pop() ?? file.path,
               pinned: true,
+              search: this._searchPayload(),
             },
           }),
         );
@@ -1238,6 +1240,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
                 path: file.path,
                 name: file.path.split("/").pop() ?? file.path,
                 pinned: true,
+                search: this._searchPayload(),
               },
             }),
           );
@@ -1250,6 +1253,22 @@ export class CommitSearchSystemTabController implements SystemTabController {
   }
 
   // ── Match highlighting + hit context ───────────────────────────────────
+
+  /**
+   * The sidebar's current search as an external highlight payload for files
+   * opened from a result row — the file editor highlights these matches.
+   */
+  private _searchPayload():
+    | {
+        query: string;
+        regex: boolean;
+        caseSensitive: boolean;
+      }
+    | undefined {
+    const q = this._lastQuery.trim();
+    if (!q) return undefined;
+    return { query: q, regex: this._searchRegex, caseSensitive: this._searchCase };
+  }
 
   /** Optional third line: “+ N more instances” and/or which file(s) matched. */
   private _matchMeta(commit: SearchResultCommit): HTMLElement | null {

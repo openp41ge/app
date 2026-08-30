@@ -14,6 +14,9 @@ export { CursorRenderer } from "./cursor-renderer";
 
 export { SelectionRenderer } from "./selection-renderer";
 
+export { FindMatchRenderer, toFindViewSpans } from "./find-match-renderer";
+export type { FindViewSpan, IFindViewConverter } from "./find-match-renderer";
+
 export { CurrentLineHighlight } from "./current-line-highlight";
 
 export { IndentationGuides } from "./indentation-guides";

@@ -106,11 +106,18 @@ export {
   LineNumbersOverlay,
   CursorRenderer,
   SelectionRenderer,
+  FindMatchRenderer,
+  toFindViewSpans,
   CurrentLineHighlight,
   IndentationGuides,
   findMatchingBracket,
 } from "./rendering";
-export type { BracketMatch, IndentationGuidesConfig } from "./rendering";
+export type {
+  BracketMatch,
+  IndentationGuidesConfig,
+  FindViewSpan,
+  IFindViewConverter,
+} from "./rendering";
 export type { RenderLineOutput, LineNumbersOverlayConfig, LineNumberMode } from "./rendering";
 
 // Input
