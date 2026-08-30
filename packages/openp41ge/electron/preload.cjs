@@ -368,6 +368,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** Get diff stat for a commit or working tree. */
     getDiffStat: (repoName, commitHash) =>
       ipcRenderer.invoke("workspace:getDiffStat", repoName, commitHash),
+    getCommitMessage: (repoName, hash) =>
+      ipcRenderer.invoke("workspace:getCommitMessage", repoName, hash),
     deleteLocalBranch: (repoName, branchName, force) =>
       ipcRenderer.invoke("workspace:deleteLocalBranch", repoName, branchName, force),
 

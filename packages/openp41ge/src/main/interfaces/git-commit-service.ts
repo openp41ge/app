@@ -60,6 +60,12 @@ export interface IGitCommitService {
   getDiffStat(repoName: string, commitHash?: string): Promise<DiffStatEntry[]>;
 
   /**
+   * Get a single commit's full data (including the complete message) by hash,
+   * or null when the commit is not reachable in this repository.
+   */
+  getCommitMessage(repoName: string, hash: string): Promise<CommitEntry | null>;
+
+  /**
    * Delete a local branch. Throws if not fully merged (use force to override).
    */
   deleteLocalBranch(repoName: string, branchName: string, force?: boolean): Promise<void>;

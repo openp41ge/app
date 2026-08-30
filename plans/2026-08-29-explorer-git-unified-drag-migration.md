@@ -182,7 +182,7 @@ Part A (unified bitmap drag) is implemented and tested; Part B (commit-search si
 - [x] Single-click on a commit result opens an unpinned (preview) git-repository tab; double-click pins; single-click on a file result opens an unpinned file-editor preview (VS Code preview model).
 - [x] Dragging a search result row into the grid opens its review tab (pinned).
 - [x] Cross-window drop of repo/worktree rows: same-window grid drop, explorer reorder, and the cross-window `open-tab` branch are automated-tested (dispatch `actionOpenFile`/`splitFileOpen` with `git-repository` + pending repo/branch).
-- [x] Selectable search-depth limit in the filter box: exclusive 5K/10K/3K/2K/1K icon options (default 5K) wired end-to-end via `CommitSearchOptions.maxCount`. The service honors it by pinning the newest N commits by hash before the git-native `--grep` pass (a plain `--max-count` only caps grep *output*, not walk depth — fixed here so old matches genuinely drop out). Renderer verified live; the main-process path of the running dev instance is live once dev is restarted (main does not hot-reload).
+- [x] Selectable search-depth limit in the filter box: exclusive 5K/10K/3K/2K/1K icon options (default 5K) wired end-to-end via `CommitSearchOptions.maxCount`. The service honors it by pinning the newest N commits by hash before the git-native `--grep` pass (a plain `--max-count` only caps grep _output_, not walk depth — fixed here so old matches genuinely drop out). Renderer verified live; the main-process path of the running dev instance is live once dev is restarted (main does not hot-reload).
 - [ ] **Not yet live-verified:** bitmap ghost + cross-window drop driven in the running app end-to-end — requires restarting `nx run openp41ge:dev` (main-process changes don't hot-reload) and using the `test-cross-window-drag` skill; the pre-change dev instance is too stale for that.
 - [x] Deferred to phase 2 and recorded above: content (`-G`/`-S`) search + hunk sub-rows, file-at-revision browsing.
 
@@ -195,3 +195,35 @@ Part A (unified bitmap drag) is implemented and tested; Part B (commit-search si
 - [ ] Single-click on a commit result opens an unpinned (preview) git-repository tab; second click pins; single-click on a file result opens an unpinned file-editor preview (VS Code preview model).
 - [ ] Dragging a search result row into the grid opens its review tab (pinned).
 - [ ] `nx run-many -t typecheck`, `nx lint` clean; `nx run-many -t test` passes (new unit + integration suites above); runtime-verified in dev via `debug` + `test-cross-window-drag`, error overlay clear.
+
+---
+
+## 2026-08-30 — Git search-result pane: read-only commit message viewer
+
+### Goal
+
+Replace the `git-commit-search` placeholder pane (opened by dragging a commit-search result row onto the grid) with a real viewer: the **full commit message shown in a `<file-editor>` in read-only mode**. The commit is fetched by hash.
+
+### Approach
+
+- **Read-only mode in `<file-editor>`** (`openp41ge-uikit`): a `setReadOnly(boolean)`/`get isReadOnly()` API. Read-only blocks every edit surface (typing, paste, cut, delete, new-line, Tab, undo/redo), hides the caret, and makes `save()`/`formatDocument()` no-ops — while keeping mouse selection + copy working.
+- **Fetch the message** end-to-end: `IGitCommitService.getCommitMessage(repoName, hash)` → `NodeGitCommitService` runs `git log -1 <hash>` with a newline-separated full-body format → new `workspace:getCommitMessage` IPC (git-handlers) → preload + `global.d.ts` → `window.openp41ge.workspaceController.getCommitMessage`.
+- **GitCommitSearchController**: mount renders a slim header (repo · short-hash) above a read-only `<file-editor>`; builds an in-memory `PieceTreeTextContentModel` (no disk/IPC) with the full message and calls `loadFile` after the editor's Lit pipeline is ready. The fetched message/meta is snapshot/restored so re-mounts render instantly without a refetch. Fetch returns `null`/throws → inline fallback text.
+
+### Files changed
+
+- `openp41ge-uikit/src/components/file-editor/file-editor.ts` — read-only API + edit/caret gates.
+- `openp41ge/src/main/interfaces/git-commit-service.ts`, `main/services/node-git-commit-service.ts` — `getCommitMessage`.
+- `openp41ge/electron/ipc-handlers/git-handlers.ts`, `electron/preload.cjs`, `renderer/global.d.ts` — IPC surface.
+- `openp41ge/src/renderer/apps/git-commit-search/git-commit-search-controller.ts` — real viewer.
+
+### Testing
+
+- uikit `read-only.test.ts` — caret hidden while focused, typing/paste/delete/newline don't mutate the model, dirty stays false, `save()` false, toggle re-enables edits.
+- `node-git-commit-service-get-commit-message.test.ts` — real-git: subject+multiline body round-trip via `%B`; unknown hash → null.
+- `git-commit-search-controller.test.ts` — mock bridge `getCommitMessage`; fresh-mount fetch + read-only editor content, restore-with-cached-message renders without fetch, null result → fallback.
+
+### Completion criteria
+
+- [ ] All tests green (uikit + openp41ge), typecheck/lint/build clean.
+- [ ] Live (dev restart — main-process IPC change): drag a search result → pane opens with header + read-only editor showing the commit message; typing does nothing, caret absent, text selectable.

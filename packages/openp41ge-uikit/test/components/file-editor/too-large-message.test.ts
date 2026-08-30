@@ -37,7 +37,8 @@ describe("file-editor too-large message", () => {
     expect(text).toContain("enormous-bundle.js");
     expect(text).toContain("120 MB");
     expect(text).toContain("50 MB");
-    expect(text).toContain("Editor to open larger files");
+    // Whitespace-insensitive (the template literal is re-wrapped by prettier).
+    expect(text.replace(/\s+/g, " ")).toContain("Editor to open larger files");
 
     // No editable content / view lines were created.
     expect(el.querySelector(".fe-viewport")).toBeNull();

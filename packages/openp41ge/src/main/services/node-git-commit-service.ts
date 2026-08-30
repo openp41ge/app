@@ -175,6 +175,66 @@ export class NodeGitCommitService implements IGitCommitService {
     return entries;
   }
 
+  /**
+   * Get a single commit by hash, or null when it is not reachable.
+   *
+   * Uses a newline-separated format (one field per line) so message bodies
+   * containing `|` or other delimiters survive round-tripping unchanged: the
+   * whole `%B` (subject + body) spans until the `---ENDBODY---` marker.
+   */
+  async getCommitMessage(repoName: string, hash: string): Promise<CommitEntry | null> {
+    let output: string;
+    try {
+      output = await this._execGit(
+        [
+          "log",
+          "-1",
+          hash,
+          "--format=%H%n%h%n%an%n%ae%n%aI%n%ar%n%B%n---ENDBODY---%n%P%n---ENDENTRY---",
+        ],
+        repoName,
+      );
+    } catch {
+      // Bad or unreachable hash (or the repo is missing) — no such commit.
+      return null;
+    }
+    if (!output.trim()) return null;
+    return this._parseSingleCommit(output);
+  }
+
+  private _parseSingleCommit(raw: string): CommitEntry | null {
+    const bodyEnd = raw.indexOf("\n---ENDBODY---\n");
+    if (bodyEnd === -1) return null;
+
+    const header = raw.slice(0, bodyEnd);
+    const footer = raw.slice(bodyEnd + "\n---ENDBODY---\n".length);
+    const lines = header.split("\n");
+    if (lines.length < 6) return null;
+
+    const [hash, shortHash = "", authorName = "", authorEmail = "", date = "", relativeDate = ""] =
+      lines;
+    // %B is raw (subject + body); fields after the five header lines are the
+    // full message. Trim trailing whitespace so the message ends cleanly.
+    const fullMessage = lines.slice(6).join("\n").trim();
+    const message = fullMessage.split("\n")[0] ?? "";
+
+    const footerLines = footer.trimEnd().split("\n");
+    const parents = footerLines.length > 0 && footerLines[0] ? footerLines[0].split(" ") : [];
+
+    return {
+      hash,
+      shortHash,
+      authorName,
+      authorEmail,
+      date,
+      relativeDate,
+      message,
+      fullMessage,
+      refs: [],
+      parents,
+    };
+  }
+
   async getBranches(repoName: string): Promise<BranchEntry[]> {
     // Get current branch (checked out HEAD)
     let currentBranch = "";

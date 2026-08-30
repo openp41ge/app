@@ -100,6 +100,8 @@ declare global {
         getBranches: (repoName: string) => Promise<BranchEntry[]>;
         /** Get diff stat for a commit or working tree. */
         getDiffStat: (repoName: string, commitHash?: string) => Promise<DiffStatEntry[]>;
+        /** Get a single commit's full data (incl. complete message) by hash, or null. */
+        getCommitMessage: (repoName: string, hash: string) => Promise<CommitEntry | null>;
         /** Delete a local branch. */
         deleteLocalBranch: (repoName: string, branchName: string, force?: boolean) => Promise<void>;
 

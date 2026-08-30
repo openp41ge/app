@@ -48,7 +48,11 @@ import { TokenRegistry } from "openp41ge-syntax-highlighting/token-registry";
 // Declared at module top level to avoid temporal dead zone (TDZ) issues
 // when the class references it during connectedCallback / firstUpdated.
 let _tokenRegistryInstance: TokenRegistry | null = null;
-import { getThemeById, generateThemeCSS, generateGlobalEditorCSS } from "openp41ge-editor-engine/themes";
+import {
+  getThemeById,
+  generateThemeCSS,
+  generateGlobalEditorCSS,
+} from "openp41ge-editor-engine/themes";
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
@@ -81,8 +85,7 @@ export class FileEditorElement extends LitElement {
   private _state: FileEditorState = "empty";
 
   /** Display info for the "file is too large to open" message pane. */
-  private _tooLargeInfo: { fileName: string; sizeBytes: number; limitBytes: number } | null =
-    null;
+  private _tooLargeInfo: { fileName: string; sizeBytes: number; limitBytes: number } | null = null;
 
   /**
    * True when the most recent render drew at least one visible line with no
@@ -196,6 +199,30 @@ export class FileEditorElement extends LitElement {
   @property({ type: String, attribute: "data-theme-id" })
   themeId: string = "openp41ge-dark";
 
+  /** Whether this editor is in read-only mode (no edits, no caret). */
+  private _readOnly: boolean = false;
+
+  /** Whether this editor is in read-only mode. */
+  get isReadOnly(): boolean {
+    return this._readOnly;
+  }
+
+  /**
+   * Enable/disable read-only mode. Read-only editors accept no edits (typing,
+   * paste, cut, delete, new-line, Tab, undo/redo all no-op), never show a
+   * caret, and make save()/formatDocument() inert — but mouse selection and
+   * copy still work. Used e.g. for the git commit-message viewer pane.
+   */
+  setReadOnly(readOnly: boolean): void {
+    if (this._readOnly === readOnly) return;
+    this._readOnly = readOnly;
+    if (readOnly) {
+      // Hide the caret immediately if the textarea happens to be focused.
+      this._cursorRenderer?.hide();
+    }
+    this.requestUpdate();
+  }
+
   /** Current syntax theme object. */
   private _theme: SyntaxTheme = getThemeById("openp41ge-dark");
 
@@ -246,11 +273,11 @@ export class FileEditorElement extends LitElement {
           class="fe-root"
           style="display:flex;flex-direction:column;width:100%;height:100%;background:var(--fe-bg, #161616);overflow:hidden;"
         >
-          <div class="fe-too-large" style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;overflow:auto;">
-            <div
-              class="fe-too-large-icon"
-              style="font-size:28px;line-height:1;opacity:0.7;"
-            >\u26A0</div>
+          <div
+            class="fe-too-large"
+            style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;overflow:auto;"
+          >
+            <div class="fe-too-large-icon" style="font-size:28px;line-height:1;opacity:0.7;">⚠</div>
             <div
               class="fe-too-large-title"
               style="font-size:16px;font-weight:600;color:var(--fe-text, #d4d4d4);"
@@ -262,8 +289,8 @@ export class FileEditorElement extends LitElement {
               style="font-size:13px;color:var(--fe-text-secondary, #9d9d9d);max-width:520px;"
             >
               ${tooLarge.fileName} (${this._formatBytes(tooLarge.sizeBytes)}) exceeds the
-              ${this._formatBytes(tooLarge.limitBytes)} editor limit. Adjust the limit in
-              Editor to open larger files.
+              ${this._formatBytes(tooLarge.limitBytes)} editor limit. Adjust the limit in Editor to
+              open larger files.
             </div>
           </div>
           <fe-status-bar></fe-status-bar>
@@ -431,7 +458,10 @@ export class FileEditorElement extends LitElement {
     //     the viewport was reconnected (container moved within document by
     //     mountController's appendChild). The viewport DOM node came back but
     //     the rendering pipeline is destroyed.
-    if (this._initDone && (!this._viewportEl || !this._viewportEl.isConnected || !this._viewModel)) {
+    if (
+      this._initDone &&
+      (!this._viewportEl || !this._viewportEl.isConnected || !this._viewModel)
+    ) {
       this._initDone = false;
       this.firstUpdated();
     }
@@ -502,6 +532,7 @@ export class FileEditorElement extends LitElement {
   }
 
   async save(): Promise<boolean> {
+    if (this._readOnly) return false;
     if (!this.textContentModel || !this.filePath) return false;
 
     const content = this.textContentModel.getValue();
@@ -530,6 +561,7 @@ export class FileEditorElement extends LitElement {
   }
 
   formatDocument(): void {
+    if (this._readOnly) return;
     if (!this.formatterRegistry || !this.textContentModel) return;
     const ext = this.filePath.split(".").pop()?.toLowerCase() || "";
     const formatter = this.formatterRegistry.get(ext);
@@ -782,7 +814,9 @@ export class FileEditorElement extends LitElement {
       parentElement: this._viewportEl,
       cursorController: this._cursorController,
       onType: (char) => {
-        const pos = this._cursorController!.position;
+        if (this._readOnly) return;
+        if (!this._cursorController) return;
+        const pos = this._cursorController.position;
 
         // Auto-closing pairs: skip matching closer
         if (char.length === 1 && shouldSkipClose(char, model, pos)) {
@@ -805,15 +839,19 @@ export class FileEditorElement extends LitElement {
         this._cursorController!.insertChar(char);
       },
       onNewLine: () => {
+        if (this._readOnly) return;
         this._cursorController!.insertNewLine();
       },
       onDeleteLeft: () => {
+        if (this._readOnly) return;
         this._cursorController!.deleteLeft();
       },
       onDeleteRight: () => {
+        if (this._readOnly) return;
         this._cursorController!.deleteRight();
       },
       onComposition: (text) => {
+        if (this._readOnly) return;
         this._compositionHandler?.onCompositionUpdate(text);
       },
       onCopy: () => {
@@ -821,19 +859,38 @@ export class FileEditorElement extends LitElement {
       },
       onFocus: () => {
         this._isFocused = true;
-        this._cursorRenderer?.show();
+        // Read-only editors keep the hidden textarea focused (so selection /
+        // copy work) but never show a caret.
+        if (!this._readOnly) {
+          this._cursorRenderer?.show();
+        }
       },
       onBlur: () => {
         this._isFocused = false;
         this._cursorRenderer?.hide();
       },
       onPaste: (text) => {
+        if (this._readOnly) return;
         this._clipboardHandler?.onPaste(text);
       },
       onCut: () => {
+        if (this._readOnly) return "";
         return this._clipboardHandler?.onCut() || "";
       },
       onKey: (e) => {
+        if (this._readOnly) {
+          // Read-only: allow navigation/selection/copy but never model edits.
+          // Plain-char typing arrives via onType (already gated); undo/redo
+          // and the delete/new-line/tab keys are blocked here so the model
+          // can never change.
+          if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) {
+            return true;
+          }
+          if (e.key === "Backspace" || e.key === "Delete" || e.key === "Enter" || e.key === "Tab") {
+            return true;
+          }
+          return this._keyboardHandler!.handleKeyDown(e);
+        }
         // Suppress scroll-to-reveal for Cmd+A (select all)
         if ((e.metaKey || e.ctrlKey) && (e.key === "a" || e.key === "A")) {
           this._suppressScroll = true;
@@ -1480,12 +1537,13 @@ export class FileEditorElement extends LitElement {
       const y = (viewLine - 1) * this._lineHeight;
       this._cursorRenderer.positionAt(x, y, this._lineHeight, i);
     }
-    // Only the focused editor may show carets. A view sync must never resurrect
-    // them while this editor is blurred (e.g. initial render, a cursor move or
-    // model change in a background tab) — onBlur hid them; refocus re-shows via
-    // onFocus. This preserves multi-carets: they stay created/positioned and are
-    // only shown/hidden as a group.
-    if (this._isFocused) {
+    // Only the focused editor may show carets — and read-only editors never
+    // do. A view sync must never resurrect them while this editor is blurred
+    // (e.g. initial render, a cursor move or model change in a background tab)
+    // — onBlur hid them; refocus re-shows via onFocus. This preserves
+    // multi-carets: they stay created/positioned and are only shown/hidden as
+    // a group.
+    if (this._isFocused && !this._readOnly) {
       this._cursorRenderer.show();
     }
 
