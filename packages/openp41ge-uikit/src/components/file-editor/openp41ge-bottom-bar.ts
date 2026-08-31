@@ -379,19 +379,6 @@ class FeStatusBar extends LitElement {
                         this._wordWrapOn = newState;
                         this._wordWrapHandler?.(newState);
                       }}
-                      @mouseenter=${(e: MouseEvent) => {
-                        const el = e.currentTarget as HTMLElement;
-                        // Always show blue on hover
-                        el.style.color = "#4a9eff";
-                        el.style.opacity = "1";
-                      }}
-                      @mouseleave=${(e: MouseEvent) => {
-                        const el = e.currentTarget as HTMLElement;
-                        // Revert to state-appropriate styling — handled by reactive render
-                        // but also set directly for immediate feedback
-                        el.style.color = "";
-                        el.style.opacity = "";
-                      }}
                     >
                       <svg
                         width="16"
