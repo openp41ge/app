@@ -697,10 +697,13 @@ export class FileEditorElement extends LitElement {
 
     this._gutterEl = document.createElement("div");
     this._gutterEl.className = "fe-gutter";
-    // sticky left:36px = one BEFORE column in, so the AFTER column stays pinned
-    // beside it during any horizontal pan; vertical scroll stays native.
+    // The flex row already places the AFTER column right after the BEFORE
+    // column (and at x=0 when there is no BEFORE column) — do NOT add a left
+    // offset: LineNumbersOverlay repositions this element to `relative`, so any
+    // `left:` would PUSH the column right (a gap between the two number
+    // columns) instead of pinning it. left:0 keeps the columns flush.
     this._gutterEl.style.cssText =
-      "flex-shrink:0;width:48px;position:sticky;left:36px;top:0;z-index:6;background:var(--fe-gutter-bg, #1a1a1a);overflow:hidden;user-select:none;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
+      "flex-shrink:0;width:48px;position:sticky;left:0;top:0;z-index:6;background:var(--fe-gutter-bg, #1a1a1a);overflow:hidden;user-select:none;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
     this._scrollContentEl.appendChild(this._gutterEl);
 
     this._textRegionEl = document.createElement("div");
