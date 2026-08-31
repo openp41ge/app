@@ -15,8 +15,10 @@
  * tinted green for added rows — colored cells run all the way across, no +/−
  * symbols. There is no separate sign column anymore.
  *
- * Wheel events over this column are forwarded to the viewport, so hovering the
- * line numbers still scrolls the editor normally.
+ * Wheel events over these columns now scroll the editor NATIVELY: the columns
+ * are inside the viewport's scroll container (one unified scroll — the same
+ * spatial model as VSCode), so no wheel forwarding or transform following is
+ * needed for the numbers to move exactly with the content.
  */
 
 export interface InlineDiffGutterRowInfo {
@@ -54,7 +56,6 @@ export class InlineDiffGutterColumns {
   private _entries = new Map<number, InlineBandEl>();
   private _lineHeight: number;
   private _rows: InlineDiffGutterRows | null = null;
-  private _scrollTarget: HTMLElement | null;
   private _onLineClick: ((lineNumber: number) => void) | null = null;
   private _activeLines: ReadonlySet<number> = new Set();
   private _disposed = false;
@@ -63,45 +64,27 @@ export class InlineDiffGutterColumns {
     contentEl: HTMLElement,
     gutterEl: HTMLElement,
     lineHeight: number,
-    scrollTarget: HTMLElement | null = null,
     onLineClick: ((lineNumber: number) => void) | null = null,
   ) {
     this._lineHeight = lineHeight;
-    this._scrollTarget = scrollTarget;
     this._onLineClick = onLineClick;
 
     // ── Left column: editor background = a separate group from the gutter. ──
     this._leftOuter = document.createElement("div");
     this._leftOuter.className = "fe-inline-left";
+    // position:sticky + left:0 pins the BEFORE column at the scrollport's left
+    // edge during horizontal scroll, while VERTICAL scroll is native (the whole
+    // column lives in the one scroll container with the text — the numbers move
+    // with the content, compositor-driven, no transform lag).
     this._leftOuter.style.cssText =
-      "flex-shrink:0;position:relative;overflow:hidden;display:none;" +
+      "flex-shrink:0;position:sticky;left:0;top:0;z-index:6;overflow:hidden;display:none;" +
       "background:var(--fe-bg,#161616);user-select:none;" +
       "font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
     this._leftInner = document.createElement("div");
-    // Viewport-height, clipped, will-change layer: labels stay document-absolute
-    // but only the visible band is painted, so the compositor backing store is
-    // bounded AND the transform scrolls in lockstep with the viewport (no
-    // main-thread repaint of a document-tall box per frame).
     this._leftInner.style.cssText =
-      "position:absolute;top:0;left:0;right:0;height:100%;overflow:hidden;will-change:transform;";
+      "position:absolute;top:0;left:0;right:0;height:100%;overflow:hidden;";
     this._leftOuter.appendChild(this._leftInner);
     contentEl.insertBefore(this._leftOuter, gutterEl);
-
-    // Hovering the BEFORE column should scroll the editor as normal.
-    this._bindWheel(this._leftOuter);
-  }
-
-  /** Bind a wheel listener that scrolls the editor viewport. */
-  private _bindWheel(el: HTMLElement): void {
-    el.addEventListener(
-      "wheel",
-      (e: WheelEvent) => {
-        if (!this._scrollTarget) return;
-        e.preventDefault();
-        this._scrollTarget.scrollTop += e.deltaY;
-      },
-      { passive: false },
-    );
   }
 
   /** Update row sizes (blend this column into the flex row). */
@@ -213,11 +196,10 @@ export class InlineDiffGutterColumns {
     }
   }
 
-  /** Vertical scroll offset (CSS transform — matches the normal gutter). */
-  setScrollOffset(scrollTop: number): void {
-    if (this._disposed) return;
-    this._leftInner.style.transform = `translate3d(0, ${-scrollTop}px, 0)`;
-  }
+  /** Column heights come from the flex row (`.view-lines` drives full content
+   * height); nothing to do here at scroll time — vertical scrolling is native.
+   * Kept as a no-op only so stale call sites are safe. */
+  setScrollOffset(_scrollTop: number): void {}
 
   /**
    * Highlight the number cells of the selected rows (cursor line, or every

@@ -36,9 +36,11 @@ async function mountEditor(file = "app.ts"): Promise<HTMLElement> {
 function caretEls(el: HTMLElement): HTMLElement[] {
   // Primary caret carries the `.cursor-blink` class; secondary carets are
   // created without a class (see CursorRenderer._createCursorEl), so select
-  // both by their common inline style (absolute, 2px wide) inside the viewport.
-  const vp = el.querySelector(".fe-viewport");
-  return [...(vp?.children ?? [])].filter((c) => {
+  // both by their common inline style (absolute, 2px wide). The caret now lives
+  // in .fe-text-region (the content layer beside the gutters, inside the one
+  // native scroll container); fall back to .fe-viewport children if absent.
+  const region = el.querySelector(".fe-text-region") || el.querySelector(".fe-viewport");
+  return [...(region?.children ?? [])].filter((c) => {
     const s = (c as HTMLElement).style;
     return s.position === "absolute" && s.width === "2px";
   }) as HTMLElement[];

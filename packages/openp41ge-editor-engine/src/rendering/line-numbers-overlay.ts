@@ -93,15 +93,12 @@ export class LineNumbersOverlay {
     this._gutterEl.setClassName("fe-gutter");
     this._gutterEl.setWidth(config.gutterWidth);
 
-    // Inner container that shifts via CSS transform instead of gutter scrollTop.
-    // This avoids scroll-boundary mismatches between gutter and viewport. The
-    // box is CLIPPED to the viewport height (labels stay document-positioned;
-    // only the visible band is painted), with will-change + translate3d so it
-    // scrolls on the compositor in lockstep with the viewport content — plain
-    // translateY over a document-tall box repaints on the main thread per frame
-    // and visibly lags behind fast scrolls.
+    // Inner container holding the (band-virtualized) labels. The gutter now
+    // lives INSIDE the viewport's scroll container, so vertical scrolling is
+    // native (compositor-driven, in lockstep with the text) — there is no CSS
+    // transform to follow, which removes the per-frame main-thread work that
+    // previously made the numbers lag and stop rendering below the fold.
     this._scrollContainer = createFastDomNode();
-    this._scrollContainer.element.style.willChange = "transform";
     this._scrollContainer.element.style.height = "100%";
     this._scrollContainer.element.style.overflow = "hidden";
     this._scrollContainer.setPosition("absolute");
@@ -312,16 +309,11 @@ export class LineNumbersOverlay {
   }
 
   /**
-   * Set the vertical scroll offset via CSS transform on the inner container.
-   * This avoids scroll-boundary issues that occur when syncing gutter scrollTop
-   * with the viewport, because absolutely positioned children may not contribute
-   * to scrollHeight consistently across browsers.
+   * No-op: line numbers scroll NATIVELY with the content now (the gutter lives
+   * inside the viewport's one scroll container, like VSCode's unified scroll),
+   * so there is no CSS transform to drive. Kept so stale callers stay safe.
    */
-  setScrollOffset(scrollTop: number): void {
-    // translate3d (not translateY) so the composited layer scrolls in lockstep
-    // with the natively-scrolled viewport content.
-    this._scrollContainer.element.style.transform = `translate3d(0, ${-scrollTop}px, 0)`;
-  }
+  setScrollOffset(_scrollTop: number): void {}
 
   /**
    * Set the line height.

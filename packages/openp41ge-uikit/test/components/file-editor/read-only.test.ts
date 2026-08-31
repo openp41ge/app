@@ -26,7 +26,7 @@ async function mountEditor(readOnly = false, content = CONTENT): Promise<HTMLEle
 }
 
 function visibleCaretEls(el): HTMLElement[] {
-  const vp = el.querySelector(".fe-viewport");
+  const vp = el.querySelector(".fe-text-region") || el.querySelector(".fe-viewport");
   const carets = [...(vp?.children ?? [])].filter((c) => {
     const s = c.style;
     return s.position === "absolute" && s.width === "2px";

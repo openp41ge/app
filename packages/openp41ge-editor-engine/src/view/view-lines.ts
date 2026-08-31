@@ -119,7 +119,12 @@ export class ViewLines {
   ) {
     this._viewportEl = new FastDomNode(viewportEl);
     this._viewportEl.setPosition("relative");
-    this._viewportEl.setClassName("fe-viewport");
+    // Give the layer a class ONLY if it doesn't already own one — the file
+    // editor passes its text-region (already classed `fe-text-region`) here,
+    // and clobbering that class hides its CSS.
+    if (!viewportEl.className) {
+      this._viewportEl.setClassName("fe-viewport");
+    }
 
     // Create an inner wrapper that holds the absolutely-positioned lines.
     // Width defaults to 100% of viewport (shrink-wraps to content otherwise).

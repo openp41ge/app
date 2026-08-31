@@ -205,6 +205,9 @@ export class FileEditorElement extends LitElement {
 
   private _viewportEl!: HTMLElement;
   private _gutterEl!: HTMLElement;
+  /** Native-scroll flex row inside the viewport: [BEFORE] [AFTER] [text]. */
+  private _scrollContentEl!: HTMLElement;
+  private _textRegionEl!: HTMLElement;
 
   private _textMateInitPromise: Promise<void> | null = null;
   private _initDone: boolean = false;
@@ -355,7 +358,6 @@ export class FileEditorElement extends LitElement {
       this._lineNumbersOverlay?.setVisibleRange(start, end);
       const wg = this._inlineWrapGetters();
       this._inlineColumns?.setVisibleRange(start, end, wg.getViewLineStart, wg.getViewLineCount);
-      this._inlineColumns?.setScrollOffset(this._viewportEl?.scrollTop ?? 0);
     }
     this._updateInlineHighlights();
   }
@@ -368,40 +370,19 @@ export class FileEditorElement extends LitElement {
    */
   private _ensureInlineColumns(): void {
     if (this._inlineColumns || !this._gutterEl) return;
-    const content = this.renderRoot?.querySelector(".fe-content") as HTMLElement | null;
+    const content = this._scrollContentEl;
     if (!content) return;
     this._inlineColumns = new InlineDiffGutterColumns(
       content,
       this._gutterEl,
       this._lineHeight,
-      this._viewportEl,
       (lineNumber: number) => {
         this._cursorController?.selectLine(lineNumber);
       },
     );
     this._inlineColumns.setSizes(this._lineHeight, 36);
-    this._inlineColumns.setScrollOffset(this._viewportEl?.scrollTop ?? 0);
-    this._bindGutterWheel();
     // If decorations were already applied (restore path), repaint everything.
     if (this._inlineRows) this.setInlineDiff(this._inlineRows);
-  }
-
-  /** Forward wheel events over the normal (AFTER) number column to the
-   * viewport, so hovering the line numbers still scrolls the editor. The
-   * BEFORE and gap columns forward their own wheels internally. */
-  private _gutterWheelBound = false;
-  private _bindGutterWheel(): void {
-    if (this._gutterWheelBound || !this._gutterEl) return;
-    this._gutterWheelBound = true;
-    this._gutterEl.addEventListener(
-      "wheel",
-      (e: WheelEvent) => {
-        if (!this._viewportEl) return;
-        e.preventDefault();
-        this._viewportEl.scrollTop += e.deltaY;
-      },
-      { passive: false },
-    );
   }
 
   /** (Re)paint the red/green row bands for the visible window. */
@@ -528,10 +509,6 @@ export class FileEditorElement extends LitElement {
           class="fe-content"
           style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;"
         >
-          <div
-            class="fe-gutter"
-            style="flex-shrink:0;width:48px;user-select:none;background:var(--fe-gutter-bg, #1a1a1a);overflow:hidden;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;"
-          ></div>
           <div
             class="fe-viewport-container"
             style="flex:1;display:flex;flex-direction:column;min-width:0;"
@@ -703,7 +680,33 @@ export class FileEditorElement extends LitElement {
     // Insert viewport into the viewport-container
     viewportContainer.appendChild(this._viewportEl);
 
-    this._gutterEl = content.querySelector(".fe-gutter") as HTMLElement;
+    // ── Native-scroll layout for the number columns ──
+    // The BEFORE column, AFTER column and the text live in ONE scroll
+    // container (the viewport) in a flex row — the same spatial model VSCode
+    // uses (margin + content scroll together). The numbers therefore scroll
+    // compositor-natively WITH the content: no transform follower, no
+    // per-frame main-thread band repaint, and the band is revealed by native
+    // scroll exactly like the text lines (numbers always continue below the
+    // fold once you scroll). The `view-lines` element drives the row's full
+    // content height, so the columns stretch to the whole document.
+    this._scrollContentEl = document.createElement("div");
+    this._scrollContentEl.className = "fe-scroll-content";
+    this._scrollContentEl.style.cssText =
+      "position:relative;display:flex;flex-direction:row;align-items:stretch;width:max-content;min-width:100%;";
+    this._viewportEl.appendChild(this._scrollContentEl);
+
+    this._gutterEl = document.createElement("div");
+    this._gutterEl.className = "fe-gutter";
+    // sticky left:36px = one BEFORE column in, so the AFTER column stays pinned
+    // beside it during any horizontal pan; vertical scroll stays native.
+    this._gutterEl.style.cssText =
+      "flex-shrink:0;width:48px;position:sticky;left:36px;top:0;z-index:6;background:var(--fe-gutter-bg, #1a1a1a);overflow:hidden;user-select:none;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
+    this._scrollContentEl.appendChild(this._gutterEl);
+
+    this._textRegionEl = document.createElement("div");
+    this._textRegionEl.className = "fe-text-region";
+    this._textRegionEl.style.cssText = "position:relative;flex:1 1 auto;min-width:0;";
+    this._scrollContentEl.appendChild(this._textRegionEl);
 
     // The extra inline-diff gutter columns (left old-number + right sign). They
     // start hidden and only appear when setInlineDiff() runs.
@@ -715,14 +718,6 @@ export class FileEditorElement extends LitElement {
 
     // Handle viewport click to position cursor and focus textarea
     this._viewportEl.addEventListener("mousedown", this._onViewportMouseDown);
-
-    // Gutter line number offset — CSS transform syncs line numbers with viewport scroll.
-    // Uses GPU-accelerated CSS transform instead of scrollTop to avoid scroll-boundary
-    // clamping issues that cause a 1-line misalignment at the bottom of the file.
-    this._viewportEl.addEventListener("scroll", () => {
-      this._lineNumbersOverlay?.setScrollOffset(this._viewportEl.scrollTop);
-      this._inlineColumns?.setScrollOffset(this._viewportEl.scrollTop);
-    });
 
     // Load file if path is already set (TextMate init started in connectedCallback)
     if (this.filePath && this.textContentModel) {
@@ -1059,8 +1054,11 @@ export class FileEditorElement extends LitElement {
     //   4. For compound names ("Dockerfile.prod"): try extension first, then prefix.
     this._applyLanguageToCurrentModel();
 
-    // Create ViewLines (rendering layer)
-    this._viewLines = new ViewLines(this._viewportEl, {
+    // Create ViewLines (rendering layer). Parented to the TEXT REGION (the
+    // flex child that starts after the number columns) so all coordinate bases
+    // — lines, cursor, selection, search, tints — shift together into the one
+    // native scroll container with the gutters.
+    this._viewLines = new ViewLines(this._textRegionEl, {
       lineHeight: this._lineHeight,
       tabSize: 4,
     });
@@ -1219,20 +1217,20 @@ export class FileEditorElement extends LitElement {
     });
 
     // Create CursorRenderer
-    this._cursorRenderer = new CursorRenderer(this._viewportEl, this._cursorController);
+    this._cursorRenderer = new CursorRenderer(this._textRegionEl, this._cursorController);
 
     // Create SelectionRenderer
-    this._selectionRenderer = new SelectionRenderer(this._viewportEl, this._cursorController);
+    this._selectionRenderer = new SelectionRenderer(this._textRegionEl, this._cursorController);
 
     // Create FindMatchRenderer (search-result highlights; empty until a find or
     // external highlight source provides matches)
-    this._findRenderer = new FindMatchRenderer(this._viewportEl);
+    this._findRenderer = new FindMatchRenderer(this._textRegionEl);
 
     // Create CurrentLineHighlight
-    this._currentLineHighlight = new CurrentLineHighlight(this._viewportEl);
+    this._currentLineHighlight = new CurrentLineHighlight(this._textRegionEl);
 
     // Create inline-diff row-tint renderer (red/removed, green/added)
-    this._inlineHighlights = new InlineDiffHighlightsRenderer(this._viewportEl);
+    this._inlineHighlights = new InlineDiffHighlightsRenderer(this._textRegionEl);
 
     // Create IndentationGuides
     this._indentationGuides = new IndentationGuides({
@@ -1316,16 +1314,11 @@ export class FileEditorElement extends LitElement {
     // highlights for the new visible lines. This ensures that cross-range selection
     // (e.g., Cmd+Shift+Down from line 5 to line 500) updates highlights correctly
     // when the user scrolls to view different parts of the selection.
-    // Line-number columns are scroll-synced to the viewport by a single
-    // scroll listener attached in firstUpdated (see above) — do NOT attach
-    // another here: this block runs per model load, so each load would pile on
-    // one more per-frame transform write (a visible lag source under fast
-    // scrolling). onVisibleRangeChanged below still re-paints the labels.
+    // Line-number columns scroll natively (they share the viewport's scroll
+    // container with the text) — only the label BAND gets repainted here as
+    // lines enter/leave the window.
 
     this._viewLines.onVisibleRangeChanged = (startLine: number, endLine: number) => {
-      // Sync line numbers with viewport scroll position
-      this._lineNumbersOverlay?.setScrollOffset(this._viewportEl.scrollTop);
-      this._inlineColumns?.setScrollOffset(this._viewportEl.scrollTop);
       // Create/reposition line number elements for the new visible range
       this._lineNumbersOverlay?.setVisibleRange(startLine, endLine);
       const wg = this._inlineWrapGetters();
@@ -2151,7 +2144,7 @@ export class FileEditorElement extends LitElement {
           return indent;
         },
         20,
-        this._viewportEl,
+        this._textRegionEl,
       );
     }
   }

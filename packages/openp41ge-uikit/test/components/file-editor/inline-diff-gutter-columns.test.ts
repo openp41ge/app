@@ -7,12 +7,12 @@
  *  - Labels sit at ABSOLUTE document positions `(line - 1) * lineHeight`,
  *    regardless of the rendered band (regression: they were band-relative, so
  *    numbers misplaced once scrolled).
- *  - The inner container's transform tracks setScrollOffset exactly (same
- *    convention as the normal gutter).
+ *  - The column is position:sticky + left:0 INSIDE the viewport's scroll
+ *    container — native vertical scroll, pinned horizontally (no transform
+ *    follower; that is what keeps it lockstep with the compositor).
  *  - A removed row's label carries the red cell class (fe-inline-removed-cell);
  *    there is no +/- sign column anymore.
- *  - Wheel events over the column scroll the editor viewport (hovering the
- *    line numbers scrolls normally).
+ *  - setScrollOffset is a no-op (native scroll owns the offset now).
  */
 import { describe, test, expect, beforeEach } from "vitest";
 import { InlineDiffGutterColumns } from "../../../src/components/file-editor/inline-diff-gutter-columns";
@@ -25,12 +25,9 @@ function setup() {
   const gutter = document.createElement("div");
   gutter.id = "gutter";
   content.appendChild(gutter);
-  const viewport = document.createElement("div");
-  viewport.style.overflowY = "auto";
-  content.appendChild(viewport);
   document.body.appendChild(content);
-  const cols = new InlineDiffGutterColumns(content, gutter, LH, viewport);
-  return { content, gutter, viewport, cols };
+  const cols = new InlineDiffGutterColumns(content, gutter, LH);
+  return { content, gutter, cols };
 }
 
 function leftLabels(): HTMLElement[] {
@@ -56,28 +53,21 @@ describe("InlineDiffGutterColumns", () => {
     cols.setVisibleRange(3, 5);
     expect(leftTops()).toEqual(["40px", "60px", "80px"]); // (line-1)*20
 
-    cols.setScrollOffset(40);
     cols.setVisibleRange(7, 9);
     expect(leftTops()).toEqual(["120px", "140px", "160px"]);
   });
 
-  test("scroll offset transforms the inner container exactly like the gutter", () => {
+  test("the column is sticky-left inside the scroll container (native vertical scroll)", () => {
     const { cols } = setup();
+    const outer = document.querySelector(".fe-inline-left");
+    expect(outer.style.position).toBe("sticky");
+    expect(outer.style.left).toBe("0px");
+    // setScrollOffset used to drive a per-frame transform; it must now be a
+    // no-op so only NATIVE scrolling moves the numbers (no harness lag).
     cols.setSizes(LH, 50);
-    cols.setRows({ infoFor: () => ({ leftLabel: "", cls: "" }) });
-    cols.setVisibleRange(1, 2);
-
-    cols.setScrollOffset(0);
-    expect(
-      document.querySelector("#content .fe-inline-left").firstElementChild.style
-        .transform,
-    ).toBe("translate3d(0, 0px, 0)");
-
-    cols.setScrollOffset(123 * LH);
-    expect(
-      document.querySelector("#content .fe-inline-left").firstElementChild.style
-        .transform,
-    ).toBe("translate3d(0, -2460px, 0)");
+    cols.setScrollOffset(9999);
+    expect(outer.querySelector(".fe-inline-left-label")).toBeNull(); // nothing moved
+    expect(outer.firstElementChild.style.transform).toBe("");
   });
 
   test("labels are FULL-WIDTH + flex-end so numbers are right-aligned (place values line up)", () => {
@@ -140,7 +130,7 @@ describe("InlineDiffGutterColumns", () => {
     const gutter = document.createElement("div");
     content.appendChild(gutter);
     document.body.appendChild(content);
-    const cols = new InlineDiffGutterColumns(content, gutter, LH, null, (ln) => clicks.push(ln));
+    const cols = new InlineDiffGutterColumns(content, gutter, LH, (ln) => clicks.push(ln));
     cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: "" }) });
     cols.setVisibleRange(5, 5);
 
@@ -200,24 +190,6 @@ describe("InlineDiffGutterColumns", () => {
     expect(document.querySelector(".fe-inline-left").style.display).toBe("none");
     cols.setRows({ infoFor: () => ({ leftLabel: "", cls: "" }) });
     expect(document.querySelector(".fe-inline-left").style.display).not.toBe("none");
-  });
-
-  test("wheel over the column scrolls the editor viewport", () => {
-    const { cols, viewport } = setup();
-    cols.setRows({ infoFor: () => ({ leftLabel: "", cls: "" }) });
-    viewport.scrollTop = 120;
-
-    const ev = new WheelEvent("wheel", { deltaY: 90, cancelable: true });
-    let defaultPrevented = false;
-    Object.defineProperty(ev, "preventDefault", {
-      value: () => {
-        defaultPrevented = true;
-      },
-    });
-    document.querySelector(".fe-inline-left").dispatchEvent(ev);
-
-    expect(defaultPrevented).toBe(true);
-    expect(viewport.scrollTop).toBe(210);
   });
 
   test("dispose removes the extra column from the content row", () => {
