@@ -35,6 +35,15 @@ interface LineNumberEntry {
   label: HTMLDivElement;
   /** Decoration classes applied to the label (cleared before reapplying). */
   cellCls?: string[];
+  /** Cached geometry so a repaint of an UNCHANGED band writes no styles. */
+  lastTop?: number;
+  lastHeight?: number;
+  lastOverflow?: string;
+  /** Cached label text + active flag so scrolling a stable band stays cheap. */
+  lastText?: string;
+  lastActive?: boolean;
+  /** Cached decoration-class key (space-joined tokens). */
+  lastCls?: string;
 }
 
 /**
@@ -146,11 +155,33 @@ export class LineNumbersOverlay {
       }
     }
 
-    // Create or update elements for visible lines
+    // Create or update elements for visible lines. Geometry (top/height) is
+    // SCROLL-INVARIANT — a model line is always at the same document offset —
+    // so reused entries are only touched when their text/decoration actually
+    // changed. Under fast scrolling this turns a full O(band) repaint into a
+    // handful of boundary creates/removes and keeps the main thread out of the
+    // way of the compositor (scroll feel stays smooth).
     for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+      // Pre-compute geometry once, then diff against each entry's cache.
+      let top: number;
+      let height: number;
+      let overflow: string;
+      if (wrapEnabled) {
+        const vStart = viewStartMap.get(lineNum) ?? lineNum;
+        const vCount = viewCountMap.get(lineNum) ?? 1;
+        top = (vStart - 1) * lineHeight;
+        height = vCount * lineHeight;
+        overflow = "hidden";
+      } else {
+        top = (lineNum - 1) * lineHeight;
+        height = lineHeight;
+        overflow = "visible";
+      }
+
       let entry = this._entries.get(lineNum);
 
       if (!entry) {
+        // New line — create element as before...
         // Outer wrapper — absolutely positioned, spans the visible height
         const wrapper = createFastDomNode();
         wrapper.setPosition("absolute");
@@ -184,64 +215,77 @@ export class LineNumbersOverlay {
 
         wrapper.element.appendChild(label);
         this._scrollContainer.appendChild(wrapper);
-        entry = { wrapper, label };
+        entry = { wrapper, label, lastTop: top, lastHeight: height, lastOverflow: overflow };
         this._entries.set(lineNum, entry);
-      }
-
-      // Position the wrapper and set heights
-      if (wrapEnabled) {
-        const vStart = viewStartMap.get(lineNum) ?? lineNum;
-        const vCount = viewCountMap.get(lineNum) ?? 1;
-        entry.wrapper.setTop((vStart - 1) * lineHeight);
-        entry.wrapper.setHeight(vCount * lineHeight);
-        entry.wrapper.element.style.overflow = "hidden";
-      } else {
-        const top = (lineNum - 1) * lineHeight;
+        // Fresh element — write its geometry once.
         entry.wrapper.setTop(top);
-        entry.wrapper.setHeight(lineHeight);
-        entry.wrapper.element.style.overflow = "visible";
+        entry.wrapper.setHeight(height);
+        entry.wrapper.element.style.overflow = overflow;
+        // Inner label is always exactly one lineHeight tall.
+        entry.label.style.height = lineHeight + "px";
+        entry.label.style.lineHeight = lineHeight + "px";
+      } else {
+        if (entry.lastTop !== top) {
+          entry.wrapper.setTop(top);
+          entry.lastTop = top;
+        }
+        if (entry.lastHeight !== height) {
+          entry.wrapper.setHeight(height);
+          entry.lastHeight = height;
+        }
+        if (entry.lastOverflow !== overflow) {
+          entry.wrapper.element.style.overflow = overflow;
+          entry.lastOverflow = overflow;
+        }
       }
-      // Inner label is always exactly one lineHeight tall
-      entry.label.style.height = lineHeight + "px";
-      entry.label.style.lineHeight = lineHeight + "px";
 
-      // Content
+      // Content — write labels only when their value actually changes.
       if (mode === "relative" && cursorLine > 0) {
         const distance = Math.abs(lineNum - cursorLine);
-        entry.label.textContent = distance === 0 ? "" : String(distance);
-        if (distance === 0) {
-          entry.label.classList.add("active-line-number");
-        } else {
-          entry.label.classList.remove("active-line-number");
+        const text = distance === 0 ? "" : String(distance);
+        if (entry.lastText !== text) {
+          entry.label.textContent = text;
+          entry.lastText = text;
+        }
+        const active = distance === 0;
+        if (entry.lastActive !== active) {
+          entry.label.classList.toggle("active-line-number", active);
+          entry.lastActive = active;
         }
       } else {
         const labelOverride = this._config.getLabelOverride?.(lineNum);
-        if (labelOverride === undefined || labelOverride === null) {
-          entry.label.textContent = String(lineNum);
-        } else {
-          entry.label.textContent = labelOverride;
+        const text = labelOverride === undefined || labelOverride === null ? String(lineNum) : labelOverride;
+        if (entry.lastText !== text) {
+          entry.label.textContent = text;
+          entry.lastText = text;
         }
-        entry.label.classList.remove("active-line-number");
+        if (entry.lastActive !== false) {
+          entry.label.classList.remove("active-line-number");
+          entry.lastActive = false;
+        }
         // Decorations on the number cell (e.g. green AFTER-cell of an added
         // row and/or the active-line ring). getLabelDecoration may return
         // several space-separated classes, so apply/clear them token-wise on
         // BOTH the one-row label (matches its text) and the full-height
         // wrapper (so a wrapped row tints all its segments).
         const decoration = this._config.getLabelDecoration?.(lineNum) ?? "";
-        const tokens = decoration ? decoration.split(/\s+/) : [];
-        if (entry.cellCls) {
-          for (const t of entry.cellCls) {
-            if (!tokens.includes(t)) {
-              entry.label.classList.remove(t);
-              entry.wrapper.element.classList.remove(t);
+        if (entry.lastCls !== decoration) {
+          const tokens = decoration ? decoration.split(/\s+/) : [];
+          if (entry.cellCls) {
+            for (const t of entry.cellCls) {
+              if (!tokens.includes(t)) {
+                entry.label.classList.remove(t);
+                entry.wrapper.element.classList.remove(t);
+              }
             }
           }
+          for (const t of tokens) {
+            entry.label.classList.add(t);
+            entry.wrapper.element.classList.add(t);
+          }
+          entry.cellCls = tokens.length > 0 ? tokens : undefined;
+          entry.lastCls = decoration;
         }
-        for (const t of tokens) {
-          entry.label.classList.add(t);
-          entry.wrapper.element.classList.add(t);
-        }
-        entry.cellCls = tokens.length > 0 ? tokens : undefined;
       }
     }
   }

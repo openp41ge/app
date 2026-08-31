@@ -226,4 +226,77 @@ describe("InlineDiffGutterColumns", () => {
     cols.dispose();
     expect(document.querySelector(".fe-inline-left")).toBeNull();
   });
+
+  test("re-painting the same band range is a no-op (no style/text/class writes)", async () => {
+    const { cols } = setup();
+    cols.setSizes(LH, 50);
+    cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: line % 2 === 0 ? "fe-inline-removed-cell" : "" }) });
+    cols.setVisibleRange(3, 7);
+
+    const container = document.querySelector(".fe-inline-left")!;
+    const records: MutationRecord[] = [];
+    const mo = new MutationObserver((rs) => records.push(...rs));
+    mo.observe(container, { subtree: true, childList: true, attributes: true, characterData: true });
+
+    cols.setVisibleRange(3, 7);
+    await new Promise((r) => setTimeout(r, 0));
+    mo.disconnect();
+
+    expect(records).toEqual([]);
+  });
+
+  test("a shifted band only adds the entering cell, keeps reused cells untouched", async () => {
+    const { cols } = setup();
+    cols.setSizes(LH, 50);
+    cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: "" }) });
+    cols.setVisibleRange(3, 6);
+    const container = document.querySelector(".fe-inline-left")!;
+    const preExisting = new Set(container.querySelectorAll("*"));
+
+    const records: MutationRecord[] = [];
+    const mo = new MutationObserver((rs) => records.push(...rs));
+    mo.observe(container, { subtree: true, childList: true, attributes: true, characterData: true });
+
+    cols.setVisibleRange(4, 7);
+    await new Promise((r) => setTimeout(r, 0));
+    mo.disconnect();
+
+    const attrMutations = records.filter(
+      (r) => r.type === "attributes" && r.target instanceof Element && preExisting.has(r.target),
+    );
+    // Count CELL-level additions/removals (textContent of the fresh cell also
+    // produces a childList record on that same new element — allowed).
+    const isCell = (n: Node) => n instanceof Element && n.classList.contains("fe-inline-left-label");
+    const cellAdds = records.filter((r) => r.type === "childList" && [...r.addedNodes].some(isCell));
+    const cellRemoves = records.filter((r) => r.type === "childList" && [...r.removedNodes].some(isCell));
+    expect(attrMutations).toEqual([]); // existing cells untouched
+    expect(cellAdds.length).toBe(1); // line 7 entered
+    expect(cellRemoves.length).toBe(1); // line 3 left
+    const labels = leftLabels().map((n) => n.textContent);
+    expect(labels).toEqual(["4", "5", "6", "7"]);
+    expect(leftLabels()[1].style.top).toBe("80px"); // (5-1)*20, unchanged
+  });
+
+  test("setActiveLines updates the cache so a later band repaint stays quiet", async () => {
+    const { cols } = setup();
+    cols.setSizes(LH, 50);
+    cols.setRows({ infoFor: () => ({ leftLabel: "", cls: "" }) });
+    cols.setVisibleRange(1, 4);
+    cols.setActiveLines(new Set([2]));
+
+    // First repaint after the selection change must not re-write anything.
+    const container = document.querySelector(".fe-inline-left")!;
+    const records: MutationRecord[] = [];
+    const mo = new MutationObserver((rs) => records.push(...rs));
+    mo.observe(container, { subtree: true, childList: true, attributes: true, characterData: true });
+
+    cols.setVisibleRange(1, 4);
+    await new Promise((r) => setTimeout(r, 0));
+    mo.disconnect();
+    expect(records).toEqual([]);
+
+    // And the active class is genuinely present.
+    expect(leftLabels()[1].classList.contains("fe-inline-left-active")).toBe(true);
+    expect(leftLabels()[0].classList.contains("fe-inline-left-active")).toBe(false);
+  });
 });

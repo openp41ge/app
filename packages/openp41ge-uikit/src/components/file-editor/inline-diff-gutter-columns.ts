@@ -28,6 +28,21 @@ export interface InlineDiffGutterRowInfo {
   readonly cls: string;
 }
 
+/** Last-applied state of one band cell, so repainting an unchanged band (e.g.
+ * a plain scroll) writes no DOM. */
+interface InlineBandCache {
+  top: number;
+  height: number;
+  text: string | undefined;
+  cls: string | undefined;
+  active: boolean | undefined;
+}
+
+/** Inline-diff LEFT (BEFORE) band element with its last-applied state. */
+interface InlineBandEl extends HTMLDivElement {
+  __st?: InlineBandCache;
+}
+
 /** Per-buffer-line provider of the left column's content. */
 export interface InlineDiffGutterRows {
   infoFor(lineNumber: number): InlineDiffGutterRowInfo;
@@ -36,7 +51,7 @@ export interface InlineDiffGutterRows {
 export class InlineDiffGutterColumns {
   private _leftOuter: HTMLElement;
   private _leftInner: HTMLElement;
-  private _entries = new Map<number, HTMLElement>();
+  private _entries = new Map<number, InlineBandEl>();
   private _lineHeight: number;
   private _rows: InlineDiffGutterRows | null = null;
   private _scrollTarget: HTMLElement | null;
@@ -128,7 +143,19 @@ export class InlineDiffGutterColumns {
     }
 
     for (let line = start; line <= end; line++) {
+      // Word-wrap: anchor at the model line's FIRST view segment and span the
+      // full wrapped height; without wrap getters this is just (line-1)*lh.
+      const vStart = viewLineStart ? viewLineStart(line) ?? line : line;
+      const vCount = viewLineCount ? viewLineCount(line) ?? 1 : 1;
+      const top = (vStart - 1) * this._lineHeight;
+      const height = vCount * this._lineHeight;
+
       let el = this._entries.get(line);
+      // Cached last-applied state, stored on the element so repainting an
+      // UNCHANGED band under fast scrolling writes nothing (geometry here is
+      // scroll-invariant; only boundary rows get created/removed).
+      let st = el?.__st;
+
       if (!el) {
         el = document.createElement("div");
         el.className = "fe-inline-left-label";
@@ -152,20 +179,37 @@ export class InlineDiffGutterColumns {
             this._onLineClick?.(line);
           });
         }
+        st = { top: NaN, height: NaN, text: undefined, cls: undefined, active: undefined };
+        el.__st = st;
       }
-      // Word-wrap: anchor at the model line's FIRST view segment and span the
-      // full wrapped height; without wrap getters this is just (line-1)*lh.
-      const vStart = viewLineStart ? viewLineStart(line) ?? line : line;
-      const vCount = viewLineCount ? viewLineCount(line) ?? 1 : 1;
-      el.style.top = `${(vStart - 1) * this._lineHeight}px`;
-      el.style.height = `${vCount * this._lineHeight}px`;
+
+      if (st!.top !== top) {
+        el.style.top = `${top}px`;
+        st!.top = top;
+      }
+      if (st!.height !== height) {
+        el.style.height = `${height}px`;
+        st!.height = height;
+      }
 
       const info = this._rows ? this._rows.infoFor(line) : { leftLabel: "", cls: "" };
-      el.textContent = info.leftLabel;
-      el.classList.remove("fe-inline-removed-cell");
-      if (info.cls) el.classList.add(info.cls);
+      const text = info.leftLabel;
+      if (st!.text !== text) {
+        el.textContent = text;
+        st!.text = text;
+      }
+      const cls = info.cls ?? "";
+      if (st!.cls !== cls) {
+        el.classList.toggle("fe-inline-removed-cell", cls.includes("fe-inline-removed-cell"));
+        el.classList.toggle("fe-inline-added-cell", cls.includes("fe-inline-added-cell"));
+        st!.cls = cls;
+      }
       // Active (selected) rows' cells are highlighted like the AFTER column.
-      el.classList.toggle("fe-inline-left-active", this._activeLines.has(line));
+      const active = this._activeLines.has(line);
+      if (st!.active !== active) {
+        el.classList.toggle("fe-inline-left-active", active);
+        st!.active = active;
+      }
     }
   }
 
@@ -183,7 +227,13 @@ export class InlineDiffGutterColumns {
     if (this._disposed) return;
     this._activeLines = lines ? new Set(lines) : new Set();
     for (const [line, el] of this._entries) {
-      el.classList.toggle("fe-inline-left-active", this._activeLines.has(line));
+      const active = this._activeLines.has(line);
+      // Keep the per-cell cache coherent so the next band repaint under
+      // scroll doesn't rewrite a class that already matches.
+      if (el.__st && el.__st.active !== active) {
+        el.classList.toggle("fe-inline-left-active", active);
+        el.__st.active = active;
+      }
     }
   }
 
