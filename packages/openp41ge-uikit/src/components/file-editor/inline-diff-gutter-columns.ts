@@ -124,8 +124,13 @@ export class InlineDiffGutterColumns {
         entry = { left, sign };
         this._entries.set(line, entry);
       }
-      entry.left.style.top = `${(line - start) * this._lineHeight}px`;
-      entry.sign.style.top = `${(line - start) * this._lineHeight}px`;
+      // Labels sit at ABSOLUTE document positions (line-1)*lineHeight — the
+      // same convention as the normal line-number gutter — so the inner
+      // container's -/* scroll transform brings the visible band into view.
+      // (Positioning relative to the band start would misplace rows when
+      // scrolled.)
+      entry.left.style.top = `${(line - 1) * this._lineHeight}px`;
+      entry.sign.style.top = `${(line - 1) * this._lineHeight}px`;
       entry.left.style.height = `${this._lineHeight}px`;
       entry.sign.style.height = `${this._lineHeight}px`;
 
