@@ -335,8 +335,16 @@ export class FileEditorElement extends LitElement {
           maxNew = Math.max(maxNew, String(row.newLine).length);
         }
       }
-      gutterWidth = Math.max(48, Math.ceil(maxNew * charW) + 16);
-      leftWidth = Math.max(36, Math.ceil(maxOld * charW) + 16);
+      // BOTH number columns always share ONE width, derived from whichever
+      // column has the widest content. A fully-DELETED file (all rows removed,
+      // maxNew = 0) still reserves the AFTER column using the BEFORE column's
+      // numbers — and a wholly-NEW file does the reverse (maxOld = 0). This
+      // keeps the two columns flush and their right-aligned place values on
+      // top of each other.
+      const maxDigits = Math.max(maxOld, maxNew);
+      const sharedWidth = Math.max(48, Math.ceil(maxDigits * charW) + 16);
+      gutterWidth = sharedWidth;
+      leftWidth = sharedWidth;
       rowsForColumns = {
         infoFor: (line: number) => {
           const row = this._inlineRows?.[line - 1];

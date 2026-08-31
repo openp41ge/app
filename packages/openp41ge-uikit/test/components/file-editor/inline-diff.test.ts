@@ -287,4 +287,48 @@ describe("file-editor inline commit-diff mode", () => {
     await loadInlineDiff(el, TEXT, []);
     expect(el.hasInlineDiff).toBeFalsy();
   });
+
+  test("BEFORE and AFTER columns always share one content-derived width — a fully-deleted file leaves the AFTER column with the BEFORE column's width", async () => {
+    const el = await mount();
+    (el as unknown as { _charWidth: number })._charWidth = 20; // widen so content beats the 48px min
+
+    // A fully-deleted file: every row removed, old numbers 1..120 (3 digits),
+    // NO new-side content at all (AFTER column would render empty). The shared
+    // width must come from the BEFORE column's content.
+    const lineCount = 120;
+    const text = Array.from({ length: lineCount }, (_, i) => `old deleted line ${i + 1}`).join(
+      "\n",
+    );
+    const rows = Array.from({ length: lineCount }, (_, i) => ({
+      kind: "removed" as const,
+      oldLine: i + 1,
+      newLine: null,
+    }));
+    await loadInlineDiff(el, text, rows);
+
+    const expected = 3 * 20 + 16; // 3 digits * charW + padding = 76
+    expect(el.querySelector(".fe-inline-left").style.width).toBe(`${expected}px`);
+    expect(el.querySelector(".fe-gutter").style.width).toBe(`${expected}px`);
+    // The AFTER column is BLANK (no new side) yet stays as wide as the BEFORE.
+    expect(middleLabels(el).every((t) => t === "")).toBe(true);
+    expect(leftLabels(el)[0]).toBe("1");
+  });
+
+  test("BEFORE and AFTER columns share the same width even when only one side has digit-heavy content", async () => {
+    const el = await mount();
+    (el as unknown as { _charWidth: number })._charWidth = 20;
+
+    // A wholly-NEW file: no BEFORE content (every row added), AFTER numbers up
+    // to 3 digits. The empty BEFORE column must still reserve the AFTER width.
+    const rows = [
+      { kind: "added" as const, oldLine: null, newLine: 1 },
+      { kind: "added" as const, oldLine: null, newLine: 2 },
+      { kind: "added" as const, oldLine: null, newLine: 999 },
+    ];
+    await loadInlineDiff(el, "fresh one\nfresh two\nfresh three", rows);
+
+    const expected = 3 * 20 + 16; // 3 digits * charW + padding = 76
+    expect(el.querySelector(".fe-inline-left").style.width).toBe(`${expected}px`);
+    expect(el.querySelector(".fe-gutter").style.width).toBe(`${expected}px`);
+  });
 });
