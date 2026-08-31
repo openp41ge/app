@@ -10,24 +10,43 @@
  * content stays legible above the tint.
  */
 
-import { createFastDomNode, FastDomNode } from "openp41ge-editor-engine/view/fast-dom-node";
-
 export type InlineDiffRowKind = "context" | "added" | "removed";
 
 /** One decorated buffer row of an inline commit diff. */
 export interface InlineDiffRow {
   readonly kind: InlineDiffRowKind;
-  /** Real new-file line number; null for removed (synthetic) rows. */
-  readonly fileLine: number | null;
+  /** Old-file line number this row pairs with (null when absent). */
+  readonly oldLine: number | null;
+  /** New-file line number this row pairs with (null when absent). */
+  readonly newLine: number | null;
+}
+
+/**
+ * The text shown in the line-number gutter for a decorated row.
+ *   - context rows: its single (new-file) number,
+ *   - changed rows: `old new` pair plus the change sign (`+` added / `−`
+ *     removed), dropping the side that has no line (pure add/delete).
+ * Shared by the gutter (which renders it) and the width calculation (which
+ * sizes the line-number column to fit the widest label).
+ */
+export function inlineDiffLabel(row: InlineDiffRow): string {
+  if (row.kind === "context") {
+    return row.newLine != null ? String(row.newLine) : "";
+  }
+  const sign = row.kind === "added" ? "+" : "−";
+  const old = row.oldLine != null ? String(row.oldLine) : "";
+  const nw = row.newLine != null ? String(row.newLine) : "";
+  const pair = [old, nw].filter(Boolean).join(" ");
+  return pair ? `${pair} ${sign}` : sign;
 }
 
 export class InlineDiffHighlightsRenderer {
-  private _parent: FastDomNode;
-  private _els: FastDomNode[] = [];
+  private _parent: HTMLElement;
+  private _els: HTMLElement[] = [];
   private _disposed = false;
 
   constructor(parentElement: HTMLElement) {
-    this._parent = new FastDomNode(parentElement);
+    this._parent = parentElement;
   }
 
   /**
@@ -45,35 +64,28 @@ export class InlineDiffHighlightsRenderer {
 
     const start = Math.max(1, visibleStartLine);
     const end = Math.max(start, visibleEndLine);
-    const band: Array<{ line: number; kind: "added" | "removed" }> = [];
     for (let i = start; i <= end; i++) {
       const row = rows?.[i - 1];
       if (!row) continue;
-      if (row.kind === "added" || row.kind === "removed") {
-        band.push({ line: i, kind: row.kind });
-      }
-    }
+      if (row.kind !== "added" && row.kind !== "removed") continue;
 
-    for (const item of band) {
-      const el = createFastDomNode();
-      el.setPosition("absolute");
-      el.setLeft(0);
-      el.setTop((item.line - 1) * lineHeight);
-      el.setHeight(lineHeight);
-      el.setZIndex(1);
-      el.setClassName(
-        item.kind === "added" ? "fe-inline-diff-added" : "fe-inline-diff-removed",
-      );
-      el.element.style.right = "0";
-      el.element.style.pointerEvents = "none";
-      this._parent.appendChild(el.element);
+      const el = document.createElement("div");
+      el.style.position = "absolute";
+      el.style.left = "0";
+      el.style.right = "0";
+      el.style.top = `${(i - 1) * lineHeight}px`;
+      el.style.height = `${lineHeight}px`;
+      el.style.zIndex = "1";
+      el.style.pointerEvents = "none";
+      el.className = row.kind === "added" ? "fe-inline-diff-added" : "fe-inline-diff-removed";
+      this._parent.appendChild(el);
       this._els.push(el);
     }
   }
 
   clear(): void {
     for (const el of this._els) {
-      el.element.remove();
+      el.remove();
     }
     this._els = [];
   }

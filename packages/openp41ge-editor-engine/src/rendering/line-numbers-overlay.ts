@@ -208,6 +208,16 @@ export class LineNumbersOverlay {
   }
 
   /**
+   * Change the gutter width at runtime (e.g. an inline diff needs room for its
+   * `old new +` labels). Existing labels re-center automatically.
+   */
+  setGutterWidth(width: number): void {
+    if (width <= 0 || this._disposed) return;
+    this._config.gutterWidth = width;
+    this._gutterEl.setWidth(width);
+  }
+
+  /**
    * Update the active line (for relative mode).
    */
   setActiveLine(lineNumber: number, mode?: LineNumberMode): void {

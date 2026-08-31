@@ -5,27 +5,27 @@
  * An inline diff is a REAL loaded buffer (the file at the commit, with its
  * removed lines spliced back in) decorated per row:
  *   - removed rows  → re-injected deleted lines, red full-width background,
- *                     gutter number blanked,
- *   - added rows    → green full-width background, gutter shows the file's
- *                     real new-file number,
- *   - context rows  → unchanged.
+ *                     gutter shows its old|new pair + a − sign,
+ *   - added rows    → green full-width background, gutter shows the pair + a +
+ *                     sign,
+ *   - context rows  → unchanged, single (new-file) number.
+ * The line-number column widens to fit the `old new sign` labels.
  * Because it is a real buffer it keeps full syntax highlighting and normal
  * editor behaviour — and there are NO @@ section headers. setInlineDiff(null)
- * removes the decorations and restores default line numbers.
+ * removes the decorations and restores the default gutter width.
  */
 import { describe, test, expect, beforeEach } from "vitest";
 import "../../../src/components/file-editor/file-editor";
 import { PieceTreeTextContentModel } from "../../../src/file-editor";
+import { inlineDiffLabel } from "../../../src/components/file-editor/inline-diff-highlights";
 
-// Old file had line1 "OLD_GONE", which became "NEW_HERE"; the merged buffer
-// splices OLD_GONE (removed, red) back above NEW_HERE (added, green). No
-// trailing newline — buildInlineDiffFile emits the exact merged lines so the
-// buffer's line count matches its decoration rows.
+// Old line 1 "OLD_GONE" became "NEW_HERE"; the merged buffer splices OLD_GONE
+// (removed, red) back above NEW_HERE (added, green). No trailing newline.
 const TEXT = "OLD_GONE\nNEW_HERE\nstill here";
 const ROWS = [
-  { kind: "removed", fileLine: null },
-  { kind: "added", fileLine: 1 },
-  { kind: "context", fileLine: 2 },
+  { kind: "removed", oldLine: 1, newLine: 1 },
+  { kind: "added", oldLine: 1, newLine: 1 },
+  { kind: "context", oldLine: 2, newLine: 2 },
 ];
 
 async function mount(): Promise<HTMLElement & any> {
@@ -51,6 +51,12 @@ function gutterLabels(el): string[] {
   return [...el.querySelectorAll(".fe-gutter .line-number")].map((n) => n.textContent ?? "");
 }
 
+function gutterWidth(el): number {
+  const el2 = el.querySelector(".fe-gutter");
+  const w = el2?.style.width ?? "";
+  return w.endsWith("px") ? Number(w.slice(0, -2)) : NaN;
+}
+
 function tints(el): { added: number; removed: number } {
   return {
     added: el.querySelectorAll(".fe-inline-diff-added").length,
@@ -66,13 +72,13 @@ describe("file-editor inline commit-diff mode", () => {
   test("loads a real buffer and decorates added/removed rows", async () => {
     const el = await mount();
 
-    // No diff yet — plain editor with default numbers.
     expect(el.hasInlineDiff).toBe(false);
+    expect(gutterWidth(el)).toBe(48); // default width
 
     await loadInlineDiff(el);
 
     // It IS the real editor: the document holds the merged text (removed line
-    // included), a textarea exists, and no caret is shown (read-only).
+    // included), a textarea exists.
     expect(el.textContentModel).toBeTruthy();
     expect(el.textContentModel.lineCount).toBe(3);
     expect(el.querySelector("textarea")).not.toBeNull();
@@ -83,10 +89,19 @@ describe("file-editor inline commit-diff mode", () => {
     expect(t.removed).toBeGreaterThanOrEqual(1);
     expect(t.added).toBeGreaterThanOrEqual(1);
 
-    // Gutter shows the FILE's real numbers: deleted row blank, added row "1",
-    // context row its own number.
-    expect(gutterLabels(el)[0]).toBe("");
-    expect(gutterLabels(el)[1]).toBe("1");
+    // Gutter shows the old|new pair + sign: removed "1 1 −", added "1 1 +".
+    expect(gutterLabels(el)[0]).toBe("1 1 −");
+    expect(gutterLabels(el)[1]).toBe("1 1 +");
+
+    // The line-number column widened to fit the labels.
+    expect(gutterWidth(el)).toBeGreaterThan(48);
+
+    // Pure label formatting is what the overlay displays.
+    expect(inlineDiffLabel({ kind: "removed", oldLine: 1, newLine: 1 })).toBe("1 1 −");
+    expect(inlineDiffLabel({ kind: "added", oldLine: 3, newLine: 4 })).toBe("3 4 +");
+    expect(inlineDiffLabel({ kind: "context", oldLine: 2, newLine: 2 })).toBe("2");
+    expect(inlineDiffLabel({ kind: "added", oldLine: null, newLine: 1 })).toBe("1 +");
+    expect(inlineDiffLabel({ kind: "removed", oldLine: 5, newLine: null })).toBe("5 −");
   });
 
   test("the visible text is the file itself — NO @@ headers", async () => {
@@ -99,10 +114,11 @@ describe("file-editor inline commit-diff mode", () => {
     expect(visible).not.toContain("@@");
   });
 
-  test("setInlineDiff(null) removes tints and restores default line numbers", async () => {
+  test("setInlineDiff(null) removes tints and restores default width + numbers", async () => {
     const el = await mount();
     await loadInlineDiff(el);
     expect(tints(el).removed).toBeGreaterThanOrEqual(1);
+    expect(gutterWidth(el)).toBeGreaterThan(48);
 
     el.setInlineDiff(null);
     await new Promise((r) => setTimeout(r, 20));
@@ -110,7 +126,8 @@ describe("file-editor inline commit-diff mode", () => {
     expect(el.hasInlineDiff).toBe(false);
     expect(tints(el).removed).toBe(0);
     expect(tints(el).added).toBe(0);
-    // Default numbers are back: 1, 2, 3 (no blanks).
+    expect(gutterWidth(el)).toBe(48);
+    // Default numbers are back: 1, 2, 3.
     const labels = gutterLabels(el);
     expect(labels[0]).toBe("1");
     expect(labels[1]).toBe("2");

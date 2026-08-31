@@ -134,8 +134,9 @@ export class CommitFileDiffController extends BaseController {
           (r) =>
             r &&
             typeof r === "object" &&
-            ("kind" in (r as object)) &&
-            ("fileLine" in (r as object)),
+            "kind" in (r as object) &&
+            "oldLine" in (r as object) &&
+            "newLine" in (r as object),
         )
       ) {
         this._diffRows = rows as InlineDiffRow[];

@@ -110,14 +110,14 @@ describe("CommitFileDiffController", () => {
     expect(host.querySelectorAll(".fe-inline-diff-removed").length).toBeGreaterThanOrEqual(1);
     expect(host.querySelectorAll(".fe-inline-diff-added").length).toBeGreaterThanOrEqual(1);
 
-    // Gutter shows the FILE's real numbers: deleted row blank, added row 1.
-    // (jsdom paints only the visible band.)
+    // Gutter shows the file's real numbers + change sign: removed "1 1 −",
+    // added "1 1 +". (jsdom paints only the visible band.)
     const labels = [
       ...(host.querySelectorAll(".fe-gutter .line-number") ?? []),
     ].map((n) => n.textContent ?? "");
     expect(labels).toHaveLength(2);
-    expect(labels[0]).toBe(""); // removed
-    expect(labels[1]).toBe("1"); // added replacement keeps its real number
+    expect(labels[0]).toBe("1 1 −"); // removed — old|new pair + minus
+    expect(labels[1]).toBe("1 1 +"); // added — old|new pair + plus
   });
 
   it("restore with cached text/rows paints instantly without refetching", async () => {

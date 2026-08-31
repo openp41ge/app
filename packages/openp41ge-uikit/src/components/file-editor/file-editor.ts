@@ -60,6 +60,7 @@ import {
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
 import {
   InlineDiffHighlightsRenderer,
+  inlineDiffLabel,
   type InlineDiffRow,
 } from "./inline-diff-highlights";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
@@ -281,8 +282,21 @@ export class FileEditorElement extends LitElement {
       // The buffer was replaced meanwhile — decorations no longer align.
       this._inlineRows = null;
     }
+    // Size the line-number column to fit the widest gutter label (old new sign)
+    // when an inline diff is active; back to the default width when cleared.
+    let gutterWidth = 48;
+    if (this._inlineRows) {
+      let widest = 0;
+      for (const row of this._inlineRows) {
+        widest = Math.max(widest, inlineDiffLabel(row).length);
+      }
+      const charW = this._charWidth > 0 ? this._charWidth : 8;
+      // chars * char width + 8px right padding + a little breathing room.
+      gutterWidth = Math.max(48, Math.ceil(widest * charW) + 20);
+    }
+    this._lineNumbersOverlay?.setGutterWidth(gutterWidth);
     // Re-paint the gutter: existing labels were already numbered by buffer
-    // line; the override now shows the real file numbers (blank on removals).
+    // line; the override now shows the file's real old|new numbers + sign.
     if (this._viewLines && this._viewModel) {
       this._lineNumbersOverlay?.setVisibleRange(
         this._viewLines.startLineNumber || 1,
@@ -1060,13 +1074,13 @@ export class FileEditorElement extends LitElement {
       onLineClick: (lineNumber: number) => {
         this._cursorController?.selectLine(lineNumber);
       },
-      // Inline commit-diff: show the file's REAL line numbers (deleted rows
-      // are blanked); null leaves the default buffer number.
+      // Inline commit-diff: the gutter shows the file's real old|new numbers
+      // plus the +/− change sign (see inlineDiffLabel); null = default.
       getLabelOverride: (lineNumber: number) => {
         const row = this._inlineRows?.[lineNumber - 1];
         if (!row) return null;
-        if (row.kind === "removed") return "";
-        return row.fileLine != null ? String(row.fileLine) : null;
+        const label = inlineDiffLabel(row);
+        return label === "" ? null : label;
       },
       wordWrapEnabled: this._wordWrapEnabled,
       getViewLineStart: (modelLine: number) =>
