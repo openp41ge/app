@@ -92,11 +92,17 @@ describe("file-editor inline commit-diff mode", () => {
     expect(el.querySelector(".fe-inline-left").style.display).not.toBe("none");
     expect(el.querySelector(".fe-inline-sign").style.display).not.toBe("none");
 
-    // middle = NEW file numbers; left = OLD numbers on changed rows; sign =
-    // colored glyphs on changed rows only. (jsdom paints the visible band = 2
-    // lines, so the context row of the fixture is off-screen here.)
-    expect(middleLabels(el)).toEqual(["1", "1"]);
-    expect(leftLabels(el)).toEqual(["1", "1"]);
+    // BEFORE/AFTER columns (band = 2 lines in jsdom):
+    //   deleted row → before (left) number only  →  left "1", middle "";
+    //   added row   → after (middle) number only →  left "",  middle "1".
+    // And never a number in BOTH columns on the same row.
+    expect(leftLabels(el)).toEqual(["1", ""]);
+    expect(middleLabels(el)).toEqual(["", "1"]);
+    for (let i = 0; i < leftLabels(el).length; i++) {
+      if (leftLabels(el)[i] && middleLabels(el)[i]) {
+        throw new Error(`both before+after on row ${i + 1}`);
+      }
+    }
     const signs = signGlyphs(el);
     expect(signs).toHaveLength(2);
     expect(signs[0].text).toBe("−");

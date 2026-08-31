@@ -122,8 +122,10 @@ describe("CommitFileDiffController", () => {
     const glyphs = [...(host.querySelectorAll(".fe-inline-sign .fe-inline-sign-label") ?? [])].map(
       (n) => ({ t: n.textContent ?? "", cls: n.className }),
     );
-    expect(middle).toEqual(["1", "1"]); // new
-    expect(left).toEqual(["1", "1"]); // old
+    // BEFORE (left) / AFTER (middle): deleted row has before only, added row
+    // has after only — never both on one row.
+    expect(middle).toEqual(["", "1"]); // after — added row only
+    expect(left).toEqual(["1", ""]); // before — deleted row only
     expect(glyphs).toHaveLength(2);
     expect(glyphs[0].t).toBe("−");
     expect(glyphs[0].cls).toContain("fe-sign-rem");

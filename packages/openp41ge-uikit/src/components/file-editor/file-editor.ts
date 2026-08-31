@@ -289,7 +289,7 @@ export class FileEditorElement extends LitElement {
     //   left   — OLD numbers (editor background, a separate group),
     //   middle — NEW file numbers (the normal line-number column),
     //   sign   — the + / − glyph column (transparent except the glyphs).
-    let gutterWidth = 48; // middle
+    let gutterWidth = 48; // middle (after)
     let leftWidth = 36;
     let signWidth = 18;
     let rowsForColumns: InlineDiffGutterRows | null = null;
@@ -298,9 +298,14 @@ export class FileEditorElement extends LitElement {
       let maxOld = 0;
       let maxNew = 0;
       for (const row of this._inlineRows) {
-        if (row.newLine != null) maxNew = Math.max(maxNew, String(row.newLine).length);
-        if ((row.kind === "added" || row.kind === "removed") && row.oldLine != null) {
+        // Left = BEFORE holds a number only on deleted rows; middle = AFTER
+        // holds a number only on added (and unchanged context) rows — never
+        // both on the same row.
+        if (row.kind === "removed" && row.oldLine != null) {
           maxOld = Math.max(maxOld, String(row.oldLine).length);
+        }
+        if (row.kind !== "removed" && row.newLine != null) {
+          maxNew = Math.max(maxNew, String(row.newLine).length);
         }
       }
       gutterWidth = Math.max(48, Math.ceil(maxNew * charW) + 16);
@@ -310,10 +315,9 @@ export class FileEditorElement extends LitElement {
         infoFor: (line: number) => {
           const row = this._inlineRows?.[line - 1];
           if (!row) return { leftLabel: "", sign: "" };
-          const left =
-            (row.kind === "added" || row.kind === "removed") && row.oldLine != null
-              ? String(row.oldLine)
-              : "";
+          // BEFORE (left) — the old line number, only on deleted rows; an
+          // added line has no before side.
+          const left = row.kind === "removed" && row.oldLine != null ? String(row.oldLine) : "";
           const sign = row.kind === "added" ? "+" : row.kind === "removed" ? "−" : "";
           return { leftLabel: left, sign };
         },
@@ -1134,13 +1138,16 @@ export class FileEditorElement extends LitElement {
       onLineClick: (lineNumber: number) => {
         this._cursorController?.selectLine(lineNumber);
       },
-      // Inline commit-diff: the middle gutter shows the file's real NEW line
-      // number per row (old numbers live in the left column, the sign in the
-      // right column); null = the default buffer number.
+      // Inline commit-diff: left = BEFORE (old numbers, deleted rows only),
+      // middle = AFTER (new numbers, added + context rows only) — deleted rows
+      // show nothing on the after side, never both on a row.
       getLabelOverride: (lineNumber: number) => {
         const row = this._inlineRows?.[lineNumber - 1];
         if (!row) return null;
-        return row.newLine != null ? String(row.newLine) : "";
+        if (row.kind !== "removed" && row.newLine != null) {
+          return String(row.newLine);
+        }
+        return ""; // removed rows: no after-side number
       },
       wordWrapEnabled: this._wordWrapEnabled,
       getViewLineStart: (modelLine: number) =>
