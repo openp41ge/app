@@ -85,8 +85,16 @@ export class LineNumbersOverlay {
     this._gutterEl.setWidth(config.gutterWidth);
 
     // Inner container that shifts via CSS transform instead of gutter scrollTop.
-    // This avoids scroll-boundary mismatches between gutter and viewport.
+    // This avoids scroll-boundary mismatches between gutter and viewport. The
+    // box is CLIPPED to the viewport height (labels stay document-positioned;
+    // only the visible band is painted), with will-change + translate3d so it
+    // scrolls on the compositor in lockstep with the viewport content — plain
+    // translateY over a document-tall box repaints on the main thread per frame
+    // and visibly lags behind fast scrolls.
     this._scrollContainer = createFastDomNode();
+    this._scrollContainer.element.style.willChange = "transform";
+    this._scrollContainer.element.style.height = "100%";
+    this._scrollContainer.element.style.overflow = "hidden";
     this._scrollContainer.setPosition("absolute");
     this._scrollContainer.setTop(0);
     this._scrollContainer.setLeft(0);
@@ -266,7 +274,9 @@ export class LineNumbersOverlay {
    * to scrollHeight consistently across browsers.
    */
   setScrollOffset(scrollTop: number): void {
-    this._scrollContainer.element.style.transform = `translateY(-${scrollTop}px)`;
+    // translate3d (not translateY) so the composited layer scrolls in lockstep
+    // with the natively-scrolled viewport content.
+    this._scrollContainer.element.style.transform = `translate3d(0, ${-scrollTop}px, 0)`;
   }
 
   /**

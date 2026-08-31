@@ -63,7 +63,12 @@ export class InlineDiffGutterColumns {
       "background:var(--fe-bg,#161616);user-select:none;" +
       "font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
     this._leftInner = document.createElement("div");
-    this._leftInner.style.cssText = "position:absolute;top:0;left:0;right:0;will-change:transform;";
+    // Viewport-height, clipped, will-change layer: labels stay document-absolute
+    // but only the visible band is painted, so the compositor backing store is
+    // bounded AND the transform scrolls in lockstep with the viewport (no
+    // main-thread repaint of a document-tall box per frame).
+    this._leftInner.style.cssText =
+      "position:absolute;top:0;left:0;right:0;height:100%;overflow:hidden;will-change:transform;";
     this._leftOuter.appendChild(this._leftInner);
     contentEl.insertBefore(this._leftOuter, gutterEl);
 

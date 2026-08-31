@@ -1316,11 +1316,11 @@ export class FileEditorElement extends LitElement {
     // highlights for the new visible lines. This ensures that cross-range selection
     // (e.g., Cmd+Shift+Down from line 5 to line 500) updates highlights correctly
     // when the user scrolls to view different parts of the selection.
-    // Sync line number positions with viewport scroll via CSS transform.
-    this._viewportEl.addEventListener("scroll", () => {
-      this._lineNumbersOverlay?.setScrollOffset(this._viewportEl.scrollTop);
-      this._inlineColumns?.setScrollOffset(this._viewportEl.scrollTop);
-    });
+    // Line-number columns are scroll-synced to the viewport by a single
+    // scroll listener attached in firstUpdated (see above) — do NOT attach
+    // another here: this block runs per model load, so each load would pile on
+    // one more per-frame transform write (a visible lag source under fast
+    // scrolling). onVisibleRangeChanged below still re-paints the labels.
 
     this._viewLines.onVisibleRangeChanged = (startLine: number, endLine: number) => {
       // Sync line numbers with viewport scroll position
