@@ -81,8 +81,6 @@ export class CommitFileDiffController extends BaseController {
     const shell = document.createElement("div");
     shell.style.cssText = "display:flex;flex-direction:column;width:100%;height:100%;";
 
-    shell.appendChild(this._buildHeader());
-
     this._bodyHost = document.createElement("div");
     this._bodyHost.style.cssText = "flex:1;min-height:0;position:relative;";
     shell.appendChild(this._bodyHost);
@@ -93,6 +91,9 @@ export class CommitFileDiffController extends BaseController {
     editor.setReadOnly(true);
     this._bodyHost.appendChild(editor);
     this._editor = editor;
+    // No header bar: the short commit ID lives right-aligned in the file
+    // editor's bottom bar (left of the icons).
+    editor.setStatusInfo(this._hash.slice(0, 7));
 
     if (this._diffText !== null) {
       void this._loadInlineDiff(editor);
@@ -142,23 +143,6 @@ export class CommitFileDiffController extends BaseController {
         this._diffRows = rows as InlineDiffRow[];
       }
     }
-  }
-
-  /** Header: file path — short hash. */
-  private _buildHeader(): HTMLElement {
-    const header = document.createElement("div");
-    header.style.cssText =
-      "display:flex;align-items:center;gap:8px;padding:0 10px;height:28px;flex-shrink:0;" +
-      "border-bottom:1px solid #333;font-size:11px;color:#999;";
-    const path = document.createElement("span");
-    path.textContent = this._path;
-    path.style.cssText = "flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-    const short = document.createElement("span");
-    short.textContent = this._hash.slice(0, 7);
-    short.style.color = "#e3e3e3";
-    header.appendChild(path);
-    header.appendChild(short);
-    return header;
   }
 
   private async _fetchAndRender(editor: FileEditorElement, token: number): Promise<void> {

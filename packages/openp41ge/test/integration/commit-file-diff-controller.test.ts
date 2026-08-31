@@ -140,6 +140,13 @@ describe("CommitFileDiffController", () => {
     // Leftmost column uses the EDITOR background (separate group from the
     // gutter column).
     expect(host.querySelector(".fe-inline-left")?.style?.background).toContain("var(--fe-bg");
+
+    // No header bar: the short commit ID lives right-aligned in the editor's
+    // bottom bar (left of the icons), not in a top strip.
+    expect(host.querySelector(".sbb-info")?.textContent).toBe(HASH.slice(0, 7));
+    // The old header strip is gone — the editor fills the pane (nothing above
+    // the fe-status-bar except the editor content region).
+    expect(host.innerHTML).not.toContain("border-bottom:1px solid #333");
   });
 
   it("restore with cached text/rows paints instantly without refetching", async () => {

@@ -101,8 +101,16 @@ export class InlineDiffGutterColumns {
     this._leftOuter.style.display = rows !== null ? "" : "none";
   }
 
-  /** Rebuild the absolutely-placed labels for the visible band. */
-  setVisibleRange(startLine: number, endLine: number): void {
+  /** Rebuild the absolutely-placed labels for the visible band. When word
+   * wrap is active, pass the per-model-line VIEW mapping (first view line +
+   * wrapped height) so labels align with the wrapped text and span every
+   * segment — exactly like the normal line-number gutter. */
+  setVisibleRange(
+    startLine: number,
+    endLine: number,
+    viewLineStart?: (modelLine: number) => number,
+    viewLineCount?: (modelLine: number) => number,
+  ): void {
     if (this._disposed) return;
     const start = Math.max(1, startLine);
     const end = Math.max(start, endLine);
@@ -120,12 +128,16 @@ export class InlineDiffGutterColumns {
         el = document.createElement("div");
         el.className = "fe-inline-left-label";
         // Full-column width + flex-end so the numbers are RIGHT-ALIGNED (place
-        // values line up) exactly like the normal gutter's `.line-number` labels.
-        // Without left:0/right:0 the absolute box shrink-wraps its content and
-        // flex-end has nothing to push against, leaving the numbers left-anchored.
+        // values line up) exactly like the normal gutter's `.line-number`
+        // labels. Without left:0/right:0 the absolute box shrink-wraps its
+        // content and flex-end has nothing to push against, leaving the
+        // numbers left-anchored.
+        // flex-start keeps the number on the FIRST wrapped segment (same as
+        // the normal gutter); the cell height below spans all segments, so the
+        // red/green/active background continues down a wrapped line.
         el.style.cssText =
           "position:absolute;left:0;right:0;box-sizing:border-box;cursor:pointer;" +
-          "display:flex;align-items:center;justify-content:flex-end;padding-right:8px;" +
+          "display:flex;align-items:flex-start;justify-content:flex-end;padding-right:8px;" +
           "overflow:hidden;white-space:nowrap;";
         this._leftInner.appendChild(el);
         this._entries.set(line, el);
@@ -136,8 +148,12 @@ export class InlineDiffGutterColumns {
           });
         }
       }
-      el.style.top = `${(line - 1) * this._lineHeight}px`;
-      el.style.height = `${this._lineHeight}px`;
+      // Word-wrap: anchor at the model line's FIRST view segment and span the
+      // full wrapped height; without wrap getters this is just (line-1)*lh.
+      const vStart = viewLineStart ? viewLineStart(line) ?? line : line;
+      const vCount = viewLineCount ? viewLineCount(line) ?? 1 : 1;
+      el.style.top = `${(vStart - 1) * this._lineHeight}px`;
+      el.style.height = `${vCount * this._lineHeight}px`;
 
       const info = this._rows ? this._rows.infoFor(line) : { leftLabel: "", cls: "" };
       el.textContent = info.leftLabel;

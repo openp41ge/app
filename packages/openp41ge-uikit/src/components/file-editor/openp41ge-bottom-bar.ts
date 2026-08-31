@@ -55,6 +55,7 @@ class FeStatusBar extends LitElement {
   // Reactive internal state — updated by public API methods
   @state() private _sizeText = "";
   @state() private _isDirty = false;
+  @state() private _infoText = "";
   @state() private _hasFormatter = false;
   @state() private _wordWrapOn = false;
   @state() private _emptyMessage: string | null = null;
@@ -66,6 +67,13 @@ class FeStatusBar extends LitElement {
 
   setSize(text: string): void {
     this._sizeText = text;
+  }
+
+  /** Right-aligned info label (e.g. the short commit ID in the commit-file
+   * diff). Sits immediately LEFT of the bottom-bar icons. Pass ""/null to
+   * remove it. */
+  setInfo(text: string | null): void {
+    this._infoText = text ?? "";
   }
 
   setDirty(isDirty: boolean): void {
@@ -294,6 +302,15 @@ class FeStatusBar extends LitElement {
                       ${unsafeHTML(ICON_FIND)}
                     </button>
                   </div>
+                  ${
+                    this._infoText
+                      ? html`<span
+                          class="sbb-info"
+                          style="flex-shrink:0;color:#9a9a9a;font-size:11px;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;white-space:nowrap;"
+                          >${this._infoText}</span
+                        >`
+                      : ""
+                  }
                   <div style="display:flex;align-items:stretch;height:24px;">
                     ${
                       this._hasFormatter

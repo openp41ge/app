@@ -150,6 +150,30 @@ describe("InlineDiffGutterColumns", () => {
     expect(clicks).toEqual([5]);
   });
 
+  test("word wrap: labels anchor at the first view segment and span the wrapped height", () => {
+    const { cols } = setup();
+    cols.setSizes(LH, 50);
+    cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: "" }) });
+
+    // Fake wrap mapping: line 1 -> view 1 (1 segment), line 2 -> view 2
+    // spanning THREE segments, line 3 -> view 5 (1 segment).
+    const viewStart = (m: number) => ({ 1: 1, 2: 2, 3: 5 }[m] ?? m);
+    const viewCount = (m: number) => (m === 2 ? 3 : 1);
+    cols.setVisibleRange(1, 3, viewStart, viewCount);
+
+    const labels = leftLabels();
+    expect(labels[0].style.top).toBe("0px");
+    expect(labels[0].style.height).toBe("20px");
+    expect(labels[1].style.top).toBe("20px"); // (vStart 2 - 1)*20
+    expect(labels[1].style.height).toBe("60px"); // 3 segments
+    expect(labels[2].style.top).toBe("80px"); // (vStart 5 - 1)*20
+    expect(labels[2].style.height).toBe("20px");
+
+    // The number text is top-aligned within its (possibly tall) cell so it
+    // sits on the first segment, matching the normal gutter.
+    expect(labels[1].style.alignItems).toBe("flex-start");
+  });
+
   test("removed rows get the red cell class; there is no sign column", () => {
     const { cols } = setup();
     cols.setSizes(LH, 50);

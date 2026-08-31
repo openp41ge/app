@@ -134,6 +134,9 @@ export class FileEditorElement extends LitElement {
    */
   _dirtyTracker: IDirtyStateTracker = new VersionBasedDirtyTracker();
   private _statusBar: FeStatusBar | null = null;
+  /** setStatusInfo text set before the status bar existed (applied in
+   * firstUpdated). undefined = never set, so we don't clobber a default. */
+  private _pendingStatusInfo: string | null | undefined = undefined;
   private _viewportResizeObserver: ResizeObserver | null = null;
 
   // ── Injected dependencies ──
@@ -249,6 +252,14 @@ export class FileEditorElement extends LitElement {
     this.requestUpdate();
   }
 
+  /** Right-aligned info text in the bottom bar (e.g. the short commit ID of
+   * the commit-file diff). Pass ""/null to clear it. Value is held until the
+   * status bar exists (firstUpdated), so callers may set it before connect. */
+  setStatusInfo(text: string | null): void {
+    this._pendingStatusInfo = text ?? "";
+    this._statusBar?.setInfo(this._pendingStatusInfo);
+  }
+
   // ── Inline commit-diff decorations (real buffer + colored rows) ──
   //
   // An inline diff is a NORMAL loaded buffer — the file at the commit with its
@@ -342,7 +353,8 @@ export class FileEditorElement extends LitElement {
       const start = this._viewLines.startLineNumber || 1;
       const end = this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount);
       this._lineNumbersOverlay?.setVisibleRange(start, end);
-      this._inlineColumns?.setVisibleRange(start, end);
+      const wg = this._inlineWrapGetters();
+      this._inlineColumns?.setVisibleRange(start, end, wg.getViewLineStart, wg.getViewLineCount);
       this._inlineColumns?.setScrollOffset(this._viewportEl?.scrollTop ?? 0);
     }
     this._updateInlineHighlights();
@@ -408,6 +420,28 @@ export class FileEditorElement extends LitElement {
     const vp = this._viewportEl;
     const contentWidth = vp ? Math.max(vp.scrollWidth, vp.clientWidth) : 0;
     this._inlineHighlights.render(this._inlineRows, start, end, this._lineHeight, contentWidth);
+  }
+
+  /** Word-wrap view mapping for the BEFORE (left) column — mirrors the normal
+   * gutter: first view segment + wrapped segment count per model line. When
+   * word wrap is off these return the identity, so the left labels behave
+   * exactly as single-row cells. */
+  private _inlineWrapGetters(): {
+    getViewLineStart: (modelLine: number) => number;
+    getViewLineCount: (modelLine: number) => number;
+  } {
+    return {
+      getViewLineStart: (modelLine: number) =>
+        this._wordWrapEnabled ? this._viewLines?.getViewLineStart(modelLine) ?? modelLine : modelLine,
+      getViewLineCount: (modelLine: number) => {
+        if (!this._wordWrapEnabled || !this._viewModel) return 1;
+        const content = this._viewModel.getLineContent(modelLine);
+        const cw = this._charWidth > 0 ? this._charWidth : 8;
+        const vw = this._viewportEl?.clientWidth ?? 600;
+        const wrapCol = Math.max(10, Math.floor((vw - 16) / (cw || 8)));
+        return computeWrapSegments(content, wrapCol).length;
+      },
+    };
   }
 
   /** Current syntax theme object. */
@@ -632,6 +666,10 @@ export class FileEditorElement extends LitElement {
 
     // Find and store the status bar reference
     this._statusBar = this.renderRoot.querySelector("fe-status-bar") as FeStatusBar | null;
+    // Status-info set before firstUpdated (e.g. the pane's short commit ID).
+    if (this._statusBar && this._pendingStatusInfo !== undefined) {
+      this._statusBar.setInfo(this._pendingStatusInfo);
+    }
 
     // Remove any existing viewport (from a previous firstUpdated call after
     // reconnection). When the editor's container is orphaned by a grid re-render
@@ -1278,7 +1316,8 @@ export class FileEditorElement extends LitElement {
       this._inlineColumns?.setScrollOffset(this._viewportEl.scrollTop);
       // Create/reposition line number elements for the new visible range
       this._lineNumbersOverlay?.setVisibleRange(startLine, endLine);
-      this._inlineColumns?.setVisibleRange(startLine, endLine);
+      const wg = this._inlineWrapGetters();
+      this._inlineColumns?.setVisibleRange(startLine, endLine, wg.getViewLineStart, wg.getViewLineCount);
       // Re-render selection highlights for the new visible lines (all cursors)
       this._renderSelectionHighlights(
         this._cursorController?.getAllCursors().map((c) => ({
