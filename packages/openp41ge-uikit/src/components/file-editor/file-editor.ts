@@ -592,12 +592,18 @@ export class FileEditorElement extends LitElement {
       .fe-gutter .line-number.fe-inline-added-cell {
         background: ${isLight ? "rgba(46,160,67,0.22)" : "rgba(46,160,67,0.24)"};
       }
+      /* A deleted row fills its empty AFTER number cell with red too, so the
+         red is ONE continuous block across the gutter (left cell + right cell
+         + text row), not two isolated blocks. */
+      .fe-gutter .line-number.fe-inline-removed-cell {
+        background: ${isLight ? "rgba(248,81,73,0.22)" : "rgba(248,81,73,0.24)"};
+      }
       /* Selected rows (cursor line or a multi-row selection): neutral number
          CELLs get the grey background used for border lines and active tabs.
-         Changed rows (red BEFORE cell, green AFTER cell) KEEP their colour —
-         the selection grey must not replace the green/red diff tints. */
+         Changed rows (red cells on deleted rows, green AFTER cell on added
+         rows) KEEP their colour — the selection grey must not replace them. */
       .fe-inline-left-label.fe-inline-left-active:not(.fe-inline-removed-cell),
-      .fe-gutter .line-number.active-line-number:not(.fe-inline-added-cell) {
+      .fe-gutter .line-number.active-line-number:not(.fe-inline-added-cell):not(.fe-inline-removed-cell) {
         background: var(--fe-border-color, #2a2a2a);
       }
       ${scopeCSS}
@@ -1205,6 +1211,10 @@ export class FileEditorElement extends LitElement {
         const row = this._inlineRows?.[lineNumber - 1];
         const parts: string[] = [];
         if (row?.kind === "added") parts.push("fe-inline-added-cell");
+        // A deleted row keeps an empty AFTER cell (no number) but tints it red
+        // too, so the row reads as ONE continuous block of colour across the
+        // gutter instead of red-left-only.
+        if (row?.kind === "removed") parts.push("fe-inline-removed-cell");
         if (this._inlineRows && this._selectedDiffLines.has(lineNumber)) {
           parts.push("active-line-number");
         }

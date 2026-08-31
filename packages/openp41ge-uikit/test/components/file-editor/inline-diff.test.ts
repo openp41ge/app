@@ -184,6 +184,12 @@ describe("file-editor inline commit-diff mode", () => {
     el._inlineColumns.setActiveLines([2]);
     const removedLeft = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")][1];
     expect(getComputedStyle(removedLeft).backgroundColor).toBe("rgba(248, 81, 73, 0.24)");
+    // The AFTER cell of the deleted row stays NUMBERLESS but is ALSO tinted
+    // red, so the row reads as one continuous red block across the gutter.
+    const removedMid = [...el.querySelectorAll(".fe-gutter .line-number")][1];
+    expect(removedMid.textContent).toBe("");
+    expect(removedMid.classList.contains("fe-inline-removed-cell")).toBe(true);
+    expect(getComputedStyle(removedMid).backgroundColor).toBe("rgba(248, 81, 73, 0.24)");
 
     // An ADDED row keeps its green AFTER cell when selected.
     await loadInlineDiff(el, TEXT_SLICE, [
