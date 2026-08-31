@@ -174,6 +174,39 @@ describe("file-editor inline commit-diff mode", () => {
     expect(lefts[1].classList.contains("fe-inline-left-active")).toBe(false);
   });
 
+  test("the grey selection background does NOT replace green/red tinted cells", async () => {
+    const el = await mount();
+    await loadInlineDiff(el); // line 1 context, 2 removed, 3 added
+
+    // Select the REMOVED row (line 2): its BEFORE cell keeps the red tint.
+    el._selectedDiffLines = new Set([2]);
+    el._lineNumbersOverlay.setActiveLine(2);
+    el._inlineColumns.setActiveLines([2]);
+    const removedLeft = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")][1];
+    expect(getComputedStyle(removedLeft).backgroundColor).toBe("rgba(248, 81, 73, 0.24)");
+
+    // An ADDED row keeps its green AFTER cell when selected.
+    await loadInlineDiff(el, TEXT_SLICE, [
+      { kind: "added", oldLine: null, newLine: 1 },
+      { kind: "context", oldLine: 1, newLine: 2 },
+    ]);
+    el._selectedDiffLines = new Set([1]);
+    el._lineNumbersOverlay.setActiveLine(1);
+    el._inlineColumns.setActiveLines([1]);
+    const addedMid = [...el.querySelectorAll(".fe-gutter .line-number")][0];
+    expect(getComputedStyle(addedMid).backgroundColor).toBe("rgba(46, 160, 67, 0.24)");
+
+    // A neutral (context) selected row gets the grey background, not a tint.
+    await loadInlineDiff(el);
+    el._selectedDiffLines = new Set([1]);
+    el._lineNumbersOverlay.setActiveLine(1);
+    el._inlineColumns.setActiveLines([1]);
+    const ctxMid = [...el.querySelectorAll(".fe-gutter .line-number")][0];
+    const bg = getComputedStyle(ctxMid).backgroundColor;
+    expect(bg).not.toBe("rgba(248, 81, 73, 0.24)");
+    expect(bg).not.toBe("rgba(46, 160, 67, 0.24)");
+  });
+
   test("the visible text is the file itself — NO @@ headers", async () => {
     const el = await mount();
     await loadInlineDiff(el);

@@ -592,11 +592,12 @@ export class FileEditorElement extends LitElement {
       .fe-gutter .line-number.fe-inline-added-cell {
         background: ${isLight ? "rgba(46,160,67,0.22)" : "rgba(46,160,67,0.24)"};
       }
-      /* Selected rows (cursor line or a multi-row selection): the number CELLs
-         in both columns get the grey background used for border lines and
-         active tabs, so the selection reads across the gutter. */
-      .fe-inline-left-label.fe-inline-left-active,
-      .fe-gutter .line-number.active-line-number {
+      /* Selected rows (cursor line or a multi-row selection): neutral number
+         CELLs get the grey background used for border lines and active tabs.
+         Changed rows (red BEFORE cell, green AFTER cell) KEEP their colour —
+         the selection grey must not replace the green/red diff tints. */
+      .fe-inline-left-label.fe-inline-left-active:not(.fe-inline-removed-cell),
+      .fe-gutter .line-number.active-line-number:not(.fe-inline-added-cell) {
         background: var(--fe-border-color, #2a2a2a);
       }
       ${scopeCSS}
