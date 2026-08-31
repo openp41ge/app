@@ -267,9 +267,10 @@ export class FileEditorElement extends LitElement {
   private _inlineHighlights: InlineDiffHighlightsRenderer | null = null;
   /** The extra left (old numbers) gutter column. */
   private _inlineColumns: InlineDiffGutterColumns | null = null;
-  /** Primary-cursor line of the inline-diff buffer — the row whose number
-   * CELLs (BEFORE and AFTER) get the active highlight. */
-  private _activeDiffLine = 0;
+  /** Model lines covered by the current selection(s) — their NUMBER CELLs
+   * (BEFORE and AFTER) get the grey active background. Includes the plain
+   * cursor line (single empty selection). */
+  private _selectedDiffLines: ReadonlySet<number> = new Set();
 
   /** True while the editor is showing an inline commit diff. */
   get hasInlineDiff(): boolean {
@@ -289,8 +290,8 @@ export class FileEditorElement extends LitElement {
     }
     if (!this._inlineRows) {
       // Leaving diff mode: drop the active-cell highlight in both columns.
-      this._activeDiffLine = 0;
-      this._inlineColumns?.setActiveLine(null);
+      this._selectedDiffLines = new Set();
+      this._inlineColumns?.setActiveLines(null);
     }
 
     // Two line-number columns only (BEFORE left / AFTER middle); the +/− sign
@@ -591,11 +592,12 @@ export class FileEditorElement extends LitElement {
       .fe-gutter .line-number.fe-inline-added-cell {
         background: ${isLight ? "rgba(46,160,67,0.22)" : "rgba(46,160,67,0.24)"};
       }
-      /* Active (cursor) row: highlight the number CELL in both columns. The
-         ring uses the cursor color so it reads on top of the red/green tints. */
+      /* Selected rows (cursor line or a multi-row selection): the number CELLs
+         in both columns get the grey background used for border lines and
+         active tabs, so the selection reads across the gutter. */
       .fe-inline-left-label.fe-inline-left-active,
       .fe-gutter .line-number.active-line-number {
-        box-shadow: inset 0 0 0 1.5px var(--fe-cursor-color, rgba(122,162,247,0.9));
+        background: var(--fe-border-color, #2a2a2a);
       }
       ${scopeCSS}
       ${globalCSS}
@@ -1202,7 +1204,7 @@ export class FileEditorElement extends LitElement {
         const row = this._inlineRows?.[lineNumber - 1];
         const parts: string[] = [];
         if (row?.kind === "added") parts.push("fe-inline-added-cell");
-        if (this._inlineRows && lineNumber === this._activeDiffLine) {
+        if (this._inlineRows && this._selectedDiffLines.has(lineNumber)) {
           parts.push("active-line-number");
         }
         return parts.join(" ");
@@ -2038,14 +2040,22 @@ export class FileEditorElement extends LitElement {
     }));
     this._renderSelectionHighlights(allSelections);
 
-    // Update line numbers (for relative mode) — based on primary cursor
-    // NOTE: update _activeDiffLine BEFORE setActiveLine — it repaints the
-    // AFTER labels from getLabelDecoration immediately, and must not see the
-    // previous cursor line.
-    this._activeDiffLine = pos.lineNumber;
+    // Update line numbers (for relative mode) — based on primary cursor.
+    // NOTE: refresh _selectedDiffLines BEFORE setActiveLine — that repaints
+    // the AFTER labels from getLabelDecoration synchronously.
+    const selected: Set<number> = new Set();
+    for (const c of allCursors) {
+      const a = c.selectionAnchor.lineNumber;
+      const b = c.position.lineNumber;
+      const lo = Math.min(a, b);
+      const hi = Math.max(a, b);
+      for (let l = lo; l <= hi; l++) selected.add(l);
+    }
+    this._selectedDiffLines = selected;
     this._lineNumbersOverlay?.setActiveLine(pos.lineNumber);
-    // Inline diff: highlight the cursor row's NUMBER CELLs in both columns.
-    this._inlineColumns?.setActiveLine(this._inlineRows ? pos.lineNumber : null);
+    // Inline diff: highlight the number cells of every selected row (cursor
+    // line on click; every line of a multi-row selection).
+    this._inlineColumns?.setActiveLines(this._inlineRows ? selected : null);
 
     // Current line highlight — based on primary cursor
     this._currentLineHighlight?.setLine(pos.lineNumber);

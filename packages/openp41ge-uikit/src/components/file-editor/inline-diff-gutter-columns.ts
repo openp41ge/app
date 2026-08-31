@@ -41,7 +41,7 @@ export class InlineDiffGutterColumns {
   private _rows: InlineDiffGutterRows | null = null;
   private _scrollTarget: HTMLElement | null;
   private _onLineClick: ((lineNumber: number) => void) | null = null;
-  private _activeLine: number | null = null;
+  private _activeLines: ReadonlySet<number> = new Set();
   private _disposed = false;
 
   constructor(
@@ -143,11 +143,8 @@ export class InlineDiffGutterColumns {
       el.textContent = info.leftLabel;
       el.classList.remove("fe-inline-removed-cell");
       if (info.cls) el.classList.add(info.cls);
-      // Active (cursor) row's cell is highlighted, like the AFTER column.
-      el.classList.toggle(
-        "fe-inline-left-active",
-        this._activeLine != null && line === this._activeLine,
-      );
+      // Active (selected) rows' cells are highlighted like the AFTER column.
+      el.classList.toggle("fe-inline-left-active", this._activeLines.has(line));
     }
   }
 
@@ -157,12 +154,15 @@ export class InlineDiffGutterColumns {
     this._leftInner.style.transform = `translate3d(0, ${-scrollTop}px, 0)`;
   }
 
-  /** Highlight the number cell of the active (cursor) row. */
-  setActiveLine(lineNumber: number | null): void {
+  /**
+   * Highlight the number cells of the selected rows (cursor line, or every
+   * line covered by a multi-row selection). Pass null to clear.
+   */
+  setActiveLines(lines: Iterable<number> | null): void {
     if (this._disposed) return;
-    this._activeLine = lineNumber;
+    this._activeLines = lines ? new Set(lines) : new Set();
     for (const [line, el] of this._entries) {
-      el.classList.toggle("fe-inline-left-active", lineNumber != null && line === lineNumber);
+      el.classList.toggle("fe-inline-left-active", this._activeLines.has(line));
     }
   }
 

@@ -131,29 +131,41 @@ describe("file-editor inline commit-diff mode", () => {
     expect(tintCounts(el).added).toBeGreaterThanOrEqual(1);
   });
 
-  test("the active (cursor) row highlights its number cells in BOTH columns", async () => {
+  test("selected rows highlight their number cells in BOTH columns", async () => {
     const el = await mount();
     await loadInlineDiff(el); // line 1 context, 2 removed, 3 added
 
     // Drive the highlight path directly: the overlay repaints from
     // getLabelDecoration (via setActiveLine -> _updateAll), and the BEFORE
     // column toggles its own entries.
-    el._activeDiffLine = 2;
+    el._selectedDiffLines = new Set([2]);
     el._lineNumbersOverlay.setActiveLine(2);
-    el._inlineColumns.setActiveLine(2);
+    el._inlineColumns.setActiveLines([2]);
     let mids = [...el.querySelectorAll(".fe-gutter .line-number")];
     let lefts = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")];
     expect(mids[1].classList.contains("active-line-number")).toBe(true);
     expect(mids[0].classList.contains("active-line-number")).toBe(false);
     expect(lefts[1].classList.contains("fe-inline-left-active")).toBe(true);
     expect(lefts[0].classList.contains("fe-inline-left-active")).toBe(false);
-    // The active ring composes with the deleted-row red cell, not replaces it.
+    // The active background composes with the deleted-row red cell, not
+    // replaces it.
     expect(lefts[1].classList.contains("fe-inline-removed-cell")).toBe(true);
 
-    // Moving the cursor away removes the highlight from the old row.
-    el._activeDiffLine = 1;
+    // A MULTI-ROW selection highlights every covered line in both columns.
+    el._selectedDiffLines = new Set([1, 2]);
     el._lineNumbersOverlay.setActiveLine(1);
-    el._inlineColumns.setActiveLine(1);
+    el._inlineColumns.setActiveLines([1, 2]);
+    mids = [...el.querySelectorAll(".fe-gutter .line-number")];
+    lefts = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")];
+    expect(mids[0].classList.contains("active-line-number")).toBe(true);
+    expect(mids[1].classList.contains("active-line-number")).toBe(true);
+    expect(lefts[0].classList.contains("fe-inline-left-active")).toBe(true);
+    expect(lefts[1].classList.contains("fe-inline-left-active")).toBe(true);
+
+    // Shrinking the selection back clears the second row.
+    el._selectedDiffLines = new Set([1]);
+    el._lineNumbersOverlay.setActiveLine(1);
+    el._inlineColumns.setActiveLines([1]);
     mids = [...el.querySelectorAll(".fe-gutter .line-number")];
     lefts = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")];
     expect(mids[0].classList.contains("active-line-number")).toBe(true);

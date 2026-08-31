@@ -97,27 +97,39 @@ describe("InlineDiffGutterColumns", () => {
     }
   });
 
-  test("setActiveLine highlights only the active row's left cell", () => {
+  test("setActiveLines highlights only the selected rows' left cells", () => {
     const { cols } = setup();
     cols.setSizes(LH, 50);
     cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: "" }) });
-    cols.setVisibleRange(1, 3);
+    cols.setVisibleRange(1, 4);
 
-    cols.setActiveLine(2);
-    // Toggled live on existing entries, no repaint required.
-    const labels = leftLabels();
+    // A single cursor line.
+    cols.setActiveLines([2]);
+    let labels = leftLabels();
     expect(labels[1].classList.contains("fe-inline-left-active")).toBe(true);
     expect(labels[0].classList.contains("fe-inline-left-active")).toBe(false);
     expect(labels[2].classList.contains("fe-inline-left-active")).toBe(false);
 
-    // A repaint keeps the active row highlighted (fresh labels get the class).
-    cols.setVisibleRange(1, 3);
+    // A multi-row selection highlights every covered line.
+    cols.setActiveLines([1, 2, 3]);
+    labels = leftLabels();
+    expect(labels[0].classList.contains("fe-inline-left-active")).toBe(true);
+    expect(labels[1].classList.contains("fe-inline-left-active")).toBe(true);
+    expect(labels[2].classList.contains("fe-inline-left-active")).toBe(true);
+    expect(labels[3].classList.contains("fe-inline-left-active")).toBe(false);
+
+    // A repaint keeps the selected rows highlighted (fresh labels get the
+    // class).
+    cols.setVisibleRange(1, 4);
     const after = leftLabels();
-    expect(after[1].classList.contains("fe-inline-left-active")).toBe(true);
+    expect(after[0].classList.contains("fe-inline-left-active")).toBe(true);
+    expect(after[2].classList.contains("fe-inline-left-active")).toBe(true);
 
     // Clearing removes it everywhere.
-    cols.setActiveLine(null);
-    expect(leftLabels()[1].classList.contains("fe-inline-left-active")).toBe(false);
+    cols.setActiveLines(null);
+    for (const l of leftLabels()) {
+      expect(l.classList.contains("fe-inline-left-active")).toBe(false);
+    }
   });
 
   test("clicking a left number invokes the injected onLineClick with the line", () => {
