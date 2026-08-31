@@ -125,6 +125,12 @@ describe("file-editor inline commit-diff mode", () => {
     const midEls = [...el.querySelectorAll(".fe-gutter .line-number")];
     expect(midEls[0].classList.contains("fe-inline-added-cell")).toBe(true);
     expect(midEls[1].classList.contains("fe-inline-added-cell")).toBe(false);
+    // The full-height wrapper carries the tint too, so a WRAPPED added row
+    // stays green down every segment (not just the first line row).
+    expect(midEls[0].parentElement.classList.contains("fe-inline-added-cell")).toBe(true);
+    expect(getComputedStyle(midEls[0].parentElement).backgroundColor).toBe(
+      "rgba(46, 160, 67, 0.24)",
+    );
     const leftAddedEls = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")];
     expect(leftAddedEls[0].classList.contains("fe-inline-removed-cell")).toBe(false);
     // The added line's green tint IS in-band here.
@@ -145,6 +151,10 @@ describe("file-editor inline commit-diff mode", () => {
     let lefts = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")];
     expect(mids[1].classList.contains("active-line-number")).toBe(true);
     expect(mids[0].classList.contains("active-line-number")).toBe(false);
+    // The wrapper also carries the decoration, so a selected WRAPPED row
+    // highlights every segment in the AFTER column, not just its first row.
+    expect(mids[1].parentElement.classList.contains("active-line-number")).toBe(true);
+    expect(mids[0].parentElement.classList.contains("active-line-number")).toBe(false);
     expect(lefts[1].classList.contains("fe-inline-left-active")).toBe(true);
     expect(lefts[0].classList.contains("fe-inline-left-active")).toBe(false);
     // The active background composes with the deleted-row red cell, not
@@ -190,6 +200,12 @@ describe("file-editor inline commit-diff mode", () => {
     expect(removedMid.textContent).toBe("");
     expect(removedMid.classList.contains("fe-inline-removed-cell")).toBe(true);
     expect(getComputedStyle(removedMid).backgroundColor).toBe("rgba(248, 81, 73, 0.24)");
+    // Wrapped removed row: the full-height wrapper stays red across all
+    // segments (selection must not grey it out either).
+    expect(removedMid.parentElement.classList.contains("fe-inline-removed-cell")).toBe(true);
+    expect(getComputedStyle(removedMid.parentElement).backgroundColor).toBe(
+      "rgba(248, 81, 73, 0.24)",
+    );
 
     // An ADDED row keeps its green AFTER cell when selected.
     await loadInlineDiff(el, TEXT_SLICE, [

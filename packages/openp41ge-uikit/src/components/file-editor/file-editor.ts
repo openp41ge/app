@@ -646,6 +646,18 @@ export class FileEditorElement extends LitElement {
       .fe-gutter .line-number.active-line-number:not(.fe-inline-added-cell):not(.fe-inline-removed-cell) {
         background: var(--fe-border-color, #2a2a2a);
       }
+      /* The full-height gutter wrapper carries the same cell decorations as
+         the one-row label (line-number-wrapper), so WRAPPED rows tint every
+         segment, not just the first one. */
+      .fe-gutter .line-number-wrapper.fe-inline-added-cell {
+        background: ${isLight ? "rgba(46,160,67,0.22)" : "rgba(46,160,67,0.24)"};
+      }
+      .fe-gutter .line-number-wrapper.fe-inline-removed-cell {
+        background: ${isLight ? "rgba(248,81,73,0.22)" : "rgba(248,81,73,0.24)"};
+      }
+      .fe-gutter .line-number-wrapper.active-line-number:not(.fe-inline-added-cell):not(.fe-inline-removed-cell) {
+        background: var(--fe-border-color, #2a2a2a);
+      }
       ${scopeCSS}
       ${globalCSS}
     `;

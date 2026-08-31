@@ -148,6 +148,11 @@ export class LineNumbersOverlay {
         wrapper.setPosition("absolute");
         wrapper.setLeft(0);
         wrapper.setWidth(this._config.gutterWidth);
+        // The wrapper spans the FULL wrapped height (vCount * lineHeight); the
+        // label inside is one row tall. CSS puts the cell BACKGROUND on this
+        // wrapper class so a selected/added/removed WRAPPED row tints every
+        // segment, not just the first one.
+        wrapper.element.classList.add("line-number-wrapper");
 
         // Inner label — exactly lineHeight tall, text vertically centered
         const label = document.createElement("div");
@@ -211,15 +216,23 @@ export class LineNumbersOverlay {
         entry.label.classList.remove("active-line-number");
         // Decorations on the number cell (e.g. green AFTER-cell of an added
         // row and/or the active-line ring). getLabelDecoration may return
-        // several space-separated classes, so apply/clear them token-wise.
+        // several space-separated classes, so apply/clear them token-wise on
+        // BOTH the one-row label (matches its text) and the full-height
+        // wrapper (so a wrapped row tints all its segments).
         const decoration = this._config.getLabelDecoration?.(lineNum) ?? "";
         const tokens = decoration ? decoration.split(/\s+/) : [];
         if (entry.cellCls) {
           for (const t of entry.cellCls) {
-            if (!tokens.includes(t)) entry.label.classList.remove(t);
+            if (!tokens.includes(t)) {
+              entry.label.classList.remove(t);
+              entry.wrapper.element.classList.remove(t);
+            }
           }
         }
-        for (const t of tokens) entry.label.classList.add(t);
+        for (const t of tokens) {
+          entry.label.classList.add(t);
+          entry.wrapper.element.classList.add(t);
+        }
         entry.cellCls = tokens.length > 0 ? tokens : undefined;
       }
     }
