@@ -38,6 +38,7 @@ interface InlineBandCache {
   text: string | undefined;
   cls: string | undefined;
   active: boolean | undefined;
+  hover: boolean | undefined;
 }
 
 /** Inline-diff LEFT (BEFORE) band element with its last-applied state. */
@@ -58,6 +59,7 @@ export class InlineDiffGutterColumns {
   private _rows: InlineDiffGutterRows | null = null;
   private _onLineClick: ((lineNumber: number) => void) | null = null;
   private _activeLines: ReadonlySet<number> = new Set();
+  private _hoverLine: number | null = null;
   private _disposed = false;
 
   constructor(
@@ -141,6 +143,7 @@ export class InlineDiffGutterColumns {
       if (!el) {
         el = document.createElement("div");
         el.className = "fe-inline-left-label";
+        el.setAttribute("data-line", String(line));
         // Full-column width + flex-end so the numbers are RIGHT-ALIGNED (place
         // values line up) exactly like the normal gutter's `.line-number`
         // labels. Without left:0/right:0 the absolute box shrink-wraps its
@@ -161,7 +164,7 @@ export class InlineDiffGutterColumns {
             this._onLineClick?.(line);
           });
         }
-        st = { top: NaN, height: NaN, text: undefined, cls: undefined, active: undefined };
+        st = { top: NaN, height: NaN, text: undefined, cls: undefined, active: undefined, hover: undefined };
         el.__st = st;
       }
 
@@ -192,6 +195,13 @@ export class InlineDiffGutterColumns {
         el.classList.toggle("fe-inline-left-active", active);
         st!.active = active;
       }
+      // Mouse-over: the hovered row's cell lights up (paired with the AFTER
+      // gutter cell via the editor's delegated mouseover handler).
+      const hover = this._hoverLine === line;
+      if (st!.hover !== hover) {
+        el.classList.toggle("fe-inline-left-hover", hover);
+        st!.hover = hover;
+      }
     }
   }
 
@@ -215,6 +225,30 @@ export class InlineDiffGutterColumns {
         el.classList.toggle("fe-inline-left-active", active);
         el.__st.active = active;
       }
+    }
+  }
+
+  /**
+   * Mouse-over highlight for a row's BEFORE cell (mirrors the AFTER gutter
+   * cell painted by the editor/overlay). Pass null to clear.
+   */
+  setHoverLine(line: number | null): void {
+    if (this._disposed) return;
+    const prev = this._hoverLine;
+    this._hoverLine = line;
+    this._paintHover(prev);
+    this._paintHover(this._hoverLine);
+  }
+
+  private _paintHover(line: number | null): void {
+    if (line == null) return;
+    const el = this._entries.get(line);
+    const st = el?.__st;
+    if (!el || !st) return;
+    const hover = this._hoverLine === line;
+    if (st.hover !== hover) {
+      el.classList.toggle("fe-inline-left-hover", hover);
+      st.hover = hover;
     }
   }
 

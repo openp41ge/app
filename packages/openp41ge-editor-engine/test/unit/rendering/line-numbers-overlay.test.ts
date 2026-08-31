@@ -139,3 +139,39 @@ describe("LineNumbersOverlay setVisibleRange", () => {
     expect(labels.filter((l) => l.textContent === "3")[0]!.classList.contains("fe-inline-added-cell")).toBe(true);
   });
 });
+
+describe("LineNumbersOverlay hover highlight", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("setHoverLine lights the cell (label + wrapper) and clears it", () => {
+    const { overlay, container } = setup();
+    overlay.setVisibleRange(1, 3);
+    expect(container.querySelectorAll(".line-number-hover").length).toBe(0);
+
+    overlay.setHoverLine(2);
+    const label2 = container.querySelector('.line-number[data-line="2"]');
+    const wrap2 = container.querySelector('.line-number-wrapper[data-line="2"]');
+    expect(label2!.classList.contains("line-number-hover")).toBe(true);
+    expect(wrap2!.classList.contains("line-number-hover")).toBe(true);
+    expect(container.querySelector('.line-number[data-line="1"]')!.classList.contains("line-number-hover")).toBe(false);
+
+    overlay.setHoverLine(null);
+    expect(label2!.classList.contains("line-number-hover")).toBe(false);
+    expect(wrap2!.classList.contains("line-number-hover")).toBe(false);
+
+    // A band repaint keeps the hover state coherent (no stale class).
+    overlay.setHoverLine(2);
+    overlay.setVisibleRange(1, 3);
+    expect(container.querySelector('.line-number[data-line="2"]')!.classList.contains("line-number-hover")).toBe(true);
+    overlay.setHoverLine(null);
+  });
+
+  test("cells carry a data-line attribute for cross-column hover resolution", () => {
+    const { overlay, container } = setup();
+    overlay.setVisibleRange(5, 6);
+    expect(container.querySelector('.line-number[data-line="5"]')).not.toBeNull();
+    expect(container.querySelector('.line-number-wrapper[data-line="6"]')).not.toBeNull();
+  });
+});

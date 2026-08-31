@@ -292,6 +292,55 @@ describe("file-editor inline commit-diff mode", () => {
     expect(el.hasInlineDiff).toBeFalsy();
   });
 
+  test("hovering a number cell highlights that row's cell in BOTH columns", async () => {
+    const el = await mount();
+    await loadInlineDiff(el);
+
+    const before1 = el.querySelector('.fe-inline-left-label[data-line="1"]');
+    const gutter1 = el.querySelector('.fe-gutter .line-number[data-line="1"]');
+    expect(before1).not.toBeNull();
+    expect(gutter1).not.toBeNull();
+
+    // Hover the BEFORE (left) cell of line 1 → both columns' line-1 cells light up.
+    before1.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(before1.classList.contains("fe-inline-left-hover")).toBe(true);
+    expect(gutter1.classList.contains("line-number-hover")).toBe(true);
+
+    // Hover the AFTER (right) cell of line 2 → line 2 highlights in BOTH columns,
+    // line 1 clears (hover follows the pointer).
+    const gutter2 = el.querySelector('.fe-gutter .line-number[data-line="2"]');
+    gutter2.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    const before2 = el.querySelector('.fe-inline-left-label[data-line="2"]');
+    expect(before2.classList.contains("fe-inline-left-hover")).toBe(true);
+    expect(before1.classList.contains("fe-inline-left-hover")).toBe(false);
+
+    // Leaving the gutter entirely clears the highlight in both columns.
+    gutter2.dispatchEvent(
+      new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(before2.classList.contains("fe-inline-left-hover")).toBe(false);
+    expect(gutter2.classList.contains("line-number-hover")).toBe(false);
+  });
+
+  test("the custom horizontal scrollbar lives inside the viewport, hidden until content overflows", async () => {
+    const el = await mount();
+    const vp = el._viewportEl;
+    const track = vp.querySelector(".fe-hscroll");
+    expect(track).not.toBeNull();
+    expect(track.querySelector(".fe-hscroll-thumb")).not.toBeNull();
+    // Hidden by default (jsdom has no layout → no overflow).
+    expect(track.style.display).toBe("none");
+    // The NATIVE horizontal scrollbar is disabled in CSS; the custom bar is styled.
+    const themeStyle = [...document.head.querySelectorAll("style[data-fe-theme]")]
+      .map((s) => s.textContent ?? "")
+      .join("\n");
+    expect(themeStyle).toContain(".fe-viewport::-webkit-scrollbar:horizontal");
+    expect(themeStyle).toContain(".fe-hscroll-thumb");
+  });
+
   test("BEFORE and AFTER columns always share one content-derived width — a fully-deleted file leaves the AFTER column with the BEFORE column's width", async () => {
     const el = await mount();
     (el as unknown as { _charWidth: number })._charWidth = 20; // widen so content beats the 48px min

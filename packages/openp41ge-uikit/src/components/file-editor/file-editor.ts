@@ -292,6 +292,12 @@ export class FileEditorElement extends LitElement {
    * cursor line (single empty selection). */
   private _selectedDiffLines: ReadonlySet<number> = new Set();
 
+  /** The model line whose number cells the pointer is over (both columns). */
+  private _hoverLine: number | null = null;
+  /** Custom horizontal scrollbar confined to the CONTENT area. */
+  private _hScrollTrack: HTMLElement | null = null;
+  private _hScrollThumb: HTMLElement | null = null;
+
   /** True while the editor is showing an inline commit diff. */
   get hasInlineDiff(): boolean {
     return this._inlineRows !== null;
@@ -374,6 +380,7 @@ export class FileEditorElement extends LitElement {
       this._inlineColumns?.setVisibleRange(start, end, wg.getViewLineStart, wg.getViewLineCount);
     }
     this._updateInlineHighlights();
+    this._updateHScroll();
   }
 
   /**
@@ -429,6 +436,94 @@ export class FileEditorElement extends LitElement {
       wg.getViewLineStart,
       wg.getViewLineCount,
     );
+  }
+
+  // ── Line-number hover highlight ────────────────────────────────────────
+
+  /** Moused over a number cell — highlight the same row in BOTH columns. */
+  private _onGutterCellMouseOver = (e: Event): void => {
+    const cell = (e.target as HTMLElement).closest?.("[data-line]") as HTMLElement | null;
+    if (!cell) return;
+    const line = Number(cell.dataset.line);
+    if (Number.isInteger(line) && line > 0) this._setHoverLine(line);
+  };
+
+  /** Left a number cell — resolve the new row (or clear when leaving the gutter). */
+  private _onGutterCellMouseOut = (e: Event): void => {
+    const next = (e as MouseEvent).relatedTarget as HTMLElement | null;
+    const cell = next?.closest?.("[data-line]") as HTMLElement | null;
+    const line = cell ? Number(cell.dataset.line) : 0;
+    this._setHoverLine(Number.isInteger(line) && line > 0 ? line : null);
+  };
+
+  private _setHoverLine(line: number | null): void {
+    if (this._hoverLine === line) return;
+    this._hoverLine = line;
+    this._lineNumbersOverlay?.setHoverLine(line);
+    this._inlineColumns?.setHoverLine(line);
+  }
+
+  // ── Custom content-scoped horizontal scrollbar ─────────────────────────
+
+  /** Native scroll of the viewport keeps the custom thumb in sync. */
+  private _onViewportScroll = (): void => this._updateHScroll();
+
+  private _onHScrollPointerDown = (e: PointerEvent): void => {
+    const track = this._hScrollTrack;
+    const vp = this._viewportEl;
+    if (!track || !vp) return;
+    const range = vp.scrollWidth - vp.clientWidth;
+    if (range <= 0) return;
+    const rect = track.getBoundingClientRect();
+    const width = Math.max(1, rect.width);
+    const thumb = (e.target as HTMLElement).classList.contains("fe-hscroll-thumb");
+    if (thumb) {
+      const onMove = (ev: PointerEvent) => {
+        const frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / width));
+        vp.scrollLeft = frac * range;
+      };
+      const endMove = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", endMove);
+        window.removeEventListener("pointercancel", endMove);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", endMove);
+      window.addEventListener("pointercancel", endMove);
+      e.preventDefault();
+      e.stopPropagation();
+    } else {
+      // Click on the track: jump the bar to the cursor.
+      const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / width));
+      vp.scrollLeft = frac * range;
+    }
+  };
+
+  /** Show/hide and position the custom horizontal scrollbar thumb. Starts at
+   * the edge of the pinned number columns and ends at the content's right edge. */
+  private _updateHScroll(): void {
+    const track = this._hScrollTrack;
+    const thumb = this._hScrollThumb;
+    const vp = this._viewportEl;
+    if (!track || !thumb || !vp) return;
+    const total = vp.scrollWidth;
+    const view = vp.clientWidth;
+    const overflowing = !this._wordWrapEnabled && total > view;
+    if (!overflowing) {
+      if (track.style.display !== "none") track.style.display = "none";
+      return;
+    }
+    if (track.style.display !== "") track.style.display = "";
+    const left = this._gutterGroupEl ? this._gutterGroupEl.offsetWidth : 0;
+    if (track.style.left !== `${left}px`) track.style.left = `${left}px`;
+    const trackW = track.clientWidth;
+    if (trackW <= 0) return;
+    const range = Math.max(1, total - view);
+    const frac = Math.min(1, Math.max(0, vp.scrollLeft / range));
+    const thumbW = Math.max(24, Math.round((view / total) * trackW));
+    if (thumb.style.width !== `${thumbW}px`) thumb.style.width = `${thumbW}px`;
+    const thumbLeft = Math.round(frac * (trackW - thumbW));
+    if (thumb.style.left !== `${thumbLeft}px`) thumb.style.left = `${thumbLeft}px`;
   }
 
   /** Word-wrap view mapping for the BEFORE (left) column — mirrors the normal
@@ -602,6 +697,23 @@ export class FileEditorElement extends LitElement {
         width: 10px;
         height: 10px;
       }
+      /* The NATIVE horizontal scrollbar spans the whole row — starting UNDER
+         the pinned line-number columns. It is hidden; a custom .fe-hscroll bar
+         confined to the content area (right of the columns) replaces it. The
+         vertical bar stays native. */
+      .fe-viewport::-webkit-scrollbar:horizontal {
+        height: 0;
+      }
+      .fe-hscroll {
+        background: transparent;
+      }
+      .fe-hscroll-thumb {
+        background: ${isLight ? "#c1c1c1" : "#424242"};
+        opacity: 0.9;
+      }
+      .fe-hscroll-thumb:hover {
+        background: ${isLight ? "#b0b0b0" : "#555"};
+      }
       /* Status bar theme support */
       fe-status-bar {
         --sbb-bg: var(--fe-gutter-bg);
@@ -662,6 +774,19 @@ export class FileEditorElement extends LitElement {
       }
       .fe-gutter .line-number-wrapper.active-line-number:not(.fe-inline-added-cell):not(.fe-inline-removed-cell) {
         background: var(--fe-border-color, #2a2a2a);
+      }
+      /* Mouse-over highlight for the number cells. NEUTRAL cells fill with a
+         light hover background; changed (coloured) cells keep their red/green
+         tint — the hover shows as a subtle inner ring on every cell, so BOTH
+         number cells of the hovered row clearly light up together. */
+      .fe-inline-left-label.fe-inline-left-hover:not(.fe-inline-removed-cell),
+      .fe-gutter .line-number.line-number-hover:not(.fe-inline-added-cell):not(.fe-inline-removed-cell),
+      .fe-gutter .line-number-wrapper.line-number-hover:not(.fe-inline-added-cell):not(.fe-inline-removed-cell) {
+        background: ${isLight ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.09)"};
+      }
+      .fe-inline-left-label.fe-inline-left-hover,
+      .fe-gutter .line-number-wrapper.line-number-hover {
+        box-shadow: inset 0 0 0 1px ${isLight ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.16)"};
       }
       ${scopeCSS}
       ${globalCSS}
@@ -751,9 +876,35 @@ export class FileEditorElement extends LitElement {
       "position:relative;flex:1 1 auto;min-width:0;overflow:hidden;";
     this._scrollContentEl.appendChild(this._textRegionEl);
 
+    // Custom horizontal scrollbar — confined to the CONTENT area so its track
+    // does NOT start underneath the pinned line-number columns. It is a direct
+    // child of the viewport (absolute → stays fixed at the bottom of the
+    // scrollport, it never scrolls with content) and maps 1:1 onto the native
+    // scrollLeft/scrollWidth/clientWidth held by the viewport, so trackpad /
+    // Shift+wheel still scroll (the native horizontal bar is hidden in CSS).
+    this._hScrollTrack = document.createElement("div");
+    this._hScrollTrack.className = "fe-hscroll";
+    this._hScrollTrack.style.cssText =
+      "position:absolute;left:0;right:0;bottom:0;height:10px;z-index:8;display:none;user-select:none;";
+    this._hScrollThumb = document.createElement("div");
+    this._hScrollThumb.className = "fe-hscroll-thumb";
+    this._hScrollThumb.style.cssText =
+      "position:absolute;top:0;bottom:0;border-radius:5px;cursor:pointer;touch-action:none;";
+    this._hScrollTrack.appendChild(this._hScrollThumb);
+    this._viewportEl.appendChild(this._hScrollTrack);
+    this._hScrollTrack.addEventListener("pointerdown", this._onHScrollPointerDown);
+    this._viewportEl.addEventListener("scroll", this._onViewportScroll);
+
+    // Mouse-over highlight for the line-number cells (both columns highlight
+    // the hovered row together).
+    this._gutterGroupEl.addEventListener("mouseover", this._onGutterCellMouseOver);
+    this._gutterGroupEl.addEventListener("mouseout", this._onGutterCellMouseOut);
+
     // The extra inline-diff gutter columns (left old-number + right sign). They
     // start hidden and only appear when setInlineDiff() runs.
     this._ensureInlineColumns();
+
+    this._updateHScroll();
 
     // Prevent mousedown from bubbling to grid drag handler
     const root = this.renderRoot.querySelector(".fe-root") as HTMLElement;
@@ -1349,6 +1500,7 @@ export class FileEditorElement extends LitElement {
           }
         }
         this._renderVisibleLines();
+        this._updateHScroll();
       });
       this._viewportResizeObserver.observe(this._viewportEl);
     }
@@ -1601,6 +1753,7 @@ export class FileEditorElement extends LitElement {
     const lineCount = this._viewModel.lineCount;
     if (lineCount === 0) {
       this._viewLines.setContentWidth(this._viewportEl.getBoundingClientRect().width);
+      this._updateHScroll();
       return;
     }
 
@@ -1617,6 +1770,7 @@ export class FileEditorElement extends LitElement {
       // Nothing measured yet — fall back to the viewport width.
       this._viewLines.setContentWidth(this._viewportEl.getBoundingClientRect().width);
     }
+    this._updateHScroll();
   }
 
   /** Width of a single line in visible columns — the tracker's measure function. */
@@ -1794,6 +1948,7 @@ export class FileEditorElement extends LitElement {
         this._lineNumbersOverlay.setVisibleRange(1, Math.min(this._viewModel.lineCount, 500));
       }
     }
+    this._updateHScroll();
   }
 
   /** Wire up formatter registry to the status bar format button. */

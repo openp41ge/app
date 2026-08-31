@@ -42,6 +42,8 @@ interface LineNumberEntry {
   /** Cached label text + active flag so scrolling a stable band stays cheap. */
   lastText?: string;
   lastActive?: boolean;
+  /** Cached hover flag (mouse-over cell highlight). */
+  lastHover?: boolean;
   /** Cached decoration-class key (space-joined tokens). */
   lastCls?: string;
 }
@@ -58,6 +60,9 @@ export interface LineNumbersOverlayConfig {
   mode?: LineNumberMode;
   /** The cursor line number for relative mode. */
   activeLineNumber?: number;
+  /** The line whose number cells the pointer is over (mouse-over highlight), or
+   * 0/absent when the pointer is elsewhere. */
+  hoverLineNumber?: number;
   /** Overrides the label shown for a line: return a string to replace the
    * number ("" blanks it), or null to use the default. Used by inline-diff
    * views where synthetic rows (deleted lines) show no number and context/
@@ -189,10 +194,12 @@ export class LineNumbersOverlay {
         // wrapper class so a selected/added/removed WRAPPED row tints every
         // segment, not just the first one.
         wrapper.element.classList.add("line-number-wrapper");
+        wrapper.element.setAttribute("data-line", String(lineNum));
 
         // Inner label — exactly lineHeight tall, text vertically centered
         const label = document.createElement("div");
         label.className = "line-number";
+        label.setAttribute("data-line", String(lineNum));
         label.style.cursor = "pointer";
         label.style.boxSizing = "border-box";
         label.style.width = "100%";
@@ -221,6 +228,7 @@ export class LineNumbersOverlay {
         // Inner label is always exactly one lineHeight tall.
         entry.label.style.height = lineHeight + "px";
         entry.label.style.lineHeight = lineHeight + "px";
+        entry.lastHover = undefined; // force the hover state to paint below
       } else {
         if (entry.lastTop !== top) {
           entry.wrapper.setTop(top);
@@ -284,6 +292,38 @@ export class LineNumbersOverlay {
           entry.lastCls = decoration;
         }
       }
+
+      // Mouse-over highlight — the cell (and, when wrapping, the full-height
+      // wrapper so every segment tints) lights up for the hovered line.
+      const hover = this._config.hoverLineNumber === lineNum;
+      if (entry.lastHover !== hover) {
+        entry.wrapper.element.classList.toggle("line-number-hover", hover);
+        entry.label.classList.toggle("line-number-hover", hover);
+        entry.lastHover = hover;
+      }
+    }
+  }
+
+  /**
+   * Highlight the number cell(s) of a hovered line. Pass null (or 0) to clear.
+   */
+  setHoverLine(lineNumber: number | null): void {
+    if (this._disposed) return;
+    const prev = this._config.hoverLineNumber ?? 0;
+    this._config.hoverLineNumber = lineNumber ?? 0;
+    this._paintHoverCell(prev);
+    this._paintHoverCell(this._config.hoverLineNumber);
+  }
+
+  private _paintHoverCell(line: number): void {
+    if (line <= 0) return;
+    const entry = this._entries.get(line);
+    if (!entry) return;
+    const hover = this._config.hoverLineNumber === line;
+    if (entry.lastHover !== hover) {
+      entry.wrapper.element.classList.toggle("line-number-hover", hover);
+      entry.label.classList.toggle("line-number-hover", hover);
+      entry.lastHover = hover;
     }
   }
 
