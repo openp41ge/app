@@ -409,12 +409,14 @@ export class FileEditorElement extends LitElement {
     }
     const start = this._viewLines.startLineNumber || 1;
     const end = this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount);
-    // Full CONTENT width (scroll width), not just the viewport: a long single
-    // line leaves empty scrollable space to the right that the red/green must
-    // also cover. scrollWidth >= clientWidth always, so short files fall back
-    // to the viewport width naturally.
-    const vp = this._viewportEl;
-    const contentWidth = vp ? Math.max(vp.scrollWidth, vp.clientWidth) : 0;
+    // Full TEXT width, not the viewport's: the tint bands live INSIDE the text
+    // region, so they must span the text region's box, not the whole scroll row
+    // (which also includes the two number columns). In the unified-scroll layout
+    // the text region's box equals its content width, so this still covers the
+    // empty scrollable space after a single very long line — without the extra
+    // gutter-wide overhang that created a phantom horizontal scrollbar.
+    const region = this._textRegionEl;
+    const contentWidth = region ? region.clientWidth : this._viewportEl?.clientWidth ?? 0;
     // Pass the same wrap mapping the number columns use so the red/green rows
     // align with the TEXT — a wrapped line's tint spans all its segments.
     const wg = this._inlineWrapGetters();
@@ -718,7 +720,7 @@ export class FileEditorElement extends LitElement {
     this._scrollContentEl = document.createElement("div");
     this._scrollContentEl.className = "fe-scroll-content";
     this._scrollContentEl.style.cssText =
-      "position:relative;display:flex;flex-direction:row;align-items:stretch;width:max-content;min-width:100%;";
+      "position:relative;display:flex;flex-direction:row;align-items:stretch;width:max-content;min-width:100%;min-height:100%;";
     this._viewportEl.appendChild(this._scrollContentEl);
 
     this._gutterGroupEl = document.createElement("div");
@@ -743,7 +745,10 @@ export class FileEditorElement extends LitElement {
 
     this._textRegionEl = document.createElement("div");
     this._textRegionEl.className = "fe-text-region";
-    this._textRegionEl.style.cssText = "position:relative;flex:1 1 auto;min-width:0;";
+    // Not a scroll container: the viewport owns the (single) horizontal + vertical
+    // scrollbars. overflow:hidden keeps this box from ever showing its own bar.
+    this._textRegionEl.style.cssText =
+      "position:relative;flex:1 1 auto;min-width:0;overflow:hidden;";
     this._scrollContentEl.appendChild(this._textRegionEl);
 
     // The extra inline-diff gutter columns (left old-number + right sign). They

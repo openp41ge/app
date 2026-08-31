@@ -709,7 +709,15 @@ export class ViewLines {
     const viewportWidth = viewportEl.getBoundingClientRect().width;
     this._linesWrapper.element.style.width = pixelWidth + "px";
     if (!this._wordWrapEnabled) {
-      viewportEl.style.overflowX = pixelWidth > viewportWidth ? "auto" : "hidden";
+      // The element passed in is usually the editor's TEXT REGION, which is NOT
+      // a scroll container in the unified-scroll layout — the editor's outer
+      // viewport owns the single horizontal scrollbar (and toggles it itself
+      // via overflow-x). Only a standalone scroller (no fe-text-region class)
+      // gets its overflow toggled here, otherwise flipping it would create a
+      // SECOND horizontal scrollbar on the text region.
+      if (!viewportEl.classList.contains("fe-text-region")) {
+        viewportEl.style.overflowX = pixelWidth > viewportWidth ? "auto" : "hidden";
+      }
     }
   }
 

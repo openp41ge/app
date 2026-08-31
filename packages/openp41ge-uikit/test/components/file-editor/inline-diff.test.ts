@@ -91,6 +91,10 @@ describe("file-editor inline commit-diff mode", () => {
     expect(group.contains(el.querySelector(".fe-inline-left"))).toBe(true);
     expect(el.querySelector(".fe-gutter").style.position).toBe("relative");
     expect(el.querySelector(".fe-inline-left").style.position).toBe("relative");
+    // The row is floored to the viewport height so the number columns always
+    // stretch to the BOTTOM of the view — never empty space beneath them on a
+    // short file (align-items:stretch + min-height:100%).
+    expect(el.querySelector(".fe-scroll-content").style.minHeight).toBe("100%");
 
     await loadInlineDiff(el);
     // The BEFORE column is inserted into the group (not beside it).
