@@ -80,6 +80,23 @@ describe("InlineDiffGutterColumns", () => {
     ).toBe("translate3d(0, -2460px, 0)");
   });
 
+  test("labels are FULL-WIDTH + flex-end so numbers are right-aligned (place values line up)", () => {
+    const { cols } = setup();
+    cols.setSizes(LH, 50);
+    cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: "" }) });
+    cols.setVisibleRange(9, 10); // forces a 2-digit "10" next to "9"
+
+    const labels = leftLabels();
+    for (const l of labels) {
+      // Shrink-to-fit absolute boxes ignore flex-end; full column width is
+      // required for the right-alignment the normal gutter already has.
+      expect(l.style.left).toBe("0px");
+      expect(l.style.right).toBe("0px");
+      expect(l.style.justifyContent).toBe("flex-end");
+      expect(l.style.boxSizing).toBe("border-box");
+    }
+  });
+
   test("removed rows get the red cell class; there is no sign column", () => {
     const { cols } = setup();
     cols.setSizes(LH, 50);

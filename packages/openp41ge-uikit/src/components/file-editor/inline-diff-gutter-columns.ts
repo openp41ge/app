@@ -115,8 +115,12 @@ export class InlineDiffGutterColumns {
       if (!el) {
         el = document.createElement("div");
         el.className = "fe-inline-left-label";
+        // Full-column width + flex-end so the numbers are RIGHT-ALIGNED (place
+        // values line up) exactly like the normal gutter's `.line-number` labels.
+        // Without left:0/right:0 the absolute box shrink-wraps its content and
+        // flex-end has nothing to push against, leaving the numbers left-anchored.
         el.style.cssText =
-          "position:absolute;" +
+          "position:absolute;left:0;right:0;box-sizing:border-box;" +
           "display:flex;align-items:center;justify-content:flex-end;padding-right:8px;" +
           "overflow:hidden;white-space:nowrap;";
         this._leftInner.appendChild(el);
