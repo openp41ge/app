@@ -60,9 +60,9 @@ import {
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
 import {
   InlineDiffHighlightsRenderer,
-  inlineDiffLabel,
   type InlineDiffRow,
 } from "./inline-diff-highlights";
+import { InlineDiffGutterColumns, type InlineDiffGutterRows } from "./inline-diff-gutter-columns";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
 import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
@@ -265,6 +265,8 @@ export class FileEditorElement extends LitElement {
   private _inlineRows: readonly InlineDiffRow[] | null = null;
   /** Paints the red/green row bands inside the viewport. */
   private _inlineHighlights: InlineDiffHighlightsRenderer | null = null;
+  /** The extra left (old numbers) + right (+/− sign) gutter columns. */
+  private _inlineColumns: InlineDiffGutterColumns | null = null;
 
   /** True while the editor is showing an inline commit diff. */
   get hasInlineDiff(): boolean {
@@ -282,28 +284,73 @@ export class FileEditorElement extends LitElement {
       // The buffer was replaced meanwhile — decorations no longer align.
       this._inlineRows = null;
     }
-    // Size the line-number column to fit the widest gutter label (old new sign)
-    // when an inline diff is active; back to the default width when cleared.
-    let gutterWidth = 48;
+
+    // Three gutters, each sized for what it shows:
+    //   left   — OLD numbers (editor background, a separate group),
+    //   middle — NEW file numbers (the normal line-number column),
+    //   sign   — the + / − glyph column (transparent except the glyphs).
+    let gutterWidth = 48; // middle
+    let leftWidth = 36;
+    let signWidth = 18;
+    let rowsForColumns: InlineDiffGutterRows | null = null;
     if (this._inlineRows) {
-      let widest = 0;
-      for (const row of this._inlineRows) {
-        widest = Math.max(widest, inlineDiffLabel(row).length);
-      }
       const charW = this._charWidth > 0 ? this._charWidth : 8;
-      // chars * char width + 8px right padding + a little breathing room.
-      gutterWidth = Math.max(48, Math.ceil(widest * charW) + 20);
+      let maxOld = 0;
+      let maxNew = 0;
+      for (const row of this._inlineRows) {
+        if (row.newLine != null) maxNew = Math.max(maxNew, String(row.newLine).length);
+        if ((row.kind === "added" || row.kind === "removed") && row.oldLine != null) {
+          maxOld = Math.max(maxOld, String(row.oldLine).length);
+        }
+      }
+      gutterWidth = Math.max(48, Math.ceil(maxNew * charW) + 16);
+      leftWidth = Math.max(36, Math.ceil(maxOld * charW) + 16);
+      signWidth = Math.max(18, Math.ceil(charW) + 14);
+      rowsForColumns = {
+        infoFor: (line: number) => {
+          const row = this._inlineRows?.[line - 1];
+          if (!row) return { leftLabel: "", sign: "" };
+          const left =
+            (row.kind === "added" || row.kind === "removed") && row.oldLine != null
+              ? String(row.oldLine)
+              : "";
+          const sign = row.kind === "added" ? "+" : row.kind === "removed" ? "−" : "";
+          return { leftLabel: left, sign };
+        },
+      };
     }
+
     this._lineNumbersOverlay?.setGutterWidth(gutterWidth);
-    // Re-paint the gutter: existing labels were already numbered by buffer
-    // line; the override now shows the file's real old|new numbers + sign.
+    this._inlineColumns?.setSizes(this._lineHeight, leftWidth, signWidth);
+    this._inlineColumns?.setRows(rowsForColumns);
+
+    // Re-paint all three gutters with the file's real numbers (left = old,
+    // middle = new, sign = the change glyph).
     if (this._viewLines && this._viewModel) {
-      this._lineNumbersOverlay?.setVisibleRange(
-        this._viewLines.startLineNumber || 1,
-        this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount),
-      );
+      const start = this._viewLines.startLineNumber || 1;
+      const end = this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount);
+      this._lineNumbersOverlay?.setVisibleRange(start, end);
+      this._inlineColumns?.setVisibleRange(start, end);
+      this._inlineColumns?.setScrollOffset(this._viewportEl?.scrollTop ?? 0);
     }
     this._updateInlineHighlights();
+  }
+
+  /**
+   * Create the inline-diff gutter columns if they do not already exist.
+   * Called on firstUpdated AND at the end of _initWithModel (the pipeline
+   * teardown at the start of _initWithModel disposes them, so they must come
+   * back with every rebuilt pipeline).
+   */
+  private _ensureInlineColumns(): void {
+    if (this._inlineColumns || !this._gutterEl) return;
+    const content = this.renderRoot?.querySelector(".fe-content") as HTMLElement | null;
+    if (!content) return;
+    this._inlineColumns = new InlineDiffGutterColumns(content, this._gutterEl, this._lineHeight);
+    this._inlineColumns.setSizes(this._lineHeight, 36, 18);
+    this._inlineColumns.setScrollOffset(this._viewportEl?.scrollTop ?? 0);
+    // If decorations were already applied (restore path), repaint everything.
+    if (this._inlineRows) this.setInlineDiff(this._inlineRows);
   }
 
   /** (Re)paint the red/green row bands for the visible window. */
@@ -493,6 +540,14 @@ export class FileEditorElement extends LitElement {
          behind the (syntax-highlighted) text rows so tokens stay legible. */
       .fe-inline-diff-added   { background: ${isLight ? "rgba(46,160,67,0.14)" : "rgba(46,160,67,0.16)"}; }
       .fe-inline-diff-removed { background: ${isLight ? "rgba(248,81,73,0.13)" : "rgba(248,81,73,0.16)"}; }
+
+      /* Inline commit-diff gutter columns: the leftmost column shares the
+         editor background (a separate group from the normal gutter) and the
+         sign column is transparent — only its green + / red − glyphs show. */
+      .fe-inline-left { background: var(--fe-bg) !important; }
+      .fe-inline-sign .fe-sign-add { color: ${isLight ? "#1a7f37" : "#3fb950"}; }
+      .fe-inline-sign .fe-sign-rem { color: ${isLight ? "#cf222e" : "#f85149"}; }
+      .fe-inline-sign .fe-sign-none { color: transparent; }
       ${scopeCSS}
       ${globalCSS}
     `;
@@ -536,6 +591,10 @@ export class FileEditorElement extends LitElement {
 
     this._gutterEl = content.querySelector(".fe-gutter") as HTMLElement;
 
+    // The extra inline-diff gutter columns (left old-number + right sign). They
+    // start hidden and only appear when setInlineDiff() runs.
+    this._ensureInlineColumns();
+
     // Prevent mousedown from bubbling to grid drag handler
     const root = this.renderRoot.querySelector(".fe-root") as HTMLElement;
     root.addEventListener("mousedown", (e: MouseEvent) => e.stopPropagation());
@@ -548,6 +607,7 @@ export class FileEditorElement extends LitElement {
     // clamping issues that cause a 1-line misalignment at the bottom of the file.
     this._viewportEl.addEventListener("scroll", () => {
       this._lineNumbersOverlay?.setScrollOffset(this._viewportEl.scrollTop);
+      this._inlineColumns?.setScrollOffset(this._viewportEl.scrollTop);
     });
 
     // Load file if path is already set (TextMate init started in connectedCallback)
@@ -1074,13 +1134,13 @@ export class FileEditorElement extends LitElement {
       onLineClick: (lineNumber: number) => {
         this._cursorController?.selectLine(lineNumber);
       },
-      // Inline commit-diff: the gutter shows the file's real old|new numbers
-      // plus the +/− change sign (see inlineDiffLabel); null = default.
+      // Inline commit-diff: the middle gutter shows the file's real NEW line
+      // number per row (old numbers live in the left column, the sign in the
+      // right column); null = the default buffer number.
       getLabelOverride: (lineNumber: number) => {
         const row = this._inlineRows?.[lineNumber - 1];
         if (!row) return null;
-        const label = inlineDiffLabel(row);
-        return label === "" ? null : label;
+        return row.newLine != null ? String(row.newLine) : "";
       },
       wordWrapEnabled: this._wordWrapEnabled,
       getViewLineStart: (modelLine: number) =>
@@ -1125,13 +1185,16 @@ export class FileEditorElement extends LitElement {
     // Sync line number positions with viewport scroll via CSS transform.
     this._viewportEl.addEventListener("scroll", () => {
       this._lineNumbersOverlay?.setScrollOffset(this._viewportEl.scrollTop);
+      this._inlineColumns?.setScrollOffset(this._viewportEl.scrollTop);
     });
 
     this._viewLines.onVisibleRangeChanged = (startLine: number, endLine: number) => {
       // Sync line numbers with viewport scroll position
       this._lineNumbersOverlay?.setScrollOffset(this._viewportEl.scrollTop);
+      this._inlineColumns?.setScrollOffset(this._viewportEl.scrollTop);
       // Create/reposition line number elements for the new visible range
       this._lineNumbersOverlay?.setVisibleRange(startLine, endLine);
+      this._inlineColumns?.setVisibleRange(startLine, endLine);
       // Re-render selection highlights for the new visible lines (all cursors)
       this._renderSelectionHighlights(
         this._cursorController?.getAllCursors().map((c) => ({
@@ -1192,6 +1255,10 @@ export class FileEditorElement extends LitElement {
     this._renderVisibleLines();
     const initialLineCount = Math.min(model.lineCount, 100);
     this._lineNumbersOverlay.setVisibleRange(1, initialLineCount);
+
+    // Pipeline is rebuilt — bring the inline-diff gutter columns back (the
+    // teardown at the start of _initWithModel disposed them).
+    this._ensureInlineColumns();
 
     // Listen for model content changes (edits, undo, redo)
     model.onDidChangeContent((event: TextContentChangeEvent) => {
@@ -2213,6 +2280,8 @@ export class FileEditorElement extends LitElement {
     this._currentLineHighlight = null;
     this._inlineHighlights?.dispose();
     this._inlineHighlights = null;
+    this._inlineColumns?.dispose();
+    this._inlineColumns = null;
     this._indentationGuides?.dispose();
     this._indentationGuides = null;
     this._lineNumbersOverlay?.dispose();

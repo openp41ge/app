@@ -3,21 +3,19 @@
  * Tests for <file-editor> inline commit-diff mode (setInlineDiff).
  *
  * An inline diff is a REAL loaded buffer (the file at the commit, with its
- * removed lines spliced back in) decorated per row:
- *   - removed rows  → re-injected deleted lines, red full-width background,
- *                     gutter shows its old|new pair + a − sign,
- *   - added rows    → green full-width background, gutter shows the pair + a +
- *                     sign,
- *   - context rows  → unchanged, single (new-file) number.
- * The line-number column widens to fit the `old new sign` labels.
- * Because it is a real buffer it keeps full syntax highlighting and normal
- * editor behaviour — and there are NO @@ section headers. setInlineDiff(null)
- * removes the decorations and restores the default gutter width.
+ * removed lines spliced back in) decorated per row with THREE parallel gutter
+ * columns:
+ *   left   → the OLD line number (editor background, a separate group),
+ *   middle → the normal line-number column with the NEW file number,
+ *   sign   → a transparent column whose only visible content is the green `+`
+ *            (added) / red `−` (removed) glyph,
+ * plus red/green full-width row tints. NO @@ headers; real buffer so syntax
+ * highlighting and normal editing behaviour are preserved. setInlineDiff(null)
+ * removes everything and restores the default gutter.
  */
 import { describe, test, expect, beforeEach } from "vitest";
 import "../../../src/components/file-editor/file-editor";
 import { PieceTreeTextContentModel } from "../../../src/file-editor";
-import { inlineDiffLabel } from "../../../src/components/file-editor/inline-diff-highlights";
 
 // Old line 1 "OLD_GONE" became "NEW_HERE"; the merged buffer splices OLD_GONE
 // (removed, red) back above NEW_HERE (added, green). No trailing newline.
@@ -47,17 +45,19 @@ async function loadInlineDiff(el, text = TEXT, rows = ROWS) {
   return el;
 }
 
-function gutterLabels(el): string[] {
+function middleLabels(el): string[] {
   return [...el.querySelectorAll(".fe-gutter .line-number")].map((n) => n.textContent ?? "");
 }
-
-function gutterWidth(el): number {
-  const el2 = el.querySelector(".fe-gutter");
-  const w = el2?.style.width ?? "";
-  return w.endsWith("px") ? Number(w.slice(0, -2)) : NaN;
+function leftLabels(el): string[] {
+  return [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")].map((n) => n.textContent ?? "");
 }
-
-function tints(el): { added: number; removed: number } {
+function signGlyphs(el): { text: string; cls: string }[] {
+  return [...el.querySelectorAll(".fe-inline-sign .fe-inline-sign-label")].map((n) => ({
+    text: n.textContent ?? "",
+    cls: n.className,
+  }));
+}
+function tintCounts(el): { added: number; removed: number } {
   return {
     added: el.querySelectorAll(".fe-inline-diff-added").length,
     removed: el.querySelectorAll(".fe-inline-diff-removed").length,
@@ -69,39 +69,48 @@ describe("file-editor inline commit-diff mode", () => {
     document.body.innerHTML = "";
   });
 
-  test("loads a real buffer and decorates added/removed rows", async () => {
+  test("three parallel gutter columns: old | new | sign, colored glyphs", async () => {
     const el = await mount();
 
-    expect(el.hasInlineDiff).toBe(false);
-    expect(gutterWidth(el)).toBe(48); // default width
+    // Extra columns start hidden; middle gutter is the default width.
+    expect(el.querySelector(".fe-inline-left").style.display).toBe("none");
+    expect(el.querySelector(".fe-inline-sign").style.display).toBe("none");
 
     await loadInlineDiff(el);
 
-    // It IS the real editor: the document holds the merged text (removed line
-    // included), a textarea exists.
+    // Real buffer (removed line spliced in, textarea present, no @@).
     expect(el.textContentModel).toBeTruthy();
     expect(el.textContentModel.lineCount).toBe(3);
     expect(el.querySelector("textarea")).not.toBeNull();
-
-    // Decorations applied.
     expect(el.hasInlineDiff).toBe(true);
-    const t = tints(el);
+
+    const t = tintCounts(el);
     expect(t.removed).toBeGreaterThanOrEqual(1);
     expect(t.added).toBeGreaterThanOrEqual(1);
 
-    // Gutter shows the old|new pair + sign: removed "1 1 −", added "1 1 +".
-    expect(gutterLabels(el)[0]).toBe("1 1 −");
-    expect(gutterLabels(el)[1]).toBe("1 1 +");
+    // Columns visible now.
+    expect(el.querySelector(".fe-inline-left").style.display).not.toBe("none");
+    expect(el.querySelector(".fe-inline-sign").style.display).not.toBe("none");
 
-    // The line-number column widened to fit the labels.
-    expect(gutterWidth(el)).toBeGreaterThan(48);
+    // middle = NEW file numbers; left = OLD numbers on changed rows; sign =
+    // colored glyphs on changed rows only. (jsdom paints the visible band = 2
+    // lines, so the context row of the fixture is off-screen here.)
+    expect(middleLabels(el)).toEqual(["1", "1"]);
+    expect(leftLabels(el)).toEqual(["1", "1"]);
+    const signs = signGlyphs(el);
+    expect(signs).toHaveLength(2);
+    expect(signs[0].text).toBe("−");
+    expect(signs[0].cls).toContain("fe-sign-rem");
+    expect(signs[1].text).toBe("+");
+    expect(signs[1].cls).toContain("fe-sign-add");
 
-    // Pure label formatting is what the overlay displays.
-    expect(inlineDiffLabel({ kind: "removed", oldLine: 1, newLine: 1 })).toBe("1 1 −");
-    expect(inlineDiffLabel({ kind: "added", oldLine: 3, newLine: 4 })).toBe("3 4 +");
-    expect(inlineDiffLabel({ kind: "context", oldLine: 2, newLine: 2 })).toBe("2");
-    expect(inlineDiffLabel({ kind: "added", oldLine: null, newLine: 1 })).toBe("1 +");
-    expect(inlineDiffLabel({ kind: "removed", oldLine: 5, newLine: null })).toBe("5 −");
+    // The leftmost column shares the EDITOR background (a separate group from
+    // the gutter), and the sign column has none (transparent).
+    const leftStyle = el.querySelector(".fe-inline-left").style;
+    expect(leftStyle.background).toContain("var(--fe-bg");
+    const leftBg = getComputedStyle(el.querySelector(".fe-inline-left")).backgroundColor;
+    const rootBg = getComputedStyle(el.querySelector(".fe-root")).backgroundColor;
+    if (leftBg && rootBg) expect(leftBg).toBe(rootBg);
   });
 
   test("the visible text is the file itself — NO @@ headers", async () => {
@@ -114,23 +123,21 @@ describe("file-editor inline commit-diff mode", () => {
     expect(visible).not.toContain("@@");
   });
 
-  test("setInlineDiff(null) removes tints and restores default width + numbers", async () => {
+  test("setInlineDiff(null) removes tints, hides the extra columns, restores defaults", async () => {
     const el = await mount();
     await loadInlineDiff(el);
-    expect(tints(el).removed).toBeGreaterThanOrEqual(1);
-    expect(gutterWidth(el)).toBeGreaterThan(48);
+    expect(tintCounts(el).removed).toBeGreaterThanOrEqual(1);
+    expect(el.querySelector(".fe-inline-left").style.display).not.toBe("none");
 
     el.setInlineDiff(null);
     await new Promise((r) => setTimeout(r, 20));
 
     expect(el.hasInlineDiff).toBe(false);
-    expect(tints(el).removed).toBe(0);
-    expect(tints(el).added).toBe(0);
-    expect(gutterWidth(el)).toBe(48);
-    // Default numbers are back: 1, 2, 3.
-    const labels = gutterLabels(el);
-    expect(labels[0]).toBe("1");
-    expect(labels[1]).toBe("2");
+    expect(tintCounts(el).removed).toBe(0);
+    expect(el.querySelector(".fe-inline-left").style.display).toBe("none");
+    expect(el.querySelector(".fe-inline-sign").style.display).toBe("none");
+    // Default numbers are back: 1, 2 (visible band).
+    expect(middleLabels(el)).toEqual(["1", "2"]);
   });
 
   test("an empty body of rows is harmless (no decorations)", async () => {

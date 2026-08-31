@@ -110,14 +110,28 @@ describe("CommitFileDiffController", () => {
     expect(host.querySelectorAll(".fe-inline-diff-removed").length).toBeGreaterThanOrEqual(1);
     expect(host.querySelectorAll(".fe-inline-diff-added").length).toBeGreaterThanOrEqual(1);
 
-    // Gutter shows the file's real numbers + change sign: removed "1 1 −",
-    // added "1 1 +". (jsdom paints only the visible band.)
-    const labels = [
-      ...(host.querySelectorAll(".fe-gutter .line-number") ?? []),
-    ].map((n) => n.textContent ?? "");
-    expect(labels).toHaveLength(2);
-    expect(labels[0]).toBe("1 1 −"); // removed — old|new pair + minus
-    expect(labels[1]).toBe("1 1 +"); // added — old|new pair + plus
+    // Gutter: THREE parallel columns. Middle = NEW file numbers,
+    // left = OLD numbers, sign = glyph (red − / green +). (jsdom paints
+    // only the visible band = 2 lines.)
+    const middle = [...(host.querySelectorAll(".fe-gutter .line-number") ?? [])].map(
+      (n) => n.textContent ?? "",
+    );
+    const left = [...(host.querySelectorAll(".fe-inline-left .fe-inline-left-label") ?? [])].map(
+      (n) => n.textContent ?? "",
+    );
+    const glyphs = [...(host.querySelectorAll(".fe-inline-sign .fe-inline-sign-label") ?? [])].map(
+      (n) => ({ t: n.textContent ?? "", cls: n.className }),
+    );
+    expect(middle).toEqual(["1", "1"]); // new
+    expect(left).toEqual(["1", "1"]); // old
+    expect(glyphs).toHaveLength(2);
+    expect(glyphs[0].t).toBe("−");
+    expect(glyphs[0].cls).toContain("fe-sign-rem");
+    expect(glyphs[1].t).toBe("+");
+    expect(glyphs[1].cls).toContain("fe-sign-add");
+    // Leftmost column uses the EDITOR background (separate group from the
+    // gutter column).
+    expect(host.querySelector(".fe-inline-left")?.style?.background).toContain("var(--fe-bg");
   });
 
   it("restore with cached text/rows paints instantly without refetching", async () => {
