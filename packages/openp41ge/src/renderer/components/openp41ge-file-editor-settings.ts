@@ -2,10 +2,14 @@
  * <openp41ge-file-editor-settings> — Editor settings tab content.
  *
  * Hosted by the system overlay's "Editor" tab (registered in
- * register-app-types.step.ts). The first (and currently only) setting is
- * `editor.maxFileSize` — the byte cap above which files open as a "too large"
- * message instead of loading content. Shows the value in MB, persists bytes,
- * and stays live when the config changes elsewhere.
+ * register-app-types.step.ts). Settings:
+ *  - `editor.maxFileSize` — the byte cap above which files open as a "too
+ *    large" message instead of loading content. Shows the value in MB,
+ *    persists bytes.
+ *  - `editor.wordWrap` — the DEFAULT word-wrap state for files that have no
+ *    per-file choice (per-file wraps are remembered per path and toggled from
+ *    the file's status bar). Either on or off.
+ * Both persist in the config service and stay live when changed elsewhere.
  */
 
 import { customElement, state } from "lit/decorators.js";
@@ -15,6 +19,8 @@ import { appServices } from "../app";
 import { DEFAULT_EDITOR_MAX_FILE_SIZE } from "../models/file-size-gate";
 
 const MAX_FILE_SIZE_KEY = "editor.maxFileSize";
+/** Default word-wrap state for files without a per-file choice (off). */
+const WORD_WRAP_KEY = "editor.wordWrap";
 /** Minimum sensible limit (1 MB) — keeps the guard meaningful. */
 const MIN_LIMIT_MB = 1;
 /** Maximum the input accepts, purely as a sanity cap. */
@@ -29,17 +35,26 @@ export class Openp41geFileEditorSettings extends LitElement {
   private _valueMb = this._readCurrentMb();
 
   @state()
+  private _wordWrapOn = this._readCurrentWordWrap();
+
+  @state()
   private _hint: string = "";
 
   private _unsubKey: (() => void) | null = null;
+  private _unsubWrap: (() => void) | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
     this._valueMb = this._readCurrentMb();
+    this._wordWrapOn = this._readCurrentWordWrap();
     // Stay live if the limit changes elsewhere (e.g. another window).
     this._unsubKey = this.configService.onKeyChange(MAX_FILE_SIZE_KEY, () => {
       this._valueMb = this._readCurrentMb();
       this._hint = "";
+      this.requestUpdate();
+    });
+    this._unsubWrap = this.configService.onKeyChange(WORD_WRAP_KEY, () => {
+      this._wordWrapOn = this._readCurrentWordWrap();
       this.requestUpdate();
     });
   }
@@ -48,6 +63,8 @@ export class Openp41geFileEditorSettings extends LitElement {
     super.disconnectedCallback();
     this._unsubKey?.();
     this._unsubKey = null;
+    this._unsubWrap?.();
+    this._unsubWrap = null;
   }
 
   render(): TemplateResult {
@@ -124,6 +141,49 @@ export class Openp41geFileEditorSettings extends LitElement {
           margin: 8px 0 0;
           color: var(--accent, #4f9cf9);
         }
+        /* Switch for the word-wrap default: hidden checkbox + track/thumb. */
+        .fes-switch {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+        }
+        .fes-switch input {
+          position: absolute;
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .fes-switch-track {
+          width: 34px;
+          height: 18px;
+          border-radius: 9px;
+          background: rgba(255, 255, 255, 0.18);
+          position: relative;
+          flex-shrink: 0;
+          transition: background 0.15s;
+        }
+        .fes-switch input:checked + .fes-switch-track {
+          background: var(--accent, #007acc);
+        }
+        .fes-switch-track::after {
+          content: "";
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #e0e0e0;
+          transition: transform 0.15s;
+        }
+        .fes-switch input:checked + .fes-switch-track::after {
+          transform: translateX(16px);
+        }
+        .fes-switch-label {
+          min-width: 28px;
+          color: var(--text-primary, #e0e0e0);
+        }
       </style>
       <div class="fes-pane">
         <div class="fes-heading">
@@ -152,6 +212,29 @@ export class Openp41geFileEditorSettings extends LitElement {
             instead of loading their content. Applies to newly opened files.
           </p>
           ${this._hint ? html`<p class="fes-setting-hint">${this._hint}</p>` : nothing}
+        </div>
+
+        <div class="fes-card" style="margin-top:16px;">
+          <label class="fes-card-question" for="fes-wordwrap">
+            Word wrap for new files
+          </label>
+          <div class="fes-card-control">
+            <label class="fes-switch" for="fes-wordwrap">
+              <input
+                id="fes-wordwrap"
+                type="checkbox"
+                .checked=${this._wordWrapOn}
+                @change=${this._onWordWrapToggle}
+              />
+              <span class="fes-switch-track"></span>
+              <span class="fes-switch-label">${this._wordWrapOn ? "On" : "Off"}</span>
+            </label>
+          </div>
+          <p class="fes-card-help">
+            Lines that exceed the editor width wrap to the next line instead of scrolling
+            horizontally. This is the default for files with no per-file choice — wrap is
+            remembered per file and can be toggled from each file's status bar.
+          </p>
         </div>
       </div>
     `;
@@ -212,6 +295,18 @@ export class Openp41geFileEditorSettings extends LitElement {
       DEFAULT_EDITOR_MAX_FILE_SIZE;
     const mb = Math.floor(bytes / 1024 / 1024);
     return Math.max(MIN_LIMIT_MB, mb);
+  }
+
+  /** Word-wrap default is a boolean (absent => off). */
+  private _readCurrentWordWrap(): boolean {
+    return this.configService.get(WORD_WRAP_KEY) === true;
+  }
+
+  /** Persist the word-wrap default choice (on/off). */
+  private _onWordWrapToggle(e: Event): void {
+    const on = (e.target as HTMLInputElement).checked;
+    this._wordWrapOn = on;
+    void this.configService.set(WORD_WRAP_KEY, on);
   }
 
   createRenderRoot(): HTMLElement {

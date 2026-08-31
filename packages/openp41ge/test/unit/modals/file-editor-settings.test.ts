@@ -185,4 +185,46 @@ describe("openp41ge-file-editor-settings", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(el.querySelector("#fes-maxsize").value).toBe("120");
   });
+
+  // ── Word wrap default card ──
+
+  test("word-wrap card renders a switch, defaulting to OFF when unset", async () => {
+    const fake = new FakeConfig({});
+    const el = await mount(fake);
+    const sw = el.querySelector("#fes-wordwrap");
+    expect(sw).not.toBeNull();
+    expect(el.textContent).toContain("Word wrap for new files");
+    expect(sw.checked).toBe(false);
+    expect(el.querySelector(".fes-switch-label").textContent).toBe("Off");
+  });
+
+  test("word-wrap switch reflects the saved default", async () => {
+    const fake = new FakeConfig({ "editor.wordWrap": true });
+    const el = await mount(fake);
+    const sw = el.querySelector("#fes-wordwrap");
+    expect(sw.checked).toBe(true);
+    expect(el.querySelector(".fes-switch-label").textContent).toBe("On");
+  });
+
+  test("toggling the word-wrap switch persists a boolean to editor.wordWrap", async () => {
+    const fake = new FakeConfig({});
+    const el = await mount(fake);
+    const sw = el.querySelector("#fes-wordwrap");
+    sw.checked = true;
+    sw.dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(fake.sets).toEqual([{ key: "editor.wordWrap", value: true }]);
+    await new Promise((r) => setTimeout(r, 10)); // Lit state re-render
+    expect(el.querySelector(".fes-switch-label").textContent).toBe("On");
+  });
+
+  test("word-wrap switch reacts to an external config change", async () => {
+    const fake = new FakeConfig({});
+    const el = await mount(fake);
+    expect(el.querySelector("#fes-wordwrap").checked).toBe(false);
+
+    await fake.set("editor.wordWrap", true);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(el.querySelector("#fes-wordwrap").checked).toBe(true);
+  });
 });

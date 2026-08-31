@@ -214,7 +214,11 @@ export class FileEditorElement extends LitElement {
   private _charWidth: number = 0;
   private _lineHeight: number = 20;
   private _fontSize: number = 14;
+  /** Document-relative word wrap is PER-FILE: a saved override for the open
+   * path wins, otherwise this editor's default (Editor-settings) applies. */
   private _wordWrapEnabled: boolean = false;
+  /** Default wrap for files with no per-file preference (Editor settings). */
+  private _wordWrapDefault: boolean = false;
   private _wrapCalculator: IWrapColumnCalculator = new ViewportWrapColumnCalculator();
   // @ts-expect-error unused
   private _mouseDownLine = 0;
@@ -1384,10 +1388,9 @@ export class FileEditorElement extends LitElement {
     this._updateStatusBarSize();
     if (this._statusBar) {
       this._statusBar.setDirty(false);
-      const lang = this.filePath.split(".").pop() || "";
-      const ext = lang;
-      const stored = localStorage.getItem("openp41ge:wordWrap:" + ext);
-      const wordWrapOn = stored === "true";
+      // Word wrap is PER-FILE: a saved override for this path wins, otherwise
+      // the Editor-settings default applies (no more extension-global key).
+      const wordWrapOn = this._resolveWordWrap();
       this._wordWrapEnabled = wordWrapOn;
       this._statusBar.setWordWrap(wordWrapOn, (on: boolean) => this._toggleWordWrap(on));
       this._applyWordWrap();
@@ -1671,14 +1674,51 @@ export class FileEditorElement extends LitElement {
     return `${value.toFixed(digits)} ${units[unit]}`;
   }
 
-  /** Toggle word wrap on/off and persist preference. */
+  /** Set the default word wrap for files with no per-file preference (from
+   * the Editor settings tab). A file with a saved per-file override is left
+   * untouched. If this editor is loaded and has no override, re-applies live. */
+  setWordWrapDefault(enabled: boolean): void {
+    this._wordWrapDefault = enabled;
+    if (this._viewModel && !this._hasPerFileWrapOverride()) {
+      this._wordWrapEnabled = enabled;
+      this._statusBar?.setWordWrap(enabled, (on: boolean) => this._toggleWordWrap(on));
+      this._applyWordWrap();
+    }
+  }
+
+  /** Stored per-file wrap preference for this path, or null when absent. */
+  private _savedFileWrap(): boolean | null {
+    if (!this.filePath) return null;
+    try {
+      const stored = localStorage.getItem("openp41ge:wordWrap:path:" + this.filePath);
+      return stored === null ? null : stored === "true";
+    } catch {
+      return null; // localStorage may be unavailable
+    }
+  }
+
+  /** True when this file has an explicit per-file wrap preference. */
+  private _hasPerFileWrapOverride(): boolean {
+    return this._savedFileWrap() !== null;
+  }
+
+  /** Per-file override when present, otherwise the editor default. */
+  private _resolveWordWrap(): boolean {
+    return this._savedFileWrap() ?? this._wordWrapDefault;
+  }
+
+  /** Toggle word wrap on/off for THIS file and persist the per-file choice. */
   private _toggleWordWrap(enabled: boolean): void {
     this._wordWrapEnabled = enabled;
-    const ext = this.filePath.split(".").pop() || "";
-    try {
-      localStorage.setItem("openp41ge:wordWrap:" + ext, enabled ? "true" : "false");
-    } catch {
-      // localStorage may be unavailable in some contexts
+    if (this.filePath) {
+      try {
+        localStorage.setItem(
+          "openp41ge:wordWrap:path:" + this.filePath,
+          enabled ? "true" : "false",
+        );
+      } catch {
+        // localStorage may be unavailable in some contexts
+      }
     }
     this._applyWordWrap();
   }

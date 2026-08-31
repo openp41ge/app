@@ -284,6 +284,10 @@ export class FileEditorController extends BaseController implements FileViewerCo
     if (typeof fontSize === "number" && fontSize >= 10 && fontSize <= 30) {
       this._editor.setEditorFontSize(fontSize);
     }
+    // Word-wrap DEFAULT (Editor settings tab): applied to files without a
+    // per-file override; per-file choices are remembered per path.
+    const wordWrap = appServices.configService.get("editor.wordWrap") as boolean | undefined;
+    this._editor.setWordWrapDefault(Boolean(wordWrap));
   }
 
   private _attachEventBridge(): void {
