@@ -94,6 +94,8 @@ describe("InlineDiffGutterColumns", () => {
       expect(l.style.right).toBe("0px");
       expect(l.style.justifyContent).toBe("flex-end");
       expect(l.style.boxSizing).toBe("border-box");
+      // Clickable, so it needs the same pointer cursor as the AFTER column.
+      expect(l.style.cursor).toBe("pointer");
     }
   });
 

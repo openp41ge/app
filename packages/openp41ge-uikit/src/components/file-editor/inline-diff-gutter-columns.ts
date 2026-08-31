@@ -124,7 +124,7 @@ export class InlineDiffGutterColumns {
         // Without left:0/right:0 the absolute box shrink-wraps its content and
         // flex-end has nothing to push against, leaving the numbers left-anchored.
         el.style.cssText =
-          "position:absolute;left:0;right:0;box-sizing:border-box;" +
+          "position:absolute;left:0;right:0;box-sizing:border-box;cursor:pointer;" +
           "display:flex;align-items:center;justify-content:flex-end;padding-right:8px;" +
           "overflow:hidden;white-space:nowrap;";
         this._leftInner.appendChild(el);
