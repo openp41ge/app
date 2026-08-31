@@ -27,11 +27,13 @@ describe("buildInlineDiffFile", () => {
     expect(file.text).toBe("alpha\nbeta\nBETA\ngamma\ndelta\nepsilon");
     expect(file.text).not.toContain("@@");
 
-    // Replaced line carries its old|new pair: removed "2 2", added "2 2".
+    // BEFORE/AFTER numbers: replaced "beta" (removed) has before 2 with no
+    // after; its replacement has after 2 with NO before (it didn't exist
+    // before). Context lines are present in both columns.
     expect(file.rows).toEqual([
       { kind: "context", oldLine: 1, newLine: 1 },
       { kind: "removed", oldLine: 2, newLine: 2 },
-      { kind: "added", oldLine: 2, newLine: 2 },
+      { kind: "added", oldLine: null, newLine: 2 },
       { kind: "context", oldLine: 3, newLine: 3 },
       { kind: "context", oldLine: 4, newLine: 4 },
       { kind: "context", oldLine: 5, newLine: 5 },
@@ -69,11 +71,13 @@ describe("buildInlineDiffFile", () => {
       },
     ]);
     expect(file.text).toBe("keep\nremove me\nremove me two\nstill here");
+    // The kept tail line is new line 2 but OLD line 4 (two lines were
+    // deleted above it) — its before number drifts by the deletions.
     expect(file.rows).toEqual([
       { kind: "context", oldLine: 1, newLine: 1 },
       { kind: "removed", oldLine: 2, newLine: 2 },
       { kind: "removed", oldLine: 3, newLine: 2 },
-      { kind: "context", oldLine: 2, newLine: 2 },
+      { kind: "context", oldLine: 4, newLine: 2 },
     ]);
   });
 

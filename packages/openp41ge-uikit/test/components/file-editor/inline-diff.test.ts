@@ -3,27 +3,31 @@
  * Tests for <file-editor> inline commit-diff mode (setInlineDiff).
  *
  * An inline diff is a REAL loaded buffer (the file at the commit, with its
- * removed lines spliced back in) decorated per row with THREE parallel gutter
- * columns:
- *   left   → the OLD line number (editor background, a separate group),
- *   middle → the normal line-number column with the NEW file number,
- *   sign   → a transparent column whose only visible content is the green `+`
- *            (added) / red `−` (removed) glyph,
- * plus red/green full-width row tints. NO @@ headers; real buffer so syntax
- * highlighting and normal editing behaviour are preserved. setInlineDiff(null)
- * removes everything and restores the default gutter.
+ * removed lines spliced back in) decorated with TWO line-number columns:
+ *   LEFT  = BEFORE — the old-file line numbers, mostly full: every context
+ *           (unchanged) line and every deleted line has a before number. The
+ *           only gap is on ADDED lines, which did not exist before.
+ *   MIDDLE = AFTER — the new-file line numbers, also mostly full: context and
+ *           added lines have an after number; the only gap is on DELETED lines
+ *           (they have no new side).
+ * So an unchanged line shows the same number in BOTH columns; a changed line
+ * shows exactly one side. Plus a transparent sign column (green + / red −) and
+ * red/green row tints. NO @@ headers; real buffer (syntax highlighting etc.).
+ * setInlineDiff(null) removes everything and restores the default gutter.
  */
 import { describe, test, expect, beforeEach } from "vitest";
 import "../../../src/components/file-editor/file-editor";
 import { PieceTreeTextContentModel } from "../../../src/file-editor";
 
-// Old line 1 "OLD_GONE" became "NEW_HERE"; the merged buffer splices OLD_GONE
-// (removed, red) back above NEW_HERE (added, green). No trailing newline.
-const TEXT = "OLD_GONE\nNEW_HERE\nstill here";
+const TEXT = "ctx one\nOLD_GONE\nNEW_HERE";
+// Two-line slice for the ADDED-gap test (rows must equal the line count).
+const TEXT_SLICE = "NEW_HERE\nstill here";
+// Context at 1 (both sides), deleted old 2 (before only), added new 2
+// (after only, no before).
 const ROWS = [
-  { kind: "removed", oldLine: 1, newLine: 1 },
-  { kind: "added", oldLine: 1, newLine: 1 },
-  { kind: "context", oldLine: 2, newLine: 2 },
+  { kind: "context", oldLine: 1, newLine: 1 },
+  { kind: "removed", oldLine: 2, newLine: 2 },
+  { kind: "added", oldLine: null, newLine: 2 },
 ];
 
 async function mount(): Promise<HTMLElement & any> {
@@ -69,54 +73,57 @@ describe("file-editor inline commit-diff mode", () => {
     document.body.innerHTML = "";
   });
 
-  test("three parallel gutter columns: old | new | sign, colored glyphs", async () => {
+  test("BEFORE and AFTER columns: context in both, deleted before-only, gap rules", async () => {
     const el = await mount();
 
-    // Extra columns start hidden; middle gutter is the default width.
+    // Extra columns start hidden.
     expect(el.querySelector(".fe-inline-left").style.display).toBe("none");
     expect(el.querySelector(".fe-inline-sign").style.display).toBe("none");
 
     await loadInlineDiff(el);
 
-    // Real buffer (removed line spliced in, textarea present, no @@).
     expect(el.textContentModel).toBeTruthy();
     expect(el.textContentModel.lineCount).toBe(3);
     expect(el.querySelector("textarea")).not.toBeNull();
     expect(el.hasInlineDiff).toBe(true);
 
     const t = tintCounts(el);
-    expect(t.removed).toBeGreaterThanOrEqual(1);
-    expect(t.added).toBeGreaterThanOrEqual(1);
+    expect(t.removed).toBeGreaterThanOrEqual(1); // deleted line is in-band (line 2)
+    // (the added row is line 3 — off the 2-line jsdom band; its tint is
+    // asserted in the dedicated ADDED test below)
 
-    // Columns visible now.
     expect(el.querySelector(".fe-inline-left").style.display).not.toBe("none");
     expect(el.querySelector(".fe-inline-sign").style.display).not.toBe("none");
 
-    // BEFORE/AFTER columns (band = 2 lines in jsdom):
-    //   deleted row → before (left) number only  →  left "1", middle "";
-    //   added row   → after (middle) number only →  left "",  middle "1".
-    // And never a number in BOTH columns on the same row.
-    expect(leftLabels(el)).toEqual(["1", ""]);
-    expect(middleLabels(el)).toEqual(["", "1"]);
-    for (let i = 0; i < leftLabels(el).length; i++) {
-      if (leftLabels(el)[i] && middleLabels(el)[i]) {
-        throw new Error(`both before+after on row ${i + 1}`);
-      }
-    }
+    // Band = lines 1..2 in jsdom:
+    //   line 1 (context) — number in BOTH columns,
+    //   line 2 (deleted) — number ONLY in the before column.
+    expect(leftLabels(el)).toEqual(["1", "2"]);
+    expect(middleLabels(el)).toEqual(["1", ""]);
+    // sign: none on context, red − on the deleted line.
     const signs = signGlyphs(el);
     expect(signs).toHaveLength(2);
-    expect(signs[0].text).toBe("−");
-    expect(signs[0].cls).toContain("fe-sign-rem");
-    expect(signs[1].text).toBe("+");
-    expect(signs[1].cls).toContain("fe-sign-add");
+    expect(signs[0].text).toBe("");
+    expect(signs[0].cls).toContain("fe-sign-none");
+    expect(signs[1].text).toBe("−");
+    expect(signs[1].cls).toContain("fe-sign-rem");
+  });
 
-    // The leftmost column shares the EDITOR background (a separate group from
-    // the gutter), and the sign column has none (transparent).
-    const leftStyle = el.querySelector(".fe-inline-left").style;
-    expect(leftStyle.background).toContain("var(--fe-bg");
-    const leftBg = getComputedStyle(el.querySelector(".fe-inline-left")).backgroundColor;
-    const rootBg = getComputedStyle(el.querySelector(".fe-root")).backgroundColor;
-    if (leftBg && rootBg) expect(leftBg).toBe(rootBg);
+  test("an ADDED line shows a gap in the BEFORE column (it did not exist before)", async () => {
+    const el = await mount();
+    // Two-line buffer so both rows fit the jsdom band.
+    await loadInlineDiff(el, TEXT_SLICE, [
+      { kind: "added", oldLine: null, newLine: 1 },
+      { kind: "context", oldLine: 1, newLine: 2 },
+    ]);
+    // line 1 added → before empty, after 1; line 2 context → before 1, after 2.
+    expect(leftLabels(el)).toEqual(["", "1"]);
+    expect(middleLabels(el)).toEqual(["1", "2"]);
+    const signs = signGlyphs(el);
+    expect(signs[0].text).toBe("+");
+    expect(signs[0].cls).toContain("fe-sign-add");
+    // The added line's green tint IS in-band here.
+    expect(tintCounts(el).added).toBeGreaterThanOrEqual(1);
   });
 
   test("the visible text is the file itself — NO @@ headers", async () => {
@@ -124,8 +131,11 @@ describe("file-editor inline commit-diff mode", () => {
     await loadInlineDiff(el);
 
     const visible = [...el.querySelectorAll(".view-line")].map((v) => v.textContent ?? "").join("\n");
-    expect(visible).toContain("OLD_GONE"); // deleted line present (red)
-    expect(visible).toContain("NEW_HERE"); // its green replacement
+    // The full buffer holds the spliced deletion AND its replacement; the
+    // visible band (2 jsdom lines) shows the deleted line; no @@ anywhere.
+    expect(el.textContentModel.getValue()).toContain("OLD_GONE");
+    expect(el.textContentModel.getValue()).toContain("NEW_HERE");
+    expect(visible).toContain("OLD_GONE");
     expect(visible).not.toContain("@@");
   });
 

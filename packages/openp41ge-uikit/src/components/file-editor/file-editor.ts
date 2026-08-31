@@ -298,10 +298,10 @@ export class FileEditorElement extends LitElement {
       let maxOld = 0;
       let maxNew = 0;
       for (const row of this._inlineRows) {
-        // Left = BEFORE holds a number only on deleted rows; middle = AFTER
-        // holds a number only on added (and unchanged context) rows — never
-        // both on the same row.
-        if (row.kind === "removed" && row.oldLine != null) {
+        // BEFORE (left) is full except gaps where a line has no old side (an
+        // addition); AFTER (middle) is full except gaps where a line has no
+        // new side (a deletion). Context (unchanged) lines appear in both.
+        if (row.kind !== "added" && row.oldLine != null) {
           maxOld = Math.max(maxOld, String(row.oldLine).length);
         }
         if (row.kind !== "removed" && row.newLine != null) {
@@ -315,9 +315,10 @@ export class FileEditorElement extends LitElement {
         infoFor: (line: number) => {
           const row = this._inlineRows?.[line - 1];
           if (!row) return { leftLabel: "", sign: "" };
-          // BEFORE (left) — the old line number, only on deleted rows; an
-          // added line has no before side.
-          const left = row.kind === "removed" && row.oldLine != null ? String(row.oldLine) : "";
+          // BEFORE (left) — the old line number. Full on context + deleted
+          // rows; a GAP where the line didn't exist before (an addition).
+          const left =
+            row.kind !== "added" && row.oldLine != null ? String(row.oldLine) : "";
           const sign = row.kind === "added" ? "+" : row.kind === "removed" ? "−" : "";
           return { leftLabel: left, sign };
         },
@@ -1138,16 +1139,16 @@ export class FileEditorElement extends LitElement {
       onLineClick: (lineNumber: number) => {
         this._cursorController?.selectLine(lineNumber);
       },
-      // Inline commit-diff: left = BEFORE (old numbers, deleted rows only),
-      // middle = AFTER (new numbers, added + context rows only) — deleted rows
-      // show nothing on the after side, never both on a row.
+      // Inline commit-diff: BEFORE (old numbers) lives in the left column;
+      // this (middle) column shows AFTER — the new file numbers — full on
+      // context + added rows and a GAP on deleted rows (they have no new side).
       getLabelOverride: (lineNumber: number) => {
         const row = this._inlineRows?.[lineNumber - 1];
         if (!row) return null;
         if (row.kind !== "removed" && row.newLine != null) {
           return String(row.newLine);
         }
-        return ""; // removed rows: no after-side number
+        return ""; // deleted rows: no after-side number
       },
       wordWrapEnabled: this._wordWrapEnabled,
       getViewLineStart: (modelLine: number) =>

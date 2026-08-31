@@ -39,25 +39,31 @@ export interface InlineDiffFile {
   readonly rows: readonly InlineDiffRow[];
 }
 
-/** New side of a `@@` header: `+N[,C]` immediately before the trailing `@@`. */
-function parseNewRange(header: string): { start: number; count: number } {
-  const m = /\+(\d+)(?:,(\d+))?\s+@@/.exec(header);
-  if (!m) return { start: 1, count: 0 };
-  return { start: Math.max(0, Number(m[1])), count: Math.max(0, Number(m[2] ?? 1)) };
-}
-
-/** Old side of a `@@` header: the first `-N` after `@@`. */
-function parseOldStart(header: string): number {
-  const m = /@@\s+-(\d+)/.exec(header);
-  return m ? Math.max(0, Number(m[1])) : 1;
-}
-
 /** Split file content into lines, dropping the single trailing "\n" artifact. */
 function splitLines(content: string): string[] {
   if (!content) return [];
   const lines = content.split("\n");
   if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
   return lines;
+}
+
+/** Full `@@ -O,C +N,C2 @@` header parse (starts 0-safe for new files). */
+interface HunkRanges {
+  oldStart: number;
+  oldCount: number;
+  newStart: number;
+  newCount: number;
+}
+
+function parseHunkRanges(header: string): HunkRanges {
+  const m = /@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/.exec(header);
+  if (!m) return { oldStart: 1, oldCount: 0, newStart: 1, newCount: 0 };
+  return {
+    oldStart: Math.max(0, Number(m[1])),
+    oldCount: Math.max(0, Number(m[2] ?? 1)),
+    newStart: Math.max(0, Number(m[3])),
+    newCount: Math.max(0, Number(m[4] ?? 1)),
+  };
 }
 
 interface MergedLine {
@@ -74,36 +80,39 @@ export function buildInlineDiffFile(
   const fileLines = splitLines(fileContent ?? "");
   const fileLen = fileLines.length;
   const sorted = [...(hunks ?? [])].sort((a, b) => {
-    const sa = parseNewRange(a.header).start;
-    const sb = parseNewRange(b.header).start;
+    const sa = parseHunkRanges(a.header).newStart;
+    const sb = parseHunkRanges(b.header).newStart;
     return sa - sb || (a.header < b.header ? -1 : a.header > b.header ? 1 : 0);
   });
 
   const merged: MergedLine[] = [];
   // Cursor into the NEW-side file: lines below it are already emitted.
   let newCursor = 1; // 1-based
+  // Old-side drift: the number of OLD lines the hunks so far consumed minus the
+  // NEW lines they emitted. Adds shift the after-column down relative to the
+  // before-column and vice versa, so unchanged context lines TO the right of a
+  // change show different before/after numbers (one number per side, mostly
+  // both columns full).
+  let shift = 0;
 
   for (const hunk of sorted) {
-    const hunkStart = parseNewRange(hunk.header).start;
-    const oldStart = parseOldStart(hunk.header);
+    const { oldStart, oldCount, newStart, newCount } = parseHunkRanges(hunk.header);
     const hunkLines = hunk.lines ?? [];
 
     // Full unchanged run BEFORE this hunk's new range — never cropped. Context
-    // occupies the same position on both sides, so old == new here.
+    // exists on both sides; BEFORE (old) drifts by the prior net deletions.
     const gapFrom = Math.min(newCursor, fileLen + 1);
-    const gapTo = Math.min(hunkStart, fileLen + 1);
+    const gapTo = Math.min(newStart, fileLen + 1);
     for (let i = gapFrom; i < gapTo; i++) {
-      merged.push({ kind: "context", text: fileLines[i - 1], oldLine: i, newLine: i });
+      merged.push({ kind: "context", text: fileLines[i - 1], oldLine: shift + i, newLine: i });
     }
     // Advance past the gap (or clamp if the hunk overlaps/starts earlier).
-    newCursor = Math.max(newCursor, Math.min(hunkStart, fileLen + 1));
+    newCursor = Math.max(newCursor, Math.min(newStart, fileLen + 1));
 
     // Walk the hunk's own line order in git's order, tracking the OLD- and
-    // NEW-side cursors so every row carries its old|new pair. A deletion r on
-    // the old side maps new = the comparable new-side position (newN); its
-    // replacement maps old = the line just removed (oldN - 1).
+    // NEW-side cursors so every row carries its old|new pair.
     let oldN = oldStart > 0 ? oldStart : 0;
-    let newN = hunkStart;
+    let newN = newStart;
     for (const line of hunkLines) {
       const t = line.text;
       if (line.type === "-") {
@@ -118,7 +127,7 @@ export function buildInlineDiffFile(
         merged.push({
           kind: "added",
           text: fileLines[newCursor - 1] ?? "",
-          oldLine: oldN > 1 ? oldN - 1 : null,
+          oldLine: null, // an added line has NO before-number
           newLine: newN,
         });
         if (newCursor <= fileLen) newCursor += 1;
@@ -135,11 +144,20 @@ export function buildInlineDiffFile(
         if (newCursor <= fileLen) newCursor += 1;
       }
     }
+
+    // Net old-minus-new line count this hunk consumed — drifts the before
+    // numbers of every later context line.
+    shift += oldCount - newCount;
   }
 
   // Remaining full content after the last hunk — never cropped.
   for (let i = newCursor; i <= fileLen; i++) {
-    merged.push({ kind: "context", text: fileLines[i - 1], oldLine: i, newLine: i });
+    merged.push({
+      kind: "context",
+      text: fileLines[i - 1],
+      oldLine: shift + i > 0 ? shift + i : null,
+      newLine: i,
+    });
   }
 
   const text = merged.map((l) => l.text).join("\n");
