@@ -202,6 +202,59 @@ describe("CommitFileDiffController", () => {
     expect(host.textContent).toContain("No textual content for this file at this commit");
   });
 
+  it("a DELETED file renders its previous version as a full red delete block", async () => {
+    // Content is gone at the commit (null) but the deletion hunks carry the
+    // ENTIRE old file as `-` lines — so the diff shows the previous version
+    // instead of a blank pane: every row removed, BEFORE numbers only.
+    const deleteHunks = [
+      {
+        header: "@@ -1,3 +0,0 @@",
+        lines: [
+          { type: "-", text: "line one" },
+          { type: "-", text: "line two" },
+          { type: "-", text: "line three" },
+        ],
+      },
+    ];
+    controller._fetchDiff = async () => [null, deleteHunks];
+    (window as unknown as Record<string, unknown>).__pendingCommitFileDiff = {
+      ...ctx(),
+      path: "src/legacy.ts",
+    };
+    controller.mount(host);
+    await flush();
+
+    const merged = buildInlineDiffFile(null, deleteHunks as never);
+    const editor = host.querySelector("file-editor") as HTMLElement & {
+      isReadOnly?: boolean;
+      hasInlineDiff?: boolean;
+      textContentModel?: { getValue(): string; lineCount: number };
+    };
+    expect(editor).not.toBeNull();
+    expect(editor.isReadOnly).toBe(true);
+    expect(editor.hasInlineDiff).toBe(true);
+    // The whole previous version is the buffer — nothing is cropped.
+    expect(editor.textContentModel?.getValue()).toBe(merged.text);
+    expect(editor.textContentModel?.lineCount).toBe(merged.rows.length);
+    expect(editor.textContentModel?.getValue()).toContain("line two");
+
+    // Every visible row is a REMOVED row (red delete block): red tint present.
+    expect(host.querySelectorAll(".fe-inline-diff-removed").length).toBeGreaterThanOrEqual(1);
+    // BEFORE (left) numbers only — the AFTER (middle) column is blank because
+    // a deleted file has no new side.
+    const left = [...(host.querySelectorAll(".fe-inline-left .fe-inline-left-label") ?? [])].map(
+      (n) => n.textContent ?? "",
+    );
+    expect(left[0]).toBe("1");
+    const middle = [...(host.querySelectorAll(".fe-gutter .line-number") ?? [])].map(
+      (n) => n.textContent ?? "",
+    );
+    expect(middle.every((t) => t === "")).toBe(true);
+    // No added rows anywhere in the model.
+    expect(merged.rows.every((r) => r.kind === "removed")).toBe(true);
+    expect(host.textContent).not.toContain("No textual content");
+  });
+
   it("shows the unavailable prompt without repo/hash/path", () => {
     controller.mount(host);
     expect(host.textContent).toContain("File diff unavailable");

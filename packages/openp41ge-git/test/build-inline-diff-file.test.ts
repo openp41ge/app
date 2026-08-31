@@ -112,6 +112,30 @@ describe("buildInlineDiffFile", () => {
     expect(file.text).toBe("gone\ngone two");
   });
 
+  it("null content (a deleted file) renders the whole previous version as removed rows", () => {
+    // The commit diff deleted this file: content at the commit is null, and the
+    // hunks carry every - line of the old file — so the merged document is the
+    // entire previous version, one big red delete block.
+    const file = buildInlineDiffFile(null, [
+      {
+        header: "@@ -1,3 +0,0 @@",
+        lines: [
+          { type: "-", text: "line one" },
+          { type: "-", text: "line two" },
+          { type: "-", text: "line three" },
+        ],
+      },
+    ]);
+    expect(file.rows.map((r) => r.kind)).toEqual(["removed", "removed", "removed"]);
+    expect(file.rows).toEqual([
+      { kind: "removed", oldLine: 1, newLine: null },
+      { kind: "removed", oldLine: 2, newLine: null },
+      { kind: "removed", oldLine: 3, newLine: null },
+    ]);
+    expect(file.text).toBe("line one\nline two\nline three");
+    expect(file.text).not.toContain("@@");
+  });
+
   it("empty content and no hunks yields an empty document", () => {
     expect(buildInlineDiffFile("", []).rows).toEqual([]);
   });

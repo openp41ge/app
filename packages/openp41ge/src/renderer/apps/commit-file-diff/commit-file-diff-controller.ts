@@ -167,10 +167,14 @@ export class CommitFileDiffController extends BaseController {
     }
     if (token !== this._mountToken || !this.container || this._editor !== editor) return;
 
-    if (content === null) {
+    if (content === null && (!hunks || hunks.length === 0)) {
       this._showEmpty(editor, "No textual content for this file at this commit");
       return;
     }
+    // A DELETED file has no blob at the commit (`getCommitFileContent` → null), but
+    // its deletion hunks carry the ENTIRE previous version as `-` lines. Feeding
+    // that with an empty new side renders the whole old file as ONE red delete
+    // block (every row removed, BEFORE numbers only), instead of a blank pane.
     const file = buildInlineDiffFile(content, hunks as Parameters<typeof buildInlineDiffFile>[1]);
     this._diffText = file.text;
     this._diffRows = [...file.rows];
