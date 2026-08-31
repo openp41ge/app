@@ -12,7 +12,7 @@
 
 import { BaseController } from "../../controllers/base-controller";
 import type { TabController } from "../../controllers/types";
-import type { GitRepositoryPanel, GitBrowserData, GitBranchContextMenuDetail } from "openp41ge-uikit";
+import type { GitRepositoryPanel, GitBrowserData, GitBranchContextMenuDetail, GitFileRowClickDetail } from "openp41ge-uikit";
 import {
   GIT_SELECT_BRANCH,
   GIT_SELECT_COMMIT,
@@ -28,6 +28,7 @@ import {
 import { toastService } from "../../components/openp41ge-toast";
 import { createOpenp41geContextMenu } from "../../interfaces/element-guards";
 import type { CommitEntry } from "openp41ge-git";
+import type { Workspace } from "../../../layout/types";
 
 export class GitRepositoryController extends BaseController implements TabController {
   /** The repo name being displayed. */
@@ -639,7 +640,83 @@ export class GitRepositoryController extends BaseController implements TabContro
     document.body.appendChild(ctx);
   };
 
-  private _onFileRowClick = (_e: Event): void => {
-    // File selection/highlight only — no navigation (deferred)
+  private _onFileRowClick = (e: Event): void => {
+    // Clicking a file in "Files changed (n)" opens it in the NEXT cell (the
+    // column to the right of this git pane) as an UNPINNED preview tab.
+    // Clicking another file swaps the preview (existing commit-file-diff
+    // preview logic handles replacement + pin-on-second-click).
+    const detail = (e as CustomEvent).detail as GitFileRowClickDetail | undefined;
+    const rawPath = detail?.filePath?.trim();
+    if (!rawPath || !this.repoName) return;
+
+    // Rename rows report "old => new" — open the NEW path.
+    const path = rawPath.includes(" => ")
+      ? (rawPath.split(" => ").pop() ?? rawPath).trim()
+      : rawPath;
+    if (!path) return;
+
+    // Diff context: the selected commit, else the current branch tip. (The
+    // repo browser reads bare repos, so a changed file only exists as git
+    // content — the diff editor needs a commit hash.)
+    const hash = this._data?.selectedCommit ?? this._data?.commits?.[0]?.hash;
+    if (!hash) return;
+
+    const winId = window.openp41ge.workspace.getWindowId();
+    if (!winId) return;
+
+    void this._openChangedFileInNextCell(winId, this.repoName, hash, path);
+    this._refocusPanel();
   };
+
+  /**
+   * Open a changed file's diff in the cell immediately to the RIGHT of this
+   * git pane. The column is derived from the live workspace (placement whose
+   * tabIds include this pane's tabId); `openTabInCell` creates the column when
+   * the git pane is already the last one.
+   */
+  private async _openChangedFileInNextCell(
+    winId: string,
+    repoName: string,
+    hash: string,
+    path: string,
+  ): Promise<void> {
+    let myCol = 0;
+    try {
+      const stateJson = await window.openp41ge.workspace.getState();
+      const ws = JSON.parse(stateJson) as Workspace | null | undefined;
+      const win = ws?.windows?.find((w) => w.id === winId);
+      const pl = win?.grid?.placements?.find((p) =>
+        (p.tabIds as string[] | undefined)?.includes(this.tabId),
+      );
+      if (pl) myCol = pl.position.col;
+    } catch {
+      // If the state can't be read, assume the git pane is in col 0.
+    }
+
+    document.dispatchEvent(
+      new CustomEvent("openp41ge:open-commit-file", {
+        detail: {
+          repoName,
+          hash,
+          path,
+          name: path.split("/").pop() ?? path,
+          col: myCol + 1,
+          mode: "preview",
+        },
+      }),
+    );
+  }
+
+  /** Keep focus on the git panel so consecutive file clicks swap the preview. */
+  private _refocusPanel(): void {
+    const panel = this._panel;
+    if (!panel || !this.container) return;
+    requestAnimationFrame(() => {
+      if (!this._panel || !this.container || !this.container.isConnected) return;
+      const ae = document.activeElement;
+      if (ae !== this.container && !this.container.contains(ae)) {
+        this.container.focus({ preventScroll: true });
+      }
+    });
+  }
 }
