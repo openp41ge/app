@@ -65,4 +65,37 @@ describe("InlineDiffHighlightsRenderer", () => {
     r.dispose();
     expect(bands()).toHaveLength(0);
   });
+
+  test("word wrap: a wrapped added row's tint spans ALL its view segments", () => {
+    const r = new InlineDiffHighlightsRenderer(parent);
+    // Model line 1 (the added row) wraps to 2 view segments starting at view
+    // line 4. Its band must cover view rows 4-5 => top = (4-1)*20 = 60px,
+    // height = 2*20 = 40px.
+    const startOf = (m) => (m === 1 ? 4 : m);
+    const countOf = (m) => (m === 1 ? 2 : 1);
+    r.render(ROWS, 1, 3, 20, 500, startOf, countOf);
+
+    const els = bands();
+    expect(els).toHaveLength(2);
+    const added = els.find((e) => e.className === "fe-inline-diff-added")!;
+    const removed = els.find((e) => e.className === "fe-inline-diff-removed")!;
+    expect(added.style.top).toBe("60px");
+    expect(added.style.height).toBe("40px");
+    // Non-wrapped rows are single-row bands at their model-line position.
+    expect(removed.style.top).toBe("20px"); // model line 2
+    expect(removed.style.height).toBe("20px");
+  });
+
+  test("wrap mapping returning identity behaves exactly like the old single-row path", () => {
+    const r = new InlineDiffHighlightsRenderer(parent);
+    const same = (m) => m;
+    const one = () => 1;
+    r.render(ROWS, 1, 3, 20, 500, same, one);
+    const els = bands();
+    expect(els).toHaveLength(2);
+    expect(els[0].style.top).toBe("0px");
+    expect(els[0].style.height).toBe("20px");
+    expect(els[1].style.top).toBe("20px");
+    expect(els[1].style.height).toBe("20px");
+  });
 });

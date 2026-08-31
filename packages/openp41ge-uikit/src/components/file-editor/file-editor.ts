@@ -400,7 +400,18 @@ export class FileEditorElement extends LitElement {
     // to the viewport width naturally.
     const vp = this._viewportEl;
     const contentWidth = vp ? Math.max(vp.scrollWidth, vp.clientWidth) : 0;
-    this._inlineHighlights.render(this._inlineRows, start, end, this._lineHeight, contentWidth);
+    // Pass the same wrap mapping the number columns use so the red/green rows
+    // align with the TEXT — a wrapped line's tint spans all its segments.
+    const wg = this._inlineWrapGetters();
+    this._inlineHighlights.render(
+      this._inlineRows,
+      start,
+      end,
+      this._lineHeight,
+      contentWidth,
+      wg.getViewLineStart,
+      wg.getViewLineCount,
+    );
   }
 
   /** Word-wrap view mapping for the BEFORE (left) column — mirrors the normal

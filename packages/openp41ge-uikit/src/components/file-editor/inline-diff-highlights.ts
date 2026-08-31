@@ -42,6 +42,8 @@ export class InlineDiffHighlightsRenderer {
     visibleEndLine: number,
     lineHeight: number,
     contentWidth?: number,
+    viewLineStart?: (modelLine: number) => number,
+    viewLineCount?: (modelLine: number) => number,
   ): void {
     if (this._disposed) return;
     this.clear();
@@ -55,12 +57,19 @@ export class InlineDiffHighlightsRenderer {
       if (!row) continue;
       if (row.kind !== "added" && row.kind !== "removed") continue;
 
+      // Word-wrap aware: a wrapped model line spans vCount view segments, so
+      // anchor the band at its FIRST view line and cover the full wrapped
+      // height — exactly like the number columns, so the tint lines up with the
+      // text on every segment. Identity when wrapping is off.
+      const vStart = viewLineStart ? viewLineStart(i) ?? i : i;
+      const vCount = viewLineCount ? viewLineCount(i) ?? 1 : 1;
+
       const el = document.createElement("div");
       el.style.position = "absolute";
       el.style.left = "0";
       el.style.width = width;
-      el.style.top = `${(i - 1) * lineHeight}px`;
-      el.style.height = `${lineHeight}px`;
+      el.style.top = `${(vStart - 1) * lineHeight}px`;
+      el.style.height = `${vCount * lineHeight}px`;
       el.style.zIndex = "1";
       el.style.pointerEvents = "none";
       el.className = row.kind === "added" ? "fe-inline-diff-added" : "fe-inline-diff-removed";
