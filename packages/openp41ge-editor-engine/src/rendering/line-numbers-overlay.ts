@@ -33,6 +33,8 @@ interface LineNumberEntry {
   wrapper: FastDomNode;
   /** Inner label — always lineHeight tall, text vertically centered. */
   label: HTMLDivElement;
+  /** Last decoration class applied to the label (cleared before reapplying). */
+  cellCls?: string;
 }
 
 /**
@@ -52,6 +54,10 @@ export interface LineNumbersOverlayConfig {
    * views where synthetic rows (deleted lines) show no number and context/
    * added rows show their real file number. */
   getLabelOverride?: (lineNumber: number) => string | null;
+  /** Decoration class applied to the LINE-NUMBER CELL for a line (e.g. the
+   * green AFTER-cell of an added row in an inline diff). Empty/css-clean per
+   * call; the previous decoration is cleared first. */
+  getLabelDecoration?: (lineNumber: number) => string;
   /** Callback when a line number is clicked. Receives the 1-based line number. */
   onLineClick?: (lineNumber: number) => void;
   /** When true, line numbers adjust for word wrap. */
@@ -203,6 +209,15 @@ export class LineNumbersOverlay {
           entry.label.textContent = labelOverride;
         }
         entry.label.classList.remove("active-line-number");
+        // Color the number cell (green AFTER-cell of an added row, etc.).
+        const decoration = this._config.getLabelDecoration?.(lineNum);
+        if (entry.cellCls && entry.cellCls !== decoration) {
+          entry.label.classList.remove(entry.cellCls);
+        }
+        if (decoration && decoration !== entry.cellCls) {
+          entry.label.classList.add(decoration);
+        }
+        entry.cellCls = decoration;
       }
     }
   }

@@ -285,13 +285,11 @@ export class FileEditorElement extends LitElement {
       this._inlineRows = null;
     }
 
-    // Three gutters, each sized for what it shows:
-    //   left   — OLD numbers (editor background, a separate group),
-    //   middle — NEW file numbers (the normal line-number column),
-    //   sign   — the + / − glyph column (transparent except the glyphs).
+    // Two line-number columns only (BEFORE left / AFTER middle); the +/− sign
+    // column is gone — the number CELLS carry the colour instead (red BEFORE
+    // cell on deleted rows, green AFTER cell on added rows).
     let gutterWidth = 48; // middle (after)
     let leftWidth = 36;
-    let signWidth = 18;
     let rowsForColumns: InlineDiffGutterRows | null = null;
     if (this._inlineRows) {
       const charW = this._charWidth > 0 ? this._charWidth : 8;
@@ -310,27 +308,27 @@ export class FileEditorElement extends LitElement {
       }
       gutterWidth = Math.max(48, Math.ceil(maxNew * charW) + 16);
       leftWidth = Math.max(36, Math.ceil(maxOld * charW) + 16);
-      signWidth = Math.max(18, Math.ceil(charW) + 14);
       rowsForColumns = {
         infoFor: (line: number) => {
           const row = this._inlineRows?.[line - 1];
-          if (!row) return { leftLabel: "", sign: "" };
+          if (!row) return { leftLabel: "", cls: "" };
           // BEFORE (left) — the old line number. Full on context + deleted
-          // rows; a GAP where the line didn't exist before (an addition).
+          // rows; a GAP where the line didn't exist before (an addition). The
+          // deleted row's cell is tinted red all the way across its column.
           const left =
             row.kind !== "added" && row.oldLine != null ? String(row.oldLine) : "";
-          const sign = row.kind === "added" ? "+" : row.kind === "removed" ? "−" : "";
-          return { leftLabel: left, sign };
+          const cls = row.kind === "removed" ? "fe-inline-removed-cell" : "";
+          return { leftLabel: left, cls };
         },
       };
     }
 
     this._lineNumbersOverlay?.setGutterWidth(gutterWidth);
-    this._inlineColumns?.setSizes(this._lineHeight, leftWidth, signWidth);
+    this._inlineColumns?.setSizes(this._lineHeight, leftWidth);
     this._inlineColumns?.setRows(rowsForColumns);
 
-    // Re-paint all three gutters with the file's real numbers (left = old,
-    // middle = new, sign = the change glyph).
+    // Re-paint both number columns with the file's real numbers (left = old
+    // before, middle = new after) and their coloured cells.
     if (this._viewLines && this._viewModel) {
       const start = this._viewLines.startLineNumber || 1;
       const end = this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount);
@@ -351,11 +349,35 @@ export class FileEditorElement extends LitElement {
     if (this._inlineColumns || !this._gutterEl) return;
     const content = this.renderRoot?.querySelector(".fe-content") as HTMLElement | null;
     if (!content) return;
-    this._inlineColumns = new InlineDiffGutterColumns(content, this._gutterEl, this._lineHeight);
-    this._inlineColumns.setSizes(this._lineHeight, 36, 18);
+    this._inlineColumns = new InlineDiffGutterColumns(
+      content,
+      this._gutterEl,
+      this._lineHeight,
+      this._viewportEl,
+    );
+    this._inlineColumns.setSizes(this._lineHeight, 36);
     this._inlineColumns.setScrollOffset(this._viewportEl?.scrollTop ?? 0);
+    this._bindGutterWheel();
     // If decorations were already applied (restore path), repaint everything.
     if (this._inlineRows) this.setInlineDiff(this._inlineRows);
+  }
+
+  /** Forward wheel events over the normal (AFTER) number column to the
+   * viewport, so hovering the line numbers still scrolls the editor. The
+   * BEFORE and gap columns forward their own wheels internally. */
+  private _gutterWheelBound = false;
+  private _bindGutterWheel(): void {
+    if (this._gutterWheelBound || !this._gutterEl) return;
+    this._gutterWheelBound = true;
+    this._gutterEl.addEventListener(
+      "wheel",
+      (e: WheelEvent) => {
+        if (!this._viewportEl) return;
+        e.preventDefault();
+        this._viewportEl.scrollTop += e.deltaY;
+      },
+      { passive: false },
+    );
   }
 
   /** (Re)paint the red/green row bands for the visible window. */
@@ -546,13 +568,18 @@ export class FileEditorElement extends LitElement {
       .fe-inline-diff-added   { background: ${isLight ? "rgba(46,160,67,0.14)" : "rgba(46,160,67,0.16)"}; }
       .fe-inline-diff-removed { background: ${isLight ? "rgba(248,81,73,0.13)" : "rgba(248,81,73,0.16)"}; }
 
-      /* Inline commit-diff gutter columns: the leftmost column shares the
-         editor background (a separate group from the normal gutter) and the
-         sign column is transparent — only its green + / red − glyphs show. */
+      /* Inline commit-diff gutter columns: the leftmost BEFORE column shares
+         the editor background (a separate group from the normal gutter). The
+         cell of a changed row is tinted all the way across its column - the
+         BEFORE cell of a deleted row is red; the AFTER cell of an added row
+         is green (on the normal line-number label). No sign column anymore. */
       .fe-inline-left { background: var(--fe-bg) !important; }
-      .fe-inline-sign .fe-sign-add { color: ${isLight ? "#1a7f37" : "#3fb950"}; }
-      .fe-inline-sign .fe-sign-rem { color: ${isLight ? "#cf222e" : "#f85149"}; }
-      .fe-inline-sign .fe-sign-none { color: transparent; }
+      .fe-inline-left-label.fe-inline-removed-cell {
+        background: ${isLight ? "rgba(248,81,73,0.22)" : "rgba(248,81,73,0.24)"};
+      }
+      .fe-gutter .line-number.fe-inline-added-cell {
+        background: ${isLight ? "rgba(46,160,67,0.22)" : "rgba(46,160,67,0.24)"};
+      }
       ${scopeCSS}
       ${globalCSS}
     `;
@@ -1149,6 +1176,12 @@ export class FileEditorElement extends LitElement {
           return String(row.newLine);
         }
         return ""; // deleted rows: no after-side number
+      },
+      // The number CELL of an added row is tinted green all the way across its
+      // column (removed rows get the red cell in the BEFORE column instead).
+      getLabelDecoration: (lineNumber: number): string => {
+        const row = this._inlineRows?.[lineNumber - 1];
+        return row?.kind === "added" ? "fe-inline-added-cell" : "";
       },
       wordWrapEnabled: this._wordWrapEnabled,
       getViewLineStart: (modelLine: number) =>

@@ -110,27 +110,33 @@ describe("CommitFileDiffController", () => {
     expect(host.querySelectorAll(".fe-inline-diff-removed").length).toBeGreaterThanOrEqual(1);
     expect(host.querySelectorAll(".fe-inline-diff-added").length).toBeGreaterThanOrEqual(1);
 
-    // Gutter: THREE parallel columns. Middle = NEW file numbers,
-    // left = OLD numbers, sign = glyph (red − / green +). (jsdom paints
-    // only the visible band = 2 lines.)
+    // Gutter: TWO line-number columns. Middle = NEW (AFTER) numbers,
+    // left = OLD (BEFORE) numbers. The number CELLS carry the colour (red
+    // BEFORE cell on the deleted row, green AFTER cell on the added row) —
+    // no +/- sign column. (jsdom paints only the visible band = 2 lines.)
     const middle = [...(host.querySelectorAll(".fe-gutter .line-number") ?? [])].map(
       (n) => n.textContent ?? "",
     );
     const left = [...(host.querySelectorAll(".fe-inline-left .fe-inline-left-label") ?? [])].map(
       (n) => n.textContent ?? "",
     );
-    const glyphs = [...(host.querySelectorAll(".fe-inline-sign .fe-inline-sign-label") ?? [])].map(
-      (n) => ({ t: n.textContent ?? "", cls: n.className }),
-    );
     // BEFORE (left) / AFTER (middle): deleted row has before only, added row
     // has after only — never both on one row.
     expect(middle).toEqual(["", "1"]); // after — added row only
     expect(left).toEqual(["1", ""]); // before — deleted row only
-    expect(glyphs).toHaveLength(2);
-    expect(glyphs[0].t).toBe("−");
-    expect(glyphs[0].cls).toContain("fe-sign-rem");
-    expect(glyphs[1].t).toBe("+");
-    expect(glyphs[1].cls).toContain("fe-sign-add");
+    // Coloured cells: deleted row's BEFORE cell red, added row's AFTER cell
+    // green. Sign column is gone.
+    const leftCls = [...(host.querySelectorAll(".fe-inline-left .fe-inline-left-label") ?? [])].map(
+      (n) => n.className,
+    );
+    const midCls = [...(host.querySelectorAll(".fe-gutter .line-number") ?? [])].map(
+      (n) => n.className,
+    );
+    expect(leftCls[0]).toContain("fe-inline-removed-cell"); // deleted row -> red BEFORE cell
+    expect(leftCls[1]).not.toContain("fe-inline-removed-cell");
+    expect(midCls[0]).not.toContain("fe-inline-added-cell");
+    expect(midCls[1]).toContain("fe-inline-added-cell"); // added row -> green AFTER cell
+    expect(host.querySelector(".fe-inline-sign")).toBeNull();
     // Leftmost column uses the EDITOR background (separate group from the
     // gutter column).
     expect(host.querySelector(".fe-inline-left")?.style?.background).toContain("var(--fe-bg");
