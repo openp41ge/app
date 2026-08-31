@@ -40,6 +40,8 @@ export class InlineDiffGutterColumns {
   private _lineHeight: number;
   private _rows: InlineDiffGutterRows | null = null;
   private _scrollTarget: HTMLElement | null;
+  private _onLineClick: ((lineNumber: number) => void) | null = null;
+  private _activeLine: number | null = null;
   private _disposed = false;
 
   constructor(
@@ -47,9 +49,11 @@ export class InlineDiffGutterColumns {
     gutterEl: HTMLElement,
     lineHeight: number,
     scrollTarget: HTMLElement | null = null,
+    onLineClick: ((lineNumber: number) => void) | null = null,
   ) {
     this._lineHeight = lineHeight;
     this._scrollTarget = scrollTarget;
+    this._onLineClick = onLineClick;
 
     // ── Left column: editor background = a separate group from the gutter. ──
     this._leftOuter = document.createElement("div");
@@ -125,6 +129,12 @@ export class InlineDiffGutterColumns {
           "overflow:hidden;white-space:nowrap;";
         this._leftInner.appendChild(el);
         this._entries.set(line, el);
+        if (this._onLineClick) {
+          el.addEventListener("click", (e: MouseEvent) => {
+            e.stopPropagation();
+            this._onLineClick?.(line);
+          });
+        }
       }
       el.style.top = `${(line - 1) * this._lineHeight}px`;
       el.style.height = `${this._lineHeight}px`;
@@ -133,6 +143,11 @@ export class InlineDiffGutterColumns {
       el.textContent = info.leftLabel;
       el.classList.remove("fe-inline-removed-cell");
       if (info.cls) el.classList.add(info.cls);
+      // Active (cursor) row's cell is highlighted, like the AFTER column.
+      el.classList.toggle(
+        "fe-inline-left-active",
+        this._activeLine != null && line === this._activeLine,
+      );
     }
   }
 
@@ -140,6 +155,15 @@ export class InlineDiffGutterColumns {
   setScrollOffset(scrollTop: number): void {
     if (this._disposed) return;
     this._leftInner.style.transform = `translate3d(0, ${-scrollTop}px, 0)`;
+  }
+
+  /** Highlight the number cell of the active (cursor) row. */
+  setActiveLine(lineNumber: number | null): void {
+    if (this._disposed) return;
+    this._activeLine = lineNumber;
+    for (const [line, el] of this._entries) {
+      el.classList.toggle("fe-inline-left-active", lineNumber != null && line === lineNumber);
+    }
   }
 
   dispose(): void {

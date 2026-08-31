@@ -33,8 +33,8 @@ interface LineNumberEntry {
   wrapper: FastDomNode;
   /** Inner label — always lineHeight tall, text vertically centered. */
   label: HTMLDivElement;
-  /** Last decoration class applied to the label (cleared before reapplying). */
-  cellCls?: string;
+  /** Decoration classes applied to the label (cleared before reapplying). */
+  cellCls?: string[];
 }
 
 /**
@@ -209,15 +209,18 @@ export class LineNumbersOverlay {
           entry.label.textContent = labelOverride;
         }
         entry.label.classList.remove("active-line-number");
-        // Color the number cell (green AFTER-cell of an added row, etc.).
-        const decoration = this._config.getLabelDecoration?.(lineNum);
-        if (entry.cellCls && entry.cellCls !== decoration) {
-          entry.label.classList.remove(entry.cellCls);
+        // Decorations on the number cell (e.g. green AFTER-cell of an added
+        // row and/or the active-line ring). getLabelDecoration may return
+        // several space-separated classes, so apply/clear them token-wise.
+        const decoration = this._config.getLabelDecoration?.(lineNum) ?? "";
+        const tokens = decoration ? decoration.split(/\s+/) : [];
+        if (entry.cellCls) {
+          for (const t of entry.cellCls) {
+            if (!tokens.includes(t)) entry.label.classList.remove(t);
+          }
         }
-        if (decoration && decoration !== entry.cellCls) {
-          entry.label.classList.add(decoration);
-        }
-        entry.cellCls = decoration;
+        for (const t of tokens) entry.label.classList.add(t);
+        entry.cellCls = tokens.length > 0 ? tokens : undefined;
       }
     }
   }

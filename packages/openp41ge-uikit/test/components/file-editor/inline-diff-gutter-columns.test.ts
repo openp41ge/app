@@ -97,6 +97,45 @@ describe("InlineDiffGutterColumns", () => {
     }
   });
 
+  test("setActiveLine highlights only the active row's left cell", () => {
+    const { cols } = setup();
+    cols.setSizes(LH, 50);
+    cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: "" }) });
+    cols.setVisibleRange(1, 3);
+
+    cols.setActiveLine(2);
+    // Toggled live on existing entries, no repaint required.
+    const labels = leftLabels();
+    expect(labels[1].classList.contains("fe-inline-left-active")).toBe(true);
+    expect(labels[0].classList.contains("fe-inline-left-active")).toBe(false);
+    expect(labels[2].classList.contains("fe-inline-left-active")).toBe(false);
+
+    // A repaint keeps the active row highlighted (fresh labels get the class).
+    cols.setVisibleRange(1, 3);
+    const after = leftLabels();
+    expect(after[1].classList.contains("fe-inline-left-active")).toBe(true);
+
+    // Clearing removes it everywhere.
+    cols.setActiveLine(null);
+    expect(leftLabels()[1].classList.contains("fe-inline-left-active")).toBe(false);
+  });
+
+  test("clicking a left number invokes the injected onLineClick with the line", () => {
+    const clicks: number[] = [];
+    const content = document.createElement("div");
+    const gutter = document.createElement("div");
+    content.appendChild(gutter);
+    document.body.appendChild(content);
+    const cols = new InlineDiffGutterColumns(content, gutter, LH, null, (ln) => clicks.push(ln));
+    cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: "" }) });
+    cols.setVisibleRange(5, 5);
+
+    (document.querySelector(".fe-inline-left .fe-inline-left-label") as HTMLElement).dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
+    expect(clicks).toEqual([5]);
+  });
+
   test("removed rows get the red cell class; there is no sign column", () => {
     const { cols } = setup();
     cols.setSizes(LH, 50);
