@@ -75,6 +75,28 @@ describe("file-editor inline commit-diff mode", () => {
     document.body.innerHTML = "";
   });
 
+  test("both number columns live in a sticky-left .fe-gutter-group (horizontal pinning)", async () => {
+    const el = await mount();
+
+    // Pinning is OWNED by a sticky-left group wrapper: both the BEFORE column
+    // and the AFTER gutter are children of it, so a horizontal scroll pins the
+    // two columns together at the left edge while only the text scrolls. The
+    // columns themselves are plain (relative) — vertical scroll stays native.
+    const group = el.querySelector(".fe-gutter-group");
+    expect(group).not.toBeNull();
+    const gs = getComputedStyle(group);
+    expect(gs.position).toBe("sticky");
+    expect(gs.left).toBe("0px");
+    expect(group.contains(el.querySelector(".fe-gutter"))).toBe(true);
+    expect(group.contains(el.querySelector(".fe-inline-left"))).toBe(true);
+    expect(el.querySelector(".fe-gutter").style.position).toBe("relative");
+    expect(el.querySelector(".fe-inline-left").style.position).toBe("relative");
+
+    await loadInlineDiff(el);
+    // The BEFORE column is inserted into the group (not beside it).
+    expect(el.querySelector(".fe-inline-left").parentElement.className).toBe("fe-gutter-group");
+  });
+
   test("BEFORE and AFTER columns: context in both, deleted before-only, gap rules", async () => {
     const el = await mount();
 

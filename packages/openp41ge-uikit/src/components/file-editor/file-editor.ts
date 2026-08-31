@@ -207,6 +207,8 @@ export class FileEditorElement extends LitElement {
   private _gutterEl!: HTMLElement;
   /** Native-scroll flex row inside the viewport: [BEFORE] [AFTER] [text]. */
   private _scrollContentEl!: HTMLElement;
+  /** Sticky-left group holding both number columns (horizontal pinning). */
+  private _gutterGroupEl!: HTMLElement;
   private _textRegionEl!: HTMLElement;
 
   private _textMateInitPromise: Promise<void> | null = null;
@@ -374,7 +376,8 @@ export class FileEditorElement extends LitElement {
    */
   private _ensureInlineColumns(): void {
     if (this._inlineColumns || !this._gutterEl) return;
-    const content = this._scrollContentEl;
+    // Insert the BEFORE column into the sticky group, next to the AFTER column.
+    const content = this._gutterGroupEl;
     if (!content) return;
     this._inlineColumns = new InlineDiffGutterColumns(
       content,
@@ -710,16 +713,25 @@ export class FileEditorElement extends LitElement {
       "position:relative;display:flex;flex-direction:row;align-items:stretch;width:max-content;min-width:100%;";
     this._viewportEl.appendChild(this._scrollContentEl);
 
+    this._gutterGroupEl = document.createElement("div");
+    this._gutterGroupEl.className = "fe-gutter-group";
+    // BOTH number columns pin together at the LEFT during horizontal scroll
+    // (position:sticky; left:0). Vertical scroll stays NATIVE: a sticky box as
+    // tall as its containing block cannot stick vertically (it is clamped), so
+    // the numbers still scroll with the content. The overlay forces the AFTER
+    // column to `relative`, so pinning has to come from this GROUP, not the
+    // column itself.
+    this._gutterGroupEl.style.cssText =
+      "flex-shrink:0;display:flex;flex-direction:row;align-items:stretch;position:sticky;left:0;top:0;z-index:6;";
+    this._scrollContentEl.appendChild(this._gutterGroupEl);
+
     this._gutterEl = document.createElement("div");
     this._gutterEl.className = "fe-gutter";
-    // The flex row already places the AFTER column right after the BEFORE
-    // column (and at x=0 when there is no BEFORE column) — do NOT add a left
-    // offset: LineNumbersOverlay repositions this element to `relative`, so any
-    // `left:` would PUSH the column right (a gap between the two number
-    // columns) instead of pinning it. left:0 keeps the columns flush.
+    // No `left:` offset — the group owns the horizontal pinning. LineNumbers-
+    // Overlay repositions this element to `relative` (fine inside the group).
     this._gutterEl.style.cssText =
-      "flex-shrink:0;width:48px;position:sticky;left:0;top:0;z-index:6;background:var(--fe-gutter-bg, #1a1a1a);overflow:hidden;user-select:none;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
-    this._scrollContentEl.appendChild(this._gutterEl);
+      "flex-shrink:0;width:48px;position:relative;background:var(--fe-gutter-bg, #1a1a1a);overflow:hidden;user-select:none;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
+    this._gutterGroupEl.appendChild(this._gutterEl);
 
     this._textRegionEl = document.createElement("div");
     this._textRegionEl.className = "fe-text-region";

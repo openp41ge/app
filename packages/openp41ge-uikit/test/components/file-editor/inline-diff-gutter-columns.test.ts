@@ -57,11 +57,14 @@ describe("InlineDiffGutterColumns", () => {
     expect(leftTops()).toEqual(["120px", "140px", "160px"]);
   });
 
-  test("the column is sticky-left inside the scroll container (native vertical scroll)", () => {
+  test("the column is relative: pinning is owned by the sticky .fe-gutter-group", () => {
     const { cols } = setup();
     const outer = document.querySelector(".fe-inline-left");
-    expect(outer.style.position).toBe("sticky");
-    expect(outer.style.left).toBe("0px");
+    // The BEFORE column itself is plain (relative) — it must NOT be sticky:
+    // horizontal pinning is owned by the .fe-gutter-group wrapper the editor
+    // places both number columns in, so they pin together and never overlap.
+    expect(outer.style.position).toBe("relative");
+    expect(outer.style.left).toBe("");
     // setScrollOffset used to drive a per-frame transform; it must now be a
     // no-op so only NATIVE scrolling moves the numbers (no harness lag).
     cols.setSizes(LH, 50);

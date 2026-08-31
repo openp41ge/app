@@ -72,12 +72,11 @@ export class InlineDiffGutterColumns {
     // ── Left column: editor background = a separate group from the gutter. ──
     this._leftOuter = document.createElement("div");
     this._leftOuter.className = "fe-inline-left";
-    // position:sticky + left:0 pins the BEFORE column at the scrollport's left
-    // edge during horizontal scroll, while VERTICAL scroll is native (the whole
-    // column lives in the one scroll container with the text — the numbers move
-    // with the content, compositor-driven, no transform lag).
+    // Horizontal pinning is owned by the sticky .fe-gutter-group the column
+    // lives in — this column itself is plain (relative) and scrolls VERTICALLY
+    // natively with the content.
     this._leftOuter.style.cssText =
-      "flex-shrink:0;position:sticky;left:0;top:0;z-index:6;overflow:hidden;display:none;" +
+      "flex-shrink:0;position:relative;overflow:hidden;display:none;" +
       "background:var(--fe-bg,#161616);user-select:none;" +
       "font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
     this._leftInner = document.createElement("div");
