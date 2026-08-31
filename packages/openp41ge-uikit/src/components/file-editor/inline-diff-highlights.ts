@@ -33,18 +33,23 @@ export class InlineDiffHighlightsRenderer {
   /**
    * (Re)paint the full-width backgrounds for added/removed rows in the visible
    * window [visibleStartLine, visibleEndLine] (1-based buffer line numbers).
+   * Bands span the FULL CONTENT width (not just the viewport) so the red/green
+   * reaches into the empty scrollable space after a single very long line.
    */
   render(
     rows: readonly InlineDiffRow[] | null,
     visibleStartLine: number,
     visibleEndLine: number,
     lineHeight: number,
+    contentWidth?: number,
   ): void {
     if (this._disposed) return;
     this.clear();
 
     const start = Math.max(1, visibleStartLine);
     const end = Math.max(start, visibleEndLine);
+    const width =
+      contentWidth && contentWidth > 0 ? `${Math.round(contentWidth)}px` : "100%";
     for (let i = start; i <= end; i++) {
       const row = rows?.[i - 1];
       if (!row) continue;
@@ -53,7 +58,7 @@ export class InlineDiffHighlightsRenderer {
       const el = document.createElement("div");
       el.style.position = "absolute";
       el.style.left = "0";
-      el.style.right = "0";
+      el.style.width = width;
       el.style.top = `${(i - 1) * lineHeight}px`;
       el.style.height = `${lineHeight}px`;
       el.style.zIndex = "1";

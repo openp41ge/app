@@ -401,7 +401,13 @@ export class FileEditorElement extends LitElement {
     }
     const start = this._viewLines.startLineNumber || 1;
     const end = this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount);
-    this._inlineHighlights.render(this._inlineRows, start, end, this._lineHeight);
+    // Full CONTENT width (scroll width), not just the viewport: a long single
+    // line leaves empty scrollable space to the right that the red/green must
+    // also cover. scrollWidth >= clientWidth always, so short files fall back
+    // to the viewport width naturally.
+    const vp = this._viewportEl;
+    const contentWidth = vp ? Math.max(vp.scrollWidth, vp.clientWidth) : 0;
+    this._inlineHighlights.render(this._inlineRows, start, end, this._lineHeight, contentWidth);
   }
 
   /** Current syntax theme object. */
