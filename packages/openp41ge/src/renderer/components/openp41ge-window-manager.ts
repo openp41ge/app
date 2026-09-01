@@ -20,14 +20,33 @@ const isMac = (() => {
   }
 })();
 
+interface OpenWindowSummary {
+  windowId: string;
+  windowType: "workspace" | "window-manager";
+  workspacePath: string | null;
+}
+
 class Openp41geWindowManager extends LitElement {
   @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
+  @state() private _openWindows: OpenWindowSummary[] = [];
   @state() private _loaded = false;
 
   connectedCallback(): void {
     super.connectedCallback();
+    window.addEventListener("focus", this._onFocus);
     void this._load();
   }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    window.removeEventListener("focus", this._onFocus);
+  }
+
+  private _onFocus = (): void => {
+    // Re-fetch open windows when the Window Manager regains focus, so the
+    // "Opened" pill reflects workspaces opened/closed elsewhere.
+    void this._load();
+  };
 
   private async _load(): Promise<void> {
     try {
@@ -35,14 +54,28 @@ class Openp41geWindowManager extends LitElement {
     } catch {
       this._workspaces = [];
     }
+    try {
+      this._openWindows = await window.openp41ge.windowManager.openWindowSummaries();
+    } catch {
+      this._openWindows = [];
+    }
     this._loaded = true;
   }
 
   private _open(filePath: string): void {
     window.openp41ge.windowManager.openWorkspaceWindow(filePath);
+    // Refresh the open-state pills shortly after the new window registers.
+    window.setTimeout(() => void this._load(), 350);
   }
 
   render(): TemplateResult {
+    // Workspaces that already have at least one live workspace window.
+    const openPaths = new Set(
+      this._openWindows
+        .filter((w) => w.windowType === "workspace" && w.workspacePath)
+        .map((w) => w.workspacePath as string),
+    );
+
     return html`
       <style>
         :host {
@@ -106,25 +139,40 @@ class Openp41geWindowManager extends LitElement {
           flex-shrink: 0;
           display: inline-flex;
           align-items: center;
-          justify-content: center;
-          width: 24px;
-          height: 24px;
+          gap: 3px;
           border: none;
-          border-radius: 5px;
+          border-radius: 4px;
           background: transparent;
-          padding: 0;
+          color: var(--text-secondary, #999);
+          font-size: 12px;
+          font-weight: 500;
+          font-family: inherit;
+          padding: 3px 7px;
           cursor: pointer;
           opacity: 0;
           pointer-events: none;
-          transition: opacity 0.12s ease, background 0.12s ease;
+          transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
         }
-        /* Show the open icon only when the row is hovered; grey square chip on button hover. */
+        /* Show the open button only when the row is hovered; grey chip on button hover. */
         .ws-row:hover .wm-open,
         .wm-open:focus-visible {
           opacity: 1;
           pointer-events: auto;
         }
-        button.wm-open:hover { background: var(--bg-active, #37373d); }
+        button.wm-open:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
+        button.wm-open svg { fill: #e3e3e3; }
+        /* Permanent pill for workspaces that are already open. */
+        .wm-opened {
+          flex-shrink: 0;
+          border-radius: 999px;
+          padding: 3px 10px;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-secondary, #999);
+          background: var(--bg-active, #37373d);
+          user-select: none;
+          white-space: nowrap;
+        }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
       </style>
       <div class="wm-titlebar">
@@ -142,9 +190,14 @@ class Openp41geWindowManager extends LitElement {
                     <li class="ws-row">
                       <div class="ws-top">
                         <span class="ws-name">${name}</span>
-                        <button class="wm-open" @click=${() => this._open(w.filePath)} aria-label="Open workspace" title="Open workspace">
-                          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></svg>
-                        </button>
+                        ${openPaths.has(w.filePath)
+                          ? html`<span class="wm-opened">Opened</span>`
+                          : html`
+                              <button class="wm-open" @click=${() => this._open(w.filePath)} aria-label="Open workspace" title="Open workspace">
+                                <span>Open</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></svg>
+                              </button>
+                            `}
                       </div>
                       <div class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</div>
                     </li>
