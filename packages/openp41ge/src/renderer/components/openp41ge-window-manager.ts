@@ -134,6 +134,29 @@ class Openp41geWindowManager extends LitElement {
     this._drawers = this._drawers.filter((d) => d.id !== id);
   }
 
+  /** Close every drawer (background click). */
+  private _closeAll(): void {
+    this._drawers = [];
+  }
+
+  /** Close every drawer deeper than `index` (clicking a parent/grandparent sliver). */
+  private _closeDeeper(index: number): void {
+    this._drawers = this._drawers.slice(0, index + 1);
+  }
+
+  /** Width of the single shared shadow, matching the widest (outermost) drawer. */
+  private _stackWidth(): number {
+    return this._drawers.length ? this._widthFor(0) : 0;
+  }
+
+  /** Clicking the background (card list area) closes all drawers. */
+  private _onBackgroundClick = (e: Event): void => {
+    if (this._drawers.length === 0) return;
+    // A click on a card opens that workspace's drawer instead of closing all.
+    if ((e.target as HTMLElement | null)?.closest?.(".ws-row")) return;
+    this._closeAll();
+  };
+
   /**
    * Drawer width rules: the deepest drawer is 75%, its direct parent 80%, and
    * every ancestor above that caps at 85%.
@@ -231,6 +254,17 @@ class Openp41geWindowManager extends LitElement {
         }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
         /* ── Drawer ─────────────────────────────────────────────── */
+        /* A single shared shadow element whose width tracks the widest drawer,
+           so the stack never stacks multiple shadows on top of each other. */
+        .drawer-shadow {
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          pointer-events: none;
+          box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+          transition: width 0.2s ease;
+        }
         .drawer {
           position: absolute;
           top: 0;
@@ -241,7 +275,6 @@ class Openp41geWindowManager extends LitElement {
           min-width: 0;
           background: var(--bg-secondary, #252526);
           border-left: 1px solid var(--divider, #444);
-          box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
           transition: width 0.2s ease;
           animation: dw-slide 0.18s ease;
         }
@@ -314,7 +347,7 @@ class Openp41geWindowManager extends LitElement {
           <span class="wm-title">Window Manager</span>
         </div>
         <div class="wm-drawer-layer">
-          <div class="wm-body">
+          <div class="wm-body" @click=${this._onBackgroundClick}>
             ${this._loaded && this._workspaces.length === 0
               ? html`<p class="empty">No workspaces yet. Create one from an open workspace window.</p>`
               : html`
@@ -323,7 +356,7 @@ class Openp41geWindowManager extends LitElement {
                       const name = w.data.name?.trim() || "Unnamed";
                       const repos = w.data.repos?.length ?? 0;
                       return html`
-                        <li class="ws-row" @click=${() => this._openWorkspace(w)}>
+                        <li class="ws-row" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspace(w); }}>
                           <div class="ws-top">
                             <span class="ws-name">${name}</span>
                             ${openPaths.has(w.filePath)
@@ -337,16 +370,19 @@ class Openp41geWindowManager extends LitElement {
                   </ul>
                 `}
           </div>
+          ${this._drawers.length > 0
+            ? html`<div class="drawer-shadow" style="width:${this._stackWidth()}%"></div>`
+            : nothing}
           ${this._drawers.map(
             (d, i) => html`
-              <div class="drawer" style="width:${this._widthFor(i)}%">
+              <div class="drawer" style="width:${this._widthFor(i)}%" @click=${() => this._closeDeeper(i)}>
                 <div class="drawer-head">
                   <span class="drawer-title">${d.title}</span>
                   <div class="drawer-actions">
                     ${d.kind === "workspace"
-                      ? html`<button class="dw-open" @click=${() => this._openWorkspaceWindow(d.workspacePath)}>Open</button>`
+                      ? html`<button class="dw-open" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(d.workspacePath); }}>Open</button>`
                       : nothing}
-                    <button class="dw-close" @click=${() => this._closeDrawer(d.id)} title="Close">✕</button>
+                    <button class="dw-close" @click=${(e: Event) => { e.stopPropagation(); this._closeDrawer(d.id); }} title="Close">✕</button>
                   </div>
                 </div>
                 <div class="drawer-body">${this._drawerContent(d)}</div>
@@ -368,7 +404,7 @@ class Openp41geWindowManager extends LitElement {
         <ul class="dw-list">
           ${repos.map(
             (repo) => html`
-              <li class="dw-item" @click=${() => this._openRepo(d, repo)}>
+              <li class="dw-item" @click=${(e: Event) => { e.stopPropagation(); this._openRepo(d, repo); }}>
                 <span class="dw-item-name">${deriveRepoName(repo.url)}</span>
                 <span class="dw-item-meta">${repo.worktrees?.length ?? 0} worktree${(repo.worktrees?.length ?? 0) === 1 ? "" : "s"}</span>
               </li>
@@ -388,7 +424,7 @@ class Openp41geWindowManager extends LitElement {
         <ul class="dw-list">
           ${wts.map(
             (wt) => html`
-              <li class="dw-item" @click=${() => this._openWorktree(d, wt)}>
+              <li class="dw-item" @click=${(e: Event) => { e.stopPropagation(); this._openWorktree(d, wt); }}>
                 <span class="dw-item-name">${wt}</span>
                 <span class="dw-item-meta">worktree</span>
               </li>
