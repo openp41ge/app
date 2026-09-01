@@ -8,11 +8,18 @@ Date: 2026-09-01
       v2 fields, `layout/workspace-file.ts` (migration, `workspaceToFileData` /
       `fileDataToWorkspace`, serialize/deserialize), read/write path migrated,
       `createWorkspace` writes v2. Unit tests green (1090).
+- [x] **Phase 2a — window-type + binding plumbing (cd20ed6)**: `Openp41geWindowType`,
+      `openp41geWindowMeta` map, `getWindowMeta()`, `createOpenp41geWindow` meta
+      param, binding sent in `openp41ge:init`; preload `getWindowType()`/
+      `getWorkspacePath()`; typed in `global.d.ts`. No behaviour change yet.
 - [ ] **Phase 1b — per-workspace save** (replace global `workspace.json` with writes
-      to the bound workspace's file) — blocked on Phase 2 binding.
-- [ ] **Phase 1c — sidebar split** (shared set/side/open; per-window active+width).
-- [ ] **Phase 2 — window types & main-process binding** (unblocks per-workspace save).
-- [ ] Phases 3-7 (renderer bootstrap, remove workspace systems, menus, restore).
+      to the bound workspace's file) — needs the binding wired to save handlers.
+- [ ] **Phase 1c — sidebar split** (shared set/side/open; per-window active+width) —
+      large, cross-cutting (types, ops, serialization, renderer, tests).
+- [ ] **Phase 2b/3 — renderer honors `windowType`** (window-manager boot mode) + startup
+      (workspace arg → workspace window; else window manager).
+- [ ] Phases 4-7 (remove workspace systems, menus, restore, terminology).
+
 
 
 ## Goal
