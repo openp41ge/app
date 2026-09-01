@@ -196,17 +196,17 @@ export function actionOpenFileInNewWindow(
   // Only the central grid is per-window: it starts with just the dropped file.
   const source = sourceWinId ? workspace.windows.find((w) => w.id === sourceWinId) : undefined;
   const base = createWindow(newWinId);
+  // Copy the source window's per-window sidebar state (active tab + width). The
+  // sidebar *set/side/open* is shared at the workspace level, so the new window
+  // picks that up automatically.
   const win = {
     ...base,
     ...(source
       ? {
-          sidebar: source.sidebar
-            ? {
-                ...source.sidebar,
-                leftSidebarTabs: [...(source.sidebar.leftSidebarTabs ?? [])],
-                rightSidebarTabs: [...(source.sidebar.rightSidebarTabs ?? [])],
-              }
-            : base.sidebar,
+          sidebar: {
+            ...base.sidebar,
+            ...source.sidebar,
+          },
         }
       : {}),
   };

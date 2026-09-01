@@ -33,11 +33,6 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
     window.openp41ge.workspace.onStateUpdate((stateJson: string) => {
       _stateUpdateCount++;
       const ws = JSON.parse(stateJson);
-      const _leftTabs = ws?.windows?.[0]?.sidebar?.leftSidebarTabs;
-      const _leftActive = ws?.windows?.[0]?.sidebar?.activeLeftTab;
-      const _rightTabs = ws?.windows?.[0]?.sidebar?.rightSidebarTabs;
-      const _rightActive = ws?.windows?.[0]?.sidebar?.activeRightTab;
-
       context.workspaceState.setState(ws);
     });
 

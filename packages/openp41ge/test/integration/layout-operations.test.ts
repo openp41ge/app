@@ -382,8 +382,8 @@ describe("Layout operations — integration", () => {
 
       // Open explorer system tab (no default sidebar tabs anymore)
       let r = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
-      expect(r.windows[0].sidebar?.rightSidebarTabs).toHaveLength(1);
-      expect(r.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+      expect(r.sidebar.rightSidebarTabs).toHaveLength(1);
+      expect(r.sidebar.rightSidebarOpen).toBe(true);
 
       // Add a tab
       const t1 = types.createTab("t1", "terminal", "Terminal");
@@ -392,14 +392,14 @@ describe("Layout operations — integration", () => {
 
       // Toggle sidebar off
       r = ops.toggleSidebar(r, winId, "right");
-      expect(r.windows[0].sidebar?.rightSidebarOpen).toBe(false);
+      expect(r.sidebar.rightSidebarOpen).toBe(false);
 
       // Tab should still be there
       expect(r.windows[0].grid.placements).toHaveLength(1);
 
       // Reopen sidebar
       r = ops.openSidebar(r, winId, "right");
-      expect(r.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+      expect(r.sidebar.rightSidebarOpen).toBe(true);
     });
   });
 

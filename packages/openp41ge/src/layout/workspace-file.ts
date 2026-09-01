@@ -93,19 +93,16 @@ export function extractWorkspaceSession(ws: Workspace): WorkspaceSession {
 }
 
 /**
- * Derive the shared sidebar block from a layout workspace. Today sidebars are
- * per-window; this takes the first window's docking/open state as the shared
- * reference. Once the sidebar split lands (shared set/side/open, per-window
- * active+width), this will aggregate the workspace-shared fields instead.
+ * Derive the shared sidebar block from a layout workspace. Sidebars now hold
+ * their shared set/side/open state directly on `Workspace.sidebar`.
  */
 function deriveSharedSidebars(ws: Workspace): SharedSidebars {
-  const first = ws.windows[0]?.sidebar;
-  if (!first) return emptySharedSidebars();
+  const shared = ws.sidebar;
   return {
-    leftSidebarTabs: [...(first.leftSidebarTabs ?? [])],
-    rightSidebarTabs: [...(first.rightSidebarTabs ?? [])],
-    leftSidebarOpen: first.leftSidebarOpen ?? false,
-    rightSidebarOpen: first.rightSidebarOpen ?? false,
+    leftSidebarTabs: [...shared.leftSidebarTabs],
+    rightSidebarTabs: [...shared.rightSidebarTabs],
+    leftSidebarOpen: shared.leftSidebarOpen,
+    rightSidebarOpen: shared.rightSidebarOpen,
   };
 }
 
@@ -140,6 +137,7 @@ export function workspaceToFileData(
  */
 export function fileDataToWorkspace(data: WorkspaceFileData): Workspace {
   const migrated = migrateWorkspaceFileData(data);
+  const shared = migrated.sharedSidebars ?? emptySharedSidebars();
   return WorkspaceSchema.parse({
     id: data.id,
     windows: migrated.windows ?? [],
@@ -147,6 +145,12 @@ export function fileDataToWorkspace(data: WorkspaceFileData): Workspace {
     systemTabs: (migrated.systemTabs ?? {}) as Workspace["systemTabs"],
     tabGroups: (migrated.tabGroups ?? {}) as Workspace["tabGroups"],
     scopedFolders: migrated.scopedFolders ?? [],
+    sidebar: {
+      leftSidebarTabs: [...(shared.leftSidebarTabs ?? [])],
+      rightSidebarTabs: [...(shared.rightSidebarTabs ?? [])],
+      leftSidebarOpen: shared.leftSidebarOpen ?? false,
+      rightSidebarOpen: shared.rightSidebarOpen ?? false,
+    },
   }) as Workspace;
 }
 

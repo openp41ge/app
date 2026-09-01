@@ -129,7 +129,7 @@ describe("workspaceToFileData / fileDataToWorkspace round-trip", () => {
 });
 
 describe("extractWorkspaceSession", () => {
-  it("derives shared sidebars from the first window (pre-split heuristic)", () => {
+  it("derives shared sidebars from the workspace-level sidebar", () => {
     const ws = sampleWorkspace();
     const session = extractWorkspaceSession(ws);
     expect(session.windows).toHaveLength(2);

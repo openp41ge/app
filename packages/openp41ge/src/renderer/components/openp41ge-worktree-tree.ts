@@ -703,32 +703,34 @@ class Openp41geWorktreeTree extends LitElement {
     if (!myWindowId) return;
     const wss = ws as {
       systemTabs?: Record<string, { appType?: string }>;
+      /** Shared sidebar docking/open state (set/side/open live on the workspace). */
+      sidebar?: {
+        leftSidebarOpen?: boolean;
+        rightSidebarOpen?: boolean;
+      };
       windows?: Array<{
         id: string;
         sidebar?: {
-          leftSidebarTabs?: string[];
-          rightSidebarTabs?: string[];
           activeLeftTab?: string | null;
           activeRightTab?: string | null;
-          leftSidebarOpen?: boolean;
-          rightSidebarOpen?: boolean;
         };
       }>;
     };
     const win = wss.windows?.find((w: { id: string }) => w.id === myWindowId);
     const sidebar = win?.sidebar;
-    if (!sidebar) return;
+    if (!sidebar || !wss.sidebar) return;
 
     // Resolve the active sidebar system tab's appType. The sidebar model
     // persists activation in activeLeftTab/activeRightTab (resolved through
-    // systemTabs[].appType), not the legacy activeViewId field.
+    // systemTabs[].appType), not the legacy activeViewId field. The set/side/
+    // open state is shared at the workspace level.
     const resolveActive = (
       tabId: string | null | undefined,
       open: boolean | undefined,
     ): string | null => (open && tabId ? (wss.systemTabs?.[tabId]?.appType ?? null) : null);
     const activeAppType =
-      resolveActive(sidebar.activeLeftTab, sidebar.leftSidebarOpen) ??
-      resolveActive(sidebar.activeRightTab, sidebar.rightSidebarOpen);
+      resolveActive(sidebar.activeLeftTab, wss.sidebar.leftSidebarOpen) ??
+      resolveActive(sidebar.activeRightTab, wss.sidebar.rightSidebarOpen);
 
     const shouldBeOpen = activeAppType === "explorer";
     if (shouldBeOpen !== _isOpen) {

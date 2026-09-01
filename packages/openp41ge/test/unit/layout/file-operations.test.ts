@@ -81,11 +81,12 @@ describe("actionOpenFileInNewWindow", () => {
     const result = ops.actionOpenFileInNewWindow(src, "/a.ts", "a.ts", srcWin.id);
     const newWin = result.windows.find((w) => w.id !== srcWin.id);
 
-    expect(newWin.sidebar.rightSidebarTabs).toEqual(srcWin.sidebar.rightSidebarTabs);
-    expect(newWin.sidebar.rightSidebarOpen).toBe(srcWin.sidebar.rightSidebarOpen);
-    expect(newWin.sidebar.leftSidebarOpen).toBe(srcWin.sidebar.leftSidebarOpen);
-    // Each copied string array is a distinct reference (no aliasing)
-    expect(newWin.sidebar.rightSidebarTabs).not.toBe(srcWin.sidebar.rightSidebarTabs);
+    // Sidebar tabs/state are shared across a workspace's windows.
+    expect(result.sidebar.rightSidebarTabs).toEqual(src.sidebar.rightSidebarTabs);
+    expect(result.sidebar.rightSidebarOpen).toBe(src.sidebar.rightSidebarOpen);
+    expect(result.sidebar.leftSidebarOpen).toBe(src.sidebar.leftSidebarOpen);
+    // The new window copies the source window's per-window active state.
+    expect(newWin.sidebar.activeRightTab).toBe(srcWin.sidebar.activeRightTab);
   });
 
   test("without a source window the new window has an empty default sidebar", () => {
@@ -95,6 +96,8 @@ describe("actionOpenFileInNewWindow", () => {
     const result = ops.actionOpenFileInNewWindow(src, "/a.ts", "a.ts");
     const newWin = result.windows.find((w) => w.id !== srcWin.id);
 
-    expect(newWin.sidebar.rightSidebarTabs).toEqual([]);
+    // The new window shares the workspace's sidebar; its per-window active tab
+    // starts empty.
+    expect(newWin.sidebar.activeRightTab).toBeNull();
   });
 });

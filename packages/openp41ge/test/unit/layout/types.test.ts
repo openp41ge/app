@@ -153,11 +153,11 @@ describe("createWorkspace (unit)", () => {
     // System tabs registry should be empty
     expect(Object.keys(ws.systemTabs)).toHaveLength(0);
 
-    // Right sidebar configuration
-    const sidebar = ws.windows[0].sidebar!;
-    expect(sidebar.rightSidebarTabs).toEqual([]);
-    expect(sidebar.activeRightTab).toBeNull();
-    expect(sidebar.rightSidebarOpen).toBe(false);
+    // Shared sidebar configuration (set/side/open live on the workspace)
+    expect(ws.sidebar.rightSidebarTabs).toEqual([]);
+    expect(ws.sidebar.rightSidebarOpen).toBe(false);
+    // Per-window active state
+    expect(ws.windows[0].sidebar!.activeRightTab).toBeNull();
   });
 
   test("workspace ID follows pattern", () => {

@@ -190,7 +190,7 @@ describe("IPC wiring simulation", () => {
       expect(state.windows[0].sidebar?.activeRightTab).toBeDefined();
 
       dispatcher.apply("closeSidebar", [winId, "right"]);
-      expect(dispatcher.getWorkspace().windows[0].sidebar?.rightSidebarOpen).toBe(false);
+      expect(dispatcher.getWorkspace().sidebar.rightSidebarOpen).toBe(false);
     });
   });
 

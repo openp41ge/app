@@ -100,13 +100,16 @@ class Openp41geSidebar extends LitElement {
    */
   private _openSidesFor(appType: string): string {
     const ws = this.workspaceData as unknown as {
-      windows?: Array<{ id: string; sidebar?: { leftSidebarTabs?: string[]; rightSidebarTabs?: string[] } }>;
+      sidebar?: { leftSidebarTabs?: string[]; rightSidebarTabs?: string[] };
       systemTabs?: Record<string, { appType?: string }>;
     } | null;
-    const win = ws?.windows?.find((w) => w.id === this.windowId);
     const sysTabs = ws?.systemTabs ?? {};
-    const inLeft = (win?.sidebar?.leftSidebarTabs ?? []).some((id) => sysTabs[id]?.appType === appType);
-    const inRight = (win?.sidebar?.rightSidebarTabs ?? []).some((id) => sysTabs[id]?.appType === appType);
+    const inLeft = (ws?.sidebar?.leftSidebarTabs ?? []).some(
+      (id) => sysTabs[id]?.appType === appType,
+    );
+    const inRight = (ws?.sidebar?.rightSidebarTabs ?? []).some(
+      (id) => sysTabs[id]?.appType === appType,
+    );
     if (inLeft && inRight) return "R/L";
     if (inRight) return "R";
     if (inLeft) return "L";

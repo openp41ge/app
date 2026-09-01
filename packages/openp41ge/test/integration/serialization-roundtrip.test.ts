@@ -88,9 +88,10 @@ describe("Serialization round-trip", () => {
       expect(dWin2.overlays[0].tab.id).toBe("o1");
       expect(dWin2.overlays[0].position).toBe("top-right");
 
-      // Verify sidebar — only the system tab we opened (no defaults)
-      expect(dWin1.sidebar?.rightSidebarTabs).toHaveLength(1);
-      expect(dWin1.sidebar?.rightSidebarOpen).toBe(true);
+      // Verify sidebar — only the system tab we opened (no defaults). Set/side/
+      // open are shared at the workspace level; active is per-window.
+      expect(deserialized.sidebar.rightSidebarTabs).toHaveLength(1);
+      expect(deserialized.sidebar.rightSidebarOpen).toBe(true);
       expect(dWin1.sidebar?.activeRightTab).toBeDefined();
     });
 
@@ -235,13 +236,63 @@ describe("Serialization round-trip", () => {
       const w2 = r2.windows[0];
       expect(w2.grid.placements).toHaveLength(w1.grid.placements.length);
       expect(w2.grid.cols).toBe(w1.grid.cols);
-      expect(w2.sidebar?.rightSidebarOpen).toBe(w1.sidebar?.rightSidebarOpen);
+      // Sidebar open state is shared across the workspace.
+      expect(r2.sidebar.rightSidebarOpen).toBe(r1.sidebar.rightSidebarOpen);
 
       // Tab properties
       const t1_1 = r1.editorTabs["t1"];
       const t1_2 = r2.editorTabs["t1"];
       expect(t1_2?.appType).toBe(t1_1?.appType);
       expect(t1_2?.title).toBe(t1_1?.title);
+    });
+  });
+
+  describe("Sidebar migration", () => {
+    it("lifts legacy per-window sidebar fields onto the workspace sidebar", () => {
+      // Old layout: shared sidebar fields lived on Window.sidebar, and there
+      // was no Workspace.sidebar.
+      const oldJson = JSON.stringify({
+        id: "ws1",
+        windows: [
+          {
+            id: "win-1",
+            bounds: { x: 0, y: 0, width: 1280, height: 800 },
+            monitor: 0,
+            grid: {
+              id: "grid-1",
+              rows: 1,
+              cols: 1,
+              placements: [],
+              dividers: { columns: [], rows: [] },
+            },
+            sidebar: {
+              activeViewId: null,
+              width: 280,
+              leftSidebarTabs: ["sys-explorer"],
+              rightSidebarTabs: ["sys-git"],
+              activeLeftTab: "sys-explorer",
+              activeRightTab: "sys-git",
+              leftSidebarOpen: false,
+              rightSidebarOpen: true,
+            },
+          },
+        ],
+        editorTabs: {},
+        systemTabs: {},
+      });
+
+      const ws = ops.deserialize(oldJson);
+
+      // Shared set/side/open lifted to the workspace level.
+      expect(ws.sidebar.leftSidebarTabs).toEqual(["sys-explorer"]);
+      expect(ws.sidebar.rightSidebarTabs).toEqual(["sys-git"]);
+      expect(ws.sidebar.rightSidebarOpen).toBe(true);
+      // Per-window active state preserved.
+      expect(ws.windows[0].sidebar?.activeLeftTab).toBe("sys-explorer");
+      expect(ws.windows[0].sidebar?.activeRightTab).toBe("sys-git");
+      // The shared fields are stripped from the window.
+      expect(ws.windows[0].sidebar?.leftSidebarTabs).toBeUndefined();
+      expect(ws.windows[0].sidebar?.rightSidebarTabs).toBeUndefined();
     });
   });
 });

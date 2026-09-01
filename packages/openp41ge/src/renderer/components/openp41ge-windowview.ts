@@ -255,14 +255,14 @@ class Openp41geWindowView extends LitElement {
         ? win.grid.placements.map((p) => ({ position: { ...p.position }, tabIds: [...p.tabIds] }))
         : [{ position: { row: 0, col: 0 }, tabIds: [] as string[] }];
 
-    // Resolve system tab data for sidebars
-    const leftSysTabs = (win.sidebar?.leftSidebarTabs ?? []).map((id) => ({
+    // Resolve system tab data for sidebars (shared across the workspace)
+    const leftSysTabs = (ws?.sidebar?.leftSidebarTabs ?? []).map((id) => ({
       id,
       title: this._getSystemTabTitle(id),
       appType: this._getSystemTabAppType(id),
       pinned: this._getSystemTabPinned(id),
     }));
-    const rightSysTabs = (win.sidebar?.rightSidebarTabs ?? []).map((id) => ({
+    const rightSysTabs = (ws?.sidebar?.rightSidebarTabs ?? []).map((id) => ({
       id,
       title: this._getSystemTabTitle(id),
       appType: this._getSystemTabAppType(id),
@@ -315,8 +315,8 @@ class Openp41geWindowView extends LitElement {
       <div class="flex flex-col w-full h-full bg-surface relative">
         <openp41ge-titlebar
           .windowData=${win}
-          .leftSidebarVisible=${win.sidebar?.leftSidebarOpen ?? false}
-          .rightSidebarVisible=${win.sidebar?.rightSidebarOpen ?? false}
+          .leftSidebarVisible=${ws?.sidebar?.leftSidebarOpen ?? false}
+          .rightSidebarVisible=${ws?.sidebar?.rightSidebarOpen ?? false}
         ></openp41ge-titlebar>
 
         <div class="openp41ge-main-area flex flex-1 overflow-hidden min-h-0 relative">
@@ -327,14 +327,14 @@ class Openp41geWindowView extends LitElement {
             .workspaceData=${ws}
             .systemTabs=${leftSysTabs}
             .activeTabId=${win.sidebar?.activeLeftTab ?? null}
-            .isOpen=${win.sidebar?.leftSidebarOpen ?? false}
-            class="sidebar-element ${win.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
+            .isOpen=${ws?.sidebar?.leftSidebarOpen ?? false}
+            class="sidebar-element ${ws?.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
             style="flex: 0 1 ${this._leftWidth}px; max-width: min(${this._leftWidth}px, 35vw)"
           ></openp41ge-sidebar>
 
           <!-- Left resize notch (between left sidebar and grid) -->
           <div
-            class="wv-notch-v left-notch ${win.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
+            class="wv-notch-v left-notch ${ws?.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "left")}
           ></div>
 
@@ -356,7 +356,7 @@ class Openp41geWindowView extends LitElement {
 
           <!-- Right resize notch (between grid and right sidebar) -->
           <div
-            class="wv-notch-v right-notch ${win.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
+            class="wv-notch-v right-notch ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "right")}
           ></div>
 
@@ -367,8 +367,8 @@ class Openp41geWindowView extends LitElement {
             .workspaceData=${ws}
             .systemTabs=${rightSysTabs}
             .activeTabId=${win.sidebar?.activeRightTab ?? null}
-            .isOpen=${win.sidebar?.rightSidebarOpen ?? false}
-            class="sidebar-element ${win.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
+            .isOpen=${ws?.sidebar?.rightSidebarOpen ?? false}
+            class="sidebar-element ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
             style="flex: 0 1 ${this._rightWidth}px; max-width: min(${this._rightWidth}px, 35vw)"
           ></openp41ge-sidebar>
           <!-- System overlay: covers the tab + sidebar area only -->

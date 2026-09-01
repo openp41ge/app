@@ -29,7 +29,7 @@ function stamp(ws: Ws, tabId: string, iso: string | null): Ws {
 }
 
 function rightTabs(ws: Ws): string[] {
-  return (ws.windows[0].sidebar?.rightSidebarTabs ?? []) as unknown as string[];
+  return (ws.sidebar.rightSidebarTabs ?? []) as unknown as string[];
 }
 
 function activeRight(ws: Ws): string | null {

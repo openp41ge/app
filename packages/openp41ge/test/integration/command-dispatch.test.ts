@@ -125,12 +125,12 @@ describe("Command dispatch — OperationDispatcher", () => {
 
       dispatcher.apply("openSystemTab", [winId, "right", "explorer", "Explorer"]);
       const state = dispatcher.getWorkspace();
-      const tabId = state.windows[0].sidebar?.rightSidebarTabs[0];
+      const tabId = state.sidebar.rightSidebarTabs[0];
       expect(tabId).toBeDefined();
-      expect(state.windows[0].sidebar?.rightSidebarOpen).toBe(true);
+      expect(state.sidebar.rightSidebarOpen).toBe(true);
 
       dispatcher.apply("closeSidebar", [winId, "right"]);
-      expect(dispatcher.getWorkspace().windows[0].sidebar?.rightSidebarOpen).toBe(false);
+      expect(dispatcher.getWorkspace().sidebar.rightSidebarOpen).toBe(false);
     });
 
     it("applies moveWindow to update bounds", () => {

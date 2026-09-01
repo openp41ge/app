@@ -23,7 +23,7 @@ export function isWorktreeOpen(): boolean {
   if (!myWindowId) return false;
   const win = ws.windows.find((w) => w.id === myWindowId);
   if (!win) return false;
-  return (win.sidebar?.rightSidebarOpen ?? false) && win.sidebar?.activeRightTab != null;
+  return (ws.sidebar?.rightSidebarOpen ?? false) && win.sidebar?.activeRightTab != null;
 }
 
 /** Toggle the right sidebar open/closed.
@@ -78,7 +78,7 @@ export function showCloneDialog(): void {
       const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
       if (myWindowId) {
         const win = ws.windows.find((w) => w.id === myWindowId);
-        if (win && !(win.sidebar?.rightSidebarOpen ?? false)) {
+        if (win && !(ws.sidebar?.rightSidebarOpen ?? false)) {
           // Open the right sidebar with explorer tab
           emitEvent("tab-open-system", { windowId: win.id, side: "right", appType: "explorer", title: "Explorer" });
         }

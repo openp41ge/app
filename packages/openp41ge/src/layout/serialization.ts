@@ -68,6 +68,36 @@ function migrateWorkspace(obj: Record<string, unknown>): Record<string, unknown>
     });
   }
 
+  // Lift legacy per-window sidebar shared fields (set/side/open) to the
+  // workspace-level sidebar. Before the sidebar split, these lived on each
+  // Window.sidebar; now they live once on Workspace.sidebar.
+  if (!("sidebar" in migrated) && Array.isArray(migrated.windows)) {
+    const first = migrated.windows[0] as Record<string, unknown> | undefined;
+    const s = first?.sidebar as Record<string, unknown> | undefined;
+    if (s && (Array.isArray(s.leftSidebarTabs) || Array.isArray(s.rightSidebarTabs))) {
+      migrated.sidebar = {
+        leftSidebarTabs: s.leftSidebarTabs ?? [],
+        rightSidebarTabs: s.rightSidebarTabs ?? [],
+        leftSidebarOpen: s.leftSidebarOpen ?? false,
+        rightSidebarOpen: s.rightSidebarOpen ?? false,
+      };
+      // Strip the lifted fields from every window's sidebar (keep active + width).
+      migrated.windows = migrated.windows.map((win: Record<string, unknown>) => {
+        if (win.sidebar) {
+          const {
+            leftSidebarTabs: _l,
+            rightSidebarTabs: _r,
+            leftSidebarOpen: _lo,
+            rightSidebarOpen: _ro,
+            ...restSidebar
+          } = win.sidebar as Record<string, unknown>;
+          win.sidebar = restSidebar;
+        }
+        return win;
+      });
+    }
+  }
+
   return migrated;
 }
 
@@ -142,17 +172,22 @@ export function stripPreviewTabs(workspace: Workspace): Workspace {
       }
     }
 
-    // Also remove unpinned system tab IDs from window sidebar lists
+    // Also remove unpinned system tab IDs from the shared workspace sidebar lists
+    const sharedSidebar = {
+      ...result.sidebar,
+      leftSidebarTabs: result.sidebar.leftSidebarTabs.filter(
+        (id) => !systemTabsToStrip.has(id as string),
+      ),
+      rightSidebarTabs: result.sidebar.rightSidebarTabs.filter(
+        (id) => !systemTabsToStrip.has(id as string),
+      ),
+    };
+
+    // Clear per-window active tabs that point at now-stripped system tabs.
     const cleanedWindows = result.windows.map((win) => ({
       ...win,
       sidebar: {
-        ...(win.sidebar ?? {}),
-        leftSidebarTabs: ((win.sidebar?.leftSidebarTabs ?? []) as string[]).filter(
-          (id: string) => !systemTabsToStrip.has(id),
-        ),
-        rightSidebarTabs: ((win.sidebar?.rightSidebarTabs ?? []) as string[]).filter(
-          (id: string) => !systemTabsToStrip.has(id),
-        ),
+        ...win.sidebar,
         activeLeftTab:
           win.sidebar?.activeLeftTab && systemTabsToStrip.has(win.sidebar.activeLeftTab as string)
             ? null
@@ -167,6 +202,7 @@ export function stripPreviewTabs(workspace: Workspace): Workspace {
     result = {
       ...result,
       systemTabs: remainingSysTabs,
+      sidebar: sharedSidebar,
       windows: cleanedWindows,
     } as unknown as Workspace;
   }

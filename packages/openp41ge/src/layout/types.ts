@@ -247,23 +247,48 @@ export function createEditorSystemTab(id: string, appType: string, title: string
 
 // ─── SidebarState ───────────────────────────────────────────────────────────────
 
+/**
+ * Per-window sidebar state — what is active and how wide the sidebar is. The
+ * *set/side/open* of sidebar tabs is shared across a workspace's windows and
+ * lives on `Workspace.sidebar` (see `WorkspaceSidebarSchema`).
+ */
 export const SidebarStateSchema = z.object({
   activeViewId: z.string().nullable().default(null),
   width: z.number().positive().default(280),
-  /** Ordered system tab IDs for the left sidebar. */
-  leftSidebarTabs: z.array(SystemTabId).default([]),
-  /** Ordered system tab IDs for the right sidebar. */
-  rightSidebarTabs: z.array(SystemTabId).default([]),
   /** Active left sidebar system tab ID. */
   activeLeftTab: SystemTabId.nullable().default(null),
   /** Active right sidebar system tab ID. */
   activeRightTab: SystemTabId.nullable().default(null),
+});
+export type SidebarState = z.infer<typeof SidebarStateSchema>;
+
+// ─── WorkspaceSidebar ─────────────────────────────────────────────────────────
+
+/**
+ * Workspace-shared sidebar state — which sidebar tabs exist, which side each is
+ * on, and whether each sidebar is open. Shared across every window of the
+ * workspace (the Explorer open in one window is open in all).
+ */
+export const WorkspaceSidebarSchema = z.object({
+  /** Ordered system tab IDs for the left sidebar. */
+  leftSidebarTabs: z.array(SystemTabId).default([]),
+  /** Ordered system tab IDs for the right sidebar. */
+  rightSidebarTabs: z.array(SystemTabId).default([]),
   /** Whether the left sidebar is open. */
   leftSidebarOpen: z.boolean().default(false),
   /** Whether the right sidebar is open. */
   rightSidebarOpen: z.boolean().default(true),
 });
-export type SidebarState = z.infer<typeof SidebarStateSchema>;
+export type WorkspaceSidebar = z.infer<typeof WorkspaceSidebarSchema>;
+
+export function createWorkspaceSidebar(): WorkspaceSidebar {
+  return WorkspaceSidebarSchema.parse({
+    leftSidebarTabs: [],
+    rightSidebarTabs: [],
+    leftSidebarOpen: false,
+    rightSidebarOpen: false,
+  });
+}
 
 // ─── Window ────────────────────────────────────────────────────────────────
 
@@ -322,6 +347,8 @@ export const WorkspaceSchema = z.object({
     )
     .default({}),
   scopedFolders: z.array(z.string()).default([]),
+  /** Shared sidebar docking/open state for every window in the workspace. */
+  sidebar: WorkspaceSidebarSchema.default(createWorkspaceSidebar()),
 });
 export type Workspace = z.infer<typeof WorkspaceSchema>;
 
@@ -335,14 +362,14 @@ export function createWorkspace(id: string): Workspace {
         ...window0,
         sidebar: {
           ...window0.sidebar!,
-          rightSidebarTabs: [],
+          activeLeftTab: null,
           activeRightTab: null,
-          rightSidebarOpen: false,
         },
       },
     ],
     editorTabs: {},
     systemTabs: {},
+    sidebar: createWorkspaceSidebar(),
   });
 }
 
