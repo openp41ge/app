@@ -34,6 +34,8 @@ import {
   setTabNames,
   createOpenp41geWindow,
   promptQuit,
+  openWindowManager,
+  setOpenWorkspaceWindowHandler,
 } from "./window-manager.js";
 
 // ─── IPC handler registrations ──────────────────────────────────────────
@@ -41,6 +43,7 @@ import { registerDispatchHandlers } from "./ipc-handlers/dispatch-handler.js";
 import { registerFileHandlers } from "./ipc-handlers/file-handlers.js";
 import { registerDialogHandlers } from "./ipc-handlers/dialog-handlers.js";
 import { registerWindowHandlers } from "./ipc-handlers/window-handlers.js";
+import { registerWindowManagerHandlers } from "./ipc-handlers/window-manager-handlers.js";
 import { registerDragHandlers } from "./ipc-handlers/drag-handlers.js";
 import { registerTerminalHandlers } from "./ipc-handlers/terminal-handlers.js";
 import { registerWorkspaceHandlers } from "./ipc-handlers/workspace-handlers.js";
@@ -240,6 +243,22 @@ export class Openp41geApplication {
 
     setDispatcher(this.dispatcher);
     setTabNames(this.tabNames);
+
+    // Window-manager workspace windows are opened with a workspace binding. For
+    // now each open just creates a fresh workspace window bound to the path
+    // (restoring the file's session is handled in a later phase).
+    setOpenWorkspaceWindowHandler((workspacePath, source) => {
+      this.dispatcher.apply("newWindow", []);
+      const ws = this.dispatcher.getWorkspace();
+      const newWin = ws.windows[ws.windows.length - 1];
+      if (newWin) {
+        this.dispatcher.broadcast();
+        createOpenp41geWindow(newWin.id, false, source, undefined, undefined, {
+          windowType: "workspace",
+          workspacePath,
+        });
+      }
+    });
   }
 
   // ── Step 5b: Load saved state ───────────────────────────────────────
@@ -266,6 +285,7 @@ export class Openp41geApplication {
     registerDispatchHandlers(this.dispatcher);
     registerFileHandlers(this.fileSystem, this.gitService, this.dispatcher);
     registerWindowHandlers(this.dispatcher, this.tabNames);
+    registerWindowManagerHandlers();
     registerDragHandlers(this.dragGhost);
     registerTerminalHandlers(this.terminalManager);
     registerWorkspaceHandlers(this.workspaceService, this.dispatcher);
@@ -456,6 +476,13 @@ export class Openp41geApplication {
           : []),
         { role: "minimize" as const },
         { role: "close" as const },
+        { type: "separator" as const },
+        {
+          label: "Show Window Manager",
+          click: () => {
+            openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined);
+          },
+        },
       ],
     });
 

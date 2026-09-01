@@ -45,13 +45,30 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
     });
 
     log.info("state update subscriptions registered");
+
+    // A window-manager window never receives a workspace state update (it is not
+    // bound to a layout Window), so render its picker view directly.
+    if (context.windowType === "window-manager") {
+      void this._render(context);
+    }
   }
 
   /** Render the current workspace state into the DOM. */
   private async _render(context: StartupContext): Promise<void> {
     const root = document.getElementById("root");
+    if (!root) return;
+
+    // A window-manager window hosts the workspace picker, not the grid.
+    if (context.windowType === "window-manager") {
+      if (!root.querySelector("openp41ge-window-manager")) {
+        const el = document.createElement("openp41ge-window-manager");
+        root.appendChild(el);
+      }
+      return;
+    }
+
     const ws = context.workspaceState.getWorkspace();
-    if (!root || !ws) return;
+    if (!ws) return;
 
     // Resolve window ID: prefer the one from FetchInitialStateStep, fall back
     // to polling the preload bridge (which gets set via the openp41ge:init IPC

@@ -40,37 +40,37 @@ describe("ResolveWindowKindStep", () => {
     removeBridge();
   });
 
-  it("defaults to workspace when the preload bridge is absent", () => {
-    new ResolveWindowKindStep().run(context as never);
+  it("defaults to workspace when the preload bridge is absent", async () => {
+    await new ResolveWindowKindStep().run(context as never);
     expect(context.windowType).toBe("workspace");
     expect(context.workspacePath).toBeNull();
   });
 
-  it("reads window-manager kind and workspace path", () => {
+  it("reads window-manager kind and workspace path", async () => {
     installBridge("window-manager", "/tmp/acme.openp41ge-workspace");
-    new ResolveWindowKindStep().run(context as never);
+    await new ResolveWindowKindStep().run(context as never);
     expect(context.windowType).toBe("window-manager");
     expect(context.workspacePath).toBe("/tmp/acme.openp41ge-workspace");
   });
 
-  it("reads workspace kind and a bound path", () => {
+  it("reads workspace kind and a bound path", async () => {
     installBridge("workspace", "/tmp/acme.openp41ge-workspace");
-    new ResolveWindowKindStep().run(context as never);
+    await new ResolveWindowKindStep().run(context as never);
     expect(context.windowType).toBe("workspace");
     expect(context.workspacePath).toBe("/tmp/acme.openp41ge-workspace");
   });
 
-  it("defaults to workspace for an unknown kind", () => {
+  it("defaults to workspace for an unknown kind", async () => {
     installBridge("something-else", null);
-    new ResolveWindowKindStep().run(context as never);
+    await new ResolveWindowKindStep().run(context as never);
     expect(context.windowType).toBe("workspace");
   });
 
-  it("defaults to workspace when getWindowType is unavailable", () => {
+  it("defaults to workspace when getWindowType is unavailable", async () => {
     (window as unknown as { openp41ge: unknown }).openp41ge = {
       workspace: {},
     } as unknown as typeof window.openp41ge;
-    new ResolveWindowKindStep().run(context as never);
+    await new ResolveWindowKindStep().run(context as never);
     expect(context.windowType).toBe("workspace");
     expect(context.workspacePath).toBeNull();
   });

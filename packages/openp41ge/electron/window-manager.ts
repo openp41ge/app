@@ -188,6 +188,74 @@ export function createOpenp41geWindow(
   }
 }
 
+// ─── Window-manager window ────────────────────────────────────────────────
+
+/** Callback invoked when a workspace window should be opened for `workspacePath`. */
+export type OpenWorkspaceWindowHandler = (workspacePath: string, source?: BrowserWindow) => void;
+
+let _openWorkspaceWindow: OpenWorkspaceWindowHandler | null = null;
+
+/** Wire the handler the window-manager uses to open a workspace-bound window. */
+export function setOpenWorkspaceWindowHandler(fn: OpenWorkspaceWindowHandler): void {
+  _openWorkspaceWindow = fn;
+}
+
+/**
+ * Create a new thin window-manager window (not bound to any workspace layout
+ * Window). Returns the window id.
+ */
+export function createWindowManagerWindow(sourceWindow?: BrowserWindow): string {
+  const winId = `wm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  createOpenp41geWindow(winId, false, sourceWindow, undefined, undefined, {
+    windowType: "window-manager",
+    workspacePath: null,
+  });
+  return winId;
+}
+
+/** Open (or focus) a window-manager window. */
+export function openWindowManager(sourceWindow?: BrowserWindow): void {
+  for (const [id, bw] of openp41geWindows) {
+    if (openp41geWindowMeta.get(id)?.windowType !== "window-manager") continue;
+    if (bw.isDestroyed()) continue;
+    if (bw.isMinimized()) bw.restore();
+    bw.focus();
+    return;
+  }
+  createWindowManagerWindow(sourceWindow);
+}
+
+/** Summaries of every open window (id, kind, workspace binding). */
+export interface OpenWindowSummary {
+  windowId: string;
+  windowType: Openp41geWindowType;
+  workspacePath: string | null;
+}
+
+/** List open windows for the window-manager's "open windows" column. */
+export function getOpenWindowSummaries(): OpenWindowSummary[] {
+  return Array.from(openp41geWindows.keys()).map((id) => ({
+    windowId: id,
+    windowType: openp41geWindowMeta.get(id)?.windowType ?? "workspace",
+    workspacePath: openp41geWindowMeta.get(id)?.workspacePath ?? null,
+  }));
+}
+
+/** Open a workspace window bound to `workspacePath` (delegates to the app). */
+export function openWorkspaceWindow(workspacePath: string, sourceWindow?: BrowserWindow): void {
+  if (_openWorkspaceWindow) {
+    _openWorkspaceWindow(workspacePath, sourceWindow);
+  } else {
+    // Fallback: a plain workspace window with no binding.
+    const ws = _dispatcher?.getWorkspace();
+    const id = ws?.windows[0]?.id ?? `win-${Date.now()}-0`;
+    createOpenp41geWindow(id, false, sourceWindow, undefined, undefined, {
+      windowType: "workspace",
+      workspacePath,
+    });
+  }
+}
+
 // ─── Window lifecycle helpers ────────────────────────────────────────────
 
 export function closeOrphanedWindows(): void {
@@ -195,7 +263,11 @@ export function closeOrphanedWindows(): void {
   const ws = _dispatcher.getWorkspace();
   const activeIds = new Set(ws.windows.map((w) => w.id as string));
   for (const [openp41geWinId, bw] of openp41geWindows) {
-    if (!bw.isDestroyed() && !activeIds.has(openp41geWinId)) {
+    if (bw.isDestroyed()) continue;
+    // Window-manager windows are not bound to a layout Window, so they are
+    // never "orphaned" by the workspace layout.
+    if (openp41geWindowMeta.get(openp41geWinId)?.windowType === "window-manager") continue;
+    if (!activeIds.has(openp41geWinId)) {
       bw.close();
     }
   }

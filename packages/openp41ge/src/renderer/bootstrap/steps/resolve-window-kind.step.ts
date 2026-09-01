@@ -27,6 +27,7 @@ export class ResolveWindowKindStep implements IStartupStep {
           workspace?: {
             getWindowType?: () => string;
             getWorkspacePath?: () => string | null;
+            waitForInit?: () => Promise<void>;
           };
         })
       | undefined;
@@ -34,6 +35,16 @@ export class ResolveWindowKindStep implements IStartupStep {
     if (!bridge?.workspace) {
       log.warn("preload bridge not available, defaulting window kind to workspace");
       return;
+    }
+
+    // The windowType / workspacePath are set by the openp41ge:init IPC, which
+    // arrives on did-finish-load. Await it so we read the real kind instead of
+    // the preload's default ("workspace") — otherwise a window-manager window
+    // would briefly bind to the first layout window.
+    try {
+      await bridge.workspace.waitForInit?.();
+    } catch {
+      // Defensive: if init never resolves, fall back to defaults below.
     }
 
     const rawType = bridge.workspace.getWindowType?.();

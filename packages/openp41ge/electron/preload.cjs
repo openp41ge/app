@@ -174,6 +174,21 @@ contextBridge.exposeInMainWorld("openp41ge", {
     },
   },
 
+  windowManager: {
+    /** Open (or focus) the Window Manager window. */
+    open: () => {
+      ipcRenderer.send("window-manager:open");
+    },
+    /** List currently open windows (id, kind, workspace binding). */
+    openWindowSummaries: () => {
+      return ipcRenderer.invoke("window-manager:open-window-summaries");
+    },
+    /** Open a workspace-bound window for `workspacePath`. */
+    openWorkspaceWindow: (workspacePath) => {
+      ipcRenderer.send("window-manager:open-workspace-window", workspacePath);
+    },
+  },
+
   drag: {
     start: (
       label,

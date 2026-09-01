@@ -20,6 +20,11 @@ declare global {
         getBounds: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
         openDevTools: () => void;
       };
+      windowManager: {
+        open: () => void;
+        openWindowSummaries: () => Promise<Array<{ windowId: string; windowType: "workspace" | "window-manager"; workspacePath: string | null }>>;
+        openWorkspaceWindow: (workspacePath: string) => void;
+      };
       workspace: {
         getState: () => Promise<string>;
         dispatch: (fn: string, ...args: unknown[]) => void;
