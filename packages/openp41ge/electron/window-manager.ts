@@ -109,6 +109,14 @@ export function createOpenp41geWindow(
     height = bounds.height;
   }
 
+  // The Window Manager is a thin utility window: cap its width to the
+  // workspace window's min-width so it stays a compact picker and never
+  // inherits a wide workspace window's size.
+  const isWindowManager = windowMeta.windowType === "window-manager";
+  if (isWindowManager) {
+    width = Math.min(width, 600);
+  }
+
   let x: number | undefined;
   let y: number | undefined;
 
@@ -135,6 +143,7 @@ export function createOpenp41geWindow(
     height,
     minWidth: 600,
     minHeight: 200,
+    ...(isWindowManager ? { maxWidth: 600 } : {}),
     title: "Openp41ge",
     titleBarStyle: "hiddenInset",
     // Match the app's dark surface so the areas exposed while the window
