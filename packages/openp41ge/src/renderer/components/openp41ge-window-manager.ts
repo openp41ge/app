@@ -264,6 +264,9 @@ class Openp41geWindowManager extends LitElement {
           pointer-events: none;
           box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
           transition: width 0.2s ease;
+          /* Slide out with the first drawer so the shadow emerges in lockstep,
+             rather than popping in at full width. */
+          animation: dw-slide 0.18s ease;
         }
         .drawer {
           position: absolute;
