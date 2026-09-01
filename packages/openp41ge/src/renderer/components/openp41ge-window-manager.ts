@@ -195,6 +195,11 @@ class Openp41geWindowManager extends LitElement {
     return 85;
   }
 
+  /** "2 repos" / "1 repo" style label. */
+  private _countLabel(n: number, singular: string): string {
+    return `${n} ${n === 1 ? singular : singular + "s"}`;
+  }
+
   render(): TemplateResult {
     // Workspaces that already have at least one live workspace window.
     const openPaths = new Set(
@@ -424,12 +429,17 @@ class Openp41geWindowManager extends LitElement {
                     ${this._workspaces.map((w) => {
                       const name = w.data.name?.trim() || "Unnamed";
                       const repos = w.data.repos?.length ?? 0;
+                      const worktrees = (w.data.repos ?? []).reduce(
+                        (n, r) => n + (r.worktrees?.length ?? 0),
+                        0,
+                      );
+                      const windows = w.data.windows?.length ?? 0;
                       return html`
                         <li class="ws-row" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspace(w); }}>
                           <div class="ws-top">
                             <span class="ws-name">${name}</span>
                           </div>
-                          <div class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</div>
+                          <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")} · ${this._countLabel(windows, "window")}</div>
                           <div class="ws-right">
                             ${openPaths.has(w.filePath) ? html`<span class="ws-open-pill">Open</span>` : nothing}
                             <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
