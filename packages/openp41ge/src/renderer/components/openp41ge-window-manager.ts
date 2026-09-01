@@ -373,14 +373,14 @@ class Openp41geWindowManager extends LitElement {
         .dw-open {
           border: none;
           border-radius: 4px;
-          background: var(--accent, #007acc);
-          color: #fff;
+          background: rgba(86, 156, 214, 0.15);
+          color: var(--accent, #569cd6);
           font-size: 12px;
           font-weight: 600;
           padding: 4px 10px;
           cursor: pointer;
         }
-        .dw-open:hover { filter: brightness(1.1); }
+        .dw-open:hover { background: rgba(86, 156, 214, 0.25); }
         .dw-close {
           border: none;
           background: transparent;
@@ -452,7 +452,7 @@ class Openp41geWindowManager extends LitElement {
                 <div class="drawer-head">
                   <span class="drawer-title">${d.title}</span>
                   <div class="drawer-actions">
-                    ${d.kind === "workspace"
+                    ${d.kind === "workspace" && !openPaths.has(d.workspacePath)
                       ? html`<button class="dw-open" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(d.workspacePath); }}>Open</button>`
                       : nothing}
                     <button class="dw-close" @click=${(e: Event) => { e.stopPropagation(); this._closeDrawer(d.id); }} title="Close">✕</button>
