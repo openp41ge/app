@@ -14,6 +14,7 @@
 
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
+import { workspaceFileService } from "../../services/workspace-file-service";
 import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("bootstrap:resolve-window-kind");
@@ -59,6 +60,18 @@ export class ResolveWindowKindStep implements IStartupStep {
     }
 
     context.workspacePath = bridge.workspace.getWorkspacePath?.() ?? null;
+
+    // A workspace window is bound to a fixed workspace — load it into the
+    // workspace-file service so the title bar shows its name and the file/git
+    // panels have a workspace to operate on. Window-manager windows have no
+    // binding, so they skip this.
+    if (context.windowType === "workspace" && context.workspacePath) {
+      try {
+        await workspaceFileService.loadPath(context.workspacePath);
+      } catch (err) {
+        log.warn("failed to bind active workspace:", err);
+      }
+    }
 
     log.info("window kind:", context.windowType, "workspacePath:", context.workspacePath);
   }

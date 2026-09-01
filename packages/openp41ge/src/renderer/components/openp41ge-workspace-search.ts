@@ -40,6 +40,36 @@ class Openp41geWorkspaceSearch extends LitElement {
 
   render() {
     const name = workspaceFileService.activeWorkspaceName;
+    // A bound workspace is fixed — the button becomes an immutable label (no
+    // picker, no cursor) so the workspace cannot be switched in-window.
+    const bound = !!workspaceFileService.activeFilePath;
+    if (bound) {
+      return html`
+        <div
+          style="display:flex;align-items:center;gap:5px;max-width:min(180px, calc((100vw - 270px) / 2));height:26px;padding:0 8px;box-sizing:border-box;border-radius:4px;background:var(--bg-secondary,#252526);user-select:none;white-space:nowrap;-webkit-app-region:no-drag;"
+          ${tooltipContent({
+            type: "simple",
+            text: "This window is bound to its workspace.",
+          })}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 -960 960 960"
+            fill="currentColor"
+            style="flex-shrink:0;color:var(--text-secondary,#999)"
+          >
+            <path
+              d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"
+            />
+          </svg>
+          <span
+            style="min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--text-primary,#ccc);"
+            >${name}</span
+          >
+        </div>
+      `;
+    }
     return html`
       <div
         style="display:flex;align-items:center;gap:5px;max-width:min(180px, calc((100vw - 270px) / 2));height:26px;padding:0 8px;box-sizing:border-box;border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
