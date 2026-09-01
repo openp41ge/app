@@ -7,6 +7,11 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sortWorkspacesByLastActivated } from "../../src/layout/workspace-sort.js";
+import type { WorkspaceFileData } from "../../src/layout/types.js";
+import {
+  migrateWorkspaceFileData,
+  serializeWorkspaceFile,
+} from "../../src/layout/workspace-file.js";
 
 const WORKSPACE_EXT = "openp41ge-workspace";
 
@@ -18,30 +23,10 @@ function resolveTilde(filePath: string): string {
   return filePath;
 }
 
-/** Read and parse a .openp41ge-workspace file, return its data. */
+/** Read and parse a .openp41ge-workspace file, returning v2 data (migrated). */
 function readWorkspaceFile(filePath: string): WorkspaceFileData {
   const raw = fs.readFileSync(filePath, "utf-8");
-  const data = JSON.parse(raw);
-  return {
-    id: String(data.id ?? ""),
-    name: data.name ? String(data.name) : undefined,
-    version: Number(data.version ?? 1),
-    createdAt: String(data.createdAt ?? new Date().toISOString()),
-    dataDir: String(data.dataDir ?? ""),
-    repos: Array.isArray(data.repos) ? data.repos : [],
-    lastActivatedAt: data.lastActivatedAt ? String(data.lastActivatedAt) : undefined,
-  };
-}
-
-export interface WorkspaceFileData {
-  id: string;
-  name?: string;
-  version: number;
-  createdAt: string;
-  dataDir: string;
-  repos: Array<{ url: string; worktrees: string[] }>;
-  /** ISO-8601 timestamp of the last activation. Additive; round-trips through read/write. */
-  lastActivatedAt?: string;
+  return migrateWorkspaceFileData(JSON.parse(raw));
 }
 
 export function registerDialogHandlers(): void {
@@ -76,7 +61,7 @@ export function registerDialogHandlers(): void {
     const finalPath = filePath.endsWith(`.${WORKSPACE_EXT}`) ? filePath : `${filePath}.${WORKSPACE_EXT}`;
     try {
       fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-      fs.writeFileSync(finalPath, JSON.stringify(data, null, 2), "utf-8");
+      fs.writeFileSync(finalPath, serializeWorkspaceFile(data), "utf-8");
       return finalPath;
     } catch (err) {
       console.error("Failed to write workspace file:", err);
@@ -111,7 +96,7 @@ export function registerDialogHandlers(): void {
     try {
       const resolved = resolveTilde(filePath);
       fs.mkdirSync(path.dirname(resolved), { recursive: true });
-      fs.writeFileSync(resolved, JSON.stringify(data, null, 2), "utf-8");
+      fs.writeFileSync(resolved, serializeWorkspaceFile(data), "utf-8");
       return true;
     } catch (err) {
       console.error("Failed to write workspace file:", err);

@@ -27,6 +27,12 @@ export type TabGroupId = z.infer<typeof TabGroupId>;
 
 /**
  * Contents of a .openp41ge-workspace file.
+ *
+ * v2 makes the file the single source of truth for a workspace: it carries the
+ * manifest (name, repos, dataDir) AND the session (the workspace's windows and
+ * shared sidebar state) that used to live in the global workspace.json. The new
+ * session fields are optional so v1 files (manifest-only) still parse; the
+ * migration in `layout/workspace-file.ts` fills their defaults.
  */
 export interface WorkspaceFileData {
   id: string;
@@ -35,8 +41,27 @@ export interface WorkspaceFileData {
   createdAt: string;
   dataDir: string;
   repos: Array<{ url: string; worktrees: string[] }>;
-  /** ISO-8601 timestamp of the last time this workspace was activated. */
+  /** ISO-8601 timestamp of the last time this workspace was opened. */
   lastActivatedAt?: string;
+
+  // ── v2: workspace-owned, shared state ──────────────────────────────
+  /** Which sidebar panels exist (pinned/order), keyed by system tab ID. */
+  systemTabs?: Record<string, unknown>;
+  /** Editor tabs pinned to the workspace (not owned by a single window). */
+  editorTabs?: Record<string, unknown>;
+  /** Tab groups (related-tab clusters) for the workspace. */
+  tabGroups?: Record<string, unknown>;
+  /** Workspace-level scoped folders. */
+  scopedFolders?: string[];
+  /** Sidebar docking/open state shared across every window of this workspace. */
+  sharedSidebars?: {
+    leftSidebarTabs: string[];
+    rightSidebarTabs: string[];
+    leftSidebarOpen: boolean;
+    rightSidebarOpen: boolean;
+  };
+  /** One entry per open window (session). */
+  windows?: Window[];
 }
 
 // ─── Rect / Bounds ─────────────────────────────────────────────────────────

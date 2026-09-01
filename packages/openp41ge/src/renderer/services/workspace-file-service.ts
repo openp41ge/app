@@ -7,6 +7,7 @@
 
 import type { WorkspaceFileData } from "../../layout/types";
 import { appState } from "./app-state";
+import { WORKSPACE_FILE_VERSION, emptyWorkspaceSession } from "../../layout/workspace-file";
 
 const WORKSPACE_CHANGED_EVENT = "workspace-file-changed";
 
@@ -154,11 +155,12 @@ export class WorkspaceFileService {
     const data: WorkspaceFileData = {
       id: uuid,
       name,
-      version: 1,
+      version: WORKSPACE_FILE_VERSION,
       createdAt: now,
       dataDir: `~/.openp41ge/workspaces-data/${uuid}`,
       repos: [],
       lastActivatedAt: now,
+      ...emptyWorkspaceSession(),
     };
 
     const filePath = `~/.openp41ge/workspaces/${uuid}.openp41ge-workspace`;
