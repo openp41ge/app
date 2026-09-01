@@ -281,13 +281,14 @@ class Openp41geWindowManager extends LitElement {
           transition: width 0.2s ease;
           animation: dw-slide 0.18s ease;
         }
-        /* Mask over any non-top drawer: dims it and blocks its buttons/items.
-           Clicking the exposed sliver closes the deeper drawers. */
+        /* Mask over any non-top drawer: blocks its buttons/items (no tint — the
+           drawer keeps the same colour). Clicking the exposed sliver closes the
+           deeper drawers. */
         .drawer-mask {
           position: absolute;
           inset: 0;
           z-index: 2;
-          background: rgba(0, 0, 0, 0.28);
+          background: transparent;
           cursor: pointer;
         }
         @keyframes dw-slide {
