@@ -54,6 +54,7 @@ import {
   SignalReadyStep,
 } from "./bootstrap/index";
 import { InitEventControllerStep } from "./bootstrap/steps/init-event-controller.step";
+import { ResolveWindowKindStep } from "./bootstrap/steps/resolve-window-kind.step";
 
 import type { Workspace } from "../layout/types";
 import type { EventRouter } from "./services/event-router";
@@ -68,15 +69,16 @@ const steps = [
   new ExposeTestModelsStep(), // 1: Expose test models for test injection
   new InitEventControllerStep(), // 2: Initialize event controller (graph + router)
   new RegisterAppTypesStep(), // 3: Register app types
-  new InitServicesStep(), // 4: Wire cross-service dependencies
-  new SubscribeStateUpdatesStep(), // 5: ** Register render subscriber BEFORE any async **
-  new RegisterEventListenersStep(), // 6: Document-level event listeners
-  new FetchInitialStateStep(), // 7: ** Async: fetch + set state → subscriber fires → UI RENDERS **
-  new LoadConfigStep(), // 8: Async: load config (cosmetic, after UI is visible)
-  new RegisterShortcutsStep(), // 9: Keyboard shortcuts
-  new RegisterIpcListenersStep(), // 10: Zoom + confirm IPC listeners
-  new StartQuoteControllerStep(), // 11: Quote rotation
-  new SignalReadyStep(), // 12: Signal readiness
+  new ResolveWindowKindStep(), // 4: Resolve window kind + workspace binding
+  new InitServicesStep(), // 5: Wire cross-service dependencies
+  new SubscribeStateUpdatesStep(), // 6: ** Register render subscriber BEFORE any async **
+  new RegisterEventListenersStep(), // 7: Document-level event listeners
+  new FetchInitialStateStep(), // 8: ** Async: fetch + set state → subscriber fires → UI RENDERS **
+  new LoadConfigStep(), // 9: Async: load config (cosmetic, after UI is visible)
+  new RegisterShortcutsStep(), // 10: Keyboard shortcuts
+  new RegisterIpcListenersStep(), // 11: Zoom + confirm IPC listeners
+  new StartQuoteControllerStep(), // 12: Quote rotation
+  new SignalReadyStep(), // 13: Signal readiness
 ];
 
 const bootstrap = new RendererBootstrap(steps, context);

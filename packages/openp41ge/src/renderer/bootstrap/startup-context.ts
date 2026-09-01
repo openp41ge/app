@@ -42,6 +42,9 @@ import { initRendererLogTransport } from "../services/renderer-log-transport";
 
 import type { Workspace } from "../../layout/types";
 
+/** Kinds of window the renderer can boot as. Mirrors `Openp41geWindowType`. */
+export type RendererWindowType = "workspace" | "window-manager";
+
 export class StartupContext {
   // ── Injected services ──────────────────────────────────────────────
   readonly commandBus: ICommandBus;
@@ -72,6 +75,19 @@ export class StartupContext {
 
   /** This window's ID, resolved during startup. */
   windowId: string | null = null;
+
+  /**
+   * The kind of window this renderer is hosting. Workspace windows run the full
+   * app; window-manager windows run a thin workspace-picker view. Populated by
+   * the `resolve-window-kind` bootstrap step (defaults to "workspace").
+   */
+  windowType: RendererWindowType = "workspace";
+
+  /**
+   * The `.openp41ge-workspace` path this window is bound to, or null when the
+   * window has no workspace binding (e.g. a window-manager window).
+   */
+  workspacePath: string | null = null;
 
   // ── Ad-hoc references set by steps ───────────────────────────────────
   /**
