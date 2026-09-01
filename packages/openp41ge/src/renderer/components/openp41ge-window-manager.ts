@@ -25,6 +25,12 @@ const isMac = (() => {
   }
 })();
 
+interface OpenWindowSummary {
+  windowId: string;
+  windowType: "workspace" | "window-manager";
+  workspacePath: string | null;
+}
+
 interface DrawerState {
   id: string;
   kind: "workspace" | "repo" | "worktree";
@@ -42,6 +48,7 @@ interface ClosingDrawer extends DrawerState {
 
 class Openp41geWindowManager extends LitElement {
   @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
+  @state() private _openWindows: OpenWindowSummary[] = [];
   @state() private _drawers: DrawerState[] = [];
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
@@ -66,6 +73,11 @@ class Openp41geWindowManager extends LitElement {
       this._workspaces = await workspaceFileService.listWorkspaces();
     } catch {
       this._workspaces = [];
+    }
+    try {
+      this._openWindows = await window.openp41ge.windowManager.openWindowSummaries();
+    } catch {
+      this._openWindows = [];
     }
     this._loaded = true;
   }
@@ -184,6 +196,13 @@ class Openp41geWindowManager extends LitElement {
   }
 
   render(): TemplateResult {
+    // Workspaces that already have at least one live workspace window.
+    const openPaths = new Set(
+      this._openWindows
+        .filter((w) => w.windowType === "workspace" && w.workspacePath)
+        .map((w) => w.workspacePath as string),
+    );
+
     return html`
       <style>
         :host {
@@ -269,18 +288,16 @@ class Openp41geWindowManager extends LitElement {
           gap: 8px;
         }
         .ws-open-pill {
-          border: none;
           border-radius: 999px;
           padding: 2px 9px;
           font-size: 11px;
           font-weight: 600;
           font-family: inherit;
-          color: var(--text-secondary, #999);
-          background: var(--bg-active, #37373d);
-          cursor: pointer;
+          color: var(--accent, #569cd6);
+          background: rgba(86, 156, 214, 0.15);
           white-space: nowrap;
+          user-select: none;
         }
-        .ws-open-pill:hover { color: var(--text-primary, #ddd); background: var(--bg-selection, #444); }
         .ws-chevron { flex-shrink: 0; display: block; color: var(--accent, #569cd6); }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
         /* ── Drawer ─────────────────────────────────────────────── */
@@ -414,7 +431,7 @@ class Openp41geWindowManager extends LitElement {
                           </div>
                           <div class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</div>
                           <div class="ws-right">
-                            <button class="ws-open-pill" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(w.filePath); }}>Open</button>
+                            ${openPaths.has(w.filePath) ? html`<span class="ws-open-pill">Open</span>` : nothing}
                             <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
                           </div>
                         </li>
