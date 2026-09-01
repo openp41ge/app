@@ -12,11 +12,14 @@ Date: 2026-09-01
       `openp41geWindowMeta` map, `getWindowMeta()`, `createOpenp41geWindow` meta
       param, binding sent in `openp41ge:init`; preload `getWindowType()`/
       `getWorkspacePath()`; typed in `global.d.ts`. No behaviour change yet.
+- [x] **Phase 1c — sidebar split (fa1482a)**: shared `Workspace.sidebar`
+      (set/side/open) + per-window `sidebar` (activeViewId,width,activeLeft/RightTab).
+      All `system-tab-operations` moved to shared sidebar; `stripPreviewTabs` +
+      `migrateWorkspace` lift legacy per-window fields; renderer reads shared
+      sidebar. Live-verified (Explorer renders in shared right sidebar). Tests 1091.
 - [ ] **Phase 1b — per-workspace save** (replace global `workspace.json` with writes
-      to the bound workspace's file) — needs the binding wired to save handlers.
-- [ ] **Phase 1c — sidebar split** (shared set/side/open; per-window active+width) —
-      large, cross-cutting (types, ops, serialization, renderer, tests).
-- [ ] **Phase 2b/3 — renderer honors `windowType`** (window-manager boot mode) + startup
+      to the bound workspace's file) — needs the runtime to bind windows to workspaces.
+- [ ] **Phase 3 — renderer honors `windowType`** (window-manager boot mode) + startup
       (workspace arg → workspace window; else window manager).
 - [ ] Phases 4-7 (remove workspace systems, menus, restore, terminology).
 
