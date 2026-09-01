@@ -120,7 +120,7 @@ class Openp41geWindowManager extends LitElement {
         /* Show the open icon only when the row is hovered; grey square chip on hover. */
         .ws-row:hover .wm-open,
         .wm-open:focus-visible { opacity: 1; }
-        button.wm-open:hover { background: var(--bg-hover, #2e2e2e); }
+        button.wm-open:hover { background: var(--bg-active, #37373d); }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
       </style>
       <div class="wm-titlebar">
