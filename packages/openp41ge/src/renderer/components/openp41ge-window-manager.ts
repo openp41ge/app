@@ -278,6 +278,15 @@ class Openp41geWindowManager extends LitElement {
           transition: width 0.2s ease;
           animation: dw-slide 0.18s ease;
         }
+        /* Mask over any non-top drawer: dims it and blocks its buttons/items.
+           Clicking the exposed sliver closes the deeper drawers. */
+        .drawer-mask {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          background: rgba(0, 0, 0, 0.28);
+          cursor: pointer;
+        }
         @keyframes dw-slide {
           from { transform: translateX(24px); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
@@ -375,7 +384,10 @@ class Openp41geWindowManager extends LitElement {
             : nothing}
           ${this._drawers.map(
             (d, i) => html`
-              <div class="drawer" style="width:${this._widthFor(i)}%" @click=${() => this._closeDeeper(i)}>
+              <div class="drawer" style="width:${this._widthFor(i)}%">
+                ${i < this._drawers.length - 1
+                  ? html`<div class="drawer-mask" @click=${(e: Event) => { e.stopPropagation(); this._closeDeeper(i); }}></div>`
+                  : nothing}
                 <div class="drawer-head">
                   <span class="drawer-title">${d.title}</span>
                   <div class="drawer-actions">
