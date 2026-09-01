@@ -17,10 +17,16 @@ Date: 2026-09-01
       All `system-tab-operations` moved to shared sidebar; `stripPreviewTabs` +
       `migrateWorkspace` lift legacy per-window fields; renderer reads shared
       sidebar. Live-verified (Explorer renders in shared right sidebar). Tests 1091.
-- [ ] **Phase 1b — per-workspace save** (replace global `workspace.json` with writes
-      to the bound workspace's file) — needs the runtime to bind windows to workspaces.
-- [ ] **Phase 3 — renderer honors `windowType`** (window-manager boot mode) + startup
-      (workspace arg → workspace window; else window manager).
+- [x] **Phase 3a — renderer window-kind awareness (7628186)**: `StartupContext`
+      gains `windowType`/`workspacePath`; new `ResolveWindowKindStep` reads
+      `getWindowType()`/`getWorkspacePath()` defensively and runs before state
+      fetch. Default stays "workspace" (no behaviour change). Tests 1096.
+- [ ] **Phase 3b — window-manager window**: a BrowserWindow that is NOT bound to a
+      workspace `Window` (decouple window from layout entry), a thin workspace-picker
+      view for it, and startup flipping to a window-manager window when no workspace
+      arg is present. Largest remaining architectural pivot.
+- [ ] **Phase 1b — per-workspace save** (replace global `workspace.json`): needs
+      workspace-scoped runtime state, so follows 3b.
 - [ ] Phases 4-7 (remove workspace systems, menus, restore, terminology).
 
 
