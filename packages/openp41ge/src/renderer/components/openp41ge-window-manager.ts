@@ -107,15 +107,17 @@ class Openp41geWindowManager extends LitElement {
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          width: 24px;
+          height: 24px;
           border: none;
-          border-radius: 4px;
+          border-radius: 5px;
           background: transparent;
-          padding: 4px;
+          padding: 0;
           cursor: pointer;
           opacity: 0;
           transition: opacity 0.12s ease, background 0.12s ease;
         }
-        /* Show the open icon only when the row is hovered; grey chip on hover. */
+        /* Show the open icon only when the row is hovered; grey square chip on hover. */
         .ws-row:hover .wm-open,
         .wm-open:focus-visible { opacity: 1; }
         button.wm-open:hover { background: var(--bg-hover, #2e2e2e); }
@@ -137,7 +139,7 @@ class Openp41geWindowManager extends LitElement {
                       <div class="ws-top">
                         <span class="ws-name">${name}</span>
                         <button class="wm-open" @click=${() => this._open(w.filePath)} aria-label="Open workspace" title="Open workspace">
-                          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></svg>
                         </button>
                       </div>
                       <div class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</div>
