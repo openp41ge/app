@@ -106,3 +106,13 @@ export type {
   DiffStatEntry,
 } from "openp41ge-git";
 
+export { tooltipContent } from "./components/tooltip";
+export type { TooltipContent, TooltipHostLike } from "./components/tooltip";
+export {
+  Openp41geTooltip,
+  Openp41geTooltipDetail,
+  Openp41geTooltipHost,
+  TooltipController,
+  tooltipController,
+} from "./components/tooltip";
+

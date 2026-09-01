@@ -11,6 +11,7 @@ import { property } from "lit/decorators.js";
 import type { Window } from "../../layout/types";
 import { emitEvent } from "../app";
 import { TITLEBAR_HEIGHT } from "openp41ge-constants";
+import { tooltipContent } from "openp41ge-uikit";
 
 import "./openp41ge-workspace-search";
 
@@ -168,7 +169,10 @@ class Openp41geTitleBar extends LitElement {
         <div
           class="tb-btn flex items-center justify-center w-7 h-7 rounded cursor-pointer text-secondary hover:text-primary shrink-0 mr-1"
           style="-webkit-app-region:no-drag"
-          title="${this.leftSidebarVisible ? "Close left sidebar" : "Open left sidebar"}"
+          ${tooltipContent({
+            type: "simple",
+            text: this.leftSidebarVisible ? "Close left sidebar" : "Open left sidebar",
+          })}
           @click=${() => this._toggleLeft()}
         >
           <svg width="18" height="18" viewBox="0 -960 960 960" fill="currentColor">
@@ -190,7 +194,10 @@ class Openp41geTitleBar extends LitElement {
         <div
           class="tb-btn flex items-center justify-center w-7 h-7 rounded cursor-pointer text-secondary hover:text-primary shrink-0"
           style="-webkit-app-region:no-drag;margin-right:14px"
-          title="${this.rightSidebarVisible ? "Close right sidebar" : "Open right sidebar"}"
+          ${tooltipContent({
+            type: "simple",
+            text: this.rightSidebarVisible ? "Close right sidebar" : "Open right sidebar",
+          })}
           @click=${() => this._toggleRight()}
         >
           <svg width="18" height="18" viewBox="0 -960 960 960" fill="currentColor">

@@ -14,6 +14,7 @@ import { getSystemTabRegistration } from "../apps/app-registry";
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import type { SystemTabController } from "../controllers/types";
+import { tooltipContent } from "openp41ge-uikit";
 
 // Keep in sync with openp41ge-windowview if changed
 
@@ -346,7 +347,7 @@ class Openp41geSidebar extends LitElement {
           <div
             class="sidebar-tab-add absolute top-0 flex items-center justify-center cursor-pointer select-none transition-colors duration-75"
             style="height:18px;width:18px;top:8px;right:7px;color:var(--text-secondary,#999);z-index:2;border-radius:3px;"
-            title="Open sidebar tab"
+            ${tooltipContent({ type: "simple", text: "Open sidebar tab" })}
             @click=${this._onAddTabClick}
             @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.color = "var(--text-primary,#ccc)"; }}
             @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.color = "var(--text-secondary,#999)"; }}

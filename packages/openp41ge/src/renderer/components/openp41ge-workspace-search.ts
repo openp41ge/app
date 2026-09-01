@@ -10,6 +10,7 @@
 import { LitElement, html } from "lit";
 import { workspaceFileService } from "../services/workspace-file-service";
 import { systemOverlayService } from "../services/system-overlay-service";
+import { tooltipContent } from "openp41ge-uikit";
 
 const WORKSPACE_CHANGED_EVENT = "workspace-file-changed";
 
@@ -42,7 +43,12 @@ class Openp41geWorkspaceSearch extends LitElement {
     return html`
       <div
         style="display:flex;align-items:center;gap:5px;max-width:min(180px, calc((100vw - 270px) / 2));height:26px;padding:0 8px;box-sizing:border-box;border-radius:4px;background:var(--bg-secondary,#252526);cursor:pointer;user-select:none;white-space:nowrap;-webkit-app-region:no-drag;transition:background .1s;"
-        title="Workspaces"
+        ${tooltipContent({
+          type: "detail",
+          title: "Workspaces",
+          subtitle:
+            "Open the Workspaces overlay to switch projects and reopen recent workspaces.",
+        })}
         @click=${() => systemOverlayService.toggle()}
         @mouseenter=${(e: MouseEvent) => {
           (e.currentTarget as HTMLElement).style.background = "var(--bg-hover,#2e2e2e)";
