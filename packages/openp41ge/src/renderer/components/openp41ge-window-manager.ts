@@ -86,28 +86,39 @@ class Openp41geWindowManager extends LitElement {
         ul { list-style: none; margin: 0; padding: 0; }
         li.ws-row {
           display: flex;
-          align-items: center;
-          gap: 8px;
+          flex-direction: column;
+          gap: 4px;
           padding: 8px 10px;
           margin-bottom: 6px;
           background: var(--bg-hover, #2a2d2e);
           border: 1px solid var(--divider, #333);
           border-radius: 6px;
         }
+        .ws-top {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+        }
         .ws-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ws-meta { color: var(--text-secondary, #999); font-size: 12px; }
+        .ws-meta { color: var(--text-secondary, #999); font-size: 12px; text-align: left; }
         button.wm-open {
           flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           border: none;
           border-radius: 4px;
-          background: var(--accent, #007acc);
-          color: #fff;
-          font-size: 12px;
-          font-weight: 600;
-          padding: 4px 10px;
+          background: transparent;
+          padding: 4px;
           cursor: pointer;
+          opacity: 0;
+          transition: opacity 0.12s ease, background 0.12s ease;
         }
-        button.wm-open:hover { filter: brightness(1.1); }
+        /* Show the open icon only when the row is hovered; grey chip on hover. */
+        .ws-row:hover .wm-open,
+        .wm-open:focus-visible { opacity: 1; }
+        button.wm-open:hover { background: var(--bg-hover, #2e2e2e); }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
       </style>
       <div class="wm-titlebar">
@@ -123,9 +134,13 @@ class Openp41geWindowManager extends LitElement {
                   const repos = w.data.repos?.length ?? 0;
                   return html`
                     <li class="ws-row">
-                      <span class="ws-name">${name}</span>
-                      <span class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</span>
-                      <button class="wm-open" @click=${() => this._open(w.filePath)}>Open</button>
+                      <div class="ws-top">
+                        <span class="ws-name">${name}</span>
+                        <button class="wm-open" @click=${() => this._open(w.filePath)} aria-label="Open workspace" title="Open workspace">
+                          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></svg>
+                        </button>
+                      </div>
+                      <div class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</div>
                     </li>
                   `;
                 })}
