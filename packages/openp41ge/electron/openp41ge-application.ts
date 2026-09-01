@@ -20,7 +20,7 @@ import {
   NodeGitService,
   NodeGitCommitService,
   ElectronFileSystem,
-  WorkspaceStateStore,
+  FileWorkspaceSessionStore,
   LogFileStore,
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
@@ -72,18 +72,13 @@ export class Openp41geApplication {
   private gitCommitService!: NodeGitCommitService;
   private fileSystem!: ElectronFileSystem;
   private workspaceService!: WorkspaceService;
-  private workspaceStateStore!: WorkspaceStateStore;
+  private workspaceSessionStore!: FileWorkspaceSessionStore;
   private logStore!: LogFileStore;
   private openp41geDir!: string;
 
   /** Repos live in their own subdirectory of the app data dir. */
   private get reposDir(): string {
     return path.join(this.openp41geDir, "repositories");
-  }
-
-  /** The single workspace-state file for this app (persistence is always on). */
-  private get workspaceStatePath(): string {
-    return path.join(this.openp41geDir, "workspace.json");
   }
 
   // ── Bootstrap ─────────────────────────────────────────────────────────
@@ -217,7 +212,7 @@ export class Openp41geApplication {
     this.gitCommitService = new NodeGitCommitService(reposDir);
     this.fileSystem = new ElectronFileSystem();
     this.workspaceService = new WorkspaceService(this.gitService, this.fileSystem, reposDir);
-    this.workspaceStateStore = new WorkspaceStateStore(this.openp41geDir);
+    this.workspaceSessionStore = new FileWorkspaceSessionStore();
     this.logStore = new LogFileStore(this.openp41geDir);
   }
 
@@ -236,18 +231,21 @@ export class Openp41geApplication {
         }
       }
     });
-    // Wire workspace state persistence: save after every mutation.
+    // Wire workspace state persistence: save after every mutation. Saves go to
+    // the bound workspace's `.openp41ge-workspace` file (no global workspace.json).
     this.dispatcher.setSaveHandler((ws) => {
-      this.workspaceStateStore.save(ws, this.workspaceStatePath);
+      if (this.workspaceSessionStore.getCurrentWorkspacePath()) {
+        this.workspaceSessionStore.save(ws);
+      }
     });
 
     setDispatcher(this.dispatcher);
     setTabNames(this.tabNames);
 
-    // Window-manager workspace windows are opened with a workspace binding. For
-    // now each open just creates a fresh workspace window bound to the path
-    // (restoring the file's session is handled in a later phase).
+    // Window-manager workspace windows are opened with a workspace binding. Bind
+    // the store to that path so mutations save to its file.
     setOpenWorkspaceWindowHandler((workspacePath, source) => {
+      this.workspaceSessionStore.setCurrentWorkspacePath(workspacePath);
       this.dispatcher.apply("newWindow", []);
       const ws = this.dispatcher.getWorkspace();
       const newWin = ws.windows[ws.windows.length - 1];
@@ -272,10 +270,13 @@ export class Openp41geApplication {
    * workspace).
    */
   private _maybeLoadState(): void {
-    if (!parseWorkspaceLaunchArg(process.argv)) return;
-    const saved = this.workspaceStateStore.load(this.workspaceStatePath);
-    if (saved) {
-      this.dispatcher.setWorkspace(saved);
+    const workspaceArg = parseWorkspaceLaunchArg(process.argv);
+    if (!workspaceArg) return;
+    // Restore the layout session from the workspace's own file.
+    const restored = this.workspaceSessionStore.load(workspaceArg);
+    if (restored) {
+      this.workspaceSessionStore.setCurrentWorkspacePath(workspaceArg);
+      this.dispatcher.setWorkspace(restored);
     }
   }
 
@@ -338,8 +339,7 @@ export class Openp41geApplication {
   private _createInitialWindow(): void {
     const workspaceArg = parseWorkspaceLaunchArg(process.argv);
     if (workspaceArg) {
-      // A workspace was provided as a launch argument — open (and bind) a
-      // workspace window. Restoring the file's session is a later phase.
+      this.workspaceSessionStore.setCurrentWorkspacePath(workspaceArg);
       const ws = this.dispatcher.getWorkspace();
       createOpenp41geWindow(ws.windows[0].id, true, undefined, undefined, undefined, {
         windowType: "workspace",
@@ -514,6 +514,7 @@ export class Openp41geApplication {
       if (openp41geWindows.size > 0) return;
       const workspaceArg = parseWorkspaceLaunchArg(process.argv);
       if (workspaceArg) {
+        this.workspaceSessionStore.setCurrentWorkspacePath(workspaceArg);
         const ws = this.dispatcher.getWorkspace();
         createOpenp41geWindow(ws.windows[0].id, true, undefined, undefined, undefined, {
           windowType: "workspace",
