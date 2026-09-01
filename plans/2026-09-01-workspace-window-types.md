@@ -2,6 +2,19 @@
 
 Date: 2026-09-01
 
+## Progress
+
+- [x] **Phase 1a — v2 data model + session conversion (5acc852)**: `WorkspaceFileData`
+      v2 fields, `layout/workspace-file.ts` (migration, `workspaceToFileData` /
+      `fileDataToWorkspace`, serialize/deserialize), read/write path migrated,
+      `createWorkspace` writes v2. Unit tests green (1090).
+- [ ] **Phase 1b — per-workspace save** (replace global `workspace.json` with writes
+      to the bound workspace's file) — blocked on Phase 2 binding.
+- [ ] **Phase 1c — sidebar split** (shared set/side/open; per-window active+width).
+- [ ] **Phase 2 — window types & main-process binding** (unblocks per-workspace save).
+- [ ] Phases 3-7 (renderer bootstrap, remove workspace systems, menus, restore).
+
+
 ## Goal
 
 Replace the single global "workspace" with a model where each window is bound to
