@@ -41,10 +41,16 @@ interface DrawerState {
   title: string;
 }
 
+/** A drawer that is animating out; keeps its last width so it exits in place. */
+interface ClosingDrawer extends DrawerState {
+  width: number;
+}
+
 class Openp41geWindowManager extends LitElement {
   @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
   @state() private _openWindows: OpenWindowSummary[] = [];
   @state() private _drawers: DrawerState[] = [];
+  @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
 
   connectedCallback(): void {
@@ -131,17 +137,38 @@ class Openp41geWindowManager extends LitElement {
   }
 
   private _closeDrawer(id: string): void {
+    const idx = this._drawers.findIndex((d) => d.id === id);
+    if (idx === -1) return;
+    const width = this._widthFor(idx);
+    const closing = this._drawers[idx];
     this._drawers = this._drawers.filter((d) => d.id !== id);
-  }
-
-  /** Close every drawer (background click). */
-  private _closeAll(): void {
-    this._drawers = [];
+    this._finalizeClose([{ ...closing, width }]);
   }
 
   /** Close every drawer deeper than `index` (clicking a parent/grandparent sliver). */
   private _closeDeeper(index: number): void {
+    const closing = this._drawers
+      .slice(index + 1)
+      .map((d, i) => ({ ...d, width: this._widthFor(index + 1 + i) }));
     this._drawers = this._drawers.slice(0, index + 1);
+    this._finalizeClose(closing);
+  }
+
+  /** Close every drawer (background click). */
+  private _closeAll(): void {
+    const closing = this._drawers.map((d, i) => ({ ...d, width: this._widthFor(i) }));
+    this._drawers = [];
+    this._finalizeClose(closing);
+  }
+
+  /** Queue closed drawers to animate out, then drop them after the exit. */
+  private _finalizeClose(closing: ClosingDrawer[]): void {
+    if (closing.length === 0) return;
+    this._closingDrawers = [...this._closingDrawers, ...closing];
+    const ids = new Set(closing.map((c) => c.id));
+    window.setTimeout(() => {
+      this._closingDrawers = this._closingDrawers.filter((c) => !ids.has(c.id));
+    }, 220);
   }
 
   /** Width of the single shared shadow, matching the widest (outermost) drawer. */
@@ -295,6 +322,15 @@ class Openp41geWindowManager extends LitElement {
           from { transform: translateX(24px); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
+        @keyframes dw-slide-out {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(24px); opacity: 0; }
+        }
+        /* A drawer that is leaving slides out to the right and fades. */
+        .drawer--closing {
+          animation: dw-slide-out 0.18s ease forwards;
+          pointer-events: none;
+        }
         .drawer-head {
           display: flex;
           align-items: center;
@@ -402,6 +438,16 @@ class Openp41geWindowManager extends LitElement {
                   </div>
                 </div>
                 <div class="drawer-body">${this._drawerContent(d)}</div>
+              </div>
+            `,
+          )}
+          ${this._closingDrawers.map(
+            (c) => html`
+              <div class="drawer drawer--closing" style="width:${c.width}%">
+                <div class="drawer-head">
+                  <span class="drawer-title">${c.title}</span>
+                </div>
+                <div class="drawer-body">${this._drawerContent(c)}</div>
               </div>
             `,
           )}
