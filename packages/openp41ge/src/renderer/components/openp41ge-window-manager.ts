@@ -52,6 +52,7 @@ class Openp41geWindowManager extends LitElement {
   @state() private _drawers: DrawerState[] = [];
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
+  @state() private _addingRepo = false;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -94,6 +95,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Clicking a top-level card resets the drawer stack to that workspace's detail. */
   private _openWorkspace(ws: { filePath: string; data: WorkspaceFileData }): void {
+    this._addingRepo = false;
     this._drawers = [
       {
         id: this._nextId(),
@@ -107,6 +109,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Drill from a workspace drawer into one of its repositories. */
   private _openRepo(d: DrawerState, repo: { url: string; worktrees: string[] }): void {
+    this._addingRepo = false;
     this._drawers = [
       ...this._drawers,
       {
@@ -122,6 +125,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Drill from a repo drawer into one of its worktrees. */
   private _openWorktree(d: DrawerState, worktree: string): void {
+    this._addingRepo = false;
     this._drawers = [
       ...this._drawers,
       {
@@ -134,6 +138,58 @@ class Openp41geWindowManager extends LitElement {
         title: worktree,
       },
     ];
+  }
+
+  /** Toggle the inline "add repo" row in the workspace drawer. */
+  private _toggleAddRepo(): void {
+    this._addingRepo = !this._addingRepo;
+    if (this._addingRepo) {
+      void this.updateComplete.then(() => {
+        this.shadowRoot?.querySelector<HTMLInputElement>(".dw-new-input")?.focus();
+      });
+    }
+  }
+
+  /** Enter commits, Escape cancels the inline add-repo row. */
+  private _onNewRepoKeydown(e: KeyboardEvent, d: DrawerState): void {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      this._commitNewRepo(d, e);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      this._addingRepo = false;
+    }
+  }
+
+  /** Blur/Enter commits the typed URL; empty input closes the row. */
+  private _commitNewRepo(d: DrawerState, e: Event): void {
+    if (!this._addingRepo) return;
+    const value = (e.target as HTMLInputElement).value.trim();
+    void this._addRepoToWorkspace(d, value);
+  }
+
+  /** Persist a new repo URL to the workspace file, then refresh the view. */
+  private async _addRepoToWorkspace(d: DrawerState, url: string): Promise<void> {
+    const repo = url.trim();
+    this._addingRepo = false;
+    if (!repo) return;
+    // Exact-match already present: just refresh (e.g. duplicate submit / blur).
+    if ((d.data.repos ?? []).some((r) => r.url === repo)) {
+      await this._load();
+      return;
+    }
+    const data: WorkspaceFileData = {
+      ...d.data,
+      repos: [...(d.data.repos ?? []), { url: repo, worktrees: [] }],
+    };
+    try {
+      await window.openp41ge.dialog.writeWorkspaceFile(d.workspacePath, data);
+    } catch {
+      return;
+    }
+    // Keep the drawer showing the freshly-added repo, and refresh the card list.
+    this._drawers = this._drawers.map((x) => (x.id === d.id ? { ...x, data } : x));
+    await this._load();
   }
 
   private _closeDrawer(id: string): void {
@@ -420,6 +476,29 @@ class Openp41geWindowManager extends LitElement {
         }
         .dw-close:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
         .drawer-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; }
+        .drawer-footer {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+          height: 44px;
+          padding: 0 14px;
+          border-top: 1px solid var(--divider, #333);
+        }
+        .dw-add {
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          font-size: 20px;
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          user-select: none;
+        }
+        .dw-add:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
         .dw-list { list-style: none; margin: 0; padding: 0; }
         .dw-item {
           display: flex;
@@ -431,6 +510,23 @@ class Openp41geWindowManager extends LitElement {
           cursor: pointer;
         }
         .dw-item:hover { background: var(--bg-active, #37373d); }
+        .dw-item--new {
+          cursor: default;
+          border: 1px dashed var(--divider, #444);
+        }
+        .dw-item--new:hover { background: transparent; }
+        .dw-new-input {
+          flex: 1;
+          min-width: 0;
+          background: transparent;
+          border: none;
+          outline: none;
+          color: var(--text-primary, #ddd);
+          font-size: 13px;
+          font-family: inherit;
+          padding: 0;
+        }
+        .dw-new-input::placeholder { color: var(--text-secondary, #777); }
         .dw-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dw-item-meta { color: var(--text-secondary, #999); font-size: 12px; }
         .dw-meta-block { color: var(--text-secondary, #999); font-size: 12px; line-height: 1.6; }
@@ -494,6 +590,13 @@ class Openp41geWindowManager extends LitElement {
                   </div>
                 </div>
                 <div class="drawer-body">${this._drawerContent(d)}</div>
+                ${d.kind === "workspace"
+                  ? html`
+                      <div class="drawer-footer">
+                        <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} title="Add repo" aria-label="Add repo">＋</button>
+                      </div>
+                    `
+                  : nothing}
               </div>
             `,
           )}
@@ -515,11 +618,24 @@ class Openp41geWindowManager extends LitElement {
   private _drawerContent(d: DrawerState): TemplateResult {
     if (d.kind === "workspace") {
       const repos = d.data.repos ?? [];
-      if (repos.length === 0) {
-        return html`<p class="empty">No repositories in this workspace.</p>`;
-      }
       return html`
         <ul class="dw-list">
+          ${this._addingRepo
+            ? html`
+                <li class="dw-item dw-item--new">
+                  <input
+                    class="dw-new-input"
+                    placeholder="Repo URL"
+                    spellcheck="false"
+                    @keydown=${(e: KeyboardEvent) => this._onNewRepoKeydown(e, d)}
+                    @blur=${(e: Event) => this._commitNewRepo(d, e)}
+                  />
+                </li>
+              `
+            : nothing}
+          ${repos.length === 0 && !this._addingRepo
+            ? html`<p class="empty">No repositories in this workspace.</p>`
+            : nothing}
           ${repos.map(
             (repo) => html`
               <li class="dw-item" @click=${(e: Event) => { e.stopPropagation(); this._openRepo(d, repo); }}>
