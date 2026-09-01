@@ -1,10 +1,9 @@
 /**
  * <openp41ge-window-manager> — thin Window Manager window.
  *
- * Hosted by a window-manager window (windowType === "window-manager"). Lists the
- * open workspaces (from the workspace-file service) and the currently open
- * browser windows (from the main process). Selecting "Open" creates a new
- * workspace-bound window for that workspace.
+ * Hosted by a window-manager window (windowType === "window-manager"). Shows a
+ * draggable top bar and the list of open workspaces; selecting "Open" creates a
+ * new workspace-bound window for that workspace.
  */
 
 import { html, type TemplateResult } from "lit";
@@ -13,15 +12,16 @@ import { state } from "lit/decorators.js";
 import type { WorkspaceFileData } from "../../layout/types";
 import { workspaceFileService } from "../services/workspace-file-service";
 
-interface OpenWindowSummary {
-  windowId: string;
-  windowType: "workspace" | "window-manager";
-  workspacePath: string | null;
-}
+const isMac = (() => {
+  try {
+    return window.openp41ge?.platform === "darwin" || navigator.platform.startsWith("Mac");
+  } catch {
+    return false;
+  }
+})();
 
 class Openp41geWindowManager extends LitElement {
   @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
-  @state() private _openWindows: OpenWindowSummary[] = [];
   @state() private _loaded = false;
 
   connectedCallback(): void {
@@ -35,11 +35,6 @@ class Openp41geWindowManager extends LitElement {
     } catch {
       this._workspaces = [];
     }
-    try {
-      this._openWindows = await window.openp41ge.windowManager.openWindowSummaries();
-    } catch {
-      this._openWindows = [];
-    }
     this._loaded = true;
   }
 
@@ -48,29 +43,46 @@ class Openp41geWindowManager extends LitElement {
   }
 
   render(): TemplateResult {
-    const workspaceWindows = this._openWindows.filter((w) => w.windowType === "workspace");
-    const managerWindows = this._openWindows.filter((w) => w.windowType === "window-manager");
-
     return html`
       <style>
         :host {
           display: flex;
+          flex-direction: column;
           height: 100vh;
           background: var(--bg, #1e1e1e);
           color: var(--text-primary, #ddd);
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-        .wm-root {
+        /* Draggable top bar (native drag region) with a macOS traffic-light spacer. */
+        .wm-titlebar {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+          height: 32px;
+          padding-left: ${isMac ? 85 : 12}px;
+          box-sizing: border-box;
+          -webkit-app-region: drag;
+          user-select: none;
+          background: var(--bg-secondary, #252526);
+          border-bottom: 1px solid var(--divider, #333);
+        }
+        .wm-title {
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          color: var(--text-secondary, #999);
+        }
+        .wm-body {
           display: flex;
           flex: 1;
           flex-direction: column;
           padding: 20px;
-          max-width: 720px;
+          max-width: 640px;
+          width: 100%;
           margin: 0 auto;
           box-sizing: border-box;
+          overflow-y: auto;
         }
-        h1 { font-size: 18px; margin: 0 0 18px; }
-        h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary, #999); margin: 22px 0 8px; }
         ul { list-style: none; margin: 0; padding: 0; }
         li.ws-row {
           display: flex;
@@ -96,33 +108,12 @@ class Openp41geWindowManager extends LitElement {
           cursor: pointer;
         }
         button.wm-open:hover { filter: brightness(1.1); }
-        .win-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: var(--text-secondary, #999); }
-        .win-kind { text-transform: uppercase; font-size: 10px; color: var(--text-secondary, #777); }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
       </style>
-      <div class="wm-root">
-        <h1>Openp41ge — Workspaces</h1>
-
-        <h2>Open windows${this._loaded ? "" : "…"}</h2>
-        ${this._loaded && this._openWindows.length === 0
-          ? html`<p class="empty">No windows open.</p>`
-          : html`
-              <ul>
-                ${this._openWindows.map(
-                  (w) => html`
-                    <li class="win-row">
-                      <span class="win-kind">${w.windowType}</span>
-                      <span>${w.workspacePath ?? "(unbound)"}</span>
-                    </li>
-                  `,
-                )}
-              </ul>
-            `}
-        ${workspaceWindows.length
-          ? html`<p class="empty">${workspaceWindows.length} workspace window(s), ${managerWindows.length} window manager.</p>`
-          : ""}
-
-        <h2>Workspaces</h2>
+      <div class="wm-titlebar">
+        <span class="wm-title">Workspaces</span>
+      </div>
+      <div class="wm-body">
         ${this._loaded && this._workspaces.length === 0
           ? html`<p class="empty">No workspaces yet. Create one from an open workspace window.</p>`
           : html`
