@@ -27,7 +27,7 @@ import type { SystemTabController } from "../../controllers/types";
 import type { CommitSearchModel } from "../../models/commit-search-model";
 import { IpcCommitSearchModel } from "../../models/commit-search-model";
 import { workspaceFileService } from "../../services/workspace-file-service";
-import type { SearchResultCommit } from "openp41ge-git";
+import type { SearchHunk, SearchResultCommit } from "openp41ge-git";
 
 /** 250ms input debounce — search as you type without spamming IPC per key. */
 const DEBOUNCE_MS = 250;
@@ -86,6 +86,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _container: HTMLElement | null = null;
   private _expandedCommits = new Set<string>(); // "repoName<sep>shortHash"
   private _expandedFiles = new Set<string>(); // "repoName<sep>shortHash<sep>path"
+  // Changed-content hunk sub-rows (content search). Expanded keys + fetch cache
+  // keyed the same as _expandedFiles, so a re-render never refetches.
+  private _expandedHunks = new Set<string>();
+  private _hunkCache = new Map<string, SearchHunk[]>();
+  private _hunkPending = new Set<string>();
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _searchToken = 0;
   /** Last search results (cache) — expansion toggles re-render, not refetch. */
@@ -851,6 +856,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
       });
       if (token !== this._searchToken) return; // a newer search superseded this one
       this._lastCommits = commits;
+      this._expandedHunks.clear();
+      this._hunkCache.clear();
       this._renderResults(commits, query);
     } catch (err: unknown) {
       if (token !== this._searchToken) return;
@@ -1199,6 +1206,30 @@ export class CommitSearchSystemTabController implements SystemTabController {
         userSelect: "none",
       });
 
+      // Content search: each file row gains a chevron that expands the changed
+      // lines (hunks) below. Clicking the row body still opens the diff.
+      const hunksKey = this._fileKey(commit, file.path);
+      if (this._searchContent) {
+        const hunksExpanded = this._expandedHunks.has(hunksKey);
+        const expandChevron = document.createElement("openp41ge-icon");
+        expandChevron.setAttribute("size", "10");
+        expandChevron.setAttribute("name", hunksExpanded ? "chevron-down" : "chevron-right");
+        const chevWrap = document.createElement("span");
+        Object.assign(chevWrap.style, {
+          width: "14px",
+          flexShrink: "0",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+        });
+        chevWrap.appendChild(expandChevron);
+        chevWrap.addEventListener("click", (e: MouseEvent) => {
+          e.stopPropagation();
+          this._toggleFileHunks(commit, file.path);
+        });
+        row.insertBefore(chevWrap, row.firstChild);
+      }
+
       const name = document.createElement("span");
       name.title = file.path;
       Object.assign(name.style, {
@@ -1262,12 +1293,113 @@ export class CommitSearchSystemTabController implements SystemTabController {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           openFileDiff(true);
+        } else if (this._searchContent && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+          e.preventDefault();
+          this._toggleFileHunks(commit, file.path);
         }
       });
 
       out.push(row);
+
+      // Expanded hunks render as their own block directly below the file row.
+      if (this._searchContent && this._expandedHunks.has(hunksKey)) {
+        out.push(this._hunkBlock(commit, file.path));
+      }
     }
     return out;
+  }
+
+  private _fileKey(commit: SearchResultCommit, path: string): string {
+    return `${commit.repoName}:${commit.shortHash}:${path}`;
+  }
+
+  /** Toggle a file's changed-content sub-rows and lazily fetch/cache the hunks. */
+  private _toggleFileHunks(commit: SearchResultCommit, path: string): void {
+    const key = this._fileKey(commit, path);
+    if (this._expandedHunks.has(key)) {
+      this._expandedHunks.delete(key);
+    } else {
+      this._expandedHunks.add(key);
+      void this._loadFileHunks(commit, path);
+    }
+    this._rerender();
+  }
+
+  /** Fetch + cache a file's hunks (no refetch while cached or already loading). */
+  private async _loadFileHunks(commit: SearchResultCommit, path: string): Promise<void> {
+    const key = this._fileKey(commit, path);
+    if (this._hunkCache.has(key) || this._hunkPending.has(key)) return;
+    this._hunkPending.add(key);
+    this._rerender(); // show "Loading…"
+    try {
+      const hunks = await window.openp41ge.workspaceController.getCommitFileHunks(
+        commit.repoName,
+        commit.hash,
+        path,
+        this._lastQuery,
+        { regex: this._searchRegex, caseSensitive: this._searchCase },
+      );
+      this._hunkCache.set(key, hunks);
+    } catch {
+      this._hunkCache.set(key, []); // fall back to a muted "no changed lines"
+    } finally {
+      this._hunkPending.delete(key);
+      this._rerender();
+    }
+  }
+
+  /** Render a file's fetched hunks as read-only +/−/context lines. */
+  private _hunkBlock(commit: SearchResultCommit, path: string): HTMLElement {
+    const key = this._fileKey(commit, path);
+    const wrap = document.createElement("div");
+    wrap.className = "commit-hunk-block";
+    Object.assign(wrap.style, {
+      padding: "1px 10px 6px 32px",
+      fontSize: "11px",
+      fontFamily: "var(--fe-monospace-font,monospace)",
+      userSelect: "text",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word",
+    });
+
+    if (this._hunkPending.has(key)) {
+      wrap.append(this._message("Loading…", "var(--text-muted,#777)"));
+      return wrap;
+    }
+
+    const hunks = this._hunkCache.get(key) ?? [];
+    if (hunks.length === 0) {
+      wrap.append(this._message("No changed lines", "var(--text-muted,#777)"));
+      return wrap;
+    }
+
+    for (const hunk of hunks) {
+      const header = document.createElement("div");
+      header.textContent = hunk.header;
+      Object.assign(header.style, {
+        color: "var(--text-muted,#666)",
+        fontSize: "10px",
+        padding: "2px 0 1px",
+      });
+      wrap.appendChild(header);
+      for (const line of hunk.lines) {
+        const row = document.createElement("div");
+        row.className = "commit-hunk-line";
+        row.textContent =
+          line.type === "+" ? `+${line.text}` : line.type === "-" ? `-${line.text}` : line.text;
+        Object.assign(row.style, {
+          color:
+            line.type === "+"
+              ? "#3fb950"
+              : line.type === "-"
+                ? "#f85149"
+                : "var(--text-secondary,#999)",
+          whiteSpace: "pre",
+        });
+        wrap.appendChild(row);
+      }
+    }
+    return wrap;
   }
 
   // ── Match highlighting + hit context ───────────────────────────────────

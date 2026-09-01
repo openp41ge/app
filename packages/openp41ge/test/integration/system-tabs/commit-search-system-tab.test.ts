@@ -82,6 +82,9 @@ function installBridge(): { events: Events } {
         { path: "/w/innova", name: "innova", url: "git@example.com:innova.git" },
       ]),
       searchCommits: vi.fn(),
+      getCommitFileHunks: vi.fn(),
+      getCommitFileContent: vi.fn(),
+      getCommitMessage: vi.fn(),
     },
     file: { readRange: vi.fn() },
   } as unknown as typeof window.openp41ge;
@@ -610,13 +613,79 @@ describe("CommitSearchSystemTabController", () => {
     expect(events.openCommitFile.at(-1)?.detail.path).toBe("README.md");
     expect(host.querySelector(".commit-hunk-block")).toBeNull();
 
-    // Toggle on → grey becomes white; a re-search carries content:true. The
-    // content dimension only affects WHICH commits match — still no sidebar
-    // hunk content, and activation still opens the reverse diff pane.
+    // Toggle on → grey becomes white; a re-search carries content:true. A
+    // commit's changed-file-path activation still opens the reverse diff pane.
+    // Hunk sub-rows only render when a FILE row is expanded, so none exist here
+    // (the file row was activated, not expanded).
     toggle.click();
     expect(toggle.style.color).toBe("rgb(227, 227, 227)");
     await search(controller, "readme");
     expect(model.calls.at(-1)?.options).toMatchObject({ content: true });
     expect(host.querySelector(".commit-hunk-block")).toBeNull();
+  });
+
+  it("content search: file rows gain a chevron and expand into lazily-fetched hunk lines (no refetch on re-render)", async () => {
+    const getCommitFileHunks = (
+      window.openp41ge.workspaceController as unknown as { getCommitFileHunks: ReturnType<typeof vi.fn> }
+    ).getCommitFileHunks;
+    getCommitFileHunks.mockResolvedValue([
+      {
+        header: "@@ -1 +1 @@",
+        lines: [
+          { type: "-", text: "import { crashy } from 'old'" },
+          { type: "+", text: "import { stable } from 'new'" },
+          { type: " ", text: "export function open() {" },
+        ],
+      },
+    ]);
+
+    // Turn content search on, then search a term that lives in a changed line.
+    (host.querySelector<HTMLButtonElement>('[data-search-into="content"]')!).click();
+    await search(controller, "stable");
+
+    // Commits start collapsed — expand the acme result to reveal its file rows.
+    (host.querySelector<HTMLElement>("[data-commit-row]")!).click();
+    await flush();
+
+    const fileRows = [...host.querySelectorAll<HTMLElement>(".commit-file-row")];
+    const acmeApp = fileRows.find((r) => r.textContent?.includes("src/app.ts"))!;
+    expect(acmeApp).toBeTruthy();
+
+    // The content toggle is on → the file row carries an expand chevron.
+    const chevron = acmeApp.querySelector("openp41ge-icon");
+    expect(chevron).not.toBeNull();
+    expect(acmeApp.querySelector(".commit-hunk-line")).toBeNull();
+
+    // Expand → hunks are fetched and rendered as +/-/context lines.
+    chevron!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    await flush();
+
+    expect(getCommitFileHunks).toHaveBeenCalledWith(
+      "acme",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "src/app.ts",
+      "stable",
+      { regex: false, caseSensitive: false },
+    );
+    // The DOM is re-rendered on expand — re-query the rebuilt hunk block.
+    const reApp = [...host.querySelectorAll<HTMLElement>(".commit-file-row")].find((r) =>
+      r.textContent?.includes("src/app.ts"),
+    )!;
+    const hunkBlock = reApp.parentElement!.querySelector(".commit-hunk-block")!;
+    expect(hunkBlock).not.toBeNull();
+    const hunkText = hunkBlock.textContent ?? "";
+    expect(hunkText).toContain("@@ -1 +1 @@");
+    expect(hunkText).toContain("+import { stable } from 'new'");
+    expect(hunkText).toContain("-import { crashy } from 'old'");
+
+    // Re-rendering (e.g. toggling the commit) reuses the cache — no refetch.
+    const calls = getCommitFileHunks.mock.calls.length;
+    (host.querySelector<HTMLElement>("[data-commit-row]")!).click();
+    await flush();
+    (host.querySelector<HTMLElement>("[data-commit-row]")!).click();
+    await flush();
+    // The file row re-expanded (cache), so no new fetch.
+    expect(getCommitFileHunks.mock.calls.length).toBe(calls);
   });
 });
