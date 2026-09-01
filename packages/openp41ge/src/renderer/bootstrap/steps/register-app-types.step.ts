@@ -15,7 +15,6 @@ const log = createLogger("bootstrap:register-app-types");
 import {
   registerAppType,
   registerSystemTabType,
-  registerEditorSystemTabType,
 } from "../../apps/app-registry";
 import { terminalAppRegistration } from "../../apps/terminal/index";
 import { videoAppRegistration } from "../../apps/video/index";
@@ -25,7 +24,6 @@ import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { gitCommitSearchAppRegistration } from "../../apps/git-commit-search/index";
 import { commitFileDiffAppRegistration } from "../../apps/commit-file-diff/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
-import { WorkspaceManagerModal } from "../../apps/system-tabs/workspace-manager-system-tab";
 import { LogsSystemTab } from "../../apps/system-tabs/logs-overlay-tab";
 import { FileEditorSettingsSystemTab } from "../../apps/system-tabs/file-editor-settings-system-tab";
 import { explorerPlugin } from "../../apps/system-tabs/explorer-plugin";
@@ -54,26 +52,16 @@ export class RegisterAppTypesStep implements IStartupStep {
     }
 
     // Register editor system tab types (override the grid)
-    registerEditorSystemTabType({
-      appType: "workspace-manager",
-      title: "Workspaces",
-      createController: (tabId: string) => new WorkspaceManagerModal(tabId),
-    });
+    // The workspace manager is no longer an in-window surface: a workspace window
+    // is bound to a fixed workspace (no in-window switching), and the Window
+    // Manager window uses its own <openp41ge-window-manager> component rather than
+    // a workspace overlay tab. So no "workspace-manager" editor system tab type
+    // nor a "workspaces" system-overlay tab is registered here.
 
     // ── System overlay tabs ──────────────────────────────────────────
     // The system overlay is the settings/config surface: every system that
     // wants configuration or internal data registers a top-bar tab here (and
     // other packages can too, e.g. from their own startup step).
-    systemOverlayService.registerTab({
-      id: "workspaces",
-      label: "Workspaces",
-      createController: (tabId: string) => {
-        const c = new WorkspaceManagerModal(tabId);
-        if (systemOverlayService.mode === "create") c.startCreate();
-        else c.startList();
-        return c;
-      },
-    });
     systemOverlayService.registerTab({
       id: "logs",
       label: "Logs",

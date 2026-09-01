@@ -48,9 +48,14 @@ Date: 2026-09-01
       Window-manager UI now says "Open" (button/pill), uses an `isOpen` helper and
       `open` card class; comments/wordings use "open workspace". Typecheck + oxlint
       clean, 1100 tests green.
-- [ ] **Phase 4 refinement**: remove the in-window Workspaces overlay tab from a
-      workspace window (the overlay top bar still lists it) — menu + title-bar
-      switching already closed; overlay tab itself still registered.
+- [x] **Phase 4 refinement — remove in-window Workspaces overlay tab**: a workspace
+      window's system overlay top bar no longer lists "Workspaces" (its `workspaces`
+      tab + `workspace-manager` editor-system-tab type are no longer registered). The
+      Window Manager window uses its own `<openp41ge-window-manager>` component, so it
+      needs neither. The Explorer worktree-warning icon (repo status) in a workspace
+      window now routes to the Window Manager instead of opening a removed overlay.
+      Live-verified: workspace window overlay registers only `[logs, editor]`.
+      Typecheck + oxlint clean, 1100 tests green.
 
 
 

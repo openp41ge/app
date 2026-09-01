@@ -108,9 +108,17 @@ export class RegisterIpcListenersStep implements IStartupStep {
     });
 
     // ── Explorer worktree warning icon → Workspaces overlay at that repo ──
+    // A workspace window has no Workspaces overlay, so this routes to the
+    // Window Manager (which owns workspace + repo status). A window-manager
+    // window opens the overlay tab directly.
     document.addEventListener("openp41ge:focus-workspace-repo", ((e: Event) => {
       const repoName = (e as CustomEvent<{ repoName?: string }>).detail?.repoName;
-      if (repoName) focusRepoInWorkspaces(repoName);
+      if (!repoName) return;
+      if (context.windowType === "window-manager") {
+        focusRepoInWorkspaces(repoName);
+      } else {
+        routeToWindowManager();
+      }
     }) as EventListener);
 
     log.info("IPC listeners registered");
