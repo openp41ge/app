@@ -336,8 +336,20 @@ export class Openp41geApplication {
   // ── Step 7-8: Window + Menu (after app.whenReady) ─────────────────────
 
   private _createInitialWindow(): void {
-    const ws = this.dispatcher.getWorkspace();
-    createOpenp41geWindow(ws.windows[0].id, true);
+    const workspaceArg = parseWorkspaceLaunchArg(process.argv);
+    if (workspaceArg) {
+      // A workspace was provided as a launch argument — open (and bind) a
+      // workspace window. Restoring the file's session is a later phase.
+      const ws = this.dispatcher.getWorkspace();
+      createOpenp41geWindow(ws.windows[0].id, true, undefined, undefined, undefined, {
+        windowType: "workspace",
+        workspacePath: workspaceArg,
+      });
+    } else {
+      // No workspace argument — start at the Window Manager so the user picks
+      // or creates a workspace.
+      openWindowManager();
+    }
   }
 
   private _setupMenu(): void {
@@ -494,17 +506,21 @@ export class Openp41geApplication {
 
   private _registerAppEvents(): void {
     app.on("window-all-closed", () => {
-      if (process.env.OPENP41GE_E2E_TEST) {
-        app.quit();
-      } else if (process.platform !== "darwin") {
-        promptQuit();
-      }
+      // Exit when the last window closes (window-manager or workspace).
+      app.quit();
     });
 
     app.on("activate", () => {
-      if (openp41geWindows.size === 0) {
+      if (openp41geWindows.size > 0) return;
+      const workspaceArg = parseWorkspaceLaunchArg(process.argv);
+      if (workspaceArg) {
         const ws = this.dispatcher.getWorkspace();
-        createOpenp41geWindow(ws.windows[0].id, true);
+        createOpenp41geWindow(ws.windows[0].id, true, undefined, undefined, undefined, {
+          windowType: "workspace",
+          workspacePath: workspaceArg,
+        });
+      } else {
+        openWindowManager();
       }
     });
   }

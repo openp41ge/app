@@ -60,6 +60,9 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
 
     // A window-manager window hosts the workspace picker, not the grid.
     if (context.windowType === "window-manager") {
+      // Remove the empty <openp41ge-windowview> shell mounted by the bootstrap
+      // before the window kind was resolved.
+      root.querySelector("openp41ge-windowview")?.remove();
       if (!root.querySelector("openp41ge-window-manager")) {
         const el = document.createElement("openp41ge-window-manager");
         root.appendChild(el);
