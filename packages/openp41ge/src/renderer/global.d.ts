@@ -25,6 +25,8 @@ declare global {
         dispatch: (fn: string, ...args: unknown[]) => void;
         onStateUpdate: (callback: (stateJson: string) => void) => () => void;
         getWindowId: () => string | null;
+        getWindowType: () => "workspace" | "window-manager";
+        getWorkspacePath: () => string | null;
         waitForInit: () => Promise<void>;
         detachPane: (windowId: string, paneId: string, bounds?: { x: number; y: number; width: number; height: number }) => void;
         detachTab: (

@@ -19,6 +19,30 @@ const isDev = !app.isPackaged && !process.env.OPENP41GE_E2E_TEST;
 // ─── Window state ────────────────────────────────────────────────────────
 export const openp41geWindows = new Map<string, BrowserWindow>();
 
+// ─── Window type / binding ───────────────────────────────────────────────
+
+/**
+ * Kinds of window the app can host. `workspace` windows are bound to a
+ * `.openp41ge-workspace` file; `window-manager` windows list/open workspaces.
+ * Not exhaustive — future window types register via a factory (see plan).
+ */
+export type Openp41geWindowType = "workspace" | "window-manager";
+
+/** Metadata describing a created window (its kind + workspace binding). */
+export interface Openp41geWindowMeta {
+  windowType: Openp41geWindowType;
+  /** `.openp41ge-workspace` path the window is bound to (null for window-manager). */
+  workspacePath: string | null;
+}
+
+/** Tracks the type/binding of every open window, keyed by window id. */
+export const openp41geWindowMeta = new Map<string, Openp41geWindowMeta>();
+
+/** Read the metadata for an open window id, or null if it isn't tracked. */
+export function getWindowMeta(openp41geWinId: string): Openp41geWindowMeta | null {
+  return openp41geWindowMeta.get(openp41geWinId) ?? null;
+}
+
 // ─── Confirm modal state ─────────────────────────────────────────────────
 let _pendingConfirm: ((result: boolean) => void) | null = null;
 
@@ -68,8 +92,13 @@ export function createOpenp41geWindow(
   sourceWindow?: BrowserWindow,
   dropScreenX?: number,
   dropScreenY?: number,
+  meta?: Partial<Openp41geWindowMeta>,
 ): void {
   const isTest = !!process.env.OPENP41GE_E2E_TEST;
+  const windowMeta: Openp41geWindowMeta = {
+    windowType: meta?.windowType ?? "workspace",
+    workspacePath: meta?.workspacePath ?? null,
+  };
 
   // Inherit size from the source window, falling back to defaults
   let width = 1280;
@@ -124,6 +153,7 @@ export function createOpenp41geWindow(
   });
 
   openp41geWindows.set(openp41geWinId, win);
+  openp41geWindowMeta.set(openp41geWinId, windowMeta);
 
   win.webContents.on("did-finish-load", () => {
     if (_dispatcher) {
@@ -131,12 +161,15 @@ export function createOpenp41geWindow(
         windowId: openp41geWinId,
         workspace: JSON.stringify(_dispatcher.getWorkspace()),
         isDev,
+        windowType: windowMeta.windowType,
+        workspacePath: windowMeta.workspacePath,
       });
     }
   });
 
   win.on("closed", () => {
     openp41geWindows.delete(openp41geWinId);
+    openp41geWindowMeta.delete(openp41geWinId);
     if (!isMaster && _dispatcher) {
       _dispatcher.apply("closeWindow", [openp41geWinId]);
       _dispatcher.broadcast();

@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 let _windowId = null;
 let _isDev = false;
+let _windowType = "workspace";
+let _workspacePath = null;
 let _initResolve = null;
 /** Promise that resolves once openp41ge:init IPC message is received. */
 const _initPromise = new Promise((resolve) => {
@@ -12,6 +14,8 @@ const _initPromise = new Promise((resolve) => {
 ipcRenderer.on("openp41ge:init", (_event, data) => {
   _windowId = data.windowId;
   _isDev = !!data.isDev;
+  _windowType = data.windowType ?? "workspace";
+  _workspacePath = data.workspacePath ?? null;
   // Store initial workspace state for the renderer to pick up
   _initialState = data.workspace;
   if (_initResolve) {
@@ -97,6 +101,12 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
     /** Get this window's Openp41ge window ID. */
     getWindowId: () => _windowId,
+
+    /** Get this window's kind ("workspace" | "window-manager"). */
+    getWindowType: () => _windowType,
+
+    /** Get the `.openp41ge-workspace` path this window is bound to (or null). */
+    getWorkspacePath: () => _workspacePath,
 
     /**
      * Wait for the openp41ge:init IPC message (which sets windowId and initial state).
