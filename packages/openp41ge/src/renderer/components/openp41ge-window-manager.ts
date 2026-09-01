@@ -25,12 +25,6 @@ const isMac = (() => {
   }
 })();
 
-interface OpenWindowSummary {
-  windowId: string;
-  windowType: "workspace" | "window-manager";
-  workspacePath: string | null;
-}
-
 interface DrawerState {
   id: string;
   kind: "workspace" | "repo" | "worktree";
@@ -48,7 +42,6 @@ interface ClosingDrawer extends DrawerState {
 
 class Openp41geWindowManager extends LitElement {
   @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
-  @state() private _openWindows: OpenWindowSummary[] = [];
   @state() private _drawers: DrawerState[] = [];
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
@@ -73,11 +66,6 @@ class Openp41geWindowManager extends LitElement {
       this._workspaces = await workspaceFileService.listWorkspaces();
     } catch {
       this._workspaces = [];
-    }
-    try {
-      this._openWindows = await window.openp41ge.windowManager.openWindowSummaries();
-    } catch {
-      this._openWindows = [];
     }
     this._loaded = true;
   }
@@ -196,12 +184,6 @@ class Openp41geWindowManager extends LitElement {
   }
 
   render(): TemplateResult {
-    const openPaths = new Set(
-      this._openWindows
-        .filter((w) => w.windowType === "workspace" && w.workspacePath)
-        .map((w) => w.workspacePath as string),
-    );
-
     return html`
       <style>
         :host {
@@ -268,16 +250,12 @@ class Openp41geWindowManager extends LitElement {
         .ws-top { display: flex; align-items: center; gap: 8px; width: 100%; }
         .ws-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ws-meta { color: var(--text-secondary, #999); font-size: 12px; text-align: left; }
-        .wm-opened {
+        /* Right-facing drill-in chevron, vertically centred in the card row. */
+        .ws-chevron {
           flex-shrink: 0;
-          border-radius: 999px;
-          padding: 3px 10px;
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--text-secondary, #999);
-          background: var(--bg-active, #37373d);
-          user-select: none;
-          white-space: nowrap;
+          display: block;
+          align-self: center;
+          color: var(--accent, #569cd6);
         }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
         /* ── Drawer ─────────────────────────────────────────────── */
@@ -408,9 +386,7 @@ class Openp41geWindowManager extends LitElement {
                         <li class="ws-row" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspace(w); }}>
                           <div class="ws-top">
                             <span class="ws-name">${name}</span>
-                            ${openPaths.has(w.filePath)
-                              ? html`<span class="wm-opened">Opened</span>`
-                              : nothing}
+                            <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
                           </div>
                           <div class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</div>
                         </li>
