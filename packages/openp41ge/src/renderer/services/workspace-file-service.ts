@@ -32,6 +32,8 @@ export function deriveRepoName(url: string): string {
     .replace(/^git@/, "")
     .replace(/\.git$/, "");
   const parts = cleaned.split(/[/:]/);
+  // A bare name (no host separator) is kept as-is, not turned into "name/name".
+  if (parts.length === 1) return cleaned;
   const provider = parts[0];
   const repoName = parts[parts.length - 1];
   const orgPath = parts.slice(1, -1).join("/");

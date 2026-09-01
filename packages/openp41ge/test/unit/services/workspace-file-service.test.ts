@@ -211,6 +211,9 @@ describe("deriveRepoName", () => {
   it("handles bare hosts", () => {
     expect(deriveRepoName("https://github.com/widget")).toBe("github.com/widget");
   });
+  it("leaves a bare single-segment name unchanged", () => {
+    expect(deriveRepoName("test")).toBe("test");
+  });
 });
 
 describe("WorkspaceFileService activation recency stamping", () => {
