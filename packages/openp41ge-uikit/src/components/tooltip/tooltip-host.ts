@@ -33,10 +33,13 @@ export class Openp41geTooltipHost extends HTMLElement {
   private _content: TooltipContent | null = null;
   private _shown = false;
   private _seq = 0;
-  private _token = 0;
+  // True once hide() has been requested, so a pending reveal (still awaiting
+  // the async Lit paint) knows to bail instead of showing after the pointer left.
+  private _dismissed = false;
   private _showTimer: ReturnType<typeof setTimeout> | null = null;
   private _hideTimer: ReturnType<typeof setTimeout> | null = null;
   private _fadeTimer: ReturnType<typeof setTimeout> | null = null;
+  private _fadeInTimer: ReturnType<typeof setTimeout> | null = null;
   private _onScroll = (): void => this._repositionOrHide();
   private _onResize = (): void => this._repositionOrHide();
 
@@ -59,7 +62,7 @@ export class Openp41geTooltipHost extends HTMLElement {
   }
 
   show(target: HTMLElement, content: TooltipContent): void {
-    this._token += 1;
+    this._dismissed = false;
     this._target = target;
     this._content = content;
     if (this._hideTimer) {
@@ -70,29 +73,37 @@ export class Openp41geTooltipHost extends HTMLElement {
       clearTimeout(this._fadeTimer);
       this._fadeTimer = null;
     }
+    if (this._fadeInTimer) {
+      clearTimeout(this._fadeInTimer);
+      this._fadeInTimer = null;
+    }
     // Mouse entered the same target that is already shown (dynamic content,
     // e.g. "Close/Open left sidebar") — re-paint and reposition in place.
     if (this._shown && this._popup && this._popupType === content.type) {
-      void this._paintPopup();
+      void this._paintPopup().then(() => {
+        this._fade(this._popup!, 1, undefined, true);
+      });
       return;
     }
     if (this._showTimer) clearTimeout(this._showTimer);
-    const tok = this._token;
     this._showTimer = setTimeout(() => {
       this._showTimer = null;
-      if (tok !== this._token) return;
-      void this._reveal();
+      this._reveal();
     }, SHOW_DELAY);
   }
 
   hide(): void {
-    this._token += 1;
+    this._dismissed = true;
     if (this._showTimer) {
       clearTimeout(this._showTimer);
       this._showTimer = null;
     }
     if (!this._shown) return;
     if (this._fadeTimer) clearTimeout(this._fadeTimer);
+    if (this._fadeInTimer) {
+      clearTimeout(this._fadeInTimer);
+      this._fadeInTimer = null;
+    }
     if (this._hideTimer) clearTimeout(this._hideTimer);
     this._hideTimer = setTimeout(() => {
       this._hideTimer = null;
@@ -111,21 +122,31 @@ export class Openp41geTooltipHost extends HTMLElement {
     if (this._showTimer) clearTimeout(this._showTimer);
     if (this._hideTimer) clearTimeout(this._hideTimer);
     if (this._fadeTimer) clearTimeout(this._fadeTimer);
+    if (this._fadeInTimer) clearTimeout(this._fadeInTimer);
   }
 
   // ── Show ────────────────────────────────────────────────────────────
 
   private _reveal(): void {
-    if (!this._content || !this._target) return;
+    if (!this._content || !this._target || this._dismissed) return;
     const popup = this._ensurePopup(this._content.type);
-    const tok = this._token;
+    // Show the box at opacity 0 FIRST (so it is measurable — a display:none
+    // popup reports offsetWidth/Height 0, which would defeat the horizontal
+    // clamp and the bottom-edge flip). Then position, and fade in on the next
+    // frame so the opacity-0 frame paints before the transition starts.
+    popup.style.display = "";
+    popup.style.opacity = "0";
+    // No CSS transition — opacity is driven by deterministic JS steps (below),
+    // since a transition armed on a just-revealed element (display:none →
+    // block) is unreliable: it can freeze at its start value and leave the
+    // tooltip permanently at opacity 0.
+    popup.style.transition = "none";
     void this._paintPopup().then(() => {
-      if (tok !== this._token || !this._target) return;
-      popup.style.display = "";
-      popup.style.opacity = "1";
+      if (this._dismissed || !this._target || !popup.isConnected) return;
       this._shown = true;
       this._target!.setAttribute("aria-describedby", popup.id);
       this._wireReposition();
+      this._fade(popup, 1, undefined, true);
     });
   }
 
@@ -159,7 +180,7 @@ export class Openp41geTooltipHost extends HTMLElement {
       pointerEvents: "none",
       display: "none",
       opacity: "0",
-      transition: `opacity ${FADE_MS}ms ease`,
+      transition: "none",
       maxWidth: "380px",
     });
     this.appendChild(this._popup);
@@ -170,15 +191,60 @@ export class Openp41geTooltipHost extends HTMLElement {
 
   private _dismiss(): void {
     if (!this._popup) return;
+    const popup = this._popup;
+    if (this._fadeInTimer) {
+      clearTimeout(this._fadeInTimer);
+      this._fadeInTimer = null;
+    }
+    if (this._fadeTimer) {
+      clearTimeout(this._fadeTimer);
+      this._fadeTimer = null;
+    }
     this._target?.removeAttribute("aria-describedby");
     this._teardownReposition();
-    this._popup.style.opacity = "0";
-    this._fadeTimer = setTimeout(() => {
-      this._fadeTimer = null;
-      if (this._popup) this._popup.style.display = "none";
+    this._fade(popup, 0, () => {
+      popup.style.display = "none";
       this._shown = false;
       this._target = null;
-    }, FADE_MS);
+    });
+  }
+
+  // ── Fade ────────────────────────────────────────────────────────────
+
+  /**
+   * Drive opacity from its current inline value to `to` over FADE_MS using
+   * deterministic setTimeout steps (16ms ≈ one frame), instead of a CSS
+   * transition. CSS transitions on a just-revealed popup can freeze at their
+   * start value in some compositors, leaving the tooltip permanently invisible;
+   * stepping `style.opacity` is reflected immediately and always settles at
+   * `to`. `fadeIn` selects which timer slot owns the loop so a hide can cancel
+   * a fade-in (and vice-versa).
+   */
+  private _fade(popup: TooltipPanel, to: number, onDone?: () => void, fadeIn = false): void {
+    const from = parseFloat(popup.style.opacity || "1");
+    if (from === to) {
+      onDone?.();
+      return;
+    }
+    const start = Date.now();
+    const step = (): void => {
+      if (fadeIn && this._dismissed) return; // cancelled — pointer left
+      const p = Math.min((Date.now() - start) / FADE_MS, 1);
+      popup.style.opacity = String(from + (to - from) * p);
+      if (p < 1) {
+        this._scheduleFade(step, fadeIn);
+      } else {
+        popup.style.opacity = String(to);
+        onDone?.();
+      }
+    };
+    this._scheduleFade(step, fadeIn);
+  }
+
+  private _scheduleFade(step: () => void, fadeIn: boolean): void {
+    const handle = setTimeout(step, 16);
+    if (fadeIn) this._fadeInTimer = handle;
+    else this._fadeTimer = handle;
   }
 
   // ── Positioning ─────────────────────────────────────────────────────
@@ -191,7 +257,8 @@ export class Openp41geTooltipHost extends HTMLElement {
     const vh = window.innerHeight;
 
     let top = tr.bottom + GAP;
-    if (top + ph + MARGIN > vh) top = tr.top - GAP - ph; // flip above near bottom edge
+    const below = top + ph + MARGIN <= vh;
+    if (!below) top = tr.top - GAP - ph; // flip above near bottom edge
     if (top < MARGIN) top = MARGIN;
 
     let left = tr.left;
@@ -200,6 +267,10 @@ export class Openp41geTooltipHost extends HTMLElement {
 
     popup.style.left = `${left}px`;
     popup.style.top = `${top}px`;
+    // Orients the tail and aligns it with the target's horizontal centre.
+    popup.setAttribute("data-placement", below ? "below" : "above");
+    const tailLeft = tr.left + tr.width / 2 - left;
+    popup.style.setProperty("--tt-tail-left", `${Math.round(tailLeft)}px`);
   }
 
   private _wireReposition(): void {

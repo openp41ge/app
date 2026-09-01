@@ -83,14 +83,19 @@ describe("Openp41geTooltipHost", () => {
     // Nothing before the show delay.
     expect(host.querySelector("openp41ge-tooltip-detail")).toBeNull();
 
-    await vi.advanceTimersByTimeAsync(120);
+    await vi.advanceTimersByTimeAsync(220);
     await Promise.resolve();
 
     const popup = host.querySelector("openp41ge-tooltip-detail");
     expect(popup).not.toBeNull();
     expect(popup!.getAttribute("role")).toBe("tooltip");
     expect(target.getAttribute("aria-describedby")).toBe(popup!.id);
-    expect(popup!.style.opacity).toBe("1");
+    expect(popup!.style.opacity).toBe("1"); // fade-in settles at 1
+    // Fade is driven by deterministic JS steps, not a CSS transition.
+    expect(popup!.style.transition).toBe("none");
+    // Tail: placement + target-centre offset (target centre 130 - popup left 100).
+    expect(popup!.getAttribute("data-placement")).toBe("below");
+    expect(popup!.style.getPropertyValue("--tt-tail-left")).toBe("30px");
   });
 
   test("hide fades out, clears aria-describedby, and hides after the fade", async () => {
