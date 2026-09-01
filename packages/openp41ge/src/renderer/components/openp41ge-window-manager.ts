@@ -207,6 +207,13 @@ class Openp41geWindowManager extends LitElement {
         .filter((w) => w.windowType === "workspace" && w.workspacePath)
         .map((w) => w.workspacePath as string),
     );
+    // Live window count per open workspace path.
+    const windowCounts = new Map<string, number>();
+    for (const w of this._openWindows) {
+      if (w.windowType === "workspace" && w.workspacePath) {
+        windowCounts.set(w.workspacePath, (windowCounts.get(w.workspacePath) ?? 0) + 1);
+      }
+    }
 
     return html`
       <style>
@@ -279,8 +286,9 @@ class Openp41geWindowManager extends LitElement {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          padding-right: 74px;
+          padding-right: 24px;
         }
+        .ws-row--open .ws-name { padding-right: 152px; }
         .ws-meta { color: var(--text-secondary, #999); font-size: 12px; text-align: left; }
         /* Right-side group (Open pill + drill-in chevron), centred in the card. */
         .ws-right {
@@ -291,6 +299,17 @@ class Openp41geWindowManager extends LitElement {
           display: flex;
           align-items: center;
           gap: 8px;
+        }
+        .ws-window-pill {
+          border-radius: 999px;
+          padding: 2px 9px;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: inherit;
+          color: var(--text-secondary, #999);
+          background: var(--bg-active, #37373d);
+          white-space: nowrap;
+          user-select: none;
         }
         .ws-open-pill {
           border-radius: 999px;
@@ -433,15 +452,21 @@ class Openp41geWindowManager extends LitElement {
                         (n, r) => n + (r.worktrees?.length ?? 0),
                         0,
                       );
-                      const windows = w.data.windows?.length ?? 0;
+                      const isOpen = openPaths.has(w.filePath);
+                      const windows = windowCounts.get(w.filePath) ?? 0;
                       return html`
-                        <li class="ws-row" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspace(w); }}>
+                        <li class="ws-row ${isOpen ? "ws-row--open" : ""}" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspace(w); }}>
                           <div class="ws-top">
                             <span class="ws-name">${name}</span>
                           </div>
-                          <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")} · ${this._countLabel(windows, "window")}</div>
+                          <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>
                           <div class="ws-right">
-                            ${openPaths.has(w.filePath) ? html`<span class="ws-open-pill">Open</span>` : nothing}
+                            ${isOpen
+                              ? html`
+                                  <span class="ws-window-pill">${this._countLabel(windows, "window")}</span>
+                                  <span class="ws-open-pill">Open</span>
+                                `
+                              : nothing}
                             <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
                           </div>
                         </li>
