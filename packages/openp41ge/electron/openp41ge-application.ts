@@ -244,19 +244,10 @@ export class Openp41geApplication {
     setTabNames(this.tabNames);
 
     // Window-manager workspace windows are opened with a workspace binding. Bind
-    // the store to that path so mutations save to its file.
+    // the store to that path so mutations save to its file, and restore the
+    // workspace's saved session (windows/grids/sidebars) when it has one.
     setOpenWorkspaceWindowHandler((workspacePath, source) => {
-      this.workspaceSessionStore.setCurrentWorkspacePath(workspacePath);
-      this.dispatcher.apply("newWindow", []);
-      const ws = this.dispatcher.getWorkspace();
-      const newWin = ws.windows[ws.windows.length - 1];
-      if (newWin) {
-        this.dispatcher.broadcast();
-        createOpenp41geWindow(newWin.id, false, source, undefined, undefined, {
-          windowType: "workspace",
-          workspacePath,
-        });
-      }
+      this._openWorkspaceSession(workspacePath, source);
     });
   }
 
@@ -337,15 +328,44 @@ export class Openp41geApplication {
 
   // ── Step 7-8: Window + Menu (after app.whenReady) ─────────────────────
 
+  // ── Step 7-8: Window + Menu (after app.whenReady) ─────────────────────
+
+  /**
+   * Open a workspace: load its session (windows/grids/sidebars) into the
+   * dispatcher and create a bound window for each restored window. Falls back
+   * to a single fresh workspace window when the file has no session.
+   */
+  private _openWorkspaceSession(workspacePath: string, source?: BrowserWindow): void {
+    this.workspaceSessionStore.setCurrentWorkspacePath(workspacePath);
+    const restored = this.workspaceSessionStore.load(workspacePath);
+    if (restored && restored.windows.length > 0) {
+      this.dispatcher.setWorkspace(restored);
+      this.dispatcher.broadcast();
+      for (const win of restored.windows) {
+        createOpenp41geWindow(win.id, false, undefined, undefined, undefined, {
+          windowType: "workspace",
+          workspacePath,
+        });
+      }
+    } else {
+      // Fresh workspace window bound to the path.
+      this.dispatcher.apply("newWindow", []);
+      const ws = this.dispatcher.getWorkspace();
+      const newWin = ws.windows[ws.windows.length - 1];
+      if (newWin) {
+        this.dispatcher.broadcast();
+        createOpenp41geWindow(newWin.id, false, source, undefined, undefined, {
+          windowType: "workspace",
+          workspacePath,
+        });
+      }
+    }
+  }
+
   private _createInitialWindow(): void {
     const workspaceArg = parseWorkspaceLaunchArg(process.argv);
     if (workspaceArg) {
-      this.workspaceSessionStore.setCurrentWorkspacePath(workspaceArg);
-      const ws = this.dispatcher.getWorkspace();
-      createOpenp41geWindow(ws.windows[0].id, true, undefined, undefined, undefined, {
-        windowType: "workspace",
-        workspacePath: workspaceArg,
-      });
+      this._openWorkspaceSession(workspaceArg);
     } else {
       // No workspace argument — start at the Window Manager so the user picks
       // or creates a workspace.
@@ -538,12 +558,7 @@ export class Openp41geApplication {
       if (openp41geWindows.size > 0) return;
       const workspaceArg = parseWorkspaceLaunchArg(process.argv);
       if (workspaceArg) {
-        this.workspaceSessionStore.setCurrentWorkspacePath(workspaceArg);
-        const ws = this.dispatcher.getWorkspace();
-        createOpenp41geWindow(ws.windows[0].id, true, undefined, undefined, undefined, {
-          windowType: "workspace",
-          workspacePath: workspaceArg,
-        });
+        this._openWorkspaceSession(workspaceArg);
       } else {
         openWindowManager();
       }
