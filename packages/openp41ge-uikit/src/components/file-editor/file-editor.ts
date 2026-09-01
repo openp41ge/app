@@ -634,7 +634,7 @@ export class FileEditorElement extends LitElement {
         >
           <div
             class="fe-viewport-container"
-            style="flex:1;display:flex;flex-direction:column;min-width:0;"
+            style="flex:1;display:flex;flex-direction:column;min-width:0;position:relative;"
           ></div>
         </div>
         <fe-status-bar></fe-status-bar>
@@ -877,21 +877,25 @@ export class FileEditorElement extends LitElement {
     this._scrollContentEl.appendChild(this._textRegionEl);
 
     // Custom horizontal scrollbar — confined to the CONTENT area so its track
-    // does NOT start underneath the pinned line-number columns. It is a direct
-    // child of the viewport (absolute → stays fixed at the bottom of the
-    // scrollport, it never scrolls with content) and maps 1:1 onto the native
-    // scrollLeft/scrollWidth/clientWidth held by the viewport, so trackpad /
-    // Shift+wheel still scroll (the native horizontal bar is hidden in CSS).
+    // does NOT start underneath the pinned line-number columns. It is NOT a
+    // child of the scroll container (the viewport scrolls, so an absolutely-
+    // positioned child there would slide with the content). Instead it lives in
+    // the non-scrolling .fe-viewport-container (position:relative) and stays
+    // pinned to the viewport's bottom edge while the content scrolls. It maps
+    // 1:1 onto the native scrollLeft/scrollWidth/clientWidth held by the
+    // viewport, so trackpad / Shift+wheel still scroll (the native horizontal
+    // bar is hidden in CSS).
     this._hScrollTrack = document.createElement("div");
     this._hScrollTrack.className = "fe-hscroll";
     this._hScrollTrack.style.cssText =
       "position:absolute;left:0;right:0;bottom:0;height:10px;z-index:8;display:none;user-select:none;";
     this._hScrollThumb = document.createElement("div");
     this._hScrollThumb.className = "fe-hscroll-thumb";
+    // Square corners (match the native bar). No border-radius.
     this._hScrollThumb.style.cssText =
-      "position:absolute;top:0;bottom:0;border-radius:5px;cursor:pointer;touch-action:none;";
+      "position:absolute;top:0;bottom:0;cursor:pointer;touch-action:none;";
     this._hScrollTrack.appendChild(this._hScrollThumb);
-    this._viewportEl.appendChild(this._hScrollTrack);
+    viewportContainer.appendChild(this._hScrollTrack);
     this._hScrollTrack.addEventListener("pointerdown", this._onHScrollPointerDown);
     this._viewportEl.addEventListener("scroll", this._onViewportScroll);
 

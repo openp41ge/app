@@ -325,12 +325,18 @@ describe("file-editor inline commit-diff mode", () => {
     expect(gutter2.classList.contains("line-number-hover")).toBe(false);
   });
 
-  test("the custom horizontal scrollbar lives inside the viewport, hidden until content overflows", async () => {
+  test("the custom horizontal scrollbar lives OUTSIDE the scroll viewport (so it stays pinned), hidden until content overflows", async () => {
     const el = await mount();
     const vp = el._viewportEl;
-    const track = vp.querySelector(".fe-hscroll");
+    const track = el.querySelector(".fe-hscroll");
     expect(track).not.toBeNull();
+    // It is NOT a child of the scrolling viewport — an absolute child there
+    // would slide with the content. It must live in the non-scrolling
+    // container so it stays pinned to the viewport's bottom edge.
+    expect(vp.querySelector(".fe-hscroll")).toBeNull();
     expect(track.querySelector(".fe-hscroll-thumb")).not.toBeNull();
+    // Square thumb (no rounded corners), matching the native bar.
+    expect((track.querySelector(".fe-hscroll-thumb") as HTMLElement).style.borderRadius).toBe("");
     // Hidden by default (jsdom has no layout → no overflow).
     expect(track.style.display).toBe("none");
     // The NATIVE horizontal scrollbar is disabled in CSS; the custom bar is styled.
