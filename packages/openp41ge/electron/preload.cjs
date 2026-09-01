@@ -495,6 +495,13 @@ contextBridge.exposeInMainWorld("openp41ge", {
     return () => ipcRenderer.removeListener("menu:new-workspace", handler);
   },
 
+  /** Listen for File > New Window (placeholder) menu action. */
+  onNewWindowPlaceholder: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu:new-window-placeholder", handler);
+    return () => ipcRenderer.removeListener("menu:new-window-placeholder", handler);
+  },
+
   /** Listen for File > Open Workspace... menu action. */
   onOpenWorkspace: (callback) => {
     const handler = () => callback();

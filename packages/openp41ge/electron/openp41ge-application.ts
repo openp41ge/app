@@ -30,6 +30,7 @@ import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-a
 // ─── Window manager ──────────────────────────────────────────────────────
 import {
   openp41geWindows,
+  openp41geWindowMeta,
   setDispatcher,
   setTabNames,
   createOpenp41geWindow,
@@ -388,14 +389,9 @@ export class Openp41geApplication {
             label: "New Window",
             accelerator: "CmdOrCtrl+N",
             click: () => {
-              this.dispatcher.apply("newWindow", []);
-              const ws = this.dispatcher.getWorkspace();
-              const newWin = ws.windows[ws.windows.length - 1];
-              if (newWin) {
-                this.dispatcher.broadcast();
-                const src = BrowserWindow.getFocusedWindow() ?? undefined;
-                createOpenp41geWindow(newWin.id, false, src);
-              }
+              // Placeholder: creating a new window is not available yet. It will
+              // later become "new tab + tab picker" (see plan).
+              BrowserWindow.getFocusedWindow()?.webContents.send("menu:new-window-placeholder");
             },
           },
           { type: "separator" },
@@ -489,6 +485,34 @@ export class Openp41geApplication {
         { role: "minimize" as const },
         { role: "close" as const },
         { type: "separator" as const },
+        {
+          label: "Add Workspace Window",
+          click: () => {
+            const src = BrowserWindow.getFocusedWindow() ?? undefined;
+            // Bind the new window to the focused window's workspace binding
+            // (fresh central grid — a workspace window of the same workspace).
+            let workspacePath: string | null = null;
+            if (src) {
+              for (const [id, bw] of openp41geWindows) {
+                if (bw === src) {
+                  workspacePath = openp41geWindowMeta.get(id)?.workspacePath ?? null;
+                  break;
+                }
+              }
+            }
+            this.workspaceSessionStore.setCurrentWorkspacePath(workspacePath);
+            this.dispatcher.apply("newWindow", []);
+            const ws = this.dispatcher.getWorkspace();
+            const newWin = ws.windows[ws.windows.length - 1];
+            if (newWin) {
+              this.dispatcher.broadcast();
+              createOpenp41geWindow(newWin.id, false, src, undefined, undefined, {
+                windowType: "workspace",
+                workspacePath,
+              });
+            }
+          },
+        },
         {
           label: "Show Window Manager",
           click: () => {
