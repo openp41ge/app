@@ -16,18 +16,38 @@ Date: 2026-09-01
       (set/side/open) + per-window `sidebar` (activeViewId,width,activeLeft/RightTab).
       All `system-tab-operations` moved to shared sidebar; `stripPreviewTabs` +
       `migrateWorkspace` lift legacy per-window fields; renderer reads shared
-      sidebar. Live-verified (Explorer renders in shared right sidebar). Tests 1091.
+      sidebar. Live-verified. Tests 1091.
 - [x] **Phase 3a — renderer window-kind awareness (7628186)**: `StartupContext`
       gains `windowType`/`workspacePath`; new `ResolveWindowKindStep` reads
-      `getWindowType()`/`getWorkspacePath()` defensively and runs before state
-      fetch. Default stays "workspace" (no behaviour change). Tests 1096.
-- [ ] **Phase 3b — window-manager window**: a BrowserWindow that is NOT bound to a
-      workspace `Window` (decouple window from layout entry), a thin workspace-picker
-      view for it, and startup flipping to a window-manager window when no workspace
-      arg is present. Largest remaining architectural pivot.
-- [ ] **Phase 1b — per-workspace save** (replace global `workspace.json`): needs
-      workspace-scoped runtime state, so follows 3b.
-- [ ] Phases 4-7 (remove workspace systems, menus, restore, terminology).
+      `getWindowType()`/`getWorkspacePath()` defensively (awaits init) and runs
+      before state fetch. Tests 1096.
+- [x] **Phase 3b — window-manager window (f4be16d)**: `createWindowManagerWindow`/
+      `openWindowManager`/`getOpenWindowSummaries`; window-manager-handlers IPC;
+      preload `window.openp41ge.windowManager`; renderer `openp41ge-window-manager`
+      panel + boot branch; `closeOrphanedWindows` skips window-manager windows.
+      Live-verified.
+- [x] **Phase 3b/7 — startup + quit (245813a)**: startup shows Window Manager when
+      no `--workspace` arg; `activate` mirrors it; last window close → quit.
+      Removes the bootstrap's stray windowview in window-manager windows.
+- [x] **Phase 1b — per-workspace save (dcd2193)**: `FileWorkspaceSessionStore`
+      (session save/load into the bound `.openp41ge-workspace` file); dispatcher
+      save handler writes to the bound file; removed global `workspace.json`.
+      Live-verified (file carries version 2 + windows + sharedSidebars). Tests 1100.
+- [x] **Phase 6/4 — menus (435e462)**: File→New Window placeholder; Window→Add
+      Workspace Window; New/Open/Save Workspaces + View>Workspaces route to the
+      Window Manager in a workspace window.
+- [x] **Phase 4 — bind active workspace (7bb0aef)**: workspace windows load their
+      bound workspace (`loadPath`); title-bar workspace button becomes an inert
+      label (no in-window switching). Live-verified (title shows "Two", no pointer).
+- [x] **Phase 7 — restore (1f2f80a)**: `_openWorkspaceSession` loads the file's
+      session and opens a bound window per restored window. Live-verified.
+- [ ] **Terminology (Phase 7)**: rename `activeWorkspace` → `openWorkspace` and
+      `WorkspaceFileService.activeFilePath`/`activeData`/`activeWorkspaceName` and
+      consumers. Broad API rename across the renderer + tests — deferred (green
+      suite, low functional value, higher regression risk).
+- [ ] **Phase 4 refinement**: remove the in-window Workspaces overlay tab from a
+      workspace window (the overlay top bar still lists it) — menu + title-bar
+      switching already closed; overlay tab itself still registered.
 
 
 
