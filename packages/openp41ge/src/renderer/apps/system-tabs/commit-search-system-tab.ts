@@ -28,6 +28,7 @@ import type { CommitSearchModel } from "../../models/commit-search-model";
 import { IpcCommitSearchModel } from "../../models/commit-search-model";
 import { workspaceFileService } from "../../services/workspace-file-service";
 import type { SearchResultCommit } from "openp41ge-git";
+import { tooltipController } from "openp41ge-uikit";
 
 /** 250ms input debounce — search as you type without spamming IPC per key. */
 const DEBOUNCE_MS = 250;
@@ -76,6 +77,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
   // Search depth limit — one active option among the icon row (default 5K).
   private _maxCount = 5000;
   private _limitOptions: HTMLButtonElement[] = [];
+  /** Buttons that received a custom tooltip — detached on teardown. */
+  private _tooltipTargets: Element[] = [];
   private _results: HTMLElement | null = null;
   private _footer: HTMLElement | null = null;
 
@@ -166,7 +169,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
       const btn = document.createElement("button");
       btn.type = "button";
       (btn.dataset as Record<string, string>)[key] = value; // camelCase → data-kebab attr
-      btn.title = title;
       btn.innerHTML = icon; // SVG uses currentColor — grey off, white on.
       Object.assign(btn.style, {
         display: "inline-flex",
@@ -181,6 +183,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
         borderRadius: "4px",
         color: "var(--text-secondary,#888)",
       });
+      this._attachTooltip(btn, title);
       return btn;
     };
     // Changed-file-path search lives in the filter box below; the search row
@@ -260,7 +263,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.dataset.filterIcon = key;
-      btn.title = title;
       btn.innerHTML = icon; // SVG uses currentColor — grey off, white on.
       Object.assign(btn.style, {
         display: "inline-flex",
@@ -275,6 +277,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
         borderRadius: "4px",
         color: "var(--text-secondary,#888)",
       });
+      this._attachTooltip(btn, title);
       return btn;
     };
     const repoFilterIcon = makeFilterToggle("repo", FILTER_ICON, "Repo filter");
@@ -292,7 +295,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.dataset.limitOption = String(o.value);
-      btn.title = `Depth limit: ${o.label} newest commits`;
       btn.innerHTML = o.svg; // currentColor — grey idle, white when active.
       Object.assign(btn.style, {
         display: "inline-flex",
@@ -307,6 +309,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
         borderRadius: "4px",
         color: "var(--text-secondary,#888)",
       });
+      this._attachTooltip(btn, `Depth limit: ${o.label} newest commits`);
       btn.addEventListener("click", () => {
         if (o.value === this._maxCount) return;
         this._maxCount = o.value;
@@ -351,7 +354,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     const repoFilter = document.createElement("button");
     repoFilter.type = "button";
     repoFilter.dataset.repoFilter = "";
-    repoFilter.title = "Filter by repo";
+    this._attachTooltip(repoFilter, "Filter by repo");
     Object.assign(repoFilter.style, {
       width: "100%",
       boxSizing: "border-box",
@@ -796,7 +799,10 @@ export class CommitSearchSystemTabController implements SystemTabController {
       // Swap between the 'match case on' and 'match case off' glyphs.
       this._caseToggle.innerHTML = this._searchCase ? CASE_ON_ICON : CASE_OFF_ICON;
       this._caseToggle.style.color = this._searchCase ? "#e3e3e3" : "var(--text-secondary,#888)";
-      this._caseToggle.title = this._searchCase ? "Match case (on)" : "Match case (off)";
+      this._attachTooltip(
+        this._caseToggle,
+        this._searchCase ? "Match case (on)" : "Match case (off)",
+      );
     }
   }
 
@@ -891,6 +897,12 @@ export class CommitSearchSystemTabController implements SystemTabController {
     if (this._footer) this._footer.textContent = "";
   }
 
+  /** Register a custom tooltip on an imperative button (replaces native `title`). */
+  private _attachTooltip(target: Element, text: string): void {
+    tooltipController.attach(target, { type: "simple", text });
+    if (!this._tooltipTargets.includes(target)) this._tooltipTargets.push(target);
+  }
+
   /** Remove the current view (placeholder or full UI) and release its wiring. */
   private _teardownView(): void {
     if (this._debounceTimer) {
@@ -905,6 +917,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
       document.removeEventListener("pointerdown", this._onRepoDocPointerDown);
       this._onRepoDocPointerDown = null;
     }
+    for (const el of this._tooltipTargets) tooltipController.detach(el);
+    this._tooltipTargets = [];
     this._searchToken += 1; // cancel any in-flight search
     if (this._viewElement && this._viewElement.parentNode) {
       this._viewElement.parentNode.removeChild(this._viewElement);

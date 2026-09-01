@@ -210,6 +210,33 @@ describe("CommitSearchSystemTabController", () => {
     expect(sep!.nextElementSibling?.hasAttribute("data-limit-option")).toBe(true);
   });
 
+  it("search-config buttons use custom tooltips, not a native title attr", async () => {
+    const find = (sel: string) => host.querySelector<HTMLButtonElement>(sel)!;
+    const configButtons = [
+      find('[data-search-into="files"]'),
+      find('[data-search-into="content"]'),
+      find('[data-search-regex]'),
+      find('[data-search-case]'),
+      find('[data-filter-icon="repo"]'),
+      find('[data-limit-option="5000"]'),
+      find('[data-repo-filter]'),
+    ];
+    // No native tooltip anywhere on the config controls — the custom system
+    // replaces it.
+    for (const b of configButtons) expect(b.hasAttribute("title")).toBe(false);
+
+    // Hovering a toggle surfaces the custom tooltip with its descriptive label.
+    const caseBtn = find('[data-search-case]');
+    caseBtn.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 180));
+    const popup =
+      document.querySelector("openp41ge-tooltip-host")?.querySelector('[role="tooltip"]');
+    expect(popup).not.toBeNull();
+    expect(popup?.querySelector(".tt-panel")?.textContent).toContain("Match case");
+    caseBtn.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 100));
+  });
+
   it("depth-limit options are exclusive: clicking one activates it and searches with that maxCount", async () => {
     await search(controller, "readme");
     const model = controller["_searchModel"] as TestCommitSearchModel;
