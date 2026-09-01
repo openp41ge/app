@@ -195,7 +195,7 @@ class Openp41geWorktreeTree extends LitElement {
       dropIndex: number;
     };
     if (!detail?.repoName) return;
-    const data = workspaceFileService.activeData;
+    const data = workspaceFileService.openData;
     if (!data) return;
 
     const repos = [...(data.repos ?? [])];
@@ -223,7 +223,7 @@ class Openp41geWorktreeTree extends LitElement {
   private _hasLoadedOnce = false;
 
   /** Gate: without a selected workspace the explorer shows a disabled hint. */
-  private _hasWorkspace = workspaceFileService.activeFilePath != null;
+  private _hasWorkspace = workspaceFileService.openFilePath != null;
   private _workspaceUnsub: (() => void) | null = null;
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
   constructor() {
@@ -410,7 +410,7 @@ class Openp41geWorktreeTree extends LitElement {
     // Workspace gate: show a disabled hint until a workspace is selected. When
     // the selection changes (top-bar workspace picker) revalidate in place.
     this._workspaceUnsub = workspaceFileService.onChange(() => {
-      const has = workspaceFileService.activeFilePath != null;
+      const has = workspaceFileService.openFilePath != null;
       if (has === this._hasWorkspace) return;
       this._hasWorkspace = has;
       if (has) {
@@ -1441,7 +1441,7 @@ class Openp41geWorktreeTree extends LitElement {
     this._loadingRepos = true;
 
     try {
-      const wsRepos = workspaceFileService.activeData?.repos ?? [];
+      const wsRepos = workspaceFileService.openData?.repos ?? [];
       const repoModels = await this._repoService.listRepos();
       const byUrl = new Map(repoModels.map((rm) => [rm.url, rm]));
       const byName = new Map(repoModels.map((rm) => [rm.name, rm]));
@@ -1581,7 +1581,7 @@ class Openp41geWorktreeTree extends LitElement {
           }
         }
         toastService.show("Repository cloned successfully", "success");
-        // Repos belong to the active workspace — register the bare clone there
+        // Repos belong to the open workspace — register the bare clone there
         // so it appears in both the explorer and the Workspaces overlay.
         workspaceFileService.addRepoToActive(url);
         await workspaceFileService.save();
@@ -1850,7 +1850,7 @@ class Openp41geWorktreeTree extends LitElement {
         await window.openp41ge.workspaceController.checkoutWorktree(repoName, branch);
       }
       toastService.show(`Worktree "${branch}" created`, "success");
-      // Declare the worktree in the active workspace (repos belong to the
+      // Declare the worktree in the open workspace (repos belong to the
       // workspace — the overlay reflects this too).
       workspaceFileService.addWorktreeToActive(repoName, branch);
       await workspaceFileService.save();

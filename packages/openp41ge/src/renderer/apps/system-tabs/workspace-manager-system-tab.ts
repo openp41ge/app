@@ -23,7 +23,7 @@ const bridge = (): any => window.openp41ge;
 let _pendingFocusRepo: string | null = null;
 
 /**
- * Open the Workspaces overlay and focus a repo in the active workspace's
+ * Open the Workspaces overlay and focus a repo in the open workspace's
  * detail view. Used by the Explorer's worktree warning icon — the repo
  * status bar lives in this overlay, so the warning just navigates here.
  */
@@ -913,7 +913,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   private _focusRepo(repoName: string): void {
     if (!repoName) return;
 
-    const activePath = workspaceFileService.activeFilePath;
+    const activePath = workspaceFileService.openFilePath;
     if (!activePath) return;
 
     const entry = this._workspaces.find((w) => w.filePath === activePath);
@@ -1162,8 +1162,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     }
   }
 
-  private async _activateWorkspace(entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
-    await workspaceFileService.activateWorkspace(entry);
+  private async _openWorkspace(entry: { filePath: string; data: WorkspaceFileData }): Promise<void> {
+    await workspaceFileService.openWorkspace(entry);
     // Re-sort locally so returning to the list (without a reload) keeps the
     // freshly activated workspace at the top; _showList() also reloads.
     this._workspaces.sort((a, b) => sortWorkspacesByLastActivated(a.data, b.data));
@@ -1200,7 +1200,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     }
 
     // If the deleted workspace was the active one, clear the active state
-    if (workspaceFileService.activeFilePath === entry.filePath) {
+    if (workspaceFileService.openFilePath === entry.filePath) {
       workspaceFileService.clear();
     }
 
@@ -1215,13 +1215,13 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
       // Temporarily set as active to use saveAs — but do NOT bump recency for
       // the selected card or the restored previous workspace; saveAs() stamps
       // only the newly written file.
-      const prevPath = workspaceFileService.activeFilePath;
-      const prevData = workspaceFileService.activeData;
-      await workspaceFileService.activateWorkspace(this._selected, { recordAccess: false });
+      const prevPath = workspaceFileService.openFilePath;
+      const prevData = workspaceFileService.openData;
+      await workspaceFileService.openWorkspace(this._selected, { recordAccess: false });
       await workspaceFileService.saveAs();
-      // Restore previous active workspace
+      // Restore previous open workspace
       if (prevPath && prevData) {
-        await workspaceFileService.activateWorkspace(
+        await workspaceFileService.openWorkspace(
           { filePath: prevPath, data: prevData },
           { recordAccess: false },
         );
@@ -1542,8 +1542,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
   // ═══ Render ─────────────────────────────────────────────────────
 
   render(): TemplateResult {
-    const isActive = (entry: { filePath: string; data: WorkspaceFileData }): boolean => {
-      return workspaceFileService.activeFilePath === entry.filePath;
+    const isOpen = (entry: { filePath: string; data: WorkspaceFileData }): boolean => {
+      return workspaceFileService.openFilePath === entry.filePath;
     };
 
     return html`
@@ -1758,7 +1758,7 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
           font-family:inherit;
           padding:0;
         }
-        .wm-card-active-pill {
+        .wm-card-open-pill {
           padding:2px 10px; border-radius:999px; font-size:11px;
           background:rgba(0,122,204,.15); color:var(--accent,#007acc);
         }
@@ -1844,9 +1844,9 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
               : this._filteredWorkspaces.length === 0
                 ? html`<div style="padding:20px;text-align:center;color:var(--text-secondary,#999);font-size:13px;">No workspaces match your search.</div>`
                 : this._filteredWorkspaces.map((entry) => html`
-                  <div class="wm-card ${isActive(entry) ? 'active' : ''}${this._selected?.filePath === entry.filePath ? ' selected' : ''}" @click=${() => this._showDetail(entry)} @dblclick=${() => { this._showDetail(entry); this._activateWorkspace(entry); }}>
+                  <div class="wm-card ${isOpen(entry) ? 'open' : ''}${this._selected?.filePath === entry.filePath ? ' selected' : ''}" @click=${() => this._showDetail(entry)} @dblclick=${() => { this._showDetail(entry); this._openWorkspace(entry); }}>
                     <div style="position:absolute;top:8px;right:12px;">
-                      ${isActive(entry) ? html`<span class="wm-card-active-pill">Active</span>` : nothing}
+                      ${isOpen(entry) ? html`<span class="wm-card-open-pill">Open</span>` : nothing}
                     </div>
                     <div class="wm-card-title">${entry.data.name ?? "(unnamed)"}</div>
                     <div class="wm-card-sub">
@@ -2096,11 +2096,11 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
     `;
   }
   private _renderDetail(entry: { filePath: string; data: WorkspaceFileData }): TemplateResult {
-    const active = workspaceFileService.activeFilePath === entry.filePath;
+    const open = workspaceFileService.openFilePath === entry.filePath;
     return html`
       <div style="position:sticky;top:0;z-index:10;background:var(--bg-primary,#1e1e1e);display:flex;align-items:center;justify-content:space-between;padding:8px 14px 8px;gap:8px;flex-shrink:0;height:45px;box-sizing:border-box;">
         ${this._wmBtn("Save", () => this._onDetailSave())}
-        ${this._wmBtn("Activate", () => this._activateWorkspace(entry), { hidden: active })}
+        ${this._wmBtn("Open", () => this._openWorkspace(entry), { hidden: open })}
       </div>
       <div class="wm-create-area" style="margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary,#999);margin:14px 16px 0;flex-shrink:0;">GENERAL</div>
@@ -2257,8 +2257,8 @@ export class WorkspaceManagerModal implements EditorSystemTabController {
 
   /**
    * Shared workspace-manager action button (single source for New / Save /
-   * Activate / Delete). `danger: true` selects the red delete style;
-   * `hidden: true` keeps the slot occupied but hides it (used by Activate so
+   * Open / Delete). `danger: true` selects the red delete style;
+   * `hidden: true` keeps the slot occupied but hides it (used by Open so
    * the header keeps its position once the workspace is already active).
    */
   private _wmBtn(

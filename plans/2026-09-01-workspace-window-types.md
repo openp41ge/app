@@ -36,15 +36,18 @@ Date: 2026-09-01
 - [x] **Phase 6/4 — menus (435e462)**: File→New Window placeholder; Window→Add
       Workspace Window; New/Open/Save Workspaces + View>Workspaces route to the
       Window Manager in a workspace window.
-- [x] **Phase 4 — bind active workspace (7bb0aef)**: workspace windows load their
+- [x] **Phase 4 — bind open workspace (7bb0aef)**: workspace windows load their
       bound workspace (`loadPath`); title-bar workspace button becomes an inert
       label (no in-window switching). Live-verified (title shows "Two", no pointer).
 - [x] **Phase 7 — restore (1f2f80a)**: `_openWorkspaceSession` loads the file's
       session and opens a bound window per restored window. Live-verified.
-- [ ] **Terminology (Phase 7)**: rename `activeWorkspace` → `openWorkspace` and
-      `WorkspaceFileService.activeFilePath`/`activeData`/`activeWorkspaceName` and
-      consumers. Broad API rename across the renderer + tests — deferred (green
-      suite, low functional value, higher regression risk).
+- [x] **Terminology (Phase 7)**: renamed `activeWorkspace` → `openWorkspace` and
+      `WorkspaceFileService.activeFilePath`/`activeData`/`activeWorkspaceName` →
+      `openFilePath`/`openData`/`openWorkspaceName`, `activateWorkspace` →
+      `openWorkspace`, `appState.activeWorkspaceFilePath` → `openWorkspaceFilePath`.
+      Window-manager UI now says "Open" (button/pill), uses an `isOpen` helper and
+      `open` card class; comments/wordings use "open workspace". Typecheck + oxlint
+      clean, 1100 tests green.
 - [ ] **Phase 4 refinement**: remove the in-window Workspaces overlay tab from a
       workspace window (the overlay top bar still lists it) — menu + title-bar
       switching already closed; overlay tab itself still registered.

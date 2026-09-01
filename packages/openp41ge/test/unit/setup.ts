@@ -102,15 +102,15 @@ if (typeof cancelAnimationFrame === "undefined") {
   ).cancelAnimationFrame = () => {};
 }
 
-// ── Give the workspace-file service a default active workspace ────────
+// ── Give the workspace-file service a default open workspace ────────
 //
 // The Git search panel and the Explorer tree are disabled while no workspace
-// is selected (they gate on workspaceFileService.activeFilePath). Most tests
+// is selected (they gate on workspaceFileService.openFilePath). Most tests
 // exercise the *enabled* UI mechanics, so default to a workspace being open;
-// gate-specific tests opt out by nulling activeFilePath and re-emitting
+// gate-specific tests opt out by nulling openFilePath and re-emitting
 // "workspace-file-changed".
 
-workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
+workspaceFileService.openFilePath = "/w/test.openp41ge-workspace";
 
 // ── Suppress Lit ChildPart errors from innerHTML cleanup ──────────────
 

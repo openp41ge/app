@@ -128,7 +128,7 @@ describe("CommitSearchSystemTabController", () => {
     controller.unmount();
     host.remove();
     document.removeEventListener("openp41ge:open-commit", () => {});
-    workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
+    workspaceFileService.openFilePath = "/w/test.openp41ge-workspace";
   });
 
   it("mounts the search UI: main input + files toggle on one row, a filter box with a repo icon + text-filter input (no select), focused main input", async () => {
@@ -256,7 +256,7 @@ describe("CommitSearchSystemTabController", () => {
     const model = controller["_searchModel"] as TestCommitSearchModel;
 
     // Closing the workspace swaps the built search UI for a single prompt.
-    workspaceFileService.activeFilePath = null;
+    workspaceFileService.openFilePath = null;
     document.dispatchEvent(new CustomEvent("workspace-file-changed"));
     await flush();
 
@@ -272,7 +272,7 @@ describe("CommitSearchSystemTabController", () => {
     expect(model.calls.length).toBe(0);
 
     // Opening a workspace rebuilds the full UI and search works again.
-    workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
+    workspaceFileService.openFilePath = "/w/test.openp41ge-workspace";
     document.dispatchEvent(new CustomEvent("workspace-file-changed"));
     await flush();
 

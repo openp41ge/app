@@ -17,7 +17,7 @@ function wsData(overrides: Partial<{ name?: string }> = {}): {
   return { id: "1", version: 1, createdAt: "", dataDir: "", repos: [], ...overrides };
 }
 
-describe("WorkspaceFileService.activeWorkspaceName", () => {
+describe("WorkspaceFileService.openWorkspaceName", () => {
   let svc: WorkspaceFileService;
 
   beforeEach(() => {
@@ -25,25 +25,25 @@ describe("WorkspaceFileService.activeWorkspaceName", () => {
   });
 
   it("uses data.name when set (trimmed)", () => {
-    svc.activeFilePath = "~/.openp41ge/workspaces/x.openp41ge-workspace";
-    svc.activeData = wsData({ name: "  My Workspace  " });
-    expect(svc.activeWorkspaceName).toBe("My Workspace");
+    svc.openFilePath = "~/.openp41ge/workspaces/x.openp41ge-workspace";
+    svc.openData = wsData({ name: "  My Workspace  " });
+    expect(svc.openWorkspaceName).toBe("My Workspace");
   });
 
   it("falls back to the file basename (minus extension) when no name is set", () => {
-    svc.activeFilePath = "~/.openp41ge/workspaces/abc.openp41ge-workspace";
-    svc.activeData = wsData();
-    expect(svc.activeWorkspaceName).toBe("abc");
+    svc.openFilePath = "~/.openp41ge/workspaces/abc.openp41ge-workspace";
+    svc.openData = wsData();
+    expect(svc.openWorkspaceName).toBe("abc");
   });
 
   it("falls back to the basename when name is only whitespace", () => {
-    svc.activeFilePath = "~/dir/foo.openp41ge-workspace";
-    svc.activeData = wsData({ name: "   " });
-    expect(svc.activeWorkspaceName).toBe("foo");
+    svc.openFilePath = "~/dir/foo.openp41ge-workspace";
+    svc.openData = wsData({ name: "   " });
+    expect(svc.openWorkspaceName).toBe("foo");
   });
 
   it("returns 'No workspace' when nothing is active", () => {
-    expect(svc.activeWorkspaceName).toBe("No workspace");
+    expect(svc.openWorkspaceName).toBe("No workspace");
   });
 });
 
@@ -116,7 +116,7 @@ describe("WorkspaceFileService.materializeActiveRepos / deriveRepoName", () => {
   it("returns [] and calls nothing when there is no active data or repos", async () => {
     const { clone, checkoutWorktree } = installBridge({});
     const svc = new WorkspaceFileService();
-    svc.activeData = { id: "1", version: 1, createdAt: "", dataDir: "", repos: [] };
+    svc.openData = { id: "1", version: 1, createdAt: "", dataDir: "", repos: [] };
 
     expect(await svc.materializeActiveRepos()).toEqual([]);
     expect(clone).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe("WorkspaceFileService.materializeActiveRepos / deriveRepoName", () => {
   it("clones the bare repo, registers it, and checks out each worktree", async () => {
     const { clone, checkoutWorktree } = installBridge({});
     const svc = new WorkspaceFileService();
-    svc.activeData = {
+    svc.openData = {
       id: "1",
       version: 1,
       createdAt: "",
@@ -156,7 +156,7 @@ describe("WorkspaceFileService.materializeActiveRepos / deriveRepoName", () => {
   it("marks the repo failed (and skips worktrees) when the clone fails", async () => {
     const { clone, checkoutWorktree } = installBridge({ cloneOk: false, cloneError: "auth" });
     const svc = new WorkspaceFileService();
-    svc.activeData = {
+    svc.openData = {
       id: "1",
       version: 1,
       createdAt: "",
@@ -179,7 +179,7 @@ describe("WorkspaceFileService.materializeActiveRepos / deriveRepoName", () => {
   it("captures worktree checkout failures without failing the whole run", async () => {
     const { checkoutWorktree } = installBridge({ wtOk: false, wtError: "no branch" });
     const svc = new WorkspaceFileService();
-    svc.activeData = {
+    svc.openData = {
       id: "1",
       version: 1,
       createdAt: "",
@@ -236,35 +236,35 @@ describe("WorkspaceFileService activation recency stamping", () => {
     data: wsData({ name: "X" }),
   });
 
-  it("stamps lastActivatedAt, persists it, and sets activeData to the stamped copy", async () => {
-    const ok = await svc.activateWorkspace(entry());
+  it("stamps lastActivatedAt, persists it, and sets openData to the stamped copy", async () => {
+    const ok = await svc.openWorkspace(entry());
     expect(ok).toBe(true);
     expect(write).toHaveBeenCalledTimes(1);
     const [path, data] = write.mock.calls[0] as [string, WorkspaceFileData];
     expect(path).toBe("~/.openp41ge/workspaces/x.openp41ge-workspace");
     expect(data.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
-    expect(svc.activeData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+    expect(svc.openData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
   });
 
   it("does not write when recordAccess is false", async () => {
-    const ok = await svc.activateWorkspace(entry(), { recordAccess: false });
+    const ok = await svc.openWorkspace(entry(), { recordAccess: false });
     expect(ok).toBe(true);
     expect(write).not.toHaveBeenCalled();
-    expect(svc.activeData?.lastActivatedAt).toBeUndefined();
+    expect(svc.openData?.lastActivatedAt).toBeUndefined();
   });
 
   it("swallows persist failure: activation still succeeds but reports false", async () => {
     write.mockResolvedValue(false);
-    const ok = await svc.activateWorkspace(entry());
+    const ok = await svc.openWorkspace(entry());
     expect(ok).toBe(false);
-    expect(svc.activeFilePath).toBe("~/.openp41ge/workspaces/x.openp41ge-workspace");
-    expect(svc.activeData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+    expect(svc.openFilePath).toBe("~/.openp41ge/workspaces/x.openp41ge-workspace");
+    expect(svc.openData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
   });
 
   it("still activates without throwing when writeWorkspaceFile itself throws", async () => {
     write.mockRejectedValue(new Error("disk"));
-    await expect(svc.activateWorkspace(entry())).resolves.toBe(false);
-    expect(svc.activeData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
+    await expect(svc.openWorkspace(entry())).resolves.toBe(false);
+    expect(svc.openData?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
   });
 
   it("createWorkspace persists a lastActivatedAt equal to creation time", async () => {
@@ -290,7 +290,7 @@ describe("WorkspaceFileService activation recency stamping", () => {
         sent = d;
         return "~/.openp41ge/workspaces/new.openp41ge-workspace";
       });
-    svc.activeData = wsData({ name: "X" });
+    svc.openData = wsData({ name: "X" });
     const saved = await svc.saveAs();
     expect(saved).toBe("~/.openp41ge/workspaces/new.openp41ge-workspace");
     expect(sent?.lastActivatedAt).toBe("2026-01-02T03:04:05.000Z");
@@ -303,12 +303,12 @@ describe("WorkspaceFileService.active-repo list helpers", () => {
 
   beforeEach(() => {
     svc = new WorkspaceFileService();
-    svc.activeData = wsData();
+    svc.openData = wsData();
   });
 
   it("addRepoToActive appends a bare repo entry and returns true", () => {
     expect(svc.addRepoToActive("https://github.com/acme/widget.git")).toBe(true);
-    expect(svc.activeData!.repos).toEqual([
+    expect(svc.openData!.repos).toEqual([
       { url: "https://github.com/acme/widget.git", worktrees: [] },
     ]);
   });
@@ -316,38 +316,38 @@ describe("WorkspaceFileService.active-repo list helpers", () => {
   it("addRepoToActive is idempotent by URL (false when already present)", () => {
     svc.addRepoToActive("https://github.com/acme/widget.git");
     expect(svc.addRepoToActive("https://github.com/acme/widget.git")).toBe(false);
-    expect(svc.activeData!.repos).toHaveLength(1);
+    expect(svc.openData!.repos).toHaveLength(1);
   });
 
-  it("addRepoToActive is a no-op without an active workspace", () => {
-    svc.activeData = null;
+  it("addRepoToActive is a no-op without an open workspace", () => {
+    svc.openData = null;
     expect(svc.addRepoToActive("https://github.com/acme/widget.git")).toBe(false);
   });
 
   it("addWorktreeToActive adds a branch to the matching repo (by derived name)", () => {
-    svc.activeData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: [] }];
+    svc.openData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: [] }];
     expect(svc.addWorktreeToActive("github.com/acme/widget", "main")).toBe(true);
-    expect(svc.activeData!.repos[0].worktrees).toEqual(["main"]);
+    expect(svc.openData!.repos[0].worktrees).toEqual(["main"]);
   });
 
   it("addWorktreeToActive does not duplicate a branch", () => {
-    svc.activeData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: ["main"] }];
+    svc.openData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: ["main"] }];
     expect(svc.addWorktreeToActive("github.com/acme/widget", "main")).toBe(false);
-    expect(svc.activeData!.repos[0].worktrees).toEqual(["main"]);
+    expect(svc.openData!.repos[0].worktrees).toEqual(["main"]);
   });
 
   it("addWorktreeToActive ignores unknown repos", () => {
-    svc.activeData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: [] }];
+    svc.openData!.repos = [{ url: "https://github.com/acme/widget.git", worktrees: [] }];
     expect(svc.addWorktreeToActive("github.com/acme/other", "main")).toBe(false);
     expect(svc.addWorktreeToActive("github.com/acme/widget", "")).toBe(false);
   });
 
   it("removeWorktreeFromActive drops a branch from the matching repo", () => {
-    svc.activeData!.repos = [
+    svc.openData!.repos = [
       { url: "https://github.com/acme/widget.git", worktrees: ["main", "dev"] },
     ];
     expect(svc.removeWorktreeFromActive("github.com/acme/widget", "main")).toBe(true);
-    expect(svc.activeData!.repos[0].worktrees).toEqual(["dev"]);
+    expect(svc.openData!.repos[0].worktrees).toEqual(["dev"]);
     expect(svc.removeWorktreeFromActive("github.com/acme/widget", "main")).toBe(false);
   });
 });

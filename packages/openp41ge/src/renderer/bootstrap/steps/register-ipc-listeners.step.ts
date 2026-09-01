@@ -88,7 +88,7 @@ export class RegisterIpcListenersStep implements IStartupStep {
         routeToWindowManager();
         return;
       }
-      if (workspaceFileService.activeData) {
+      if (workspaceFileService.openData) {
         await workspaceFileService.saveAs();
       }
     });

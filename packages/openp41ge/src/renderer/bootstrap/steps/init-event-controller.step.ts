@@ -107,8 +107,8 @@ export class InitEventControllerStep implements IStartupStep {
     // Explorer sidebar mid-work.
     let lastOpenedFilePath: string | null | undefined;
     const openSidebarTabsForActiveWorkspace = (): void => {
-      const path_ = workspaceFileService.activeFilePath;
-      if (!workspaceFileService.activeData || !path_) return;
+      const path_ = workspaceFileService.openFilePath;
+      if (!workspaceFileService.openData || !path_) return;
       if (path_ === lastOpenedFilePath) return;
       lastOpenedFilePath = path_;
       const ws = context.workspaceState.getWorkspace();
@@ -122,7 +122,7 @@ export class InitEventControllerStep implements IStartupStep {
       openSidebarTabsForActiveWorkspace();
       // Materialise the workspace's repos (clone + checkout) so Explorer and
       // Git panels can list them; refresh both after the clones land.
-      if (workspaceFileService.activeData) {
+      if (workspaceFileService.openData) {
         void workspaceFileService.materializeActiveRepos().then(() => {
           document.dispatchEvent(new CustomEvent("git:refresh", { bubbles: true }));
           document.dispatchEvent(new CustomEvent("project:changed", { bubbles: true }));

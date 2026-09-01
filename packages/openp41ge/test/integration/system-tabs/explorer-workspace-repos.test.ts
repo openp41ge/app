@@ -3,7 +3,7 @@
  * the workspace, not to any window-global list. Regression guards for the
  * 2026-08 "repos belong to the workspace" migration:
  *
- *  - only repos listed in the active workspace render (a disk repo that is not
+ *  - only repos listed in the open workspace render (a disk repo that is not
  *    in the workspace is hidden — the old repoRefs auto-registration is gone)
  *  - worktree rows come from DECLARED worktrees (repos[].worktrees), not from
  *    enumerating git branches — a freshly cloned bare repo shows zero rows
@@ -44,21 +44,21 @@ describe("Explorer workspace-backed repos", () => {
         listRepos: async () => [],
       },
     };
-    workspaceFileService.activeFilePath = null;
-    workspaceFileService.activeData = null;
+    workspaceFileService.openFilePath = null;
+    workspaceFileService.openData = null;
   });
 
   afterEach(() => {
     HTMLElement.prototype.scrollIntoView = ORIG_SCROLL;
     (window as unknown as { openp41ge: unknown }).openp41ge = ORIG_PRELOAD;
-    workspaceFileService.activeFilePath = null;
-    workspaceFileService.activeData = null;
+    workspaceFileService.openFilePath = null;
+    workspaceFileService.openData = null;
     host.remove();
   });
 
   function setWorkspace(repos: Array<{ url: string; worktrees: string[] }>): void {
-    workspaceFileService.activeFilePath = "/w/t.openp41ge-workspace";
-    workspaceFileService.activeData = {
+    workspaceFileService.openFilePath = "/w/t.openp41ge-workspace";
+    workspaceFileService.openData = {
       id: "w",
       name: "Test",
       version: 1,
@@ -100,7 +100,7 @@ describe("Explorer workspace-backed repos", () => {
     svc.addRepoModel(new TestRepositoryModel(WIDGET.name, WIDGET.url));
   }
 
-  it("renders only repos listed in the active workspace", async () => {
+  it("renders only repos listed in the open workspace", async () => {
     const svc = new TestRepoService();
     // Disk has TWO repos; the workspace lists only widget.
     svc.addRepoModel(new TestRepositoryModel(WIDGET.name, WIDGET.url));

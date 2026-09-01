@@ -39,10 +39,10 @@ class Openp41geWorkspaceSearch extends LitElement {
   };
 
   render() {
-    const name = workspaceFileService.activeWorkspaceName;
+    const name = workspaceFileService.openWorkspaceName;
     // A bound workspace is fixed — the button becomes an immutable label (no
     // picker, no cursor) so the workspace cannot be switched in-window.
-    const bound = !!workspaceFileService.activeFilePath;
+    const bound = !!workspaceFileService.openFilePath;
     if (bound) {
       return html`
         <div

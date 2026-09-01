@@ -84,7 +84,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
   private _repos: RepoOption[] = [];
   // Gate: without a selected workspace the panel shows a single placeholder.
-  private _hasWorkspace = workspaceFileService.activeFilePath != null;
+  private _hasWorkspace = workspaceFileService.openFilePath != null;
   private _unsubscribeWorkspace: (() => void) | null = null;
   private _container: HTMLElement | null = null;
   private _expandedCommits = new Set<string>(); // "repoName<sep>shortHash"
@@ -969,7 +969,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
   /** Re-evaluate the workspace gate — swap the whole view in place. */
   private _updateWorkspaceGate(): void {
-    const has = workspaceFileService.activeFilePath != null;
+    const has = workspaceFileService.openFilePath != null;
     if (has === this._hasWorkspace) return;
     this._hasWorkspace = has;
     const container = this._container;

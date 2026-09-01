@@ -52,7 +52,7 @@ describe("ExplorerSystemTabController", () => {
     (window as unknown as { openp41ge: unknown }).openp41ge = ORIG_OPENP41GE;
     controller.unmount();
     host.remove();
-    workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
+    workspaceFileService.openFilePath = "/w/test.openp41ge-workspace";
   });
 
   /** Mount the controller as an Explorer tab of a (fake) sidebar — the real
@@ -87,7 +87,7 @@ describe("ExplorerSystemTabController", () => {
   });
 
   it("shows a disabled placeholder with no workspace, and the tree once one is selected", async () => {
-    workspaceFileService.activeFilePath = null; // no workspace selected
+    workspaceFileService.openFilePath = null; // no workspace selected
     const sidebar = document.createElement("openp41ge-sidebar");
     host.appendChild(sidebar);
     await controller.mount(sidebar);
@@ -97,7 +97,7 @@ describe("ExplorerSystemTabController", () => {
     expect(tree!.textContent).toContain("Select a workspace to get started");
 
     // Selecting a workspace swaps the placeholder for the tree skeleton.
-    workspaceFileService.activeFilePath = "/w/test.openp41ge-workspace";
+    workspaceFileService.openFilePath = "/w/test.openp41ge-workspace";
     document.dispatchEvent(new CustomEvent("workspace-file-changed", { bubbles: true }));
     await (tree as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
     expect(tree!.textContent).not.toContain("Select a workspace to get started");

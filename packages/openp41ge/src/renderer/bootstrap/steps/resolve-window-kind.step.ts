@@ -69,7 +69,7 @@ export class ResolveWindowKindStep implements IStartupStep {
       try {
         await workspaceFileService.loadPath(context.workspacePath);
       } catch (err) {
-        log.warn("failed to bind active workspace:", err);
+        log.warn("failed to bind open workspace:", err);
       }
     }
 

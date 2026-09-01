@@ -40,21 +40,21 @@ export function deriveRepoName(url: string): string {
 
 export class WorkspaceFileService {
   /** Path to the active .openp41ge-workspace file, or null if none. */
-  activeFilePath: string | null = null;
+  openFilePath: string | null = null;
 
-  /** Parsed contents of the active workspace file. */
-  activeData: WorkspaceFileData | null = null;
+  /** Parsed contents of the open workspace file. */
+  openData: WorkspaceFileData | null = null;
 
   /**
-   * Human-readable name of the active workspace:
+   * Human-readable name of the open workspace:
    * `data.name` if set, else the workspace file's basename (minus the
    * `.openp41ge-workspace` extension), else "No workspace".
    */
-  get activeWorkspaceName(): string {
-    const name = this.activeData?.name?.trim();
+  get openWorkspaceName(): string {
+    const name = this.openData?.name?.trim();
     if (name) return name;
-    if (this.activeFilePath) {
-      const base = this.activeFilePath.split(/[\\/]/).pop() ?? "";
+    if (this.openFilePath) {
+      const base = this.openFilePath.split(/[\\/]/).pop() ?? "";
       const cleaned = base.replace(/\.openp41ge-workspace$/i, "").trim();
       if (cleaned) return cleaned;
     }
@@ -73,9 +73,9 @@ export class WorkspaceFileService {
     // Opening a file counts as an activation — record it best-effort.
     const stamped = this._stamp(result.data);
     await this._persistAccess(result.filePath, stamped);
-    this.activeFilePath = result.filePath;
-    this.activeData = stamped;
-    appState.activeWorkspaceFilePath = result.filePath;
+    this.openFilePath = result.filePath;
+    this.openData = stamped;
+    appState.openWorkspaceFilePath = result.filePath;
     appState.notify();
     this._emitChanged();
     return true;
@@ -92,9 +92,9 @@ export class WorkspaceFileService {
     if (!result) return false;
     const stamped = this._stamp(result.data);
     await this._persistAccess(result.filePath, stamped);
-    this.activeFilePath = result.filePath;
-    this.activeData = stamped;
-    appState.activeWorkspaceFilePath = result.filePath;
+    this.openFilePath = result.filePath;
+    this.openData = stamped;
+    appState.openWorkspaceFilePath = result.filePath;
     appState.notify();
     this._emitChanged();
     return true;
@@ -103,13 +103,13 @@ export class WorkspaceFileService {
   // ── Save ────────────────────────────────────────────
 
   /**
-   * Write current data to the active workspace file (no dialog).
+   * Write current data to the open workspace file (no dialog).
    */
   async save(): Promise<boolean> {
-    if (!this.activeFilePath || !this.activeData) return false;
+    if (!this.openFilePath || !this.openData) return false;
     const ok = await window.openp41ge.dialog.writeWorkspaceFile(
-      this.activeFilePath,
-      this.activeData,
+      this.openFilePath,
+      this.openData,
     );
     return ok;
   }
@@ -118,15 +118,15 @@ export class WorkspaceFileService {
    * Save via dialog (Save As). Returns the new path, or null if cancelled.
    */
   async saveAs(): Promise<string | null> {
-    if (!this.activeData) return null;
+    if (!this.openData) return null;
     // Save As records access only for the newly written file.
-    const stamped = this._stamp(this.activeData);
-    const defaultPath = this.activeFilePath ?? undefined;
+    const stamped = this._stamp(this.openData);
+    const defaultPath = this.openFilePath ?? undefined;
     const filePath = await window.openp41ge.dialog.saveWorkspaceFile(stamped, defaultPath);
     if (!filePath) return null;
-    this.activeFilePath = filePath;
-    this.activeData = stamped;
-    appState.activeWorkspaceFilePath = filePath;
+    this.openFilePath = filePath;
+    this.openData = stamped;
+    appState.openWorkspaceFilePath = filePath;
     appState.notify();
     this._emitChanged();
     return filePath;
@@ -147,7 +147,7 @@ export class WorkspaceFileService {
   /**
    * Create a new workspace file with the given name.
    * Writes to ~/.openp41ge/workspaces/<uuid>.openp41ge-workspace
-   * and sets it as the active workspace.
+   * and sets it as the open workspace.
    */
   async createWorkspace(name: string): Promise<WorkspaceFileData | null> {
     const uuid = crypto.randomUUID();
@@ -171,41 +171,41 @@ export class WorkspaceFileService {
     const written = await window.openp41ge.dialog.writeWorkspaceFile(filePath, data);
     if (!written) return null;
 
-    this.activeFilePath = filePath;
-    this.activeData = data;
-    appState.activeWorkspaceFilePath = filePath;
+    this.openFilePath = filePath;
+    this.openData = data;
+    appState.openWorkspaceFilePath = filePath;
     appState.notify();
     this._emitChanged();
     return data;
   }
 
-  // ── Activate existing workspace ────────────────────
+  // ── Open existing workspace ────────────────────────
 
   /**
-   * Set a workspace (from listWorkspaces) as the active workspace.
+   * Set a workspace (from listWorkspaces) as the open workspace.
    *
    * By default this records the activation: it stamps `lastActivatedAt` on a
    * copy of the data, persists it best-effort to the workspace file, and sets
    * the in-memory state to the stamped copy. Persistence failure does not
-   * block activation (best-effort) — the returned boolean reports whether the
+   * block the open (best-effort) — the returned boolean reports whether the
    * persist succeeded. Pass `{ recordAccess: false }` for internal/restore
-   * activations that should not bump recency.
+   * opens that should not bump recency.
    */
-  async activateWorkspace(
+  async openWorkspace(
     entry: { filePath: string; data: WorkspaceFileData },
     opts: { recordAccess?: boolean } = {},
   ): Promise<boolean> {
     const recordAccess = opts.recordAccess ?? true;
-    let activeData = entry.data;
+    let openData = entry.data;
     let persisted = true;
     if (recordAccess) {
       const stamped = this._stamp(entry.data);
-      activeData = stamped;
+      openData = stamped;
       persisted = await this._persistAccess(entry.filePath, stamped);
     }
-    this.activeFilePath = entry.filePath;
-    this.activeData = activeData;
-    appState.activeWorkspaceFilePath = entry.filePath;
+    this.openFilePath = entry.filePath;
+    this.openData = openData;
+    appState.openWorkspaceFilePath = entry.filePath;
     appState.notify();
     this._emitChanged();
     return persisted;
@@ -227,32 +227,32 @@ export class WorkspaceFileService {
     }
   }
 
-  // ── Active workspace repo list ───────────────────────────
+  // ── Open workspace repo list ───────────────────────────
 
   /**
-   * Append a repo (its bare-clone URL) to the active workspace's `repos` list
+   * Append a repo (its bare-clone URL) to the open workspace's `repos` list
    * if not already present. Returns true when a new entry was added.
-   * Persist with `save()`. Repos belong to the active workspace — the
+   * Persist with `save()`. Repos belong to the open workspace — the
    * explorer and the Workspaces overlay share this single list.
    */
   addRepoToActive(url: string): boolean {
-    if (!this.activeData) return false;
+    if (!this.openData) return false;
     const repo = url.trim();
     if (!repo) return false;
-    if ((this.activeData.repos ?? []).some((r) => r.url === repo)) return false;
-    this.activeData.repos = [...(this.activeData.repos ?? []), { url: repo, worktrees: [] }];
+    if ((this.openData.repos ?? []).some((r) => r.url === repo)) return false;
+    this.openData.repos = [...(this.openData.repos ?? []), { url: repo, worktrees: [] }];
     this._emitChanged();
     return true;
   }
 
   /**
-   * Add a worktree branch to a repo in the active workspace (by its derived
+   * Add a worktree branch to a repo in the open workspace (by its derived
    * name). Returns true when the list actually changed. Persist with `save()`.
    */
   addWorktreeToActive(repoName: string, branch: string): boolean {
-    if (!this.activeData) return false;
+    if (!this.openData) return false;
     if (!branch) return false;
-    const entry = this.activeData.repos?.find((r) => deriveRepoName(r.url) === repoName);
+    const entry = this.openData.repos?.find((r) => deriveRepoName(r.url) === repoName);
     if (!entry) return false;
     if ((entry.worktrees ?? []).includes(branch)) return false;
     entry.worktrees = [...(entry.worktrees ?? []), branch];
@@ -261,13 +261,13 @@ export class WorkspaceFileService {
   }
 
   /**
-   * Remove a worktree branch from a repo in the active workspace (by its
+   * Remove a worktree branch from a repo in the open workspace (by its
    * derived name). Returns true when the list actually changed. Persist with
    * `save()`.
    */
   removeWorktreeFromActive(repoName: string, branch: string): boolean {
-    if (!this.activeData) return false;
-    const entry = this.activeData.repos?.find((r) => deriveRepoName(r.url) === repoName);
+    if (!this.openData) return false;
+    const entry = this.openData.repos?.find((r) => deriveRepoName(r.url) === repoName);
     if (!entry) return false;
     if (!(entry.worktrees ?? []).includes(branch)) return false;
     entry.worktrees = (entry.worktrees ?? []).filter((b) => b !== branch);
@@ -281,15 +281,15 @@ export class WorkspaceFileService {
    * Update the dataDir in memory. Call save() to persist to disk.
    */
   changeDataDir(newPath: string): void {
-    if (!this.activeData) return;
-    this.activeData.dataDir = newPath;
+    if (!this.openData) return;
+    this.openData.dataDir = newPath;
     this._emitChanged();
   }
 
   // ── Materialize repos (clone on disk) ────────────────────────────
 
   /**
-   * Best-effort clone of the active workspace's repos into the project
+   * Best-effort clone of the open workspace's repos into the project
    * repositories dir, and checkout of their worktrees, so the Explorer/Git
    * sidebar panels can list them.
    *
@@ -300,7 +300,7 @@ export class WorkspaceFileService {
    * outcome summary (for tests/diagnostics).
    */
   async materializeActiveRepos(): Promise<MaterializeOutcome[]> {
-    const data = this.activeData;
+    const data = this.openData;
     if (!data || !Array.isArray(data.repos) || data.repos.length === 0) return [];
 
     const outcomes: MaterializeOutcome[] = [];
@@ -339,11 +339,11 @@ export class WorkspaceFileService {
 
   // ── Clear ───────────────────────────────────────────
 
-  /** Clear the active workspace (drops references, file stays on disk). */
+  /** Clear the open workspace (drops references, file stays on disk). */
   clear(): void {
-    this.activeFilePath = null;
-    this.activeData = null;
-    appState.activeWorkspaceFilePath = null;
+    this.openFilePath = null;
+    this.openData = null;
+    appState.openWorkspaceFilePath = null;
     appState.notify();
     this._emitChanged();
   }
@@ -355,8 +355,8 @@ export class WorkspaceFileService {
       new CustomEvent(WORKSPACE_CHANGED_EVENT, {
         bubbles: true,
         detail: {
-          filePath: this.activeFilePath,
-          data: this.activeData,
+          filePath: this.openFilePath,
+          data: this.openData,
         },
       }),
     );
