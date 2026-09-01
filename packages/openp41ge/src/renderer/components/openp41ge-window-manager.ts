@@ -235,6 +235,7 @@ class Openp41geWindowManager extends LitElement {
         }
         ul { list-style: none; margin: 0; padding: 0; }
         li.ws-row {
+          position: relative;
           display: flex;
           flex-direction: column;
           gap: 4px;
@@ -250,11 +251,12 @@ class Openp41geWindowManager extends LitElement {
         .ws-top { display: flex; align-items: center; gap: 8px; width: 100%; }
         .ws-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ws-meta { color: var(--text-secondary, #999); font-size: 12px; text-align: left; }
-        /* Right-facing drill-in chevron, vertically centred in the card row. */
+        /* Right-facing drill-in chevron, vertically centred in the whole card. */
         .ws-chevron {
-          flex-shrink: 0;
-          display: block;
-          align-self: center;
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
           color: var(--accent, #569cd6);
         }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
@@ -386,9 +388,9 @@ class Openp41geWindowManager extends LitElement {
                         <li class="ws-row" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspace(w); }}>
                           <div class="ws-top">
                             <span class="ws-name">${name}</span>
-                            <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
                           </div>
                           <div class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</div>
+                          <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
                         </li>
                       `;
                     })}
