@@ -249,16 +249,39 @@ class Openp41geWindowManager extends LitElement {
         }
         li.ws-row:hover { background: var(--bg-active, #37373d); }
         .ws-top { display: flex; align-items: center; gap: 8px; width: 100%; }
-        .ws-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ws-name {
+          flex: 1;
+          min-width: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          padding-right: 74px;
+        }
         .ws-meta { color: var(--text-secondary, #999); font-size: 12px; text-align: left; }
-        /* Right-facing drill-in chevron, vertically centred in the whole card. */
-        .ws-chevron {
+        /* Right-side group (Open pill + drill-in chevron), centred in the card. */
+        .ws-right {
           position: absolute;
           right: 10px;
           top: 50%;
           transform: translateY(-50%);
-          color: var(--accent, #569cd6);
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
+        .ws-open-pill {
+          border: none;
+          border-radius: 999px;
+          padding: 2px 9px;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: inherit;
+          color: var(--text-secondary, #999);
+          background: var(--bg-active, #37373d);
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .ws-open-pill:hover { color: var(--text-primary, #ddd); background: var(--bg-selection, #444); }
+        .ws-chevron { flex-shrink: 0; display: block; color: var(--accent, #569cd6); }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
         /* ── Drawer ─────────────────────────────────────────────── */
         /* A single shared shadow element whose width tracks the widest drawer,
@@ -390,7 +413,10 @@ class Openp41geWindowManager extends LitElement {
                             <span class="ws-name">${name}</span>
                           </div>
                           <div class="ws-meta">${repos} ${repos === 1 ? "repo" : "repos"}</div>
-                          <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                          <div class="ws-right">
+                            <button class="ws-open-pill" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(w.filePath); }}>Open</button>
+                            <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                          </div>
                         </li>
                       `;
                     })}
