@@ -115,16 +115,20 @@ class Openp41geWindowManager extends LitElement {
           padding: 0;
           cursor: pointer;
           opacity: 0;
+          pointer-events: none;
           transition: opacity 0.12s ease, background 0.12s ease;
         }
-        /* Show the open icon only when the row is hovered; grey square chip on hover. */
+        /* Show the open icon only when the row is hovered; grey square chip on button hover. */
         .ws-row:hover .wm-open,
-        .wm-open:focus-visible { opacity: 1; }
+        .wm-open:focus-visible {
+          opacity: 1;
+          pointer-events: auto;
+        }
         button.wm-open:hover { background: var(--bg-active, #37373d); }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
       </style>
       <div class="wm-titlebar">
-        <span class="wm-title">Workspaces</span>
+        <span class="wm-title">Window Manager</span>
       </div>
       <div class="wm-body">
         ${this._loaded && this._workspaces.length === 0
