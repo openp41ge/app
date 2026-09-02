@@ -14,6 +14,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
+import { tooltipController } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 
@@ -58,6 +59,7 @@ class Openp41geWindowManager extends LitElement {
   @state() private _addingWorkspace = false;
   @state() private _workspaceDeleteMode = false;
   @state() private _selectedWorkspaces: Set<string> = new Set();
+  private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -70,6 +72,29 @@ class Openp41geWindowManager extends LitElement {
     super.disconnectedCallback();
     window.removeEventListener("focus", this._onFocus);
     document.removeEventListener("keydown", this._onKeydown);
+    for (const el of this._tooltipTargets) tooltipController.detach(el);
+    this._tooltipTargets = [];
+  }
+
+  /** Attach custom tooltips to the footer tool buttons (replaces native `title`). */
+  updated(): void {
+    const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm",
+    );
+    const live = new Set<Element>();
+    if (btns) {
+      for (const btn of btns) {
+        const text = btn.getAttribute("data-tip");
+        if (text) {
+          tooltipController.attach(btn, { type: "simple", text });
+          live.add(btn);
+        }
+      }
+    }
+    for (const el of this._tooltipTargets) {
+      if (!live.has(el)) tooltipController.detach(el);
+    }
+    this._tooltipTargets = [...live];
   }
 
   /** Escape cancels an active delete mode. */
@@ -223,12 +248,12 @@ class Openp41geWindowManager extends LitElement {
       <div class="drawer-footer">
         ${this._workspaceDeleteMode
           ? html`
-              <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorkspaceDeleteMode(); }} title="Cancel">Cancel</button>
-              <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedWorkspaces(); }} title="Delete selected workspaces" ?disabled=${this._selectedWorkspaces.size === 0}>Delete</button>
+              <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorkspaceDeleteMode(); }} data-tip="Cancel">Cancel</button>
+              <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedWorkspaces(); }} data-tip="Delete selected workspaces" ?disabled=${this._selectedWorkspaces.size === 0}>Delete</button>
             `
           : html`
-              <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddWorkspace(); }} title="New workspace" aria-label="New workspace">＋</button>
-              <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateWorkspaceDeleteMode(); }} title="Delete workspaces" aria-label="Delete workspaces">
+              <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddWorkspace(); }} aria-label="New workspace" data-tip="New workspace">＋</button>
+              <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateWorkspaceDeleteMode(); }} aria-label="Delete workspaces" data-tip="Delete workspaces">
                 <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
               </button>
             `}
@@ -356,12 +381,12 @@ class Openp41geWindowManager extends LitElement {
         <div class="drawer-footer">
           ${this._deleteMode
             ? html`
-                <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }} title="Cancel">Cancel</button>
-                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedRepos(d); }} title="Delete selected repos" ?disabled=${this._selectedRepos.size === 0}>Delete</button>
+                <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }} data-tip="Cancel">Cancel</button>
+                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedRepos(d); }} data-tip="Delete selected repos" ?disabled=${this._selectedRepos.size === 0}>Delete</button>
               `
             : html`
-                <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} title="Add repo" aria-label="Add repo">＋</button>
-                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }} title="Delete repos" aria-label="Delete repos">
+                <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} aria-label="Add repo" data-tip="Add repo">＋</button>
+                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }} aria-label="Delete repos" data-tip="Delete repos">
                   <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
                 </button>
               `}
