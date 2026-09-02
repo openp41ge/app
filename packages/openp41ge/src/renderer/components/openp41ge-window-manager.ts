@@ -88,6 +88,10 @@ class Openp41geWindowManager extends LitElement {
     window.addEventListener("resize", this._measureListOverflow);
     document.addEventListener("keydown", this._onKeydown);
     document.addEventListener("click", this._onDocumentClick);
+    // Any new pointer press clears the drag-follow-up suppression. A click can
+    // only follow a drag within the same gesture (no pointerdown between), so a
+    // fresh press always means the previous drag's follow-up click is moot.
+    document.addEventListener("pointerdown", this._onPointerDown);
     // When a drag-out opens a workspace window in the main process (cursor left
     // the window), the main process ends the session and notifies us to clear
     // the in-flight drag state.
@@ -101,6 +105,7 @@ class Openp41geWindowManager extends LitElement {
     window.removeEventListener("resize", this._measureListOverflow);
     document.removeEventListener("keydown", this._onKeydown);
     document.removeEventListener("click", this._onDocumentClick);
+    document.removeEventListener("pointerdown", this._onPointerDown);
     this._offEndSession?.();
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
@@ -185,11 +190,9 @@ class Openp41geWindowManager extends LitElement {
       if (Math.hypot(dx, dy) < 8) return;
       drag.active = true;
       // A drag/swipe means the following row click is not a navigation — suppress
-      // it so the drawer doesn't pop open over the drag.
+      // it so the drawer doesn't pop open over the drag. Cleared by the next
+      // pointerdown (see _onPointerDown) or by the row click itself.
       this._suppressClick = true;
-      window.setTimeout(() => {
-        this._suppressClick = false;
-      }, 600);
       // Horizontal swipe → carousel; vertical drag → open the workspace window.
       drag.mode = Math.abs(dx) > Math.abs(dy) ? "carousel" : "open";
       if (drag.mode === "open") {
@@ -275,6 +278,11 @@ class Openp41geWindowManager extends LitElement {
     this._drag = null;
     this._carouselTrack = null;
   }
+
+  /** A fresh pointer press marks the end of any drag-follow-up click window. */
+  private _onPointerDown = (): void => {
+    this._suppressClick = false;
+  };
 
   /** Escape cancels delete modes, closes an add card, or closes the crumb menu. */
   private _onKeydown = (e: KeyboardEvent): void => {
