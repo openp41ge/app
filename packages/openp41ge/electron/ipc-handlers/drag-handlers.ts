@@ -16,7 +16,7 @@
 
 import { ipcMain, BrowserWindow, screen, type WebContents } from "electron";
 import type { DragGhostManager } from "../../src/main/index.js";
-import { openp41geWindows } from "../window-manager.js";
+import { openp41geWindows, openWorkspaceWindow } from "../window-manager.js";
 
 // ─── Session tracking ─────────────────────────────────────────────────────
 
@@ -35,6 +35,9 @@ interface ActiveDragSession {
 
 let _activeSession: ActiveDragSession | null = null;
 let _cursorPollInterval: ReturnType<typeof setInterval> | null = null;
+// The DragGhostManager instance (set in registerDragHandlers) — used to keep
+// the ghost following the cursor globally and to detect workspace drag-outs.
+let _dragGhost: DragGhostManager | null = null;
 
 function _startCursorPoll(): void {
   _stopCursorPoll();
@@ -49,6 +52,35 @@ function _startCursorPoll(): void {
       return;
     }
     const pos = screen.getCursorScreenPoint();
+    // Keep the main-process ghost following the cursor globally, so a drag can
+    // visually leave the window (the source renderer only gets moves in-window).
+    _dragGhost?.move(pos.x, pos.y);
+    // Workspace skeleton drag-out: open the workspace window when the cursor
+    // leaves the source (window-manager) window. Dropping inside never opens.
+    if (_activeSession.dragData.type === "workspace") {
+      const source = openp41geWindows.get(_activeSession.sourceWinId);
+      if (source && !source.isDestroyed()) {
+        const b = source.getBounds();
+        const outside =
+          pos.x < b.x || pos.x > b.x + b.width || pos.y < b.y || pos.y > b.y + b.height;
+        if (outside) {
+          const wsPath = _activeSession.dragData.filePath;
+          const sourceWin = source;
+          _stopCursorPoll();
+          _dragGhost?.hide();
+          _broadcastDragState(false, null);
+          _activeSession = null;
+          // Signal the source window to cancel its in-flight drag, then open.
+          if (!sourceWin.isDestroyed()) {
+            sourceWin.webContents.send("openp41ge:drag-end-session");
+          }
+          if (typeof wsPath === "string" && wsPath.length > 0) {
+            openWorkspaceWindow(wsPath);
+          }
+          return;
+        }
+      }
+    }
     const data = JSON.stringify({ screenX: pos.x, screenY: pos.y });
     for (const [, bw] of openp41geWindows) {
       if (!bw.isDestroyed()) {
@@ -77,6 +109,7 @@ function _broadcastDragState(active: boolean, exclude: WebContents | null): void
 }
 
 export function registerDragHandlers(dragGhost: DragGhostManager): void {
+  _dragGhost = dragGhost;
   // ── Drag lifecycle ──────────────────────────────────────────────────────
 
   ipcMain.on("openp41ge:drag-start", (_event, data: string) => {
@@ -104,7 +137,8 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     // entries) so even a very quick drag gets visible feedback. Blocking on
     // capturePage first meant a fast drag could end (drag.end hides the ghost)
     // before the slow capture resolved -> no drag element at all.
-    const isRowStyle = dragType === "file" || dragType === "open-tab";
+    const isRowStyle =
+      dragType === "file" || dragType === "open-tab" || dragType === "workspace";
     dragGhost.show(
       label,
       screenX,
@@ -133,6 +167,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
             type,
             title: label,
             ...(type === "file" && filePath ? { filePath } : {}),
+            ...(type === "workspace" && filePath ? { filePath } : {}),
             // Persist the open-tab payload so a TARGET window's cross-window
             // drop can resolve appType/tabConfig without seeing the source row.
             ...(type === "open-tab" && openTabData && typeof openTabData === "object"

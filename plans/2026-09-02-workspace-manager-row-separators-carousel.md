@@ -73,3 +73,15 @@ each window in the workspace.
       (transform + dot active), vertical drag-out ghost + open, open-workspace
       row is a static (default-cursor) skeleton. Typecheck + oxlint clean;
       `nx run openp41ge:test` green.
+- [x] (follow-up) Rows full-bleed: removed the body's horizontal 20px padding so
+      rows + separators span the full window width; rows carry their own inset.
+- [x] (follow-up) Row text top-aligned (`align-items: stretch`); reintroduced
+      the "Open" and "N windows" pills at the bottom-left (`margin-top: auto`),
+      hidden in delete mode. "Open" opens the workspace window (no drawer);
+      "N windows" shows the live open-window count.
+- [x] (follow-up) Drag-out uses a real (native) drag: the workspace skeleton
+      drag now starts a `workspace` drag via `window.openp41ge.drag.*` and the
+      main-process `DragGhostManager` ghost (a BrowserWindow), so it can leave
+      the window. The main cursor poll opens the workspace window when the
+      cursor leaves the window-manager window and ends the session; releasing
+      inside the window only calls `drag.end()` (no open).

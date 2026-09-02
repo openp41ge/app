@@ -70,13 +70,14 @@ class Openp41geWindowManager extends LitElement {
     startX: number;
     startY: number;
     path: string;
+    label: string;
     active: boolean;
     mode: "carousel" | "open" | null;
     windowCount: number;
     baseIndex: number;
   } | null = null;
-  private _dragGhost: HTMLElement | null = null;
   private _carouselTrack: HTMLElement | null = null;
+  private _offEndSession: (() => void) | null = null;
   private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
@@ -85,6 +86,10 @@ class Openp41geWindowManager extends LitElement {
     window.addEventListener("resize", this._measureListOverflow);
     document.addEventListener("keydown", this._onKeydown);
     document.addEventListener("click", this._onDocumentClick);
+    // When a drag-out opens a workspace window in the main process (cursor left
+    // the window), the main process ends the session and notifies us to clear
+    // the in-flight drag state.
+    this._offEndSession = window.openp41ge.drag.onEndSession(() => this._teardownDrag());
     void this._load();
   }
 
@@ -94,6 +99,7 @@ class Openp41geWindowManager extends LitElement {
     window.removeEventListener("resize", this._measureListOverflow);
     document.removeEventListener("keydown", this._onKeydown);
     document.removeEventListener("click", this._onDocumentClick);
+    this._offEndSession?.();
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
   }
@@ -148,11 +154,13 @@ class Openp41geWindowManager extends LitElement {
     // open affordance on top of the already-open window.
     if (isOpen) return;
     this._teardownDrag();
-    const winCount = this._workspaces.find((w) => w.filePath === path)?.data.windows?.length ?? 1;
+    const ws = this._workspaces.find((w) => w.filePath === path);
+    const winCount = ws?.data.windows?.length ?? 1;
     this._drag = {
       startX: e.clientX,
       startY: e.clientY,
       path,
+      label: ws?.data.name?.trim() || "Unnamed",
       active: false,
       mode: null,
       windowCount: Math.max(1, winCount),
@@ -177,13 +185,30 @@ class Openp41geWindowManager extends LitElement {
       // Horizontal swipe → carousel; vertical drag → open the workspace window.
       drag.mode = Math.abs(dx) > Math.abs(dy) ? "carousel" : "open";
       if (drag.mode === "open") {
-        this._dragGhost = this._makeDragGhost(e.currentTarget as HTMLElement);
+        // Start a real (native) drag so it can leave the window. The main
+        // process opens the workspace when the cursor leaves this window.
+        window.openp41ge.drag.start(
+          drag.label,
+          e.screenX,
+          e.screenY,
+          "🗂",
+          undefined,
+          undefined,
+          undefined,
+          132,
+          84,
+          66,
+          42,
+          "workspace",
+          drag.path,
+        );
+        window.openp41ge.drag.activate();
       } else {
         this._carouselTrack = (e.currentTarget as HTMLElement).querySelector(".ws-carousel-track");
       }
     }
     if (drag.mode === "open") {
-      if (this._dragGhost) this._positionGhost(e.clientX, e.clientY);
+      window.openp41ge.drag.move(e.screenX, e.screenY);
     } else if (drag.mode === "carousel") {
       const width = (e.currentTarget as HTMLElement).clientWidth || 132;
       const step = Math.max(20, width / 2);
@@ -193,16 +218,18 @@ class Openp41geWindowManager extends LitElement {
     }
   }
 
-  /** Release: a vertical drag-out opens the workspace window; a swipe just commits. */
+  /** Release: a vertical drag-out is handled by the main process (opens only if it left the window). */
   private _onThumbPointerUp(): void {
     const drag = this._drag;
     if (!drag) return;
-    const { active, mode, path } = drag;
     this._teardownDrag();
-    if (mode === "open" && active) this._openWorkspaceWindow(path);
+    if (drag.mode === "open") window.openp41ge.drag.end();
   }
 
   private _onThumbPointerCancel(): void {
+    const drag = this._drag;
+    if (!drag) return;
+    if (drag.mode === "open") window.openp41ge.drag.end();
     this._teardownDrag();
   }
 
@@ -220,29 +247,9 @@ class Openp41geWindowManager extends LitElement {
     }
   }
 
-  private _makeDragGhost(src: HTMLElement): HTMLElement {
-    const ghost = src.cloneNode(true) as HTMLElement;
-    ghost.classList.add("drag-ghost");
-    ghost.style.position = "fixed";
-    ghost.style.zIndex = "9999";
-    ghost.style.pointerEvents = "none";
-    this.shadowRoot?.appendChild(ghost);
-    return ghost;
-  }
-
-  private _positionGhost(x: number, y: number): void {
-    if (!this._dragGhost) return;
-    this._dragGhost.style.left = `${x - this._dragGhost.offsetWidth / 2}px`;
-    this._dragGhost.style.top = `${y - this._dragGhost.offsetHeight / 2}px`;
-  }
-
   private _teardownDrag(): void {
     this._drag = null;
     this._carouselTrack = null;
-    if (this._dragGhost) {
-      this._dragGhost.remove();
-      this._dragGhost = null;
-    }
   }
 
   /** Escape cancels delete modes, closes an add card, or closes the crumb menu. */
@@ -287,6 +294,12 @@ class Openp41geWindowManager extends LitElement {
   private _openWorkspaceWindow(path: string): void {
     window.openp41ge.windowManager.openWorkspaceWindow(path);
     window.setTimeout(() => void this._load(), 350);
+  }
+
+  /** Clicking the row's "Open" pill opens the workspace window (no drawer). */
+  private _onRowPillOpen(e: Event, path: string): void {
+    e.stopPropagation();
+    this._openWorkspaceWindow(path);
   }
 
   /** Reset the transient add/delete modes when the drawer stack navigates. */
@@ -847,6 +860,13 @@ class Openp41geWindowManager extends LitElement {
   render(): TemplateResult {
     // Workspaces that already have at least one live workspace window.
     const openPaths = this._openPaths;
+    // Live window count per open workspace path.
+    const windowCounts = new Map<string, number>();
+    for (const w of this._openWindows) {
+      if (w.windowType === "workspace" && w.workspacePath) {
+        windowCounts.set(w.workspacePath, (windowCounts.get(w.workspacePath) ?? 0) + 1);
+      }
+    }
 
     return html`
       <style>
@@ -904,7 +924,7 @@ class Openp41geWindowManager extends LitElement {
         li.ws-row {
           position: relative;
           display: flex;
-          align-items: center;
+          align-items: stretch;
           gap: 12px;
           padding: 10px 16px;
           cursor: pointer;
@@ -926,7 +946,28 @@ class Openp41geWindowManager extends LitElement {
           font-weight: 600;
         }
         .ws-meta { color: var(--text-secondary, #999); font-size: 12px; }
-        .ws-chevron { flex-shrink: 0; display: block; color: var(--accent, #569cd6); }
+        /* Bottom-left action pills (Open + window count) in each row. */
+        .ws-pills { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+        .ws-pill {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 2px 9px;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: inherit;
+          color: var(--text-secondary, #999);
+          background: var(--bg-active, #37373d);
+          white-space: nowrap;
+          user-select: none;
+        }
+        .ws-pill--open {
+          color: var(--accent, #569cd6);
+          background: rgba(86, 156, 214, 0.15);
+          cursor: pointer;
+        }
+        .ws-pill--open:hover { background: rgba(86, 156, 214, 0.25); }
+        .ws-chevron { flex-shrink: 0; display: block; align-self: center; color: var(--accent, #569cd6); }
 
         /* Mini workspace-window skeleton: title bar + carousel of window layouts. */
         .ws-thumb {
@@ -986,12 +1027,6 @@ class Openp41geWindowManager extends LitElement {
         }
         .ws-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-secondary, #999); opacity: 0.4; }
         .ws-dot--active { opacity: 1; background: var(--accent, #569cd6); }
-        /* The floating ghost while dragging a skeleton out of the picker. */
-        .drag-ghost {
-          filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.6));
-          opacity: 0.92;
-          cursor: grabbing;
-        }
         /* Workspace-list delete mode + inline "new workspace" row. */
         .ws-row--select { cursor: pointer; }
         .ws-row--new {
@@ -1311,6 +1346,7 @@ class Openp41geWindowManager extends LitElement {
           border: 1px solid var(--text-secondary, #999);
           border-radius: 3px;
           flex-shrink: 0;
+          align-self: center;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -1407,6 +1443,14 @@ class Openp41geWindowManager extends LitElement {
                           <div class="ws-info">
                             <div class="ws-name">${name}</div>
                             <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>
+                            ${this._workspaceDeleteMode
+                              ? nothing
+                              : html`
+                                  <div class="ws-pills">
+                                    <span class="ws-pill ws-pill--open" role="button" tabindex="0" @click=${(e: Event) => this._onRowPillOpen(e, w.filePath)}>Open</span>
+                                    <span class="ws-pill">${this._countLabel(windowCounts.get(w.filePath) ?? 0, "window")}</span>
+                                  </div>
+                                `}
                           </div>
                           ${this._workspaceDeleteMode
                             ? html`<span class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"></span>`
