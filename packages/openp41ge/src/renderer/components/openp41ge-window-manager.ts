@@ -895,7 +895,9 @@ class Openp41geWindowManager extends LitElement {
           position: absolute;
           inset: 0;
           overflow-y: auto;
-          padding: 20px;
+          /* No horizontal padding so rows + separators span the full window width;
+             the rows keep their own content inset. */
+          padding: 20px 0;
           box-sizing: border-box;
         }
         ul { list-style: none; margin: 0; padding: 0; }
@@ -904,7 +906,7 @@ class Openp41geWindowManager extends LitElement {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 10px 12px;
+          padding: 10px 16px;
           cursor: pointer;
           border-bottom: 1px solid var(--divider, #2f3031);
           transition: background 0.1s ease;
@@ -1027,7 +1029,7 @@ class Openp41geWindowManager extends LitElement {
           border-radius: 4px;
           background: rgba(86, 156, 214, 0.35);
         }
-        .empty { color: var(--text-secondary, #777); font-size: 13px; }
+        .empty { color: var(--text-secondary, #777); font-size: 13px; padding: 0 16px; }
         /* ── Drawer ─────────────────────────────────────────────── */
         /* A single shared shadow element whose width tracks the widest drawer,
            so the stack never stacks multiple shadows on top of each other. */
