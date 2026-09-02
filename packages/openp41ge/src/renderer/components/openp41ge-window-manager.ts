@@ -68,6 +68,8 @@ class Openp41geWindowManager extends LitElement {
   private _pressTimer: number | null = null;
   private _pressTriggered = false;
   private static readonly LONG_PRESS_MS = 500;
+  /** Grace period before the fill animates — a click released before this shows nothing. */
+  private static readonly LONG_PRESS_DELAY_MS = 150;
   private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
@@ -125,7 +127,8 @@ class Openp41geWindowManager extends LitElement {
     this._pressProgress = 0;
   }
 
-  /** Begin a long-press on a top-level card: fill left-to-right, then open. */
+  /** Begin a long-press on a top-level card. After a short grace period the fill
+   *  animates left-to-right; when it completes the workspace window opens. */
   private _onCardPointerDown(e: PointerEvent, filePath: string, isOpen: boolean): void {
     if (this._workspaceDeleteMode || isOpen || e.button !== 0) return;
     this._clearPress();
@@ -133,9 +136,18 @@ class Openp41geWindowManager extends LitElement {
     this._pressingPath = filePath;
     this._pressProgress = 0;
     const start = performance.now();
+    const grace = Openp41geWindowManager.LONG_PRESS_DELAY_MS;
+    const duration = Openp41geWindowManager.LONG_PRESS_MS - grace;
     const timer = window.setInterval(() => {
-      this._pressProgress = Math.min(1, (performance.now() - start) / Openp41geWindowManager.LONG_PRESS_MS);
-      if (this._pressProgress >= 1) {
+      const elapsed = performance.now() - start;
+      // Hold still before the grace period: a release is a plain click, no fill.
+      if (elapsed < grace) {
+        this._pressProgress = 0;
+        return;
+      }
+      // Once the long-press is determined, fill over the remaining time.
+      this._pressProgress = Math.min(1, (elapsed - grace) / duration);
+      if (elapsed >= Openp41geWindowManager.LONG_PRESS_MS) {
         window.clearInterval(timer);
         this._pressTimer = null;
         this._pressTriggered = true;
@@ -581,7 +593,41 @@ class Openp41geWindowManager extends LitElement {
         </div>
       `;
     }
+    if (d.kind === "worktree") {
+      return html`
+        <div class="drawer-footer">
+          ${!this._openPaths.has(d.workspacePath)
+            ? html`<button class="dw-open" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(d.workspacePath); }}>Open</button>`
+            : nothing}
+          <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); void this._deleteWorktree(d); }} aria-label="Delete worktree" data-tip="Delete worktree">
+            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
+          </button>
+        </div>
+      `;
+    }
     return nothing;
+  }
+
+  /** Delete the worktree the drawer currently points at, then return to its repo. */
+  private async _deleteWorktree(d: DrawerState): Promise<void> {
+    const worktree = d.worktree ?? "";
+    const data: WorkspaceFileData = {
+      ...d.data,
+      repos: (d.data.repos ?? []).map((r) =>
+        r.url === d.repoUrl
+          ? { ...r, worktrees: (r.worktrees ?? []).filter((wt) => wt !== worktree) }
+          : r,
+      ),
+    };
+    try {
+      await window.openp41ge.dialog.writeWorkspaceFile(d.workspacePath, data);
+    } catch {
+      return;
+    }
+    this._drawers = this._drawers.map((x) => (x.id === d.id ? { ...x, data } : x));
+    const idx = this._drawers.findIndex((x) => x.id === d.id);
+    if (idx >= 0) this._closeDeeper(idx - 1);
+    await this._load();
   }
 
   private _closeDrawer(id: string): void {
@@ -705,13 +751,18 @@ class Openp41geWindowManager extends LitElement {
     this._closeDeeper(index);
   }
 
-  render(): TemplateResult {
-    // Workspaces that already have at least one live workspace window.
-    const openPaths = new Set(
+  /** Workspace paths that already have at least one live workspace window. */
+  private get _openPaths(): Set<string> {
+    return new Set(
       this._openWindows
         .filter((w) => w.windowType === "workspace" && w.workspacePath)
         .map((w) => w.workspacePath as string),
     );
+  }
+
+  render(): TemplateResult {
+    // Workspaces that already have at least one live workspace window.
+    const openPaths = this._openPaths;
     // Live window count per open workspace path.
     const windowCounts = new Map<string, number>();
     for (const w of this._openWindows) {
