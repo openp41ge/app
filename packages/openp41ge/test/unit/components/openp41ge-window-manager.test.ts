@@ -131,4 +131,45 @@ describe("Openp41geWindowManager skeleton drag", () => {
     const captureRect = args[args.length - 2];
     expect(captureRect).toEqual({ x: 10, y: 20, width: 132, height: 84 });
   });
+
+  it("steps the carousel between window skeletons via _gotoCarousel", () => {
+    wm._workspaces = [{ filePath: "/w/two", data: { name: "Two", windows: [{}, {}] } }] as never;
+    (wm as Wm)._gotoCarousel("/w/two", 1);
+    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);
+    expect(wm._carouselLive).toBe(false);
+    (wm as Wm)._gotoCarousel("/w/two", 0);
+    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(0);
+  });
+
+  it("clamps carousel navigation at the edges", () => {
+    wm._workspaces = [{ filePath: "/w/two", data: { name: "Two", windows: [{}, {}] } }] as never;
+    (wm as Wm)._gotoCarousel("/w/two", 9); // beyond last
+    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);
+    (wm as Wm)._gotoCarousel("/w/two", -3); // before first
+    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(0);
+  });
+
+  it("marks the carousel as live (no transition) while swiping, then clears it", () => {
+    wm._workspaces = [{ filePath: "/w/two", data: { name: "Two", windows: [{}, {}] } }] as never;
+    (wm as Wm)._drag = {
+      startX: 50,
+      startY: 40,
+      startScreenX: 200,
+      startScreenY: 300,
+      captureRect: null,
+      path: "/w/two",
+      label: "Two",
+      active: true,
+      mode: "carousel",
+      windowCount: 2,
+      baseIndex: 0,
+    } as never;
+    const move = new PointerEvent("pointermove", { clientX: 10, clientY: 42, screenX: 160, screenY: 302 });
+    Object.defineProperty(move, "currentTarget", { value: { clientWidth: 132 } });
+    (wm as Wm)._onThumbPointerMove(move as PointerEvent);
+    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);
+    expect(wm._carouselLive).toBe(true);
+    (wm as Wm)._teardownDrag();
+    expect(wm._carouselLive).toBe(false);
+  });
 });
