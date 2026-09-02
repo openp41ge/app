@@ -287,24 +287,6 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     };
   });
 
-  // ── Was the drop point outside the source window? (workspace drag-out) ──
-  // The source window keeps receiving mouse events while the button is held
-  // (macOS implicit capture), so on mouseup we ask whether the release point was
-  // outside the source window before deciding to open the workspace.
-  ipcMain.handle("openp41ge:drag-is-outside", async (_event, data: string) => {
-    const parsed = JSON.parse(data) as { screenX: number; screenY: number };
-    if (!_activeSession) return false;
-    const source = openp41geWindows.get(_activeSession.sourceWinId);
-    if (!source || source.isDestroyed()) return false;
-    const b = source.getBounds();
-    return (
-      parsed.screenX < b.x ||
-      parsed.screenX > b.x + b.width ||
-      parsed.screenY < b.y ||
-      parsed.screenY > b.y + b.height
-    );
-  });
-
   // ── Cross-window drag check (resolve drop target in another window) ─────
 
   ipcMain.handle("openp41ge:drag-check", async (_event, data: string) => {

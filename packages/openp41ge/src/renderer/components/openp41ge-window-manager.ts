@@ -241,13 +241,21 @@ class Openp41geWindowManager extends LitElement {
   }
 
   /** Release: open the workspace only if the cursor was outside this window at the drop. */
-  private async _onThumbPointerUp(e: PointerEvent): Promise<void> {
+  private _onThumbPointerUp(e: PointerEvent): void {
     const drag = this._drag;
     if (!drag) return;
     const { mode, path } = drag;
     this._teardownDrag();
     if (mode === "open") {
-      const outside = await window.openp41ge.drag.isOutside(e.screenX, e.screenY);
+      // Compute outside synchronously (window.screenX/screenY match the main
+      // process window bounds) and end the drag in the same tick. Awaiting an
+      // IPC before drag.end() left a window in which a second drag could start
+      // and have its session/ghost clobbered by the delayed drag.end().
+      const outside =
+        e.screenX < window.screenX ||
+        e.screenX > window.screenX + window.outerWidth ||
+        e.screenY < window.screenY ||
+        e.screenY > window.screenY + window.outerHeight;
       window.openp41ge.drag.end();
       if (outside) this._openWorkspaceWindow(path);
     }
