@@ -254,7 +254,9 @@ class Openp41geWindowManager extends LitElement {
               `
             : html`
                 <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} title="Add repo" aria-label="Add repo">＋</button>
-                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }}>Delete</button>
+                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }} title="Delete repos" aria-label="Delete repos">
+                  <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
+                </button>
               `}
         </div>
       `;
@@ -583,10 +585,23 @@ class Openp41geWindowManager extends LitElement {
           cursor: pointer;
         }
         .dw-delete {
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          padding: 0;
+        }
+        .dw-delete:hover {
           background: rgba(224, 108, 117, 0.15);
           color: #e06c75;
         }
-        .dw-delete:hover { background: rgba(224, 108, 117, 0.25); }
+        .dw-delete svg { fill: currentColor; }
         .dw-delete-confirm {
           background: #e06c75;
           color: #fff;
