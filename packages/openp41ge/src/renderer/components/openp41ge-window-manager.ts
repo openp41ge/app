@@ -1140,20 +1140,19 @@ export class Openp41geWindowManager extends LitElement {
           padding: 0;
           border-radius: 50%;
           border: none;
-          background: rgba(0, 0, 0, 0.55);
+          background: rgba(0, 0, 0, 0.35);
           color: var(--text-primary, #ddd);
-          font-size: 12px;
-          line-height: 1;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
           opacity: 0;
           pointer-events: none;
-          transition: opacity 0.12s ease;
+          transition: opacity 0.12s ease, background 0.12s ease;
           z-index: 2;
         }
-        .ws-carousel-arrow:hover { background: rgba(0, 0, 0, 0.75); }
+        .ws-carousel-arrow:hover { background: rgba(0, 0, 0, 0.55); }
+        .ws-carousel-arrow svg { display: block; }
         .ws-carousel-arrow:disabled { opacity: 0; pointer-events: none; }
         .ws-carousel-arrow--prev { left: 4px; }
         .ws-carousel-arrow--next { right: 4px; }
@@ -1581,7 +1580,7 @@ export class Openp41geWindowManager extends LitElement {
                                         e.stopPropagation();
                                         this._gotoCarousel(w.filePath, idx - 1);
                                       }}
-                                    >‹</button>
+                                    ><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
                                     <button
                                       class="ws-carousel-arrow ws-carousel-arrow--next"
                                       ?disabled=${idx === wins.length - 1}
@@ -1591,7 +1590,7 @@ export class Openp41geWindowManager extends LitElement {
                                         e.stopPropagation();
                                         this._gotoCarousel(w.filePath, idx + 1);
                                       }}
-                                    >›</button>
+                                    ><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
                                   `
                                 : nothing}
                             </div>
