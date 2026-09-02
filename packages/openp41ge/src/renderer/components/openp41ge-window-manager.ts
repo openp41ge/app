@@ -382,11 +382,11 @@ class Openp41geWindowManager extends LitElement {
           ${this._deleteMode
             ? html`
                 <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }} data-tip="Cancel">Cancel</button>
-                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedRepos(d); }} data-tip="Delete selected repos" ?disabled=${this._selectedRepos.size === 0}>Delete</button>
+                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedRepos(d); }} data-tip="Delete selected repositories" ?disabled=${this._selectedRepos.size === 0}>Delete</button>
               `
             : html`
-                <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} aria-label="Add repo" data-tip="Add repo">＋</button>
-                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }} aria-label="Delete repos" data-tip="Delete repos">
+                <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} aria-label="Add repository" data-tip="Add repository">＋</button>
+                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }} aria-label="Delete repositories" data-tip="Delete repositories">
                   <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
                 </button>
               `}
