@@ -62,12 +62,14 @@ class Openp41geWindowManager extends LitElement {
   @state() private _addingWorktree = false;
   @state() private _worktreeDeleteMode = false;
   @state() private _selectedWorktrees: Set<string> = new Set();
+  @state() private _crumbsOpen = false;
   private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener("focus", this._onFocus);
     document.addEventListener("keydown", this._onKeydown);
+    document.addEventListener("click", this._onDocumentClick);
     void this._load();
   }
 
@@ -75,6 +77,7 @@ class Openp41geWindowManager extends LitElement {
     super.disconnectedCallback();
     window.removeEventListener("focus", this._onFocus);
     document.removeEventListener("keydown", this._onKeydown);
+    document.removeEventListener("click", this._onDocumentClick);
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
   }
@@ -100,9 +103,21 @@ class Openp41geWindowManager extends LitElement {
     this._tooltipTargets = [...live];
   }
 
-  /** Escape cancels an active delete mode, or closes any open add card. */
+  /** A click outside the breadcrumb trail closes the collapse menu. */
+  private _onDocumentClick = (e: MouseEvent): void => {
+    if (!this._crumbsOpen) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.(".crumbs")) return;
+    this._crumbsOpen = false;
+  };
+
+  /** Escape cancels delete modes, closes an add card, or closes the crumb menu. */
   private _onKeydown = (e: KeyboardEvent): void => {
     if (e.key !== "Escape") return;
+    if (this._crumbsOpen) {
+      this._crumbsOpen = false;
+      return;
+    }
     if (this._addingRepo || this._addingWorkspace || this._addingWorktree) {
       this._addingRepo = false;
       this._addingWorkspace = false;
@@ -590,6 +605,60 @@ class Openp41geWindowManager extends LitElement {
     return `${n} ${n === 1 ? singular : singular + "s"}`;
   }
 
+  /** The path of drawer titles leading up to (and including) drawer `i`. */
+  private _breadcrumbModel(i: number): {
+    visible: Array<{ label: string; index: number }>;
+    hidden: Array<{ label: string; index: number }>;
+    collapsed: boolean;
+  } {
+    const crumbs = this._drawers.slice(0, i + 1).map((d, idx) => ({ label: d.title, index: idx }));
+    const total = crumbs.reduce((n, c) => n + c.label.length, 0);
+    // Collapse the earlier crumbs into the … menu when the trail is too long.
+    const collapsed = crumbs.length > 4 || total > 52;
+    const tail = 2;
+    return collapsed
+      ? { visible: crumbs.slice(-tail), hidden: crumbs.slice(0, crumbs.length - tail), collapsed }
+      : { visible: crumbs, hidden: [], collapsed };
+  }
+
+  /** Breadcrumb trail for the top drawer; earlier levels navigate back. */
+  private _drawerBreadcrumbs(i: number): TemplateResult {
+    const { visible, hidden, collapsed } = this._breadcrumbModel(i);
+    const parts: TemplateResult[] = [];
+    if (collapsed) {
+      parts.push(html`
+        <span class="crumbs-more">
+          <button
+            class="crumbs-ellipsis"
+            @click=${(e: Event) => { e.stopPropagation(); this._crumbsOpen = !this._crumbsOpen; }}
+            aria-label="Show earlier locations"
+            aria-expanded=${this._crumbsOpen}
+          >…</button>
+          ${this._crumbsOpen
+            ? html`<menu class="crumbs-menu" @click=${(e: Event) => e.stopPropagation()}>
+                ${hidden.map((c) => html`<li><button class="crumbs-menu-item" @click=${(e: Event) => { e.stopPropagation(); this._navigateCrumb(c.index); }}>${c.label}</button></li>`)}
+              </menu>`
+            : nothing}
+        </span>
+      `);
+    }
+    visible.forEach((c, k) => {
+      if (parts.length > 0) parts.push(html`<span class="crumbs-sep">/</span>`);
+      if (k === visible.length - 1) {
+        parts.push(html`<span class="crumbs-current">${c.label}</span>`);
+      } else {
+        parts.push(html`<button class="crumbs-item" @click=${(e: Event) => { e.stopPropagation(); this._navigateCrumb(c.index); }}>${c.label}</button>`);
+      }
+    });
+    return html`<nav class="crumbs" @click=${(e: Event) => e.stopPropagation()}>${parts}</nav>`;
+  }
+
+  /** Navigate back to a drawer level, closing every deeper drawer. */
+  private _navigateCrumb(index: number): void {
+    this._crumbsOpen = false;
+    this._closeDeeper(index);
+  }
+
   render(): TemplateResult {
     // Workspaces that already have at least one live workspace window.
     const openPaths = new Set(
@@ -822,6 +891,85 @@ class Openp41geWindowManager extends LitElement {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+        .crumbs {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          overflow: hidden;
+          white-space: nowrap;
+        }
+        .crumbs-sep { color: var(--text-secondary, #999); margin: 0 2px; flex-shrink: 0; }
+        .crumbs-item {
+          border: none;
+          background: transparent;
+          color: var(--accent, #569cd6);
+          font-size: 13px;
+          padding: 2px 4px;
+          border-radius: 4px;
+          cursor: pointer;
+          max-width: 20em;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          flex-shrink: 1;
+          min-width: 0;
+        }
+        .crumbs-item:hover { background: var(--bg-active, #37373d); }
+        .crumbs-current {
+          color: var(--text-primary, #e8e8e8);
+          font-size: 13px;
+          font-weight: 600;
+          max-width: 20em;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          flex-shrink: 1;
+          min-width: 0;
+        }
+        .crumbs-more { position: relative; display: inline-flex; flex-shrink: 0; }
+        .crumbs-ellipsis {
+          border: none;
+          background: transparent;
+          color: var(--accent, #569cd6);
+          font-size: 13px;
+          padding: 2px 6px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .crumbs-ellipsis:hover { background: var(--bg-active, #37373d); }
+        .crumbs-menu {
+          position: absolute;
+          top: 26px;
+          left: 0;
+          z-index: 30;
+          min-width: 180px;
+          max-height: 260px;
+          overflow-y: auto;
+          margin: 0;
+          padding: 4px;
+          list-style: none;
+          background: var(--bg-secondary, #252526);
+          border: 1px solid var(--divider, #333);
+          border-radius: 6px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        .crumbs-menu-item {
+          width: 100%;
+          border: none;
+          background: transparent;
+          color: var(--text-primary, #e8e8e8);
+          font-size: 13px;
+          text-align: left;
+          padding: 6px 10px;
+          border-radius: 4px;
+          cursor: pointer;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .crumbs-menu-item:hover { background: var(--bg-active, #37373d); }
         .drawer-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .dw-open {
           border: none;
@@ -1043,7 +1191,9 @@ class Openp41geWindowManager extends LitElement {
                   ? html`<div class="drawer-mask" @click=${(e: Event) => { e.stopPropagation(); this._closeDeeper(i); }}></div>`
                   : nothing}
                 <div class="drawer-head">
-                  <span class="drawer-title">${d.title}</span>
+                  ${i === this._drawers.length - 1
+                    ? this._drawerBreadcrumbs(i)
+                    : html`<span class="drawer-title">${d.title}</span>`}
                   <div class="drawer-actions">
                     ${d.kind === "workspace" && !openPaths.has(d.workspacePath)
                       ? html`<button class="dw-open" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(d.workspacePath); }}>Open</button>`
