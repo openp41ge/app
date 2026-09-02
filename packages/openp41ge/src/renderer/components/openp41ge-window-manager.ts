@@ -603,6 +603,7 @@ class Openp41geWindowManager extends LitElement {
 
     return html`
       <style>
+        *, *::before, *::after { box-sizing: border-box; }
         :host {
           display: flex;
           height: 100vh;
