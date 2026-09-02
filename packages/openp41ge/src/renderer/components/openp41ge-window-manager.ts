@@ -897,7 +897,7 @@ class Openp41geWindowManager extends LitElement {
           display: flex;
           align-items: center;
           gap: 2px;
-          overflow: hidden;
+          overflow: visible;
           white-space: nowrap;
         }
         .crumbs-sep { color: var(--text-secondary, #999); margin: 0 2px; flex-shrink: 0; }
