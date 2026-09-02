@@ -797,6 +797,7 @@ class Openp41geWindowManager extends LitElement {
         .drawer--closing {
           animation: dw-slide-out 0.18s ease forwards;
           pointer-events: none;
+          z-index: 1000;
         }
         .drawer-head {
           display: flex;
@@ -1032,7 +1033,7 @@ class Openp41geWindowManager extends LitElement {
             : nothing}
           ${this._drawers.map(
             (d, i) => html`
-              <div class="drawer" style="width:${this._widthFor(i)}%">
+              <div class="drawer" style="width:${this._widthFor(i)}%; z-index:${i + 1}">
                 ${i < this._drawers.length - 1
                   ? html`<div class="drawer-mask" @click=${(e: Event) => { e.stopPropagation(); this._closeDeeper(i); }}></div>`
                   : nothing}
