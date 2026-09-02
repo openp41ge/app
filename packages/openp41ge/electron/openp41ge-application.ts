@@ -38,6 +38,7 @@ import {
   openWindowManager,
   setOpenWorkspaceWindowHandler,
   setAppQuitting,
+  focusWorkspaceWindow,
 } from "./window-manager.js";
 
 // ─── IPC handler registrations ──────────────────────────────────────────
@@ -338,6 +339,14 @@ export class Openp41geApplication {
    */
   private _openWorkspaceSession(workspacePath: string, source?: BrowserWindow): void {
     this.workspaceSessionStore.setCurrentWorkspacePath(workspacePath);
+    // If a workspace window for this path is already open, focus it rather than
+    // re-creating every window in the file. Unconditional re-creation produced
+    // duplicate BrowserWindows (same id, map overwrite) and left stale windows
+    // in the file desynced from the live set — e.g. a window id shared across
+    // two workspace files, or a window in the file with no live BrowserWindow.
+    if (focusWorkspaceWindow(workspacePath)) {
+      return;
+    }
     const restored = this.workspaceSessionStore.load(workspacePath);
     if (restored && restored.windows.length > 0) {
       this.dispatcher.setWorkspace(restored);
