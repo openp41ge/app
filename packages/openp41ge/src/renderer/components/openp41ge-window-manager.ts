@@ -100,10 +100,14 @@ class Openp41geWindowManager extends LitElement {
     this._tooltipTargets = [...live];
   }
 
-  /** Escape cancels an active delete mode. */
+  /** Escape cancels an active delete mode, or closes any open add card. */
   private _onKeydown = (e: KeyboardEvent): void => {
     if (e.key !== "Escape") return;
-    if (this._workspaceDeleteMode) this._cancelWorkspaceDeleteMode();
+    if (this._addingRepo || this._addingWorkspace || this._addingWorktree) {
+      this._addingRepo = false;
+      this._addingWorkspace = false;
+      this._addingWorktree = false;
+    } else if (this._workspaceDeleteMode) this._cancelWorkspaceDeleteMode();
     else if (this._deleteMode) this._cancelDeleteMode();
     else if (this._worktreeDeleteMode) this._cancelWorktreeDeleteMode();
   };
