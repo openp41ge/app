@@ -53,6 +53,8 @@ class Openp41geWindowManager extends LitElement {
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
   @state() private _addingRepo = false;
+  @state() private _deleteMode = false;
+  @state() private _selectedRepos: Set<string> = new Set();
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -93,9 +95,16 @@ class Openp41geWindowManager extends LitElement {
     window.setTimeout(() => void this._load(), 350);
   }
 
+  /** Reset the transient add/delete modes when the drawer stack navigates. */
+  private _resetDrawerModes(): void {
+    this._addingRepo = false;
+    this._deleteMode = false;
+    this._selectedRepos = new Set();
+  }
+
   /** Clicking a top-level card resets the drawer stack to that workspace's detail. */
   private _openWorkspace(ws: { filePath: string; data: WorkspaceFileData }): void {
-    this._addingRepo = false;
+    this._resetDrawerModes();
     this._drawers = [
       {
         id: this._nextId(),
@@ -109,7 +118,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Drill from a workspace drawer into one of its repositories. */
   private _openRepo(d: DrawerState, repo: { url: string; worktrees: string[] }): void {
-    this._addingRepo = false;
+    this._resetDrawerModes();
     this._drawers = [
       ...this._drawers,
       {
@@ -125,7 +134,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Drill from a repo drawer into one of its worktrees. */
   private _openWorktree(d: DrawerState, worktree: string): void {
-    this._addingRepo = false;
+    this._resetDrawerModes();
     this._drawers = [
       ...this._drawers,
       {
@@ -142,6 +151,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Toggle the inline "add repo" row in the workspace drawer. */
   private _toggleAddRepo(): void {
+    this._deleteMode = false;
     this._addingRepo = !this._addingRepo;
     if (this._addingRepo) {
       void this.updateComplete.then(() => {
@@ -192,7 +202,68 @@ class Openp41geWindowManager extends LitElement {
     await this._load();
   }
 
+  /** Enter delete mode: repo cards become checkbox-selectable. */
+  private _activateDeleteMode(): void {
+    this._addingRepo = false;
+    this._deleteMode = true;
+    this._selectedRepos = new Set();
+  }
+
+  /** Leave delete mode and clear any selection. */
+  private _cancelDeleteMode(): void {
+    this._deleteMode = false;
+    this._selectedRepos = new Set();
+  }
+
+  /** Toggle whether a repo card is selected for deletion. */
+  private _toggleRepoSelection(url: string): void {
+    const next = new Set(this._selectedRepos);
+    if (next.has(url)) next.delete(url);
+    else next.add(url);
+    this._selectedRepos = next;
+  }
+
+  /** Remove every selected repo from the workspace file, then refresh. */
+  private async _deleteSelectedRepos(d: DrawerState): Promise<void> {
+    const selected = this._selectedRepos;
+    this._deleteMode = false;
+    this._selectedRepos = new Set();
+    if (selected.size === 0) return;
+    const data: WorkspaceFileData = {
+      ...d.data,
+      repos: (d.data.repos ?? []).filter((r) => !selected.has(r.url)),
+    };
+    try {
+      await window.openp41ge.dialog.writeWorkspaceFile(d.workspacePath, data);
+    } catch {
+      return;
+    }
+    this._drawers = this._drawers.map((x) => (x.id === d.id ? { ...x, data } : x));
+    await this._load();
+  }
+
+  /** Footer bar specific to a drawer kind (add / delete controls). */
+  private _drawerFooter(d: DrawerState): TemplateResult | typeof nothing {
+    if (d.kind === "workspace") {
+      return html`
+        <div class="drawer-footer">
+          ${this._deleteMode
+            ? html`
+                <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }}>Cancel</button>
+                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedRepos(d); }} ?disabled=${this._selectedRepos.size === 0}>Delete</button>
+              `
+            : html`
+                <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} title="Add repo" aria-label="Add repo">＋</button>
+                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }}>Delete</button>
+              `}
+        </div>
+      `;
+    }
+    return nothing;
+  }
+
   private _closeDrawer(id: string): void {
+    this._resetDrawerModes();
     const idx = this._drawers.findIndex((d) => d.id === id);
     if (idx === -1) return;
     const width = this._widthFor(idx);
@@ -203,6 +274,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Close every drawer deeper than `index` (clicking a parent/grandparent sliver). */
   private _closeDeeper(index: number): void {
+    this._resetDrawerModes();
     const closing = this._drawers
       .slice(index + 1)
       .map((d, i) => ({ ...d, width: this._widthFor(index + 1 + i) }));
@@ -212,6 +284,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Close every drawer (background click). */
   private _closeAll(): void {
+    this._resetDrawerModes();
     const closing = this._drawers.map((d, i) => ({ ...d, width: this._widthFor(i) }));
     this._drawers = [];
     this._finalizeClose(closing);
@@ -479,6 +552,7 @@ class Openp41geWindowManager extends LitElement {
         .drawer-footer {
           display: flex;
           align-items: center;
+          gap: 6px;
           flex-shrink: 0;
           height: 44px;
           padding: 0 14px;
@@ -499,6 +573,35 @@ class Openp41geWindowManager extends LitElement {
           user-select: none;
         }
         .dw-add:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
+        .dw-delete,
+        .dw-delete-confirm {
+          border: none;
+          border-radius: 4px;
+          padding: 4px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .dw-delete {
+          background: rgba(224, 108, 117, 0.15);
+          color: #e06c75;
+        }
+        .dw-delete:hover { background: rgba(224, 108, 117, 0.25); }
+        .dw-delete-confirm {
+          background: #e06c75;
+          color: #fff;
+        }
+        .dw-delete-confirm:disabled { opacity: 0.4; cursor: default; }
+        .dw-delete-cancel {
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          font-size: 12px;
+          font-weight: 600;
+          padding: 4px 10px;
+          cursor: pointer;
+        }
+        .dw-delete-cancel:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
         .dw-list { list-style: none; margin: 0; padding: 0; }
         .dw-item {
           display: flex;
@@ -527,6 +630,25 @@ class Openp41geWindowManager extends LitElement {
           padding: 0;
         }
         .dw-new-input::placeholder { color: var(--text-secondary, #777); }
+        .dw-item--selectable { cursor: pointer; }
+        .dw-item--selected { background: var(--bg-active, #37373d); }
+        .dw-checkbox {
+          width: 14px;
+          height: 14px;
+          border: 1px solid var(--text-secondary, #999);
+          border-radius: 3px;
+          flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: transparent;
+        }
+        .dw-checkbox--checked {
+          background: var(--accent, #569cd6);
+          border-color: var(--accent, #569cd6);
+          color: #fff;
+        }
+        .dw-checkbox--checked::after { content: "✓"; font-size: 11px; line-height: 1; }
         .dw-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dw-item-meta { color: var(--text-secondary, #999); font-size: 12px; }
         .dw-meta-block { color: var(--text-secondary, #999); font-size: 12px; line-height: 1.6; }
@@ -590,13 +712,7 @@ class Openp41geWindowManager extends LitElement {
                   </div>
                 </div>
                 <div class="drawer-body">${this._drawerContent(d)}</div>
-                ${d.kind === "workspace"
-                  ? html`
-                      <div class="drawer-footer">
-                        <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} title="Add repo" aria-label="Add repo">＋</button>
-                      </div>
-                    `
-                  : nothing}
+                ${this._drawerFooter(d)}
               </div>
             `,
           )}
@@ -638,7 +754,13 @@ class Openp41geWindowManager extends LitElement {
             : nothing}
           ${repos.map(
             (repo) => html`
-              <li class="dw-item" @click=${(e: Event) => { e.stopPropagation(); this._openRepo(d, repo); }}>
+              <li
+                class="dw-item ${this._deleteMode ? "dw-item--selectable" : ""} ${this._selectedRepos.has(repo.url) ? "dw-item--selected" : ""}"
+                @click=${(e: Event) => { e.stopPropagation(); if (this._deleteMode) this._toggleRepoSelection(repo.url); else this._openRepo(d, repo); }}
+              >
+                ${this._deleteMode
+                  ? html`<span class="dw-checkbox ${this._selectedRepos.has(repo.url) ? "dw-checkbox--checked" : ""}"></span>`
+                  : nothing}
                 <span class="dw-item-name">${deriveRepoName(repo.url)}</span>
                 <span class="dw-item-meta">${repo.worktrees?.length ?? 0} worktree${(repo.worktrees?.length ?? 0) === 1 ? "" : "s"}</span>
               </li>
