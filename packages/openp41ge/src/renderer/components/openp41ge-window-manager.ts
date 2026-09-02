@@ -296,10 +296,10 @@ class Openp41geWindowManager extends LitElement {
     window.setTimeout(() => void this._load(), 350);
   }
 
-  /** Clicking the row's "Open" pill opens the workspace window (no drawer). */
+  /** Clicking the row's "Open" pill focuses the already-open workspace window. */
   private _onRowPillOpen(e: Event, path: string): void {
     e.stopPropagation();
-    this._openWorkspaceWindow(path);
+    window.openp41ge.windowManager.focusWorkspaceWindow(path);
   }
 
   /** Reset the transient add/delete modes when the drawer stack navigates. */
@@ -860,13 +860,6 @@ class Openp41geWindowManager extends LitElement {
   render(): TemplateResult {
     // Workspaces that already have at least one live workspace window.
     const openPaths = this._openPaths;
-    // Live window count per open workspace path.
-    const windowCounts = new Map<string, number>();
-    for (const w of this._openWindows) {
-      if (w.windowType === "workspace" && w.workspacePath) {
-        windowCounts.set(w.workspacePath, (windowCounts.get(w.workspacePath) ?? 0) + 1);
-      }
-    }
 
     return html`
       <style>
@@ -1447,8 +1440,10 @@ class Openp41geWindowManager extends LitElement {
                               ? nothing
                               : html`
                                   <div class="ws-pills">
-                                    <span class="ws-pill ws-pill--open" role="button" tabindex="0" @click=${(e: Event) => this._onRowPillOpen(e, w.filePath)}>Open</span>
-                                    <span class="ws-pill">${this._countLabel(windowCounts.get(w.filePath) ?? 0, "window")}</span>
+                                    ${isOpen
+                                      ? html`<span class="ws-pill ws-pill--open" role="button" tabindex="0" @click=${(e: Event) => this._onRowPillOpen(e, w.filePath)}>Open</span>`
+                                      : nothing}
+                                    <span class="ws-pill">${this._countLabel(w.data.windows?.length ?? 0, "window")}</span>
                                   </div>
                                 `}
                           </div>

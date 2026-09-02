@@ -187,6 +187,10 @@ contextBridge.exposeInMainWorld("openp41ge", {
     openWorkspaceWindow: (workspacePath) => {
       ipcRenderer.send("window-manager:open-workspace-window", workspacePath);
     },
+    /** Focus the first live workspace window bound to `workspacePath` (if any). */
+    focusWorkspaceWindow: (workspacePath) => {
+      return ipcRenderer.invoke("window-manager:focus-workspace-window", workspacePath);
+    },
   },
 
   drag: {

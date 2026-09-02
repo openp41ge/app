@@ -303,6 +303,19 @@ export function openWorkspaceWindow(workspacePath: string, sourceWindow?: Browse
   }
 }
 
+/** Focus the first live workspace window bound to `workspacePath`, if any. */
+export function focusWorkspaceWindow(workspacePath: string): boolean {
+  for (const [id, bw] of openp41geWindows) {
+    if (bw.isDestroyed()) continue;
+    const meta = openp41geWindowMeta.get(id);
+    if (meta?.windowType !== "workspace" || meta.workspacePath !== workspacePath) continue;
+    if (bw.isMinimized()) bw.restore();
+    bw.focus();
+    return true;
+  }
+  return false;
+}
+
 // ─── Window lifecycle helpers ────────────────────────────────────────────
 
 export function closeOrphanedWindows(): void {

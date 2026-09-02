@@ -8,6 +8,7 @@ import {
   openWindowManager,
   getOpenWindowSummaries,
   openWorkspaceWindow,
+  focusWorkspaceWindow,
 } from "../window-manager.js";
 
 export function registerWindowManagerHandlers(): void {
@@ -17,6 +18,11 @@ export function registerWindowManagerHandlers(): void {
 
   ipcMain.handle("window-manager:open-window-summaries", () => {
     return getOpenWindowSummaries();
+  });
+
+  ipcMain.handle("window-manager:focus-workspace-window", (_event, workspacePath: string) => {
+    if (typeof workspacePath !== "string" || workspacePath.length === 0) return false;
+    return focusWorkspaceWindow(workspacePath);
   });
 
   ipcMain.on("window-manager:open-workspace-window", (event, workspacePath: string) => {

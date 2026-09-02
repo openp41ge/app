@@ -24,6 +24,7 @@ declare global {
         open: () => void;
         openWindowSummaries: () => Promise<Array<{ windowId: string; windowType: "workspace" | "window-manager"; workspacePath: string | null }>>;
         openWorkspaceWindow: (workspacePath: string) => void;
+        focusWorkspaceWindow: (workspacePath: string) => Promise<boolean>;
       };
       workspace: {
         getState: () => Promise<string>;
