@@ -246,7 +246,7 @@ class Openp41geWindowManager extends LitElement {
   private _drawerFooter(d: DrawerState): TemplateResult | typeof nothing {
     if (d.kind === "workspace") {
       return html`
-        <div class="drawer-footer">
+        <div class="drawer-footer ${this._deleteMode ? "drawer-footer--end" : ""}">
           ${this._deleteMode
             ? html`
                 <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }}>Cancel</button>
@@ -560,6 +560,8 @@ class Openp41geWindowManager extends LitElement {
           padding: 0 14px;
           border-top: 1px solid var(--divider, #333);
         }
+        /* In delete mode the footer controls are pushed to the right edge. */
+        .drawer-footer--end { justify-content: flex-end; }
         .dw-add {
           border: none;
           background: transparent;
@@ -578,7 +580,7 @@ class Openp41geWindowManager extends LitElement {
         .dw-delete,
         .dw-delete-confirm {
           border: none;
-          border-radius: 4px;
+          border-radius: 6px;
           padding: 4px 10px;
           font-size: 12px;
           font-weight: 600;
@@ -603,9 +605,10 @@ class Openp41geWindowManager extends LitElement {
         }
         .dw-delete svg { fill: currentColor; }
         .dw-delete-confirm {
-          background: #e06c75;
-          color: #fff;
+          background: rgba(224, 108, 117, 0.15);
+          color: #e06c75;
         }
+        .dw-delete-confirm:hover { background: rgba(224, 108, 117, 0.25); }
         .dw-delete-confirm:disabled { opacity: 0.4; cursor: default; }
         .dw-delete-cancel {
           border: none;
@@ -615,6 +618,7 @@ class Openp41geWindowManager extends LitElement {
           font-weight: 600;
           padding: 4px 10px;
           cursor: pointer;
+          border-radius: 6px;
         }
         .dw-delete-cancel:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
         .dw-list { list-style: none; margin: 0; padding: 0; }
@@ -773,11 +777,10 @@ class Openp41geWindowManager extends LitElement {
                 class="dw-item ${this._deleteMode ? "dw-item--selectable" : ""} ${this._selectedRepos.has(repo.url) ? "dw-item--selected" : ""}"
                 @click=${(e: Event) => { e.stopPropagation(); if (this._deleteMode) this._toggleRepoSelection(repo.url); else this._openRepo(d, repo); }}
               >
+                <span class="dw-item-name">${deriveRepoName(repo.url)}</span>
                 ${this._deleteMode
                   ? html`<span class="dw-checkbox ${this._selectedRepos.has(repo.url) ? "dw-checkbox--checked" : ""}"></span>`
-                  : nothing}
-                <span class="dw-item-name">${deriveRepoName(repo.url)}</span>
-                <span class="dw-item-meta">${repo.worktrees?.length ?? 0} worktree${(repo.worktrees?.length ?? 0) === 1 ? "" : "s"}</span>
+                  : html`<span class="dw-item-meta">${repo.worktrees?.length ?? 0} worktree${(repo.worktrees?.length ?? 0) === 1 ? "" : "s"}</span>`}
               </li>
             `,
           )}
