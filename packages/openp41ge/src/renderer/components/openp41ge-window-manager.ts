@@ -63,13 +63,8 @@ class Openp41geWindowManager extends LitElement {
   @state() private _worktreeDeleteMode = false;
   @state() private _selectedWorktrees: Set<string> = new Set();
   @state() private _crumbsOpen = false;
-  @state() private _pressingPath: string | null = null;
-  @state() private _pressProgress = 0;
-  private _pressTimer: number | null = null;
-  private _pressTriggered = false;
-  private static readonly LONG_PRESS_MS = 500;
-  /** Grace period before the fill animates — a click released before this shows nothing. */
-  private static readonly LONG_PRESS_DELAY_MS = 150;
+  private _drag: { startX: number; startY: number; path: string; active: boolean } | null = null;
+  private _dragGhost: HTMLElement | null = null;
   private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
@@ -118,55 +113,67 @@ class Openp41geWindowManager extends LitElement {
     this._crumbsOpen = false;
   };
 
-  /** Cancel any in-flight pointer press (timer + fill state). */
-  private _clearPress(): void {
-    const timer = this._pressTimer;
-    if (timer !== null) window.clearInterval(timer);
-    this._pressTimer = null;
-    this._pressingPath = null;
-    this._pressProgress = 0;
+  /** Begin dragging a workspace window skeleton out of the picker. */
+  private _onThumbPointerDown(e: PointerEvent, path: string, isOpen: boolean): void {
+    if (e.button !== 0) return;
+    // An already-open workspace isn't a drag handle — avoid a second open affordance.
+    if (isOpen) return;
+    this._teardownDrag();
+    this._drag = { startX: e.clientX, startY: e.clientY, path, active: false };
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch {
+      /* synthetic events have no active pointer */
+    }
   }
 
-  /** Begin a long-press on a top-level card. After a short grace period the fill
-   *  animates left-to-right; when it completes the workspace window opens. */
-  private _onCardPointerDown(e: PointerEvent, filePath: string, isOpen: boolean): void {
-    if (this._workspaceDeleteMode || isOpen || e.button !== 0) return;
-    this._clearPress();
-    this._pressTriggered = false;
-    this._pressingPath = filePath;
-    this._pressProgress = 0;
-    const start = performance.now();
-    const grace = Openp41geWindowManager.LONG_PRESS_DELAY_MS;
-    const duration = Openp41geWindowManager.LONG_PRESS_MS - grace;
-    const timer = window.setInterval(() => {
-      const elapsed = performance.now() - start;
-      // Hold still before the grace period: a release is a plain click, no fill.
-      if (elapsed < grace) {
-        this._pressProgress = 0;
-        return;
-      }
-      // Once the long-press is determined, fill over the remaining time.
-      this._pressProgress = Math.min(1, (elapsed - grace) / duration);
-      if (elapsed >= Openp41geWindowManager.LONG_PRESS_MS) {
-        window.clearInterval(timer);
-        this._pressTimer = null;
-        this._pressTriggered = true;
-        this._pressingPath = null;
-        this._openWorkspaceWindow(filePath);
-      }
-    }, 30);
-    this._pressTimer = timer;
+  /** Once the drag passes a small threshold, show a floating ghost of the skeleton. */
+  private _onThumbPointerMove(e: PointerEvent): void {
+    if (!this._drag) return;
+    if (!this._drag.active) {
+      const dx = e.clientX - this._drag.startX;
+      const dy = e.clientY - this._drag.startY;
+      if (Math.hypot(dx, dy) < 8) return;
+      this._drag.active = true;
+      this._dragGhost = this._makeDragGhost(e.currentTarget as HTMLElement);
+    }
+    if (this._dragGhost) this._positionGhost(e.clientX, e.clientY);
   }
 
-  /** End a press early (released before the threshold) → normal click may follow. */
-  private _onCardPointerUp(): void {
-    this._clearPress();
+  /** Release: if it was a real drag, open the workspace window. */
+  private _onThumbPointerUp(): void {
+    if (!this._drag) return;
+    const { active, path } = this._drag;
+    this._teardownDrag();
+    if (active) this._openWorkspaceWindow(path);
   }
 
-  /** Cancel the press (pointer left the card or was interrupted). */
-  private _onCardPointerCancel(): void {
-    this._clearPress();
-    this._pressTriggered = false;
+  private _onThumbPointerCancel(): void {
+    this._teardownDrag();
+  }
+
+  private _makeDragGhost(src: HTMLElement): HTMLElement {
+    const ghost = src.cloneNode(true) as HTMLElement;
+    ghost.classList.add("drag-ghost");
+    ghost.style.position = "fixed";
+    ghost.style.zIndex = "9999";
+    ghost.style.pointerEvents = "none";
+    this.shadowRoot?.appendChild(ghost);
+    return ghost;
+  }
+
+  private _positionGhost(x: number, y: number): void {
+    if (!this._dragGhost) return;
+    this._dragGhost.style.left = `${x - this._dragGhost.offsetWidth / 2}px`;
+    this._dragGhost.style.top = `${y - this._dragGhost.offsetHeight / 2}px`;
+  }
+
+  private _teardownDrag(): void {
+    this._drag = null;
+    if (this._dragGhost) {
+      this._dragGhost.remove();
+      this._dragGhost = null;
+    }
   }
 
   /** Escape cancels delete modes, closes an add card, or closes the crumb menu. */
@@ -763,13 +770,6 @@ class Openp41geWindowManager extends LitElement {
   render(): TemplateResult {
     // Workspaces that already have at least one live workspace window.
     const openPaths = this._openPaths;
-    // Live window count per open workspace path.
-    const windowCounts = new Map<string, number>();
-    for (const w of this._openWindows) {
-      if (w.windowType === "workspace" && w.workspacePath) {
-        windowCounts.set(w.workspacePath, (windowCounts.get(w.workspacePath) ?? 0) + 1);
-      }
-    }
 
     return html`
       <style>
@@ -825,75 +825,84 @@ class Openp41geWindowManager extends LitElement {
         li.ws-row {
           position: relative;
           display: flex;
-          flex-direction: column;
-          gap: 4px;
-          padding: 8px 10px;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 12px;
           margin-bottom: 6px;
           background: var(--bg-hover, #2a2d2e);
           border: 1px solid var(--divider, #333);
-          border-radius: 6px;
+          border-radius: 8px;
           cursor: pointer;
           transition: background 0.1s ease;
         }
         li.ws-row:hover { background: var(--bg-active, #37373d); }
-        /* Long-press progress: card fills left-to-right over the press duration. */
-        li.ws-row .ws-fill {
-          position: absolute;
-          inset: 0;
-          z-index: 0;
-          background: var(--accent, #569cd6);
-          opacity: 0.22;
-          transform: scaleX(0);
-          transform-origin: left center;
-          pointer-events: none;
-        }
-        li.ws-row .ws-top,
-        li.ws-row .ws-meta { position: relative; z-index: 1; }
-        li.ws-row .ws-right { z-index: 1; }
-        .ws-top { display: flex; align-items: center; gap: 8px; width: 100%; }
+        .ws-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
         .ws-name {
-          flex: 1;
           min-width: 0;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          padding-right: 24px;
+          font-size: 14px;
+          font-weight: 600;
         }
-        .ws-row--open .ws-name { padding-right: 152px; }
-        .ws-meta { color: var(--text-secondary, #999); font-size: 12px; text-align: left; }
-        /* Right-side group (Open pill + drill-in chevron), centred in the card. */
-        .ws-right {
-          position: absolute;
-          right: 10px;
-          top: 50%;
-          transform: translateY(-50%);
+        .ws-meta { color: var(--text-secondary, #999); font-size: 12px; }
+        .ws-chevron { flex-shrink: 0; display: block; color: var(--accent, #569cd6); }
+
+        /* Mini workspace-window skeleton: title bar + open sidebar + grid tabs. */
+        .ws-thumb {
+          width: 132px;
+          height: 84px;
+          flex-shrink: 0;
+          border-radius: 6px;
+          background: var(--bg, #1e1e1e);
+          border: 1px solid var(--divider, #444);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          cursor: grab;
+        }
+        .ws-thumb:active { cursor: grabbing; }
+        .ws-row--open .ws-thumb { cursor: default; }
+        .ws-thumb--skeleton { opacity: 0.75; animation: ws-skeleton-pulse 1.3s ease-in-out infinite; }
+        .ws-thumb-chrome {
+          height: 12px;
+          flex-shrink: 0;
+          background: var(--bg-secondary, #252526);
+          border-bottom: 1px solid var(--divider, #333);
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 3px;
+          padding: 0 5px;
         }
-        .ws-window-pill {
-          border-radius: 999px;
-          padding: 2px 9px;
-          font-size: 11px;
-          font-weight: 600;
-          font-family: inherit;
-          color: var(--text-secondary, #999);
-          background: var(--bg-active, #37373d);
-          white-space: nowrap;
-          user-select: none;
+        .ws-thumb-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-secondary, #999); opacity: 0.55; }
+        .ws-thumb-body { flex: 1; display: flex; gap: 4px; padding: 4px; min-height: 0; }
+        .ws-thumb-sidebar {
+          width: 18px;
+          flex-shrink: 0;
+          background: var(--bg-secondary, #252526);
+          border-radius: 3px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 3px;
+          padding: 3px 0;
         }
-        .ws-open-pill {
-          border-radius: 999px;
-          padding: 2px 9px;
-          font-size: 11px;
-          font-weight: 600;
-          font-family: inherit;
-          color: var(--accent, #569cd6);
-          background: rgba(86, 156, 214, 0.15);
-          white-space: nowrap;
-          user-select: none;
+        .ws-thumb-side-row { width: 8px; height: 8px; border-radius: 2px; background: var(--bg-active, #37373d); }
+        .ws-thumb-grid {
+          flex: 1;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          grid-template-rows: 1fr 1fr;
+          gap: 3px;
         }
-        .ws-chevron { flex-shrink: 0; display: block; color: var(--accent, #569cd6); }
+        .ws-thumb-cell { background: var(--bg-active, #37373d); border-radius: 3px; }
+        .ws-thumb-cell--wide { grid-column: 1 / -1; }
+        /* The floating ghost while dragging a skeleton out of the picker. */
+        .drag-ghost {
+          filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.6));
+          opacity: 0.92;
+          cursor: grabbing;
+        }
         /* Workspace-list delete mode + inline "new workspace" row. */
         .ws-row--select { cursor: pointer; }
         .ws-row--new {
@@ -1230,7 +1239,7 @@ class Openp41geWindowManager extends LitElement {
       </style>
       <div class="wm-root">
         <div class="wm-titlebar">
-          <span class="wm-title">Window Manager</span>
+          <span class="wm-title">Workspace Manager</span>
         </div>
         <div class="wm-drawer-layer">
           <div class="wm-body" @click=${this._onBackgroundClick}>
@@ -1241,7 +1250,14 @@ class Openp41geWindowManager extends LitElement {
                     ${this._addingWorkspace
                       ? html`
                           <li class="ws-row ws-row--new">
-                            <div class="ws-top">
+                            <div class="ws-thumb ws-thumb--skeleton">
+                              <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
+                              <div class="ws-thumb-body">
+                                <div class="ws-thumb-sidebar"><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span></div>
+                                <div class="ws-thumb-grid"><div class="ws-thumb-cell"></div><div class="ws-thumb-cell"></div></div>
+                              </div>
+                            </div>
+                            <div class="ws-info">
                               <input
                                 class="wm-new-ws-input"
                                 placeholder="Workspace name"
@@ -1249,9 +1265,9 @@ class Openp41geWindowManager extends LitElement {
                                 @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
                                 @blur=${() => { if (this._addingWorkspace) void this._createWorkspaceFromInput(); }}
                               />
+                              <div class="ws-meta"><span class="ws-skeleton ws-skeleton--num"></span></div>
                             </div>
-                            <div class="ws-meta"><span class="ws-skeleton ws-skeleton--num"></span></div>
-                            <div class="ws-right"><span class="ws-skeleton ws-skeleton--chevron"></span></div>
+                            <span class="ws-skeleton ws-skeleton--chevron"></span>
                           </li>
                         `
                       : nothing}
@@ -1263,34 +1279,35 @@ class Openp41geWindowManager extends LitElement {
                         0,
                       );
                       const isOpen = openPaths.has(w.filePath);
-                      const windows = windowCounts.get(w.filePath) ?? 0;
                       return html`
                         <li
-                          class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${this._pressingPath === w.filePath ? "ws-row--pressing" : ""}"
-                          @pointerdown=${(e: PointerEvent) => this._onCardPointerDown(e, w.filePath, isOpen)}
-                          @pointerup=${this._onCardPointerUp}
-                          @pointercancel=${this._onCardPointerCancel}
-                          @pointerleave=${this._onCardPointerCancel}
-                          @click=${(e: Event) => { e.stopPropagation(); if (this._pressTriggered) { this._pressTriggered = false; return; } if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
+                          class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""}"
+                          @click=${(e: Event) => { e.stopPropagation(); if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
                         >
-                          <span class="ws-fill" style="transform: scaleX(${this._pressingPath === w.filePath ? this._pressProgress.toFixed(3) : 0})"></span>
-                          <div class="ws-top">
-                            <span class="ws-name">${name}</span>
+                          <div
+                            class="ws-thumb"
+                            @pointerdown=${(e: PointerEvent) => this._onThumbPointerDown(e, w.filePath, isOpen)}
+                            @pointermove=${this._onThumbPointerMove}
+                            @pointerup=${this._onThumbPointerUp}
+                            @pointercancel=${this._onThumbPointerCancel}
+                          >
+                            <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
+                            <div class="ws-thumb-body">
+                              <div class="ws-thumb-sidebar"><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span></div>
+                              <div class="ws-thumb-grid">
+                                <div class="ws-thumb-cell ws-thumb-cell--wide"></div>
+                                <div class="ws-thumb-cell"></div>
+                                <div class="ws-thumb-cell"></div>
+                              </div>
+                            </div>
                           </div>
-                          <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>
-                          <div class="ws-right">
-                            ${this._workspaceDeleteMode
-                              ? html`<span class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"></span>`
-                              : html`
-                                  ${isOpen
-                                    ? html`
-                                        <span class="ws-window-pill">${this._countLabel(windows, "window")}</span>
-                                        <span class="ws-open-pill">Open</span>
-                                      `
-                                    : nothing}
-                                  <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-                                `}
+                          <div class="ws-info">
+                            <div class="ws-name">${name}</div>
+                            <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>
                           </div>
+                          ${this._workspaceDeleteMode
+                            ? html`<span class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"></span>`
+                            : html`<svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`}
                         </li>
                       `;
                     })}

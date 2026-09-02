@@ -477,6 +477,17 @@ export class Openp41geApplication {
           },
         ],
       },
+      {
+        label: "Workspace",
+        submenu: [
+          {
+            label: "Show Workspace Manager",
+            click: () => {
+              openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined);
+            },
+          },
+        ],
+      },
     ];
 
     // Window menu — includes dev items (Reload, Devtools) only in dev mode
@@ -531,12 +542,6 @@ export class Openp41geApplication {
                 workspacePath,
               });
             }
-          },
-        },
-        {
-          label: "Show Window Manager",
-          click: () => {
-            openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined);
           },
         },
       ],
