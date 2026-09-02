@@ -60,6 +60,7 @@ declare global {
         activate: () => void;
         ghostForward: (screenX: number, screenY: number) => void;
         check: (screenX: number, screenY: number, dragData?: string) => Promise<{ target: Record<string, unknown> | null; windowId: string } | null>;
+        isOutside: (screenX: number, screenY: number) => Promise<boolean>;
         getActive: () => Promise<{
           sourceWinId: string;
           label: string;

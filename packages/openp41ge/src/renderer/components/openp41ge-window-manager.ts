@@ -78,6 +78,8 @@ class Openp41geWindowManager extends LitElement {
   } | null = null;
   private _carouselTrack: HTMLElement | null = null;
   private _offEndSession: (() => void) | null = null;
+  /** Suppress the following row click after a drag/swipe, so the drawer doesn't pop open. */
+  private _suppressClick = false;
   private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
@@ -182,11 +184,21 @@ class Openp41geWindowManager extends LitElement {
     if (!drag.active) {
       if (Math.hypot(dx, dy) < 8) return;
       drag.active = true;
+      // A drag/swipe means the following row click is not a navigation — suppress
+      // it so the drawer doesn't pop open over the drag.
+      this._suppressClick = true;
+      window.setTimeout(() => {
+        this._suppressClick = false;
+      }, 600);
       // Horizontal swipe → carousel; vertical drag → open the workspace window.
       drag.mode = Math.abs(dx) > Math.abs(dy) ? "carousel" : "open";
       if (drag.mode === "open") {
-        // Start a real (native) drag so it can leave the window. The main
-        // process opens the workspace when the cursor leaves this window.
+        const el = e.currentTarget as HTMLElement;
+        const rect = el.getBoundingClientRect();
+        // Start a real (native) drag so it can leave the window. Pass the
+        // skeleton's capture rect so the main process swaps in a bitmap of the
+        // actual skeleton (not just a label). The window opens on the drop, only
+        // if the cursor is outside this window at release.
         window.openp41ge.drag.start(
           drag.label,
           e.screenX,
@@ -201,6 +213,13 @@ class Openp41geWindowManager extends LitElement {
           42,
           "workspace",
           drag.path,
+          {
+            x: Math.round(rect.left),
+            y: Math.round(rect.top),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          },
+          0,
         );
         window.openp41ge.drag.activate();
       } else {
@@ -218,12 +237,17 @@ class Openp41geWindowManager extends LitElement {
     }
   }
 
-  /** Release: a vertical drag-out is handled by the main process (opens only if it left the window). */
-  private _onThumbPointerUp(): void {
+  /** Release: open the workspace only if the cursor was outside this window at the drop. */
+  private async _onThumbPointerUp(e: PointerEvent): Promise<void> {
     const drag = this._drag;
     if (!drag) return;
+    const { mode, path } = drag;
     this._teardownDrag();
-    if (drag.mode === "open") window.openp41ge.drag.end();
+    if (mode === "open") {
+      const outside = await window.openp41ge.drag.isOutside(e.screenX, e.screenY);
+      window.openp41ge.drag.end();
+      if (outside) this._openWorkspaceWindow(path);
+    }
   }
 
   private _onThumbPointerCancel(): void {
@@ -1410,7 +1434,7 @@ class Openp41geWindowManager extends LitElement {
                       return html`
                         <li
                           class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
-                          @click=${(e: Event) => { e.stopPropagation(); if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
+                          @click=${(e: Event) => { e.stopPropagation(); if (this._suppressClick) { this._suppressClick = false; return; } if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
                         >
                           <div
                             class="ws-thumb"

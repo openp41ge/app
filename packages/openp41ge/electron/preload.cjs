@@ -258,6 +258,14 @@ contextBridge.exposeInMainWorld("openp41ge", {
       );
     },
 
+    /** Was the given screen point outside the source window during this drag? */
+    isOutside: (screenX, screenY) => {
+      return ipcRenderer.invoke(
+        "openp41ge:drag-is-outside",
+        JSON.stringify({ screenX, screenY }),
+      );
+    },
+
     /** Query the main process for the current active drag session (cross-window). */
     getActive: () => {
       return ipcRenderer.invoke("openp41ge:drag-get-active");

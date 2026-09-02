@@ -16,7 +16,7 @@
 
 import { ipcMain, BrowserWindow, screen, type WebContents } from "electron";
 import type { DragGhostManager } from "../../src/main/index.js";
-import { openp41geWindows, openWorkspaceWindow } from "../window-manager.js";
+import { openp41geWindows } from "../window-manager.js";
 
 // ─── Session tracking ─────────────────────────────────────────────────────
 
@@ -55,32 +55,6 @@ function _startCursorPoll(): void {
     // Keep the main-process ghost following the cursor globally, so a drag can
     // visually leave the window (the source renderer only gets moves in-window).
     _dragGhost?.move(pos.x, pos.y);
-    // Workspace skeleton drag-out: open the workspace window when the cursor
-    // leaves the source (window-manager) window. Dropping inside never opens.
-    if (_activeSession.dragData.type === "workspace") {
-      const source = openp41geWindows.get(_activeSession.sourceWinId);
-      if (source && !source.isDestroyed()) {
-        const b = source.getBounds();
-        const outside =
-          pos.x < b.x || pos.x > b.x + b.width || pos.y < b.y || pos.y > b.y + b.height;
-        if (outside) {
-          const wsPath = _activeSession.dragData.filePath;
-          const sourceWin = source;
-          _stopCursorPoll();
-          _dragGhost?.hide();
-          _broadcastDragState(false, null);
-          _activeSession = null;
-          // Signal the source window to cancel its in-flight drag, then open.
-          if (!sourceWin.isDestroyed()) {
-            sourceWin.webContents.send("openp41ge:drag-end-session");
-          }
-          if (typeof wsPath === "string" && wsPath.length > 0) {
-            openWorkspaceWindow(wsPath);
-          }
-          return;
-        }
-      }
-    }
     const data = JSON.stringify({ screenX: pos.x, screenY: pos.y });
     for (const [, bw] of openp41geWindows) {
       if (!bw.isDestroyed()) {
@@ -311,6 +285,24 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       label: _activeSession.label,
       dragData: _activeSession.dragData,
     };
+  });
+
+  // ── Was the drop point outside the source window? (workspace drag-out) ──
+  // The source window keeps receiving mouse events while the button is held
+  // (macOS implicit capture), so on mouseup we ask whether the release point was
+  // outside the source window before deciding to open the workspace.
+  ipcMain.handle("openp41ge:drag-is-outside", async (_event, data: string) => {
+    const parsed = JSON.parse(data) as { screenX: number; screenY: number };
+    if (!_activeSession) return false;
+    const source = openp41geWindows.get(_activeSession.sourceWinId);
+    if (!source || source.isDestroyed()) return false;
+    const b = source.getBounds();
+    return (
+      parsed.screenX < b.x ||
+      parsed.screenX > b.x + b.width ||
+      parsed.screenY < b.y ||
+      parsed.screenY > b.y + b.height
+    );
   });
 
   // ── Cross-window drag check (resolve drop target in another window) ─────
