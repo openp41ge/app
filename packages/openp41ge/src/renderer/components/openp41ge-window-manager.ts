@@ -63,13 +63,26 @@ class Openp41geWindowManager extends LitElement {
   @state() private _worktreeDeleteMode = false;
   @state() private _selectedWorktrees: Set<string> = new Set();
   @state() private _crumbsOpen = false;
-  private _drag: { startX: number; startY: number; path: string; active: boolean } | null = null;
+  @state() private _listOverflows = false;
+  /** Active carousel window index per workspace path (non-reactive; set imperatively while dragging). */
+  private _carouselIndex: Map<string, number> = new Map();
+  private _drag: {
+    startX: number;
+    startY: number;
+    path: string;
+    active: boolean;
+    mode: "carousel" | "open" | null;
+    windowCount: number;
+    baseIndex: number;
+  } | null = null;
   private _dragGhost: HTMLElement | null = null;
+  private _carouselTrack: HTMLElement | null = null;
   private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener("focus", this._onFocus);
+    window.addEventListener("resize", this._measureListOverflow);
     document.addEventListener("keydown", this._onKeydown);
     document.addEventListener("click", this._onDocumentClick);
     void this._load();
@@ -78,6 +91,7 @@ class Openp41geWindowManager extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener("focus", this._onFocus);
+    window.removeEventListener("resize", this._measureListOverflow);
     document.removeEventListener("keydown", this._onKeydown);
     document.removeEventListener("click", this._onDocumentClick);
     for (const el of this._tooltipTargets) tooltipController.detach(el);
@@ -86,6 +100,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Attach custom tooltips to the footer tool buttons (replaces native `title`). */
   updated(): void {
+    this._measureListOverflow();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
       ".dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close",
     );
@@ -105,6 +120,19 @@ class Openp41geWindowManager extends LitElement {
     this._tooltipTargets = [...live];
   }
 
+  /**
+   * The last row shows a trailing separator only when the list doesn't overflow
+   * (content fits the viewport). When the list scrolls, the trailing separator is
+   * removed so a scrolled-to-bottom last row doesn't double up with the viewport
+   * edge. Measure after every render and on window resize.
+   */
+  private _measureListOverflow = (): void => {
+    const body = this.shadowRoot?.querySelector(".wm-body");
+    if (!body) return;
+    const overflow = body.scrollHeight > body.clientHeight + 1;
+    if (overflow !== this._listOverflows) this._listOverflows = overflow;
+  };
+
   /** A click outside the breadcrumb trail closes the collapse menu. */
   private _onDocumentClick = (e: MouseEvent): void => {
     if (!this._crumbsOpen) return;
@@ -113,13 +141,23 @@ class Openp41geWindowManager extends LitElement {
     this._crumbsOpen = false;
   };
 
-  /** Begin dragging a workspace window skeleton out of the picker. */
+  /** Begin a pointer press on a workspace skeleton (drag-out or carousel swipe). */
   private _onThumbPointerDown(e: PointerEvent, path: string, isOpen: boolean): void {
     if (e.button !== 0) return;
-    // An already-open workspace isn't a drag handle — avoid a second open affordance.
+    // An already-open workspace isn't an interactive drag handle — avoid a second
+    // open affordance on top of the already-open window.
     if (isOpen) return;
     this._teardownDrag();
-    this._drag = { startX: e.clientX, startY: e.clientY, path, active: false };
+    const winCount = this._workspaces.find((w) => w.filePath === path)?.data.windows?.length ?? 1;
+    this._drag = {
+      startX: e.clientX,
+      startY: e.clientY,
+      path,
+      active: false,
+      mode: null,
+      windowCount: Math.max(1, winCount),
+      baseIndex: this._carouselIndex.get(path) ?? 0,
+    };
     try {
       (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     } catch {
@@ -127,29 +165,59 @@ class Openp41geWindowManager extends LitElement {
     }
   }
 
-  /** Once the drag passes a small threshold, show a floating ghost of the skeleton. */
+  /** Once the drag passes the threshold, decide the gesture by dominant axis. */
   private _onThumbPointerMove(e: PointerEvent): void {
-    if (!this._drag) return;
-    if (!this._drag.active) {
-      const dx = e.clientX - this._drag.startX;
-      const dy = e.clientY - this._drag.startY;
+    const drag = this._drag;
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (!drag.active) {
       if (Math.hypot(dx, dy) < 8) return;
-      this._drag.active = true;
-      this._dragGhost = this._makeDragGhost(e.currentTarget as HTMLElement);
+      drag.active = true;
+      // Horizontal swipe → carousel; vertical drag → open the workspace window.
+      drag.mode = Math.abs(dx) > Math.abs(dy) ? "carousel" : "open";
+      if (drag.mode === "open") {
+        this._dragGhost = this._makeDragGhost(e.currentTarget as HTMLElement);
+      } else {
+        this._carouselTrack = (e.currentTarget as HTMLElement).querySelector(".ws-carousel-track");
+      }
     }
-    if (this._dragGhost) this._positionGhost(e.clientX, e.clientY);
+    if (drag.mode === "open") {
+      if (this._dragGhost) this._positionGhost(e.clientX, e.clientY);
+    } else if (drag.mode === "carousel") {
+      const width = (e.currentTarget as HTMLElement).clientWidth || 132;
+      const step = Math.max(20, width / 2);
+      const pages = Math.round(dx / step);
+      const idx = Math.max(0, Math.min(drag.windowCount - 1, drag.baseIndex - pages));
+      this._setCarouselIndex(drag.path, idx);
+    }
   }
 
-  /** Release: if it was a real drag, open the workspace window. */
+  /** Release: a vertical drag-out opens the workspace window; a swipe just commits. */
   private _onThumbPointerUp(): void {
-    if (!this._drag) return;
-    const { active, path } = this._drag;
+    const drag = this._drag;
+    if (!drag) return;
+    const { active, mode, path } = drag;
     this._teardownDrag();
-    if (active) this._openWorkspaceWindow(path);
+    if (mode === "open" && active) this._openWorkspaceWindow(path);
   }
 
   private _onThumbPointerCancel(): void {
     this._teardownDrag();
+  }
+
+  /** Commit a carousel index for a workspace path (drives the track transform + dots). */
+  private _setCarouselIndex(path: string, idx: number): void {
+    if ((this._carouselIndex.get(path) ?? 0) === idx) return;
+    this._carouselIndex = new Map(this._carouselIndex).set(path, idx);
+    this._carouselTrack?.style.setProperty("transition", "none");
+    if (this._carouselTrack) {
+      this._carouselTrack.style.transform = `translateX(${-idx * 100}%)`;
+      const thumb = this._carouselTrack.closest(".ws-thumb");
+      thumb?.querySelectorAll(".ws-dot").forEach((d, wi) => {
+        d.classList.toggle("ws-dot--active", wi === idx);
+      });
+    }
   }
 
   private _makeDragGhost(src: HTMLElement): HTMLElement {
@@ -170,6 +238,7 @@ class Openp41geWindowManager extends LitElement {
 
   private _teardownDrag(): void {
     this._drag = null;
+    this._carouselTrack = null;
     if (this._dragGhost) {
       this._dragGhost.remove();
       this._dragGhost = null;
@@ -704,6 +773,14 @@ class Openp41geWindowManager extends LitElement {
     return `${n} ${n === 1 ? singular : singular + "s"}`;
   }
 
+  /** Number of vertical columns/cells to draw for a window in the skeleton.
+   *  The workspace grid only splits horizontally, so cells are one per column. */
+  private _skeletonCells(win: { grid?: { placements?: unknown[]; cols?: number } } | undefined): number {
+    const g = win?.grid;
+    if (!g) return 1;
+    return g.placements?.length || g.cols || 1;
+  }
+
   /** The path of drawer titles leading up to (and including) drawer `i`. */
   private _breadcrumbModel(i: number): {
     visible: Array<{ label: string; index: number }>;
@@ -828,14 +905,15 @@ class Openp41geWindowManager extends LitElement {
           align-items: center;
           gap: 12px;
           padding: 10px 12px;
-          margin-bottom: 6px;
-          background: var(--bg-hover, #2a2d2e);
-          border: 1px solid var(--divider, #333);
-          border-radius: 8px;
           cursor: pointer;
+          border-bottom: 1px solid var(--divider, #2f3031);
           transition: background 0.1s ease;
         }
-        li.ws-row:hover { background: var(--bg-active, #37373d); }
+        li.ws-row:hover { background: var(--bg-hover, #2a2d2e); }
+        /* The last row's trailing separator only renders when the list fits the
+           viewport (not below the fold), so a folded last row never shows a
+           second bottom border when it scrolls into view. */
+        li.ws-row--last:not(.ws-row--last-visible) { border-bottom: none; }
         .ws-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
         .ws-name {
           min-width: 0;
@@ -848,8 +926,9 @@ class Openp41geWindowManager extends LitElement {
         .ws-meta { color: var(--text-secondary, #999); font-size: 12px; }
         .ws-chevron { flex-shrink: 0; display: block; color: var(--accent, #569cd6); }
 
-        /* Mini workspace-window skeleton: title bar + open sidebar + grid tabs. */
+        /* Mini workspace-window skeleton: title bar + carousel of window layouts. */
         .ws-thumb {
+          position: relative;
           width: 132px;
           height: 84px;
           flex-shrink: 0;
@@ -875,8 +954,10 @@ class Openp41geWindowManager extends LitElement {
           padding: 0 5px;
         }
         .ws-thumb-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-secondary, #999); opacity: 0.55; }
-        .ws-thumb-body { flex: 1; display: flex; gap: 4px; padding: 4px; min-height: 0; }
-        .ws-thumb-sidebar {
+        .ws-carousel { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+        .ws-carousel-track { display: flex; height: 100%; width: 100%; will-change: transform; }
+        .ws-win { flex: 0 0 100%; display: flex; gap: 3px; padding: 4px; min-width: 0; min-height: 0; }
+        .ws-win-side {
           width: 18px;
           flex-shrink: 0;
           background: var(--bg-secondary, #252526);
@@ -884,19 +965,25 @@ class Openp41geWindowManager extends LitElement {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 3px;
-          padding: 3px 0;
+          gap: 2px;
+          padding: 4px 0;
         }
-        .ws-thumb-side-row { width: 8px; height: 8px; border-radius: 2px; background: var(--bg-active, #37373d); }
-        .ws-thumb-grid {
-          flex: 1;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          grid-template-rows: 1fr 1fr;
+        .ws-thumb-side-row { width: 12px; height: 4px; border-radius: 2px; background: var(--bg-active, #37373d); }
+        .ws-win-grid { flex: 1; display: flex; gap: 3px; min-width: 0; }
+        .ws-thumb-cell { flex: 1 1 0; min-width: 0; background: var(--bg-active, #37373d); border-radius: 3px; }
+        /* Carousel page dots. */
+        .ws-carousel-dots {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 3px;
+          display: flex;
+          justify-content: center;
           gap: 3px;
+          pointer-events: none;
         }
-        .ws-thumb-cell { background: var(--bg-active, #37373d); border-radius: 3px; }
-        .ws-thumb-cell--wide { grid-column: 1 / -1; }
+        .ws-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-secondary, #999); opacity: 0.4; }
+        .ws-dot--active { opacity: 1; background: var(--accent, #569cd6); }
         /* The floating ghost while dragging a skeleton out of the picker. */
         .drag-ghost {
           filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.6));
@@ -1252,10 +1339,12 @@ class Openp41geWindowManager extends LitElement {
                           <li class="ws-row ws-row--new">
                             <div class="ws-thumb ws-thumb--skeleton">
                               <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
-                              <div class="ws-thumb-body">
-                                <div class="ws-thumb-sidebar"><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span></div>
-                                <div class="ws-thumb-grid"><div class="ws-thumb-cell"></div><div class="ws-thumb-cell"></div></div>
-                              </div>
+                              <div class="ws-carousel"><div class="ws-carousel-track">
+                                <div class="ws-win">
+                                  <div class="ws-win-side"><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span></div>
+                                  <div class="ws-win-grid"><div class="ws-thumb-cell"></div><div class="ws-thumb-cell"></div></div>
+                                </div>
+                              </div></div>
                             </div>
                             <div class="ws-info">
                               <input
@@ -1271,7 +1360,7 @@ class Openp41geWindowManager extends LitElement {
                           </li>
                         `
                       : nothing}
-                    ${this._workspaces.map((w) => {
+                    ${this._workspaces.map((w, i) => {
                       const name = w.data.name?.trim() || "Unnamed";
                       const repos = w.data.repos?.length ?? 0;
                       const worktrees = (w.data.repos ?? []).reduce(
@@ -1279,9 +1368,17 @@ class Openp41geWindowManager extends LitElement {
                         0,
                       );
                       const isOpen = openPaths.has(w.filePath);
+                      const windows = w.data.windows ?? [];
+                      const shared = w.data.sharedSidebars;
+                      const leftOpen = !!shared?.leftSidebarOpen;
+                      const rightOpen = !!shared?.rightSidebarOpen;
+                      const wins = windows.length > 0 ? windows : [undefined];
+                      const idx = Math.min(this._carouselIndex.get(w.filePath) ?? 0, wins.length - 1);
+                      const isLast = i === this._workspaces.length - 1;
+                      const sideRows = html`<span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span>`;
                       return html`
                         <li
-                          class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""}"
+                          class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
                           @click=${(e: Event) => { e.stopPropagation(); if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
                         >
                           <div
@@ -1292,14 +1389,18 @@ class Openp41geWindowManager extends LitElement {
                             @pointercancel=${this._onThumbPointerCancel}
                           >
                             <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
-                            <div class="ws-thumb-body">
-                              <div class="ws-thumb-sidebar"><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span></div>
-                              <div class="ws-thumb-grid">
-                                <div class="ws-thumb-cell ws-thumb-cell--wide"></div>
-                                <div class="ws-thumb-cell"></div>
-                                <div class="ws-thumb-cell"></div>
+                            <div class="ws-carousel">
+                              <div class="ws-carousel-track" style="transform: translateX(${-idx * 100}%)">
+                                ${wins.map((win) => html`
+                                  <div class="ws-win">
+                                    ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                    <div class="ws-win-grid">${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}</div>
+                                    ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                  </div>
+                                `)}
                               </div>
                             </div>
+                            ${wins.length > 1 ? html`<div class="ws-carousel-dots">${wins.map((_win, wi) => html`<span class="ws-dot ${wi === idx ? "ws-dot--active" : ""}"></span>`)}</div>` : nothing}
                           </div>
                           <div class="ws-info">
                             <div class="ws-name">${name}</div>

@@ -37,6 +37,7 @@ import {
   promptQuit,
   openWindowManager,
   setOpenWorkspaceWindowHandler,
+  setAppQuitting,
 } from "./window-manager.js";
 
 // ─── IPC handler registrations ──────────────────────────────────────────
@@ -554,6 +555,12 @@ export class Openp41geApplication {
   // ── Step 9: App events ────────────────────────────────────────────────
 
   private _registerAppEvents(): void {
+    // Preserve open workspace windows across a full app quit so reopening the
+    // workspace restores them (see setAppQuitting).
+    app.on("before-quit", () => {
+      setAppQuitting(true);
+    });
+
     app.on("window-all-closed", () => {
       // Exit when the last window closes (window-manager or workspace).
       app.quit();

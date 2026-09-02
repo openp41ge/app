@@ -19,6 +19,15 @@ const isDev = !app.isPackaged && !process.env.OPENP41GE_E2E_TEST;
 // ─── Window state ────────────────────────────────────────────────────────
 export const openp41geWindows = new Map<string, BrowserWindow>();
 
+// When the whole app quits (Cmd+Q) we preserve the workspace's open windows so
+// reopening the workspace restores them. A single window closed by hand (no
+// quit in flight) still removes that window from state.
+let _appQuitting = false;
+
+export function setAppQuitting(value: boolean): void {
+  _appQuitting = value;
+}
+
 // ─── Window type / binding ───────────────────────────────────────────────
 
 /**
@@ -206,7 +215,9 @@ export function createOpenp41geWindow(
   win.on("closed", () => {
     openp41geWindows.delete(openp41geWinId);
     openp41geWindowMeta.delete(openp41geWinId);
-    if (!isMaster && _dispatcher) {
+    // Don't mutate workspace state during a full app quit — the whole session
+    // (all open windows) is preserved so reopening the workspace restores them.
+    if (!isMaster && _dispatcher && !_appQuitting) {
       _dispatcher.apply("closeWindow", [openp41geWinId]);
       _dispatcher.broadcast();
     }
