@@ -55,6 +55,9 @@ class Openp41geWindowManager extends LitElement {
   @state() private _addingRepo = false;
   @state() private _deleteMode = false;
   @state() private _selectedRepos: Set<string> = new Set();
+  @state() private _addingWorkspace = false;
+  @state() private _workspaceDeleteMode = false;
+  @state() private _selectedWorkspaces: Set<string> = new Set();
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -100,6 +103,9 @@ class Openp41geWindowManager extends LitElement {
     this._addingRepo = false;
     this._deleteMode = false;
     this._selectedRepos = new Set();
+    this._addingWorkspace = false;
+    this._workspaceDeleteMode = false;
+    this._selectedWorkspaces = new Set();
   }
 
   /** Clicking a top-level card resets the drawer stack to that workspace's detail. */
@@ -202,6 +208,98 @@ class Openp41geWindowManager extends LitElement {
     await this._load();
   }
 
+  /** Footer for the top-level workspace list (+ / trashcan, delete mode). */
+  private _workspaceListFooter(): TemplateResult {
+    return html`
+      <div class="drawer-footer">
+        ${this._workspaceDeleteMode
+          ? html`
+              <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorkspaceDeleteMode(); }}>Cancel</button>
+              <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedWorkspaces(); }} ?disabled=${this._selectedWorkspaces.size === 0}>Delete</button>
+            `
+          : html`
+              <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddWorkspace(); }} title="New workspace" aria-label="New workspace">＋</button>
+              <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateWorkspaceDeleteMode(); }} title="Delete workspaces" aria-label="Delete workspaces">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
+              </button>
+            `}
+      </div>
+    `;
+  }
+
+  /** Toggle the inline "new workspace" name row on the top-level list. */
+  private _toggleAddWorkspace(): void {
+    this._workspaceDeleteMode = false;
+    this._addingWorkspace = !this._addingWorkspace;
+    if (this._addingWorkspace) {
+      void this.updateComplete.then(() => {
+        this.shadowRoot?.querySelector<HTMLInputElement>(".wm-new-ws-input")?.focus();
+      });
+    }
+  }
+
+  /** Enter commits, Escape cancels the new-workspace name row. */
+  private _onNewWorkspaceKeydown(e: KeyboardEvent): void {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void this._createWorkspaceFromInput();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      this._addingWorkspace = false;
+    }
+  }
+
+  /** Create a workspace from the inline name input, then refresh the list. */
+  private async _createWorkspaceFromInput(): Promise<void> {
+    const input = this.shadowRoot?.querySelector<HTMLInputElement>(".wm-new-ws-input");
+    const name = input?.value.trim() ?? "";
+    this._addingWorkspace = false;
+    if (!name) return;
+    try {
+      await workspaceFileService.createWorkspace(name);
+    } catch {
+      return;
+    }
+    await this._load();
+  }
+
+  /** Enter workspace delete mode: cards become checkbox-selectable. */
+  private _activateWorkspaceDeleteMode(): void {
+    this._addingWorkspace = false;
+    this._workspaceDeleteMode = true;
+    this._selectedWorkspaces = new Set();
+  }
+
+  /** Leave workspace delete mode and clear the selection. */
+  private _cancelWorkspaceDeleteMode(): void {
+    this._workspaceDeleteMode = false;
+    this._selectedWorkspaces = new Set();
+  }
+
+  /** Toggle whether a workspace card is selected for deletion. */
+  private _toggleWorkspaceSelection(filePath: string): void {
+    const next = new Set(this._selectedWorkspaces);
+    if (next.has(filePath)) next.delete(filePath);
+    else next.add(filePath);
+    this._selectedWorkspaces = next;
+  }
+
+  /** Delete the selected workspace files (keeping their data dirs), then refresh. */
+  private async _deleteSelectedWorkspaces(): Promise<void> {
+    const selected = this._selectedWorkspaces;
+    this._workspaceDeleteMode = false;
+    this._selectedWorkspaces = new Set();
+    if (selected.size === 0) return;
+    for (const path of selected) {
+      try {
+        await window.openp41ge.dialog.deleteWorkspaceFile(path, false);
+      } catch {
+        // ignore individual failures
+      }
+    }
+    await this._load();
+  }
+
   /** Enter delete mode: repo cards become checkbox-selectable. */
   private _activateDeleteMode(): void {
     this._addingRepo = false;
@@ -246,7 +344,7 @@ class Openp41geWindowManager extends LitElement {
   private _drawerFooter(d: DrawerState): TemplateResult | typeof nothing {
     if (d.kind === "workspace") {
       return html`
-        <div class="drawer-footer ${this._deleteMode ? "drawer-footer--end" : ""}">
+        <div class="drawer-footer">
           ${this._deleteMode
             ? html`
                 <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }}>Cancel</button>
@@ -454,6 +552,26 @@ class Openp41geWindowManager extends LitElement {
           user-select: none;
         }
         .ws-chevron { flex-shrink: 0; display: block; color: var(--accent, #569cd6); }
+        /* Workspace-list delete mode + inline "new workspace" row. */
+        .ws-row--select { cursor: pointer; }
+        .ws-row--new {
+          cursor: default;
+          border: 1px dashed var(--divider, #444);
+        }
+        .ws-row--new:hover { background: var(--bg-hover, #2a2d2e); }
+        .wm-new-ws-input {
+          flex: 1;
+          min-width: 0;
+          width: 100%;
+          background: transparent;
+          border: none;
+          outline: none;
+          color: var(--text-primary, #ddd);
+          font-size: 13px;
+          font-family: inherit;
+          padding: 0;
+        }
+        .wm-new-ws-input::placeholder { color: var(--text-secondary, #777); }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
         /* ── Drawer ─────────────────────────────────────────────── */
         /* A single shared shadow element whose width tracks the widest drawer,
@@ -555,13 +673,12 @@ class Openp41geWindowManager extends LitElement {
           display: flex;
           align-items: center;
           gap: 6px;
+          justify-content: flex-end;
           flex-shrink: 0;
           height: 44px;
           padding: 0 14px;
           border-top: 1px solid var(--divider, #333);
         }
-        /* In delete mode the footer controls are pushed to the right edge. */
-        .drawer-footer--end { justify-content: flex-end; }
         .dw-add {
           border: none;
           background: transparent;
@@ -678,10 +795,23 @@ class Openp41geWindowManager extends LitElement {
         </div>
         <div class="wm-drawer-layer">
           <div class="wm-body" @click=${this._onBackgroundClick}>
-            ${this._loaded && this._workspaces.length === 0
+            ${this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
               ? html`<p class="empty">No workspaces yet. Create one from an open workspace window.</p>`
               : html`
                   <ul>
+                    ${this._addingWorkspace
+                      ? html`
+                          <li class="ws-row ws-row--new">
+                            <input
+                              class="wm-new-ws-input"
+                              placeholder="Workspace name"
+                              spellcheck="false"
+                              @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
+                              @blur=${() => { if (this._addingWorkspace) void this._createWorkspaceFromInput(); }}
+                            />
+                          </li>
+                        `
+                      : nothing}
                     ${this._workspaces.map((w) => {
                       const name = w.data.name?.trim() || "Unnamed";
                       const repos = w.data.repos?.length ?? 0;
@@ -692,19 +822,28 @@ class Openp41geWindowManager extends LitElement {
                       const isOpen = openPaths.has(w.filePath);
                       const windows = windowCounts.get(w.filePath) ?? 0;
                       return html`
-                        <li class="ws-row ${isOpen ? "ws-row--open" : ""}" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspace(w); }}>
+                        <li
+                          class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""}"
+                          @click=${(e: Event) => { e.stopPropagation(); if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
+                        >
                           <div class="ws-top">
                             <span class="ws-name">${name}</span>
                           </div>
-                          <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>
+                          ${this._workspaceDeleteMode
+                            ? nothing
+                            : html`<div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>`}
                           <div class="ws-right">
-                            ${isOpen
-                              ? html`
-                                  <span class="ws-window-pill">${this._countLabel(windows, "window")}</span>
-                                  <span class="ws-open-pill">Open</span>
-                                `
-                              : nothing}
-                            <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                            ${this._workspaceDeleteMode
+                              ? html`<span class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"></span>`
+                              : html`
+                                  ${isOpen
+                                    ? html`
+                                        <span class="ws-window-pill">${this._countLabel(windows, "window")}</span>
+                                        <span class="ws-open-pill">Open</span>
+                                      `
+                                    : nothing}
+                                  <svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                                `}
                           </div>
                         </li>
                       `;
@@ -746,6 +885,9 @@ class Openp41geWindowManager extends LitElement {
             `,
           )}
         </div>
+        ${this._drawers.length === 0 && this._closingDrawers.length === 0
+          ? this._workspaceListFooter()
+          : nothing}
       </div>
     `;
   }
