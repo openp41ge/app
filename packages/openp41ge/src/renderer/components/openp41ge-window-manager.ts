@@ -59,6 +59,9 @@ class Openp41geWindowManager extends LitElement {
   @state() private _addingWorkspace = false;
   @state() private _workspaceDeleteMode = false;
   @state() private _selectedWorkspaces: Set<string> = new Set();
+  @state() private _addingWorktree = false;
+  @state() private _worktreeDeleteMode = false;
+  @state() private _selectedWorktrees: Set<string> = new Set();
   private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
@@ -102,6 +105,7 @@ class Openp41geWindowManager extends LitElement {
     if (e.key !== "Escape") return;
     if (this._workspaceDeleteMode) this._cancelWorkspaceDeleteMode();
     else if (this._deleteMode) this._cancelDeleteMode();
+    else if (this._worktreeDeleteMode) this._cancelWorktreeDeleteMode();
   };
 
   private _onFocus = (): void => {
@@ -140,6 +144,9 @@ class Openp41geWindowManager extends LitElement {
     this._addingWorkspace = false;
     this._workspaceDeleteMode = false;
     this._selectedWorkspaces = new Set();
+    this._addingWorktree = false;
+    this._worktreeDeleteMode = false;
+    this._selectedWorktrees = new Set();
   }
 
   /** Clicking a top-level card resets the drawer stack to that workspace's detail. */
@@ -374,6 +381,105 @@ class Openp41geWindowManager extends LitElement {
     await this._load();
   }
 
+  /** Toggle the inline "add worktree" row on the worktree list drawer. */
+  private _toggleAddWorktree(): void {
+    this._worktreeDeleteMode = false;
+    this._addingWorktree = !this._addingWorktree;
+    if (this._addingWorktree) {
+      void this.updateComplete.then(() => {
+        this.shadowRoot?.querySelector<HTMLInputElement>(".dw-new-input")?.focus();
+      });
+    }
+  }
+
+  /** Enter commits, Escape cancels the inline add-worktree row. */
+  private _onNewWorktreeKeydown(e: KeyboardEvent, d: DrawerState): void {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      this._commitNewWorktree(d, e);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      this._addingWorktree = false;
+    }
+  }
+
+  /** Blur/Enter commits the typed worktree branch; empty input closes the row. */
+  private _commitNewWorktree(d: DrawerState, e: Event): void {
+    if (!this._addingWorktree) return;
+    const value = (e.target as HTMLInputElement).value.trim();
+    void this._addWorktreeToWorkspace(d, value);
+  }
+
+  /** Append a worktree branch to the repo in the workspace file, then refresh. */
+  private async _addWorktreeToWorkspace(d: DrawerState, branch: string): Promise<void> {
+    const b = branch.trim();
+    this._addingWorktree = false;
+    if (!b) return;
+    const repo = d.data.repos?.find((r) => r.url === d.repoUrl);
+    if (!repo) return;
+    if ((repo.worktrees ?? []).includes(b)) {
+      await this._load();
+      return;
+    }
+    const data: WorkspaceFileData = {
+      ...d.data,
+      repos: (d.data.repos ?? []).map((r) =>
+        r.url === d.repoUrl ? { ...r, worktrees: [...(r.worktrees ?? []), b] } : r,
+      ),
+    };
+    try {
+      await window.openp41ge.dialog.writeWorkspaceFile(d.workspacePath, data);
+    } catch {
+      return;
+    }
+    this._drawers = this._drawers.map((x) => (x.id === d.id ? { ...x, data } : x));
+    await this._load();
+  }
+
+  /** Enter worktree delete mode: worktree cards become checkbox-selectable. */
+  private _activateWorktreeDeleteMode(): void {
+    this._addingWorktree = false;
+    this._worktreeDeleteMode = true;
+    this._selectedWorktrees = new Set();
+  }
+
+  /** Leave worktree delete mode and clear the selection. */
+  private _cancelWorktreeDeleteMode(): void {
+    this._worktreeDeleteMode = false;
+    this._selectedWorktrees = new Set();
+  }
+
+  /** Toggle whether a worktree card is selected for deletion. */
+  private _toggleWorktreeSelection(branch: string): void {
+    const next = new Set(this._selectedWorktrees);
+    if (next.has(branch)) next.delete(branch);
+    else next.add(branch);
+    this._selectedWorktrees = next;
+  }
+
+  /** Remove the selected worktrees from the repo in the workspace file, then refresh. */
+  private async _deleteSelectedWorktrees(d: DrawerState): Promise<void> {
+    const selected = this._selectedWorktrees;
+    this._worktreeDeleteMode = false;
+    this._selectedWorktrees = new Set();
+    if (selected.size === 0) return;
+    const data: WorkspaceFileData = {
+      ...d.data,
+      repos: (d.data.repos ?? []).map((r) =>
+        r.url === d.repoUrl
+          ? { ...r, worktrees: (r.worktrees ?? []).filter((wt) => !selected.has(wt)) }
+          : r,
+      ),
+    };
+    try {
+      await window.openp41ge.dialog.writeWorkspaceFile(d.workspacePath, data);
+    } catch {
+      return;
+    }
+    this._drawers = this._drawers.map((x) => (x.id === d.id ? { ...x, data } : x));
+    await this._load();
+  }
+
   /** Footer bar specific to a drawer kind (add / delete controls). */
   private _drawerFooter(d: DrawerState): TemplateResult | typeof nothing {
     if (d.kind === "workspace") {
@@ -387,6 +493,23 @@ class Openp41geWindowManager extends LitElement {
             : html`
                 <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} aria-label="Add repository" data-tip="Add repository">＋</button>
                 <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }} aria-label="Delete repositories" data-tip="Delete repositories">
+                  <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
+                </button>
+              `}
+        </div>
+      `;
+    }
+    if (d.kind === "repo") {
+      return html`
+        <div class="drawer-footer">
+          ${this._worktreeDeleteMode
+            ? html`
+                <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorktreeDeleteMode(); }} data-tip="Cancel">Cancel</button>
+                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedWorktrees(d); }} data-tip="Delete selected worktrees" ?disabled=${this._selectedWorktrees.size === 0}>Delete</button>
+              `
+            : html`
+                <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddWorktree(); }} aria-label="Add worktree" data-tip="Add worktree">＋</button>
+                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateWorktreeDeleteMode(); }} aria-label="Delete worktrees" data-tip="Delete worktrees">
                   <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
                 </button>
               `}
@@ -986,16 +1109,34 @@ class Openp41geWindowManager extends LitElement {
     if (d.kind === "repo") {
       const repo = d.data.repos?.find((r) => r.url === d.repoUrl);
       const wts = repo?.worktrees ?? [];
-      if (wts.length === 0) {
-        return html`<p class="empty">No worktrees yet.</p>`;
-      }
       return html`
         <ul class="dw-list">
+          ${this._addingWorktree
+            ? html`
+                <li class="dw-item dw-item--new">
+                  <input
+                    class="dw-new-input"
+                    placeholder="Worktree branch"
+                    spellcheck="false"
+                    @keydown=${(e: KeyboardEvent) => this._onNewWorktreeKeydown(e, d)}
+                    @blur=${(e: Event) => this._commitNewWorktree(d, e)}
+                  />
+                </li>
+              `
+            : nothing}
+          ${wts.length === 0 && !this._addingWorktree
+            ? html`<p class="empty">No worktrees yet.</p>`
+            : nothing}
           ${wts.map(
             (wt) => html`
-              <li class="dw-item" @click=${(e: Event) => { e.stopPropagation(); this._openWorktree(d, wt); }}>
+              <li
+                class="dw-item ${this._worktreeDeleteMode ? "dw-item--selectable" : ""} ${this._selectedWorktrees.has(wt) ? "dw-item--selected" : ""}"
+                @click=${(e: Event) => { e.stopPropagation(); if (this._worktreeDeleteMode) this._toggleWorktreeSelection(wt); else this._openWorktree(d, wt); }}
+              >
                 <span class="dw-item-name">${wt}</span>
-                <span class="dw-item-meta">worktree</span>
+                ${this._worktreeDeleteMode
+                  ? html`<span class="dw-checkbox ${this._selectedWorktrees.has(wt) ? "dw-checkbox--checked" : ""}"></span>`
+                  : html`<span class="dw-item-meta">worktree</span>`}
               </li>
             `,
           )}
