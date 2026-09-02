@@ -86,6 +86,15 @@ export async function showConfirmViaIPC(
 
 // ─── Window creation ─────────────────────────────────────────────────────
 
+/** True if `source` is the compact Window-Manager picker window. */
+function sourceIsWindowManager(source?: BrowserWindow): boolean {
+  if (!source || source.isDestroyed()) return false;
+  for (const [id, bw] of openp41geWindows) {
+    if (bw === source) return openp41geWindowMeta.get(id)?.windowType === "window-manager";
+  }
+  return false;
+}
+
 export function createOpenp41geWindow(
   openp41geWinId: string,
   isMaster: boolean,
@@ -100,21 +109,34 @@ export function createOpenp41geWindow(
     workspacePath: meta?.workspacePath ?? null,
   };
 
-  // Inherit size from the source window, falling back to defaults
+  // The Window Manager is a thin utility window: cap its width to 600 so it
+  // stays a compact picker and never inherits a wide workspace window's size.
+  const isWindowManager = windowMeta.windowType === "window-manager";
+  // A workspace window opened from the compact Window Manager must not inherit
+  // the picker's narrow size — open it large, clamped to the work area.
+  const fromWindowManager = !isWindowManager && sourceIsWindowManager(sourceWindow);
+
+  // Inherit size from the source window, falling back to defaults.
   let width = 1280;
   let height = 860;
-  if (sourceWindow && !sourceWindow.isDestroyed()) {
+  if (sourceWindow && !sourceWindow.isDestroyed() && !fromWindowManager) {
     const bounds = sourceWindow.getBounds();
     width = bounds.width;
     height = bounds.height;
   }
 
-  // The Window Manager is a thin utility window: cap its width to the
-  // workspace window's min-width so it stays a compact picker and never
-  // inherits a wide workspace window's size.
-  const isWindowManager = windowMeta.windowType === "window-manager";
+  // The Window Manager is a thin utility window: cap its width to 600 so it
+  // stays a compact picker and never inherits a wide workspace window's size.
   if (isWindowManager) {
     width = Math.min(width, 600);
+  }
+
+  let display: ReturnType<typeof screen.getDisplayMatching> | undefined;
+  if (fromWindowManager) {
+    display = screen.getDisplayMatching(sourceWindow!.getBounds());
+    const workArea = display.workArea;
+    width = Math.min(1280, workArea.width);
+    height = Math.min(860, workArea.height);
   }
 
   let x: number | undefined;
@@ -132,6 +154,11 @@ export function createOpenp41geWindow(
 
     x = Math.max(workArea.x, Math.min(candidateX, workArea.x + workArea.width - width));
     y = Math.max(workArea.y, Math.min(candidateY, workArea.y + workArea.height - height));
+  } else if (fromWindowManager && display) {
+    // Centre the freshly-opened workspace window on the Window Manager's display.
+    const workArea = display.workArea;
+    x = workArea.x + Math.round((workArea.width - width) / 2);
+    y = workArea.y + Math.round((workArea.height - height) / 2);
   } else if (sourceWindow && !sourceWindow.isDestroyed()) {
     const bounds = sourceWindow.getBounds();
     x = bounds.x + 30;

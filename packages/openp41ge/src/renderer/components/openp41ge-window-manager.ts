@@ -63,6 +63,11 @@ class Openp41geWindowManager extends LitElement {
   @state() private _worktreeDeleteMode = false;
   @state() private _selectedWorktrees: Set<string> = new Set();
   @state() private _crumbsOpen = false;
+  @state() private _pressingPath: string | null = null;
+  @state() private _pressProgress = 0;
+  private _pressTimer: number | null = null;
+  private _pressTriggered = false;
+  private static readonly LONG_PRESS_MS = 500;
   private _tooltipTargets: Element[] = [];
 
   connectedCallback(): void {
@@ -110,6 +115,47 @@ class Openp41geWindowManager extends LitElement {
     if (target?.closest?.(".crumbs")) return;
     this._crumbsOpen = false;
   };
+
+  /** Cancel any in-flight pointer press (timer + fill state). */
+  private _clearPress(): void {
+    const timer = this._pressTimer;
+    if (timer !== null) window.clearInterval(timer);
+    this._pressTimer = null;
+    this._pressingPath = null;
+    this._pressProgress = 0;
+  }
+
+  /** Begin a long-press on a top-level card: fill left-to-right, then open. */
+  private _onCardPointerDown(e: PointerEvent, filePath: string, isOpen: boolean): void {
+    if (this._workspaceDeleteMode || isOpen || e.button !== 0) return;
+    this._clearPress();
+    this._pressTriggered = false;
+    this._pressingPath = filePath;
+    this._pressProgress = 0;
+    const start = performance.now();
+    const timer = window.setInterval(() => {
+      this._pressProgress = Math.min(1, (performance.now() - start) / Openp41geWindowManager.LONG_PRESS_MS);
+      if (this._pressProgress >= 1) {
+        window.clearInterval(timer);
+        this._pressTimer = null;
+        this._pressTriggered = true;
+        this._pressingPath = null;
+        this._openWorkspaceWindow(filePath);
+      }
+    }, 30);
+    this._pressTimer = timer;
+  }
+
+  /** End a press early (released before the threshold) → normal click may follow. */
+  private _onCardPointerUp(): void {
+    this._clearPress();
+  }
+
+  /** Cancel the press (pointer left the card or was interrupted). */
+  private _onCardPointerCancel(): void {
+    this._clearPress();
+    this._pressTriggered = false;
+  }
 
   /** Escape cancels delete modes, closes an add card, or closes the crumb menu. */
   private _onKeydown = (e: KeyboardEvent): void => {
@@ -739,6 +785,20 @@ class Openp41geWindowManager extends LitElement {
           transition: background 0.1s ease;
         }
         li.ws-row:hover { background: var(--bg-active, #37373d); }
+        /* Long-press progress: card fills left-to-right over the press duration. */
+        li.ws-row .ws-fill {
+          position: absolute;
+          inset: 0;
+          z-index: 0;
+          background: var(--accent, #569cd6);
+          opacity: 0.22;
+          transform: scaleX(0);
+          transform-origin: left center;
+          pointer-events: none;
+        }
+        li.ws-row .ws-top,
+        li.ws-row .ws-meta { position: relative; z-index: 1; }
+        li.ws-row .ws-right { z-index: 1; }
         .ws-top { display: flex; align-items: center; gap: 8px; width: 100%; }
         .ws-name {
           flex: 1;
@@ -1155,9 +1215,14 @@ class Openp41geWindowManager extends LitElement {
                       const windows = windowCounts.get(w.filePath) ?? 0;
                       return html`
                         <li
-                          class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""}"
-                          @click=${(e: Event) => { e.stopPropagation(); if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
+                          class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${this._pressingPath === w.filePath ? "ws-row--pressing" : ""}"
+                          @pointerdown=${(e: PointerEvent) => this._onCardPointerDown(e, w.filePath, isOpen)}
+                          @pointerup=${this._onCardPointerUp}
+                          @pointercancel=${this._onCardPointerCancel}
+                          @pointerleave=${this._onCardPointerCancel}
+                          @click=${(e: Event) => { e.stopPropagation(); if (this._pressTriggered) { this._pressTriggered = false; return; } if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
                         >
+                          <span class="ws-fill" style="transform: scaleX(${this._pressingPath === w.filePath ? this._pressProgress.toFixed(3) : 0})"></span>
                           <div class="ws-top">
                             <span class="ws-name">${name}</span>
                           </div>
