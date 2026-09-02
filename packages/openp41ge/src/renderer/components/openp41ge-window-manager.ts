@@ -85,7 +85,7 @@ class Openp41geWindowManager extends LitElement {
   /** Attach custom tooltips to the footer tool buttons (replaces native `title`). */
   updated(): void {
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
-      ".dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm",
+      ".dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close",
     );
     const live = new Set<Element>();
     if (btns) {
@@ -1198,7 +1198,7 @@ class Openp41geWindowManager extends LitElement {
                     ${d.kind === "workspace" && !openPaths.has(d.workspacePath)
                       ? html`<button class="dw-open" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(d.workspacePath); }}>Open</button>`
                       : nothing}
-                    <button class="dw-close" @click=${(e: Event) => { e.stopPropagation(); this._closeDrawer(d.id); }} title="Close">✕</button>
+                    <button class="dw-close" @click=${(e: Event) => { e.stopPropagation(); this._closeDrawer(d.id); }} aria-label="Close" data-tip="Close">✕</button>
                   </div>
                 </div>
                 <div class="drawer-body">${this._drawerContent(d)}</div>
