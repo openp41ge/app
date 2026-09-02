@@ -69,6 +69,15 @@ export class OperationDispatcher implements IOperationDispatcher {
     return this._workspace;
   }
 
+  /**
+   * Persist the current layout without mutating it. Used when the last window
+   * of a workspace closes (so its grid stays in the file) and on app quit
+   * (so all open windows are saved).
+   */
+  persist(): void {
+    this._saveHandler?.(this._workspace);
+  }
+
   setWorkspace(ws: Workspace): void {
     this._workspace = ws;
   }

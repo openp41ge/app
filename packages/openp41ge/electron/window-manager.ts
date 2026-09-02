@@ -213,13 +213,37 @@ export function createOpenp41geWindow(
   });
 
   win.on("closed", () => {
+    const meta = openp41geWindowMeta.get(openp41geWinId);
     openp41geWindows.delete(openp41geWinId);
     openp41geWindowMeta.delete(openp41geWinId);
     // Don't mutate workspace state during a full app quit — the whole session
     // (all open windows) is preserved so reopening the workspace restores them.
     if (!isMaster && _dispatcher && !_appQuitting) {
-      _dispatcher.apply("closeWindow", [openp41geWinId]);
-      _dispatcher.broadcast();
+      // Closing a window while other windows of the same workspace remain open
+      // *edits* the workspace (removes the window). Closing the LAST live
+      // window closes the workspace itself — persist the layout (keep every
+      // window, including this one, in the file) so the skeleton keeps
+      // rendering the right grid and reopening restores it.
+      const isWorkspace = meta?.windowType === "workspace";
+      const wsPath = meta?.workspacePath;
+      if (isWorkspace && wsPath) {
+        let otherLive = 0;
+        for (const [id, bw] of openp41geWindows) {
+          if (bw.isDestroyed()) continue;
+          const otherMeta = openp41geWindowMeta.get(id);
+          if (otherMeta?.windowType === "workspace" && otherMeta.workspacePath === wsPath) {
+            otherLive++;
+          }
+        }
+        if (otherLive === 0) {
+          // Last live window -> closing the workspace: persist, don't remove.
+          _dispatcher.persist();
+        } else {
+          // Editing the workspace -> remove this window from the layout.
+          _dispatcher.apply("closeWindow", [openp41geWinId]);
+          _dispatcher.broadcast();
+        }
+      }
     }
   });
 

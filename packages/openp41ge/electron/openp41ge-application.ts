@@ -556,14 +556,21 @@ export class Openp41geApplication {
 
   private _registerAppEvents(): void {
     // Preserve open workspace windows across a full app quit so reopening the
-    // workspace restores them (see setAppQuitting).
+    // workspace restores them (see setAppQuitting). Persist the layout (with all
+    // live windows) so closing every window at once saves the full multi-window
+    // state for the skeleton to render on relaunch.
     app.on("before-quit", () => {
       setAppQuitting(true);
+      this.dispatcher.persist();
     });
 
     app.on("window-all-closed", () => {
-      // Exit when the last window closes (window-manager or workspace).
-      app.quit();
+      // macOS: keep the app resident in the dock when the last window closes,
+      // so clicking the dock icon (the 'activate' handler) reopens the Window
+      // Manager. On other platforms, exit when the last window closes.
+      if (process.platform !== "darwin") {
+        app.quit();
+      }
     });
 
     app.on("activate", () => {

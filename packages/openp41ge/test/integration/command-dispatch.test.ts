@@ -167,6 +167,28 @@ describe("Command dispatch — OperationDispatcher", () => {
       expect(savedWs.windows[0].grid.placements).toHaveLength(1);
     });
 
+    it("persist() saves the current layout without mutating it", () => {
+      const dispatcher = new OperationDispatcher();
+      const saveHandler = vi.fn();
+      dispatcher.setSaveHandler(saveHandler);
+
+      const ws = dispatcher.getWorkspace();
+      const winId = ws.windows[0].id;
+      dispatcher.apply("addTabToCell", [
+        winId,
+        { id: "t1", appType: "terminal", title: "T1", config: {}, isPreview: false },
+        0,
+        0,
+      ]);
+      const callsAfterApply = saveHandler.mock.calls.length;
+
+      dispatcher.persist();
+      expect(saveHandler.mock.calls.length).toBe(callsAfterApply + 1);
+      // persist() never mutates the layout.
+      expect(dispatcher.getWorkspace().windows[0].grid.placements).toHaveLength(1);
+      expect(dispatcher.getWorkspace().windows).toHaveLength(1);
+    });
+
     it("does not invoke save handler when apply fails", () => {
       const dispatcher = new OperationDispatcher();
       const saveHandler = vi.fn();
