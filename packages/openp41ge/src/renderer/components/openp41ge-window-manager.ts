@@ -62,13 +62,22 @@ class Openp41geWindowManager extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener("focus", this._onFocus);
+    document.addEventListener("keydown", this._onKeydown);
     void this._load();
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener("focus", this._onFocus);
+    document.removeEventListener("keydown", this._onKeydown);
   }
+
+  /** Escape cancels an active delete mode. */
+  private _onKeydown = (e: KeyboardEvent): void => {
+    if (e.key !== "Escape") return;
+    if (this._workspaceDeleteMode) this._cancelWorkspaceDeleteMode();
+    else if (this._deleteMode) this._cancelDeleteMode();
+  };
 
   private _onFocus = (): void => {
     void this._load();
@@ -214,8 +223,8 @@ class Openp41geWindowManager extends LitElement {
       <div class="drawer-footer">
         ${this._workspaceDeleteMode
           ? html`
-              <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorkspaceDeleteMode(); }}>Cancel</button>
-              <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedWorkspaces(); }} ?disabled=${this._selectedWorkspaces.size === 0}>Delete</button>
+              <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorkspaceDeleteMode(); }} title="Cancel">Cancel</button>
+              <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedWorkspaces(); }} title="Delete selected workspaces" ?disabled=${this._selectedWorkspaces.size === 0}>Delete</button>
             `
           : html`
               <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddWorkspace(); }} title="New workspace" aria-label="New workspace">＋</button>
@@ -347,8 +356,8 @@ class Openp41geWindowManager extends LitElement {
         <div class="drawer-footer">
           ${this._deleteMode
             ? html`
-                <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }}>Cancel</button>
-                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedRepos(d); }} ?disabled=${this._selectedRepos.size === 0}>Delete</button>
+                <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }} title="Cancel">Cancel</button>
+                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedRepos(d); }} title="Delete selected repos" ?disabled=${this._selectedRepos.size === 0}>Delete</button>
               `
             : html`
                 <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} title="Add repo" aria-label="Add repo">＋</button>
@@ -562,16 +571,33 @@ class Openp41geWindowManager extends LitElement {
         .wm-new-ws-input {
           flex: 1;
           min-width: 0;
-          width: 100%;
           background: transparent;
           border: none;
           outline: none;
           color: var(--text-primary, #ddd);
           font-size: 13px;
           font-family: inherit;
-          padding: 0;
+          padding-right: 24px;
         }
         .wm-new-ws-input::placeholder { color: var(--text-secondary, #777); }
+        /* Skeleton placeholders for the inline "new workspace" card. */
+        @keyframes ws-skeleton-pulse {
+          0%, 100% { opacity: 0.45; }
+          50% { opacity: 1; }
+        }
+        .ws-skeleton {
+          display: inline-block;
+          border-radius: 4px;
+          background: var(--bg-active, #37373d);
+          animation: ws-skeleton-pulse 1.3s ease-in-out infinite;
+        }
+        .ws-skeleton--num { width: 118px; height: 12px; vertical-align: middle; }
+        .ws-skeleton--chevron {
+          width: 16px;
+          height: 16px;
+          border-radius: 4px;
+          background: rgba(86, 156, 214, 0.35);
+        }
         .empty { color: var(--text-secondary, #777); font-size: 13px; }
         /* ── Drawer ─────────────────────────────────────────────── */
         /* A single shared shadow element whose width tracks the widest drawer,
@@ -802,13 +828,17 @@ class Openp41geWindowManager extends LitElement {
                     ${this._addingWorkspace
                       ? html`
                           <li class="ws-row ws-row--new">
-                            <input
-                              class="wm-new-ws-input"
-                              placeholder="Workspace name"
-                              spellcheck="false"
-                              @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
-                              @blur=${() => { if (this._addingWorkspace) void this._createWorkspaceFromInput(); }}
-                            />
+                            <div class="ws-top">
+                              <input
+                                class="wm-new-ws-input"
+                                placeholder="Workspace name"
+                                spellcheck="false"
+                                @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
+                                @blur=${() => { if (this._addingWorkspace) void this._createWorkspaceFromInput(); }}
+                              />
+                            </div>
+                            <div class="ws-meta"><span class="ws-skeleton ws-skeleton--num"></span></div>
+                            <div class="ws-right"><span class="ws-skeleton ws-skeleton--chevron"></span></div>
                           </li>
                         `
                       : nothing}
