@@ -47,3 +47,13 @@ that workspace's window (replacing the long-press).
       chevron for checkbox.
 - [x] `nx run-many -t typecheck` clean; `nx lint` clean; `nx run openp41ge:test`
       1101/1101 pass; live-verified (title, rows, drag+release, cancel, delete mode).
+
+## Refinement: long-press pickup
+- [x] Skeleton now shows the drag element after a SHORT HOLD (350ms) with no
+      pointer movement, not only once the drag threshold is crossed
+      (`_beginOpenDrag`). A quick drag that crosses the threshold still starts
+      the drag and cancels the pending long-press; a quick click (down + up
+      before the hold) never starts a drag.
+      (HOLD_MS const; `_holdTimer`; capture rect captured at pointerdown for the
+      bitmap ghost. `openp41ge-window-manager.ts`, unit-tested in
+      `test/unit/components/openp41ge-window-manager.test.ts`.)

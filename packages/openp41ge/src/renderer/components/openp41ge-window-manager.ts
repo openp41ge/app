@@ -18,6 +18,9 @@ import { tooltipController } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 
+/** Hold a skeleton this long before the drag element appears (long-press pickup). */
+const HOLD_MS = 350;
+
 const isMac = (() => {
   try {
     return window.openp41ge?.platform === "darwin" || navigator.platform.startsWith("Mac");
@@ -47,7 +50,7 @@ interface ClosingDrawer extends DrawerState {
   width: number;
 }
 
-class Openp41geWindowManager extends LitElement {
+export class Openp41geWindowManager extends LitElement {
   @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
   @state() private _openWindows: OpenWindowSummary[] = [];
   @state() private _drawers: DrawerState[] = [];
@@ -69,6 +72,9 @@ class Openp41geWindowManager extends LitElement {
   private _drag: {
     startX: number;
     startY: number;
+    startScreenX: number;
+    startScreenY: number;
+    captureRect: { x: number; y: number; width: number; height: number } | null;
     path: string;
     label: string;
     active: boolean;
@@ -77,6 +83,7 @@ class Openp41geWindowManager extends LitElement {
     baseIndex: number;
   } | null = null;
   private _carouselTrack: HTMLElement | null = null;
+  private _holdTimer: number | null = null;
   private _offEndSession: (() => void) | null = null;
   /** Suppress the following row click after a drag/swipe, so the drawer doesn't pop open. */
   private _suppressClick = false;
@@ -163,9 +170,19 @@ class Openp41geWindowManager extends LitElement {
     this._teardownDrag();
     const ws = this._workspaces.find((w) => w.filePath === path);
     const winCount = ws?.data.windows?.length ?? 1;
+    const thumb = e.currentTarget as HTMLElement;
+    const rect = thumb.getBoundingClientRect();
     this._drag = {
       startX: e.clientX,
       startY: e.clientY,
+      startScreenX: e.screenX,
+      startScreenY: e.screenY,
+      captureRect: {
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      },
       path,
       label: ws?.data.name?.trim() || "Unnamed",
       active: false,
@@ -174,9 +191,50 @@ class Openp41geWindowManager extends LitElement {
       baseIndex: this._carouselIndex.get(path) ?? 0,
     };
     try {
-      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      thumb.setPointerCapture?.(e.pointerId);
     } catch {
       /* synthetic events have no active pointer */
+    }
+    // A short hold shows the drag element without any pointer movement (long-press
+    // pickup). A quick drag that crosses the threshold clears this timer and starts
+    // the drag from the move handler instead.
+    this._clearHoldTimer();
+    this._holdTimer = window.setTimeout(() => this._beginOpenDrag(), HOLD_MS);
+  }
+
+  /** Long-press fired: show the drag element (open mode) at the press point. */
+  private _beginOpenDrag(): void {
+    this._holdTimer = null;
+    const drag = this._drag;
+    if (!drag || drag.active) return;
+    drag.active = true;
+    this._suppressClick = true;
+    drag.mode = "open";
+    window.openp41ge.drag.start(
+      drag.label,
+      drag.startScreenX,
+      drag.startScreenY,
+      "🗂",
+      undefined,
+      undefined,
+      undefined,
+      132,
+      84,
+      66,
+      42,
+      "workspace",
+      drag.path,
+      drag.captureRect ?? undefined,
+      0,
+    );
+    window.openp41ge.drag.activate();
+    window.openp41ge.drag.move(drag.startScreenX, drag.startScreenY);
+  }
+
+  private _clearHoldTimer(): void {
+    if (this._holdTimer !== null) {
+      window.clearTimeout(this._holdTimer);
+      this._holdTimer = null;
     }
   }
 
@@ -188,6 +246,8 @@ class Openp41geWindowManager extends LitElement {
     const dy = e.clientY - drag.startY;
     if (!drag.active) {
       if (Math.hypot(dx, dy) < 8) return;
+      // A real drag beat the long-press timer — cancel the pending pickup.
+      this._clearHoldTimer();
       drag.active = true;
       // A drag/swipe means the following row click is not a navigation — suppress
       // it so the drawer doesn't pop open over the drag. Cleared by the next
@@ -196,8 +256,6 @@ class Openp41geWindowManager extends LitElement {
       // Horizontal swipe → carousel; vertical drag → open the workspace window.
       drag.mode = Math.abs(dx) > Math.abs(dy) ? "carousel" : "open";
       if (drag.mode === "open") {
-        const el = e.currentTarget as HTMLElement;
-        const rect = el.getBoundingClientRect();
         // Start a real (native) drag so it can leave the window. Pass the
         // skeleton's capture rect so the main process swaps in a bitmap of the
         // actual skeleton (not just a label). The window opens on the drop, only
@@ -216,12 +274,7 @@ class Openp41geWindowManager extends LitElement {
           42,
           "workspace",
           drag.path,
-          {
-            x: Math.round(rect.left),
-            y: Math.round(rect.top),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-          },
+          drag.captureRect ?? undefined,
           0,
         );
         window.openp41ge.drag.activate();
@@ -242,6 +295,7 @@ class Openp41geWindowManager extends LitElement {
 
   /** Release: open the workspace only if the cursor was outside this window at the drop. */
   private _onThumbPointerUp(e: PointerEvent): void {
+    this._clearHoldTimer();
     const drag = this._drag;
     if (!drag) return;
     const { mode, path } = drag;
@@ -262,6 +316,7 @@ class Openp41geWindowManager extends LitElement {
   }
 
   private _onThumbPointerCancel(): void {
+    this._clearHoldTimer();
     const drag = this._drag;
     if (!drag) return;
     if (drag.mode === "open") window.openp41ge.drag.end();
@@ -283,6 +338,7 @@ class Openp41geWindowManager extends LitElement {
   }
 
   private _teardownDrag(): void {
+    this._clearHoldTimer();
     this._drag = null;
     this._carouselTrack = null;
   }
