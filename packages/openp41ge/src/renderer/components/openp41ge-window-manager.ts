@@ -829,9 +829,7 @@ class Openp41geWindowManager extends LitElement {
                           <div class="ws-top">
                             <span class="ws-name">${name}</span>
                           </div>
-                          ${this._workspaceDeleteMode
-                            ? nothing
-                            : html`<div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>`}
+                          <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>
                           <div class="ws-right">
                             ${this._workspaceDeleteMode
                               ? html`<span class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"></span>`
