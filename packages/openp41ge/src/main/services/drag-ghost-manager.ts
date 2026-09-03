@@ -58,6 +58,35 @@ export function buildBitmapGhostHtml(
 }
 
 /**
+ * Build the initial ghost HTML for a workspace skeleton drag before the captured
+ * bitmap arrives. Renders a skeleton-sized card at the largest frame
+ * (source × LIFT_MAX_SCALE) that springs up from the source size, so the ghost
+ * lifts on the very first frame the user starts dragging — not only once the
+ * async bitmap capture resolves.
+ *
+ * `offsetX`/`offsetY` are the grab point in SOURCE-element coordinates.
+ */
+export function buildWorkspaceGhostHtml(
+  label: string,
+  emoji: string,
+  width: number,
+  height: number,
+  offsetX: number,
+  offsetY: number,
+): string {
+  const scale = LIFT_MAX_SCALE;
+  const outW = Math.max(1, Math.round(width * scale));
+  const outH = Math.max(1, Math.round(height * scale));
+  const originX = Math.round(offsetX * scale);
+  const originY = Math.round(offsetY * scale);
+  const emojiHtml = emoji
+    ? `<span style="font-size:18px;line-height:1;flex-shrink:0">${emoji}</span>`
+    : "";
+  const nameHtml = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;font-size:12px;color:#d4d4d4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">${label}</span>`;
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:${outW}px;height:${outH}px;box-sizing:border-box;padding:8px;background:#1e1e1e;border:1px solid #3a3d3f;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.3);outline:1px solid rgba(74,158,255,0.5);outline-offset:-1px;transform-origin:${originX}px ${originY}px;animation:op41ge-lift ${LIFT_SPRING_MS}ms ${LIFT_SPRING_EASE} both;">${emojiHtml}${nameHtml}</div>`;
+}
+
+/**
  * Manages a frameless BrowserWindow used as a drag ghost.
  *
  * The ghost follows the cursor outside the app window during drag-and-drop
@@ -74,6 +103,10 @@ export class DragGhostManager implements IDragGhostManager {
   private _contentH = 0;
   private _offsetX = 0;
   private _offsetY = 0;
+  /** The cursor's grab point within the source element (unscaled source coords).
+   * Kept separate from `_offset*` because a lift scales the positioning offset. */
+  private _srcOffsetX = 0;
+  private _srcOffsetY = 0;
   /** True when the current ghost is a workspace skeleton (springs up on pick-up). */
   private _liftOff = false;
   /** When true the did-finish-load handler may reposition the window; after a
@@ -103,13 +136,21 @@ export class DragGhostManager implements IDragGhostManager {
     this._liftOff = dragType === "workspace";
     this._allowAutoPosition = true;
 
-    // Store offset for subsequent move() calls
-    this._offsetX = offsetX ?? Math.round((tabWidth ?? 110) / 2);
-    this._offsetY = offsetY ?? Math.round((tabHeight ?? 35) / 2);
+    // Store the unscaled grab point, then scale the positioning offset for a lift
+    // so the cursor stays on the grab point in the (larger) lifted content.
+    this._srcOffsetX = offsetX ?? Math.round((tabWidth ?? 110) / 2);
+    this._srcOffsetY = offsetY ?? Math.round((tabHeight ?? 35) / 2);
+    const liftScale = this._liftOff ? LIFT_MAX_SCALE : 1;
+    this._offsetX = this._srcOffsetX * liftScale;
+    this._offsetY = this._srcOffsetY * liftScale;
 
-    // Use tab dimensions if provided, otherwise use defaults
+    // Use tab dimensions if provided, otherwise use defaults. A lift sizes the
+    // window to the largest frame (source × LIFT_MAX_SCALE) so the sprung-up
+    // content never clips.
     const ghostW = tabWidth ?? 110;
     const ghostH = tabHeight ?? 35;
+    const winW = Math.max(1, Math.round(ghostW * liftScale));
+    const winH = Math.max(1, Math.round(ghostH * liftScale));
     // When dimensions are explicit (files and tabs always pass the element's
     // size) we can make the window VISIBLE immediately at that size instead of
     // waiting for did-finish-load — a fast drag can otherwise mousedown+release
@@ -119,8 +160,8 @@ export class DragGhostManager implements IDragGhostManager {
     const initialX = screenX - this._offsetX;
     const initialY = screenY - this._offsetY;
     const ghost = new this._BrowserWindow({
-      width: ghostW,
-      height: ghostH,
+      width: winW,
+      height: winH,
       x: isFinite(initialX) ? initialX : 0,
       y: isFinite(initialY) ? initialY : 0,
       frame: false,
@@ -138,8 +179,8 @@ export class DragGhostManager implements IDragGhostManager {
     // Seed the assumed size with the explicit/fallback dims so move() always has
     // sane bounds even before content loads (otherwise a fast drag would move a
     // 0×0 window). The did-finish-load measure overwrites these with the real size.
-    this._contentW = ghostW;
-    this._contentH = ghostH;
+    this._contentW = winW;
+    this._contentH = winH;
 
     if (showImmediately && !process.env.OPENP41GE_E2E_TEST) {
       ghost.show();
@@ -174,12 +215,25 @@ ${nameHtml}</div>`;
     // adopt those dimensions. Falls back to the file-row / pill HTML otherwise.
     const innerHtml = bitmapDataUrl
       ? `<img src="${bitmapDataUrl}" alt="" style="display:block;width:${ghostW}px;height:${ghostH}px;" />`
-      : isFileGhost
-        ? rowHtml
-        : pillHtml;
+      : this._liftOff
+        ? buildWorkspaceGhostHtml(
+            escapedLabel,
+            escapedEmoji,
+            ghostW,
+            ghostH,
+            this._srcOffsetX,
+            this._srcOffsetY,
+          )
+        : isFileGhost
+          ? rowHtml
+          : pillHtml;
+
+    const liftKeyframes = this._liftOff
+      ? `<style>@keyframes op41ge-lift{from{transform:scale(${1 / LIFT_MAX_SCALE})}to{transform:scale(1)}}</style>`
+      : "";
 
     const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:transparent;cursor:grabbing;">${innerHtml}
+<html><head>${liftKeyframes}</head><body style="margin:0;padding:0;background:transparent;cursor:grabbing;">${innerHtml}
 </body></html>`;
 
     ghost.webContents.on("did-finish-load", () => {
@@ -246,8 +300,8 @@ ${nameHtml}</div>`;
     const outerW = Math.max(1, Math.round(width));
     const outerH = Math.max(1, Math.round(height));
     const scale = this._liftOff ? LIFT_MAX_SCALE : 1;
-    const srcOffsetX = this._offsetX;
-    const srcOffsetY = this._offsetY;
+    const srcOffsetX = this._srcOffsetX;
+    const srcOffsetY = this._srcOffsetY;
     this._contentW = Math.max(1, Math.round(outerW * scale));
     this._contentH = Math.max(1, Math.round(outerH * scale));
     // For a workspace lift, grow the ghost around the grab point so the cursor
@@ -304,6 +358,8 @@ ${nameHtml}</div>`;
     this._contentH = 0;
     this._offsetX = 0;
     this._offsetY = 0;
+    this._srcOffsetX = 0;
+    this._srcOffsetY = 0;
     this._liftOff = false;
     this._allowAutoPosition = true;
   }
