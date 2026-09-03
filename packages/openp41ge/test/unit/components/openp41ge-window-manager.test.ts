@@ -195,3 +195,87 @@ describe("Openp41geWindowManager skeleton drag", () => {
     expect(wm._carouselLive).toBe(false);
   });
 });
+
+describe("Openp41geWindowManager header search", () => {
+  type WmSearch = Wm & {
+    _workspaces: Array<{ filePath: string; data: unknown }>;
+    _matchesQuery(ws: { data: unknown }, q: string, cs: boolean, re: boolean): boolean;
+    _filteredWorkspaces: Array<{ filePath: string; data: unknown }>;
+    _searchOpen: boolean;
+    _searchQuery: string;
+    _caseSensitive: boolean;
+    _useRegex: boolean;
+    _exitSearch(): void;
+    _onSearchKeydown(e: KeyboardEvent): void;
+  };
+
+  let wm: WmSearch;
+
+  beforeEach(() => {
+    stubWindow();
+    wm = new Openp41geWindowManager() as unknown as WmSearch;
+  });
+
+  const W = (
+    filePath: string,
+    name: string,
+    repos: Array<{ url: string; worktrees: string[] }> = [],
+  ) => ({ filePath, data: { name, repos } });
+
+  it("matches a workspace by name, repo URL, and worktree name", () => {
+    const w = W("/a", "Alpha", [
+      { url: "https://github.com/acme/app", worktrees: ["main", "feat-x"] },
+    ]);
+    expect(wm._matchesQuery(w, "alpha", false, false)).toBe(true);
+    expect(wm._matchesQuery(w, "acme/app", false, false)).toBe(true);
+    expect(wm._matchesQuery(w, "feat-x", false, false)).toBe(true);
+    expect(wm._matchesQuery(w, "nomatch", false, false)).toBe(false);
+  });
+
+  it("is case-insensitive by default and case-sensitive when toggled", () => {
+    const w = W("/a", "Alpha");
+    expect(wm._matchesQuery(w, "alpha", false, false)).toBe(true);
+    expect(wm._matchesQuery(w, "ALPHA", false, false)).toBe(true);
+    expect(wm._matchesQuery(w, "alpha", true, false)).toBe(false);
+    expect(wm._matchesQuery(w, "Alpha", true, false)).toBe(true);
+  });
+
+  it("supports regex matching and returns false for an invalid regex", () => {
+    const w = W("/a", "Alpha");
+    expect(wm._matchesQuery(w, "^Al", false, true)).toBe(true);
+    expect(wm._matchesQuery(w, "A.*a$", false, true)).toBe(true);
+    expect(wm._matchesQuery(w, "[", false, true)).toBe(false);
+  });
+
+  it("returns all workspaces for an empty query and filters otherwise", () => {
+    wm._workspaces = [
+      W("/a", "Alpha", [{ url: "https://x/y", worktrees: [] }]),
+      W("/b", "Beta", [{ url: "https://x/z", worktrees: ["feat"] }]),
+    ];
+    wm._searchQuery = "feat";
+    expect(wm._filteredWorkspaces.map((w) => w.filePath)).toEqual(["/b"]);
+
+    wm._searchQuery = "";
+    expect(wm._filteredWorkspaces).toHaveLength(2);
+  });
+
+  it("exits search on Escape and resets the query + toggles", () => {
+    wm._searchOpen = true;
+    wm._searchQuery = "foo";
+    wm._caseSensitive = true;
+    wm._useRegex = true;
+    wm._onSearchKeydown(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(wm._searchOpen).toBe(false);
+    expect(wm._searchQuery).toBe("");
+    expect(wm._caseSensitive).toBe(false);
+    expect(wm._useRegex).toBe(false);
+  });
+
+  it("exits search via the clear control and resets the query", () => {
+    wm._searchOpen = true;
+    wm._searchQuery = "bar";
+    wm._exitSearch();
+    expect(wm._searchOpen).toBe(false);
+    expect(wm._searchQuery).toBe("");
+  });
+});

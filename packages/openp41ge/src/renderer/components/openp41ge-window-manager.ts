@@ -12,8 +12,10 @@
  */
 
 import { html, nothing, type TemplateResult } from "lit";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
+import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
 import { tooltipController } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
@@ -65,6 +67,14 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _carouselIndex: Map<string, number> = new Map();
   /** True while a carousel swipe follows the pointer (disables the slide transition). */
   @state() private _carouselLive = false;
+  /** The header is expanded into the workspace search bar. */
+  @state() private _searchOpen = false;
+  /** Raw text in the header search input. */
+  @state() private _searchQuery = "";
+  /** Match case in the header search. */
+  @state() private _caseSensitive = false;
+  /** Treat the header search query as a regular expression. */
+  @state() private _useRegex = false;
   private _drag: {
     startX: number;
     startY: number;
@@ -121,7 +131,7 @@ export class Openp41geWindowManager extends LitElement {
   updated(): void {
     this._measureListOverflow();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
-      ".dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close",
+      ".wm-search-btn, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close",
     );
     const live = new Set<Element>();
     if (btns) {
@@ -588,6 +598,70 @@ export class Openp41geWindowManager extends LitElement {
     await this._load();
   }
 
+  /** Whether a workspace matches the header search query (name / repo URL / worktree). */
+  private _matchesQuery(
+    ws: { data: WorkspaceFileData },
+    query: string,
+    caseSensitive: boolean,
+    useRegex: boolean,
+  ): boolean {
+    if (!query) return true;
+    const name = ws.data.name?.trim() || "Unnamed";
+    const haystacks = [
+      name,
+      ...(ws.data.repos ?? []).map((r) => r.url),
+      ...(ws.data.repos ?? []).flatMap((r) => r.worktrees ?? []),
+    ];
+    if (useRegex) {
+      try {
+        const re = new RegExp(query, caseSensitive ? "" : "i");
+        return haystacks.some((h) => re.test(h));
+      } catch {
+        return false;
+      }
+    }
+    const needle = caseSensitive ? query : query.toLowerCase();
+    return haystacks.some((h) =>
+      caseSensitive ? h.includes(query) : h.toLowerCase().includes(needle),
+    );
+  }
+
+  /** Workspaces shown in the list, honouring the header search query + toggles. */
+  private get _filteredWorkspaces(): Array<{ filePath: string; data: WorkspaceFileData }> {
+    const q = this._searchQuery;
+    if (!q.trim()) return this._workspaces;
+    return this._workspaces.filter((w) =>
+      this._matchesQuery(w, q, this._caseSensitive, this._useRegex),
+    );
+  }
+
+  /** Expand the header into the search bar and focus the input. */
+  private _startSearch(): void {
+    this._searchOpen = true;
+    void this.updateComplete.then(() => {
+      this.shadowRoot?.querySelector<HTMLInputElement>(".wm-search-input")?.focus();
+    });
+  }
+
+  /** Collapse the search bar, clear the query, and reset the toggles. */
+  private _exitSearch(): void {
+    this._searchOpen = false;
+    this._searchQuery = "";
+    this._caseSensitive = false;
+    this._useRegex = false;
+  }
+
+  private _onSearchInput(e: Event): void {
+    this._searchQuery = (e.target as HTMLInputElement).value;
+  }
+
+  private _onSearchKeydown(e: KeyboardEvent): void {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      this._exitSearch();
+    }
+  }
+
   /** Enter workspace delete mode: cards become checkbox-selectable. */
   private _activateWorkspaceDeleteMode(): void {
     this._addingWorkspace = false;
@@ -978,6 +1052,8 @@ export class Openp41geWindowManager extends LitElement {
   render(): TemplateResult {
     // Workspaces that already have at least one live workspace window.
     const openPaths = this._openPaths;
+    // Rows shown in the list — filtered by the header search when it is active.
+    const filtered = this._searchQuery.trim() ? this._filteredWorkspaces : this._workspaces;
 
     return html`
       <style>
@@ -1066,6 +1142,102 @@ export class Openp41geWindowManager extends LitElement {
           text-overflow: ellipsis;
           white-space: nowrap;
           color: var(--text-primary, #ddd);
+        }
+        .wm-search-btn {
+          flex: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          margin-left: auto;
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          cursor: pointer;
+          border-radius: 4px;
+          transition: color 0.1s ease, background 0.1s ease;
+        }
+        .wm-search-btn:hover {
+          color: var(--text-primary, #ddd);
+          background: var(--bg-hover, #2a2d2e);
+        }
+        .wm-search {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          flex: 1;
+          min-width: 0;
+          height: 100%;
+        }
+        .wm-search-input {
+          flex: 1;
+          min-width: 0;
+          height: 100%;
+          background: transparent;
+          color: var(--text-primary, #ddd);
+          border: none;
+          padding: 0;
+          font-size: 13px;
+          outline: none;
+          caret-color: var(--text-primary, #ddd);
+        }
+        .wm-search-input::placeholder {
+          color: var(--text-secondary, #777);
+          font-weight: 400;
+        }
+        .wm-search-toggle {
+          flex: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 18px;
+          height: 18px;
+          min-width: 18px;
+          padding: 0;
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          cursor: pointer;
+          transition: color 0.1s ease;
+        }
+        .wm-search-toggle:first-of-type {
+          margin-left: 8px;
+        }
+        .wm-search-toggle:hover {
+          color: var(--text-primary, #ddd);
+        }
+        .wm-search-toggle--on {
+          color: var(--text-primary, #ddd);
+        }
+        .wm-search-toggle--on:hover {
+          color: var(--text-primary, #ddd);
+        }
+        .wm-search-sep {
+          align-self: stretch;
+          flex: none;
+          width: 1px;
+          margin: 0 6px;
+          background: var(--divider, #333);
+        }
+        .wm-search-clear {
+          flex: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 24px;
+          min-width: 24px;
+          border: none;
+          border-radius: 3px;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          font-size: 13px;
+          cursor: pointer;
+          transition: color 0.1s ease, background 0.1s ease;
+        }
+        .wm-search-clear:hover {
+          color: var(--text-primary, #ddd);
+          background: var(--bg-hover, #2a2d2e);
         }
         .wm-drawer-layer {
           position: relative;
@@ -1244,12 +1416,10 @@ export class Openp41geWindowManager extends LitElement {
         .ws-thumb:hover .ws-carousel-arrow { opacity: 1; pointer-events: auto; }
         /* Workspace-list delete mode + inline "new workspace" row. */
         .ws-row--select { cursor: pointer; }
-        /* The inline "new workspace" row is a normal full-width row — only the
-           top/bottom edges get the dashed "add" affordance, not the sides. */
+        /* The inline "new workspace" row uses the standard solid separator; the
+           dashed outline doubled with the view header's bottom border. */
         .ws-row--new {
           cursor: default;
-          border-top: 1px dashed var(--divider, #444);
-          border-bottom: 1px dashed var(--divider, #444);
         }
         .ws-row--new:hover { background: var(--bg-hover, #2a2d2e); }
         .wm-new-ws-input {
@@ -1626,12 +1796,60 @@ export class Openp41geWindowManager extends LitElement {
         </div>
         <div class="wm-drawer-layer">
           <div class="wm-view-header">
-            <span class="wm-view-title">Workspaces</span>
+            ${this._searchOpen
+              ? html`
+                  <div class="wm-search">
+                    <input
+                      class="wm-search-input"
+                      placeholder="Search workspaces…"
+                      spellcheck="false"
+                      .value=${this._searchQuery}
+                      @input=${this._onSearchInput}
+                      @keydown=${this._onSearchKeydown}
+                    />
+                    <button
+                      class="wm-search-toggle ${this._useRegex ? "wm-search-toggle--on" : ""}"
+                      aria-label="Regex search"
+                      aria-pressed=${this._useRegex}
+                      data-tip="Regex search"
+                      @click=${() => {
+                        this._useRegex = !this._useRegex;
+                      }}
+                    >${unsafeHTML(REGEX_ICON)}</button>
+                    <button
+                      class="wm-search-toggle ${this._caseSensitive ? "wm-search-toggle--on" : ""}"
+                      aria-label="Match case"
+                      aria-pressed=${this._caseSensitive}
+                      data-tip=${this._caseSensitive ? "Match case (on)" : "Match case (off)"}
+                      @click=${() => {
+                        this._caseSensitive = !this._caseSensitive;
+                      }}
+                    >${unsafeHTML(CASE_ON_ICON)}</button>
+                    <span class="wm-search-sep"></span>
+                    <button
+                      class="wm-search-clear"
+                      aria-label="Clear search"
+                      data-tip="Clear search"
+                      @click=${this._exitSearch}
+                    >✕</button>
+                  </div>
+                `
+              : html`
+                  <span class="wm-view-title">Workspaces</span>
+                  <button
+                    class="wm-search-btn"
+                    aria-label="Search workspaces"
+                    data-tip="Search workspaces"
+                    @click=${this._startSearch}
+                  ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></button>
+                `}
           </div>
           <div class="wm-body" @click=${this._onBackgroundClick}>
             ${this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
               ? html`<p class="empty">No workspaces yet. Create one from an open workspace window.</p>`
-              : html`
+              : this._searchOpen && this._workspaces.length > 0 && filtered.length === 0
+                ? html`<p class="empty">No workspaces match “${this._searchQuery}”.</p>`
+                : html`
                   <ul>
                     ${this._addingWorkspace
                       ? html`
@@ -1661,7 +1879,7 @@ export class Openp41geWindowManager extends LitElement {
                           </li>
                         `
                       : nothing}
-                    ${this._workspaces.map((w, i) => {
+                    ${filtered.map((w, i) => {
                       const name = w.data.name?.trim() || "Unnamed";
                       const repos = w.data.repos?.length ?? 0;
                       const worktrees = (w.data.repos ?? []).reduce(
@@ -1675,7 +1893,7 @@ export class Openp41geWindowManager extends LitElement {
                       const rightOpen = !!shared?.rightSidebarOpen;
                       const wins = windows.length > 0 ? windows : [undefined];
                       const idx = Math.min(this._carouselIndex.get(w.filePath) ?? 0, wins.length - 1);
-                      const isLast = i === this._workspaces.length - 1;
+                      const isLast = i === filtered.length - 1;
                       const sideRows = html`<span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span>`;
                       return html`
                         <li
