@@ -145,6 +145,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       offsetY,
       isRowStyle,
       undefined,
+      dragType,
     );
 
     // Track the active drag session for cross-window drops

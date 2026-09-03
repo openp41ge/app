@@ -16,6 +16,8 @@ export interface IDragGhostManager {
    * @param isFile Render as an explorer file row (document glyph + name) instead of a tab pill.
    * @param bitmapDataUrl Optional captured PNG of the actual dragged element; when present it is
    *   rendered at the element's size and the window adopts those exact dimensions.
+   * @param dragType The drag kind (e.g. "workspace"); a "workspace" drag picks a
+   *   spring scale-up ghost instead of a static one.
    */
   show(
     label: string,
@@ -28,6 +30,7 @@ export interface IDragGhostManager {
     offsetY?: number,
     isFile?: boolean,
     bitmapDataUrl?: string,
+    dragType?: string,
   ): void;
 
   /** Swap the ghost content to a captured bitmap in-place (no window recreate). */

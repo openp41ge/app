@@ -70,6 +70,10 @@ export class Openp41geWindowManager extends LitElement {
     startY: number;
     startScreenX: number;
     startScreenY: number;
+    /** Cursor offset within the skeleton element (grab point), so the drag
+     * element hangs from where the user actually grabbed it, not centred. */
+    offsetX: number;
+    offsetY: number;
     captureRect: { x: number; y: number; width: number; height: number } | null;
     path: string;
     label: string;
@@ -172,6 +176,8 @@ export class Openp41geWindowManager extends LitElement {
       startY: e.clientY,
       startScreenX: e.screenX,
       startScreenY: e.screenY,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
       captureRect: {
         x: Math.round(rect.left),
         y: Math.round(rect.top),
@@ -215,8 +221,8 @@ export class Openp41geWindowManager extends LitElement {
       undefined,
       132,
       84,
-      66,
-      42,
+      drag.offsetX,
+      drag.offsetY,
       "workspace",
       drag.path,
       drag.captureRect ?? undefined,
@@ -267,8 +273,8 @@ export class Openp41geWindowManager extends LitElement {
           undefined,
           132,
           84,
-          66,
-          42,
+          drag.offsetX,
+          drag.offsetY,
           "workspace",
           drag.path,
           drag.captureRect ?? undefined,

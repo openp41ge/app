@@ -2,6 +2,62 @@ import type { BrowserWindow } from "electron";
 import type { IDragGhostManager } from "../interfaces/drag-ghost-manager.js";
 
 /**
+ * Max scale the workspace-skeleton ghost springs up to on pick-up
+ * (source size → source × LIFT_MAX_SCALE), so it reads as being "lifted off"
+ * rather than teleported to the cursor.
+ */
+export const LIFT_MAX_SCALE = 1.08;
+const LIFT_SPRING_MS = 220;
+// Overshoot / spring easing: scales past the target then settles back.
+const LIFT_SPRING_EASE = "cubic-bezier(0.34, 1.56, 0.64, 1)";
+
+/**
+ * Build the ghost body HTML for a captured bitmap snapshot.
+ *
+ * When `liftOff` is true the bitmap is rendered at `outerW×LIFT_MAX_SCALE`
+ * (the largest frame, so nothing clips) and springs up from the source size
+ * (scale `1/LIFT_MAX_SCALE`) to full size, anchored at the grab point so the
+ * cursor stays on the spot the user grabbed. When `liftOff` is false the bitmap
+ * is rendered 1:1 at its source size (the previous behaviour).
+ *
+ * `offsetX`/`offsetY` are the grab point in SOURCE-element coordinates.
+ */
+export function buildBitmapGhostHtml(
+  dataUrl: string,
+  width: number,
+  height: number,
+  inset: number,
+  liftOff: boolean,
+  offsetX: number,
+  offsetY: number,
+): string {
+  const insetPx = Math.max(0, Math.round(inset) || 0);
+  const outerW = Math.max(1, Math.round(width));
+  const outerH = Math.max(1, Math.round(height));
+  const scale = liftOff ? LIFT_MAX_SCALE : 1;
+  // Outer (window/content) size — source for non-lift, source × LIFT_MAX_SCALE
+  // for a lift so the sprung-up bitmap never clips.
+  const outW = Math.max(1, Math.round(outerW * scale));
+  const outH = Math.max(1, Math.round(outerH * scale));
+  // Inner (image) size — the inset trims the source element by `inset`px on
+  // every side, and the margin re-inserts it so the window keeps its outer size.
+  const innerW = Math.max(1, Math.round((outerW - insetPx * 2) * scale));
+  const innerH = Math.max(1, Math.round((outerH - insetPx * 2) * scale));
+  const margin = Math.round(insetPx * scale);
+  const originX = Math.max(0, Math.round((offsetX - insetPx) * scale));
+  const originY = Math.max(0, Math.round((offsetY - insetPx) * scale));
+  const style = liftOff
+    ? `display:block;width:${innerW}px;height:${innerH}px;transform-origin:${originX}px ${originY}px;animation:op41ge-lift ${LIFT_SPRING_MS}ms ${LIFT_SPRING_EASE} both;`
+    : `display:block;width:${innerW}px;height:${innerH}px;`;
+  const keyframes = liftOff
+    ? `<style>@keyframes op41ge-lift{from{transform:scale(${1 / LIFT_MAX_SCALE})}to{transform:scale(1)}}</style>`
+    : "";
+  return `<!DOCTYPE html>
+<html><head>${keyframes}</head><body style="margin:0;padding:0;background:transparent;cursor:grabbing;"><img src="${dataUrl}" alt="" style="${style}margin:${margin}px;" />
+</body></html>`;
+}
+
+/**
  * Manages a frameless BrowserWindow used as a drag ghost.
  *
  * The ghost follows the cursor outside the app window during drag-and-drop
@@ -18,6 +74,12 @@ export class DragGhostManager implements IDragGhostManager {
   private _contentH = 0;
   private _offsetX = 0;
   private _offsetY = 0;
+  /** True when the current ghost is a workspace skeleton (springs up on pick-up). */
+  private _liftOff = false;
+  /** When true the did-finish-load handler may reposition the window; after a
+   * bitmap swap only `move()` should set the position (avoids a jump back to the
+   * drag-start coordinate once the async capture resolves). */
+  private _allowAutoPosition = true;
 
   constructor(BrowserWindowCtor: typeof BrowserWindow) {
     this._BrowserWindow = BrowserWindowCtor;
@@ -34,8 +96,12 @@ export class DragGhostManager implements IDragGhostManager {
     offsetY?: number,
     isFile?: boolean,
     bitmapDataUrl?: string,
+    dragType?: string,
   ): void {
     this.hide();
+
+    this._liftOff = dragType === "workspace";
+    this._allowAutoPosition = true;
 
     // Store offset for subsequent move() calls
     this._offsetX = offsetX ?? Math.round((tabWidth ?? 110) / 2);
@@ -133,9 +199,10 @@ ${nameHtml}</div>`;
           const boundsX = isFinite(screenX - this._offsetX) ? screenX - this._offsetX : 0;
           const boundsY = isFinite(screenY - this._offsetY) ? screenY - this._offsetY : 0;
           try {
+            const cur = ghost.getBounds();
             ghost.setBounds({
-              x: boundsX,
-              y: boundsY,
+              x: this._allowAutoPosition ? boundsX : cur.x,
+              y: this._allowAutoPosition ? boundsY : cur.y,
               width: cw,
               height: ch,
             });
@@ -178,13 +245,33 @@ ${nameHtml}</div>`;
     const insetPx = Math.max(0, Math.round(inset) || 0);
     const outerW = Math.max(1, Math.round(width));
     const outerH = Math.max(1, Math.round(height));
-    const w = Math.max(1, outerW - insetPx * 2);
-    const h = Math.max(1, outerH - insetPx * 2);
-    this._contentW = outerW;
-    this._contentH = outerH;
-    const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:transparent;cursor:grabbing;"><img src="${dataUrl}" alt="" style="display:block;width:${w}px;height:${h}px;margin:${insetPx}px;" />
-</body></html>`;
+    const scale = this._liftOff ? LIFT_MAX_SCALE : 1;
+    const srcOffsetX = this._offsetX;
+    const srcOffsetY = this._offsetY;
+    this._contentW = Math.max(1, Math.round(outerW * scale));
+    this._contentH = Math.max(1, Math.round(outerH * scale));
+    // For a workspace lift, grow the ghost around the grab point so the cursor
+    // stays on the spot that was grabbed, and subsequent move() calls track with
+    // the scaled offset.
+    if (this._liftOff) {
+      this._offsetX = srcOffsetX * scale;
+      this._offsetY = srcOffsetY * scale;
+      const b = this._ghost.getBounds();
+      try {
+        this._ghost.setBounds({
+          x: Math.round(b.x - srcOffsetX * (scale - 1)),
+          y: Math.round(b.y - srcOffsetY * (scale - 1)),
+          width: this._contentW,
+          height: this._contentH,
+        });
+      } catch {
+        // setBounds can throw if the window is closing. Swallow.
+      }
+    }
+    // The reload below re-measures the content; it must NOT re-anchor the window
+    // back to the drag-start coordinate (move() owns the position now).
+    this._allowAutoPosition = false;
+    const html = buildBitmapGhostHtml(dataUrl, outerW, outerH, insetPx, this._liftOff, srcOffsetX, srcOffsetY);
     this._ghost.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   }
 
@@ -217,6 +304,8 @@ ${nameHtml}</div>`;
     this._contentH = 0;
     this._offsetX = 0;
     this._offsetY = 0;
+    this._liftOff = false;
+    this._allowAutoPosition = true;
   }
 
   isActive(): boolean {

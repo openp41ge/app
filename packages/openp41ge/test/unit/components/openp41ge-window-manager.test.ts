@@ -132,6 +132,27 @@ describe("Openp41geWindowManager skeleton drag", () => {
     expect(captureRect).toEqual({ x: 10, y: 20, width: 132, height: 84 });
   });
 
+  it("passes the grabbed point (not the centred half-size) as the drag offset on long-press", () => {
+    // Thumb rect is {left:10, top:20, width:132, height:84}; pointer at (50,40).
+    down(wm, "/w/two", 50, 40, 200, 300);
+    vi.advanceTimersByTime(HOLD_MS + 5);
+    const args = drags.dragStart.mock.calls[0] as unknown[];
+    expect(args[9]).toBe(50 - 10); // offsetX = cursor - rect.left
+    expect(args[10]).toBe(40 - 20); // offsetY = cursor - rect.top
+    // Regression: it used to be the hard-coded half-size (66, 42) which centred
+    // the ghost on the cursor instead of hanging it from the grab point.
+    expect(args[9]).not.toBe(66);
+    expect(args[10]).not.toBe(42);
+  });
+
+  it("passes the grabbed point as the drag offset on a quick drag", () => {
+    down(wm, "/w/two", 50, 40, 200, 300);
+    move(wm, 53, 100, 203, 360); // crosses the threshold → open drag
+    const args = drags.dragStart.mock.calls[0] as unknown[];
+    expect(args[9]).toBe(50 - 10);
+    expect(args[10]).toBe(40 - 20);
+  });
+
   it("steps the carousel between window skeletons via _gotoCarousel", () => {
     wm._workspaces = [{ filePath: "/w/two", data: { name: "Two", windows: [{}, {}] } }] as never;
     (wm as Wm)._gotoCarousel("/w/two", 1);
