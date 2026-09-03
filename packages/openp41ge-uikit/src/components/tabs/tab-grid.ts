@@ -4,8 +4,8 @@
  * and pin state management.
  */
 
-import { LitElement, html } from "lit";
-import { property } from "lit/decorators.js";
+import { LitElement, html, type TemplateResult } from "lit";
+import { property, state } from "lit/decorators.js";
 import { GridDropTarget } from "openp41ge-tabs/targets/grid-drop-target";
 import { GhostManager, type GhostPreview } from "openp41ge-tabs/ghost-manager";
 import { computeDropTarget } from "openp41ge-tabs/boundary";
@@ -87,6 +87,14 @@ export class TabGrid extends LitElement {
 
   private _dropTarget: GridDropTarget | null = null;
   private _ghostManager = new GhostManager();
+
+  /** Per-column flex-basis widths (px). 0 means auto/shared. */
+  @state() private _cellWidths: number[] = [];
+  private _resizeCol = -1;
+  private _resizeStartX = 0;
+  private _resizeStartWidth = 200;
+  private _onCellResizeMove: ((e: PointerEvent) => void) | null = null;
+  private _onCellResizeUp: ((e: PointerEvent) => void) | null = null;
   private _boundOnClick: ((e: MouseEvent) => void) | null = null;
   private _boundOnDragOver: ((e: DragEvent) => void) | null = null;
   private _boundOnDragLeave: ((e: DragEvent) => void) | null = null;
@@ -158,6 +166,10 @@ export class TabGrid extends LitElement {
       changedProperties.has("placements")
     ) {
       this._setupDropTarget();
+    }
+    if (changedProperties.has("cols")) {
+      // Reset per-cell widths when the column count changes.
+      this._cellWidths = [];
     }
   }
 
@@ -751,14 +763,85 @@ export class TabGrid extends LitElement {
       "display:flex;flex-direction:row;height:100%;background:#1e1e1e;overflow-x:auto;overflow-y:hidden;";
 
     return html`
+      <style>
+        .grid-resize-handle {
+          flex-shrink: 0;
+          width: 5px;
+          /* Asymmetric negative margins cancel the 5px width to a ZERO-width
+             flex track (margin-box 5 - 2 - 3 = 0) so the 1px cell separator
+             stays at the boundary without pushing cells; the 5px handle still
+             overlays it, ~2px on each side. */
+          margin-left: -2px;
+          margin-right: -3px;
+          cursor: col-resize;
+          position: relative;
+          z-index: 6;
+        }
+        .grid-resize-handle::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 1px;
+          width: 3px;
+          background: rgba(74, 158, 255, 0.7);
+          opacity: 0;
+          transition: opacity 0.12s ease;
+        }
+        .grid-resize-handle:hover::before,
+        .grid-resize-handle.dragging::before {
+          opacity: 1;
+        }
+      </style>
       <div class="grid-container" style=${gridStyle}>
-        ${Array.from({ length: this.cols }, (_, i) => this._renderColumn(i))}
+        ${Array.from({ length: this.cols }, (_, i) =>
+          html`${this._renderColumn(i)}${i < this.cols - 1 ? this._renderResizeHandle(i) : ""}`,
+        )}
       </div>
     `;
   }
 
+  private _renderResizeHandle(colIndex: number): TemplateResult {
+    return html`
+      <div
+        class="grid-resize-handle ${this._resizeCol === colIndex ? "dragging" : ""}"
+        data-resize-col=${colIndex}
+        @pointerdown=${(e: PointerEvent) => this._onCellResizeStart(e, colIndex)}
+      ></div>
+    `;
+  }
+
+  private _onCellResizeStart(e: PointerEvent, colIndex: number): void {
+    e.preventDefault();
+    e.stopPropagation();
+    const cell = this.querySelector(`.grid-cell[data-cell-col="${colIndex}"]`) as HTMLElement | null;
+    this._resizeCol = colIndex;
+    this._resizeStartX = e.clientX;
+    this._resizeStartWidth = cell?.getBoundingClientRect().width ?? this._cellWidths[colIndex] ?? 200;
+    this._onCellResizeMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - this._resizeStartX;
+      const next = Math.max(200, this._resizeStartWidth + dx);
+      const widths = this._cellWidths.slice();
+      widths[colIndex] = next;
+      this._cellWidths = widths;
+      this.requestUpdate();
+    };
+    this._onCellResizeUp = () => {
+      if (this._onCellResizeMove) window.removeEventListener("pointermove", this._onCellResizeMove);
+      if (this._onCellResizeUp) window.removeEventListener("pointerup", this._onCellResizeUp);
+      this._onCellResizeMove = null;
+      this._onCellResizeUp = null;
+      this._resizeCol = -1;
+      this.requestUpdate();
+    };
+    window.addEventListener("pointermove", this._onCellResizeMove);
+    window.addEventListener("pointerup", this._onCellResizeUp);
+  }
+
   private _renderColumn(colIndex: number) {
-    const colStyle = `display:flex;flex-direction:column;flex:1;min-width:200px;border-right:${colIndex < this.cols - 1 ? "1px solid #333" : "none"};overflow:hidden;`;
+    const w = this._cellWidths[colIndex];
+    const flex = w ? `flex:0 0 ${w}px;` : "flex:1;";
+    const colStyle = `display:flex;flex-direction:column;min-width:200px;${flex}border-right:${colIndex < this.cols - 1 ? "1px solid #333" : "none"};overflow:hidden;`;
     const placement = this.placements.find((p) => p.position.col === colIndex);
     const tabIds = placement ? placement.tabIds : [];
     const activeTabId = this.activeTabIds[String(colIndex)] || tabIds[0] || "";

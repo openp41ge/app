@@ -688,14 +688,15 @@ export class FileEditorElement extends LitElement {
         background: var(--fe-bg);
       }
       .fe-viewport::-webkit-scrollbar-thumb {
-        background: ${isLight ? "#c1c1c1" : "#424242"};
+        background: ${isLight ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.16)"};
+        border-radius: 6px;
       }
       .fe-viewport::-webkit-scrollbar-thumb:hover {
-        background: ${isLight ? "#a8a8a8" : "#555"};
+        background: ${isLight ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.32)"};
       }
       .fe-viewport::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
+        width: 6px;
+        height: 6px;
       }
       /* The NATIVE horizontal scrollbar spans the whole row — starting UNDER
          the pinned line-number columns. It is hidden; a custom .fe-hscroll bar

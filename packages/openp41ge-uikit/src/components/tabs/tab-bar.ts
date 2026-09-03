@@ -267,8 +267,8 @@ export class TabBar extends LitElement {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          margin-left: 4px;
-          font-size: 12px;
+          margin-left: 6px;
+          font-size: 13px;
           /* The ✕ glyph must never inherit the tab's italic (unpinned tabs
              italicize their title). Always render it upright. */
           font-style: normal;
@@ -289,9 +289,8 @@ export class TabBar extends LitElement {
         .tab-close-x {
           display: block;
           line-height: 1;
-          /* Font metrics leave the \u00d7 glyph low in its 16px button;
-             lift just the glyph (the button itself stays put). -2px overshot,
-             -1px reads centered. */
+          /* Font metrics leave the ✕ glyph low in its 16px button;
+             lift just the glyph (the button itself stays put). */
           transform: translateY(-1px);
         }
         .tab-close:hover {
@@ -432,9 +431,9 @@ export class TabBar extends LitElement {
                               <path d="M680-840v80h-40v327l-80-80v-247H400v87l-87-87-33-33v-47h400ZM480-40l-40-40v-240H240v-80l80-80v-46L56-792l56-56 736 736-58 56-264-264h-6v240l-40 40ZM354-400h92l-44-44-2-2-46 46Zm126-193Zm-78 149Z"/>
                             </svg>`}
                       </span>
-                      <span class="tab-close" data-close-tab-id=${id}><span class="tab-close-x">×</span></span>
+                      <span class="tab-close" data-close-tab-id=${id}><span class="tab-close-x">✕</span></span>
                     </span>`
-                  : html`<span class="tab-close" data-close-tab-id=${id}><span class="tab-close-x">×</span></span>`}
+                  : html`<span class="tab-close" data-close-tab-id=${id}><span class="tab-close-x">✕</span></span>`}
               </div>
             `;
           })}

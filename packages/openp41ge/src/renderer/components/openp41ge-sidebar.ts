@@ -70,6 +70,17 @@ class Openp41geSidebar extends LitElement {
   private _onTabClick(tabId: string): void {
     const side = this.side;
     emitEvent("tab-activate", { windowId: this.windowId, side, tabId });
+    // Ensure the clicked tab is scrolled fully into view (not left clipped under
+    // the edge fade) — mirrors tab-bar.scrollToTab.
+    requestAnimationFrame(() => {
+      const scroll = this.querySelector<HTMLElement>(".sidebar-tab-scroll");
+      const tab = this.querySelector<HTMLElement>(`.sidebar-tab[data-sidebar-tab-id="${tabId}"]`);
+      if (!scroll || !tab) return;
+      const cRect = scroll.getBoundingClientRect();
+      const tRect = tab.getBoundingClientRect();
+      if (tRect.left >= cRect.left && tRect.right <= cRect.right) return;
+      scroll.scrollLeft = Math.max(0, tRect.left - cRect.left + scroll.scrollLeft - 8);
+    });
   }
 
   private _onTabClose(e: Event, tabId: string): void {
@@ -298,7 +309,10 @@ class Openp41geSidebar extends LitElement {
         <style>
           .sidebar-tab-bar { min-height: 34px; }
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
-          .sidebar-tab-close:hover { background: var(--bg-hover-strong, #444); }
+          .sidebar-tab-close:hover {
+            background: rgba(255, 50, 50, 0.3);
+            color: #ff3232;
+          }
           .sidebar-tab-add:hover { background: var(--bg-hover-strong, #444); }
           /* Keep-alive hosts: one absolute full-fill container per tab. Only the
              active one is displayed; the rest stay mounted (hidden) so
@@ -339,7 +353,7 @@ class Openp41geSidebar extends LitElement {
                     <span class="truncate flex-1">${tab.title}</span>
                     <span
                       class="sidebar-tab-close flex items-center justify-center"
-                      style="width:16px;height:16px;border-radius:3px;font-size:12px;line-height:1"
+                      style="width:16px;height:16px;border-radius:4px;font-size:13px;line-height:1"
                       @click=${(e: Event) => this._onTabClose(e, tab.id)}
                     >✕</span>
                   </div>`;

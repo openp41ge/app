@@ -281,7 +281,7 @@ class Openp41geWindowView extends LitElement {
           flex-shrink: 0;
           cursor: col-resize;
           position: relative;
-          z-index: 5;
+          z-index: 30;
           background: transparent;
           /* Asymmetric negative margins cancel the 7px width to a ZERO-width
              flex track (margin-box 7 - 3 - 4 = 0), so the sidebar border sits
