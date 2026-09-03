@@ -179,9 +179,12 @@ export function createOpenp41geWindow(
     height,
     minWidth: 600,
     minHeight: 200,
-    ...(isWindowManager ? { maxWidth: 600 } : {}),
+    // The Window Manager is a thin utility picker — it is not meant to be
+    // fullscreenable, so remove the native window chrome and render custom
+    // close/minimize controls (no fullscreen/green button) in the renderer.
+    ...(isWindowManager ? { maxWidth: 600, frame: false, fullscreenable: false } : {}),
     title: "Openp41ge",
-    titleBarStyle: "hiddenInset",
+    ...(!isWindowManager ? { titleBarStyle: "hiddenInset" } : {}),
     // Match the app's dark surface so the areas exposed while the window
     // grows (native maximize animation, resize) never flash white.
     backgroundColor: "#161616",

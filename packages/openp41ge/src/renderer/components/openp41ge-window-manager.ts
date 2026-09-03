@@ -23,14 +23,6 @@ const HOLD_MS = 350;
 /** Pointer travel past this many px starts an immediate drag (below the long-press hold). */
 const DRAG_THRESHOLD = 4;
 
-const isMac = (() => {
-  try {
-    return window.openp41ge?.platform === "darwin" || navigator.platform.startsWith("Mac");
-  } catch {
-    return false;
-  }
-})();
-
 interface OpenWindowSummary {
   windowId: string;
   windowType: "workspace" | "window-manager";
@@ -979,22 +971,48 @@ export class Openp41geWindowManager extends LitElement {
           height: 100%;
           position: relative;
         }
-        /* Draggable top bar (native drag region) with a macOS traffic-light spacer.
-           This is the WINDOW chrome — it always spans the full width and is never
-           covered by a drawer. The view header (below) is what aligns with the
-           drawer heads. */
+        /* Frameless window title bar (native drag region). The Window Manager is
+           not fullscreenable, so it renders its own close/minimize traffic-light
+           buttons (no fullscreen/green) here. */
         .wm-titlebar {
           display: flex;
           align-items: center;
           flex-shrink: 0;
           height: 32px;
-          padding-left: ${isMac ? 85 : 12}px;
+          padding: 0 14px;
+          gap: 12px;
           box-sizing: border-box;
           -webkit-app-region: drag;
           user-select: none;
           background: var(--bg-secondary, #252526);
           border-bottom: 1px solid var(--divider, #333);
         }
+        .wm-winbtns {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+          -webkit-app-region: no-drag;
+        }
+        .wm-winbtn {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          border: none;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: transparent;
+          font-size: 9px;
+          line-height: 1;
+          cursor: pointer;
+        }
+        .wm-winbtn span { opacity: 0; }
+        .wm-winbtn:hover { color: #222; }
+        .wm-winbtn:hover span { opacity: 1; }
+        .wm-winbtn--close { background: #ff5f57; }
+        .wm-winbtn--min { background: #febc2e; }
         .wm-title {
           font-size: 12px;
           font-weight: 600;
@@ -1562,6 +1580,22 @@ export class Openp41geWindowManager extends LitElement {
       </style>
       <div class="wm-root">
         <div class="wm-titlebar">
+          <div class="wm-winbtns">
+            <button
+              class="wm-winbtn wm-winbtn--close"
+              aria-label="Close window"
+              @click=${() => window.openp41ge?.window.close()}
+            >
+              <span>✕</span>
+            </button>
+            <button
+              class="wm-winbtn wm-winbtn--min"
+              aria-label="Minimize window"
+              @click=${() => window.openp41ge?.window.minimize()}
+            >
+              <span>─</span>
+            </button>
+          </div>
           <span class="wm-title">Workspace Manager</span>
         </div>
         <div class="wm-drawer-layer">
