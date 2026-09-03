@@ -67,10 +67,6 @@ export function buildBitmapImgHtml(
   const outerW = Math.max(1, Math.round(width));
   const outerH = Math.max(1, Math.round(height));
   const scale = liftOff ? LIFT_MAX_SCALE : 1;
-  // Outer (window/content) size — source for non-lift, source × LIFT_MAX_SCALE
-  // for a lift so the sprung-up bitmap never clips.
-  const outW = Math.max(1, Math.round(outerW * scale));
-  const outH = Math.max(1, Math.round(outerH * scale));
   // Inner (image) size — the inset trims the source element by `inset`px on
   // every side, and the margin re-inserts it so the window keeps its outer size.
   const innerW = Math.max(1, Math.round((outerW - insetPx * 2) * scale));
@@ -140,6 +136,10 @@ export class DragGhostManager implements IDragGhostManager {
    * bitmap swap only `move()` should set the position (avoids a jump back to the
    * drag-start coordinate once the async capture resolves). */
   private _allowAutoPosition = true;
+  /** True once the ghost page has loaded (did-finish-load fired). */
+  private _pageLoaded = false;
+  /** A skeleton swap that arrived before the page loaded; applied on load. */
+  private _pendingSkeleton: (() => void) | null = null;
 
   constructor(BrowserWindowCtor: typeof BrowserWindow) {
     this._BrowserWindow = BrowserWindowCtor;
@@ -162,6 +162,8 @@ export class DragGhostManager implements IDragGhostManager {
 
     this._liftOff = dragType === "workspace";
     this._allowAutoPosition = true;
+    this._pageLoaded = false;
+    this._pendingSkeleton = null;
 
     // Store the unscaled grab point, then scale the positioning offset for a lift
     // so the cursor stays on the grab point in the (larger) lifted content.
@@ -295,11 +297,22 @@ ${nameHtml}</div>`;
           if (!ghost.isDestroyed() && !process.env.OPENP41GE_E2E_TEST) {
             ghost.show();
           }
+          // Now that the page has painted, apply any skeleton swap that arrived
+          // before the load (inject in-place, no navigation) so the ghost never
+          // goes blank while the cursor is already dragging.
+          this._pageLoaded = true;
+          const pending = this._pendingSkeleton;
+          this._pendingSkeleton = null;
+          if (pending) pending();
         })
         .catch(() => {
           if (!ghost.isDestroyed() && !process.env.OPENP41GE_E2E_TEST) {
             ghost.show();
           }
+          this._pageLoaded = true;
+          const pending = this._pendingSkeleton;
+          this._pendingSkeleton = null;
+          if (pending) pending();
         });
     });
 
@@ -338,11 +351,27 @@ ${nameHtml}</div>`;
       this._offsetX = srcOffsetX * scale;
       this._offsetY = srcOffsetY * scale;
     }
-    // The reload below re-measures the content; it must NOT re-anchor the window
-    // back to the drag-start coordinate (move() owns the position now).
+    // The in-place swap below must NOT re-anchor the window back to the
+    // drag-start coordinate (move() owns the position now).
     this._allowAutoPosition = false;
-    const html = buildBitmapGhostHtml(dataUrl, outerW, outerH, insetPx, this._liftOff, srcOffsetX, srcOffsetY);
-    this._ghost.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    // Inject just the <img> element (the placeholder page already carries the
+    // @keyframes + cursor styles). Injecting via document.body.innerHTML avoids
+    // a loadURL navigation that would tear down the placeholder before it paints
+    // and leave the ghost blank until the PNG decodes.
+    const html = buildBitmapImgHtml(dataUrl, outerW, outerH, insetPx, this._liftOff, srcOffsetX, srcOffsetY);
+    const ghost = this._ghost;
+    const apply = () => {
+      if (ghost && !ghost.isDestroyed()) {
+        ghost.webContents.executeJavaScript(`document.body.innerHTML = ${JSON.stringify(html)};`).catch(() => {
+          /* page could be closing; keep whatever is painted */
+        });
+      }
+    };
+    if (this._pageLoaded) {
+      apply();
+    } else {
+      this._pendingSkeleton = apply;
+    }
   }
 
   move(screenX: number, screenY: number): void {
@@ -378,6 +407,8 @@ ${nameHtml}</div>`;
     this._srcOffsetY = 0;
     this._liftOff = false;
     this._allowAutoPosition = true;
+    this._pageLoaded = false;
+    this._pendingSkeleton = null;
   }
 
   isActive(): boolean {
