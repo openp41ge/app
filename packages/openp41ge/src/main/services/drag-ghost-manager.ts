@@ -31,6 +31,38 @@ export function buildBitmapGhostHtml(
   offsetX: number,
   offsetY: number,
 ): string {
+  const keyframes = liftOff
+    ? `<style>@keyframes op41ge-lift{from{transform:scale(${1 / LIFT_MAX_SCALE})}to{transform:scale(1)}}</style>`
+    : "";
+  return `<!DOCTYPE html>
+<html><head>${keyframes}</head><body style="margin:0;padding:0;background:transparent;cursor:grabbing;">${buildBitmapImgHtml(
+    dataUrl,
+    width,
+    height,
+    inset,
+    liftOff,
+    offsetX,
+    offsetY,
+  )}
+</body></html>`;
+}
+
+/**
+ * Build just the `<img>` body content for a captured bitmap. Used by both
+ * `buildBitmapGhostHtml` (setBitmap swap) and `show` (a pre-captured bitmap), so
+ * a workspace drag renders the real skeleton with the lift immediately.
+ *
+ * `offsetX`/`offsetY` are the grab point in SOURCE-element coordinates.
+ */
+export function buildBitmapImgHtml(
+  dataUrl: string,
+  width: number,
+  height: number,
+  inset: number,
+  liftOff: boolean,
+  offsetX: number,
+  offsetY: number,
+): string {
   const insetPx = Math.max(0, Math.round(inset) || 0);
   const outerW = Math.max(1, Math.round(width));
   const outerH = Math.max(1, Math.round(height));
@@ -49,12 +81,7 @@ export function buildBitmapGhostHtml(
   const style = liftOff
     ? `display:block;width:${innerW}px;height:${innerH}px;transform-origin:${originX}px ${originY}px;animation:op41ge-lift ${LIFT_SPRING_MS}ms ${LIFT_SPRING_EASE} both;`
     : `display:block;width:${innerW}px;height:${innerH}px;`;
-  const keyframes = liftOff
-    ? `<style>@keyframes op41ge-lift{from{transform:scale(${1 / LIFT_MAX_SCALE})}to{transform:scale(1)}}</style>`
-    : "";
-  return `<!DOCTYPE html>
-<html><head>${keyframes}</head><body style="margin:0;padding:0;background:transparent;cursor:grabbing;"><img src="${dataUrl}" alt="" style="${style}margin:${margin}px;" />
-</body></html>`;
+  return `<img src="${dataUrl}" alt="" style="${style}margin:${margin}px;" />`;
 }
 
 /**
@@ -214,7 +241,15 @@ ${nameHtml}</div>`;
     // ghost: render the PNG at the exact source element size and let the window
     // adopt those dimensions. Falls back to the file-row / pill HTML otherwise.
     const innerHtml = bitmapDataUrl
-      ? `<img src="${bitmapDataUrl}" alt="" style="display:block;width:${ghostW}px;height:${ghostH}px;" />`
+      ? buildBitmapImgHtml(
+          bitmapDataUrl,
+          ghostW,
+          ghostH,
+          0,
+          this._liftOff,
+          this._srcOffsetX,
+          this._srcOffsetY,
+        )
       : this._liftOff
         ? buildWorkspaceGhostHtml(
             escapedLabel,

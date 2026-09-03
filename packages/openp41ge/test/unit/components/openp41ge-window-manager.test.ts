@@ -29,6 +29,7 @@ function stubWindow(): { dragStart: ReturnType<typeof vi.fn>; dragActivate: Retu
       activate: dragActivate,
       move: dragMove,
       end: dragEnd,
+      prepareBitmap: vi.fn(),
       onEndSession: vi.fn(() => () => {}),
     },
     windowManager: { openWindowSummaries: vi.fn().mockResolvedValue([]) },

@@ -39,6 +39,11 @@ let _cursorPollInterval: ReturnType<typeof setInterval> | null = null;
 // The DragGhostManager instance (set in registerDragHandlers) — used to keep
 // the ghost following the cursor globally and to detect workspace drag-outs.
 let _dragGhost: DragGhostManager | null = null;
+// A skeleton bitmap pre-captured at pointer-down (before drag.start) so the ghost
+// can render the real skeleton the instant the drag begins, instead of waiting
+// for the async capture that runs in the drag-start handler.
+let _preparedBitmap: string | null = null;
+let _preparedRect: { x: number; y: number; width: number; height: number } | null = null;
 
 function _startCursorPoll(): void {
   _stopCursorPoll();
@@ -132,8 +137,22 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     // Show the ghost IMMEDIATELY (synchronous, row-styled for files / git
     // entries) so even a very quick drag gets visible feedback. Blocking on
     // capturePage first meant a fast drag could end (drag.end hides the ghost)
-    // before the slow capture resolved -> no drag element at all.
+    // before the slow capture resolved -> no drag element at all. If a skeleton
+    // bitmap was pre-captured at pointer-down, use it so the ghost pops with the
+    // real skeleton instantly (no placeholder, no async capture wait).
     const isRowStyle = dragType === "file" || dragType === "open-tab" || dragType === "workspace";
+    const rectMatch =
+      !!captureRect &&
+      !!_preparedRect &&
+      _preparedRect.x === Math.round(captureRect.x) &&
+      _preparedRect.y === Math.round(captureRect.y) &&
+      _preparedRect.width === Math.round(captureRect.width) &&
+      _preparedRect.height === Math.round(captureRect.height);
+    const preparedBitmap = dragType === "workspace" && rectMatch ? _preparedBitmap : null;
+    if (preparedBitmap) {
+      _preparedBitmap = null;
+      _preparedRect = null;
+    }
     dragGhost.show(
       label,
       screenX,
@@ -144,7 +163,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       offsetX,
       offsetY,
       isRowStyle,
-      undefined,
+      preparedBitmap ?? undefined,
       dragType,
     );
 
@@ -193,6 +212,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       typeof captureRect.y === "number" &&
       typeof captureRect.width === "number" &&
       typeof captureRect.height === "number" &&
+      !preparedBitmap &&
       !sender.isDestroyed()
     ) {
       const session = _activeSession;
@@ -240,10 +260,46 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     dragGhost.move(screenX, screenY);
   });
 
+  // Pre-capture the source element region at pointer-down so the ghost can pop
+  // with the real skeleton the instant the drag starts (see drag-start).
+  ipcMain.on("openp41ge:drag-prepare-bitmap", (event, raw: string) => {
+    const rect = JSON.parse(raw);
+    if (
+      !rect ||
+      typeof rect.x !== "number" ||
+      typeof rect.y !== "number" ||
+      typeof rect.width !== "number" ||
+      typeof rect.height !== "number" ||
+      event.sender.isDestroyed()
+    ) {
+      return;
+    }
+    const requestRect = {
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    };
+    _preparedRect = requestRect;
+    _preparedBitmap = null;
+    void (async () => {
+      try {
+        const img = await event.sender.capturePage(requestRect);
+        if (!img || img.isEmpty()) return;
+        _preparedBitmap = img.toDataURL();
+      } catch {
+        _preparedBitmap = null;
+        _preparedRect = null;
+      }
+    })();
+  });
+
   ipcMain.on("openp41ge:drag-end", () => {
     _stopCursorPoll();
     dragGhost.hide();
     _activeSession = null;
+    _preparedBitmap = null;
+    _preparedRect = null;
     _broadcastDragState(false, null);
   });
 

@@ -241,6 +241,14 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.send("openp41ge:drag-end");
     },
     /**
+     * Pre-capture the source element region at pointer-down (before the drag
+     * starts) so the ghost can render the exact bitmap instantly once the drag
+     * begins, instead of waiting for the async capture in the drag-start handler.
+     */
+    prepareBitmap: (rect) => {
+      ipcRenderer.send("openp41ge:drag-prepare-bitmap", JSON.stringify(rect));
+    },
+    /**
      * Called when the drag threshold is met (actual drag starts, not just mousedown).
      * Broadcasts drag-active state to other windows.
      */

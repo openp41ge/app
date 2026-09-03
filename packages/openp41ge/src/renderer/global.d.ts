@@ -58,6 +58,7 @@ declare global {
         move: (screenX: number, screenY: number) => void;
         end: () => void;
         activate: () => void;
+        prepareBitmap: (rect: { x: number; y: number; width: number; height: number }) => void;
         ghostForward: (screenX: number, screenY: number) => void;
         check: (screenX: number, screenY: number, dragData?: string) => Promise<{ target: Record<string, unknown> | null; windowId: string } | null>;
         getActive: () => Promise<{

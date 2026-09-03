@@ -7,7 +7,7 @@
  * file/tab) swaps stay 1:1 with no animation.
  */
 import { describe, it, expect } from "vitest";
-import { buildBitmapGhostHtml, buildWorkspaceGhostHtml, LIFT_MAX_SCALE } from "../../../src/main/services/drag-ghost-manager.js";
+import { buildBitmapGhostHtml, buildBitmapImgHtml, buildWorkspaceGhostHtml, LIFT_MAX_SCALE } from "../../../src/main/services/drag-ghost-manager.js";
 
 const SPRING_EASE = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
@@ -59,5 +59,21 @@ describe("buildBitmapGhostHtml", () => {
     expect(html).toContain("transform-origin:" + Math.round(40 * LIFT_MAX_SCALE) + "px " + Math.round(20 * LIFT_MAX_SCALE) + "px");
     expect(html).toContain("op41ge-lift");
     expect(html).toContain(SPRING_EASE);
+  });
+
+  it("renders a lift bitmap img at the lifted frame with the spring (no full doc)", () => {
+    const html = buildBitmapImgHtml("data:image/png;base64,AAA", 132, 84, 0, true, 40, 20);
+    expect(html).toContain("<img");
+    expect(html).not.toContain("<!DOCTYPE");
+    expect(html).toContain("width:" + Math.round(132 * LIFT_MAX_SCALE) + "px");
+    expect(html).toContain("op41ge-lift");
+    expect(html).toContain("transform-origin:" + Math.round(40 * LIFT_MAX_SCALE) + "px");
+  });
+
+  it("renders a non-lift bitmap img 1:1 at its source size (no animation)", () => {
+    const html = buildBitmapImgHtml("data:image/png;base64,AAA", 132, 84, 6, false, 70, 40);
+    expect(html).toContain("width:120px;height:72px");
+    expect(html).toContain("margin:6px;");
+    expect(html).not.toContain("op41ge-lift");
   });
 });

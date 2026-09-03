@@ -171,6 +171,16 @@ export class Openp41geWindowManager extends LitElement {
     const winCount = ws?.data.windows?.length ?? 1;
     const thumb = e.currentTarget as HTMLElement;
     const rect = thumb.getBoundingClientRect();
+    const captureRect = {
+      x: Math.round(rect.left),
+      y: Math.round(rect.top),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    };
+    // Pre-capture the skeleton bitmap now so the ghost can pop with the real
+    // skeleton the instant the drag starts, rather than waiting for the async
+    // capture that runs after drag.start.
+    window.openp41ge.drag.prepareBitmap(captureRect);
     this._drag = {
       startX: e.clientX,
       startY: e.clientY,
@@ -178,12 +188,7 @@ export class Openp41geWindowManager extends LitElement {
       startScreenY: e.screenY,
       offsetX: e.clientX - rect.left,
       offsetY: e.clientY - rect.top,
-      captureRect: {
-        x: Math.round(rect.left),
-        y: Math.round(rect.top),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-      },
+      captureRect,
       path,
       label: ws?.data.name?.trim() || "Unnamed",
       active: false,
