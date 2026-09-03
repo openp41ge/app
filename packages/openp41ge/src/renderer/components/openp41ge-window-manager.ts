@@ -979,7 +979,10 @@ export class Openp41geWindowManager extends LitElement {
           height: 100%;
           position: relative;
         }
-        /* Draggable top bar (native drag region) with a macOS traffic-light spacer. */
+        /* Draggable top bar (native drag region) with a macOS traffic-light spacer.
+           This is the WINDOW chrome — it always spans the full width and is never
+           covered by a drawer. The view header (below) is what aligns with the
+           drawer heads. */
         .wm-titlebar {
           display: flex;
           align-items: center;
@@ -998,6 +1001,28 @@ export class Openp41geWindowManager extends LitElement {
           letter-spacing: 0.02em;
           color: var(--text-secondary, #999);
         }
+        /* Top-level view header — sits below the window title bar and matches the
+           drawer header (same height/title), so a slide-in drawer's head lands on
+           the same row and the headers stay aligned. */
+        .wm-view-header {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+          height: 44px;
+          padding: 0 14px;
+          box-sizing: border-box;
+          background: var(--bg-secondary, #252526);
+          border-bottom: 1px solid var(--divider, #333);
+        }
+        .wm-view-title {
+          font-size: 13px;
+          font-weight: 600;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--text-primary, #ddd);
+        }
         .wm-drawer-layer {
           position: relative;
           flex: 1;
@@ -1006,12 +1031,15 @@ export class Openp41geWindowManager extends LitElement {
         }
         .wm-body {
           position: absolute;
-          inset: 0;
+          top: 44px;
+          left: 0;
+          right: 0;
+          bottom: 0;
           overflow-y: auto;
           /* No horizontal padding so rows + separators span the full window width;
-             the rows keep their own content inset. No top padding — the title bar
-             is the top of the view, so the list starts right below it. Bottom
-             padding clears the overlaying bottom bar (44px) + scroll space. */
+             the rows keep their own content inset. The list starts below the
+             view header, and the bottom padding clears the overlaying bottom bar
+             (44px) + scroll space. */
           padding: 0 0 64px;
           box-sizing: border-box;
         }
@@ -1537,6 +1565,9 @@ export class Openp41geWindowManager extends LitElement {
           <span class="wm-title">Workspace Manager</span>
         </div>
         <div class="wm-drawer-layer">
+          <div class="wm-view-header">
+            <span class="wm-view-title">Workspaces</span>
+          </div>
           <div class="wm-body" @click=${this._onBackgroundClick}>
             ${this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
               ? html`<p class="empty">No workspaces yet. Create one from an open workspace window.</p>`
