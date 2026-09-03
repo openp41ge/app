@@ -1592,6 +1592,10 @@ if (typeof window !== "undefined") {
       _remoteDragActive = active;
       if (!active) _hideCrossWindowGhost();
     },
+    setRemoteDragType: (type: string | null) => {
+      _remoteDragType = type;
+    },
+    getRemoteDragType: () => _remoteDragType,
     isRemoteDragActive: () => _remoteDragActive,
     isLocalDragActive: () => _localDragActive,
     getGridGhostOverlay: () =>
@@ -1655,9 +1659,10 @@ let _crossWindowGridCols = 1;
  * split/cell-center classification via computeDropTarget.
  */
 function _updateCrossWindowGhost(clientX: number, clientY: number): void {
-  // Sidebar-tab drags are sidebar-only — they must never light up a central
-  // grid as a drop zone, so skip the grid ghost preview entirely.
-  if (_remoteDragType === "sidebar-tab") {
+  // Sidebar-tab drags are sidebar-only, and workspace-skeleton drags open a
+  // workspace window on drop — neither may light up a central grid as a drop
+  // zone, so skip the grid ghost preview entirely.
+  if (_remoteDragType === "sidebar-tab" || _remoteDragType === "workspace") {
     _hideCrossWindowGhost();
     return;
   }
