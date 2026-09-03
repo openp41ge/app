@@ -17,6 +17,7 @@
 import { ipcMain, BrowserWindow, screen, type WebContents } from "electron";
 import type { DragGhostManager } from "../../src/main/index.js";
 import { openp41geWindows } from "../window-manager.js";
+import { computeGhostShowWindows, containsPoint } from "../drag-ghost-target.js";
 
 // ─── Session tracking ─────────────────────────────────────────────────────
 
@@ -55,11 +56,32 @@ function _startCursorPoll(): void {
     // Keep the main-process ghost following the cursor globally, so a drag can
     // visually leave the window (the source renderer only gets moves in-window).
     _dragGhost?.move(pos.x, pos.y);
-    const data = JSON.stringify({ screenX: pos.x, screenY: pos.y });
-    for (const [, bw] of openp41geWindows) {
-      if (!bw.isDestroyed()) {
-        bw.webContents.send("openp41ge:drag-ghost", data);
-      }
+
+    // While the cursor is still over the SOURCE window, the source is on top
+    // (it initiated the drag and holds focus), so no other window should paint
+    // a cross-window drop indicator. An overlaid window's grid bounds can
+    // overlap the cursor even when the source is the window actually under the
+    // pointer — e.g. dragging a workspace skeleton over the Workspace Manager
+    // while it covers a workspace window. Only when the cursor leaves the
+    // source do we forward its position to a target window; every other window
+    // gets an explicit clear so a stale indicator is never left showing.
+    const sourceBw = _activeSession ? openp41geWindows.get(_activeSession.sourceWinId) : undefined;
+    const sourceBounds = sourceBw && !sourceBw.isDestroyed() ? sourceBw.getBounds() : null;
+    const sourceWc = sourceBw && !sourceBw.isDestroyed() ? sourceBw.webContents : null;
+    const showIds = computeGhostShowWindows(
+      sourceBounds,
+      [...openp41geWindows]
+        .filter(([, bw]) => !bw.isDestroyed())
+        .map(([id, bw]) => ({ id, bounds: bw.getBounds() })),
+      pos,
+    );
+    for (const [sid, bw] of openp41geWindows) {
+      if (bw.isDestroyed()) continue;
+      if (sourceWc && bw.webContents === sourceWc) continue;
+      bw.webContents.send(
+        "openp41ge:drag-ghost",
+        JSON.stringify({ screenX: pos.x, screenY: pos.y, clear: !showIds.has(sid) }),
+      );
     }
   }, 50);
 }
@@ -111,8 +133,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     // entries) so even a very quick drag gets visible feedback. Blocking on
     // capturePage first meant a fast drag could end (drag.end hides the ghost)
     // before the slow capture resolved -> no drag element at all.
-    const isRowStyle =
-      dragType === "file" || dragType === "open-tab" || dragType === "workspace";
+    const isRowStyle = dragType === "file" || dragType === "open-tab" || dragType === "workspace";
     dragGhost.show(
       label,
       screenX,
@@ -267,12 +288,27 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
   // ── Forward ghost cursor position from source to all other windows ───────
   // The source window's orchestrator fires CROSS events when the cursor
   // leaves valid drop targets. We forward screenX/screenY so every window
-  // can show a ghost at the correct position.
+  // can show a ghost at the correct position. Skip forwarding while the
+  // cursor is still over the source window — an overlaid window must not
+  // light up a drop indicator for a cursor that has not left the source yet.
   ipcMain.on("openp41ge:drag-ghost-forward", (_event, data: string) => {
     const sender = _event.sender;
+    let parsed: { screenX: number; screenY: number };
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (!_activeSession) return;
+    const sourceBw = openp41geWindows.get(_activeSession.sourceWinId);
+    const sourceBounds = sourceBw && !sourceBw.isDestroyed() ? sourceBw.getBounds() : null;
+    if (sourceBounds && containsPoint(sourceBounds, { x: parsed.screenX, y: parsed.screenY })) {
+      return;
+    }
+    const payload = JSON.stringify({ ...parsed, clear: false });
     for (const [, bw] of openp41geWindows) {
       if (bw.webContents !== sender && !bw.isDestroyed()) {
-        bw.webContents.send("openp41ge:drag-ghost", data);
+        bw.webContents.send("openp41ge:drag-ghost", payload);
       }
     }
   });

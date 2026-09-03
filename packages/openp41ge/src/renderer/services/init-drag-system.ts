@@ -1175,7 +1175,7 @@ export function initDragSystem(): () => void {
   // updates; otherwise it would set _remoteDragActive and paint a grid ghost
   // via _updateCrossWindowGhost based purely on grid-relative coords (which
   // even extend under an overlaid sidebar).
-  type GhostShowData = { screenX: number; screenY: number; label?: string };
+  type GhostShowData = { screenX: number; screenY: number; label?: string; clear?: boolean };
   window.openp41ge.drag.onGhostShow((data: GhostShowData) => {
     if (_localDragActive) return;
     const screenX = data.screenX;
@@ -1183,6 +1183,14 @@ export function initDragSystem(): () => void {
     if (typeof screenX !== "number" || typeof screenY !== "number") return;
 
     _remoteDragActive = true;
+
+    // A `clear` payload means the cursor is over another window (usually the
+    // source) — this window must not paint a cross-window drop indicator. Hide
+    // any stale indicator left from a previous position.
+    if (data.clear) {
+      _hideCrossWindowGhost();
+      return;
+    }
 
     // Convert screen → viewport coordinates and show ghost
     const cx = screenX - window.screenX;
