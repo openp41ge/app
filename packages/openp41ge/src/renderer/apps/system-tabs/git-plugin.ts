@@ -1,5 +1,5 @@
 /**
- * Git plugin — repository browser.
+ * Git/History plugin — repository browser.
  *
  * Registers through the PluginRegistry to add graph nodes and handlers
  * for git operations.

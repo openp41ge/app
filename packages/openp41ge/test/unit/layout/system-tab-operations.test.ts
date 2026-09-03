@@ -15,7 +15,7 @@ function makeRightSidebarWs(tabCount: number): { ws: Ws; winId: string } {
   let ws = types.createWorkspace("ws1");
   const winId = ws.windows[0].id;
   ws = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer", true);
-  if (tabCount > 1) ws = ops.openSystemTab(ws, winId, "right", "git", "Git", true);
+  if (tabCount > 1) ws = ops.openSystemTab(ws, winId, "right", "git", "History", true);
   if (tabCount > 2) ws = ops.openSystemTab(ws, winId, "right", "search", "Search", true);
   return { ws, winId };
 }

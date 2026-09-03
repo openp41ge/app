@@ -115,7 +115,7 @@ export class InitEventControllerStep implements IStartupStep {
       const winId = ws?.windows?.[0]?.id;
       if (winId) {
         emitOpenSystemTab(winId, "explorer", "Explorer");
-        emitOpenSystemTab(winId, "git", "Git");
+        emitOpenSystemTab(winId, "git", "History");
       }
     };
     document.addEventListener("workspace-file-changed", () => {

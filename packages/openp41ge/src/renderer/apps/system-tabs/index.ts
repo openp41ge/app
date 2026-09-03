@@ -18,9 +18,9 @@ export const explorerSystemTabRegistration: SystemTabRegistration = {
 
 export const gitSystemTabRegistration: SystemTabRegistration = {
   id: "git",
-  label: "Git",
+  label: "History",
   icon: "\u2387",
-  description: "Search commits across repositories",
+  description: "Browse commit history across repositories",
   defaultSide: "right",
   createController: (tabId: string) => new CommitSearchSystemTabController(tabId),
 };

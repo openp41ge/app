@@ -14,7 +14,7 @@ import * as ops from "@openp41ge/layout/operations";
 function buildSourceWs() {
   const ws = types.createWorkspace("ws1");
   let result = ops.openSystemTab(ws, ws.windows[0].id, "right", "explorer", "Explorer", true);
-  result = ops.openSystemTab(result, ws.windows[0].id, "right", "git", "Git", true);
+  result = ops.openSystemTab(result, ws.windows[0].id, "right", "git", "History", true);
   const tab = types.createTab("p1", "file-viewer", "app.ts", { filePath: "/src/app.ts" });
   result = ops.addTabToCell(result, ws.windows[0].id, tab, 0, 0);
   return result;

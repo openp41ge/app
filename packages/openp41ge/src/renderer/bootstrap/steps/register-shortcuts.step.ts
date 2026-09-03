@@ -154,7 +154,7 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "View",
     });
 
-    // Cmd+Shift+G opens Git in the right sidebar
+    // Cmd+Shift+G opens History in the right sidebar
     km.register({
       modifiers: 12,
       key: "g",
@@ -168,13 +168,13 @@ export class RegisterShortcutsStep implements IStartupStep {
             windowId: myWindowId,
             side: "right",
             appType: "git",
-            title: "Git",
+            title: "History",
           });
         } catch (_err) {
           // ignore
         }
       },
-      description: "Open Git",
+      description: "Open History",
       category: "View",
     });
 

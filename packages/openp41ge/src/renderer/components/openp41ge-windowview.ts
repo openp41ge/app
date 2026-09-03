@@ -208,7 +208,7 @@ class Openp41geWindowView extends LitElement {
         "workspace-manager": "Workspaces",
         settings: "Settings",
         explorer: "Explorer",
-        git: "Git",
+        git: "History",
         search: "Search",
       };
       return names[appType] ?? appType;

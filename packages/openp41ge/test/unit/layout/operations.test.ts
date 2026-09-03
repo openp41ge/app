@@ -13,7 +13,7 @@ import * as ops from "@openp41ge/layout/operations";
 function addDefaultSidebarTabs(ws: any) {
   const winId = ws.windows[0].id;
   ws = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer", true);
-  ws = ops.openSystemTab(ws, winId, "right", "git", "Git", true);
+  ws = ops.openSystemTab(ws, winId, "right", "git", "History", true);
   return ws;
 }
 
@@ -850,7 +850,7 @@ describe("system tab operations", () => {
     const winId = ws.windows[0].id;
 
     const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer");
-    const r2 = ops.openSystemTab(r1, winId, "right", "git", "Git");
+    const r2 = ops.openSystemTab(r1, winId, "right", "git", "History");
     // Both tab types stay open — opening a new type no longer closes the previous
     expect(r2.sidebar.rightSidebarTabs).toHaveLength(2);
 
@@ -922,7 +922,7 @@ describe("system tab operations", () => {
     const winId = ws.windows[0].id;
 
     const r1 = ops.openSystemTab(ws, winId, "right", "explorer", "Explorer", true);
-    const r2 = ops.openSystemTab(r1, winId, "right", "git", "Git", true);
+    const r2 = ops.openSystemTab(r1, winId, "right", "git", "History", true);
     const tabs = r2.sidebar.rightSidebarTabs!;
     expect(tabs).toHaveLength(2);
 
