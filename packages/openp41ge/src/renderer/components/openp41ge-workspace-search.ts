@@ -47,10 +47,6 @@ class Openp41geWorkspaceSearch extends LitElement {
       return html`
         <div
           style="display:flex;align-items:center;gap:5px;max-width:min(180px, calc((100vw - 270px) / 2));height:26px;padding:0 8px;box-sizing:border-box;border-radius:4px;background:var(--bg-secondary,#252526);user-select:none;white-space:nowrap;-webkit-app-region:no-drag;"
-          ${tooltipContent({
-            type: "simple",
-            text: "This window is bound to its workspace.",
-          })}
         >
           <svg
             width="18"

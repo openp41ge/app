@@ -20,6 +20,8 @@ import { workspaceFileService, deriveRepoName } from "../services/workspace-file
 
 /** Hold a skeleton this long before the drag element appears (long-press pickup). */
 const HOLD_MS = 350;
+/** Pointer travel past this many px starts an immediate drag (below the long-press hold). */
+const DRAG_THRESHOLD = 4;
 
 const isMac = (() => {
   try {
@@ -246,7 +248,9 @@ export class Openp41geWindowManager extends LitElement {
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     if (!drag.active) {
-      if (Math.hypot(dx, dy) < 8) return;
+      // A small movement kickstarts the drag immediately — the long-press hold
+      // delay is only for grab-and-hold with no movement, not for a quick drag.
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
       // A real drag beat the long-press timer — cancel the pending pickup.
       this._clearHoldTimer();
       drag.active = true;
@@ -1005,8 +1009,9 @@ export class Openp41geWindowManager extends LitElement {
           inset: 0;
           overflow-y: auto;
           /* No horizontal padding so rows + separators span the full window width;
-             the rows keep their own content inset. */
-          padding: 20px 0;
+             the rows keep their own content inset. No top padding — the title bar
+             is the top of the view, so the list starts right below it. */
+          padding: 0 0 20px;
           box-sizing: border-box;
         }
         ul { list-style: none; margin: 0; padding: 0; }
@@ -1058,12 +1063,13 @@ export class Openp41geWindowManager extends LitElement {
         .ws-pill--open:hover { background: rgba(86, 156, 214, 0.25); }
         .ws-chevron { flex-shrink: 0; display: block; align-self: center; color: var(--accent, #569cd6); }
 
-        /* Skeleton + its carousel dots stacked in a column below. */
+        /* Skeleton + its carousel dots stacking. The dots stay inside the row's
+           bottom padding area, absolutely positioned so they never push content. */
         .ws-thumb-wrap {
+          position: relative;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 4px;
           flex-shrink: 0;
           align-self: flex-start;
         }
@@ -1121,8 +1127,13 @@ export class Openp41geWindowManager extends LitElement {
         .ws-thumb-side-row { width: 12px; height: 4px; border-radius: 2px; background: var(--bg-active, #37373d); }
         .ws-win-grid { flex: 1; display: flex; gap: 3px; min-width: 0; }
         .ws-thumb-cell { flex: 1 1 0; min-width: 0; background: var(--bg-active, #37373d); border-radius: 3px; }
-        /* Carousel page dots (below the skeleton, in normal flow). */
+        /* Carousel page dots — absolutely positioned inside the skeleton's bottom
+           padding area so they add no height and never push the row content. */
         .ws-carousel-dots {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: -13px;
           display: flex;
           justify-content: center;
           gap: 3px;
@@ -1159,23 +1170,29 @@ export class Openp41geWindowManager extends LitElement {
         .ws-thumb:hover .ws-carousel-arrow { opacity: 1; pointer-events: auto; }
         /* Workspace-list delete mode + inline "new workspace" row. */
         .ws-row--select { cursor: pointer; }
+        /* The inline "new workspace" row is a normal full-width row — only the
+           top/bottom edges get the dashed "add" affordance, not the sides. */
         .ws-row--new {
           cursor: default;
-          border: 1px dashed var(--divider, #444);
+          border-top: 1px dashed var(--divider, #444);
+          border-bottom: 1px dashed var(--divider, #444);
         }
         .ws-row--new:hover { background: var(--bg-hover, #2a2d2e); }
         .wm-new-ws-input {
-          flex: 1;
           min-width: 0;
           background: transparent;
           border: none;
           outline: none;
           color: var(--text-primary, #ddd);
-          font-size: 13px;
+          font-size: 14px;
           font-family: inherit;
-          padding-right: 24px;
+          font-weight: 600;
+          padding: 0;
+          /* Align the placeholder with the workspace name in the other rows. */
+          height: auto;
+          align-self: flex-start;
         }
-        .wm-new-ws-input::placeholder { color: var(--text-secondary, #777); }
+        .wm-new-ws-input::placeholder { color: var(--text-secondary, #777); font-weight: 400; }
         /* Skeleton placeholders for the inline "new workspace" card. */
         @keyframes ws-skeleton-pulse {
           0%, 100% { opacity: 0.45; }
@@ -1187,8 +1204,9 @@ export class Openp41geWindowManager extends LitElement {
           background: var(--bg-active, #37373d);
           animation: ws-skeleton-pulse 1.3s ease-in-out infinite;
         }
-        .ws-skeleton--num { width: 118px; height: 12px; vertical-align: middle; }
+        .ws-skeleton--num { width: 118px; height: 12px; vertical-align: middle; margin-top: 4px; }
         .ws-skeleton--chevron {
+          align-self: center;
           width: 16px;
           height: 16px;
           border-radius: 4px;
@@ -1657,9 +1675,7 @@ export class Openp41geWindowManager extends LitElement {
             `,
           )}
         </div>
-        ${this._drawers.length === 0 && this._closingDrawers.length === 0
-          ? this._workspaceListFooter()
-          : nothing}
+        ${this._workspaceListFooter()}
       </div>
     `;
   }
