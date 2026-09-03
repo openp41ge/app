@@ -19,8 +19,11 @@ import type { CommitSearchOptions, SearchResultCommit } from "openp41ge-git";
 /** Narrow read-only search contract (ISP — read only, no write ops). */
 export interface CommitSearchModel {
   /**
-   * Search commits across the given repos, or all repos (null/empty list).
-   * Returns commits with their changed files, ordered most-recent-first.
+   * Search commits across the given repos (the workspace-connected repo names).
+   * An empty/null list yields no results — the implementation never falls back
+   * to scanning the repo directory, so leftover/removed folders are never
+   * searched. Returns commits with their changed files, ordered
+   * most-recent-first.
    */
   search(repoNames: string[] | null, options: CommitSearchOptions): Promise<SearchResultCommit[]>;
 }

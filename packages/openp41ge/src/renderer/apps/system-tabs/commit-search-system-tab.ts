@@ -1,5 +1,5 @@
 /**
- * CommitSearchSystemTabController — system tab controller for the Git panel
+ * CommitSearchSystemTabController — system tab controller for the History panel
  * (registration id `"git"`), repurposed as a commit search/query UI.
  *
  * Search across connected repos by commit message or changed-file path, with
@@ -20,13 +20,14 @@
  *
  * Data access goes through the CommitSearchModel interface (public `_searchModel`
  * property for test injection — production IpcCommitSearchModel, tests
- * TestCommitSearchModel). Loads repoNames via workspaceController.listRepos.
+ * TestCommitSearchModel). The repo scope is the current workspace's connected
+ * repos (from the workspace repo list), never the whole repo directory.
  */
 
 import type { SystemTabController } from "../../controllers/types";
 import type { CommitSearchModel } from "../../models/commit-search-model";
 import { IpcCommitSearchModel } from "../../models/commit-search-model";
-import { workspaceFileService } from "../../services/workspace-file-service";
+import { workspaceFileService, deriveRepoName } from "../../services/workspace-file-service";
 import type { SearchResultCommit } from "openp41ge-git";
 import { tooltipController } from "openp41ge-uikit";
 
@@ -588,25 +589,28 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
   // ── Repo scope loading ────────────────────────────────────────────────
 
-  private async _loadRepos(): Promise<void> {
-    try {
-      const repos = (await window.openp41ge.workspaceController.listRepos()) as RepoOption[];
-      this._repos = repos;
-      // Drop selected repos that are no longer present (empty set = all).
-      for (const name of [...this._selectedRepos]) {
-        if (!this._repos.some((r) => r.name === name)) this._selectedRepos.delete(name);
-      }
-      this._updateRepoSelectLabel();
-      // Repo availability changed the empty-state hint — re-render it once
-      // repos arrive (they load asynchronously after first paint).
-      if (!this._input?.value.trim()) {
-        this._renderEmptyQuery();
-      }
-    } catch {
-      // Non-fatal — "All repos" scope still works.
-      this._repos = [];
-      this._selectedRepos.clear();
-      this._updateRepoSelectLabel();
+  /**
+   * Repos connected to the current workspace, derived from the workspace repo
+   * list. Leftover/removed folders under the repo directory are never included
+   * (they are not part of the workspace's repo list).
+   */
+  private _connectedRepoOptions(): RepoOption[] {
+    const repos = workspaceFileService.openData?.repos ?? [];
+    return repos.map((r) => ({ name: deriveRepoName(r.url) }));
+  }
+
+  private _loadRepos(): void {
+    // The repo scope is the current workspace's connected repos — never the
+    // whole repo directory (which would include leftover/removed folders).
+    this._repos = this._connectedRepoOptions();
+    // Drop selected repos that are no longer present (empty set = all).
+    for (const name of [...this._selectedRepos]) {
+      if (!this._repos.some((r) => r.name === name)) this._selectedRepos.delete(name);
+    }
+    this._updateRepoSelectLabel();
+    // Repo availability changed the empty-state hint — re-render it once.
+    if (!this._input?.value.trim()) {
+      this._renderEmptyQuery();
     }
   }
 
@@ -834,7 +838,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
     }
 
     const token = ++this._searchToken;
-    const repoNames = this._repoScope();
+    // Resolve the repo scope: the user's selected repos, else every repo
+    // connected to the current workspace. Empty means nothing is connected —
+    // render the empty state and do not dispatch a search.
+    const repoNames = this._repoScope() ?? this._connectedRepoOptions().map((r) => r.name);
+    if (repoNames.length === 0) {
+      this._renderEmptyQuery();
+      return;
+    }
     const maxCount = this._maxCount;
     // Commits (messages) are always searched; files add the changed-file-path
     // dimension when the toggle is on; content the git -G content-lines pass.
@@ -885,7 +896,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
     if (!results) return;
     results.replaceChildren();
     if (this._repos.length === 0) {
-      results.appendChild(this._message("No repos", "var(--text-secondary,#999)"));
+      results.appendChild(this._message("No repositories to search", "var(--text-secondary,#999)"));
     } else {
       results.appendChild(
         this._message(

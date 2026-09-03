@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CommitSearchSystemTabController } from "../../../src/renderer/apps/system-tabs/commit-search-system-tab";
 import { TestCommitSearchModel } from "../../../src/renderer/models/commit-search-model";
 import { workspaceFileService } from "../../../src/renderer/services/workspace-file-service";
+import type { WorkspaceFileData } from "../../../src/layout/types";
 
 const fixtures = [
   {
@@ -69,6 +70,23 @@ const fixtures = [
   },
 ];
 
+/** Repos connected to the test workspace. URLs derive to the fixture repo names. */
+const connectedRepos: WorkspaceFileData["repos"] = [
+  { url: "acme", worktrees: [] },
+  { url: "globex", worktrees: [] },
+  { url: "innova", worktrees: [] },
+];
+
+/** A minimal open workspace record for the controller. */
+const testOpenData = (repos: WorkspaceFileData["repos"]): WorkspaceFileData =>
+  ({
+    id: "w1",
+    name: "test",
+    version: 1,
+    dataDir: "/data",
+    repos,
+  } as WorkspaceFileData);
+
 type Events = { openCommit: CustomEvent[]; openFile: CustomEvent[]; openCommitFile: CustomEvent[] };
 
 function installBridge(): { events: Events } {
@@ -119,6 +137,8 @@ describe("CommitSearchSystemTabController", () => {
     events = installBridge().events;
     host = document.createElement("div");
     document.body.appendChild(host);
+    // The repo scope comes from the workspace repo list, not the repo-dir scan.
+    workspaceFileService.openData = testOpenData(connectedRepos);
     controller = new CommitSearchSystemTabController("sys-git-test");
     controller._searchModel = new TestCommitSearchModel(fixtures);
     controller.mount(host);
@@ -129,6 +149,7 @@ describe("CommitSearchSystemTabController", () => {
     host.remove();
     document.removeEventListener("openp41ge:open-commit", () => {});
     workspaceFileService.openFilePath = "/w/test.openp41ge-workspace";
+    workspaceFileService.openData = null;
   });
 
   it("mounts the search UI: main input + files toggle on one row, a filter box with a repo icon + text-filter input (no select), focused main input", async () => {
@@ -306,13 +327,13 @@ describe("CommitSearchSystemTabController", () => {
     await search(controller, "readme");
     expect(model.calls.at(-1)?.repoNames).toEqual(["acme", "globex"]);
 
-    // Picking "All repos" clears the multi-selection back to all repos.
+    // Picking "All repos" clears the multi-selection back to all connected repos.
     repoFilter.click(); // menu closed after All repos → reopen
     host
       .querySelector<HTMLElement>('[data-repo-options] [data-repo-option=""]')!
       .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     await search(controller, "readme");
-    expect(model.calls.at(-1)?.repoNames).toBeNull();
+    expect(model.calls.at(-1)?.repoNames).toEqual(connectedRepos.map((r) => r.url));
   });
 
   it("toggling the repo filter icon off hides the row and searches all repos", async () => {
@@ -329,7 +350,8 @@ describe("CommitSearchSystemTabController", () => {
 
     await search(controller, "readme");
     const model = controller["_searchModel"] as TestCommitSearchModel;
-    expect(model.calls.at(-1)?.repoNames).toBeNull(); // all repos
+    // Filter off = "all repos", which means every workspace-connected repo.
+    expect(model.calls.at(-1)?.repoNames).toEqual(connectedRepos.map((r) => r.url));
 
     repoFilterIcon.click();
     expect(repoFilter.parentElement?.style.display).toBe("flex");
@@ -576,16 +598,14 @@ describe("CommitSearchSystemTabController", () => {
     expect(host.querySelector("[data-commit-row]")).toBeNull();
   });
 
-  it("renders a no-repos hint before any search when no repos exist", async () => {
-    (window.openp41ge.workspaceController.listRepos as ReturnType<typeof vi.fn>).mockResolvedValue(
-      [],
-    );
+  it("renders a no-repos hint before any search when the workspace has no connected repos", async () => {
+    workspaceFileService.openData = testOpenData([]);
     controller.unmount();
     controller = new CommitSearchSystemTabController("sys-git-test");
     controller._searchModel = new TestCommitSearchModel(fixtures);
     controller.mount(host);
     await flush();
-    expect(host.textContent).toContain("No repos");
+    expect(host.textContent).toContain("No repositories to search");
   });
 
   it("shows a search-failure message when the model throws", async () => {
@@ -645,5 +665,53 @@ describe("CommitSearchSystemTabController", () => {
     await search(controller, "readme");
     expect(model.calls.at(-1)?.options).toMatchObject({ content: true });
     expect(host.querySelector(".commit-hunk-block")).toBeNull();
+  });
+
+  it("excludes leftover repos that exist on disk but are not in the workspace repo list", async () => {
+    // The repo-dir scan also sees an "orphan" folder, but the scope is the
+    // workspace repo list — orphan must never appear in the filter or a search.
+    (window.openp41ge.workspaceController.listRepos as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { path: "/w/acme", name: "acme", url: "git@example.com:acme.git" },
+      { path: "/w/orphan", name: "orphan", url: "git@example.com:orphan.git" },
+      { path: "/w/globex", name: "globex", url: "git@example.com:globex.git" },
+      { path: "/w/innova", name: "innova", url: "git@example.com:innova.git" },
+    ]);
+    controller.unmount();
+    controller = new CommitSearchSystemTabController("sys-git-test");
+    controller._searchModel = new TestCommitSearchModel(fixtures);
+    controller.mount(host);
+    await flush();
+
+    const repoFilter = host.querySelector<HTMLButtonElement>("[data-repo-filter]")!;
+    repoFilter.click();
+    const opts = Array.from(
+      host.querySelectorAll<HTMLElement>("[data-repo-options] [data-repo-option]"),
+    );
+    expect(opts.map((o) => o.dataset.repoOption)).toEqual(["", "acme", "globex", "innova"]);
+    expect(opts.map((o) => o.dataset.repoOption)).not.toContain("orphan");
+
+    await search(controller, "readme");
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+    expect(model.calls.at(-1)?.repoNames).toEqual(connectedRepos.map((r) => r.url));
+    expect(model.calls.at(-1)?.repoNames).not.toContain("orphan");
+  });
+
+  it("does not dispatch a search when the workspace has no connected repos", async () => {
+    workspaceFileService.openData = testOpenData([]);
+    controller.unmount();
+    controller = new CommitSearchSystemTabController("sys-git-test");
+    const model = new TestCommitSearchModel(fixtures);
+    controller._searchModel = model;
+    controller.mount(host);
+    await flush();
+
+    const input = host.querySelector("input[placeholder^='Search']") as HTMLInputElement;
+    expect(input).not.toBeNull();
+    input.value = "readme";
+    pressEnter(input);
+    await flush();
+
+    expect(model.calls.length).toBe(0); // no search dispatched
+    expect(host.textContent).toContain("No repositories to search");
   });
 });

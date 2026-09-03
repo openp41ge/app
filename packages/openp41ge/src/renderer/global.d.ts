@@ -130,7 +130,7 @@ declare global {
         /** Get untracked file paths for a repository. */
         getUntrackedFiles: (repoName: string) => Promise<string[]>;
 
-        /** Search commit history (repoName null = across all repos). */
+        /** Search commit history for the workspace-connected repos (explicit repoNames; empty/null = no repos). */
         searchCommits: (
           repoNames: string[] | null,
           options: CommitSearchOptions,

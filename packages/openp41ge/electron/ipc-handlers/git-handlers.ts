@@ -49,17 +49,20 @@ export function registerGitHandlers(
   });
 
   ipcMain.handle("workspace:searchCommits", async (_event, repoNames, options) => {
-    // repoNames: string[] | string | null → scope, per-repo isolation so one
-    // bad repo can't kill the whole search. null/empty → every repo in the
-    // repos dir is searched.
+    // repoNames: string[] | string | null → the explicit list of repo names to
+    // search (the workspace-connected repos). Per-repo isolation so one bad
+    // repo can't kill the whole search. An empty/null list means NO repos are
+    // scoped — we never fall back to scanning the repos directory, which would
+    // include leftover/removed folders that are not in the workspace's repo
+    // list.
     try {
       const names: string[] = Array.isArray(repoNames)
         ? repoNames
         : repoNames && typeof repoNames === "string"
           ? [repoNames]
           : [];
-      const repos =
-        names.length > 0 ? names.map((n) => ({ name: n })) : await gitService.listRepos();
+      if (names.length === 0) return [];
+      const repos = names.map((n) => ({ name: n }));
       const out: unknown[] = [];
       for (const repo of repos) {
         try {
