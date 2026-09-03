@@ -160,6 +160,21 @@ export class Openp41geWindowManager extends LitElement {
     this._crumbsOpen = false;
   };
 
+  /** Hover a workspace skeleton: pre-capture its bitmap so the drag ghost has
+   * the real skeleton ready at drag.start even for a fast grab-and-drag. The
+   * pointer-down re-request reuses this cache (see the prepare-bitmap handler). */
+  private _onThumbPointerEnter(e: PointerEvent, path: string, isOpen: boolean): void {
+    if (isOpen) return;
+    const thumb = e.currentTarget as HTMLElement;
+    const rect = thumb.getBoundingClientRect();
+    window.openp41ge.drag.prepareBitmap({
+      x: Math.round(rect.left),
+      y: Math.round(rect.top),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    });
+  }
+
   /** Begin a pointer press on a workspace skeleton (drag-out or carousel swipe). */
   private _onThumbPointerDown(e: PointerEvent, path: string, isOpen: boolean): void {
     if (e.button !== 0) return;
@@ -1670,6 +1685,7 @@ export class Openp41geWindowManager extends LitElement {
                           <div class="ws-thumb-wrap">
                             <div
                               class="ws-thumb"
+                              @pointerenter=${(e: PointerEvent) => this._onThumbPointerEnter(e, w.filePath, isOpen)}
                               @pointerdown=${(e: PointerEvent) => this._onThumbPointerDown(e, w.filePath, isOpen)}
                               @pointermove=${this._onThumbPointerMove}
                               @pointerup=${this._onThumbPointerUp}

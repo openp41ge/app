@@ -322,6 +322,16 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       width: Math.round(rect.width),
       height: Math.round(rect.height),
     };
+    // Hover also requests a capture (pointerenter); a pointerdown re-request for
+    // the SAME region must not clobber it — otherwise a fast grab-and-drag starts
+    // a fresh capture that races the hover one and isn't ready at drag.start.
+    const sameRect =
+      !!_preparedRect &&
+      _preparedRect.x === requestRect.x &&
+      _preparedRect.y === requestRect.y &&
+      _preparedRect.width === requestRect.width &&
+      _preparedRect.height === requestRect.height;
+    if (sameRect && (_preparedBitmap || _preparing)) return;
     _preparedRect = requestRect;
     _preparedBitmap = null;
     _preparing = (async () => {
