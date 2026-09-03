@@ -500,40 +500,6 @@ contextBridge.exposeInMainWorld("openp41ge", {
     return () => ipcRenderer.removeListener("zoom:reset", handler);
   },
 
-  /** Listen for File > New Workspace... menu action. */
-  onNewWorkspace: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu:new-workspace", handler);
-    return () => ipcRenderer.removeListener("menu:new-workspace", handler);
-  },
-
-  /** Listen for File > New Window (placeholder) menu action. */
-  onNewWindowPlaceholder: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu:new-window-placeholder", handler);
-    return () => ipcRenderer.removeListener("menu:new-window-placeholder", handler);
-  },
-
-  /** Listen for File > Open Workspace... menu action. */
-  onOpenWorkspace: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu:open-workspace", handler);
-    return () => ipcRenderer.removeListener("menu:open-workspace", handler);
-  },
-  /** Listen for File > Save Workspace As... menu action. */
-  onSaveWorkspaceAs: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu:save-workspace-as", handler);
-    return () => ipcRenderer.removeListener("menu:save-workspace-as", handler);
-  },
-
-  /** Listen for View > Workspaces… menu action (opens the system overlay). */
-  onOpenWorkspaces: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu:open-workspaces", handler);
-    return () => ipcRenderer.removeListener("menu:open-workspaces", handler);
-  },
-
   /** Listen for View > Logs… menu action (opens the system overlay Logs tab). */
   onOpenLogs: (callback) => {
     const handler = () => callback();

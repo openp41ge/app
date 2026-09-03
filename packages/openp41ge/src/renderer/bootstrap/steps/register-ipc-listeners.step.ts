@@ -14,9 +14,7 @@ const log = createLogger("bootstrap:register-ipc-listeners");
 
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { wireResetListener } from "../../app";
-import { workspaceFileService } from "../../services/workspace-file-service";
 import { systemOverlayService } from "../../services/system-overlay-service";
-import { toastService } from "../../components/openp41ge-toast";
 import { focusRepoInWorkspaces } from "../../apps/system-tabs/workspace-manager-system-tab";
 
 export class RegisterIpcListenersStep implements IStartupStep {
@@ -47,60 +45,12 @@ export class RegisterIpcListenersStep implements IStartupStep {
     // Wire the app reset listener so window.openp41ge.workspace.reset() works
     wireResetListener();
 
-    // ── Menu: New Window (placeholder — coming soon) ─────────────────────
-    window.openp41ge.onNewWindowPlaceholder(() => {
-      toastService.show("New Window is not available yet — use Window → Add Workspace Window.", "info");
-    });
-
     // ── In-window workspace switching is removed from workspace windows ─────
-    // Workspace windows are bound to a fixed workspace; the New/Open/Save
-    // workspace actions live in the Window Manager instead. In a workspace
-    // window, these route to the Window Manager.
+    // Workspace windows are bound to a fixed workspace; workspace actions live
+    // in the Window Manager instead. A non-window-manager window routes to it.
     const routeToWindowManager = (): void => {
       window.openp41ge.windowManager.open();
     };
-
-    // ── Menu: New Workspace ─────────────────────────────────────────────
-    window.openp41ge.onNewWorkspace(async () => {
-      if (context.windowType === "window-manager") {
-        systemOverlayService.open("create", "workspaces");
-      } else {
-        routeToWindowManager();
-      }
-    });
-
-    // ── Menu: Open Workspace ────────────────────────────────────────────
-    window.openp41ge.onOpenWorkspace(() => {
-      if (context.windowType !== "window-manager") {
-        routeToWindowManager();
-        return;
-      }
-      workspaceFileService.openDialog().then((loaded) => {
-        if (loaded) {
-          systemOverlayService.open("list", "workspaces");
-        }
-      });
-    });
-
-    // ── Menu: Save Workspace As... ──────────────────────────────────────
-    window.openp41ge.onSaveWorkspaceAs(async () => {
-      if (context.windowType !== "window-manager") {
-        routeToWindowManager();
-        return;
-      }
-      if (workspaceFileService.openData) {
-        await workspaceFileService.saveAs();
-      }
-    });
-
-    // ── Menu: View > Workspaces… (opens the system overlay on Workspaces) ──
-    window.openp41ge.onOpenWorkspaces(() => {
-      if (context.windowType !== "window-manager") {
-        routeToWindowManager();
-        return;
-      }
-      systemOverlayService.open("list", "workspaces");
-    });
 
     // ── Menu: View > Logs… (opens the system overlay on Logs) ─────────
     window.openp41ge.onOpenLogs(() => {
