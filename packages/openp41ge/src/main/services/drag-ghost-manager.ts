@@ -241,15 +241,7 @@ ${nameHtml}</div>`;
     // ghost: render the PNG at the exact source element size and let the window
     // adopt those dimensions. Falls back to the file-row / pill HTML otherwise.
     const innerHtml = bitmapDataUrl
-      ? buildBitmapImgHtml(
-          bitmapDataUrl,
-          ghostW,
-          ghostH,
-          0,
-          this._liftOff,
-          this._srcOffsetX,
-          this._srcOffsetY,
-        )
+      ? `<img src="${bitmapDataUrl}" alt="" style="display:block;width:${ghostW}px;height:${ghostH}px;" />`
       : this._liftOff
         ? buildWorkspaceGhostHtml(
             escapedLabel,
@@ -339,23 +331,12 @@ ${nameHtml}</div>`;
     const srcOffsetY = this._srcOffsetY;
     this._contentW = Math.max(1, Math.round(outerW * scale));
     this._contentH = Math.max(1, Math.round(outerH * scale));
-    // For a workspace lift, grow the ghost around the grab point so the cursor
-    // stays on the spot that was grabbed, and subsequent move() calls track with
-    // the scaled offset.
+    // show() already sized the window for a lift (source × LIFT_MAX_SCALE) and
+    // set the scaled offset, so the window is already positioned on the grab
+    // point; just keep the offset scaled so move() tracks with it. No grow here.
     if (this._liftOff) {
       this._offsetX = srcOffsetX * scale;
       this._offsetY = srcOffsetY * scale;
-      const b = this._ghost.getBounds();
-      try {
-        this._ghost.setBounds({
-          x: Math.round(b.x - srcOffsetX * (scale - 1)),
-          y: Math.round(b.y - srcOffsetY * (scale - 1)),
-          width: this._contentW,
-          height: this._contentH,
-        });
-      } catch {
-        // setBounds can throw if the window is closing. Swallow.
-      }
     }
     // The reload below re-measures the content; it must NOT re-anchor the window
     // back to the drag-start coordinate (move() owns the position now).

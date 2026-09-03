@@ -163,9 +163,20 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       offsetX,
       offsetY,
       isRowStyle,
-      preparedBitmap ?? undefined,
+      undefined,
       dragType,
     );
+    // If a skeleton bitmap was pre-captured at pointer-down, swap it in now so
+    // the ghost pops with the real skeleton immediately (no async capture wait).
+    // The placeholder/shape is already visible from show(); this upgrades it.
+    if (preparedBitmap) {
+      dragGhost.setBitmap(
+        preparedBitmap,
+        typeof tabWidth === "number" ? tabWidth : captureRect ? Math.round(captureRect.width) : 132,
+        typeof tabHeight === "number" ? tabHeight : captureRect ? Math.round(captureRect.height) : 84,
+        typeof inset === "number" ? inset : 0,
+      );
+    }
 
     // Track the active drag session for cross-window drops
     const sender = _event.sender;
