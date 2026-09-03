@@ -128,7 +128,9 @@ class Openp41geSidebar extends LitElement {
     menu.items = allSystemTabRegistrations.map((reg: SystemTabRegistration) => ({
       label: reg.label,
       badge: this._openSidesFor(reg.id),
-      action: () => emitOpenSystemTab(this.windowId, reg.id, reg.label, reg.defaultSide),
+      // The ＋ opens the tab on the sidebar that hosts the ＋ (`this.side`), not
+      // the tab type's `defaultSide`. Callers that pass no side keep `defaultSide`.
+      action: () => emitOpenSystemTab(this.windowId, reg.id, reg.label, this.side),
     }));
     document.body.appendChild(menu);
   }

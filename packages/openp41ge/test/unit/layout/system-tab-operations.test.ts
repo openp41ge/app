@@ -119,3 +119,22 @@ describe("moved active tab → activate most recently accessed remaining tab", (
     expect(activeLeft(ws2)).toBe(only);
   });
 });
+
+describe("openSystemTab explicit side overrides the registration default", () => {
+  it("places a tab on an explicitly requested left sidebar even when its default is right", () => {
+    // explorer's `defaultSide` is "right"; an explicit "left" must win.
+    let ws = types.createWorkspace("ws1");
+    const winId = ws.windows[0].id;
+    ws = ops.openSystemTab(ws, winId, "left", "explorer", "Explorer", true);
+
+    const leftTabs = (ws.sidebar.leftSidebarTabs ?? []) as unknown as string[];
+    const rightTabs = (ws.sidebar.rightSidebarTabs ?? []) as unknown as string[];
+    expect(leftTabs).toHaveLength(1);
+    expect(rightTabs).toEqual([]);
+    // The left sidebar is open and the tab is active in this window.
+    expect(ws.sidebar.leftSidebarOpen).toBe(true);
+    expect(ws.windows[0].sidebar?.activeLeftTab).toBe(leftTabs[0]);
+    // The tab was registered with the explorer appType.
+    expect(ws.systemTabs[leftTabs[0] as types.SystemTabId]?.appType).toBe("explorer");
+  });
+});
