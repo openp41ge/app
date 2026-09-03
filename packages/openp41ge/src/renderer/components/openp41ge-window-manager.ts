@@ -1259,6 +1259,20 @@ export class Openp41geWindowManager extends LitElement {
           padding: 0 0 64px;
           box-sizing: border-box;
         }
+        /* Invisible mask over the workspace list while a drawer is open, so a
+           click on a card closes the drawer instead of opening another
+           workspace. Sits over .wm-body but under the drawers (which are later
+           siblings with a higher z-index), so drawer interactions still work. */
+        .wm-list-mask {
+          position: absolute;
+          top: 44px;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 1;
+          background: transparent;
+          cursor: default;
+        }
         ul { list-style: none; margin: 0; padding: 0; }
         li.ws-row {
           position: relative;
@@ -1975,6 +1989,9 @@ export class Openp41geWindowManager extends LitElement {
                   </ul>
                 `}
           </div>
+          ${this._drawers.length > 0
+            ? html`<div class="wm-list-mask" @click=${(e: Event) => { e.stopPropagation(); this._closeAll(); }}></div>`
+            : nothing}
           ${this._drawers.length > 0
             ? html`<div class="drawer-shadow" style="width:${this._stackWidth()}%"></div>`
             : nothing}
