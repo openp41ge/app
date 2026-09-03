@@ -518,7 +518,7 @@ export class Openp41geWindowManager extends LitElement {
   /** Footer for the top-level workspace list (+ / trashcan, delete mode). */
   private _workspaceListFooter(): TemplateResult {
     return html`
-      <div class="drawer-footer">
+      <div class="ws-list-footer">
         ${this._workspaceDeleteMode
           ? html`
               <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorkspaceDeleteMode(); }} data-tip="Cancel">Cancel</button>
@@ -1010,8 +1010,9 @@ export class Openp41geWindowManager extends LitElement {
           overflow-y: auto;
           /* No horizontal padding so rows + separators span the full window width;
              the rows keep their own content inset. No top padding — the title bar
-             is the top of the view, so the list starts right below it. */
-          padding: 0 0 20px;
+             is the top of the view, so the list starts right below it. Bottom
+             padding clears the overlaying bottom bar (44px) + scroll space. */
+          padding: 0 0 64px;
           box-sizing: border-box;
         }
         ul { list-style: none; margin: 0; padding: 0; }
@@ -1112,7 +1113,8 @@ export class Openp41geWindowManager extends LitElement {
         }
         /* While a swipe follows the pointer, disable the slide transition. */
         .ws-carousel-track--live { transition: none; }
-        .ws-win { flex: 0 0 100%; display: flex; gap: 3px; padding: 4px; min-width: 0; min-height: 0; }
+        .ws-win { flex: 0 0 100%; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+        .ws-win-body { flex: 1; min-height: 0; display: flex; gap: 3px; padding: 4px; min-width: 0; }
         .ws-win-side {
           width: 18px;
           flex-shrink: 0;
@@ -1127,13 +1129,13 @@ export class Openp41geWindowManager extends LitElement {
         .ws-thumb-side-row { width: 12px; height: 4px; border-radius: 2px; background: var(--bg-active, #37373d); }
         .ws-win-grid { flex: 1; display: flex; gap: 3px; min-width: 0; }
         .ws-thumb-cell { flex: 1 1 0; min-width: 0; background: var(--bg-active, #37373d); border-radius: 3px; }
-        /* Carousel page dots — absolutely positioned inside the skeleton's bottom
-           padding area so they add no height and never push the row content. */
+        /* Carousel page dots — absolutely positioned just below the skeleton so
+           they add no height, but a few px above the row's bottom separator. */
         .ws-carousel-dots {
           position: absolute;
           left: 0;
           right: 0;
-          bottom: -13px;
+          bottom: -9px;
           display: flex;
           justify-content: center;
           gap: 3px;
@@ -1205,6 +1207,7 @@ export class Openp41geWindowManager extends LitElement {
           animation: ws-skeleton-pulse 1.3s ease-in-out infinite;
         }
         .ws-skeleton--num { width: 118px; height: 12px; vertical-align: middle; margin-top: 4px; }
+        .ws-skeleton--pill { width: 64px; height: 16px; border-radius: 999px; }
         .ws-skeleton--chevron {
           align-self: center;
           width: 16px;
@@ -1399,6 +1402,25 @@ export class Openp41geWindowManager extends LitElement {
           padding: 0 14px;
           border-top: 1px solid var(--divider, #333);
         }
+        /* Persistent bottom bar of the top-level workspace list. Sits at the
+           window bottom, behind the drawer layer — a drawer slides over it. */
+        .ws-list-footer {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          /* Below the drawers (z-index 1+) so a slide-in drawer covers it. */
+          z-index: 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          justify-content: flex-end;
+          flex-shrink: 0;
+          height: 44px;
+          padding: 0 14px;
+          border-top: 1px solid var(--divider, #333);
+          background: var(--bg-secondary, #252526);
+        }
         .dw-add {
           border: none;
           background: transparent;
@@ -1524,11 +1546,12 @@ export class Openp41geWindowManager extends LitElement {
                       ? html`
                           <li class="ws-row ws-row--new">
                             <div class="ws-thumb ws-thumb--skeleton">
-                              <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
                               <div class="ws-carousel"><div class="ws-carousel-track">
                                 <div class="ws-win">
-                                  <div class="ws-win-side"><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span></div>
-                                  <div class="ws-win-grid"><div class="ws-thumb-cell"></div><div class="ws-thumb-cell"></div></div>
+                                  <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
+                                  <div class="ws-win-body">
+                                    <div class="ws-win-grid"><div class="ws-thumb-cell"></div><div class="ws-thumb-cell"></div></div>
+                                  </div>
                                 </div>
                               </div></div>
                             </div>
@@ -1541,6 +1564,7 @@ export class Openp41geWindowManager extends LitElement {
                                 @blur=${() => { if (this._addingWorkspace) void this._createWorkspaceFromInput(); }}
                               />
                               <div class="ws-meta"><span class="ws-skeleton ws-skeleton--num"></span></div>
+                              <div class="ws-pills"><span class="ws-skeleton ws-skeleton--pill"></span></div>
                             </div>
                             <span class="ws-skeleton ws-skeleton--chevron"></span>
                           </li>
@@ -1575,14 +1599,16 @@ export class Openp41geWindowManager extends LitElement {
                               @pointerup=${this._onThumbPointerUp}
                               @pointercancel=${this._onThumbPointerCancel}
                             >
-                              <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
                               <div class="ws-carousel">
                                 <div class="ws-carousel-track ${this._carouselLive ? "ws-carousel-track--live" : ""}" style="transform: translateX(${-idx * 100}%)">
                                   ${wins.map((win) => html`
                                     <div class="ws-win">
-                                      ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
-                                      <div class="ws-win-grid">${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}</div>
-                                      ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                      <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
+                                      <div class="ws-win-body">
+                                        ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                        <div class="ws-win-grid">${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}</div>
+                                        ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                      </div>
                                     </div>
                                   `)}
                                 </div>
