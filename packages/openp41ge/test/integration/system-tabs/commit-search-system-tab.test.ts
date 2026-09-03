@@ -214,21 +214,29 @@ describe("CommitSearchSystemTabController", () => {
       if (b === fiveK) continue;
       expect(b.style.color).toBe("var(--text-secondary,#888)"); // inactive grey
     }
-    // The limit options share the icon row with the filter icon — and the
-    // changed-file-path toggle now sits in the config row too.
-    const iconRow = repoFilterIcon.parentElement as HTMLElement;
-    expect(iconRow).toBe(fiveK.parentElement);
-    expect(iconRow.querySelectorAll("[data-limit-option]").length).toBe(5);
+    // The limit options share the wrapping config row with the filter icon —
+    // grouped by the separator: [config toggles] | [limits], so each group
+    // wraps as a unit when the sidebar narrows.
+    const iconRow = repoFilterIcon.parentElement as HTMLElement; // config group (repo/files/content/divider)
+    const limitGroup = fiveK.parentElement as HTMLElement; // limit group (buttons only)
+    const configRow = iconRow.parentElement as HTMLElement;
+    expect(configRow).toBe(limitGroup.parentElement);
     expect(iconRow.querySelectorAll("[data-search-into]").length).toBe(2);
     expect(iconRow.querySelector("[data-search-into]")).toBe(toggles[0]);
-    // A vertical separator sits between the config toggles (filter + files +
-    // content) and the limit group — only the middle 50% of the row height.
+    expect(limitGroup.querySelectorAll("[data-limit-option]").length).toBe(5);
+    // The separator trails the config group (only the middle 50% of the row
+    // height), NOT the limit group — so when the row wraps the limit buttons
+    // sit flush with the container's padding instead of being indented.
+    expect(limitGroup.querySelector("[data-icon-separator]")).toBeNull();
     const sep = iconRow.querySelector<HTMLElement>("[data-icon-separator]");
     expect(sep).not.toBeNull();
     expect(sep!.style.height).toBe("50%");
     expect(sep!.style.alignSelf).toBe("center");
-    expect(sep!.previousElementSibling).toBe(toggles[1]); // content toggle before the divider
-    expect(sep!.nextElementSibling?.hasAttribute("data-limit-option")).toBe(true);
+    expect(sep!.parentElement).toBe(iconRow);
+    // The content toggle sits right before the divider at the end of the
+    // config group.
+    expect(toggles[1].parentElement).toBe(iconRow);
+    expect(sep!.previousElementSibling).toBe(toggles[1]);
   });
 
   it("search-config buttons use custom tooltips, not a native title attr", async () => {

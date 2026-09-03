@@ -315,16 +315,33 @@ export class CommitSearchSystemTabController implements SystemTabController {
       });
       return btn;
     };
+    // Config row wraps by separator-delimited groups when the sidebar narrows,
+    // so a whole group moves to the next line instead of splitting icons.
     const filterIconRow = document.createElement("div");
-    Object.assign(filterIconRow.style, { display: "flex", gap: "4px", alignItems: "center" });
-    filterIconRow.appendChild(repoFilterIcon);
-    // Changed-file-path search is a config toggle like the filter icon.
-    filterIconRow.appendChild(filesToggle);
-    // Content search (git -G pickaxe on changed lines) is the third dimension.
-    filterIconRow.appendChild(contentToggle);
+    Object.assign(filterIconRow.style, {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: "4px",
+      alignItems: "center",
+    });
 
-    // A vertical divider between the repo icon and the depth-limit group —
-    // only the middle 50% of the row height, vertically centred.
+    const filterGroupA = document.createElement("div");
+    Object.assign(filterGroupA.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      flexShrink: "0",
+    });
+    filterGroupA.appendChild(repoFilterIcon);
+    // Changed-file-path search is a config toggle like the filter icon.
+    filterGroupA.appendChild(filesToggle);
+    // Content search (git -G pickaxe on changed lines) is the third dimension.
+    filterGroupA.appendChild(contentToggle);
+    // A vertical divider between the repo icon group and the depth-limit group —
+    // only the middle 50% of the row height, vertically centred. It trails the
+    // config group (not the limit group) so that when the row wraps, the limit
+    // buttons start flush with the container's padding instead of being indented
+    // by a leading divider + gap.
     const iconDivider = document.createElement("div");
     iconDivider.dataset.iconSeparator = "";
     Object.assign(iconDivider.style, {
@@ -333,11 +350,20 @@ export class CommitSearchSystemTabController implements SystemTabController {
       alignSelf: "center",
       flexShrink: "0",
       background: "var(--divider,#333)",
-      margin: "0 2px",
     });
-    filterIconRow.appendChild(iconDivider);
+    filterGroupA.appendChild(iconDivider);
+    filterIconRow.appendChild(filterGroupA);
 
-    for (const o of LIMIT_OPTIONS) filterIconRow.appendChild(makeLimitOption(o));
+    const filterGroupB = document.createElement("div");
+    Object.assign(filterGroupB.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      flexShrink: "0",
+    });
+    for (const o of LIMIT_OPTIONS) filterGroupB.appendChild(makeLimitOption(o));
+    filterIconRow.appendChild(filterGroupB);
+
     filterBox.appendChild(filterIconRow);
 
     // Repo filter config row — shown while the funnel icon is on. A custom
