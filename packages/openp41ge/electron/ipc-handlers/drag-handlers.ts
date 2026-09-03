@@ -44,6 +44,10 @@ let _dragGhost: DragGhostManager | null = null;
 // for the async capture that runs in the drag-start handler.
 let _preparedBitmap: string | null = null;
 let _preparedRect: { x: number; y: number; width: number; height: number } | null = null;
+// The in-flight capture that resolves into _preparedBitmap. Kept so drag-start
+// can AWAIT the pointer-down capture instead of starting a second capturePage
+// (which raced the first one and made the skeleton pop late / not at all).
+let _preparing: Promise<string | null> | null = null;
 
 function _startCursorPoll(): void {
   _stopCursorPoll();
@@ -149,9 +153,14 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       _preparedRect.width === Math.round(captureRect.width) &&
       _preparedRect.height === Math.round(captureRect.height);
     const preparedBitmap = dragType === "workspace" && rectMatch ? _preparedBitmap : null;
+    // The pointer-down capture may still be in flight on a fast drag. Await it
+    // rather than issuing a second capturePage, which raced the first.
+    const pendingPrepare =
+      dragType === "workspace" && rectMatch && !preparedBitmap ? _preparing : null;
     if (preparedBitmap) {
       _preparedBitmap = null;
       _preparedRect = null;
+      _preparing = null;
     }
     dragGhost.show(
       label,
@@ -214,10 +223,32 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     }
 
     // Async upgrade: capture a pixel-accurate bitmap of the source element (file
-    // row or tab button) and swap it into the ghost in-place — only if the drag is
-    // still ACTIVE (the session object identity is unchanged), otherwise the drag
-    // already ended and we must not resurrect a ghost after drag.end hid it.
-    if (
+    // row or workspace skeleton) and swap it into the ghost in-place — only if the
+    // drag is still ACTIVE (the session object identity is unchanged), otherwise
+    // the drag already ended and we must not resurrect a ghost after drag.end.
+    if (pendingPrepare) {
+      // Reuse the pointer-down capture instead of starting a second capturePage
+      // (which raced the first and made the skeleton pop late / not at all).
+      const session = _activeSession;
+      pendingPrepare.then((bm) => {
+        if (bm && _activeSession === session && !sender.isDestroyed()) {
+          dragGhost.setBitmap(
+            bm,
+            typeof tabWidth === "number"
+              ? tabWidth
+              : captureRect
+                ? Math.round(captureRect.width)
+                : 132,
+            typeof tabHeight === "number"
+              ? tabHeight
+              : captureRect
+                ? Math.round(captureRect.height)
+                : 84,
+            typeof inset === "number" ? inset : 0,
+          );
+        }
+      });
+    } else if (
       captureRect &&
       typeof captureRect.x === "number" &&
       typeof captureRect.y === "number" &&
@@ -293,14 +324,17 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     };
     _preparedRect = requestRect;
     _preparedBitmap = null;
-    void (async () => {
+    _preparing = (async () => {
       try {
         const img = await event.sender.capturePage(requestRect);
-        if (!img || img.isEmpty()) return;
-        _preparedBitmap = img.toDataURL();
+        if (!img || img.isEmpty()) return null;
+        const bm = img.toDataURL();
+        _preparedBitmap = bm;
+        return bm;
       } catch {
         _preparedBitmap = null;
         _preparedRect = null;
+        return null;
       }
     })();
   });
@@ -311,6 +345,7 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     _activeSession = null;
     _preparedBitmap = null;
     _preparedRect = null;
+    _preparing = null;
     _broadcastDragState(false, null);
   });
 
