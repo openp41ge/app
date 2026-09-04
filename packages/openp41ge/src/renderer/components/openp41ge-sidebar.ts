@@ -310,8 +310,8 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab-bar { min-height: 34px; }
           .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
           .sidebar-tab-close:hover {
-            background: rgba(255, 50, 50, 0.3);
-            color: #ff3232;
+            background: var(--bg-hover-strong, #444);
+            color: #fff;
           }
           .sidebar-tab-add:hover { background: var(--bg-hover-strong, #444); }
           /* Keep-alive hosts: one absolute full-fill container per tab. Only the

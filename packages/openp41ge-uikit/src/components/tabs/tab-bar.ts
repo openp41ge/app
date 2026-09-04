@@ -294,8 +294,8 @@ export class TabBar extends LitElement {
           transform: translateY(-1px);
         }
         .tab-close:hover {
-          background: rgba(255, 50, 50, 0.3);
-          color: #ff3232;
+          background: var(--bg-hover-strong, #444);
+          color: #fff;
         }
         .tab-pin {
           display: inline-flex;
