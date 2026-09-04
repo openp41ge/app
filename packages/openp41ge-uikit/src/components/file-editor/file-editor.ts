@@ -8,6 +8,7 @@
 
 import { LitElement, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { OverlayScrollbar } from "../scrollbar/overlay-scrollbar";
 
 import {
   EVENT_TITLE_CHANGED,
@@ -76,6 +77,11 @@ import type { IDirtyStateTracker } from "./dirty-state-tracker";
 import type { IFormatterRegistry } from "openp41ge-editor-engine/interfaces/formatter-registry";
 
 export type FileEditorState = "loading" | "ready" | "error" | "empty" | "too-large";
+
+// Width of the floating vertical OverlayScrollbar track. The custom horizontal
+// .fe-hscroll bar stops this far short of the right edge so the two bars never
+// overlap in the bottom-right corner.
+const VERTICAL_SCROLLBAR_WIDTH = 10;
 
 @customElement("file-editor")
 export class FileEditorElement extends LitElement {
@@ -213,6 +219,7 @@ export class FileEditorElement extends LitElement {
 
   private _textMateInitPromise: Promise<void> | null = null;
   private _initDone: boolean = false;
+  private _verticalScrollbar: OverlayScrollbar | null = null;
   private _charWidth: number = 0;
   private _lineHeight: number = 20;
   private _fontSize: number = 14;
@@ -516,6 +523,12 @@ export class FileEditorElement extends LitElement {
     if (track.style.display !== "") track.style.display = "";
     const left = this._gutterGroupEl ? this._gutterGroupEl.offsetWidth : 0;
     if (track.style.left !== `${left}px`) track.style.left = `${left}px`;
+    // Only stop short of the right edge when the vertical scrollbar is present.
+    // If the content fits vertically (no vertical bar), the horizontal bar can
+    // span the full content width instead of leaving a 10px dead zone.
+    const verticalVisible = vp.scrollHeight > vp.clientHeight;
+    const right = verticalVisible ? `${VERTICAL_SCROLLBAR_WIDTH}px` : "0";
+    if (track.style.right !== right) track.style.right = right;
     const trackW = track.clientWidth;
     if (trackW <= 0) return;
     const range = Math.max(1, total - view);
@@ -559,6 +572,8 @@ export class FileEditorElement extends LitElement {
     this.themeId = themeId;
     this._theme = getThemeById(themeId);
     this._applyThemeStyles();
+    // The vertical scrollbar thumb colour follows the theme (matches .fe-hscroll).
+    this._attachVerticalScrollbar();
   }
 
   /** Update line height and rebuild the rendering pipeline. */
@@ -683,20 +698,23 @@ export class FileEditorElement extends LitElement {
       /* Scrollbar styling — match the editor background */
       .fe-viewport::-webkit-scrollbar-track {
         background: var(--fe-bg);
+        box-sizing: border-box;
+        /* Faded content-facing edge on the whole scroll zone. */
+        border-left: 1px solid rgba(128,128,128,0.25);
       }
       .fe-viewport::-webkit-scrollbar-corner {
         background: var(--fe-bg);
       }
       .fe-viewport::-webkit-scrollbar-thumb {
         background: ${isLight ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.16)"};
-        border-radius: 6px;
+        border-radius: 0;
       }
       .fe-viewport::-webkit-scrollbar-thumb:hover {
         background: ${isLight ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.32)"};
       }
       .fe-viewport::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
       }
       /* The NATIVE horizontal scrollbar spans the whole row — starting UNDER
          the pinned line-number columns. It is hidden; a custom .fe-hscroll bar
@@ -707,10 +725,14 @@ export class FileEditorElement extends LitElement {
       }
       .fe-hscroll {
         background: transparent;
+        box-sizing: border-box;
+        /* Faded content-facing (top) edge on the whole scroll zone. */
+        border-top: 1px solid rgba(128,128,128,0.25);
       }
       .fe-hscroll-thumb {
         background: ${isLight ? "#c1c1c1" : "#424242"};
         opacity: 0.9;
+        border-radius: 0;
       }
       .fe-hscroll-thumb:hover {
         background: ${isLight ? "#b0b0b0" : "#555"};
@@ -889,7 +911,7 @@ export class FileEditorElement extends LitElement {
     this._hScrollTrack = document.createElement("div");
     this._hScrollTrack.className = "fe-hscroll";
     this._hScrollTrack.style.cssText =
-      "position:absolute;left:0;right:0;bottom:0;height:10px;z-index:8;display:none;user-select:none;";
+      `position:absolute;left:0;right:${VERTICAL_SCROLLBAR_WIDTH}px;bottom:0;height:10px;z-index:8;display:none;user-select:none;`;
     this._hScrollThumb = document.createElement("div");
     this._hScrollThumb.className = "fe-hscroll-thumb";
     // Square corners (match the native bar). No border-radius.
@@ -922,6 +944,11 @@ export class FileEditorElement extends LitElement {
     if (this.filePath && this.textContentModel) {
       this._initWithModel(this.textContentModel);
     }
+
+    // Floating vertical scrollbar must be attached AFTER the model is initialised
+    // (_initWithModel's _teardownPipeline destroys any prior one on rebuild, and
+    // re-running firstUpdated on reconnect re-creates the viewport).
+    this._attachVerticalScrollbar();
   }
 
   connectedCallback(): void {
@@ -1625,6 +1652,7 @@ export class FileEditorElement extends LitElement {
     this._lineWidthTracker.reset();
     this._lineWidthTracker.measureRange(1, model.lineCount);
     this._refreshContentWidth();
+    this._attachVerticalScrollbar();
 
     // Do NOT focus the textarea here. Opening a file (e.g. from the Explorer)
     // must not steal focus or place a caret — the user keeps focus where it
@@ -2648,6 +2676,41 @@ export class FileEditorElement extends LitElement {
     return { line: clampedLine, col: clampedCol };
   }
 
+  /**
+   * Attach (or re-attach) the floating vertical OverlayScrollbar to the current
+   * viewport. The native vertical scrollbar reserves an 8px layout gutter, so
+   * content never renders behind it. Replacing it with an overlay lets the
+   * scrollbar float OVER the text: content stays visible through the
+   * translucent thumb. IDEMPOTENT — destroys any existing overlay first, so it
+   * can be called on every rebuild (initial mount, reconnect, font/line-height
+   * change) and on every _initWithModel re-entry.
+   */
+  private _attachVerticalScrollbar(): void {
+    this._verticalScrollbar?.destroy();
+    this._verticalScrollbar = null;
+    const target = this._viewportEl;
+    const container = target?.parentElement;
+    if (!container || !target?.isConnected) return;
+    const isLight = this._theme.type === "light";
+    // Match the bespoke .fe-hscroll horizontal bar: a theme-aware dark/light
+    // thumb, and a thumb that fills the track content (9px inside the 10px
+    // track, leaving the faded 1px content-edge border) so the vertical bar
+    // isn't a skinny 6px thumb floating in a 10px track.
+    this._verticalScrollbar = OverlayScrollbar.attach(target, {
+      axis: "vertical",
+      container,
+      inset: { top: "0", right: "0" },
+      size: 9,
+      hoverSize: VERTICAL_SCROLLBAR_WIDTH,
+      thumbColor: isLight ? "rgba(193,193,193,0.9)" : "rgba(66,66,66,0.9)",
+      thumbHoverColor: isLight ? "rgba(176,176,176,0.9)" : "rgba(85,85,85,0.9)",
+      // Sit BELOW the custom .fe-hscroll (z-index 8) so at the bottom-right
+      // corner the horizontal bar overlays the vertical thumb rather than
+      // under it.
+      zIndex: 5,
+    });
+  }
+
   private _teardownPipeline(): void {
     this._findRenderer?.dispose();
     this._findRenderer = null;
@@ -2671,6 +2734,8 @@ export class FileEditorElement extends LitElement {
     this._textAreaInput = null;
     this._scrollManager?.dispose();
     this._scrollManager = null;
+    this._verticalScrollbar?.destroy();
+    this._verticalScrollbar = null;
     this._viewportResizeObserver?.disconnect();
     this._viewportResizeObserver = null;
     this._clipboardHandler?.dispose();

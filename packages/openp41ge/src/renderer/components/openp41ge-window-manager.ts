@@ -16,7 +16,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
 import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
-import { tooltipController } from "openp41ge-uikit";
+import { tooltipController, OverlayScrollbar } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 
@@ -97,6 +97,7 @@ export class Openp41geWindowManager extends LitElement {
   /** Suppress the following row click after a drag/swipe, so the drawer doesn't pop open. */
   private _suppressClick = false;
   private _tooltipTargets: Element[] = [];
+  private _overlayScrollbar: OverlayScrollbar | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -125,6 +126,8 @@ export class Openp41geWindowManager extends LitElement {
     this._offEndSession?.();
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
+    this._overlayScrollbar?.destroy();
+    this._overlayScrollbar = null;
   }
 
   /** Attach custom tooltips to the footer tool buttons (replaces native `title`). */
@@ -147,6 +150,21 @@ export class Openp41geWindowManager extends LitElement {
       if (!live.has(el)) tooltipController.detach(el);
     }
     this._tooltipTargets = [...live];
+
+    // Attach the custom overlay scrollbar to the workspace list once. It floats
+    // over the list (no reserved gutter) and sits below the drawer mask/drawers.
+    if (!this._overlayScrollbar) {
+      const body = this.shadowRoot?.querySelector<HTMLElement>(".wm-body");
+      const layer = this.shadowRoot?.querySelector<HTMLElement>(".wm-drawer-layer");
+      if (body && layer) {
+        this._overlayScrollbar = OverlayScrollbar.attach(body, {
+          axis: "vertical",
+          container: layer,
+          inset: { top: "44px" },
+          zIndex: 0,
+        });
+      }
+    }
   }
 
   /**

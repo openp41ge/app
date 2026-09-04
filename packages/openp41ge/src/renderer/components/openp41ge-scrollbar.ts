@@ -54,13 +54,13 @@ function injectStyles(): void {
   const s = document.createElement("style");
   s.id = id;
   s.textContent = [
-    "::-webkit-scrollbar { width: 6px; height: 6px; }",
-    "::-webkit-scrollbar-track { background: transparent; }",
-    "::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 6px; min-height: 28px; }",
-    "::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.38); }",
-    "::-webkit-scrollbar-thumb:active { background: rgba(255,255,255,0.5); }",
+    "::-webkit-scrollbar { width: 8px; height: 8px; }",
+    "::-webkit-scrollbar-track { background: transparent; box-sizing: border-box; }",
+    "::-webkit-scrollbar-track:vertical { border-left: 1px solid rgba(128,128,128,0.25); }",
+    "::-webkit-scrollbar-track:horizontal { border-top: 1px solid rgba(128,128,128,0.25); }",
+    "::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16); border-radius: 0; min-height: 28px; }",
+    "::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.34); }",
     "::-webkit-scrollbar-corner { background: transparent; }",
-    "* { scrollbar-width: thin; }",
   ].join("\n");
   document.head.appendChild(s);
 }
