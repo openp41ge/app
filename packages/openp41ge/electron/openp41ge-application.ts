@@ -406,6 +406,16 @@ export class Openp41geApplication {
         ],
       },
       {
+        label: "File",
+        submenu: [
+          {
+            label: "Quit",
+            accelerator: "CmdOrCtrl+Q",
+            click: () => promptQuit(BrowserWindow.getFocusedWindow() ?? undefined),
+          },
+        ],
+      },
+      {
         label: "Edit",
         submenu: [
           { role: "undo" },
@@ -415,16 +425,6 @@ export class Openp41geApplication {
           { role: "copy" },
           { role: "paste" },
           { role: "selectAll" },
-        ],
-      },
-      {
-        label: "File",
-        submenu: [
-          {
-            label: "Quit",
-            accelerator: "CmdOrCtrl+Q",
-            click: () => promptQuit(BrowserWindow.getFocusedWindow() ?? undefined),
-          },
         ],
       },
       {
@@ -473,10 +473,23 @@ export class Openp41geApplication {
       },
     ];
 
-    // Window menu — includes dev items (Reload, Devtools) only in dev mode
+    // Window menu — includes dev items (Reload, Devtools) only in dev mode.
+    // "Add Workspace Window" is pinned at the TOP of this menu with a separator
+    // below it. It binds the new window to the focused window's workspace — the
+    // Window Manager has no workspace to add a window to, so it (and its
+    // separator) are omitted there.
     template.push({
       label: "Window",
       submenu: [
+        ...(isWindowManager
+          ? []
+          : [
+              {
+                label: "Add Workspace Window",
+                click: () => this._addWorkspaceWindow(),
+              },
+              { type: "separator" as const },
+            ]),
         ...(!app.isPackaged
           ? [
               {
@@ -498,18 +511,6 @@ export class Openp41geApplication {
           : []),
         { role: "minimize" as const },
         { role: "close" as const },
-        // "Add Workspace Window" binds the new window to the focused window's
-        // workspace — the Window Manager has no workspace to add a window to,
-        // so omit it there.
-        ...(isWindowManager
-          ? []
-          : [
-              { type: "separator" as const },
-              {
-                label: "Add Workspace Window",
-                click: () => this._addWorkspaceWindow(),
-              },
-            ]),
       ],
     });
 
