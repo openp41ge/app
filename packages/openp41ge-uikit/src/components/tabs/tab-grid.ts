@@ -775,7 +775,11 @@ export class TabGrid extends LitElement {
           margin-right: -3px;
           cursor: col-resize;
           position: relative;
-          z-index: 6;
+          /* Paint above all cell content (gutter group, cursor blink, drop
+             indicator, etc. use z-index ≤ 100) so the drag bar and its blue
+             indicator are never drawn under a neighbouring cell — and the
+             whole 5px strip stays grabbable/visible. */
+          z-index: 1000;
         }
         .grid-resize-handle::before {
           content: "";
