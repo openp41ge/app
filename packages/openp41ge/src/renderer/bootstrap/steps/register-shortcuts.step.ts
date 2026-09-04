@@ -154,11 +154,11 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "View",
     });
 
-    // Cmd+Shift+G opens History in the right sidebar
+    // Cmd+Shift+H opens History in the right sidebar
     km.register({
       modifiers: 12,
-      key: "g",
-      code: "KeyG",
+      key: "h",
+      code: "KeyH",
       handler: () => {
         try {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
