@@ -59,12 +59,21 @@ sizes. Define one scrollbar style and build a reusable helper so all elements an
 all window types match: float over content, partially transparent, thin, and
 animate thicker on hover/use with a spring.
 
-**Approach** — build a shared scrollbar helper (e.g. in `openp41ge-uikit` +
-`openp41ge-constants`) exposing a CSS class/variable set, then apply it across the
-file editor, sidebars, grid, and any other scrolled surfaces. The helper provides
-`::-webkit-scrollbar` styled thin + transparent, plus a `:hover`/`:active` thicker
-state with a spring-like transition. Consolidate the existing divergent
-`scrollbar` declarations.
+**Approach** — build a reusable overlay scrollbar component in `openp41ge-uikit`
+(`components/scrollbar/overlay-scrollbar.ts`) that hides the native scrollbar and
+draws its own track+thumb (floating over content), and a global native-restyle
+module (`components/scrollbar/global-scrollbar-styles.ts`) so any remaining native
+scrollbars match: **square corners**, thin translucent thumb, **faded/transparent
+left side border (vertical) / top border (horizontal)**, and a spring thicken on
+hover/use. Apply the overlay component to the primary scroll surfaces (worktree
+tree, pane picker, workspace-manager list, file editor vertical + horizontal) and
+restyle the file editor's custom horizontal bar + adjust its `virtual-scroll`
+gutter accounting for the overlay bars. Install the global styles at bootstrap so
+all native scrollbars across every window type look consistent.
+
+**UX** — same visual language everywhere: thin translucent thumbs that thicken
+automatically on hover/drag; no reserved gutter (bars float over content); square
+corners; a subtle faded inner border on the content-facing edge.
 
 ## 7. History search config wraps by separator groups
 
@@ -92,12 +101,24 @@ divider gaps) so whole groups move to the next line instead of only the last ico
       on hover; grid-tab close has more left spacing (`margin-left: 7px`).
       (`tab-bar.ts`, `openp41ge-sidebar.ts`.)
 - [x] 5 — drag bars between grid cells resize them, respecting a 200px min
-      width. (`tab-grid.ts` `_cellWidths` + per-cell resize handles.)
-- [~] 6 — scrollbar styling unified (thin 6px, translucent, hover-thicken) in
-      `Openp41geScrollbar` + aligned the file editor. **Not fully done**: a
-      custom spring-animated overlay (float-over-content) scrollbar across every
-      window type is a larger component build and was not implemented or
-      live-verified. Flagged as partial.
+      width. (`tab-grid.ts` `_cellWidths` + per-cell resize handles.) The drag
+      bar + blue indicator now paint above the neighbouring cell's content
+      (handle `z-index: 1000`) so it's fully grabbable/visible.
+- [x] 6 — **Reusable overlay scrollbar + consistent look built.** New
+      `OverlayScrollbar` in `openp41ge-uikit` (square corners, faded left/top
+      border, spring thicken, floats over content) + geometry unit tests; a
+      global scrollbar restyle (square corners + faded per-axis border) installed
+      at bootstrap covers every native scrollbar; aligned `Openp41geScrollbar` and
+      the file editor; applied `OverlayScrollbar` to the workspace-manager list
+      and to the file editor's **vertical** bar, and made the editor's vertical +
+      horizontal bars consistent (same theme-aware thumb colour + thumb width, no
+      bottom-right corner overlap, and the horizontal bar spans full width when
+      there's no vertical bar).
+      **Deliberate deferrals**: the worktree tree keeps its bespoke overlay (no
+      visual gain in converting) and the pane picker uses the global restyled
+      native bar.
 - [x] 7 — history search config wraps by separator groups.
       (`commit-search-system-tab.ts` groups + test updated.)
-- [x] typecheck + lint + tests green. Not live-verified in the running app.
+- [x] typecheck + lint + tests green. The scrollbar + drag-bar changes were
+      live-verified in the running app (file editor vertical/horizontal bars,
+      the bottom-right corner, and the grid resize handle being on top).
