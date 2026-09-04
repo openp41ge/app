@@ -4,6 +4,11 @@ export { Openp41geInlineIcon } from "./components/openp41ge-inline-icon";
 export { FileExtensionSvg } from "./components/file-extension-svg";
 export { iconRegistry } from "./icons";
 
+// ─── Scrollbar ──────────────────────────────────────────────────────────
+export { OverlayScrollbar, computeThumbLength, computeThumbPosition } from "./components/scrollbar/overlay-scrollbar";
+export type { ScrollbarAxis, OverlayScrollbarOptions } from "./components/scrollbar/overlay-scrollbar";
+export { installGlobalScrollbarStyles } from "./components/scrollbar/global-scrollbar-styles";
+
 // Re-export the inline tailwind CSS for component static styles
 export { tailwindCSS } from "./generated/tailwind";
 

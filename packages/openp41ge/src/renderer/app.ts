@@ -34,6 +34,7 @@ import { isDebugSeed } from "./components/debug-log-panel";
 
 // Import openp41ge-uikit (registers <tab-grid>, <tab-bar>, <tab-content>, etc.)
 import "openp41ge-uikit";
+import { installGlobalScrollbarStyles } from "openp41ge-uikit";
 
 // ─── Theme CSS variables (bundled by Vite) ────────────────────────────────
 import "../styles/themes.css";
@@ -223,6 +224,9 @@ export const renderer = {
 
     // Inject global Tailwind utility classes before any UI renders
     injectGlobalTailwind();
+
+    // Install consistent global scrollbar styles before any UI renders
+    installGlobalScrollbarStyles();
 
     // Start the bootstrap (returns a promise, but we don't await it)
     // The UI renders synchronously in the first phase of start()
