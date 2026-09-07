@@ -2,7 +2,7 @@
  * Tests for <openp41ge-agent-settings>.
  *
  * Verifies the Providers card, the slide-in provider drawer, preset pickers,
- * add/edit/delete flows, and the default-provider radio.
+ * add/edit/delete flows, and the default-provider select.
  */
 // @ts-nocheck
 import { describe, test, expect, beforeEach, vi } from "vitest";
@@ -77,7 +77,9 @@ describe("openp41ge-agent-settings", () => {
     expect(row.querySelector(".ags-provider-meta").textContent).toContain(
       "Qwen2.5-Coder-7B-Instruct",
     );
-    expect(row.querySelector(".ags-badge").textContent).toBe("Default");
+    // No per-row selection control; the default is chosen with the second card's select.
+    expect(row.querySelector(".ags-provider-radio")).toBeNull();
+    expect(q(el, ".ags-default-select").value).toBe("vllm");
   });
 
   test("empty provider list shows no rows and a prominent add row", async () => {
@@ -176,13 +178,14 @@ describe("openp41ge-agent-settings", () => {
     expect(lastSet.value.providerId).toBe("vllm");
   });
 
-  test("the default-provider radio persists providerId", async () => {
+  test("the default-provider select persists providerId", async () => {
     const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
-    const radios = qa(el, ".ags-provider-radio");
-    expect(radios).toHaveLength(2);
-    expect(radios[0].checked).toBe(true);
-    radios[1].checked = true;
-    radios[1].dispatchEvent(new Event("change", { bubbles: true }));
+    const select = q(el, ".ags-default-select");
+    expect(select).not.toBeNull();
+    expect([...select.options].map((o) => o.value)).toEqual(["vllm", "openai"]);
+    expect(select.value).toBe("vllm");
+    select.value = "openai";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
 
     const lastSet = el.configService.sets[el.configService.sets.length - 1];

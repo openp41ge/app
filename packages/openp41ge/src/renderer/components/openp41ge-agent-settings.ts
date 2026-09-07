@@ -463,13 +463,6 @@ export class Openp41geAgentSettings extends LitElement {
         .ags-provider-row:hover {
           background: var(--bg-active, #37373d);
         }
-        .ags-provider-radio {
-          width: 14px;
-          height: 14px;
-          flex-shrink: 0;
-          accent-color: var(--accent, #569cd6);
-          cursor: pointer;
-        }
         .ags-provider-info {
           flex: 1;
           min-width: 0;
@@ -491,15 +484,6 @@ export class Openp41geAgentSettings extends LitElement {
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .ags-badge {
-          flex-shrink: 0;
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--accent, #569cd6);
-          background: rgba(86, 156, 214, 0.15);
-          border-radius: 999px;
-          padding: 2px 8px;
-        }
         .ags-chevron {
           flex-shrink: 0;
           color: var(--accent, #569cd6);
@@ -514,6 +498,26 @@ export class Openp41geAgentSettings extends LitElement {
         .ags-empty {
           padding: 10px;
           color: var(--text-secondary, #999);
+        }
+        .ags-default-select {
+          width: 100%;
+          height: 32px;
+          padding: 0 8px;
+          box-sizing: border-box;
+          font-size: 13px;
+          color: var(--text-primary, #ddd);
+          background: transparent;
+          border: none;
+          outline: none;
+          font-family: inherit;
+          cursor: pointer;
+        }
+        .ags-default-select:focus,
+        .ags-default-select:focus-visible {
+          outline: none;
+        }
+        .ags-default-select:hover {
+          background: rgba(255, 255, 255, 0.05);
         }
 
         /* Mask over the base while a drawer is open. */
@@ -776,7 +780,7 @@ export class Openp41geAgentSettings extends LitElement {
         <div class="ags-drawer-layer">
           <div class="ags-base">
             <div class="ags-pane">
-              <p class="ags-section-title">Agents</p>
+              <p class="ags-section-title">Providers</p>
               <div class="ags-card">
                 <label class="ags-card-question">
                   Which providers should be available for chats?
@@ -798,8 +802,34 @@ export class Openp41geAgentSettings extends LitElement {
                           </li>
                         </ul>
                         <p class="ags-card-help">
-                          Chats use the provider marked Default. Click a provider to edit how it
-                          connects, or add another — including local OpenAI-compatible servers.
+                          Define the providers your chats can use — including local
+                          OpenAI-compatible servers. Click a provider to edit how it connects.
+                        </p>
+                      `
+                }
+              </div>
+
+              <div class="ags-card ags-card-gap">
+                <label class="ags-card-question">Which provider is the default?</label>
+                ${
+                  this._loading || entries.length === 0
+                    ? html`<p class="ags-card-help">Add a provider above to set a default.</p>`
+                    : html`
+                        <select
+                          class="ags-default-select"
+                          .value=${this._config?.providerId ?? ""}
+                          @change=${(e: Event) =>
+                            this._setActive((e.target as HTMLSelectElement).value)}
+                        >
+                          ${entries.map(
+                            ([id, p]) =>
+                              html`<option value=${id}>
+                                ${providerDisplayName(presetFor(p), p)}
+                              </option>`,
+                          )}
+                        </select>
+                        <p class="ags-card-help">
+                          Chats use the default provider whenever you don't pick another.
                         </p>
                       `
                 }
@@ -825,31 +855,20 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _providerRow(id: string, p: ProviderConfig): TemplateResult {
-    const config = this._config;
     const preset = presetFor(p);
     const name = providerDisplayName(preset, p);
-    const isActive = config?.providerId === id;
     const metaParts: string[] = [];
     if (p.model) metaParts.push(p.model);
     const host = endpointHost(p.baseUrl);
     if (host) metaParts.push(host);
     return html`
       <li class="ags-provider-row" @click=${() => this._openEdit(id)}>
-        <input
-          type="radio"
-          class="ags-provider-radio"
-          name="ags-default-provider"
-          .checked=${isActive}
-          @click=${(e: Event) => e.stopPropagation()}
-          @change=${() => this._setActive(id)}
-        />
         <div class="ags-provider-info">
           <span class="ags-provider-name">${name}</span>
           <span class="ags-provider-meta">
             ${metaParts.length ? metaParts.join(" · ") : "No endpoint configured"}
           </span>
         </div>
-        ${isActive ? html`<span class="ags-badge">Default</span>` : nothing}
         <svg
           class="ags-chevron"
           width="14"
