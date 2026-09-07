@@ -3,7 +3,7 @@
  *
  * Usage:
  *   import { createLogger } from "openp41ge-logger";
- *   const log = createLogger("my-module");
+ *   const log = createLogger("my-plugin", "my-module");
  *   log.error("Something went wrong:", err);
  *
  * Every call writes a structured entry to the global log bus (log-buffer.ts),
@@ -25,6 +25,7 @@
 
 import { LogLevel, pushLog } from "./log-buffer";
 import { installConsoleTransport } from "./console-transport";
+import { registerLogStream } from "./log-streams";
 
 export interface ILogger {
   debug(...args: unknown[]): void;
@@ -51,7 +52,11 @@ function isDataCandidate(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * Create a named logger instance.
+ * Create a named logger instance within a system.
+ *
+ * `system` is the plugin id (or internal subsystem id) the logger belongs to;
+ * `name` is the stream name. Logs are organised by system, and a logger must
+ * declare both — there is no implicit default system.
  *
  * Each call writes to:
  *   1. The global log bus (in-memory buffer + transports: log viewer,
@@ -59,7 +64,13 @@ function isDataCandidate(v: unknown): v is Record<string, unknown> {
  *   2. The browser/Node console, replayed by the console transport with the
  *      original arguments so source-mapped stacks are preserved.
  */
-export function createLogger(name: string): ILogger {
+export function createLogger(system: string, name: string): ILogger {
+  // Force both a system and a stream name: the Logs sidebar lists streams
+  // that have actually logged, so a nameless logger is a programming error.
+  if (!system || !system.trim() || !name || !name.trim()) {
+    throw new TypeError("createLogger requires a non-empty system and stream name");
+  }
+
   function emit(level: LogLevel, ...args: unknown[]): void {
     let data: Record<string, unknown> | undefined;
     if (args.length >= 2 && isDataCandidate(args[args.length - 1])) {
@@ -68,7 +79,15 @@ export function createLogger(name: string): ILogger {
     // Pass the full original args so the console replay preserves the exact
     // developer call (including the data object); the detached `data` payload
     // stays queryable / persisted separately.
-    pushLog(level, name, args, data);
+    //
+    // Register the stream only when an entry is actually stored: the Logs
+    // sidebar lists streams that have produced logs, not every declared
+    // namespace. A DEBUG entry dropped by the capture threshold never runs
+    // this, so it won't surface a stream with zero entries.
+    const entry = pushLog(level, system, name, args, data);
+    if (entry) {
+      registerLogStream(system, name);
+    }
   }
 
   return {

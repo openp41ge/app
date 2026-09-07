@@ -3,7 +3,7 @@
  *
  * Merges setup logic from:
  * - packages/openp41ge-file-editor/test/unit/setup.ts
- * - packages/openp41ge-agent-chat/test/unit/setup.ts
+ * - packages/openp41ge-agents/test/unit/setup.ts
  * - packages/openp41ge-logger/test/unit/setup.ts
  * - packages/openp41ge-terminal/test/unit/setup.ts
  */

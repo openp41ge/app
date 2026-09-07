@@ -66,14 +66,14 @@ describe("getLogBuffer()", () => {
   });
 
   it("returns a snapshot that reflects pushed entries", () => {
-    pushLog(LogLevel.INFO, "test", ["hello"]);
+    pushLog(LogLevel.INFO, "test", "test", ["hello"]);
     expect(getLogBuffer()).toHaveLength(1);
   });
 
   it("the returned array is a different reference from the internal buffer", () => {
-    pushLog(LogLevel.INFO, "test", ["a"]);
+    pushLog(LogLevel.INFO, "test", "test", ["a"]);
     const snapshot = getLogBuffer();
-    pushLog(LogLevel.INFO, "test", ["b"]);
+    pushLog(LogLevel.INFO, "test", "test", ["b"]);
     // The old snapshot should be unchanged
     expect(snapshot).toHaveLength(1);
   });
@@ -81,7 +81,7 @@ describe("getLogBuffer()", () => {
 
 describe("pushLog()", () => {
   it("creates an entry with the correct structure", () => {
-    pushLog(LogLevel.WARN, "my-module", ["something went wrong"]);
+    pushLog(LogLevel.WARN, "test", "my-module", ["something went wrong"]);
 
     const entries = getLogBuffer();
     expect(entries).toHaveLength(1);
@@ -98,23 +98,26 @@ describe("pushLog()", () => {
   });
 
   it("accepts a plain string message", () => {
-    pushLog(LogLevel.INFO, "str-module", "a plain string");
+    pushLog(LogLevel.INFO, "test", "str-module", "a plain string");
     const entry = getLogBuffer()[0];
     expect(entry.message).toBe("a plain string");
     expect(entry.text).toBe("a plain string");
   });
 
   it("detaches a structured data payload when provided", () => {
-    pushLog(LogLevel.INFO, "data-module", "something happened", { x: 1, label: "ghost-update" });
+    pushLog(LogLevel.INFO, "test", "data-module", "something happened", {
+      x: 1,
+      label: "ghost-update",
+    });
     const entry = getLogBuffer()[0];
     expect(entry.data).toEqual({ x: 1, label: "ghost-update" });
     expect(entry.message).toBe("something happened");
   });
 
   it("increments ids sequentially", () => {
-    pushLog(LogLevel.INFO, "a", ["first"]);
-    pushLog(LogLevel.INFO, "a", ["second"]);
-    pushLog(LogLevel.INFO, "a", ["third"]);
+    pushLog(LogLevel.INFO, "test", "a", ["first"]);
+    pushLog(LogLevel.INFO, "test", "a", ["second"]);
+    pushLog(LogLevel.INFO, "test", "a", ["third"]);
 
     const entries = getLogBuffer();
     expect(entries[1].id).toBe(entries[0].id + 1);
@@ -123,7 +126,7 @@ describe("pushLog()", () => {
 
   it("records a timestamp close to now", () => {
     const before = Date.now();
-    pushLog(LogLevel.INFO, "t", ["ts"]);
+    pushLog(LogLevel.INFO, "test", "t", ["ts"]);
     const after = Date.now();
 
     const entry = getLogBuffer()[0];
@@ -132,13 +135,13 @@ describe("pushLog()", () => {
   });
 
   it("joins multiple args with space", () => {
-    pushLog(LogLevel.INFO, "test", ["hello", "world", 42]);
+    pushLog(LogLevel.INFO, "test", "test", ["hello", "world", 42]);
     expect(getLogBuffer()[0].text).toBe("hello world 42");
   });
 
   it("stringifies objects via JSON.stringify", () => {
     const obj = { foo: "bar", num: 1 };
-    pushLog(LogLevel.INFO, "test", ["data:", obj]);
+    pushLog(LogLevel.INFO, "test", "test", ["data:", obj]);
     expect(getLogBuffer()[0].text).toBe('data: {"foo":"bar","num":1}');
   });
 
@@ -149,7 +152,7 @@ describe("pushLog()", () => {
     b.ref = a;
 
     // Should not throw
-    pushLog(LogLevel.INFO, "test", [a]);
+    pushLog(LogLevel.INFO, "test", "test", [a]);
     const text = getLogBuffer()[0].text;
     // The fallback String() representation will be "[object Object]"
     expect(text).toBe("[object Object]");
@@ -159,7 +162,7 @@ describe("pushLog()", () => {
     const listener = vi.fn();
     subscribeLogs(listener);
 
-    pushLog(LogLevel.INFO, "test", ["notify"]);
+    pushLog(LogLevel.INFO, "test", "test", ["notify"]);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener.mock.calls[0][0]).toMatchObject({ level: LogLevel.INFO, source: "test" });
   });
@@ -168,7 +171,7 @@ describe("pushLog()", () => {
     const listener = vi.fn();
     subscribeLogs(listener);
 
-    pushLog(LogLevel.INFO, "test", ["a"]);
+    pushLog(LogLevel.INFO, "test", "test", ["a"]);
     clearLogBuffer();
     expect(listener).toHaveBeenLastCalledWith(null);
   });
@@ -184,7 +187,7 @@ describe("pushLog()", () => {
 
     // Should not throw despite the failing listener
     expect(() => {
-      pushLog(LogLevel.INFO, "test", ["error handling"]);
+      pushLog(LogLevel.INFO, "test", "test", ["error handling"]);
     }).not.toThrow();
 
     expect(goodListener).toHaveBeenCalledTimes(1);
@@ -195,7 +198,7 @@ describe("pushLog()", () => {
     const unsub = subscribeLogs(listener);
     unsub();
 
-    pushLog(LogLevel.INFO, "test", ["no notify"]);
+    pushLog(LogLevel.INFO, "test", "test", ["no notify"]);
     expect(listener).not.toHaveBeenCalled();
   });
 });
@@ -205,21 +208,21 @@ describe("pushLog()", () => {
 describe("capture levels (setMinLevel / getMinLevel)", () => {
   it("defaults to INFO capture (DEBUG dropped)", () => {
     expect(getMinLevel()).toBe(LogLevel.INFO);
-    const pushed = pushLog(LogLevel.DEBUG, "dbg", ["should be dropped"]);
+    const pushed = pushLog(LogLevel.DEBUG, "test", "dbg", ["should be dropped"]);
     expect(pushed).toBeNull();
     expect(entryCount()).toBe(0);
   });
 
   it("captures INFO/WARN/ERROR automatically", () => {
-    pushLog(LogLevel.INFO, "a", ["i"]);
-    pushLog(LogLevel.WARN, "a", ["w"]);
-    pushLog(LogLevel.ERROR, "a", ["e"]);
+    pushLog(LogLevel.INFO, "test", "a", ["i"]);
+    pushLog(LogLevel.WARN, "test", "a", ["w"]);
+    pushLog(LogLevel.ERROR, "test", "a", ["e"]);
     expect(entryCount()).toBe(3);
   });
 
   it("captures DEBUG when the debug session is enabled", () => {
     setMinLevel(LogLevel.DEBUG);
-    const pushed = pushLog(LogLevel.DEBUG, "dbg", ["captured"]);
+    const pushed = pushLog(LogLevel.DEBUG, "test", "dbg", ["captured"]);
     expect(pushed).not.toBeNull();
     expect(entryCount()).toBe(1);
   });
@@ -227,7 +230,7 @@ describe("capture levels (setMinLevel / getMinLevel)", () => {
   it("does not notify listeners for dropped entries", () => {
     const listener = vi.fn();
     subscribeLogs(listener);
-    pushLog(LogLevel.DEBUG, "dbg", ["dropped"]);
+    pushLog(LogLevel.DEBUG, "test", "dbg", ["dropped"]);
     expect(listener).not.toHaveBeenCalled();
   });
 });
@@ -238,53 +241,53 @@ describe("queryLog()", () => {
   });
 
   it("returns all entries with no filter", () => {
-    pushLog(LogLevel.INFO, "a", ["1"]);
-    pushLog(LogLevel.WARN, "a", ["2"]);
+    pushLog(LogLevel.INFO, "test", "a", ["1"]);
+    pushLog(LogLevel.WARN, "test", "a", ["2"]);
     expect(queryLog()).toHaveLength(2);
   });
 
   it("filters by source", () => {
-    pushLog(LogLevel.INFO, "alpha", ["1"]);
-    pushLog(LogLevel.INFO, "beta", ["2"]);
+    pushLog(LogLevel.INFO, "test", "alpha", ["1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["2"]);
     const result = queryLog({ source: "alpha" });
     expect(result).toHaveLength(1);
     expect(result[0].source).toBe("alpha");
   });
 
   it("filters by source set", () => {
-    pushLog(LogLevel.INFO, "alpha", ["1"]);
-    pushLog(LogLevel.INFO, "beta", ["2"]);
-    pushLog(LogLevel.INFO, "gamma", ["3"]);
+    pushLog(LogLevel.INFO, "test", "alpha", ["1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["2"]);
+    pushLog(LogLevel.INFO, "test", "gamma", ["3"]);
     expect(queryLog({ source: ["alpha", "gamma"] })).toHaveLength(2);
   });
 
   it("filters by minimum level", () => {
-    pushLog(LogLevel.INFO, "a", ["i"]);
-    pushLog(LogLevel.WARN, "a", ["w"]);
-    pushLog(LogLevel.ERROR, "a", ["e"]);
+    pushLog(LogLevel.INFO, "test", "a", ["i"]);
+    pushLog(LogLevel.WARN, "test", "a", ["w"]);
+    pushLog(LogLevel.ERROR, "test", "a", ["e"]);
     const result = queryLog({ minLevel: LogLevel.WARN });
     expect(result).toHaveLength(2);
     expect(result.map((e) => e.level)).toEqual([LogLevel.WARN, LogLevel.ERROR]);
   });
 
   it("filters by maximum level", () => {
-    pushLog(LogLevel.INFO, "a", ["i"]);
-    pushLog(LogLevel.WARN, "a", ["w"]);
+    pushLog(LogLevel.INFO, "test", "a", ["i"]);
+    pushLog(LogLevel.WARN, "test", "a", ["w"]);
     const result = queryLog({ maxLevel: LogLevel.INFO });
     expect(result).toHaveLength(1);
     expect(result[0].level).toBe(LogLevel.INFO);
   });
 
   it("filters by search across source and message", () => {
-    pushLog(LogLevel.INFO, "drag", ["ghost-update"]);
-    pushLog(LogLevel.INFO, "drag", ["mousemove"]);
-    pushLog(LogLevel.INFO, "other", ["ghost-update"]);
+    pushLog(LogLevel.INFO, "test", "drag", ["ghost-update"]);
+    pushLog(LogLevel.INFO, "test", "drag", ["mousemove"]);
+    pushLog(LogLevel.INFO, "test", "other", ["ghost-update"]);
     const result = queryLog({ search: "ghost" });
     expect(result).toHaveLength(2);
   });
 
   it("filters by process", () => {
-    pushLog(LogLevel.INFO, "a", ["1"]);
+    pushLog(LogLevel.INFO, "test", "a", ["1"]);
     const result = queryLog({ process: "renderer" });
     // jsdom counts as "renderer"
     expect(result).toHaveLength(1);
@@ -292,9 +295,9 @@ describe("queryLog()", () => {
   });
 
   it("caps to the most recent matches with limit", () => {
-    pushLog(LogLevel.INFO, "a", ["1"]);
-    pushLog(LogLevel.INFO, "a", ["2"]);
-    pushLog(LogLevel.INFO, "a", ["3"]);
+    pushLog(LogLevel.INFO, "test", "a", ["1"]);
+    pushLog(LogLevel.INFO, "test", "a", ["2"]);
+    pushLog(LogLevel.INFO, "test", "a", ["3"]);
     const result = queryLog({ limit: 2 });
     expect(result).toHaveLength(2);
     expect(result[0].text).toBe("2");
@@ -303,9 +306,9 @@ describe("queryLog()", () => {
 
   it("filters by since timestamp", () => {
     const spy = vi.spyOn(Date, "now").mockReturnValue(1000);
-    pushLog(LogLevel.INFO, "a", ["old"]);
+    pushLog(LogLevel.INFO, "test", "a", ["old"]);
     spy.mockReturnValue(2000);
-    pushLog(LogLevel.INFO, "a", ["recent"]);
+    pushLog(LogLevel.INFO, "test", "a", ["recent"]);
     spy.mockRestore();
     const result = queryLog({ since: 1500 });
     expect(result).toHaveLength(1);
@@ -318,7 +321,7 @@ describe("buffer capacity (MAX_LOG_ENTRIES)", () => {
     setMinLevel(LogLevel.DEBUG);
     // Push 10_050 entries for one name
     for (let i = 0; i < 10_050; i++) {
-      pushLog(LogLevel.DEBUG, "spam", [`entry ${i}`]);
+      pushLog(LogLevel.DEBUG, "test", "spam", [`entry ${i}`]);
     }
 
     const entries = getLogBuffer();
@@ -334,8 +337,8 @@ describe("buffer capacity (MAX_LOG_ENTRIES)", () => {
 
 describe("clearLogBuffer()", () => {
   it("removes all entries", () => {
-    pushLog(LogLevel.INFO, "a", ["x"]);
-    pushLog(LogLevel.INFO, "a", ["y"]);
+    pushLog(LogLevel.INFO, "test", "a", ["x"]);
+    pushLog(LogLevel.INFO, "test", "a", ["y"]);
     expect(entryCount()).toBe(2);
 
     clearLogBuffer();
@@ -343,7 +346,7 @@ describe("clearLogBuffer()", () => {
   });
 
   it("notifies listeners after clearing", () => {
-    pushLog(LogLevel.INFO, "a", ["x"]);
+    pushLog(LogLevel.INFO, "test", "a", ["x"]);
     const listener = vi.fn();
     subscribeLogs(listener);
 
@@ -352,7 +355,7 @@ describe("clearLogBuffer()", () => {
   });
 
   it("handles listener errors during clear notification", () => {
-    pushLog(LogLevel.INFO, "a", ["x"]);
+    pushLog(LogLevel.INFO, "test", "a", ["x"]);
     subscribeLogs(() => {
       throw new Error("clear error");
     });
@@ -374,7 +377,7 @@ describe("subscribeLogs()", () => {
     unsub();
     unsub(); // should not throw
 
-    pushLog(LogLevel.INFO, "test", ["after double unsub"]);
+    pushLog(LogLevel.INFO, "test", "test", ["after double unsub"]);
     expect(listener).not.toHaveBeenCalled();
   });
 
@@ -384,7 +387,7 @@ describe("subscribeLogs()", () => {
     subscribeLogs(a);
     subscribeLogs(b);
 
-    pushLog(LogLevel.INFO, "test", ["multi"]);
+    pushLog(LogLevel.INFO, "test", "test", ["multi"]);
     expect(a).toHaveBeenCalledTimes(1);
     expect(b).toHaveBeenCalledTimes(1);
   });

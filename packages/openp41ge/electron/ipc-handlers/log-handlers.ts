@@ -10,7 +10,7 @@
 
 import { ipcMain, type IpcMainEvent } from "electron";
 import { LogLevel, setMinLevel, subscribeLogs } from "openp41ge-logger";
-import type { LogFileStore } from "../../src/main/services/log-file-store.js";
+import type { LogFileStore, LogBackCursor } from "../../src/main/services/log-file-store.js";
 import type { StoredLogEntry } from "openp41ge-logger";
 
 export function registerLogHandlers(logStore: LogFileStore): void {
@@ -43,7 +43,15 @@ export function registerLogHandlers(logStore: LogFileStore): void {
   });
 
   ipcMain.handle("log:path", () => {
-    return { logsDir: logStore.logsDir };
+    // Advertise which log features this main process supports. Older main
+    // processes (started before log:read-backward) omit `capabilities`, which
+    // lets the renderer's LogFilePageReader detect the staleness probe safely
+    // and fall back to the in-memory bus instead of calling a missing IPC
+    // that would flood the error overlay.
+    return {
+      logsDir: logStore.logsDir,
+      capabilities: { readBackward: true },
+    };
   });
 
   ipcMain.handle("log:files", () => {
@@ -51,6 +59,18 @@ export function registerLogHandlers(logStore: LogFileStore): void {
       return logStore.listFiles();
     } catch {
       return [];
+    }
+  });
+
+  ipcMain.handle("log:read-backward", (_event, payload: unknown) => {
+    try {
+      const { cursor, limit } = (payload ?? {}) as {
+        cursor?: LogBackCursor | null;
+        limit?: number;
+      };
+      return logStore.readLogsBackward(cursor ?? null, limit ?? 200);
+    } catch {
+      return { entries: [], hasOlder: false, cursor: null, nextDay: null };
     }
   });
 }

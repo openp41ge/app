@@ -14,7 +14,7 @@ import { IpcShellConnector } from "../shell/ipc-shell-connector";
 import { BUILT_IN_THEMES } from "../themes";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("openp41ge-terminal");
+const log = createLogger("openp41ge-terminal", "openp41ge-terminal");
 
 export type TerminalDataHandler = (data: string) => void;
 

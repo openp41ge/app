@@ -21,7 +21,7 @@ import {
   type StoredLogEntry,
 } from "openp41ge-logger";
 
-const log = createLogger("LogFileStore");
+const log = createLogger("openp41ge", "LogFileStore");
 
 export interface LogFileInfo {
   name: string;
@@ -33,11 +33,35 @@ export interface PersistedLogEntry {
   timestamp: number;
   level: LogLevel;
   levelLabel: string;
+  system: string;
   source: string;
   message: string;
   data?: Record<string, unknown>;
   process: "main" | "renderer";
   winId?: string;
+}
+
+/** Cursor for backward paging through the daily log files. */
+export interface LogBackCursor {
+  /** Index into `listFiles()` (0 = newest file). */
+  fileIndex: number;
+  /** Raw lines already served from that file's bottom. */
+  lineCount: number;
+}
+
+export interface LogBackPage {
+  /** Entries in this window, oldest → newest. */
+  entries: PersistedLogEntry[];
+  /** True if more (older) entries are available **within the current file**. */
+  hasOlder: boolean;
+  /** Cursor to continue older within the current file; `null` when none. */
+  cursor: LogBackCursor | null;
+  /**
+   * Set when `hasOlder` is false and an **older day** exists: the reader must
+   * not silently cross the day boundary. Load it only after explicit
+   * confirmation (the viewer renders a "Load yesterday's logs" row).
+   */
+  nextDay?: { cursor: LogBackCursor; label: string } | null;
 }
 
 const LIVE_FILE = "openp41ge.log";
@@ -111,6 +135,7 @@ export class LogFileStore {
     const line: Record<string, unknown> = {
       timestamp: entry.timestamp,
       level: LOG_LEVEL_LABELS[entry.level],
+      system: entry.system,
       source: entry.source,
       message: entry.message,
       process: entry.process,
@@ -206,6 +231,7 @@ export class LogFileStore {
         timestamp: typeof raw.timestamp === "number" ? raw.timestamp : Date.now(),
         level: levelIdx >= 0 ? levelIdx : LogLevel.INFO,
         levelLabel,
+        system: String(raw.system ?? "unknown"),
         source: String(raw.source ?? "unknown"),
         message: String(raw.message ?? ""),
         ...(raw.data !== undefined ? { data: raw.data as Record<string, unknown> } : {}),
@@ -215,6 +241,105 @@ export class LogFileStore {
     } catch {
       return null;
     }
+  }
+
+  private _readLines(fileName: string): string[] {
+    try {
+      const content = fs.readFileSync(path.join(this._logsDir, fileName), "utf-8");
+      return content.split("\n").filter((l) => l.trim().length > 0);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Human label for the confirmation row shown at a day boundary.
+   *
+   * Files are newest-first, so the file at `fileIndex` is normally `fileIndex`
+   * days old. When the name embeds a `YYYY-MM-DD` date, that is used to compute
+   * an exact age; otherwise the index is the fallback.
+   */
+  private _dayBoundaryLabel(fileName: string, fileIndex: number): string {
+    let daysAgo = fileIndex;
+    const m = /openp41ge-(\d{4}-\d{2}-\d{2})\.log$/.exec(fileName);
+    if (m) {
+      const fileDate = new Date(`${m[1]}T00:00:00`);
+      const today = new Date(`${_dayString(new Date())}T00:00:00`);
+      if (!Number.isNaN(fileDate.getTime())) {
+        const diff = Math.round((today.getTime() - fileDate.getTime()) / MS_PER_DAY);
+        if (diff > 0) daysAgo = diff;
+      }
+    }
+    if (daysAgo === 1) return "Load yesterday's logs";
+    return `Load logs from ${daysAgo} days ago`;
+  }
+
+  /**
+   * Read log entries **backward**, strictly **within a single daily file**.
+   *
+   * Starts at the bottom of the file at `cursor.fileIndex` (0 = newest) and
+   * returns up to `limit` entries (oldest → newest), plus a cursor to continue
+   * loading older lines **from that same file**. When the file is exhausted,
+   * `hasOlder` is `false` and, if an older day exists, `nextDay` is set — the
+   * reader must not silently cross the day boundary; it loads that file only
+   * after explicit confirmation.
+   *
+   * `cursor === null` means "start at the very end of the newest file".
+   */
+  readLogsBackward(cursor: LogBackCursor | null, limit = 200): LogBackPage {
+    const files = this.listFiles(); // newest first
+    if (files.length === 0) {
+      return { entries: [], hasOlder: false, cursor: null, nextDay: null };
+    }
+    const want = Math.max(1, Math.floor(limit));
+    const fileIndex = cursor ? Math.max(0, Math.min(cursor.fileIndex, files.length - 1)) : 0;
+    const lineCount = cursor ? Math.max(0, cursor.lineCount) : 0;
+
+    const lines = this._readLines(files[fileIndex].name);
+    const total = lines.length;
+
+    // Current file fully consumed → expose the older day as a confirmable
+    // boundary, rather than silently crossing into it.
+    if (lineCount >= total) {
+      const nextIndex = fileIndex + 1;
+      if (nextIndex < files.length) {
+        return {
+          entries: [],
+          hasOlder: false,
+          cursor: null,
+          nextDay: {
+            cursor: { fileIndex: nextIndex, lineCount: 0 },
+            label: this._dayBoundaryLabel(files[nextIndex].name, nextIndex),
+          },
+        };
+      }
+      return { entries: [], hasOlder: false, cursor: null, nextDay: null };
+    }
+
+    const end = total - lineCount; // raw lines already served
+    const start = Math.max(0, end - want);
+    const entries: PersistedLogEntry[] = [];
+    for (let i = start; i < end; i++) {
+      const entry = this._parseLine(lines[i]);
+      if (entry) entries.push(entry);
+    }
+    const newLineCount = lineCount + (end - start);
+    const hasMoreInFile = newLineCount < total;
+    const hasOlder = hasMoreInFile;
+    const nextDay = hasOlder
+      ? null
+      : fileIndex + 1 < files.length
+        ? {
+            cursor: { fileIndex: fileIndex + 1, lineCount: 0 },
+            label: this._dayBoundaryLabel(files[fileIndex + 1].name, fileIndex + 1),
+          }
+        : null;
+    return {
+      entries,
+      hasOlder,
+      cursor: hasOlder ? { fileIndex, lineCount: newLineCount } : null,
+      nextDay,
+    };
   }
 
   /**

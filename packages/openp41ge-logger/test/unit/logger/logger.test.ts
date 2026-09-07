@@ -19,7 +19,7 @@ beforeEach(() => {
 
 describe("createLogger()", () => {
   it("returns an object with debug, info, warn, error methods", () => {
-    const log = createLogger("test");
+    const log = createLogger("test", "test");
     expect(typeof log.debug).toBe("function");
     expect(typeof log.info).toBe("function");
     expect(typeof log.warn).toBe("function");
@@ -28,7 +28,7 @@ describe("createLogger()", () => {
 
   it("calls console.debug with prefix when debug() is called", () => {
     const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const log = createLogger("my-module");
+    const log = createLogger("test", "my-module");
     log.debug("hello", "world");
 
     expect(spy).toHaveBeenCalledWith("[my-module]", "hello", "world");
@@ -38,7 +38,7 @@ describe("createLogger()", () => {
   it("does not call console.debug for dropped DEBUG by default", () => {
     setMinLevel(LogLevel.INFO);
     const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const log = createLogger("my-module");
+    const log = createLogger("test", "my-module");
     log.debug("hello", "world");
 
     expect(spy).not.toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe("createLogger()", () => {
 
   it("calls console.info with prefix when info() is called", () => {
     const spy = vi.spyOn(console, "info").mockImplementation(() => {});
-    const log = createLogger("my-module");
+    const log = createLogger("test", "my-module");
     log.info("info message", 42);
 
     expect(spy).toHaveBeenCalledWith("[my-module]", "info message", 42);
@@ -57,7 +57,7 @@ describe("createLogger()", () => {
 
   it("calls console.warn with prefix when warn() is called", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const log = createLogger("my-module");
+    const log = createLogger("test", "my-module");
     log.warn("warning");
 
     expect(spy).toHaveBeenCalledWith("[my-module]", "warning");
@@ -66,7 +66,7 @@ describe("createLogger()", () => {
 
   it("calls console.error with prefix when error() is called", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const log = createLogger("my-module");
+    const log = createLogger("test", "my-module");
     log.error("error occurred");
 
     expect(spy).toHaveBeenCalledWith("[my-module]", "error occurred");
@@ -74,7 +74,7 @@ describe("createLogger()", () => {
   });
 
   it("writes entries to the log buffer at the correct level", () => {
-    const log = createLogger("buf-test");
+    const log = createLogger("test", "buf-test");
 
     // Suppress console output
     const spies = [
@@ -105,7 +105,7 @@ describe("createLogger()", () => {
   });
 
   it("detaches a structured data payload from the trailing plain object", () => {
-    const log = createLogger("drag");
+    const log = createLogger("test", "drag");
     const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
 
     log.debug("mousemove", { x: 12, y: 40, isBoundary: true });
@@ -118,7 +118,7 @@ describe("createLogger()", () => {
   });
 
   it("does not treat Errors or plain trailing non-objects as data", () => {
-    const log = createLogger("err");
+    const log = createLogger("test", "err");
     const err = new Error("boom");
     log.error("something failed:", err);
 
@@ -129,7 +129,7 @@ describe("createLogger()", () => {
 
   it("passes all args to both console and log buffer", () => {
     const spy = vi.spyOn(console, "info").mockImplementation(() => {});
-    const log = createLogger("multi-arg");
+    const log = createLogger("test", "multi-arg");
 
     log.info("a", 1, true, null);
 
@@ -177,7 +177,7 @@ describe("createNoopLogger()", () => {
   });
 
   it("returns the same shape as createLogger (implements ILogger)", () => {
-    const real = createLogger("real");
+    const real = createLogger("test", "real");
     const noop = createNoopLogger();
 
     const methods = ["debug", "info", "warn", "error"] as const;

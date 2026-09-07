@@ -39,6 +39,9 @@ export interface StoredLogEntry {
   id: number;
   timestamp: number;
   level: LogLevel;
+  /** The system (plugin id / subsystem) this entry belongs to. */
+  system: string;
+  /** The stream name (logger namespace) within the system. */
   source: string;
   message: string;
   /** Structured payload (optional) — queryable, persisted as JSON. */
@@ -62,6 +65,7 @@ export interface LogEntry extends StoredLogEntry {
 
 /** Query filters for `queryLog()` — all optional, all ANDed. */
 export interface LogQuery {
+  system?: string | readonly string[];
   source?: string | readonly string[];
   minLevel?: LogLevel;
   maxLevel?: LogLevel;
@@ -118,6 +122,7 @@ function _renderText(message: string | readonly unknown[]): string {
  */
 export function pushLog(
   level: LogLevel,
+  system: string,
   source: string,
   message: string | readonly unknown[],
   data?: Record<string, unknown>,
@@ -129,6 +134,7 @@ export function pushLog(
     id: _nextId++,
     timestamp: Date.now(),
     level,
+    system,
     source,
     message: rendered,
     ...(data !== undefined ? { data } : {}),
@@ -164,12 +170,16 @@ export function getLogBuffer(): readonly LogEntry[] {
  * Returns matches oldest → newest; `limit` caps to the most recent matches.
  */
 export function queryLog(filter: LogQuery = {}): readonly LogEntry[] {
+  const systems = filter.system
+    ? new Set(Array.isArray(filter.system) ? filter.system : [filter.system])
+    : null;
   const sources = filter.source
     ? new Set(Array.isArray(filter.source) ? filter.source : [filter.source])
     : null;
   const search = filter.search?.trim().toLowerCase();
 
   const matches = _buffer.filter((e) => {
+    if (systems && !systems.has(e.system)) return false;
     if (sources && !sources.has(e.source)) return false;
     if (filter.minLevel !== undefined && e.level < filter.minLevel) return false;
     if (filter.maxLevel !== undefined && e.level > filter.maxLevel) return false;

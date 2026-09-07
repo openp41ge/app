@@ -21,6 +21,7 @@ function makeEntry(overrides: Partial<StoredLogEntry> = {}): StoredLogEntry {
     id: 1,
     timestamp: Date.now(),
     level: LogLevel.INFO,
+    system: "openp41ge",
     source: "test",
     message: "hello",
     process: "main",
@@ -219,5 +220,111 @@ describe("LogFileStore (main process)", () => {
     // Even with a malformed base dir it must not throw.
     const bad = new LogFileStore(path.join(os.tmpdir(), "x-no-perm-xyz"));
     expect(() => bad.append(makeEntry())).not.toThrow();
+  });
+});
+
+describe("LogFileStore.readLogsBackward", () => {
+  function seed(n: number): void {
+    for (let i = 0; i < n; i++) {
+      store.append(makeEntry({ system: "openp41ge", source: "mod", message: `m${i}` }));
+    }
+  }
+
+  test("returns the newest entries oldest→newest from the live file", () => {
+    seed(10);
+    const page = store.readLogsBackward(null, 4);
+    expect(page.entries.map((e) => e.message)).toEqual(["m6", "m7", "m8", "m9"]);
+    expect(page.hasOlder).toBe(true);
+    expect(page.cursor).toEqual({ fileIndex: 0, lineCount: 4 });
+  });
+
+  test("pages backward through the same file", () => {
+    seed(10);
+    const p1 = store.readLogsBackward(null, 4);
+    const p2 = store.readLogsBackward(p1.cursor, 4);
+    expect(p2.entries.map((e) => e.message)).toEqual(["m2", "m3", "m4", "m5"]);
+    expect(p2.hasOlder).toBe(true);
+    // m0, m1 follow
+    const p3 = store.readLogsBackward(p2.cursor, 4);
+    expect(p3.entries.map((e) => e.message)).toEqual(["m0", "m1"]);
+    expect(p3.hasOlder).toBe(false);
+    expect(p3.cursor).toBeNull();
+  });
+
+  test("sets hasOlder false and cursor null at the start of the file", () => {
+    seed(3);
+    const page = store.readLogsBackward(null, 10);
+    expect(page.entries.map((e) => e.message)).toEqual(["m0", "m1", "m2"]);
+    expect(page.hasOlder).toBe(false);
+    expect(page.cursor).toBeNull();
+  });
+
+  test("stops at a day boundary and exposes the next day for confirmation", () => {
+    const dir = logsDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const ago = (days: number) => {
+      const d = new Date(Date.now() - days * 86_400_000);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    const archive = path.join(dir, `openp41ge-${ago(3)}.log`);
+    fs.writeFileSync(
+      archive,
+      [
+        JSON.stringify({
+          timestamp: 1,
+          level: "INFO",
+          system: "openp41ge",
+          source: "old",
+          message: "old0",
+          process: "main",
+        }),
+        JSON.stringify({
+          timestamp: 2,
+          level: "INFO",
+          system: "openp41ge",
+          source: "old",
+          message: "old1",
+          process: "main",
+        }),
+      ].join("\n") + "\n",
+      "utf-8",
+    );
+    // Live file (newest) with three entries.
+    seed(3); // m0,m1,m2
+
+    const p1 = store.readLogsBackward(null, 1); // m2
+    expect(p1.entries.map((e) => e.message)).toEqual(["m2"]);
+    const p2 = store.readLogsBackward(p1.cursor, 1); // m1
+    expect(p2.entries.map((e) => e.message)).toEqual(["m1"]);
+    const p3 = store.readLogsBackward(p2.cursor, 1); // m0
+    expect(p3.entries.map((e) => e.message)).toEqual(["m0"]);
+    // The live file is now exhausted: it must NOT silently cross into the
+    // previous day. Instead it reports the boundary for explicit confirmation.
+    expect(p3.hasOlder).toBe(false);
+    expect(p3.cursor).toBeNull();
+    expect(p3.nextDay).toEqual({
+      cursor: { fileIndex: 1, lineCount: 0 },
+      label: "Load logs from 3 days ago",
+    });
+
+    // Confirming loads the previous day's file from its bottom.
+    const p4 = store.readLogsBackward(p3.nextDay!.cursor, 1); // old1
+    expect(p4.entries.map((e) => e.message)).toEqual(["old1"]);
+    expect(p4.hasOlder).toBe(true); // old0 remains in the same file
+    const p5 = store.readLogsBackward(p4.cursor, 1); // old0
+    expect(p5.entries.map((e) => e.message)).toEqual(["old0"]);
+    expect(p5.hasOlder).toBe(false);
+    expect(p5.cursor).toBeNull();
+    expect(p5.nextDay).toBeNull(); // no third day
+  });
+
+  test("returns an empty page when there are no log files", () => {
+    expect(store.readLogsBackward(null, 10)).toEqual({
+      entries: [],
+      hasOlder: false,
+      cursor: null,
+      nextDay: null,
+    });
   });
 });

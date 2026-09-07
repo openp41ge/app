@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe("renderer-log-transport", () => {
   it("forwards entries already in the buffer at init (early bootstrap logs)", () => {
-    pushLog(LogLevel.INFO, "bootstrap", ["early"]);
+    pushLog(LogLevel.INFO, "test", "bootstrap", ["early"]);
     installBridge();
 
     initRendererLogTransport();
@@ -66,7 +66,7 @@ describe("renderer-log-transport", () => {
     initRendererLogTransport();
     appendMock.mockClear();
 
-    pushLog(LogLevel.WARN, "drag", ["ghost-issue"]);
+    pushLog(LogLevel.WARN, "test", "drag", ["ghost-issue"]);
     expect(appendMock).not.toHaveBeenCalled(); // not yet flushed
 
     vi.advanceTimersByTime(150); // past FLUSH_INTERVAL_MS
@@ -84,7 +84,7 @@ describe("renderer-log-transport", () => {
     appendMock.mockClear();
 
     for (let i = 0; i < 200; i++) {
-      pushLog(LogLevel.INFO, "spam", [`entry ${i}`]);
+      pushLog(LogLevel.INFO, "test", "spam", [`entry ${i}`]);
     }
     // 200 >= MAX_BATCH triggers an eager flush.
     expect(appendMock).toHaveBeenCalledTimes(1);
@@ -96,7 +96,7 @@ describe("renderer-log-transport", () => {
     initRendererLogTransport();
     appendMock.mockClear();
 
-    pushLog(LogLevel.INFO, "a", ["no winid yet"]);
+    pushLog(LogLevel.INFO, "test", "a", ["no winid yet"]);
     vi.advanceTimersByTime(150);
 
     expect(appendMock).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe("renderer-log-transport", () => {
     appendMock.mockClear();
 
     stop();
-    pushLog(LogLevel.INFO, "after", ["cleanup"]);
+    pushLog(LogLevel.INFO, "test", "after", ["cleanup"]);
     vi.advanceTimersByTime(300);
     expect(appendMock).not.toHaveBeenCalled();
   });

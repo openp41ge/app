@@ -26,3 +26,18 @@ export {
   getMinLevel,
 } from "./log-buffer";
 export { createLogger, createNoopLogger, type ILogger } from "./logger";
+export {
+  registerLogStream,
+  unregisterLogStream,
+  listLogStreams,
+  subscribeLogStreams,
+  type LogStreamInfo,
+  _resetLogStreams,
+} from "./log-streams";
+export {
+  MemLogPageReader,
+  LOG_PAGE_DEFAULT_LIMIT,
+  type LogViewEntry,
+  type LogPageResult,
+  type LogPageReader,
+} from "./log-page-reader";

@@ -8,7 +8,7 @@ import {
 
 // Set up display
 const app = document.getElementById("app")!;
-const log = createLogger("demo");
+const log = createLogger("openp41ge-logger-demo", "demo");
 const output = document.createElement("pre");
 output.style.overflow = "auto";
 output.style.maxHeight = "400px";

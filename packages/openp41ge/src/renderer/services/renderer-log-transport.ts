@@ -37,6 +37,7 @@ function _serialize(e: StoredLogEntry): Record<string, unknown> {
   const line: Record<string, unknown> = {
     timestamp: e.timestamp,
     level: e.level,
+    system: e.system,
     source: e.source,
     message: e.message,
     process: e.process,
