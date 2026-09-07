@@ -21,3 +21,6 @@ playwright-report/
 .claude/worktrees
 pi.json*.openp41ge-workspace
 pi.json
+
+# Local pi agent settings (not project code)
+.pi/settings.json
