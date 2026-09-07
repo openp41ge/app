@@ -1,67 +1,249 @@
 /**
- * <openp41ge-agent-settings> — Lit settings surface for the AI agent provider.
+ * <openp41ge-agent-settings> — Agent settings grid tab content.
  *
- * Hosted by the "Agent" system overlay tab. Reads/writes the `agent` config
- * via IPC, provides a Test Connection button, and dispatches
- * `openp41ge:config-changed` on save so chat panes can refresh their
- * connection status.
+ * A settings-card surface that manages **multiple** AI provider connections.
+ * The base view is a "Providers" card listing every configured provider and an
+ * add row. Clicking a provider row (or the add row) slides a **right-side
+ * drawer** in from the right — replicating the Window Manager's multi-tiered
+ * stacked-drawer mechanics (breadcrumb-style head, slide animation, masked
+ * sliver of the level beneath, width tiers) — to edit that provider on the
+ * standard cards, with radio-style **preset pickers** at the top (OpenAI,
+ * Anthropic, local servers, etc.) so endpoints aren't typed by hand.
+ *
+ * Persists the `agent` config via an injectable ConfigService (so tests can
+ * substitute a fake). Settings UI only — the chat runtime is untouched.
  */
 
-import { LitElement, html, type TemplateResult } from "lit";
+import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
+import type { ConfigService } from "../services/config-service";
+import {
+  PROVIDER_PRESETS,
+  CUSTOM_PRESET_ID,
+  customPreset,
+  providerPreset,
+  presetFor,
+  applyPreset,
+  nextProviderId,
+  providerDisplayName,
+  endpointHost,
+  type AgentConfig,
+  type ProviderConfig,
+  type ProviderPreset,
+} from "../models/agent-provider-presets";
 
-interface ProviderConfig {
-  baseUrl: string;
-  model: string;
-  apiKey?: string;
-  temperature?: number;
-  maxTokens?: number;
+interface DrawerState {
+  id: string;
+  kind: "provider";
+  /** The provider key being edited; null = adding a new provider. */
+  editId: string | null;
+  title: string;
+  presetId: string;
+  draft: ProviderConfig;
 }
 
-interface AgentConfig {
-  providerId: string;
-  providers: Record<string, ProviderConfig>;
+/** A drawer that is animating out; keeps its last width so it exits in place. */
+interface ClosingDrawer extends DrawerState {
+  width: number;
+}
+
+interface TestResult {
+  ok: boolean;
+  error?: string;
 }
 
 export class Openp41geAgentSettings extends LitElement {
+  /**
+   * Injectable for tests. When null, the component reads/writes the `agent`
+   * config directly through `window.openp41ge.config` (the IPC bridge).
+   */
+  configService: ConfigService | null = null;
+
   @state() private _config: AgentConfig | null = null;
   @state() private _loading = true;
-  @state() private _testing = false;
-  @state() private _testResult: { ok: boolean; error?: string } | null = null;
+  @state() private _drawers: DrawerState[] = [];
+  @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _saving = false;
+  @state() private _testing = false;
+  @state() private _testResult: TestResult | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.addEventListener("keydown", this._onKeydown);
     void this._load();
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.removeEventListener("keydown", this._onKeydown);
   }
 
   private async _load(): Promise<void> {
     try {
-      const cfg = (await window.openp41ge.config.get("agent")) as AgentConfig | undefined;
-      this._config = cfg ?? { providerId: "vllm", providers: { vllm: { baseUrl: "", model: "" } } };
+      const cfg = this.configService
+        ? (this.configService.get("agent") as AgentConfig | undefined)
+        : ((await window.openp41ge?.config?.get?.("agent")) as AgentConfig | undefined);
+      this._config = cfg ?? this._defaultConfig();
     } catch {
-      this._config = { providerId: "vllm", providers: { vllm: { baseUrl: "", model: "" } } };
+      this._config = this._defaultConfig();
     }
     this._loading = false;
   }
 
-  private async _testConnection(): Promise<void> {
-    if (!this._config) return;
-    this._testing = true;
-    this._testResult = null;
-    try {
-      this._testResult = await window.openp41ge.chat.pingProvider(this._config.providerId);
-    } catch (err) {
-      this._testResult = { ok: false, error: (err as Error).message };
-    }
-    this._testing = false;
+  private _defaultConfig(): AgentConfig {
+    return {
+      providerId: "vllm",
+      providers: { vllm: { baseUrl: "http://localhost:8000/v1", model: "" } },
+    };
   }
 
-  private async _save(): Promise<void> {
-    if (!this._config) return;
-    this._saving = true;
-    const value = JSON.parse(JSON.stringify(this._config));
-    await window.openp41ge.config.set("agent", value);
+  /** Escape closes the top drawer. */
+  private _onKeydown = (e: KeyboardEvent): void => {
+    if (e.key !== "Escape") return;
+    if (this._drawers.length === 0) return;
+    e.preventDefault();
+    this._closeTopDrawer();
+  };
+
+  // ── Drawer stack mechanics (mirrors the Window Manager) ─────────────────
+
+  private _nextId(): string {
+    return `ags-d-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  }
+
+  /**
+   * Drawer width tiers: the deepest drawer is 75%, its direct parent 80%, and
+   * every ancestor above that caps at 85%.
+   */
+  private _widthFor(index: number): number {
+    const L = this._drawers.length;
+    if (index === L - 1) return 75;
+    if (index === L - 2) return 80;
+    return 85;
+  }
+
+  /** Width of the single shared shadow, matching the widest (outermost) drawer. */
+  private _stackWidth(): number {
+    return this._drawers.length ? this._widthFor(0) : 0;
+  }
+
+  private _openEdit(id: string): void {
+    const config = this._config;
+    if (!config) return;
+    const draft = config.providers[id];
+    if (!draft) return;
+    const preset = presetFor(draft);
+    this._testResult = null;
+    this._drawers = [
+      ...this._drawers,
+      {
+        id: this._nextId(),
+        kind: "provider",
+        editId: id,
+        title: providerDisplayName(preset, draft),
+        presetId: preset.id,
+        draft: { ...draft },
+      },
+    ];
+    void this.updateComplete.then(() => this._focusBaseUrl());
+  }
+
+  private _openAdd(): void {
+    const draft = applyPreset(customPreset());
+    this._testResult = null;
+    this._drawers = [
+      ...this._drawers,
+      {
+        id: this._nextId(),
+        kind: "provider",
+        editId: null,
+        title: "New provider",
+        presetId: CUSTOM_PRESET_ID,
+        draft,
+      },
+    ];
+    void this.updateComplete.then(() => this._focusBaseUrl());
+  }
+
+  private _focusBaseUrl(): void {
+    this.renderRoot.querySelector<HTMLInputElement>(".ags-baseurl-input")?.focus();
+  }
+
+  private _updateDrawer(id: string, patch: Partial<DrawerState>): void {
+    this._drawers = this._drawers.map((d) => (d.id === id ? { ...d, ...patch } : d));
+  }
+
+  private _selectPreset(d: DrawerState, presetId: string): void {
+    const preset = providerPreset(presetId) ?? customPreset();
+    const draft = applyPreset(preset);
+    this._updateDrawer(d.id, {
+      presetId,
+      draft,
+      title: draft.name || d.title,
+    });
+  }
+
+  private _setDraftField(d: DrawerState, patch: Partial<ProviderConfig>): void {
+    const cur = this._drawers.find((x) => x.id === d.id);
+    if (!cur) return;
+    const draft = { ...cur.draft, ...patch };
+    const title = patch.name !== undefined && patch.name.trim() ? patch.name.trim() : cur.title;
+    this._updateDrawer(d.id, { draft, title });
+  }
+
+  private _numberValue(v: string): number | undefined {
+    if (v.trim() === "") return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  private _closeDrawer(id: string): void {
+    const idx = this._drawers.findIndex((d) => d.id === id);
+    if (idx === -1) return;
+    const width = this._widthFor(idx);
+    const closing = this._drawers[idx];
+    this._drawers = this._drawers.filter((d) => d.id !== id);
+    this._finalizeClose([{ ...closing, width }]);
+  }
+
+  private _closeTopDrawer(): void {
+    const top = this._drawers[this._drawers.length - 1];
+    if (top) this._closeDrawer(top.id);
+  }
+
+  private _closeDeeper(index: number): void {
+    const closing = this._drawers
+      .slice(index + 1)
+      .map((d, i) => ({ ...d, width: this._widthFor(index + 1 + i) }));
+    this._drawers = this._drawers.slice(0, index + 1);
+    this._finalizeClose(closing);
+  }
+
+  private _closeAllDrawers(): void {
+    if (this._drawers.length === 0) return;
+    const closing = this._drawers.map((d, i) => ({ ...d, width: this._widthFor(i) }));
+    this._drawers = [];
+    this._finalizeClose(closing);
+  }
+
+  private _finalizeClose(closing: ClosingDrawer[]): void {
+    if (closing.length === 0) return;
+    this._closingDrawers = [...this._closingDrawers, ...closing];
+    const ids = new Set(closing.map((c) => c.id));
+    window.setTimeout(() => {
+      this._closingDrawers = this._closingDrawers.filter((c) => !ids.has(c.id));
+    }, 220);
+  }
+
+  // ── Persistence ─────────────────────────────────────────────────────────
+
+  private async _persist(config: AgentConfig): Promise<void> {
+    const value = JSON.parse(JSON.stringify(config));
+    if (this.configService) {
+      await this.configService.set("agent", value);
+      return;
+    }
+    await window.openp41ge?.config?.set?.("agent", value);
     document.dispatchEvent(
       new CustomEvent("openp41ge:config-changed", {
         detail: { key: "agent", value },
@@ -69,103 +251,450 @@ export class Openp41geAgentSettings extends LitElement {
         composed: true,
       }),
     );
+  }
+
+  private async _setActive(id: string): Promise<void> {
+    const config = this._config;
+    if (!config) return;
+    const next = { ...config, providerId: id };
+    this._config = next;
+    await this._persist(next);
+  }
+
+  private async _saveProvider(d: DrawerState): Promise<void> {
+    const config = this._config;
+    if (!config) return;
+    this._saving = true;
+    const draft = { ...d.draft };
+    const existingIds = Object.keys(config.providers);
+    const hadProviders = existingIds.length > 0;
+    const base = d.presetId === CUSTOM_PRESET_ID ? CUSTOM_PRESET_ID : d.presetId;
+    const id = d.editId ?? nextProviderId(existingIds, base);
+    const providers = { ...config.providers, [id]: draft };
+    let providerId = config.providerId;
+    if (!hadProviders) providerId = id;
+    else if (!providers[providerId]) providerId = Object.keys(providers)[0] ?? id;
+    const next = { ...config, providerId, providers };
+    this._config = next;
+    await this._persist(next);
     this._saving = false;
+    this._closeDrawer(d.id);
   }
 
-  private _provider(): ProviderConfig {
-    const cfg = this._config;
-    if (!cfg) return { baseUrl: "", model: "" };
-    return cfg.providers[cfg.providerId] ?? { baseUrl: "", model: "" };
+  private async _deleteProvider(d: DrawerState): Promise<void> {
+    const config = this._config;
+    if (!config) return;
+    const id = d.editId;
+    if (!id) return;
+    const providers = { ...config.providers };
+    delete providers[id];
+    let providerId = config.providerId;
+    if (providerId === id) providerId = Object.keys(providers)[0] ?? "";
+    const next = { ...config, providerId, providers };
+    this._config = next;
+    await this._persist(next);
+    this._closeDrawer(d.id);
   }
 
-  private _setProvider(patch: Partial<ProviderConfig>): void {
-    const cfg = this._config;
-    if (!cfg) return;
-    const merged = { ...this._provider(), ...patch };
-    this._config = {
-      ...cfg,
-      providers: { ...cfg.providers, [cfg.providerId]: merged },
-    };
+  private async _testConnection(): Promise<void> {
+    const d = this._drawers[this._drawers.length - 1];
+    if (!d) return;
+    const providerId = d.editId ?? this._config?.providerId;
+    if (!providerId) return;
+    this._testing = true;
+    this._testResult = null;
+    try {
+      const res = await window.openp41ge?.chat?.pingProvider?.(providerId);
+      this._testResult = res ?? { ok: false, error: "No test connection available" };
+    } catch (err) {
+      this._testResult = { ok: false, error: (err as Error).message };
+    }
+    this._testing = false;
   }
+
+  // ── Rendering ───────────────────────────────────────────────────────────
 
   render(): TemplateResult {
-    const provider = this._provider();
+    const config = this._config;
+    const providers = config?.providers ?? {};
+    const entries = Object.entries(providers);
     return html`
       <style>
         :host {
           display: block;
+          box-sizing: border-box;
+          height: 100%;
           color: var(--text-primary, #ccc);
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 13px;
         }
-        /* Padding lives on an inner wrapper (not :host) because the app's
-           global reset '* { padding: 0 }' overrides :host padding. */
-        .as-pane {
+        .ags-root {
+          position: relative;
+          height: 100%;
+          overflow: hidden;
+          background: var(--bg-primary, #1e1e1e);
+        }
+        /* The drawer layer hosts the base card and any slide-in drawers. */
+        .ags-drawer-layer {
+          position: relative;
+          height: 100%;
+          min-height: 0;
+          overflow: hidden;
+        }
+        .ags-base {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          overflow-y: auto;
+        }
+        .ags-pane {
           box-sizing: border-box;
           min-height: 100%;
-          padding: 16px;
+          padding: 28px 32px;
         }
-        h2 {
-          margin: 0 0 4px;
-          font-size: 15px;
+        .ags-section-title {
+          margin: 0 0 14px;
+          font-size: 11px;
           font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--text-secondary, #999);
         }
-        .hint {
-          color: var(--text-muted, #777);
-          margin: 0 0 16px;
+        .ags-card {
+          box-sizing: border-box;
+          max-width: 620px;
+          padding: 12px 14px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.05);
         }
-        .field {
+        .ags-card-question {
+          display: block;
+          margin: 0 0 14px;
+          font-weight: 500;
+          color: var(--text-primary, #e0e0e0);
+        }
+        .ags-card-help {
+          margin: 14px 0 0;
+          color: var(--text-secondary, #999);
+          line-height: 1.5;
+        }
+        .ags-card-gap {
+          margin-top: 16px;
+        }
+
+        /* Provider rows in the base card. */
+        .ags-provider-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+        .ags-provider-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          border-bottom: 1px solid var(--divider, #2f3031);
+        }
+        .ags-provider-row:hover {
+          background: var(--bg-active, #37373d);
+        }
+        .ags-provider-radio {
+          width: 14px;
+          height: 14px;
+          flex-shrink: 0;
+          accent-color: var(--accent, #569cd6);
+          cursor: pointer;
+        }
+        .ags-provider-info {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .ags-provider-name {
+          font-size: 13px;
+          font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .ags-provider-meta {
+          font-size: 12px;
+          color: var(--text-secondary, #999);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .ags-badge {
+          flex-shrink: 0;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--accent, #569cd6);
+          background: rgba(86, 156, 214, 0.15);
+          border-radius: 999px;
+          padding: 2px 8px;
+        }
+        .ags-chevron {
+          flex-shrink: 0;
+          color: var(--accent, #569cd6);
+        }
+        .ags-add-row {
+          color: var(--accent, #569cd6);
+          font-weight: 500;
+        }
+        .ags-add-plus {
+          font-size: 15px;
+        }
+        .ags-empty {
+          padding: 10px;
+          color: var(--text-secondary, #999);
+        }
+
+        /* Mask over the base while a drawer is open. */
+        .ags-base-mask {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          background: transparent;
+          cursor: pointer;
+        }
+
+        /* Drawer stack (mirrors the Window Manager drawings). */
+        .drawer-shadow {
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 1;
+          pointer-events: none;
+          box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+          transition: width 0.2s ease;
+          animation: ags-dw-slide 0.18s ease;
+        }
+        .drawer {
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          background: var(--bg-secondary, #252526);
+          border-left: 1px solid var(--divider, #444);
+          transition: width 0.2s ease;
+          animation: ags-dw-slide 0.18s ease;
+        }
+        .drawer-mask {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          background: transparent;
+          cursor: pointer;
+        }
+        @keyframes ags-dw-slide {
+          from {
+            transform: translateX(24px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes ags-dw-slide-out {
+          from {
+            transform: translateX(0);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(24px);
+            opacity: 0;
+          }
+        }
+        .drawer--closing {
+          animation: ags-dw-slide-out 0.18s ease forwards;
+          pointer-events: none;
+          z-index: 1000;
+        }
+        .drawer-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          flex-shrink: 0;
+          height: 44px;
+          padding: 0 14px;
+          border-bottom: 1px solid var(--divider, #333);
+        }
+        .drawer-title {
+          font-size: 13px;
+          font-weight: 600;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .drawer-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        .dw-close {
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          font-size: 16px;
+          width: 26px;
+          height: 26px;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+        .dw-close:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .drawer-body {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          padding: 18px 18px 28px;
+        }
+        .drawer-footer {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          justify-content: flex-end;
+          flex-shrink: 0;
+          height: 44px;
+          padding: 0 14px;
+          border-top: 1px solid var(--divider, #333);
+        }
+        .dw-delete-label {
+          border: none;
+          background: transparent;
+          color: #e06c75;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 4px 10px;
+          cursor: pointer;
+          border-radius: 6px;
+          margin-right: auto;
+        }
+        .dw-delete-label:hover {
+          background: rgba(224, 108, 117, 0.15);
+        }
+        .dw-cancel {
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          font-size: 12px;
+          font-weight: 600;
+          padding: 4px 10px;
+          cursor: pointer;
+          border-radius: 6px;
+        }
+        .dw-cancel:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .dw-save {
+          border: none;
+          border-radius: 6px;
+          padding: 4px 14px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          color: #fff;
+          background: var(--accent, #2b5a9c);
+        }
+        .dw-save:hover {
+          filter: brightness(1.1);
+        }
+        .dw-save:disabled {
+          opacity: 0.5;
+          cursor: default;
+        }
+
+        /* Preset picker grid. */
+        .ags-preset-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          gap: 8px;
+          margin-bottom: 20px;
+          max-width: 620px;
+        }
+        .ags-preset-option {
           display: flex;
           flex-direction: column;
           gap: 4px;
-          margin-bottom: 12px;
+          padding: 10px;
+          border-radius: 8px;
+          border: 1px solid var(--divider, #333);
+          background: rgba(255, 255, 255, 0.04);
+          cursor: pointer;
         }
-        label {
+        .ags-preset-option:hover {
+          background: var(--bg-active, #37373d);
+        }
+        .ags-preset-option--active {
+          border-color: var(--accent, #569cd6);
+          background: rgba(86, 156, 214, 0.12);
+        }
+        .ags-preset-top {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .ags-preset-radio {
+          accent-color: var(--accent, #569cd6);
+          width: 14px;
+          height: 14px;
+          flex-shrink: 0;
+          cursor: pointer;
+        }
+        .ags-preset-label {
+          font-weight: 600;
+          font-size: 13px;
+          color: var(--text-primary, #e0e0e0);
+        }
+        .ags-preset-desc {
+          color: var(--text-secondary, #999);
           font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: var(--text-secondary, #aaa);
+          line-height: 1.4;
         }
-        input,
-        select {
-          height: 26px;
+
+        /* Field cards inside the drawer. */
+        .ags-input {
+          width: 100%;
+          height: 28px;
           padding: 0 8px;
-          font-size: 12px;
-          color: var(--text-primary, #ccc);
-          background: var(--bg-secondary, #252526);
+          box-sizing: border-box;
+          font-size: 13px;
+          color: var(--text-primary, #ddd);
+          background: var(--bg-primary, #1e1e1e);
           border: 1px solid var(--divider, #333);
           border-radius: 4px;
           outline: none;
-          box-sizing: border-box;
-          width: 100%;
+          font-family: inherit;
         }
-        input:focus,
-        select:focus {
-          border-color: var(--accent, #4a9eff);
+        .ags-input:focus {
+          border-color: var(--accent, #569cd6);
         }
-        .buttons {
-          display: flex;
-          gap: 8px;
-          margin-top: 8px;
+        .ags-input--mono {
+          font-family: ui-monospace, "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
         }
-        button {
-          height: 26px;
-          padding: 0 12px;
-          font-size: 12px;
-          color: #fff;
-          background: var(--accent, #2b5a9c);
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-        }
-        button.secondary {
-          color: var(--text-primary, #ccc);
-          background: var(--bg-tertiary, #2d2d2d);
-          border: 1px solid var(--divider, #333);
-        }
-        button:disabled {
-          opacity: 0.5;
-          cursor: default;
+        .ags-test-row {
+          margin-top: 18px;
+          max-width: 620px;
         }
         .test-ok {
           color: #4caf50;
@@ -177,98 +706,333 @@ export class Openp41geAgentSettings extends LitElement {
         }
       </style>
 
-      <div class="as-pane">
-        <h2>Agent</h2>
-        <p class="hint">Configure the AI agent provider. Chats stream from a local vLLM server.</p>
-
-        ${
-          this._loading
-            ? html`<p class="hint">Loading…</p>`
-            : html`
-                <div class="field">
-                  <label>Provider</label>
-                  <select
-                    .value=${this._config?.providerId ?? "vllm"}
-                    @change=${(e: Event) => {
-                      const v = (e.target as HTMLSelectElement).value;
-                      this._config = this._config
-                        ? { ...this._config, providerId: v }
-                        : this._config;
-                      this.requestUpdate();
-                    }}
-                  >
-                    <option value="vllm">vLLM</option>
-                  </select>
-                </div>
-
-                <div class="field">
-                  <label>Base URL</label>
-                  <input
-                    type="text"
-                    placeholder="http://localhost:8000/v1"
-                    .value=${provider.baseUrl}
-                    @input=${(e: Event) =>
-                      this._setProvider({ baseUrl: (e.target as HTMLInputElement).value })}
-                  />
-                </div>
-
-                <div class="field">
-                  <label>Model</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Qwen2.5-Coder-7B-Instruct"
-                    .value=${provider.model}
-                    @input=${(e: Event) =>
-                      this._setProvider({ model: (e.target as HTMLInputElement).value })}
-                  />
-                </div>
-
-                <div class="field">
-                  <label>API Key (optional)</label>
-                  <input
-                    type="password"
-                    placeholder="sk-…"
-                    .value=${provider.apiKey ?? ""}
-                    @input=${(e: Event) =>
-                      this._setProvider({ apiKey: (e.target as HTMLInputElement).value })}
-                  />
-                </div>
-
-                <div class="buttons">
-                  <button
-                    class="secondary"
-                    ?disabled=${this._testing}
-                    @click=${() => this._testConnection()}
-                  >
-                    ${this._testing ? "Testing…" : "Test Connection"}
-                  </button>
-                  <button ?disabled=${this._saving} @click=${() => this._save()}>
-                    ${this._saving ? "Saving…" : "Save"}
-                  </button>
-                </div>
-
+      <div class="ags-root">
+        <div class="ags-drawer-layer">
+          <div class="ags-base">
+            <div class="ags-pane">
+              <p class="ags-section-title">Agents</p>
+              <div class="ags-card">
+                <label class="ags-card-question">
+                  Which providers should be available for chats?
+                </label>
                 ${
-                  this._testResult
-                    ? html`<div class=${this._testResult.ok ? "test-ok" : "test-err"}>
-                        ${
-                          this._testResult.ok
-                            ? "✓ Connected"
-                            : `✗ ${this._testResult.error ?? "Unreachable"}`
-                        }
-                      </div>`
-                    : ""
+                  this._loading
+                    ? html`<p class="ags-card-help">Loading…</p>`
+                    : html`
+                        <ul class="ags-provider-list">
+                          ${
+                            entries.length === 0
+                              ? html`<li class="ags-empty">No providers yet.</li>`
+                              : nothing
+                          }
+                          ${entries.map(([id, p]) => this._providerRow(id, p))}
+                          <li class="ags-provider-row ags-add-row" @click=${() => this._openAdd()}>
+                            <span class="ags-add-plus">＋</span>
+                            <span>Add another provider</span>
+                          </li>
+                        </ul>
+                        <p class="ags-card-help">
+                          Chats use the provider marked Default. Click a provider to edit how it
+                          connects, or add another — including local OpenAI-compatible servers.
+                        </p>
+                      `
                 }
-              `
+              </div>
+            </div>
+          </div>
+
+          ${
+            this._drawers.length > 0
+              ? html`<div class="ags-base-mask" @click=${() => this._closeAllDrawers()}></div>`
+              : nothing
+          }
+          ${
+            this._drawers.length > 0
+              ? html`<div class="drawer-shadow" style="width:${this._stackWidth()}%"></div>`
+              : nothing
+          }
+          ${this._drawers.map((d, i) => this._renderDrawer(d, i))}
+          ${this._closingDrawers.map((c) => this._renderClosingDrawer(c))}
+        </div>
+      </div>
+    `;
+  }
+
+  private _providerRow(id: string, p: ProviderConfig): TemplateResult {
+    const config = this._config;
+    const preset = presetFor(p);
+    const name = providerDisplayName(preset, p);
+    const isActive = config?.providerId === id;
+    const metaParts: string[] = [];
+    if (p.model) metaParts.push(p.model);
+    const host = endpointHost(p.baseUrl);
+    if (host) metaParts.push(host);
+    return html`
+      <li class="ags-provider-row" @click=${() => this._openEdit(id)}>
+        <input
+          type="radio"
+          class="ags-provider-radio"
+          name="ags-default-provider"
+          .checked=${isActive}
+          @click=${(e: Event) => e.stopPropagation()}
+          @change=${() => this._setActive(id)}
+        />
+        <div class="ags-provider-info">
+          <span class="ags-provider-name">${name}</span>
+          <span class="ags-provider-meta">
+            ${metaParts.length ? metaParts.join(" · ") : "No endpoint configured"}
+          </span>
+        </div>
+        ${isActive ? html`<span class="ags-badge">Default</span>` : nothing}
+        <svg
+          class="ags-chevron"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </li>
+    `;
+  }
+
+  private _renderDrawer(d: DrawerState, i: number): TemplateResult {
+    const isTop = i === this._drawers.length - 1;
+    return html`
+      <div class="drawer" style="width:${this._widthFor(i)}%; z-index:${i + 2}">
+        ${
+          !isTop
+            ? html`<div
+                class="drawer-mask"
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  this._closeDeeper(i);
+                }}
+              ></div>`
+            : nothing
         }
+        <div class="drawer-head">
+          <div class="drawer-title">${d.title}</div>
+          <div class="drawer-actions">
+            <button
+              class="dw-close"
+              @click=${(e: Event) => {
+                e.stopPropagation();
+                this._closeDrawer(d.id);
+              }}
+              aria-label="Close"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        <div class="drawer-body">${this._providerDetail(d)}</div>
+        ${this._drawerFooter(d)}
+      </div>
+    `;
+  }
+
+  private _renderClosingDrawer(c: ClosingDrawer): TemplateResult {
+    return html`
+      <div class="drawer drawer--closing" style="width:${c.width}%">
+        <div class="drawer-head">
+          <div class="drawer-title">${c.title}</div>
+        </div>
+        <div class="drawer-body">${this._providerDetail(c)}</div>
+      </div>
+    `;
+  }
+
+  private _drawerFooter(d: DrawerState): TemplateResult {
+    return html`
+      <div class="drawer-footer">
+        ${
+          d.editId !== null
+            ? html`<button
+                class="dw-delete-label"
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  void this._deleteProvider(d);
+                }}
+                title="Delete provider"
+              >
+                Delete
+              </button>`
+            : nothing
+        }
+        <button
+          class="dw-cancel"
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            this._closeDrawer(d.id);
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          class="dw-save"
+          ?disabled=${this._saving}
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            void this._saveProvider(d);
+          }}
+        >
+          ${this._saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    `;
+  }
+
+  private _presetOption(d: DrawerState, p: ProviderPreset): TemplateResult {
+    const active = d.presetId === p.id;
+    return html`
+      <label class="ags-preset-option ${active ? "ags-preset-option--active" : ""}">
+        <span class="ags-preset-top">
+          <input
+            type="radio"
+            name="ags-preset-${d.id}"
+            class="ags-preset-radio"
+            .checked=${active}
+            @change=${() => this._selectPreset(d, p.id)}
+          />
+          <span class="ags-preset-label">${p.label}</span>
+        </span>
+        ${p.description ? html`<span class="ags-preset-desc">${p.description}</span>` : nothing}
+      </label>
+    `;
+  }
+
+  private _providerDetail(d: DrawerState): TemplateResult {
+    const draft = d.draft;
+    return html`
+      <div class="ags-section-title">Provider</div>
+      <div class="ags-preset-grid">${PROVIDER_PRESETS.map((p) => this._presetOption(d, p))}</div>
+
+      <div class="ags-card ags-card-gap" style="max-width:620px;">
+        <label class="ags-card-question">What is the display name?</label>
+        <input
+          class="ags-input"
+          type="text"
+          placeholder="e.g. My GPU server"
+          .value=${draft.name ?? ""}
+          @input=${(e: Event) =>
+            this._setDraftField(d, { name: (e.target as HTMLInputElement).value })}
+        />
+        <p class="ags-card-help">
+          A friendly name for this provider. Leave blank to derive one from the preset or endpoint.
+        </p>
+      </div>
+
+      <div class="ags-card ags-card-gap" style="max-width:620px;">
+        <label class="ags-card-question">What base URL should be used?</label>
+        <input
+          class="ags-input ags-input--mono ags-baseurl-input"
+          type="text"
+          placeholder="https://api.example.com/v1"
+          .value=${draft.baseUrl}
+          @input=${(e: Event) =>
+            this._setDraftField(d, { baseUrl: (e.target as HTMLInputElement).value })}
+        />
+        <p class="ags-card-help">
+          The OpenAI-compatible endpoint. Picking a preset above fills this in for you.
+        </p>
+      </div>
+
+      <div class="ags-card ags-card-gap" style="max-width:620px;">
+        <label class="ags-card-question">Which model should be used?</label>
+        <input
+          class="ags-input ags-input--mono"
+          type="text"
+          placeholder="e.g. gpt-4o"
+          .value=${draft.model}
+          @input=${(e: Event) =>
+            this._setDraftField(d, { model: (e.target as HTMLInputElement).value })}
+        />
+        <p class="ags-card-help">The model id that chat requests will use.</p>
+      </div>
+
+      <div class="ags-card ags-card-gap" style="max-width:620px;">
+        <label class="ags-card-question">What API key should be used?</label>
+        <input
+          class="ags-input ags-input--mono"
+          type="password"
+          placeholder="sk-…"
+          autocomplete="off"
+          .value=${draft.apiKey ?? ""}
+          @input=${(e: Event) =>
+            this._setDraftField(d, { apiKey: (e.target as HTMLInputElement).value })}
+        />
+        <p class="ags-card-help">Only hosted services need one; local servers usually don't.</p>
+      </div>
+
+      <div class="ags-card ags-card-gap" style="max-width:620px;">
+        <label class="ags-card-question">What temperature should be used?</label>
+        <input
+          class="ags-input"
+          type="number"
+          placeholder="0.7"
+          step="0.1"
+          min="0"
+          max="2"
+          .value=${draft.temperature ?? ""}
+          @input=${(e: Event) =>
+            this._setDraftField(d, {
+              temperature: this._numberValue((e.target as HTMLInputElement).value),
+            })}
+        />
+        <p class="ags-card-help">Optional. Controls randomness in responses.</p>
+      </div>
+
+      <div class="ags-card ags-card-gap" style="max-width:620px;">
+        <label class="ags-card-question">What is the max output tokens?</label>
+        <input
+          class="ags-input"
+          type="number"
+          placeholder="e.g. 2048"
+          step="1"
+          min="1"
+          .value=${draft.maxTokens ?? ""}
+          @input=${(e: Event) =>
+            this._setDraftField(d, {
+              maxTokens: this._numberValue((e.target as HTMLInputElement).value),
+            })}
+        />
+        <p class="ags-card-help">Optional. Caps the response length.</p>
+      </div>
+
+      ${
+        this._testResult
+          ? html`<div
+              class=${this._testResult.ok ? "test-ok" : "test-err"}
+              style="max-width:620px;"
+            >
+              ${
+                this._testResult.ok ? "✓ Connected" : `✗ ${this._testResult.error ?? "Unreachable"}`
+              }
+            </div>`
+          : nothing
+      }
+      <div class="ags-test-row">
+        <button class="dw-cancel" ?disabled=${this._testing} @click=${() => this._testConnection()}>
+          ${this._testing ? "Testing…" : "Test Connection"}
+        </button>
       </div>
     `;
   }
 }
 
-export function registerOpenp41geAgentSettings(): void {
-  if (!customElements.get("openp41ge-agent-settings")) {
-    customElements.define("openp41ge-agent-settings", Openp41geAgentSettings);
-  }
+if (!customElements.get("openp41ge-agent-settings")) {
+  customElements.define("openp41ge-agent-settings", Openp41geAgentSettings);
 }
 
-registerOpenp41geAgentSettings();
+declare global {
+  interface HTMLElementTagNameMap {
+    "openp41ge-agent-settings": Openp41geAgentSettings;
+  }
+}

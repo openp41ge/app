@@ -22,6 +22,20 @@ export interface UserConfig {
     /** Max file size in bytes the editor will open (larger files show a "too large" message). */
     maxFileSize: number;
   };
+  agent: {
+    providerId: string;
+    providers: Record<
+      string,
+      {
+        baseUrl: string;
+        model: string;
+        apiKey?: string;
+        temperature?: number;
+        maxTokens?: number;
+        name?: string;
+      }
+    >;
+  };
 }
 
 // ─── ConfigService ───────────────────────────────────────────────────────

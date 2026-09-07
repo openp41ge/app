@@ -17,6 +17,8 @@ export interface ChatProviderConfig {
   apiKey?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Friendly display name — settings UI only, ignored by the runtime. */
+  name?: string;
 }
 
 /** Streamed delta from a provider. */

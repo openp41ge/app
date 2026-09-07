@@ -1,0 +1,190 @@
+/**
+ * Tests for <openp41ge-agent-settings>.
+ *
+ * Verifies the Providers card, the slide-in provider drawer, preset pickers,
+ * add/edit/delete flows, and the default-provider radio.
+ */
+// @ts-nocheck
+import { describe, test, expect, beforeEach } from "vitest";
+import "../../../src/renderer/components/openp41ge-agent-settings";
+import { PROVIDER_PRESETS } from "../../../src/renderer/models/agent-provider-presets";
+
+/** Minimal ConfigService fake that captures set() and serves get(). */
+class FakeConfig {
+  constructor(initial) {
+    this.vals = { ...initial };
+    this.sets = [];
+  }
+  get(key) {
+    const keys = key.split(".");
+    let obj = this.vals;
+    for (const k of keys) {
+      if (obj === null || obj === undefined) return undefined;
+      if (typeof obj === "object" && k in obj) obj = obj[k];
+      else return undefined;
+    }
+    return obj;
+  }
+  async set(key, value) {
+    this.sets.push({ key, value });
+    const keys = key.split(".");
+    let obj = this.vals;
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!obj[keys[i]] || typeof obj[keys[i]] !== "object") obj[keys[i]] = {};
+      obj = obj[keys[i]];
+    }
+    obj[keys[keys.length - 1]] = value;
+  }
+}
+
+const VLLM = { baseUrl: "http://localhost:8000/v1", model: "Qwen2.5-Coder-7B-Instruct" };
+const OPENAI = { baseUrl: "https://api.openai.com/v1", model: "gpt-4o", name: "OpenAI" };
+const AGENT = (providers = { vllm: VLLM }, providerId = "vllm") => ({ providerId, providers });
+
+async function mount(agent) {
+  const el = document.createElement("openp41ge-agent-settings");
+  el.configService = new FakeConfig(agent === undefined ? {} : { agent });
+  document.body.appendChild(el);
+  await new Promise((r) => setTimeout(r, 10));
+  return el;
+}
+
+const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
+
+/** Wait for a closing drawer to be removed from the DOM. */
+const settleClose = () => tick(300);
+
+function q(el, sel) {
+  return el.shadowRoot.querySelector(sel);
+}
+function qa(el, sel) {
+  return [...el.shadowRoot.querySelectorAll(sel)];
+}
+
+describe("openp41ge-agent-settings", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("renders the Providers card and lists the default vLLM provider", async () => {
+    const el = await mount(AGENT());
+    expect(q(el, ".ags-card")).not.toBeNull();
+    expect(q(el, ".ags-card-question").textContent).toContain(
+      "Which providers should be available for chats?",
+    );
+    const row = qa(el, ".ags-provider-row")[0];
+    expect(row.querySelector(".ags-provider-name").textContent).toBe("vLLM (local)");
+    expect(row.querySelector(".ags-provider-meta").textContent).toContain(
+      "Qwen2.5-Coder-7B-Instruct",
+    );
+    expect(row.querySelector(".ags-badge").textContent).toBe("Default");
+  });
+
+  test("empty provider list shows no rows and a prominent add row", async () => {
+    const el = await mount(AGENT({}, ""));
+    expect(q(el, ".ags-empty")).not.toBeNull();
+    expect(qa(el, ".ags-provider-info")).toHaveLength(0);
+    expect(q(el, ".ags-add-row").textContent).toContain("Add another provider");
+  });
+
+  test("clicking Add another provider opens a drawer with preset radios", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(1);
+    expect(q(el, ".drawer-title").textContent).toBe("New provider");
+    expect(qa(el, ".ags-preset-option")).toHaveLength(PROVIDER_PRESETS.length);
+  });
+
+  test("selecting a preset pre-fills baseUrl and model", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    const openai = qa(el, ".ags-preset-option").find((o) =>
+      o.querySelector(".ags-preset-label").textContent.includes("OpenAI"),
+    );
+    const radio = openai.querySelector(".ags-preset-radio");
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    expect(q(el, ".ags-baseurl-input").value).toBe("https://api.openai.com/v1");
+    // The model card's input follows the display-name + base-url cards.
+    const modelInputs = qa(el, ".ags-card").map((c) => c.querySelector(".ags-input"));
+    expect(modelInputs.some((i) => i && i.value === "gpt-4o")).toBe(true);
+  });
+
+  test("Save adds a new provider, persists agent, and returns to the list", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    const openai = qa(el, ".ags-preset-option").find((o) =>
+      o.querySelector(".ags-preset-label").textContent.includes("OpenAI"),
+    );
+    openai.querySelector(".ags-preset-radio").dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    qa(el, ".dw-save")[0].click();
+    await tick();
+    await settleClose();
+
+    const lastSet = el.configService.sets[el.configService.sets.length - 1];
+    expect(lastSet.key).toBe("agent");
+    expect(lastSet.value.providers.openai).toBeDefined();
+    expect(lastSet.value.providerId).toBe("openai");
+    // Drawer closed, list now shows the new provider.
+    expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(0);
+    const names = qa(el, ".ags-provider-name").map((n) => n.textContent);
+    expect(names).toContain("OpenAI");
+  });
+
+  test("editing an existing provider updates it and persists", async () => {
+    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }));
+    // Open the OpenAI row (the second provider row, index 1).
+    const row = qa(el, ".ags-provider-row")[1];
+    row.click();
+    await tick();
+    // Change the model field.
+    const modelInput = qa(el, ".ags-card")
+      .map((c) => c.querySelector(".ags-input"))
+      .find((i) => i && i.classList.contains("ags-input--mono") && i.value === "gpt-4o");
+    modelInput.value = "gpt-4o-mini";
+    modelInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    qa(el, ".dw-save")[0].click();
+    await tick();
+    await settleClose();
+
+    const lastSet = el.configService.sets[el.configService.sets.length - 1];
+    expect(lastSet.value.providers.openai.model).toBe("gpt-4o-mini");
+  });
+
+  test("Delete removes the provider and re-points the active id", async () => {
+    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "openai"));
+    // Open the OpenAI default provider and delete it.
+    const row = qa(el, ".ags-provider-row").find((r) =>
+      r.querySelector(".ags-provider-name").textContent.includes("OpenAI"),
+    );
+    row.click();
+    await tick();
+    q(el, ".dw-delete-label").click();
+    await tick();
+    await settleClose();
+
+    const lastSet = el.configService.sets[el.configService.sets.length - 1];
+    expect(lastSet.value.providers.openai).toBeUndefined();
+    expect(lastSet.value.providerId).toBe("vllm");
+  });
+
+  test("the default-provider radio persists providerId", async () => {
+    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
+    const radios = qa(el, ".ags-provider-radio");
+    expect(radios).toHaveLength(2);
+    expect(radios[0].checked).toBe(true);
+    radios[1].checked = true;
+    radios[1].dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+
+    const lastSet = el.configService.sets[el.configService.sets.length - 1];
+    expect(lastSet.key).toBe("agent");
+    expect(lastSet.value.providerId).toBe("openai");
+  });
+});
