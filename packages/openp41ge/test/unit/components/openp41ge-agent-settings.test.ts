@@ -180,40 +180,60 @@ describe("openp41ge-agent-settings", () => {
     expect(lastSet.value.providerId).toBe("vllm");
   });
 
-  test("the default-provider dropdown lists providers and persists providerId", async () => {
+  test("the default-provider list lists providers and persists providerId", async () => {
     const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
     const trigger = q(el, ".ags-default-trigger");
     expect(trigger).not.toBeNull();
     expect(q(el, ".ags-default-value").textContent.trim()).toBe("vLLM (local)");
 
-    // Open the dropdown and check the listed providers.
+    // Open the list; the card becomes an in-place list of providers.
     trigger.click();
     await tick();
-    const opts = qa(el, ".ags-default-option");
-    expect(
-      opts.map((o) => o.querySelector(".ags-default-option-label").textContent.trim()),
-    ).toEqual(["vLLM (local)", "OpenAI"]);
-    expect(opts[0].classList.contains("is-active")).toBe(true);
+    const rows = qa(el, ".ags-default-row");
+    expect(rows.map((o) => o.querySelector(".ags-default-row-name").textContent.trim())).toEqual([
+      "vLLM (local)",
+      "OpenAI",
+    ]);
+    expect(rows[0].classList.contains("is-active")).toBe(true);
 
-    // Select OpenAI -> closes the dropdown and persists the default.
-    opts[1].click();
+    // Select OpenAI -> closes the list and persists the default.
+    rows[1].click();
     await tick();
     const lastSet = el.configService.sets[el.configService.sets.length - 1];
     expect(lastSet.key).toBe("agent");
     expect(lastSet.value.providerId).toBe("openai");
-    expect(qa(el, ".ags-default-menu")).toHaveLength(0);
+    expect(qa(el, ".ags-default-list")).toHaveLength(0);
     expect(q(el, ".ags-default-value").textContent.trim()).toBe("OpenAI");
   });
 
-  test("the default-provider dropdown toggles closed on a second trigger click", async () => {
+  test("closing the default list via the close button keeps the current default", async () => {
     const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
-    const trigger = q(el, ".ags-default-trigger");
-    trigger.click();
+    q(el, ".ags-default-trigger").click();
     await tick();
-    expect(qa(el, ".ags-default-menu")).toHaveLength(1);
-    trigger.click();
+    expect(qa(el, ".ags-default-list")).toHaveLength(1);
+    q(el, ".ags-default-close").click();
     await tick();
-    expect(qa(el, ".ags-default-menu")).toHaveLength(0);
+    expect(qa(el, ".ags-default-list")).toHaveLength(0);
+    expect(q(el, ".ags-default-value").textContent.trim()).toBe("vLLM (local)");
+  });
+
+  test("the default list is virtualized — it only renders a bounded window of rows", async () => {
+    const many = {};
+    for (let i = 0; i < 50; i++) {
+      many[`p${i}`] = { baseUrl: `http://localhost:${i + 8000}/v1`, model: `m${i}` };
+    }
+    const el = await mount(AGENT(many, "p0"));
+    q(el, ".ags-default-trigger").click();
+    await tick();
+    const rows = qa(el, ".ags-default-row");
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeLessThan(50);
+    // The currently-selected provider sits at the top of the rendered window.
+    expect(rows[0].textContent).toContain("m0");
+    // Clicking a row selects it and closes the list.
+    rows[rows.length - 1].click();
+    await tick();
+    expect(qa(el, ".ags-default-list")).toHaveLength(0);
   });
 
   test("numeric fields are text inputs that strip non-numeric characters", async () => {

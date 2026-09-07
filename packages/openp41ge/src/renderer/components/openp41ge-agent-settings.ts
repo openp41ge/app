@@ -16,7 +16,9 @@
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
+import { ref, createRef } from "lit/directives/ref.js";
 import type { ConfigService } from "../services/config-service";
+import type { PropertyValues } from "lit";
 import { showConfirmModal } from "../components/openp41ge-confirm-modal";
 import {
   PROVIDER_PRESETS,
@@ -76,6 +78,17 @@ export class Openp41geAgentSettings extends LitElement {
   @state() private _testing = false;
   @state() private _testResult: TestResult | null = null;
   @state() private _defaultOpen = false;
+  @state() private _listScrollTop = 0;
+
+  /** Fixed row height of the default-provider virtual list. */
+  private static readonly ROW_H = 44;
+  /** Scrollable viewport height of the default-provider list. */
+  private static readonly LIST_H = 240;
+  /** Rows rendered above and below the visible window. */
+  private static readonly OVERSCAN = 8;
+
+  private _listEl = createRef<HTMLDivElement>();
+  private _pendingScrollTop: number | null = null;
 
   /** DI seam — production shows the confirm modal; tests stub this. */
   _confirm: (opts: {
@@ -96,6 +109,15 @@ export class Openp41geAgentSettings extends LitElement {
     super.disconnectedCallback();
     this.removeEventListener("keydown", this._onKeydown);
     document.removeEventListener("pointerdown", this._onDocPointerDown);
+  }
+
+  protected updated(_changedProperties: PropertyValues): void {
+    super.updated(_changedProperties);
+    if (!this._defaultOpen || !this._listEl.value) return;
+    if (this._pendingScrollTop != null) {
+      this._listEl.value.scrollTop = this._pendingScrollTop;
+      this._pendingScrollTop = null;
+    }
   }
 
   private async _load(): Promise<void> {
@@ -146,13 +168,81 @@ export class Openp41geAgentSettings extends LitElement {
     return providerDisplayName(presetFor(entry[1]), entry[1]);
   }
 
-  private _toggleDefault(): void {
-    this._defaultOpen = !this._defaultOpen;
+  private _providerEntries(): Array<[string, ProviderConfig]> {
+    return Object.entries(this._config?.providers ?? {});
+  }
+
+  private _providerMeta(p: ProviderConfig): string {
+    const parts: string[] = [];
+    if (p.model) parts.push(p.model);
+    const host = endpointHost(p.baseUrl);
+    if (host) parts.push(host);
+    return parts.length ? parts.join(" ·") : "No endpoint configured";
+  }
+
+  private _openDefaultList(): void {
+    const entries = this._providerEntries();
+    const selected = entries.findIndex(([id]) => id === this._config?.providerId);
+    const scrollTop = selected >= 0 ? selected * Openp41geAgentSettings.ROW_H : 0;
+    this._listScrollTop = scrollTop;
+    this._pendingScrollTop = scrollTop;
+    this._defaultOpen = true;
+  }
+
+  private _closeDefaultList(): void {
+    this._defaultOpen = false;
+  }
+
+  private _onListScroll = (e: Event): void => {
+    this._listScrollTop = (e.currentTarget as HTMLDivElement).scrollTop;
+  };
+
+  private _listHeight(count: number): number {
+    return Math.min(count * Openp41geAgentSettings.ROW_H, Openp41geAgentSettings.LIST_H);
+  }
+
+  private _defaultWindow(): { start: number; end: number; topPad: number; bottomPad: number } {
+    const count = this._providerEntries().length;
+    const start = Math.max(
+      0,
+      Math.floor(this._listScrollTop / Openp41geAgentSettings.ROW_H) -
+        Openp41geAgentSettings.OVERSCAN,
+    );
+    const end = Math.min(
+      count,
+      Math.ceil(
+        (this._listScrollTop + Openp41geAgentSettings.LIST_H) / Openp41geAgentSettings.ROW_H,
+      ) + Openp41geAgentSettings.OVERSCAN,
+    );
+    return {
+      start,
+      end,
+      topPad: start * Openp41geAgentSettings.ROW_H,
+      bottomPad: (count - end) * Openp41geAgentSettings.ROW_H,
+    };
   }
 
   private async _selectDefault(id: string): Promise<void> {
     this._defaultOpen = false;
     await this._setActive(id);
+  }
+
+  private _defaultListRow(id: string, p: ProviderConfig): TemplateResult {
+    const isActive = this._config?.providerId === id;
+    return html`
+      <div
+        class="ags-default-row ${isActive ? "is-active" : ""}"
+        role="option"
+        aria-selected=${isActive ? "true" : "false"}
+        @click=${() => this._selectDefault(id)}
+      >
+        <div class="ags-default-row-info">
+          <span class="ags-default-row-name">${providerDisplayName(presetFor(p), p)}</span>
+          <span class="ags-default-row-meta">${this._providerMeta(p)}</span>
+        </div>
+        ${isActive ? html`<span class="ags-default-check">✓</span>` : nothing}
+      </div>
+    `;
   }
 
   private _chevronSvg(): TemplateResult {
@@ -169,6 +259,24 @@ export class Openp41geAgentSettings extends LitElement {
         stroke-linejoin="round"
       >
         <path d="M6 9l6 6 6-6" />
+      </svg>
+    `;
+  }
+
+  private _closeSvg(): TemplateResult {
+    return html`
+      <svg
+        class="ags-default-x"
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M6 6l12 12M18 6L6 18" />
       </svg>
     `;
   }
@@ -550,8 +658,38 @@ export class Openp41geAgentSettings extends LitElement {
           padding: 10px;
           color: var(--text-secondary, #999);
         }
-        .ags-default-wrap {
-          position: relative;
+        .ags-default-head {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+        }
+        .ags-default-head .ags-card-question {
+          flex: 1;
+          min-width: 0;
+          margin: 0;
+        }
+        .ags-default-close {
+          flex-shrink: 0;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          color: var(--text-secondary, #999);
+          background: transparent;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-family: inherit;
+        }
+        .ags-default-close:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .ags-default-close:focus,
+        .ags-default-close:focus-visible {
+          outline: none;
         }
         .ags-default-trigger {
           width: 100%;
@@ -584,40 +722,49 @@ export class Openp41geAgentSettings extends LitElement {
           flex-shrink: 0;
           color: var(--text-secondary, #999);
         }
-        .ags-default-menu {
-          position: absolute;
-          top: calc(100% + 4px);
-          left: 0;
-          right: 0;
-          z-index: 30;
-          list-style: none;
-          margin: 0;
-          padding: 4px;
-          background: var(--bg-primary, #1e1e1e);
-          border: 1px solid var(--divider, #333);
-          border-radius: 8px;
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-          max-height: 220px;
+        .ags-default-list {
+          position: relative;
           overflow-y: auto;
+          overscroll-behavior: contain;
         }
-        .ags-default-option {
+        .ags-default-spacer {
+          pointer-events: none;
+        }
+        .ags-default-row {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 10px;
-          border-radius: 6px;
+          box-sizing: border-box;
+          height: 44px;
+          padding: 0 10px;
           cursor: pointer;
+          border-bottom: 1px solid var(--divider, #2f3031);
           color: var(--text-primary, #ddd);
         }
-        .ags-default-option:hover {
+        .ags-default-row:hover {
           background: var(--bg-active, #37373d);
         }
-        .ags-default-option.is-active {
+        .ags-default-row.is-active {
           color: var(--accent, #569cd6);
         }
-        .ags-default-option-label {
+        .ags-default-row-info {
           flex: 1;
           min-width: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 2px;
+        }
+        .ags-default-row-name {
+          font-size: 13px;
+          font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .ags-default-row-meta {
+          font-size: 12px;
+          color: var(--text-secondary, #999);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -917,54 +1064,65 @@ export class Openp41geAgentSettings extends LitElement {
               </div>
 
               <div class="ags-card ags-input-card ags-card-gap">
-                <label class="ags-card-question">Which provider is the default?</label>
                 ${
                   this._loading || entries.length === 0
                     ? html`<p class="ags-card-help">Add a provider above to set a default.</p>`
                     : html`
-                        <div class="ags-default-wrap">
-                          <button
-                            class="ags-default-trigger"
-                            type="button"
-                            aria-haspopup="listbox"
-                            aria-expanded=${this._defaultOpen ? "true" : "false"}
-                            @click=${() => this._toggleDefault()}
-                          >
-                            <span class="ags-default-value">${this._activeProviderName()}</span>
-                            ${this._chevronSvg()}
-                          </button>
+                        <div class="ags-default-head">
+                          <label class="ags-card-question">Which provider is the default?</label>
                           ${
                             this._defaultOpen
                               ? html`
-                                  <ul class="ags-default-menu" role="listbox">
-                                    ${entries.map(
-                                      ([id, p]) => html`
-                                        <li
-                                          class="ags-default-option ${
-                                            this._config?.providerId === id ? "is-active" : ""
-                                          }"
-                                          role="option"
-                                          aria-selected=${
-                                            this._config?.providerId === id ? "true" : "false"
-                                          }
-                                          @click=${() => this._selectDefault(id)}
-                                        >
-                                          <span class="ags-default-option-label">
-                                            ${providerDisplayName(presetFor(p), p)}
-                                          </span>
-                                          ${
-                                            this._config?.providerId === id
-                                              ? html`<span class="ags-default-check">✓</span>`
-                                              : nothing
-                                          }
-                                        </li>
-                                      `,
-                                    )}
-                                  </ul>
+                                  <button
+                                    class="ags-default-close"
+                                    type="button"
+                                    aria-label="Close selection"
+                                    @click=${() => this._closeDefaultList()}
+                                  >
+                                    ${this._closeSvg()}
+                                  </button>
                                 `
                               : nothing
                           }
                         </div>
+                        ${
+                          this._defaultOpen
+                            ? html`
+                                <div
+                                  class="ags-default-list"
+                                  ${ref(this._listEl)}
+                                  style="height:${this._listHeight(entries.length)}px"
+                                  role="listbox"
+                                  @scroll=${this._onListScroll}
+                                >
+                                  <div
+                                    class="ags-default-spacer"
+                                    style="height:${this._defaultWindow().topPad}px"
+                                  ></div>
+                                  ${entries
+                                    .slice(this._defaultWindow().start, this._defaultWindow().end)
+                                    .map(([id, p]) => this._defaultListRow(id, p))}
+                                  <div
+                                    class="ags-default-spacer"
+                                    style="height:${this._defaultWindow().bottomPad}px"
+                                  ></div>
+                                </div>
+                              `
+                            : html`
+                                <button
+                                  class="ags-default-trigger"
+                                  type="button"
+                                  aria-haspopup="listbox"
+                                  aria-expanded="false"
+                                  @click=${() => this._openDefaultList()}
+                                >
+                                  <span class="ags-default-value"
+                                    >${this._activeProviderName()}</span
+                                  >
+                                  ${this._chevronSvg()}
+                                </button>
+                              `
+                        }
                         <p class="ags-card-help">
                           Chats use the default provider whenever you don't pick another.
                         </p>
