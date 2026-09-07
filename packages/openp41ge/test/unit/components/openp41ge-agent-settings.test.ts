@@ -77,9 +77,11 @@ describe("openp41ge-agent-settings", () => {
     expect(row.querySelector(".ags-provider-meta").textContent).toContain(
       "Qwen2.5-Coder-7B-Instruct",
     );
-    // No per-row selection control; the default is chosen with the second card's select.
+    // No per-row selection control; the default is chosen with the second card's dropdown.
     expect(row.querySelector(".ags-provider-radio")).toBeNull();
-    expect(q(el, ".ags-default-select").value).toBe("vllm");
+    expect(q(el, ".ags-default-trigger .ags-default-value").textContent.trim()).toBe(
+      "vLLM (local)",
+    );
   });
 
   test("empty provider list shows no rows and a prominent add row", async () => {
@@ -178,19 +180,40 @@ describe("openp41ge-agent-settings", () => {
     expect(lastSet.value.providerId).toBe("vllm");
   });
 
-  test("the default-provider select persists providerId", async () => {
+  test("the default-provider dropdown lists providers and persists providerId", async () => {
     const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
-    const select = q(el, ".ags-default-select");
-    expect(select).not.toBeNull();
-    expect([...select.options].map((o) => o.value)).toEqual(["vllm", "openai"]);
-    expect(select.value).toBe("vllm");
-    select.value = "openai";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-    await tick();
+    const trigger = q(el, ".ags-default-trigger");
+    expect(trigger).not.toBeNull();
+    expect(q(el, ".ags-default-value").textContent.trim()).toBe("vLLM (local)");
 
+    // Open the dropdown and check the listed providers.
+    trigger.click();
+    await tick();
+    const opts = qa(el, ".ags-default-option");
+    expect(
+      opts.map((o) => o.querySelector(".ags-default-option-label").textContent.trim()),
+    ).toEqual(["vLLM (local)", "OpenAI"]);
+    expect(opts[0].classList.contains("is-active")).toBe(true);
+
+    // Select OpenAI -> closes the dropdown and persists the default.
+    opts[1].click();
+    await tick();
     const lastSet = el.configService.sets[el.configService.sets.length - 1];
     expect(lastSet.key).toBe("agent");
     expect(lastSet.value.providerId).toBe("openai");
+    expect(qa(el, ".ags-default-menu")).toHaveLength(0);
+    expect(q(el, ".ags-default-value").textContent.trim()).toBe("OpenAI");
+  });
+
+  test("the default-provider dropdown toggles closed on a second trigger click", async () => {
+    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
+    const trigger = q(el, ".ags-default-trigger");
+    trigger.click();
+    await tick();
+    expect(qa(el, ".ags-default-menu")).toHaveLength(1);
+    trigger.click();
+    await tick();
+    expect(qa(el, ".ags-default-menu")).toHaveLength(0);
   });
 
   test("numeric fields are text inputs that strip non-numeric characters", async () => {

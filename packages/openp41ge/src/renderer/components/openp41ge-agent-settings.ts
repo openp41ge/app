@@ -75,6 +75,7 @@ export class Openp41geAgentSettings extends LitElement {
   @state() private _saving = false;
   @state() private _testing = false;
   @state() private _testResult: TestResult | null = null;
+  @state() private _defaultOpen = false;
 
   /** DI seam — production shows the confirm modal; tests stub this. */
   _confirm: (opts: {
@@ -87,12 +88,14 @@ export class Openp41geAgentSettings extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this.addEventListener("keydown", this._onKeydown);
+    document.addEventListener("pointerdown", this._onDocPointerDown);
     void this._load();
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.removeEventListener("keydown", this._onKeydown);
+    document.removeEventListener("pointerdown", this._onDocPointerDown);
   }
 
   private async _load(): Promise<void> {
@@ -114,13 +117,61 @@ export class Openp41geAgentSettings extends LitElement {
     };
   }
 
-  /** Escape closes the top drawer. */
+  /** Escape closes the default-provider dropdown first, then the top drawer. */
   private _onKeydown = (e: KeyboardEvent): void => {
     if (e.key !== "Escape") return;
+    if (this._defaultOpen) {
+      this._defaultOpen = false;
+      return;
+    }
     if (this._drawers.length === 0) return;
     e.preventDefault();
     this._closeTopDrawer();
   };
+
+  private _onDocPointerDown = (e: PointerEvent): void => {
+    if (!this._defaultOpen) return;
+    // Events from inside the shadow root retarget to the host, so a target of
+    // `this` means the click was inside the component.
+    if (e.target === this) return;
+    this._defaultOpen = false;
+  };
+
+  /** The display name of the currently-selected default provider. */
+  private _activeProviderName(): string {
+    const config = this._config;
+    const id = config?.providerId;
+    const entry = Object.entries(config?.providers ?? {}).find(([key]) => key === id);
+    if (!entry) return "Select a provider";
+    return providerDisplayName(presetFor(entry[1]), entry[1]);
+  }
+
+  private _toggleDefault(): void {
+    this._defaultOpen = !this._defaultOpen;
+  }
+
+  private async _selectDefault(id: string): Promise<void> {
+    this._defaultOpen = false;
+    await this._setActive(id);
+  }
+
+  private _chevronSvg(): TemplateResult {
+    return html`
+      <svg
+        class="ags-default-chevron"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    `;
+  }
 
   // ── Drawer stack mechanics (mirrors the Window Manager) ─────────────────
 
@@ -499,25 +550,81 @@ export class Openp41geAgentSettings extends LitElement {
           padding: 10px;
           color: var(--text-secondary, #999);
         }
-        .ags-default-select {
+        .ags-default-wrap {
+          position: relative;
+        }
+        .ags-default-trigger {
           width: 100%;
           height: 32px;
-          padding: 0 8px;
           box-sizing: border-box;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 0 10px;
           font-size: 13px;
           color: var(--text-primary, #ddd);
-          background: transparent;
-          border: none;
-          outline: none;
-          font-family: inherit;
+          background: var(--bg-primary, #1e1e1e);
+          border: 1px solid var(--divider, #333);
+          border-radius: 6px;
           cursor: pointer;
+          font-family: inherit;
+          text-align: left;
         }
-        .ags-default-select:focus,
-        .ags-default-select:focus-visible {
-          outline: none;
+        .ags-default-trigger:hover {
+          border-color: var(--accent, #569cd6);
         }
-        .ags-default-select:hover {
-          background: rgba(255, 255, 255, 0.05);
+        .ags-default-value {
+          flex: 1;
+          min-width: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .ags-default-chevron {
+          flex-shrink: 0;
+          color: var(--text-secondary, #999);
+        }
+        .ags-default-menu {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          z-index: 30;
+          list-style: none;
+          margin: 0;
+          padding: 4px;
+          background: var(--bg-primary, #1e1e1e);
+          border: 1px solid var(--divider, #333);
+          border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+          max-height: 220px;
+          overflow-y: auto;
+        }
+        .ags-default-option {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          color: var(--text-primary, #ddd);
+        }
+        .ags-default-option:hover {
+          background: var(--bg-active, #37373d);
+        }
+        .ags-default-option.is-active {
+          color: var(--accent, #569cd6);
+        }
+        .ags-default-option-label {
+          flex: 1;
+          min-width: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .ags-default-check {
+          flex-shrink: 0;
+          color: var(--accent, #569cd6);
         }
 
         /* Mask over the base while a drawer is open. */
@@ -815,19 +922,49 @@ export class Openp41geAgentSettings extends LitElement {
                   this._loading || entries.length === 0
                     ? html`<p class="ags-card-help">Add a provider above to set a default.</p>`
                     : html`
-                        <select
-                          class="ags-default-select"
-                          .value=${this._config?.providerId ?? ""}
-                          @change=${(e: Event) =>
-                            this._setActive((e.target as HTMLSelectElement).value)}
-                        >
-                          ${entries.map(
-                            ([id, p]) =>
-                              html`<option value=${id}>
-                                ${providerDisplayName(presetFor(p), p)}
-                              </option>`,
-                          )}
-                        </select>
+                        <div class="ags-default-wrap">
+                          <button
+                            class="ags-default-trigger"
+                            type="button"
+                            aria-haspopup="listbox"
+                            aria-expanded=${this._defaultOpen ? "true" : "false"}
+                            @click=${() => this._toggleDefault()}
+                          >
+                            <span class="ags-default-value">${this._activeProviderName()}</span>
+                            ${this._chevronSvg()}
+                          </button>
+                          ${
+                            this._defaultOpen
+                              ? html`
+                                  <ul class="ags-default-menu" role="listbox">
+                                    ${entries.map(
+                                      ([id, p]) => html`
+                                        <li
+                                          class="ags-default-option ${
+                                            this._config?.providerId === id ? "is-active" : ""
+                                          }"
+                                          role="option"
+                                          aria-selected=${
+                                            this._config?.providerId === id ? "true" : "false"
+                                          }
+                                          @click=${() => this._selectDefault(id)}
+                                        >
+                                          <span class="ags-default-option-label">
+                                            ${providerDisplayName(presetFor(p), p)}
+                                          </span>
+                                          ${
+                                            this._config?.providerId === id
+                                              ? html`<span class="ags-default-check">✓</span>`
+                                              : nothing
+                                          }
+                                        </li>
+                                      `,
+                                    )}
+                                  </ul>
+                                `
+                              : nothing
+                          }
+                        </div>
                         <p class="ags-card-help">
                           Chats use the default provider whenever you don't pick another.
                         </p>
