@@ -50,7 +50,7 @@ packages/
 ├── openp41ge-file-editor/ # File editor web component
 ├── openp41ge-terminal/    # Terminal emulator (xterm.js)
 ├── openp41ge-git-repository/  # Git repository browser
-├── openp41ge-agent-chat/  # AI chat panel
+├── openp41ge-agents/  # AI chat panel
 ├── openp41ge-tabs/        # Tab/drag-and-drop components
 ├── openp41ge-logger/      # Structured logging
 ├── openp41ge-uikit/       # Shared UI toolkit (components, themes, tabs, etc.)

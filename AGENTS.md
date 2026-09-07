@@ -53,7 +53,7 @@ openp41ge/
 │   ├── openp41ge-piece-tree/             # Piece-tree text buffer backing the editor
 │   ├── openp41ge-filesystem/             # Filesystem abstraction / models
 │   ├── openp41ge-terminal/               # Terminal emulator (xterm.js + child process)
-│   ├── openp41ge-agent-chat/             # AI chat panel
+│   ├── openp41ge-agents/             # AI chat panel
 │   ├── openp41ge-logger/                 # Logging utility
 │   ├── openp41ge-syntax-highlighting/    # Syntax highlighting engine
 │   ├── openp41ge-uikit/                  # Shared UI toolkit (Lit components, themes)
@@ -62,7 +62,7 @@ openp41ge/
 │   ├── openp41ge-git/                    # Git integration utilities
 │   └── openp41ge-constants/              # Shared constants
 ├── demos/
-│   ├── openp41ge-agent-chat-demo/        # Demo app for the chat panel
+│   ├── openp41ge-agents-demo/        # Demo app for the chat panel
 │   ├── openp41ge-file-editor-demo/       # Demo app for the file editor
 │   ├── openp41ge-git-demo/               # Demo app for git utilities
 │   ├── openp41ge-git-repository-demo/    # Demo app for the git browser
@@ -83,16 +83,16 @@ All operations use **Nx** directly — there are no `package.json` scripts.
 
 Most targets are **per-project**, so they need `run-many`. Only `lint`, `knip`, and `format*` are root-project (`openp41ge-monorepo`) targets that can be run bare.
 
-| Command                      | What it does                                        |
-| ---------------------------- | --------------------------------------------------- |
-| `nx run-many -t build`       | Build all projects (libs → demos → Electron app)    |
-| `nx run openp41ge:dev`       | Start Electron app in dev mode (vite + Electron)    |
-| `nx run-many -t test`        | Run vitest tests across all projects that have them |
-| `nx run-many -t typecheck`   | TypeScript type-checking across all packages        |
+| Command                      | What it does                                                        |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `nx run-many -t build`       | Build all projects (libs → demos → Electron app)                    |
+| `nx run openp41ge:dev`       | Start Electron app in dev mode (vite + Electron)                    |
+| `nx run-many -t test`        | Run vitest tests across all projects that have them                 |
+| `nx run-many -t typecheck`   | TypeScript type-checking across all packages                        |
 | `nx lint`                    | oxlint across `packages/` and `demos/` (config in `.oxlintrc.json`) |
-| `nx knip`                    | Dead code detection                                 |
-| `nx format` / `format:check` | Prettier write / check                              |
-| `nx run-many -t clean`       | Remove all `dist/` directories                      |
+| `nx knip`                    | Dead code detection                                                 |
+| `nx format` / `format:check` | Prettier write / check                                              |
+| `nx run-many -t clean`       | Remove all `dist/` directories                                      |
 
 **There is no `quality` or `e2e` target, and no Playwright in the repo.** Use the **quality** skill, which runs the tools above in sequence. Before quoting a command from this table, confirm it still exists — `nx show projects --with-target <target>` returns `[]` if it does not.
 
@@ -268,7 +268,7 @@ Read the result in this order — each answers a different question:
 
 The Electron desktop app. Owns the layout data model (`src/layout/`), renderer Web Components (`src/renderer/components/`), controller system (`src/renderer/controllers/`), Electron main process (`electron/`), and IPC handlers (`electron/ipc-handlers/`).
 
-Other packages (`openp41ge-editor-engine`, `openp41ge-terminal`, `openp41ge-agent-chat`, `openp41ge-tabs`, `openp41ge-uikit`) communicate with the platform exclusively through:
+Other packages (`openp41ge-editor-engine`, `openp41ge-terminal`, `openp41ge-agents`, `openp41ge-tabs`, `openp41ge-uikit`) communicate with the platform exclusively through:
 
 1. **DOM CustomEvents** — dispatched on the element or `document`, bubbles up.
 2. **IPC** through the Electron preload bridge (`window.openp41ge.*`).

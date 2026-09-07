@@ -7,7 +7,7 @@
 Add a full **AI agent chat** surface to Openp41ge:
 
 1. **Central grid chat panes** — a new `agent-chat` app type. Chat conversations open as tabs in the grid (`<openp41ge-agent-chat>`, upgraded). All chats live and run in the central grid.
-2. **Per-window chat-list sidebar** — a new system tab listing all chats, with **full-content search** over message text **and tool-call commands** (names + args, *not* responses). Each chat row can be **opened (expanded) to glance at the list of tool calls** made so far. Chats are shared/persisted app-wide, but a chat may be **open in at most one window** ("opened once"): the sidebar shows an indicator when a chat is open in another window, plus a **highlight button** that paints a blue highlight on that chat's tab handle in the other window (no activation/focus).
+2. **Per-window chat-list sidebar** — a new system tab listing all chats, with **full-content search** over message text **and tool-call commands** (names + args, _not_ responses). Each chat row can be **opened (expanded) to glance at the list of tool calls** made so far. Chats are shared/persisted app-wide, but a chat may be **open in at most one window** ("opened once"): the sidebar shows an indicator when a chat is open in another window, plus a **highlight button** that paints a blue highlight on that chat's tab handle in the other window (no activation/focus).
 3. **Real agent runtime** — a provider-agnostic runtime executing against a **local vLLM server** now (OpenAI-compatible `/v1/chat/completions` SSE streaming), architected so other providers can be added later. **Provider setup lives in the system overlay** (a new "Agent" overlay tab).
 
 ## Rationale / Current State
@@ -98,11 +98,13 @@ Add a full **AI agent chat** surface to Openp41ge:
 ## Files Changed
 
 **Package (`openp41ge-agent-chat`)**
+
 - `src/ui/openp41ge-agent-chat.ts` — message/tool-call model + rendering, streaming, connection strip, imperative API.
 - `src/index.ts` — export new types.
 - `test/unit/chat/openp41ge-agent-chat.test.ts` — extend.
 
 **Main (`packages/openp41ge`)**
+
 - `src/main/interfaces/chat-provider.ts`, `src/main/interfaces/tool.ts` — new.
 - `src/main/services/chat-provider-registry.ts`, `vllm-chat-provider.ts`, `tool-registry.ts`, `agent-runtime.ts`, `chat-store-service.ts` — new.
 - `src/main/interfaces/git-commit-service.ts` — untouched; `src/main/index.ts` + `electron/openp41ge-application.ts` — wire new services.
@@ -110,6 +112,7 @@ Add a full **AI agent chat** surface to Openp41ge:
 - `electron/ipc-handlers/chat-handlers.ts` — new; `electron/preload.cjs` + `src/renderer/global.d.ts` — `window.openp41ge.chat.*`.
 
 **Platform renderer (`packages/openp41ge`)**
+
 - `src/renderer/apps/agent-chat/agent-chat-controller.ts` + `index.ts` — new grid pane; register in `src/renderer/bootstrap/steps/register-app-types.step.ts`; add `id: "agent-chat"` to `src/renderer/app-types.ts` `APP_TYPES`.
 - `src/renderer/apps/system-tabs/agent-chat-system-tab.ts` — new sidebar list; register in `apps/system-tabs/index.ts`.
 - `src/renderer/apps/system-tabs/agent-chat-settings-system-tab.ts` — new overlay tab; register via `systemOverlayService.registerTab(...)` in `register-app-types.step.ts`.
@@ -117,6 +120,7 @@ Add a full **AI agent chat** surface to Openp41ge:
 - `src/renderer/models/chat-store-model.ts`, `chat-runtime-model.ts` (+ Test impls) — new; expose in `expose-test-models.step.ts`.
 
 **Tests**
+
 - New: unit (`vllm-chat-provider` SSE parse, `agent-runtime` loop w/ `TestChatProvider`+fake tool, `chat-store` search/open-state, `chat-search` matcher incl. tool-command-only), integration (`chat-handlers` IPC shapes, sidebar `agent-chat-system-tab` render/expand/indicator, `agent-chat-controller` with `TestChat*Models`).
 
 ## SOLID Review
@@ -140,6 +144,7 @@ Add a full **AI agent chat** surface to Openp41ge:
 ## Testing Strategy
 
 **Unit**
+
 - `VllmChatProvider`: SSE parser (mock stream text: content deltas, `tool_calls` items, `[DONE]`), message-payload assembly, `ping()`; abort cancels.
 - `AgentTool`/`ToolRegistry`: schema validation, `isAvailable` gating, result/error in-band (no throws).
 - `AgentRuntime` (TestProvider + fake tool): message sequence (system → user → tool_calls → tool result → assistant), max-turns guard, abort mid-stream, persistence calls.
@@ -147,12 +152,14 @@ Add a full **AI agent chat** surface to Openp41ge:
 - GUI component: setChat renders messages + tool rows; appendDelta stream assembly; setToolCallState status transitions; send event payload.
 
 **Integration**
+
 - `chat-handlers` IPC method shapes + broadcast events (`chat:changed`, `chat:delta`, `chat:open-state`, `chat:highlight`).
 - Sidebar `AgentChatSystemTabController` with `TestChatStoreModel`: list render, search filter + counts, row expand → tool-call sublist, indicator when open in another window, highlight button dispatch.
 - Grid `AgentChatController` with `TestChat*Models`: mount reads `config.chatId`, send→runtime, delta→component, snapshot/restore round-trip.
 - Open-once: opening a chat already open in another window → no duplicate + toast (per Open Question 2).
 
 **Manual / E2E**
+
 - `debug` skill (`OPENP41GE_DEVTOOLS=1`): configure overlay Agent tab against a local vLLM (`docker run ... --api-server`), new chat → streamed reply + tool calls, sidebar list/search/expand, two windows → indicator + Highlight paints blue handle only.
 - `test-cross-window-drag` skill if tool rows become draggable (future), and to confirm chat tabs drag between windows like other grid tabs.
 
@@ -170,6 +177,40 @@ Add a full **AI agent chat** surface to Openp41ge:
 5. **Default sidebar side** — default `right` (matches Explorer/Git). Confirm (chat often left).
 6. **Cmd+N picker** — add `agent-chat` to `APP_TYPES` so it appears in the pane picker, or keep it sidebar/overlay-only for v1? Default: include in `APP_TYPES`.
 7. **System prompt / scope** — default: a built-in default system prompt, and chat tabs record `config.scopeRoots` (already anticipated by `scope-expansion-utils`) but v1 tools are **not** clamped to scope roots (flag if you want closed-scope enforcement now).
+
+## Implementation Status (2026-09-04)
+
+Core implementation is in place and typecheck/lint/unit+integration tests pass:
+
+- **Main process**: `ChatProvider`/`ToolDefinition` interfaces, `ChatProviderRegistry`
+  (provider factories — Open/Closed), `VllmChatProvider` (OpenAI-compatible SSE),
+  `ToolRegistry` + `registerBuiltinTools` (`read_file`/`search_files`/`run_command`),
+  `AgentRuntime` (agent loop, tool execution, max-turns guard, abort), `ChatStoreService`
+  (CRUD + search + open-once + atomic persistence to `~/.openp41ge/chats.json`),
+  `AgentRuntimeHooks` seam. Wired in `openp41ge-application.ts`.
+- **Config**: `UserConfig.agent` added (provider-keyed shape) in `config-service.ts`.
+- **IPC/preload/global.d.ts**: `chat:*` bridge + broadcasts
+  (`chat:changed`/`delta`/`tool`/`status`/`open-state`/`highlight`).
+- **Renderer**: `agent-chat` grid app type + `AgentChatController` (streaming,
+  tool rows, abort, snapshot/restore, `__pendingChatId`), `Chat-open-handler`
+  (preview/pin), `ChatStoreModel`/`ChatRuntimeModel` (Ipc+Test) exposed on
+  `window.__testModels`, per-window `agent-chat` sidebar system tab (search,
+  tool-call sublists, open-once indicator + Highlight), `agent` system-overlay
+  settings tab + `<openp41ge-agent-settings>`, `chat-highlight` deep-shadow util,
+  `chatIcon`, `APP_TYPES` entry.
+- **Agent-chat UI upgraded**: `<openp41ge-agent-chat>` renders full transcript, tool
+  rows, streaming caret, abort affordance, provider connection strip; imperative API
+  (`setChat`/`appendDelta`/`setToolCallState`/`setProviderStatus`).
+- **Cmd+W refinement** (workspace windows): closes grid tabs first in reverse/LIFO
+  order (`resolveCmdWTarget` in `services/cmd-w-target.ts`, column order left→right,
+  last tab of rightmost column first), independent of sidebar/grid focus and never
+  touching sidebar (system) tabs; once no grid tabs remain the next Cmd+W closes the
+  window. Non-workspace windows (Window Manager) still close on Cmd+W. Covered by
+  `test/unit/services/cmd-w-target.test.ts` (5 tests) + manual CDP verification.
+
+**Remaining (manual)**: end-to-end verification against a running local vLLM server
+via the `debug` skill (configure overlay Agent tab → new chat → streamed reply +
+tool calls). Cross-window drag of chat tabs is future work per the plan scope.
 
 ## Completion Criteria
 

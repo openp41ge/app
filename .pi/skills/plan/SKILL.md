@@ -187,7 +187,7 @@ openp41ge/
 │   ├── openp41ge-file-editor/        # File editor web component (<file-editor>)
 │   ├── openp41ge-git-repository/     # Git repository browser
 │   ├── openp41ge-terminal/           # Terminal emulator (xterm.js + child process)
-│   ├── openp41ge-agent-chat/         # AI chat panel
+│   ├── openp41ge-agents/         # AI chat panel
 │   └── openp41ge-logger/             # Logging utility shared across packages
 ├── test/
 │   └── e2e/                      # Playwright E2E tests
@@ -266,7 +266,7 @@ Workspace
 
 ### Communication Between Packages
 
-Other packages (`openp41ge-file-editor`, `openp41ge-terminal`, `openp41ge-git-repository`, `openp41ge-agent-chat`)
+Other packages (`openp41ge-file-editor`, `openp41ge-terminal`, `openp41ge-git-repository`, `openp41ge-agents`)
 communicate with the openp41ge platform exclusively through:
 
 1. **DOM CustomEvents** — dispatched on the element or `document`, bubbles up.

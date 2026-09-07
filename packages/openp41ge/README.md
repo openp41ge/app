@@ -6,8 +6,15 @@ column-based grid layout with tabs, drag-and-drop, and multi-window support.
 ## Logs & Debugging
 
 The app has a **permanent, structured log bus** built in. Every feature emits through
-`createLogger("namespace")` (from `openp41ge-logger`); entries are captured in-memory,
-printed to the console, and persisted to disk.
+`createLogger(system, name)` (from `openp41ge-logger`), where `system` is the owning
+plugin id (or the platform) and `name` is the stream. A system is either **the platform**
+(`openp41ge` — every logger inside the `openp41ge` package) or **a plugin** (a separate
+package named `openp41ge-*`, e.g. `openp41ge-terminal`). Logs are organised by system,
+not a flat list of stream names. Entries are captured in-memory, printed to the console,
+and persisted to disk. The **Logs sidebar lists one row per system**; clicking a system
+opens a **file-backed grid log tab** — a flat, datetime-ordered list that starts at the
+bottom of the newest daily file and, as you scroll up, loads older lines from that file
+and then previous days (backward paging).
 
 ### Log files
 
