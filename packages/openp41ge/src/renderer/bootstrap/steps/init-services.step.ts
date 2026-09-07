@@ -12,7 +12,7 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:init-services");
+const log = createLogger("openp41ge", "init-services");
 
 export class InitServicesStep implements IStartupStep {
   readonly name = "init-services";

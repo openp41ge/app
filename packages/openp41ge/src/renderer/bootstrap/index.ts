@@ -11,6 +11,7 @@ export { LoadConfigStep } from "./steps/load-config.step";
 export { RegisterEventListenersStep } from "./steps/register-event-listeners.step";
 export { FetchInitialStateStep } from "./steps/fetch-initial-state.step";
 export { SubscribeStateUpdatesStep } from "./steps/subscribe-state-updates.step";
+export { RegisterTabActivationRecorderStep } from "./steps/register-tab-activation-recorder.step";
 export { RegisterShortcutsStep } from "./steps/register-shortcuts.step";
 export { RegisterIpcListenersStep } from "./steps/register-ipc-listeners.step";
 export { StartQuoteControllerStep } from "./steps/start-quote-controller.step";

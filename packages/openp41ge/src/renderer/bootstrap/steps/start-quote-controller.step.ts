@@ -10,7 +10,7 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:start-quote-controller");
+const log = createLogger("openp41ge", "start-quote-controller");
 
 export class StartQuoteControllerStep implements IStartupStep {
   readonly name = "start-quote-controller";

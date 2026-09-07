@@ -3,7 +3,7 @@ import { computeLayout } from "../../layout/compute-layout";
 import type { IWorkspaceStateManager } from "../interfaces/workspace-state-manager";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("workspace-state-manager");
+const log = createLogger("openp41ge", "workspace-state-manager");
 
 /**
  * Observable workspace state manager.

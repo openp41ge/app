@@ -5,7 +5,7 @@ import { cleanupWorkspace } from "../../layout/grid-operations.js";
 import type { IOperationDispatcher, BroadcastFn } from "../interfaces/operation-dispatcher.js";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("operation-dispatcher");
+const log = createLogger("openp41ge", "operation-dispatcher");
 
 /**
  * Dispatches layout operations and manages workspace state.

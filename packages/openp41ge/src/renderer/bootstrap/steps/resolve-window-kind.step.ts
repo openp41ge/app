@@ -17,7 +17,7 @@ import type { StartupContext } from "../startup-context";
 import { workspaceFileService } from "../../services/workspace-file-service";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:resolve-window-kind");
+const log = createLogger("openp41ge", "resolve-window-kind");
 
 export class ResolveWindowKindStep implements IStartupStep {
   readonly name = "resolve-window-kind";

@@ -31,6 +31,9 @@ import { ZoomService } from "../services/zoom-service";
 import { ConfigService } from "../services/config-service";
 import { FileOpenHandler } from "../services/file-open-handler";
 import { CommitOpenHandler } from "../services/commit-open-handler";
+import { AgentsOpenHandler } from "../services/agents-open-handler";
+import { LogOpenHandler } from "../services/log-open-handler";
+import { SettingsOpenHandler } from "../services/settings-open-handler";
 import { ContextMenuBuilder } from "../services/context-menu-builder";
 import { QuoteController } from "../services/quote-controller";
 import { FileDropHandler } from "../services/file-drop-handler";
@@ -54,6 +57,9 @@ export class StartupContext {
   readonly configService: ConfigService;
   readonly fileOpenHandler: IFileOpenHandler;
   readonly commitOpenHandler: CommitOpenHandler;
+  readonly agentsOpenHandler: AgentsOpenHandler;
+  readonly logOpenHandler: LogOpenHandler;
+  readonly settingsOpenHandler: SettingsOpenHandler;
   readonly contextMenuBuilder: IContextMenuBuilder;
   readonly quoteController: IQuoteController;
   readonly fileDropHandler: IFileDropHandler;
@@ -111,6 +117,9 @@ export class StartupContext {
     this.configService = new ConfigService();
     this.fileOpenHandler = new FileOpenHandler();
     this.commitOpenHandler = new CommitOpenHandler();
+    this.agentsOpenHandler = new AgentsOpenHandler();
+    this.logOpenHandler = new LogOpenHandler();
+    this.settingsOpenHandler = new SettingsOpenHandler();
     this.contextMenuBuilder = new ContextMenuBuilder();
     this.quoteController = new QuoteController();
     this.fileDropHandler = new FileDropHandler();
@@ -127,6 +136,9 @@ export class StartupContext {
     this.contextMenuBuilder.init(this.commandBus);
     this.fileOpenHandler.init(this.commandBus, this.workspaceState);
     this.commitOpenHandler.init(this.commandBus, this.workspaceState);
+    this.agentsOpenHandler.init(this.commandBus, this.workspaceState);
+    this.logOpenHandler.init(this.commandBus, this.workspaceState);
+    this.settingsOpenHandler.init(this.commandBus, this.workspaceState);
     this.fileDropHandler.init(this.commandBus);
 
     // Initialize Openp41geTabsEventHandler to handle tab-grid custom events

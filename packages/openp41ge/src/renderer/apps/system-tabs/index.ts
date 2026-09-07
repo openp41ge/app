@@ -6,6 +6,15 @@ import type { SystemTabRegistration } from "../../controllers/types";
 import { ExplorerSystemTabController } from "./explorer-system-tab";
 import { CommitSearchSystemTabController } from "./commit-search-system-tab";
 import { SearchSystemTabController } from "./search-system-tab";
+import { AgentsSystemTabController } from "./agents-system-tab";
+import { LogsSystemTabController } from "./logs-system-tab";
+import {
+  explorerSettings,
+  agentsSettings,
+  gitSettings,
+  searchSettings,
+  logsSettings,
+} from "../settings/index";
 
 export const explorerSystemTabRegistration: SystemTabRegistration = {
   id: "explorer",
@@ -14,6 +23,7 @@ export const explorerSystemTabRegistration: SystemTabRegistration = {
   description: "Browse project files and folders",
   defaultSide: "right",
   createController: (tabId: string) => new ExplorerSystemTabController(tabId),
+  settings: explorerSettings,
 };
 
 export const gitSystemTabRegistration: SystemTabRegistration = {
@@ -23,6 +33,7 @@ export const gitSystemTabRegistration: SystemTabRegistration = {
   description: "Browse commit history across repositories",
   defaultSide: "right",
   createController: (tabId: string) => new CommitSearchSystemTabController(tabId),
+  settings: gitSettings,
 };
 
 export const searchSystemTabRegistration: SystemTabRegistration = {
@@ -32,6 +43,27 @@ export const searchSystemTabRegistration: SystemTabRegistration = {
   description: "Full-text search across files",
   defaultSide: "left",
   createController: (tabId: string) => new SearchSystemTabController(tabId),
+  settings: searchSettings,
+};
+
+export const agentsSystemTabRegistration: SystemTabRegistration = {
+  id: "agents",
+  label: "Agents",
+  icon: "\uD83E\uDD16",
+  description: "AI agent conversations",
+  defaultSide: "right",
+  createController: (tabId: string) => new AgentsSystemTabController(tabId),
+  settings: agentsSettings,
+};
+
+export const logsSystemTabRegistration: SystemTabRegistration = {
+  id: "logs",
+  label: "Logs",
+  icon: "\u{1F4CB}",
+  description: "Browse registered application log streams",
+  defaultSide: "right",
+  createController: (tabId: string) => new LogsSystemTabController(tabId),
+  settings: logsSettings,
 };
 
 /** All system tab registrations for bulk registration. */
@@ -39,4 +71,6 @@ export const allSystemTabRegistrations: SystemTabRegistration[] = [
   explorerSystemTabRegistration,
   gitSystemTabRegistration,
   searchSystemTabRegistration,
+  agentsSystemTabRegistration,
+  logsSystemTabRegistration,
 ];

@@ -8,13 +8,13 @@
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { emitEvent } from "../../app";
+import { resolveCmdWTarget } from "../../services/cmd-w-target";
+import { TabActivationHistory } from "../../services/tab-activation-history";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:register-shortcuts");
+const log = createLogger("openp41ge", "register-shortcuts");
 
 import { showCloneDialog } from "../../components/openp41ge-worktree-controller";
-import { Openp41geTabsEventHandler } from "../../services/openp41ge-tabs-event-handler";
-import { systemOverlayService } from "../../services/system-overlay-service";
 
 export class RegisterShortcutsStep implements IStartupStep {
   readonly name = "register-shortcuts";
@@ -42,27 +42,33 @@ export class RegisterShortcutsStep implements IStartupStep {
       key: "w",
       code: "KeyW",
       handler: () => {
+        // Non-workspace windows (e.g. the Window Manager) have no grid to
+        // close a tab in — Cmd+W closes the window itself.
+        if (context.windowType !== "workspace") {
+          window.openp41ge.window.close();
+          return;
+        }
         try {
-          // Close the tab in the focused cell using the last focused column.
-          // This is handled in the renderer (not IPC) so we can use the
-          // focus tracking from Openp41geTabsEventHandler.
           const ws = context.workspaceState.getWorkspace();
-          if (!ws) return;
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
-          const win = ws.windows.find((w) => w.id === myWindowId);
-          if (!win) return;
 
-          // Get the last focused column, falling back to the first placement
-          const focusedCol = Openp41geTabsEventHandler.getLastFocusedCol(myWindowId);
-          const placement =
-            win.grid.placements.find((p) => p.position.col === focusedCol) ??
-            win.grid.placements[0];
-          if (!placement || placement.tabIds.length === 0) return;
-          const activeTabId = placement.activeTabId ?? placement.tabIds[0];
-          if (!activeTabId) return;
-
-          emitEvent("tab-remove-from-cell", { windowId: myWindowId, paneId: activeTabId });
+          // Close the next grid tab in activation-history order (most-recently
+          // activated first, ignoring sidebar focus). When no grid tabs remain,
+          // close the window. Sidebar (system) tabs are never closed by Cmd+W.
+          const target = resolveCmdWTarget(ws, myWindowId);
+          if (!target) return;
+          if (target.kind === "close-window") {
+            window.openp41ge.window.close();
+            return;
+          }
+          emitEvent("tab-remove-from-cell", {
+            windowId: myWindowId,
+            paneId: target.tabId,
+          });
+          // Drop the closed tab from the activation history so Back/Forward
+          // never navigate to it again.
+          TabActivationHistory.remove(myWindowId, target.tabId);
         } catch (err) {
           log.warn("Cmd+W handler error:", err);
         }
@@ -298,26 +304,18 @@ export class RegisterShortcutsStep implements IStartupStep {
     });
 
     // ── App logs (Cmd+Shift+D) ───────────────────────────────────────
-    // Opens the system overlay on its Logs tab (or switches to it if the
-    // overlay is already open on Workspaces; a second press closes it). The
-    // Logs tab (and its Events sub-tab) is always present — the Debug toggle
-    // inside it only gates DEBUG capture/storage for the session.
+    // Opens the Logs sidebar (the overlay's Logs tab was replaced by the
+    // sidebar + grid log tabs).
     km.register({
       modifiers: 12, // Meta + Shift
       key: "d",
       code: "KeyD",
       handler: () => {
-        if (systemOverlayService.isOpen) {
-          if (systemOverlayService.activeTab === "logs") {
-            systemOverlayService.close();
-          } else {
-            systemOverlayService.open("list", "logs");
-          }
-        } else {
-          systemOverlayService.open("list", "logs");
-        }
+        const winId = window.openp41ge?.workspace?.getWindowId?.();
+        if (!winId) return;
+        window.openp41ge.workspace.dispatch("openSystemTab", winId, "right", "logs", "Logs");
       },
-      description: "Open App Logs (system overlay → Logs)",
+      description: "Open Logs sidebar",
       category: "Debug",
     });
 

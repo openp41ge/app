@@ -60,13 +60,14 @@ export class ExplorerReorderDropTarget implements IDropTarget {
     this.element = element;
   }
 
-  /** Repo rows reorder; worktree rows (branch present) never do. */
+  /** Repo rows reorder; worktree rows (branch present) and other open-tab
+   * sources (e.g. log-stream rows, which carry `source` not `repoName`) never do. */
   private _isReorderable(source: IDragSource): boolean {
     const data = source.getDragData() as {
       type?: string;
-      tabConfig?: { branch?: string };
+      tabConfig?: { branch?: string; repoName?: string };
     };
-    return data.type === "open-tab" && !data.tabConfig?.branch;
+    return data.type === "open-tab" && !!data.tabConfig?.repoName && !data.tabConfig?.branch;
   }
 
   onHover(source: IDragSource, _clientX: number, clientY: number): TargetFeedback | null {

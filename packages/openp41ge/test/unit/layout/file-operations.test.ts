@@ -52,6 +52,19 @@ describe("splitFileOpen empty-grid guard", () => {
     expect(grid.placements.some((pl) => pl.position.col === 0)).toBe(true);
     expect(grid.placements.some((pl) => pl.position.col === 1)).toBe(true);
   });
+
+  test("carries an extraConfig payload (e.g. { source }) onto the split tab", () => {
+    const ws = types.createWorkspace("ws1");
+    let r = ops.addTabToCell(ws, ws.windows[0].id, types.createTab("p1", "terminal", "t"), 0, 0);
+    r = ops.splitFileOpen(r, ws.windows[0].id, "log-viewer", "editor-engine", undefined, 0, false, {
+      source: "editor-engine",
+    });
+    const grid = r.windows[0].grid;
+    const p = grid.placements.find((pl) => pl.position.col === 1);
+    const tab = r.editorTabs[p!.tabIds[0] as string];
+    expect(tab?.appType).toBe("log-viewer");
+    expect(tab?.config?.source).toBe("editor-engine");
+  });
 });
 
 describe("actionOpenFileInNewWindow", () => {

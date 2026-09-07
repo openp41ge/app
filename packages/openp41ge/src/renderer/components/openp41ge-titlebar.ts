@@ -12,8 +12,9 @@ import type { Window } from "../../layout/types";
 import { emitEvent } from "../app";
 import { TITLEBAR_HEIGHT } from "openp41ge-constants";
 import { tooltipContent } from "openp41ge-uikit";
+import { TabActivationHistory } from "../services/tab-activation-history";
 
-import "./openp41ge-workspace-search";
+import "./openp41ge-workspace-label";
 
 const isMac = (() => {
   try {
@@ -22,8 +23,6 @@ const isMac = (() => {
     return false;
   }
 })();
-
-
 
 class Openp41geTitleBar extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -86,7 +85,7 @@ class Openp41geTitleBar extends LitElement {
   // fire-and-forget so pointer tracking stays tight.
   private _onBarPointerDown = (e: PointerEvent): void => {
     const target = e.target as HTMLElement;
-    if (target.closest(".tb-btn, openp41ge-workspace-search, [data-winbtn]")) return;
+    if (target.closest(".tb-btn, openp41ge-workspace-label, [data-winbtn]")) return;
     if (e.button !== 0) return;
 
     this._dragActive = true;
@@ -109,7 +108,11 @@ class Openp41geTitleBar extends LitElement {
       // Click-vs-drag discriminant: don't call this a drag (and don't send
       // any IPC) until the pointer has clearly travelled — slight jitter
       // during a double-click must never start a drag/restore.
-      if (Math.abs(e.screenX - this._downScreen.x) <= 3 && Math.abs(e.screenY - this._downScreen.y) <= 3) return;
+      if (
+        Math.abs(e.screenX - this._downScreen.x) <= 3 &&
+        Math.abs(e.screenY - this._downScreen.y) <= 3
+      )
+        return;
       this._dragStarted = true;
       this._dragMoved = true;
       window.openp41ge?.window.startDrag();
@@ -138,12 +141,83 @@ class Openp41geTitleBar extends LitElement {
 
   private _onBarDblClick = (e: MouseEvent): void => {
     const target = e.target as HTMLElement;
-    if (target.closest(".tb-btn, openp41ge-workspace-search, [data-winbtn]")) return;
+    if (target.closest(".tb-btn, openp41ge-workspace-label, [data-winbtn]")) return;
     if (this._dragMoved) return; // was a real drag, not a double-click
     window.openp41ge?.window.maximizeAnimated();
   };
 
+  // ── Back / Forward activation-history navigation ───────────────────
+  private _isTabOpen(tabId: string): boolean {
+    const win = this.windowData;
+    if (!win) return false;
+    return win.grid.placements.some((pl) => (pl.tabIds as string[]).includes(tabId));
+  }
 
+  /** Dispatch the same DOM event the tab grid uses to activate a tab. */
+  private _activateTab(tabId: string): void {
+    const win = this.windowData;
+    if (!win) return;
+    document.dispatchEvent(
+      new CustomEvent("grid-activate", {
+        bubbles: true,
+        composed: true,
+        detail: { winId: win.id, tabId },
+      }),
+    );
+  }
+
+  private _goBack(): void {
+    const win = this.windowData;
+    if (!win) return;
+    const tabId = TabActivationHistory.goBack(win.id, (t) => this._isTabOpen(t));
+    if (tabId) this._activateTab(tabId);
+  }
+
+  private _goForward(): void {
+    const win = this.windowData;
+    if (!win) return;
+    const tabId = TabActivationHistory.goForward(win.id, (t) => this._isTabOpen(t));
+    if (tabId) this._activateTab(tabId);
+  }
+
+  private _navBtn(direction: "back" | "forward", title: string, path: string): TemplateResult {
+    const win = this.windowData;
+    const disabled = win
+      ? direction === "back"
+        ? !TabActivationHistory.canGoBack(win.id, (t) => this._isTabOpen(t))
+        : !TabActivationHistory.canGoForward(win.id, (t) => this._isTabOpen(t))
+      : true;
+    return html`
+      <div
+        class="tb-btn flex items-center justify-center w-7 h-7 rounded cursor-pointer shrink-0"
+        style="-webkit-app-region:no-drag;color:var(--text-secondary,#aaa);${
+          disabled ? "opacity:0.35;cursor:default;pointer-events:none;" : ""
+        }"
+        title="${title}"
+        @click=${() => (direction === "back" ? this._goBack() : this._goForward())}
+        @mouseenter=${(e: MouseEvent) => {
+          if (disabled) return;
+          (e.currentTarget as HTMLElement).style.color = "var(--text-primary,#eee)";
+        }}
+        @mouseleave=${(e: MouseEvent) => {
+          (e.currentTarget as HTMLElement).style.color = "var(--text-secondary,#aaa)";
+        }}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="${path}"></path>
+        </svg>
+      </div>
+    `;
+  }
 
   render(): TemplateResult | typeof nothing {
     const win = this.windowData;
@@ -151,7 +225,9 @@ class Openp41geTitleBar extends LitElement {
 
     return html`
       <style>
-        .tb-btn:hover { background: var(--hover-bg, rgba(128,128,128,0.15)); }
+        .tb-btn:hover {
+          background: var(--hover-bg, rgba(128, 128, 128, 0.15));
+        }
       </style>
       <div
         class="tb-row flex items-center bg-gutter border-b border-divider shrink-0 select-none relative"
@@ -176,19 +252,25 @@ class Openp41geTitleBar extends LitElement {
           @click=${() => this._toggleLeft()}
         >
           <svg width="18" height="18" viewBox="0 -960 960 960" fill="currentColor">
-            <path d="${this.leftSidebarVisible
-              ? "M660-320v-320L500-480l160 160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm120-80v-560H200v560h120Zm80 0h360v-560H400v560Zm-80 0H200h120Z"
-              : "M500-640v320l160-160-160-160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm120-80v-560H200v560h120Zm80 0h360v-560H400v560Zm-80 0H200h120Z"}"></path>
+            <path
+              d="${
+                this.leftSidebarVisible
+                  ? "M660-320v-320L500-480l160 160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm120-80v-560H200v560h120Zm80 0h360v-560H400v560Zm-80 0H200h120Z"
+                  : "M500-640v320l160-160-160-160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm120-80v-560H200v560h120Zm80 0h360v-560H400v560Zm-80 0H200h120Z"
+              }"
+            ></path>
           </svg>
         </div>
 
-        <!-- Workspace button (left-aligned, toggles the workspaces overlay) -->
-        <openp41ge-workspace-search
-          style="position:relative;height:100%;display:flex;align-items:center;-webkit-app-region:no-drag;margin-left:2px;"
-        ></openp41ge-workspace-search>
+        <!-- Back / Forward (activation history navigation) -->
+        ${this._navBtn("back", "Back", "M15 18 9 12 15 6")}
+        ${this._navBtn("forward", "Forward", "M9 18 15 12 9 6")}
 
         <!-- Spacer to push content to the right -->
         <div class="flex-1 min-w-0"></div>
+
+        <!-- Workspace name (right-aligned, plain text — not clickable) -->
+        <openp41ge-workspace-label></openp41ge-workspace-label>
 
         <!-- Right sidebar toggle -->
         <div
@@ -201,9 +283,13 @@ class Openp41geTitleBar extends LitElement {
           @click=${() => this._toggleRight()}
         >
           <svg width="18" height="18" viewBox="0 -960 960 960" fill="currentColor">
-            <path d="${this.rightSidebarVisible
-              ? "M300-640v320l160-160-160-160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm440-80h120v-560H640v560Zm-80 0v-560H200v560h360Zm80 0h120-120Z"
-              : "M460-320v-320L300-480l160 160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm440-80h120v-560H640v560Zm-80 0v-560H200v560h360Zm80 0h120-120Z"}"></path>
+            <path
+              d="${
+                this.rightSidebarVisible
+                  ? "M300-640v320l160-160-160-160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm440-80h120v-560H640v560Zm-80 0v-560H200v560h360Zm80 0h120-120Z"
+                  : "M460-320v-320L300-480l160 160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm440-80h120v-560H640v560Zm-80 0v-560H200v560h360Zm80 0h120-120Z"
+              }"
+            ></path>
           </svg>
         </div>
 

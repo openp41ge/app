@@ -15,9 +15,7 @@ import { createWorkspace } from "../../layout/types.js";
 import { serialize, deserialize } from "../../layout/serialization.js";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("WorkspaceStateStore");
-
-
+const log = createLogger("openp41ge", "WorkspaceStateStore");
 
 import { WORKSPACE_STATE_FILENAME } from "openp41ge-constants";
 

@@ -10,12 +10,11 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:register-ipc-listeners");
+const log = createLogger("openp41ge", "register-ipc-listeners");
 
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { wireResetListener } from "../../app";
-import { systemOverlayService } from "../../services/system-overlay-service";
-import { focusRepoInWorkspaces } from "../../apps/system-tabs/workspace-manager-system-tab";
+import { highlightChatTab } from "../../services/chat-highlight";
 
 export class RegisterIpcListenersStep implements IStartupStep {
   readonly name = "register-ipc-listeners";
@@ -52,23 +51,27 @@ export class RegisterIpcListenersStep implements IStartupStep {
       window.openp41ge.windowManager.open();
     };
 
-    // ── Menu: View > Logs… (opens the system overlay on Logs) ─────────
+    // ── Menu: View > Logs… (opens the Logs sidebar) ──────────────────
     window.openp41ge.onOpenLogs(() => {
-      systemOverlayService.open("list", "logs");
+      const winId = window.openp41ge?.workspace?.getWindowId?.();
+      if (!winId) return;
+      window.openp41ge.workspace.dispatch("openSystemTab", winId, "right", "logs", "Logs");
     });
 
-    // ── Explorer worktree warning icon → Workspaces overlay at that repo ──
-    // A workspace window has no Workspaces overlay, so this routes to the
-    // Window Manager (which owns workspace + repo status). A window-manager
-    // window opens the overlay tab directly.
+    // ── Chat highlight (from the Chat sidebar in another window) ───────
+    if (window.openp41ge.chat?.onHighlight) {
+      window.openp41ge.chat.onHighlight(({ chatId }) => {
+        void highlightChatTab(chatId);
+      });
+    }
+
+    // ── Explorer worktree warning icon → Window Manager at that repo ──
+    // The workspaces overlay is gone; every window routes to the Window
+    // Manager, which owns workspace + repo status.
     document.addEventListener("openp41ge:focus-workspace-repo", ((e: Event) => {
       const repoName = (e as CustomEvent<{ repoName?: string }>).detail?.repoName;
       if (!repoName) return;
-      if (context.windowType === "window-manager") {
-        focusRepoInWorkspaces(repoName);
-      } else {
-        routeToWindowManager();
-      }
+      routeToWindowManager();
     }) as EventListener);
 
     log.info("IPC listeners registered");

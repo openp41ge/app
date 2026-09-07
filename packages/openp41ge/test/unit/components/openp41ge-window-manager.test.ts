@@ -18,7 +18,12 @@ const HOLD_MS = 350;
 
 type Wm = Openp41geWindowManager & Record<string, unknown>;
 
-function stubWindow(): { dragStart: ReturnType<typeof vi.fn>; dragActivate: ReturnType<typeof vi.fn>; dragMove: ReturnType<typeof vi.fn>; dragEnd: ReturnType<typeof vi.fn> } {
+function stubWindow(): {
+  dragStart: ReturnType<typeof vi.fn>;
+  dragActivate: ReturnType<typeof vi.fn>;
+  dragMove: ReturnType<typeof vi.fn>;
+  dragEnd: ReturnType<typeof vi.fn>;
+} {
   const dragStart = vi.fn();
   const dragActivate = vi.fn();
   const dragMove = vi.fn();
@@ -32,7 +37,10 @@ function stubWindow(): { dragStart: ReturnType<typeof vi.fn>; dragActivate: Retu
       prepareBitmap: vi.fn(),
       onEndSession: vi.fn(() => () => {}),
     },
-    windowManager: { openWindowSummaries: vi.fn().mockResolvedValue([]) },
+    windowManager: {
+      openWindowSummaries: vi.fn().mockResolvedValue([]),
+      onOpenWindowsChanged: vi.fn(() => () => {}),
+    },
   };
   return { dragStart, dragActivate, dragMove, dragEnd };
 }
@@ -45,7 +53,13 @@ function makeThumb(): HTMLElement {
 }
 
 function down(wm: Wm, path: string, x = 50, y = 40, sx = 200, sy = 300): void {
-  const e = new PointerEvent("pointerdown", { button: 0, clientX: x, clientY: y, screenX: sx, screenY: sy });
+  const e = new PointerEvent("pointerdown", {
+    button: 0,
+    clientX: x,
+    clientY: y,
+    screenX: sx,
+    screenY: sy,
+  });
   Object.defineProperty(e, "currentTarget", { value: makeThumb() });
   (wm as Wm)._onThumbPointerDown(e as PointerEvent, path, false);
 }
@@ -186,7 +200,12 @@ describe("Openp41geWindowManager skeleton drag", () => {
       windowCount: 2,
       baseIndex: 0,
     } as never;
-    const move = new PointerEvent("pointermove", { clientX: 10, clientY: 42, screenX: 160, screenY: 302 });
+    const move = new PointerEvent("pointermove", {
+      clientX: 10,
+      clientY: 42,
+      screenX: 160,
+      screenY: 302,
+    });
     Object.defineProperty(move, "currentTarget", { value: { clientWidth: 132 } });
     (wm as Wm)._onThumbPointerMove(move as PointerEvent);
     expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);

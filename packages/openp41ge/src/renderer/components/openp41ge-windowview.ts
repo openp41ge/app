@@ -19,7 +19,6 @@ import {
 } from "openp41ge-constants";
 
 import "./openp41ge-sidebar";
-import "./openp41ge-system-overlay";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -371,8 +370,6 @@ class Openp41geWindowView extends LitElement {
             class="sidebar-element ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
             style="flex: 0 1 ${this._rightWidth}px; max-width: min(${this._rightWidth}px, 35vw)"
           ></openp41ge-sidebar>
-          <!-- System overlay: covers the tab + sidebar area only -->
-          <openp41ge-system-overlay></openp41ge-system-overlay>
         </div>
       </div>
     `;

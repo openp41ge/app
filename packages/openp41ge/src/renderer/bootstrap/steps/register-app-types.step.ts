@@ -10,12 +10,9 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:register-app-types");
+const log = createLogger("openp41ge", "register-app-types");
 
-import {
-  registerAppType,
-  registerSystemTabType,
-} from "../../apps/app-registry";
+import { registerAppType, registerSystemTabType } from "../../apps/app-registry";
 import { terminalAppRegistration } from "../../apps/terminal/index";
 import { videoAppRegistration } from "../../apps/video/index";
 import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
@@ -23,13 +20,11 @@ import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { gitCommitSearchAppRegistration } from "../../apps/git-commit-search/index";
 import { commitFileDiffAppRegistration } from "../../apps/commit-file-diff/index";
+import { agentsAppRegistration } from "../../apps/agents/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
-import { LogsSystemTab } from "../../apps/system-tabs/logs-overlay-tab";
-import { FileEditorSettingsSystemTab } from "../../apps/system-tabs/file-editor-settings-system-tab";
 import { explorerPlugin } from "../../apps/system-tabs/explorer-plugin";
 import { gitPlugin } from "../../apps/system-tabs/git-plugin";
 import { workspaceData } from "../../services/workspace-data";
-import { systemOverlayService } from "../../services/system-overlay-service";
 
 // ─── Log viewer component (auto-registers <openp41ge-log-viewer>) ──────────
 import "openp41ge-logger/viewer";
@@ -45,6 +40,7 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(gitRepositoryAppRegistration);
     registerAppType(gitCommitSearchAppRegistration);
     registerAppType(commitFileDiffAppRegistration);
+    registerAppType(agentsAppRegistration);
 
     // Register system tab types for sidebars
     for (const reg of allSystemTabRegistrations) {
@@ -58,20 +54,10 @@ export class RegisterAppTypesStep implements IStartupStep {
     // a workspace overlay tab. So no "workspace-manager" editor system tab type
     // nor a "workspaces" system-overlay tab is registered here.
 
-    // ── System overlay tabs ──────────────────────────────────────────
-    // The system overlay is the settings/config surface: every system that
-    // wants configuration or internal data registers a top-bar tab here (and
-    // other packages can too, e.g. from their own startup step).
-    systemOverlayService.registerTab({
-      id: "logs",
-      label: "Logs",
-      createController: (tabId: string) => new LogsSystemTab(tabId),
-    });
-    systemOverlayService.registerTab({
-      id: "file-editor-settings",
-      label: "Editor",
-      createController: (tabId: string) => new FileEditorSettingsSystemTab(tabId),
-    });
+    // ── Per-tab settings are registered with their system tab ─────────
+    // Each system tab declares its own settings surface (a grid app type) in
+    // its registration's `settings`, and registerSystemTabType() registers that
+    // grid app type too. So opening a settings grid tab just works.
 
     // ── Register built-in plugins through PluginRegistry ──────────────
     const ec = context.__eventController;

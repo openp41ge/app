@@ -23,6 +23,7 @@ import { plusIconThick } from "../icons";
 import { showConfirmModal } from "./openp41ge-confirm-modal";
 import "./openp41ge-repo-tree-item";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
+import { TabActivationHistory } from "../services/tab-activation-history";
 import "./openp41ge-clone-dialog";
 import "./openp41ge-add-worktree-dialog";
 import { appServices } from "../app";
@@ -236,7 +237,7 @@ class Openp41geWorktreeTree extends LitElement {
     const s = document.createElement("style");
     s.id = "wt-scrollbar-style";
     s.textContent = `
-      openp41ge-worktree-tree { outline: none; box-shadow: -6px 0 8px rgba(0,0,0,0.1); }
+      openp41ge-worktree-tree { outline: none; box-shadow: -6px 0 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 100%; }
       .wt-tree-scroll { outline: none; }
       .wt-tree-scroll * { outline: none; }
       /* Native scrollbar hidden; custom overlay scrollbar implemented via JS. */
@@ -659,6 +660,15 @@ class Openp41geWorktreeTree extends LitElement {
           style="border-top:1px solid var(--divider,#333);height:24px;flex-shrink:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary,#252526);"
         >
           <span style="flex:1"></span>
+          <button
+            type="button"
+            title="Editor settings"
+            aria-label="Editor settings"
+            @click=${this._onSettingsClick}
+            style="height:18px;width:18px;display:flex;align-items:center;justify-content:center;padding:0;border:none;border-radius:3px;background:transparent;color:var(--text-secondary,#999);font-size:14px;line-height:1;cursor:pointer;"
+          >
+            ⚙
+          </button>
         </div>
       </div>
     `;
@@ -1136,6 +1146,17 @@ class Openp41geWorktreeTree extends LitElement {
     }
   };
 
+  /** Explorer tab's settings button — opens the file-editor settings grid tab. */
+  private _onSettingsClick = () => {
+    document.dispatchEvent(
+      new CustomEvent("openp41ge:open-explorer-settings", {
+        bubbles: true,
+        composed: true,
+        detail: { appType: "file-editor-settings", title: "Editor" },
+      }),
+    );
+  };
+
   private _onPanelClick = (e: Event) => {
     // composedPath() crosses the <openp41ge-tree> shadow boundary so we can
     // adopt selection of clicked file/folder rows too. Header rows (repo /
@@ -1348,8 +1369,7 @@ class Openp41geWorktreeTree extends LitElement {
       // Clicked/active-file row: light grey background derived from the
       // border color, no outline — the cursor paint above already covers
       // the coincide case.
-      el.style.background =
-        "color-mix(in srgb, var(--border-divider, #2d2d2d) 60%, transparent)";
+      el.style.background = "color-mix(in srgb, var(--border-divider, #2d2d2d) 60%, transparent)";
       el.style.boxShadow = "";
     }
   }
@@ -2133,6 +2153,7 @@ class Openp41geWorktreeTree extends LitElement {
     for (const tabId of placement.tabIds) {
       const tab = tabs[tabId];
       if (tab && tab.appType === "git-repository" && tab.config?.filePath === repoName) {
+        TabActivationHistory.pushActivation(winId, tabId);
         window.openp41ge.workspace.dispatch("activateTabInCell", winId, tabId);
         return true;
       }

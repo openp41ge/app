@@ -16,7 +16,7 @@ import { isOpenp41geWindowview } from "../../interfaces/element-guards";
 import type { Openp41geWindowviewElement } from "../../interfaces/element-guards";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:subscribe-state-updates");
+const log = createLogger("openp41ge", "subscribe-state-updates");
 
 export class SubscribeStateUpdatesStep implements IStartupStep {
   readonly name = "subscribe-state-updates";

@@ -11,7 +11,8 @@
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
-const log = createLogger("bootstrap:register-event-listeners");
+import { allSystemTabRegistrations } from "../../apps/system-tabs";
+const log = createLogger("openp41ge", "register-event-listeners");
 
 export class RegisterEventListenersStep implements IStartupStep {
   readonly name = "register-event-listeners";
@@ -39,6 +40,26 @@ export class RegisterEventListenersStep implements IStartupStep {
     document.addEventListener("openp41ge:open-commit-file", ((e: CustomEvent) => {
       context.commitOpenHandler.handleOpenCommitFile(e);
     }) as EventListener);
+
+    // Chat open events (Chat sidebar rows + New Chat)
+    document.addEventListener("openp41ge:open-chat", ((e: CustomEvent) => {
+      context.agentsOpenHandler.handleOpenChat(e);
+    }) as EventListener);
+
+    // Log-system open events (Logs sidebar rows)
+    document.addEventListener("openp41ge:open-log-system", ((e: CustomEvent) => {
+      context.logOpenHandler.handleOpenLogSystem(e);
+    }) as EventListener);
+
+    // Settings open events — one listener per sidebar tab's *unique* settings
+    // event, so each tab opens exactly its own settings grid tab.
+    for (const reg of allSystemTabRegistrations) {
+      const settings = reg.settings;
+      if (!settings) continue;
+      document.addEventListener(settings.openEvent, ((e: CustomEvent) => {
+        context.settingsOpenHandler.handleOpenSettings(e);
+      }) as EventListener);
+    }
 
     // Worktree tab close events
     document.addEventListener("openp41ge:close-worktree-tabs", ((e: CustomEvent) => {

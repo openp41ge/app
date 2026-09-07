@@ -18,7 +18,6 @@ import { tooltipContent } from "openp41ge-uikit";
 
 // Keep in sync with openp41ge-windowview if changed
 
-
 import { MIN_SIDEBAR_WIDTH } from "openp41ge-constants";
 
 class Openp41geSidebar extends LitElement {
@@ -190,9 +189,10 @@ class Openp41geSidebar extends LitElement {
   /** Find a tab's persistent host in the content area. */
   private _hostFor(tabId: string): HTMLElement | null {
     const content = this.querySelector<HTMLElement>(".sidebar-content");
-    return content?.querySelector<HTMLElement>(
-      `[data-tab-host="${tabId}"][data-side="${this.side}"]`,
-    ) ?? null;
+    return (
+      content?.querySelector<HTMLElement>(`[data-tab-host="${tabId}"][data-side="${this.side}"]`) ??
+      null
+    );
   }
 
   /** Create the controller + content for a tab inside its host (once). */
@@ -227,9 +227,7 @@ class Openp41geSidebar extends LitElement {
 
     // Remove + unmount tabs that have left the window state.
     const hosts = Array.from(
-      content.querySelectorAll<HTMLElement>(
-        `[data-tab-host][data-side="${this.side}"]`,
-      ),
+      content.querySelectorAll<HTMLElement>(`[data-tab-host][data-side="${this.side}"]`),
     );
     for (const hostEl of hosts) {
       const tabId = hostEl.dataset.tabHost!;
@@ -255,9 +253,7 @@ class Openp41geSidebar extends LitElement {
     const open = this.isOpen;
     const activeId = this.activeTabId;
     const hosts = Array.from(
-      content.querySelectorAll<HTMLElement>(
-        `[data-tab-host][data-side="${this.side}"]`,
-      ),
+      content.querySelectorAll<HTMLElement>(`[data-tab-host][data-side="${this.side}"]`),
     );
     for (const host of hosts) {
       const tabId = host.dataset.tabHost!;
@@ -297,9 +293,8 @@ class Openp41geSidebar extends LitElement {
   // ═══ Render ──────────────────────────────────────────────────────────
 
   render(): TemplateResult {
-    const borderClass = this.side === "left"
-      ? "border-r border-divider"
-      : "border-l border-divider";
+    const borderClass =
+      this.side === "left" ? "border-r border-divider" : "border-l border-divider";
 
     return html`
       <div
@@ -307,74 +302,117 @@ class Openp41geSidebar extends LitElement {
         style="height:100%;min-width:${MIN_SIDEBAR_WIDTH}px"
       >
         <style>
-          .sidebar-tab-bar { min-height: 34px; }
-          .sidebar-tab-scroll::-webkit-scrollbar { display: none; }
+          .sidebar-tab-bar {
+            min-height: 34px;
+          }
+          .sidebar-tab-scroll::-webkit-scrollbar {
+            display: none;
+          }
           .sidebar-tab-close:hover {
             background: var(--bg-hover-strong, #444);
             color: #fff;
           }
-          .sidebar-tab-add:hover { background: var(--bg-hover-strong, #444); }
+          .sidebar-tab-add:hover {
+            background: var(--bg-hover-strong, #444);
+          }
           /* Keep-alive hosts: one absolute full-fill container per tab. Only the
              active one is displayed; the rest stay mounted (hidden) so
              switching back is an instant display flip. */
-          .sidebar-content { position: relative; }
-          .sidebar-tab-host {
-            position: absolute; inset: 0;
-            display: none;
-            overflow-y: auto; overflow-x: hidden;
+          .sidebar-content {
+            position: relative;
           }
-          .sidebar-tab-host.visible { display: block; }
+          .sidebar-tab-host {
+            position: absolute;
+            inset: 0;
+            display: none;
+            /* Each system tab owns its own bottom bar/footer, so the host must
+               not scroll as a whole — the tab content scrolls internally and its
+               footer stays pinned. */
+            overflow: hidden;
+          }
+          .sidebar-tab-host.visible {
+            display: block;
+          }
         </style>
 
         <!-- System tab bar -->
-        <div class="sidebar-tab-bar relative shrink-0${this.systemTabs.length > 0 ? ' border-b border-divider' : ''}" data-sidebar-tab-bar="${this.side}">
-          ${this.systemTabs.length > 0 ? html`
-            <div class="sidebar-tab-scroll flex items-stretch overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;margin-right:29px;" @scroll=${this._onTabBarScroll}>
-              ${this.systemTabs.map((tab, idx) => {
-                const isActive = tab.id === this.activeTabId;
-                const isLast = idx === this.systemTabs.length - 1;
-                let sideBorder = idx === 0 && this.side !== "right" ? "border-l" : "";
-                // Divider between tabs (including the strip's right end) so each
-                // tab's extent is visible on both sidebars. Border on the last
-                // tab is dropped only while overflowing (offscreen/at the fade).
-                if (!isLast || !this._hasOverflow) sideBorder += " border-r";
-                return html`
+        <div
+          class="sidebar-tab-bar relative shrink-0${this.systemTabs.length > 0 ? " border-b border-divider" : ""}"
+          data-sidebar-tab-bar="${this.side}"
+        >
+          ${
+            this.systemTabs.length > 0
+              ? html`
                   <div
-                    class="sidebar-tab flex items-center gap-2.5 px-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
-                    data-sidebar-tab-id=${tab.id}
-                    data-sidebar-side=${this.side}
-                    data-tab-title=${tab.title}
-                    style="width:120px;height:34px;font-size:13px;${isActive
-                      ? "background:var(--border-divider, #2d2d2d);color:var(--text-primary, #ccc)"
-                      : "color:var(--text-secondary, #999)"}"
-                    @click=${() => this._onTabClick(tab.id)}
-                    @mouseup=${(e: MouseEvent) => this._onTabMiddleClick(e, tab.id)}
+                    class="sidebar-tab-scroll flex items-stretch overflow-x-auto"
+                    style="scrollbar-width:none;-ms-overflow-style:none;margin-right:29px;"
+                    @scroll=${this._onTabBarScroll}
                   >
-                    <span class="truncate flex-1">${tab.title}</span>
-                    <span
-                      class="sidebar-tab-close flex items-center justify-center"
-                      style="width:16px;height:16px;border-radius:4px;font-size:13px;line-height:1"
-                      @click=${(e: Event) => this._onTabClose(e, tab.id)}
-                    >✕</span>
-                  </div>`;
-              })}
-            </div>
-          ` : nothing}
-          <div class="absolute top-0 left-0 w-4 h-full pointer-events-none" style="opacity:${this._showLeftShadow ? 1 : 0};transition:opacity .12s ease;background:linear-gradient(to right, rgba(0,0,0,0.35), transparent)"></div>
-          <div class="absolute top-0 w-4 h-full pointer-events-none" style="right:29px;opacity:${this._showRightShadow ? 1 : 0};transition:opacity .12s ease;background:linear-gradient(to left, rgba(0,0,0,0.35), transparent)"></div>
+                    ${this.systemTabs.map((tab, idx) => {
+                      const isActive = tab.id === this.activeTabId;
+                      const isLast = idx === this.systemTabs.length - 1;
+                      let sideBorder = idx === 0 && this.side !== "right" ? "border-l" : "";
+                      // Divider between tabs (including the strip's right end) so each
+                      // tab's extent is visible on both sidebars. Border on the last
+                      // tab is dropped only while overflowing (offscreen/at the fade).
+                      if (!isLast || !this._hasOverflow) sideBorder += " border-r";
+                      const tabStyle = `width:120px;height:34px;font-size:13px;${
+                        isActive
+                          ? "background:var(--border-divider, #2d2d2d);color:var(--text-primary, #ccc)"
+                          : "color:var(--text-secondary, #999)"
+                      }`;
+                      return html` <div
+                        class="sidebar-tab flex items-center gap-2.5 px-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
+                        data-sidebar-tab-id=${tab.id}
+                        data-sidebar-side=${this.side}
+                        data-tab-title=${tab.title}
+                        style="${tabStyle}"
+                        @click=${() => this._onTabClick(tab.id)}
+                        @mouseup=${(e: MouseEvent) => this._onTabMiddleClick(e, tab.id)}
+                      >
+                        <span class="truncate flex-1">${tab.title}</span>
+                        <span
+                          class="sidebar-tab-close flex items-center justify-center"
+                          style="width:16px;height:16px;border-radius:4px;font-size:13px;line-height:1"
+                          @click=${(e: Event) => this._onTabClose(e, tab.id)}
+                          >✕</span
+                        >
+                      </div>`;
+                    })}
+                  </div>
+                `
+              : nothing
+          }
+          <div
+            class="absolute top-0 left-0 w-4 h-full pointer-events-none"
+            style="opacity:${this._showLeftShadow ? 1 : 0};transition:opacity .12s ease;background:linear-gradient(to right, rgba(0,0,0,0.35), transparent)"
+          ></div>
+          <div
+            class="absolute top-0 w-4 h-full pointer-events-none"
+            style="right:29px;opacity:${this._showRightShadow ? 1 : 0};transition:opacity .12s ease;background:linear-gradient(to left, rgba(0,0,0,0.35), transparent)"
+          ></div>
           <!-- + button: open inline menu of registered sidebar tabs -->
           <div
             class="sidebar-tab-add absolute top-0 flex items-center justify-center cursor-pointer select-none transition-colors duration-75"
             style="height:18px;width:18px;top:8px;right:7px;color:var(--text-secondary,#999);z-index:2;border-radius:3px;"
             ${tooltipContent({ type: "simple", text: "Open sidebar tab" })}
             @click=${this._onAddTabClick}
-            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.color = "var(--text-primary,#ccc)"; }}
-            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.color = "var(--text-secondary,#999)"; }}
-          >＋</div>
+            @mouseenter=${(e: MouseEvent) => {
+              (e.currentTarget as HTMLElement).style.color = "var(--text-primary,#ccc)";
+            }}
+            @mouseleave=${(e: MouseEvent) => {
+              (e.currentTarget as HTMLElement).style.color = "var(--text-secondary,#999)";
+            }}
+          >
+            ＋
+          </div>
         </div>
 
         <!-- Content area (keep-alive host stack: one persistent host per tab) -->
-        <div class="sidebar-content flex-1 relative overflow-hidden" data-sidebar-content="${this.side}"></div>
+        <div
+          class="sidebar-content flex-1 relative overflow-hidden"
+          data-sidebar-content="${this.side}"
+        ></div>
       </div>
     `;
   }

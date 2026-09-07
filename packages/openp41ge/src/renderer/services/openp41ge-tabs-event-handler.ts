@@ -154,6 +154,8 @@ export class Openp41geTabsEventHandler {
           branch?: string;
           hash?: string;
           shortHash?: string;
+          source?: string;
+          system?: string;
         };
         targetCol: number;
         isBoundary?: boolean;
@@ -254,6 +256,45 @@ export class Openp41geTabsEventHandler {
             configSlot,
             targetCol,
             pinned ?? true,
+          );
+        }
+        return;
+      }
+
+      // ── Log-system drop: open a system-scoped log-viewer pane ─────────
+      if (_tabType === "log-viewer") {
+        const system = tabConfig.system;
+        if (!system) return;
+        const tabName = system;
+
+        const logFocusCol = isBoundary
+          ? (splitLeft ?? true)
+            ? (splitCol ?? targetCol)
+            : (splitCol ?? targetCol) + 1
+          : targetCol;
+        Openp41geTabsEventHandler.lastFocusedCol[winId] = logFocusCol;
+
+        if (isBoundary) {
+          this._dispatch(
+            "splitFileOpen",
+            winId,
+            "log-viewer",
+            tabName,
+            undefined,
+            splitCol ?? targetCol,
+            splitLeft ?? true,
+            { system },
+          );
+        } else {
+          this._dispatch(
+            "actionOpenFile",
+            winId,
+            "log-viewer",
+            tabName,
+            undefined,
+            targetCol,
+            pinned ?? true,
+            { system },
           );
         }
         return;

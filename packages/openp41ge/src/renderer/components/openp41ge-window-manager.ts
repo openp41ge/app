@@ -94,6 +94,7 @@ export class Openp41geWindowManager extends LitElement {
   } | null = null;
   private _holdTimer: number | null = null;
   private _offEndSession: (() => void) | null = null;
+  private _offOpenWindowsChanged: (() => void) | null = null;
   /** Suppress the following row click after a drag/swipe, so the drawer doesn't pop open. */
   private _suppressClick = false;
   private _tooltipTargets: Element[] = [];
@@ -113,6 +114,11 @@ export class Openp41geWindowManager extends LitElement {
     // the window), the main process ends the session and notifies us to clear
     // the in-flight drag state.
     this._offEndSession = window.openp41ge.drag.onEndSession(() => this._teardownDrag());
+    // Refresh the open-windows column immediately when any window opens/closes,
+    // rather than waiting for this window to regain focus.
+    this._offOpenWindowsChanged = window.openp41ge.windowManager.onOpenWindowsChanged(() => {
+      void this._load();
+    });
     void this._load();
   }
 
@@ -124,6 +130,8 @@ export class Openp41geWindowManager extends LitElement {
     document.removeEventListener("click", this._onDocumentClick);
     document.removeEventListener("pointerdown", this._onPointerDown);
     this._offEndSession?.();
+    this._offOpenWindowsChanged?.();
+    this._offOpenWindowsChanged = null;
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
     this._overlayScrollbar?.destroy();
@@ -565,17 +573,66 @@ export class Openp41geWindowManager extends LitElement {
   private _workspaceListFooter(): TemplateResult {
     return html`
       <div class="ws-list-footer">
-        ${this._workspaceDeleteMode
-          ? html`
-              <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorkspaceDeleteMode(); }} data-tip="Cancel">Cancel</button>
-              <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedWorkspaces(); }} data-tip="Delete selected workspaces" ?disabled=${this._selectedWorkspaces.size === 0}>Delete</button>
-            `
-          : html`
-              <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddWorkspace(); }} aria-label="New workspace" data-tip="New workspace">＋</button>
-              <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateWorkspaceDeleteMode(); }} aria-label="Delete workspaces" data-tip="Delete workspaces">
-                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
-              </button>
-            `}
+        ${
+          this._workspaceDeleteMode
+            ? html`
+                <button
+                  class="dw-delete-cancel"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._cancelWorkspaceDeleteMode();
+                  }}
+                  data-tip="Cancel"
+                >
+                  Cancel
+                </button>
+                <button
+                  class="dw-delete-confirm"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    void this._deleteSelectedWorkspaces();
+                  }}
+                  data-tip="Delete selected workspaces"
+                  ?disabled=${this._selectedWorkspaces.size === 0}
+                >
+                  Delete
+                </button>
+              `
+            : html`
+                <button
+                  class="dw-add"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._toggleAddWorkspace();
+                  }}
+                  aria-label="New workspace"
+                  data-tip="New workspace"
+                >
+                  ＋
+                </button>
+                <button
+                  class="dw-delete"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._activateWorkspaceDeleteMode();
+                  }}
+                  aria-label="Delete workspaces"
+                  data-tip="Delete workspaces"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    height="18px"
+                    viewBox="0 -960 960 960"
+                    width="18px"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
+                    />
+                  </svg>
+                </button>
+              `
+        }
       </div>
     `;
   }
@@ -861,45 +918,171 @@ export class Openp41geWindowManager extends LitElement {
     if (d.kind === "workspace") {
       return html`
         <div class="drawer-footer">
-          ${this._deleteMode
-            ? html`
-                <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelDeleteMode(); }} data-tip="Cancel">Cancel</button>
-                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedRepos(d); }} data-tip="Delete selected repositories" ?disabled=${this._selectedRepos.size === 0}>Delete</button>
-              `
-            : html`
-                <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddRepo(); }} aria-label="Add repository" data-tip="Add repository">＋</button>
-                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateDeleteMode(); }} aria-label="Delete repositories" data-tip="Delete repositories">
-                  <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
-                </button>
-              `}
+          ${
+            this._deleteMode
+              ? html`
+                  <button
+                    class="dw-delete-cancel"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this._cancelDeleteMode();
+                    }}
+                    data-tip="Cancel"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    class="dw-delete-confirm"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      void this._deleteSelectedRepos(d);
+                    }}
+                    data-tip="Delete selected repositories"
+                    ?disabled=${this._selectedRepos.size === 0}
+                  >
+                    Delete
+                  </button>
+                `
+              : html`
+                  <button
+                    class="dw-add"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this._toggleAddRepo();
+                    }}
+                    aria-label="Add repository"
+                    data-tip="Add repository"
+                  >
+                    ＋
+                  </button>
+                  <button
+                    class="dw-delete"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this._activateDeleteMode();
+                    }}
+                    aria-label="Delete repositories"
+                    data-tip="Delete repositories"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="18px"
+                      viewBox="0 -960 960 960"
+                      width="18px"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
+                      />
+                    </svg>
+                  </button>
+                `
+          }
         </div>
       `;
     }
     if (d.kind === "repo") {
       return html`
         <div class="drawer-footer">
-          ${this._worktreeDeleteMode
-            ? html`
-                <button class="dw-delete-cancel" @click=${(e: Event) => { e.stopPropagation(); this._cancelWorktreeDeleteMode(); }} data-tip="Cancel">Cancel</button>
-                <button class="dw-delete-confirm" @click=${(e: Event) => { e.stopPropagation(); void this._deleteSelectedWorktrees(d); }} data-tip="Delete selected worktrees" ?disabled=${this._selectedWorktrees.size === 0}>Delete</button>
-              `
-            : html`
-                <button class="dw-add" @click=${(e: Event) => { e.stopPropagation(); this._toggleAddWorktree(); }} aria-label="Add worktree" data-tip="Add worktree">＋</button>
-                <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); this._activateWorktreeDeleteMode(); }} aria-label="Delete worktrees" data-tip="Delete worktrees">
-                  <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
-                </button>
-              `}
+          ${
+            this._worktreeDeleteMode
+              ? html`
+                  <button
+                    class="dw-delete-cancel"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this._cancelWorktreeDeleteMode();
+                    }}
+                    data-tip="Cancel"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    class="dw-delete-confirm"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      void this._deleteSelectedWorktrees(d);
+                    }}
+                    data-tip="Delete selected worktrees"
+                    ?disabled=${this._selectedWorktrees.size === 0}
+                  >
+                    Delete
+                  </button>
+                `
+              : html`
+                  <button
+                    class="dw-add"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this._toggleAddWorktree();
+                    }}
+                    aria-label="Add worktree"
+                    data-tip="Add worktree"
+                  >
+                    ＋
+                  </button>
+                  <button
+                    class="dw-delete"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this._activateWorktreeDeleteMode();
+                    }}
+                    aria-label="Delete worktrees"
+                    data-tip="Delete worktrees"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="18px"
+                      viewBox="0 -960 960 960"
+                      width="18px"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
+                      />
+                    </svg>
+                  </button>
+                `
+          }
         </div>
       `;
     }
     if (d.kind === "worktree") {
       return html`
         <div class="drawer-footer">
-          ${!this._openPaths.has(d.workspacePath)
-            ? html`<button class="dw-open" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(d.workspacePath); }}>Open</button>`
-            : nothing}
-          <button class="dw-delete" @click=${(e: Event) => { e.stopPropagation(); void this._deleteWorktree(d); }} aria-label="Delete worktree" data-tip="Delete worktree">
-            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
+          ${
+            !this._openPaths.has(d.workspacePath)
+              ? html`<button
+                  class="dw-open"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._openWorkspaceWindow(d.workspacePath);
+                  }}
+                >
+                  Open
+                </button>`
+              : nothing
+          }
+          <button
+            class="dw-delete"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              void this._deleteWorktree(d);
+            }}
+            aria-label="Delete worktree"
+            data-tip="Delete worktree"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              height="18px"
+              viewBox="0 -960 960 960"
+              width="18px"
+              fill="currentColor"
+            >
+              <path
+                d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
+              />
+            </svg>
           </button>
         </div>
       `;
@@ -998,7 +1181,9 @@ export class Openp41geWindowManager extends LitElement {
 
   /** Number of vertical columns/cells to draw for a window in the skeleton.
    *  The workspace grid only splits horizontally, so cells are one per column. */
-  private _skeletonCells(win: { grid?: { placements?: unknown[]; cols?: number } } | undefined): number {
+  private _skeletonCells(
+    win: { grid?: { placements?: unknown[]; cols?: number } } | undefined,
+  ): number {
     const g = win?.grid;
     if (!g) return 1;
     return g.placements?.length || g.cols || 1;
@@ -1029,15 +1214,35 @@ export class Openp41geWindowManager extends LitElement {
         <span class="crumbs-more">
           <button
             class="crumbs-ellipsis"
-            @click=${(e: Event) => { e.stopPropagation(); this._crumbsOpen = !this._crumbsOpen; }}
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._crumbsOpen = !this._crumbsOpen;
+            }}
             aria-label="Show earlier locations"
             aria-expanded=${this._crumbsOpen}
-          >…</button>
-          ${this._crumbsOpen
-            ? html`<menu class="crumbs-menu" @click=${(e: Event) => e.stopPropagation()}>
-                ${hidden.map((c) => html`<li><button class="crumbs-menu-item" @click=${(e: Event) => { e.stopPropagation(); this._navigateCrumb(c.index); }}>${c.label}</button></li>`)}
-              </menu>`
-            : nothing}
+          >
+            …
+          </button>
+          ${
+            this._crumbsOpen
+              ? html`<menu class="crumbs-menu" @click=${(e: Event) => e.stopPropagation()}>
+                  ${hidden.map(
+                    (c) =>
+                      html`<li>
+                        <button
+                          class="crumbs-menu-item"
+                          @click=${(e: Event) => {
+                            e.stopPropagation();
+                            this._navigateCrumb(c.index);
+                          }}
+                        >
+                          ${c.label}
+                        </button>
+                      </li>`,
+                  )}
+                </menu>`
+              : nothing
+          }
         </span>
       `);
     }
@@ -1046,7 +1251,17 @@ export class Openp41geWindowManager extends LitElement {
       if (k === visible.length - 1) {
         parts.push(html`<span class="crumbs-current">${c.label}</span>`);
       } else {
-        parts.push(html`<button class="crumbs-item" @click=${(e: Event) => { e.stopPropagation(); this._navigateCrumb(c.index); }}>${c.label}</button>`);
+        parts.push(
+          html`<button
+            class="crumbs-item"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._navigateCrumb(c.index);
+            }}
+          >
+            ${c.label}
+          </button>`,
+        );
       }
     });
     return html`<nav class="crumbs" @click=${(e: Event) => e.stopPropagation()}>${parts}</nav>`;
@@ -1075,7 +1290,11 @@ export class Openp41geWindowManager extends LitElement {
 
     return html`
       <style>
-        *, *::before, *::after { box-sizing: border-box; }
+        *,
+        *::before,
+        *::after {
+          box-sizing: border-box;
+        }
         :host {
           display: flex;
           height: 100vh;
@@ -1128,11 +1347,21 @@ export class Openp41geWindowManager extends LitElement {
           line-height: 1;
           cursor: pointer;
         }
-        .wm-winbtn span { opacity: 0; }
-        .wm-winbtn:hover { color: #222; }
-        .wm-winbtn:hover span { opacity: 1; }
-        .wm-winbtn--close { background: #ff5f57; }
-        .wm-winbtn--min { background: #febc2e; }
+        .wm-winbtn span {
+          opacity: 0;
+        }
+        .wm-winbtn:hover {
+          color: #222;
+        }
+        .wm-winbtn:hover span {
+          opacity: 1;
+        }
+        .wm-winbtn--close {
+          background: #ff5f57;
+        }
+        .wm-winbtn--min {
+          background: #febc2e;
+        }
         .wm-title {
           font-size: 12px;
           font-weight: 600;
@@ -1174,7 +1403,9 @@ export class Openp41geWindowManager extends LitElement {
           color: var(--text-secondary, #999);
           cursor: pointer;
           border-radius: 4px;
-          transition: color 0.1s ease, background 0.1s ease;
+          transition:
+            color 0.1s ease,
+            background 0.1s ease;
         }
         .wm-search-btn:hover {
           color: var(--text-primary, #ddd);
@@ -1251,7 +1482,9 @@ export class Openp41geWindowManager extends LitElement {
           color: var(--text-secondary, #999);
           font-size: 13px;
           cursor: pointer;
-          transition: color 0.1s ease, background 0.1s ease;
+          transition:
+            color 0.1s ease,
+            background 0.1s ease;
         }
         .wm-search-clear:hover {
           color: var(--text-primary, #ddd);
@@ -1291,7 +1524,11 @@ export class Openp41geWindowManager extends LitElement {
           background: transparent;
           cursor: default;
         }
-        ul { list-style: none; margin: 0; padding: 0; }
+        ul {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
         li.ws-row {
           position: relative;
           display: flex;
@@ -1302,12 +1539,22 @@ export class Openp41geWindowManager extends LitElement {
           border-bottom: 1px solid var(--divider, #2f3031);
           transition: background 0.1s ease;
         }
-        li.ws-row:hover { background: var(--bg-hover, #2a2d2e); }
+        li.ws-row:hover {
+          background: var(--bg-hover, #2a2d2e);
+        }
         /* The last row's trailing separator only renders when the list fits the
            viewport (not below the fold), so a folded last row never shows a
            second bottom border when it scrolls into view. */
-        li.ws-row--last:not(.ws-row--last-visible) { border-bottom: none; }
-        .ws-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+        li.ws-row--last:not(.ws-row--last-visible) {
+          border-bottom: none;
+        }
+        .ws-info {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
         .ws-name {
           min-width: 0;
           white-space: nowrap;
@@ -1316,9 +1563,17 @@ export class Openp41geWindowManager extends LitElement {
           font-size: 14px;
           font-weight: 600;
         }
-        .ws-meta { color: var(--text-secondary, #999); font-size: 12px; }
+        .ws-meta {
+          color: var(--text-secondary, #999);
+          font-size: 12px;
+        }
         /* Bottom-left action pills (Open + window count) in each row. */
-        .ws-pills { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+        .ws-pills {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: auto;
+        }
         .ws-pill {
           display: inline-flex;
           align-items: center;
@@ -1337,8 +1592,15 @@ export class Openp41geWindowManager extends LitElement {
           background: rgba(86, 156, 214, 0.15);
           cursor: pointer;
         }
-        .ws-pill--open:hover { background: rgba(86, 156, 214, 0.25); }
-        .ws-chevron { flex-shrink: 0; display: block; align-self: center; color: var(--accent, #569cd6); }
+        .ws-pill--open:hover {
+          background: rgba(86, 156, 214, 0.25);
+        }
+        .ws-chevron {
+          flex-shrink: 0;
+          display: block;
+          align-self: center;
+          color: var(--accent, #569cd6);
+        }
 
         /* Skeleton + its carousel dots stacking. The dots stay inside the row's
            bottom padding area, absolutely positioned so they never push content. */
@@ -1365,9 +1627,16 @@ export class Openp41geWindowManager extends LitElement {
           flex-direction: column;
           cursor: grab;
         }
-        .ws-thumb:active { cursor: grabbing; }
-        .ws-row--open .ws-thumb { cursor: default; }
-        .ws-thumb--skeleton { opacity: 0.75; animation: ws-skeleton-pulse 1.3s ease-in-out infinite; }
+        .ws-thumb:active {
+          cursor: grabbing;
+        }
+        .ws-row--open .ws-thumb {
+          cursor: default;
+        }
+        .ws-thumb--skeleton {
+          opacity: 0.75;
+          animation: ws-skeleton-pulse 1.3s ease-in-out infinite;
+        }
         .ws-thumb-chrome {
           height: 12px;
           flex-shrink: 0;
@@ -1378,8 +1647,19 @@ export class Openp41geWindowManager extends LitElement {
           gap: 3px;
           padding: 0 5px;
         }
-        .ws-thumb-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-secondary, #999); opacity: 0.55; }
-        .ws-carousel { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+        .ws-thumb-dot {
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: var(--text-secondary, #999);
+          opacity: 0.55;
+        }
+        .ws-carousel {
+          flex: 1;
+          min-height: 0;
+          overflow: hidden;
+          display: flex;
+        }
         .ws-carousel-track {
           display: flex;
           height: 100%;
@@ -1388,9 +1668,24 @@ export class Openp41geWindowManager extends LitElement {
           transition: transform 0.25s ease;
         }
         /* While a swipe follows the pointer, disable the slide transition. */
-        .ws-carousel-track--live { transition: none; }
-        .ws-win { flex: 0 0 100%; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-        .ws-win-body { flex: 1; min-height: 0; display: flex; gap: 3px; padding: 4px; min-width: 0; }
+        .ws-carousel-track--live {
+          transition: none;
+        }
+        .ws-win {
+          flex: 0 0 100%;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          min-height: 0;
+        }
+        .ws-win-body {
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          gap: 3px;
+          padding: 4px;
+          min-width: 0;
+        }
         .ws-win-side {
           width: 18px;
           flex-shrink: 0;
@@ -1402,9 +1697,24 @@ export class Openp41geWindowManager extends LitElement {
           gap: 2px;
           padding: 4px 0;
         }
-        .ws-thumb-side-row { width: 12px; height: 4px; border-radius: 2px; background: var(--bg-active, #37373d); }
-        .ws-win-grid { flex: 1; display: flex; gap: 3px; min-width: 0; }
-        .ws-thumb-cell { flex: 1 1 0; min-width: 0; background: var(--bg-active, #37373d); border-radius: 3px; }
+        .ws-thumb-side-row {
+          width: 12px;
+          height: 4px;
+          border-radius: 2px;
+          background: var(--bg-active, #37373d);
+        }
+        .ws-win-grid {
+          flex: 1;
+          display: flex;
+          gap: 3px;
+          min-width: 0;
+        }
+        .ws-thumb-cell {
+          flex: 1 1 0;
+          min-width: 0;
+          background: var(--bg-active, #37373d);
+          border-radius: 3px;
+        }
         /* Carousel page dots — absolutely positioned just below the skeleton so
            they add no height, but a few px above the row's bottom separator. */
         .ws-carousel-dots {
@@ -1417,8 +1727,17 @@ export class Openp41geWindowManager extends LitElement {
           gap: 3px;
           pointer-events: none;
         }
-        .ws-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-secondary, #999); opacity: 0.4; }
-        .ws-dot--active { opacity: 1; background: var(--accent, #569cd6); }
+        .ws-dot {
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: var(--text-secondary, #999);
+          opacity: 0.4;
+        }
+        .ws-dot--active {
+          opacity: 1;
+          background: var(--accent, #569cd6);
+        }
         /* Hover arrows to step the carousel to the next/previous window skeleton. */
         .ws-carousel-arrow {
           position: absolute;
@@ -1437,23 +1756,43 @@ export class Openp41geWindowManager extends LitElement {
           cursor: pointer;
           opacity: 0;
           pointer-events: none;
-          transition: opacity 0.12s ease, background 0.12s ease;
+          transition:
+            opacity 0.12s ease,
+            background 0.12s ease;
           z-index: 2;
         }
-        .ws-carousel-arrow:hover { background: rgba(0, 0, 0, 0.55); }
-        .ws-carousel-arrow svg { display: block; }
-        .ws-carousel-arrow:disabled { opacity: 0; pointer-events: none; }
-        .ws-carousel-arrow--prev { left: 4px; }
-        .ws-carousel-arrow--next { right: 4px; }
-        .ws-thumb:hover .ws-carousel-arrow { opacity: 1; pointer-events: auto; }
+        .ws-carousel-arrow:hover {
+          background: rgba(0, 0, 0, 0.55);
+        }
+        .ws-carousel-arrow svg {
+          display: block;
+        }
+        .ws-carousel-arrow:disabled {
+          opacity: 0;
+          pointer-events: none;
+        }
+        .ws-carousel-arrow--prev {
+          left: 4px;
+        }
+        .ws-carousel-arrow--next {
+          right: 4px;
+        }
+        .ws-thumb:hover .ws-carousel-arrow {
+          opacity: 1;
+          pointer-events: auto;
+        }
         /* Workspace-list delete mode + inline "new workspace" row. */
-        .ws-row--select { cursor: pointer; }
+        .ws-row--select {
+          cursor: pointer;
+        }
         /* The inline "new workspace" row uses the standard solid separator; the
            dashed outline doubled with the view header's bottom border. */
         .ws-row--new {
           cursor: default;
         }
-        .ws-row--new:hover { background: var(--bg-hover, #2a2d2e); }
+        .ws-row--new:hover {
+          background: var(--bg-hover, #2a2d2e);
+        }
         .wm-new-ws-input {
           min-width: 0;
           background: transparent;
@@ -1468,11 +1807,19 @@ export class Openp41geWindowManager extends LitElement {
           height: auto;
           align-self: flex-start;
         }
-        .wm-new-ws-input::placeholder { color: var(--text-secondary, #777); font-weight: 400; }
+        .wm-new-ws-input::placeholder {
+          color: var(--text-secondary, #777);
+          font-weight: 400;
+        }
         /* Skeleton placeholders for the inline "new workspace" card. */
         @keyframes ws-skeleton-pulse {
-          0%, 100% { opacity: 0.45; }
-          50% { opacity: 1; }
+          0%,
+          100% {
+            opacity: 0.45;
+          }
+          50% {
+            opacity: 1;
+          }
         }
         .ws-skeleton {
           display: inline-block;
@@ -1480,8 +1827,17 @@ export class Openp41geWindowManager extends LitElement {
           background: var(--bg-active, #37373d);
           animation: ws-skeleton-pulse 1.3s ease-in-out infinite;
         }
-        .ws-skeleton--num { width: 118px; height: 12px; vertical-align: middle; margin-top: 4px; }
-        .ws-skeleton--pill { width: 64px; height: 16px; border-radius: 999px; }
+        .ws-skeleton--num {
+          width: 118px;
+          height: 12px;
+          vertical-align: middle;
+          margin-top: 4px;
+        }
+        .ws-skeleton--pill {
+          width: 64px;
+          height: 16px;
+          border-radius: 999px;
+        }
         .ws-skeleton--chevron {
           align-self: center;
           width: 16px;
@@ -1489,7 +1845,11 @@ export class Openp41geWindowManager extends LitElement {
           border-radius: 4px;
           background: rgba(86, 156, 214, 0.35);
         }
-        .empty { color: var(--text-secondary, #777); font-size: 13px; padding: 0 16px; }
+        .empty {
+          color: var(--text-secondary, #777);
+          font-size: 13px;
+          padding: 0 16px;
+        }
         /* ── Drawer ─────────────────────────────────────────────── */
         /* A single shared shadow element whose width tracks the widest drawer,
            so the stack never stacks multiple shadows on top of each other. */
@@ -1529,12 +1889,24 @@ export class Openp41geWindowManager extends LitElement {
           cursor: pointer;
         }
         @keyframes dw-slide {
-          from { transform: translateX(24px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
+          from {
+            transform: translateX(24px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
         }
         @keyframes dw-slide-out {
-          from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(24px); opacity: 0; }
+          from {
+            transform: translateX(0);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(24px);
+            opacity: 0;
+          }
         }
         /* A drawer that is leaving slides out to the right and fades. */
         .drawer--closing {
@@ -1569,7 +1941,11 @@ export class Openp41geWindowManager extends LitElement {
           overflow: visible;
           white-space: nowrap;
         }
-        .crumbs-sep { color: var(--text-secondary, #999); margin: 0 2px; flex-shrink: 0; }
+        .crumbs-sep {
+          color: var(--text-secondary, #999);
+          margin: 0 2px;
+          flex-shrink: 0;
+        }
         .crumbs-item {
           border: none;
           background: transparent;
@@ -1585,7 +1961,9 @@ export class Openp41geWindowManager extends LitElement {
           flex-shrink: 1;
           min-width: 0;
         }
-        .crumbs-item:hover { background: var(--bg-active, #37373d); }
+        .crumbs-item:hover {
+          background: var(--bg-active, #37373d);
+        }
         .crumbs-current {
           color: var(--text-primary, #e8e8e8);
           font-size: 13px;
@@ -1597,7 +1975,11 @@ export class Openp41geWindowManager extends LitElement {
           flex-shrink: 1;
           min-width: 0;
         }
-        .crumbs-more { position: relative; display: inline-flex; flex-shrink: 0; }
+        .crumbs-more {
+          position: relative;
+          display: inline-flex;
+          flex-shrink: 0;
+        }
         .crumbs-ellipsis {
           border: none;
           background: transparent;
@@ -1607,7 +1989,9 @@ export class Openp41geWindowManager extends LitElement {
           border-radius: 4px;
           cursor: pointer;
         }
-        .crumbs-ellipsis:hover { background: var(--bg-active, #37373d); }
+        .crumbs-ellipsis:hover {
+          background: var(--bg-active, #37373d);
+        }
         .crumbs-menu {
           position: absolute;
           top: 26px;
@@ -1638,8 +2022,15 @@ export class Openp41geWindowManager extends LitElement {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .crumbs-menu-item:hover { background: var(--bg-active, #37373d); }
-        .drawer-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .crumbs-menu-item:hover {
+          background: var(--bg-active, #37373d);
+        }
+        .drawer-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
         .dw-open {
           border: none;
           border-radius: 4px;
@@ -1650,7 +2041,9 @@ export class Openp41geWindowManager extends LitElement {
           padding: 4px 10px;
           cursor: pointer;
         }
-        .dw-open:hover { background: rgba(86, 156, 214, 0.25); }
+        .dw-open:hover {
+          background: rgba(86, 156, 214, 0.25);
+        }
         .dw-close {
           border: none;
           background: transparent;
@@ -1664,8 +2057,16 @@ export class Openp41geWindowManager extends LitElement {
           justify-content: center;
           cursor: pointer;
         }
-        .dw-close:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
-        .drawer-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; }
+        .dw-close:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .drawer-body {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          padding: 14px;
+        }
         .drawer-footer {
           display: flex;
           align-items: center;
@@ -1709,7 +2110,10 @@ export class Openp41geWindowManager extends LitElement {
           cursor: pointer;
           user-select: none;
         }
-        .dw-add:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
+        .dw-add:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
         .dw-delete,
         .dw-delete-confirm {
           border: none;
@@ -1736,13 +2140,20 @@ export class Openp41geWindowManager extends LitElement {
           background: rgba(224, 108, 117, 0.15);
           color: #e06c75;
         }
-        .dw-delete svg { fill: currentColor; }
+        .dw-delete svg {
+          fill: currentColor;
+        }
         .dw-delete-confirm {
           background: rgba(224, 108, 117, 0.15);
           color: #e06c75;
         }
-        .dw-delete-confirm:hover { background: rgba(224, 108, 117, 0.25); }
-        .dw-delete-confirm:disabled { opacity: 0.4; cursor: default; }
+        .dw-delete-confirm:hover {
+          background: rgba(224, 108, 117, 0.25);
+        }
+        .dw-delete-confirm:disabled {
+          opacity: 0.4;
+          cursor: default;
+        }
         .dw-delete-cancel {
           border: none;
           background: transparent;
@@ -1753,8 +2164,15 @@ export class Openp41geWindowManager extends LitElement {
           cursor: pointer;
           border-radius: 6px;
         }
-        .dw-delete-cancel:hover { background: var(--bg-active, #37373d); color: var(--text-primary, #ddd); }
-        .dw-list { list-style: none; margin: 0; padding: 0; }
+        .dw-delete-cancel:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .dw-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
         .dw-item {
           display: flex;
           align-items: center;
@@ -1764,12 +2182,16 @@ export class Openp41geWindowManager extends LitElement {
           border-radius: 4px;
           cursor: pointer;
         }
-        .dw-item:hover { background: var(--bg-active, #37373d); }
+        .dw-item:hover {
+          background: var(--bg-active, #37373d);
+        }
         .dw-item--new {
           cursor: default;
           border: 1px dashed var(--divider, #444);
         }
-        .dw-item--new:hover { background: transparent; }
+        .dw-item--new:hover {
+          background: transparent;
+        }
         .dw-new-input {
           flex: 1;
           min-width: 0;
@@ -1781,9 +2203,15 @@ export class Openp41geWindowManager extends LitElement {
           font-family: inherit;
           padding: 0;
         }
-        .dw-new-input::placeholder { color: var(--text-secondary, #777); }
-        .dw-item--selectable { cursor: pointer; }
-        .dw-item--selected { background: var(--bg-active, #37373d); }
+        .dw-new-input::placeholder {
+          color: var(--text-secondary, #777);
+        }
+        .dw-item--selectable {
+          cursor: pointer;
+        }
+        .dw-item--selected {
+          background: var(--bg-active, #37373d);
+        }
         .dw-checkbox {
           width: 14px;
           height: 14px;
@@ -1801,10 +2229,27 @@ export class Openp41geWindowManager extends LitElement {
           border-color: var(--accent, #569cd6);
           color: #fff;
         }
-        .dw-checkbox--checked::after { content: "✓"; font-size: 11px; line-height: 1; }
-        .dw-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .dw-item-meta { color: var(--text-secondary, #999); font-size: 12px; }
-        .dw-meta-block { color: var(--text-secondary, #999); font-size: 12px; line-height: 1.6; }
+        .dw-checkbox--checked::after {
+          content: "✓";
+          font-size: 11px;
+          line-height: 1;
+        }
+        .dw-item-name {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .dw-item-meta {
+          color: var(--text-secondary, #999);
+          font-size: 12px;
+        }
+        .dw-meta-block {
+          color: var(--text-secondary, #999);
+          font-size: 12px;
+          line-height: 1.6;
+        }
       </style>
       <div class="wm-root">
         <div class="wm-titlebar">
@@ -1828,206 +2273,378 @@ export class Openp41geWindowManager extends LitElement {
         </div>
         <div class="wm-drawer-layer">
           <div class="wm-view-header">
-            ${this._searchOpen
-              ? html`
-                  <div class="wm-search">
-                    <input
-                      class="wm-search-input"
-                      placeholder="Search workspaces…"
-                      spellcheck="false"
-                      .value=${this._searchQuery}
-                      @input=${this._onSearchInput}
-                      @keydown=${this._onSearchKeydown}
-                    />
+            ${
+              this._searchOpen
+                ? html`
+                    <div class="wm-search">
+                      <input
+                        class="wm-search-input"
+                        placeholder="Search workspaces…"
+                        spellcheck="false"
+                        .value=${this._searchQuery}
+                        @input=${this._onSearchInput}
+                        @keydown=${this._onSearchKeydown}
+                      />
+                      <button
+                        class="wm-search-toggle ${this._useRegex ? "wm-search-toggle--on" : ""}"
+                        aria-label="Regex search"
+                        aria-pressed=${this._useRegex}
+                        data-tip="Regex search"
+                        @click=${() => {
+                          this._useRegex = !this._useRegex;
+                        }}
+                      >
+                        ${unsafeHTML(REGEX_ICON)}
+                      </button>
+                      <button
+                        class="wm-search-toggle ${this._caseSensitive ? "wm-search-toggle--on" : ""}"
+                        aria-label="Match case"
+                        aria-pressed=${this._caseSensitive}
+                        data-tip=${this._caseSensitive ? "Match case (on)" : "Match case (off)"}
+                        @click=${() => {
+                          this._caseSensitive = !this._caseSensitive;
+                        }}
+                      >
+                        ${unsafeHTML(CASE_ON_ICON)}
+                      </button>
+                      <span class="wm-search-sep"></span>
+                      <button
+                        class="wm-search-clear"
+                        aria-label="Clear search"
+                        data-tip="Clear search"
+                        @click=${this._exitSearch}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  `
+                : html`
+                    <span class="wm-view-title">Workspaces</span>
                     <button
-                      class="wm-search-toggle ${this._useRegex ? "wm-search-toggle--on" : ""}"
-                      aria-label="Regex search"
-                      aria-pressed=${this._useRegex}
-                      data-tip="Regex search"
-                      @click=${() => {
-                        this._useRegex = !this._useRegex;
-                      }}
-                    >${unsafeHTML(REGEX_ICON)}</button>
-                    <button
-                      class="wm-search-toggle ${this._caseSensitive ? "wm-search-toggle--on" : ""}"
-                      aria-label="Match case"
-                      aria-pressed=${this._caseSensitive}
-                      data-tip=${this._caseSensitive ? "Match case (on)" : "Match case (off)"}
-                      @click=${() => {
-                        this._caseSensitive = !this._caseSensitive;
-                      }}
-                    >${unsafeHTML(CASE_ON_ICON)}</button>
-                    <span class="wm-search-sep"></span>
-                    <button
-                      class="wm-search-clear"
-                      aria-label="Clear search"
-                      data-tip="Clear search"
-                      @click=${this._exitSearch}
-                    >✕</button>
-                  </div>
-                `
-              : html`
-                  <span class="wm-view-title">Workspaces</span>
-                  <button
-                    class="wm-search-btn"
-                    aria-label="Search workspaces"
-                    data-tip="Search workspaces"
-                    @click=${this._startSearch}
-                  ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></button>
-                `}
+                      class="wm-search-btn"
+                      aria-label="Search workspaces"
+                      data-tip="Search workspaces"
+                      @click=${this._startSearch}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="M21 21l-4.35-4.35" />
+                      </svg>
+                    </button>
+                  `
+            }
           </div>
           <div class="wm-body" @click=${this._onBackgroundClick}>
-            ${this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
-              ? html`<p class="empty">No workspaces yet. Create one from an open workspace window.</p>`
-              : this._searchOpen && this._workspaces.length > 0 && filtered.length === 0
-                ? html`<p class="empty">No workspaces match “${this._searchQuery}”.</p>`
-                : html`
-                  <ul>
-                    ${this._addingWorkspace
-                      ? html`
-                          <li class="ws-row ws-row--new">
-                            <div class="ws-thumb ws-thumb--skeleton">
-                              <div class="ws-carousel"><div class="ws-carousel-track">
-                                <div class="ws-win">
-                                  <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
-                                  <div class="ws-win-body">
-                                    <div class="ws-win-grid"><div class="ws-thumb-cell"></div><div class="ws-thumb-cell"></div></div>
-                                  </div>
-                                </div>
-                              </div></div>
-                            </div>
-                            <div class="ws-info">
-                              <input
-                                class="wm-new-ws-input"
-                                placeholder="Workspace name"
-                                spellcheck="false"
-                                @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
-                                @blur=${() => { if (this._addingWorkspace) void this._createWorkspaceFromInput(); }}
-                              />
-                              <div class="ws-meta"><span class="ws-skeleton ws-skeleton--num"></span></div>
-                              <div class="ws-pills"><span class="ws-skeleton ws-skeleton--pill"></span></div>
-                            </div>
-                            <span class="ws-skeleton ws-skeleton--chevron"></span>
-                          </li>
-                        `
-                      : nothing}
-                    ${filtered.map((w, i) => {
-                      const name = w.data.name?.trim() || "Unnamed";
-                      const repos = w.data.repos?.length ?? 0;
-                      const worktrees = (w.data.repos ?? []).reduce(
-                        (n, r) => n + (r.worktrees?.length ?? 0),
-                        0,
-                      );
-                      const isOpen = openPaths.has(w.filePath);
-                      const windows = w.data.windows ?? [];
-                      const shared = w.data.sharedSidebars;
-                      const leftOpen = !!shared?.leftSidebarOpen;
-                      const rightOpen = !!shared?.rightSidebarOpen;
-                      const wins = windows.length > 0 ? windows : [undefined];
-                      const idx = Math.min(this._carouselIndex.get(w.filePath) ?? 0, wins.length - 1);
-                      const isLast = i === filtered.length - 1;
-                      const sideRows = html`<span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span><span class="ws-thumb-side-row"></span>`;
-                      return html`
-                        <li
-                          class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
-                          @click=${(e: Event) => { e.stopPropagation(); if (this._suppressClick) { this._suppressClick = false; return; } if (this._workspaceDeleteMode) this._toggleWorkspaceSelection(w.filePath); else this._openWorkspace(w); }}
-                        >
-                          <div class="ws-thumb-wrap">
-                            <div
-                              class="ws-thumb"
-                              @pointerenter=${(e: PointerEvent) => this._onThumbPointerEnter(e, w.filePath, isOpen)}
-                              @pointerdown=${(e: PointerEvent) => this._onThumbPointerDown(e, w.filePath, isOpen)}
-                              @pointermove=${this._onThumbPointerMove}
-                              @pointerup=${this._onThumbPointerUp}
-                              @pointercancel=${this._onThumbPointerCancel}
-                            >
-                              <div class="ws-carousel">
-                                <div class="ws-carousel-track ${this._carouselLive ? "ws-carousel-track--live" : ""}" style="transform: translateX(${-idx * 100}%)">
-                                  ${wins.map((win) => html`
-                                    <div class="ws-win">
-                                      <div class="ws-thumb-chrome"><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span><span class="ws-thumb-dot"></span></div>
-                                      <div class="ws-win-body">
-                                        ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
-                                        <div class="ws-win-grid">${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}</div>
-                                        ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+            ${
+              this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
+                ? html`<p class="empty">
+                    No workspaces yet. Create one from an open workspace window.
+                  </p>`
+                : this._searchOpen && this._workspaces.length > 0 && filtered.length === 0
+                  ? html`<p class="empty">No workspaces match “${this._searchQuery}”.</p>`
+                  : html`
+                      <ul>
+                        ${
+                          this._addingWorkspace
+                            ? html`
+                                <li class="ws-row ws-row--new">
+                                  <div class="ws-thumb ws-thumb--skeleton">
+                                    <div class="ws-carousel">
+                                      <div class="ws-carousel-track">
+                                        <div class="ws-win">
+                                          <div class="ws-thumb-chrome">
+                                            <span class="ws-thumb-dot"></span
+                                            ><span class="ws-thumb-dot"></span
+                                            ><span class="ws-thumb-dot"></span>
+                                          </div>
+                                          <div class="ws-win-body">
+                                            <div class="ws-win-grid">
+                                              <div class="ws-thumb-cell"></div>
+                                              <div class="ws-thumb-cell"></div>
+                                            </div>
+                                          </div>
+                                        </div>
                                       </div>
                                     </div>
-                                  `)}
-                                </div>
-                              </div>
-                              ${wins.length > 1
-                                ? html`
-                                    <button
-                                      class="ws-carousel-arrow ws-carousel-arrow--prev"
-                                      ?disabled=${idx === 0}
-                                      aria-label="Previous window"
-                                      @pointerdown=${(e: Event) => e.stopPropagation()}
-                                      @click=${(e: Event) => {
-                                        e.stopPropagation();
-                                        this._gotoCarousel(w.filePath, idx - 1);
-                                      }}
-                                    ><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-                                    <button
-                                      class="ws-carousel-arrow ws-carousel-arrow--next"
-                                      ?disabled=${idx === wins.length - 1}
-                                      aria-label="Next window"
-                                      @pointerdown=${(e: Event) => e.stopPropagation()}
-                                      @click=${(e: Event) => {
-                                        e.stopPropagation();
-                                        this._gotoCarousel(w.filePath, idx + 1);
-                                      }}
-                                    ><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
-                                  `
-                                : nothing}
-                            </div>
-                            ${wins.length > 1
-                              ? html`<div class="ws-carousel-dots">${wins.map((_win, wi) => html`<span class="ws-dot ${wi === idx ? "ws-dot--active" : ""}"></span>`)}</div>`
-                              : nothing}
-                          </div>
-                          <div class="ws-info">
-                            <div class="ws-name">${name}</div>
-                            <div class="ws-meta">${this._countLabel(repos, "repo")} · ${this._countLabel(worktrees, "worktree")}</div>
-                            ${this._workspaceDeleteMode
-                              ? nothing
-                              : html`
-                                  <div class="ws-pills">
-                                    ${isOpen
-                                      ? html`<span class="ws-pill ws-pill--open" role="button" tabindex="0" @click=${(e: Event) => this._onRowPillOpen(e, w.filePath)}>Open</span>`
-                                      : nothing}
-                                    <span class="ws-pill">${this._countLabel(w.data.windows?.length ?? 0, "window")}</span>
                                   </div>
-                                `}
-                          </div>
-                          ${this._workspaceDeleteMode
-                            ? html`<span class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"></span>`
-                            : html`<svg class="ws-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`}
-                        </li>
-                      `;
-                    })}
-                  </ul>
-                `}
+                                  <div class="ws-info">
+                                    <input
+                                      class="wm-new-ws-input"
+                                      placeholder="Workspace name"
+                                      spellcheck="false"
+                                      @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
+                                      @blur=${() => {
+                                        if (this._addingWorkspace)
+                                          void this._createWorkspaceFromInput();
+                                      }}
+                                    />
+                                    <div class="ws-meta">
+                                      <span class="ws-skeleton ws-skeleton--num"></span>
+                                    </div>
+                                    <div class="ws-pills">
+                                      <span class="ws-skeleton ws-skeleton--pill"></span>
+                                    </div>
+                                  </div>
+                                  <span class="ws-skeleton ws-skeleton--chevron"></span>
+                                </li>
+                              `
+                            : nothing
+                        }
+                        ${filtered.map((w, i) => {
+                          const name = w.data.name?.trim() || "Unnamed";
+                          const repos = w.data.repos?.length ?? 0;
+                          const worktrees = (w.data.repos ?? []).reduce(
+                            (n, r) => n + (r.worktrees?.length ?? 0),
+                            0,
+                          );
+                          const isOpen = openPaths.has(w.filePath);
+                          const windows = w.data.windows ?? [];
+                          const shared = w.data.sharedSidebars;
+                          const leftOpen = !!shared?.leftSidebarOpen;
+                          const rightOpen = !!shared?.rightSidebarOpen;
+                          const wins = windows.length > 0 ? windows : [undefined];
+                          const idx = Math.min(
+                            this._carouselIndex.get(w.filePath) ?? 0,
+                            wins.length - 1,
+                          );
+                          const isLast = i === filtered.length - 1;
+                          const sideRows = html`<span class="ws-thumb-side-row"></span
+                            ><span class="ws-thumb-side-row"></span
+                            ><span class="ws-thumb-side-row"></span>`;
+                          return html`
+                            <li
+                              class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
+                              @click=${(e: Event) => {
+                                e.stopPropagation();
+                                if (this._suppressClick) {
+                                  this._suppressClick = false;
+                                  return;
+                                }
+                                if (this._workspaceDeleteMode)
+                                  this._toggleWorkspaceSelection(w.filePath);
+                                else this._openWorkspace(w);
+                              }}
+                            >
+                              <div class="ws-thumb-wrap">
+                                <div
+                                  class="ws-thumb"
+                                  @pointerenter=${(e: PointerEvent) => this._onThumbPointerEnter(e, w.filePath, isOpen)}
+                                  @pointerdown=${(e: PointerEvent) => this._onThumbPointerDown(e, w.filePath, isOpen)}
+                                  @pointermove=${this._onThumbPointerMove}
+                                  @pointerup=${this._onThumbPointerUp}
+                                  @pointercancel=${this._onThumbPointerCancel}
+                                >
+                                  <div class="ws-carousel">
+                                    <div
+                                      class="ws-carousel-track ${this._carouselLive ? "ws-carousel-track--live" : ""}"
+                                      style="transform: translateX(${-idx * 100}%)"
+                                    >
+                                      ${wins.map(
+                                        (win) => html`
+                                          <div class="ws-win">
+                                            <div class="ws-thumb-chrome">
+                                              <span class="ws-thumb-dot"></span
+                                              ><span class="ws-thumb-dot"></span
+                                              ><span class="ws-thumb-dot"></span>
+                                            </div>
+                                            <div class="ws-win-body">
+                                              ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                              <div class="ws-win-grid">
+                                                ${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}
+                                              </div>
+                                              ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                            </div>
+                                          </div>
+                                        `,
+                                      )}
+                                    </div>
+                                  </div>
+                                  ${
+                                    wins.length > 1
+                                      ? html`
+                                          <button
+                                            class="ws-carousel-arrow ws-carousel-arrow--prev"
+                                            ?disabled=${idx === 0}
+                                            aria-label="Previous window"
+                                            @pointerdown=${(e: Event) => e.stopPropagation()}
+                                            @click=${(e: Event) => {
+                                              e.stopPropagation();
+                                              this._gotoCarousel(w.filePath, idx - 1);
+                                            }}
+                                          >
+                                            <svg
+                                              width="10"
+                                              height="10"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              stroke-width="3"
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                            >
+                                              <path d="M15 18l-6-6 6-6" />
+                                            </svg>
+                                          </button>
+                                          <button
+                                            class="ws-carousel-arrow ws-carousel-arrow--next"
+                                            ?disabled=${idx === wins.length - 1}
+                                            aria-label="Next window"
+                                            @pointerdown=${(e: Event) => e.stopPropagation()}
+                                            @click=${(e: Event) => {
+                                              e.stopPropagation();
+                                              this._gotoCarousel(w.filePath, idx + 1);
+                                            }}
+                                          >
+                                            <svg
+                                              width="10"
+                                              height="10"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              stroke-width="3"
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                            >
+                                              <path d="M9 18l6-6-6-6" />
+                                            </svg>
+                                          </button>
+                                        `
+                                      : nothing
+                                  }
+                                </div>
+                                ${
+                                  wins.length > 1
+                                    ? html`<div class="ws-carousel-dots">
+                                        ${wins.map((_win, wi) => html`<span class="ws-dot ${wi === idx ? "ws-dot--active" : ""}"></span>`)}
+                                      </div>`
+                                    : nothing
+                                }
+                              </div>
+                              <div class="ws-info">
+                                <div class="ws-name">${name}</div>
+                                <div class="ws-meta">
+                                  ${this._countLabel(repos, "repo")} ·
+                                  ${this._countLabel(worktrees, "worktree")}
+                                </div>
+                                ${
+                                  this._workspaceDeleteMode
+                                    ? nothing
+                                    : html`
+                                        <div class="ws-pills">
+                                          ${
+                                            isOpen
+                                              ? html`<span
+                                                  class="ws-pill ws-pill--open"
+                                                  role="button"
+                                                  tabindex="0"
+                                                  @click=${(e: Event) => this._onRowPillOpen(e, w.filePath)}
+                                                  >Open</span
+                                                >`
+                                              : nothing
+                                          }
+                                          <span class="ws-pill"
+                                            >${this._countLabel(w.data.windows?.length ?? 0, "window")}</span
+                                          >
+                                        </div>
+                                      `
+                                }
+                              </div>
+                              ${
+                                this._workspaceDeleteMode
+                                  ? html`<span
+                                      class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"
+                                    ></span>`
+                                  : html`<svg
+                                      class="ws-chevron"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                    >
+                                      <path d="M9 6l6 6-6 6" />
+                                    </svg>`
+                              }
+                            </li>
+                          `;
+                        })}
+                      </ul>
+                    `
+            }
           </div>
-          ${this._drawers.length > 0
-            ? html`<div class="wm-list-mask" @click=${(e: Event) => { e.stopPropagation(); this._closeAll(); }}></div>`
-            : nothing}
-          ${this._drawers.length > 0
-            ? html`<div class="drawer-shadow" style="width:${this._stackWidth()}%"></div>`
-            : nothing}
+          ${
+            this._drawers.length > 0
+              ? html`<div
+                  class="wm-list-mask"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._closeAll();
+                  }}
+                ></div>`
+              : nothing
+          }
+          ${
+            this._drawers.length > 0
+              ? html`<div class="drawer-shadow" style="width:${this._stackWidth()}%"></div>`
+              : nothing
+          }
           ${this._drawers.map(
             (d, i) => html`
               <div class="drawer" style="width:${this._widthFor(i)}%; z-index:${i + 1}">
-                ${i < this._drawers.length - 1
-                  ? html`<div class="drawer-mask" @click=${(e: Event) => { e.stopPropagation(); this._closeDeeper(i); }}></div>`
-                  : nothing}
+                ${
+                  i < this._drawers.length - 1
+                    ? html`<div
+                        class="drawer-mask"
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          this._closeDeeper(i);
+                        }}
+                      ></div>`
+                    : nothing
+                }
                 <div class="drawer-head">
-                  ${i === this._drawers.length - 1
-                    ? this._drawerBreadcrumbs(i)
-                    : html`<span class="drawer-title">${d.title}</span>`}
+                  ${
+                    i === this._drawers.length - 1
+                      ? this._drawerBreadcrumbs(i)
+                      : html`<span class="drawer-title">${d.title}</span>`
+                  }
                   <div class="drawer-actions">
-                    ${d.kind === "workspace" && !openPaths.has(d.workspacePath)
-                      ? html`<button class="dw-open" @click=${(e: Event) => { e.stopPropagation(); this._openWorkspaceWindow(d.workspacePath); }}>Open</button>`
-                      : nothing}
-                    <button class="dw-close" @click=${(e: Event) => { e.stopPropagation(); this._closeDrawer(d.id); }} aria-label="Close" data-tip="Close">✕</button>
+                    ${
+                      d.kind === "workspace" && !openPaths.has(d.workspacePath)
+                        ? html`<button
+                            class="dw-open"
+                            @click=${(e: Event) => {
+                              e.stopPropagation();
+                              this._openWorkspaceWindow(d.workspacePath);
+                            }}
+                          >
+                            Open
+                          </button>`
+                        : nothing
+                    }
+                    <button
+                      class="dw-close"
+                      @click=${(e: Event) => {
+                        e.stopPropagation();
+                        this._closeDrawer(d.id);
+                      }}
+                      aria-label="Close"
+                      data-tip="Close"
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
                 <div class="drawer-body">${this._drawerContent(d)}</div>
@@ -2056,32 +2673,47 @@ export class Openp41geWindowManager extends LitElement {
       const repos = d.data.repos ?? [];
       return html`
         <ul class="dw-list">
-          ${this._addingRepo
-            ? html`
-                <li class="dw-item dw-item--new">
-                  <input
-                    class="dw-new-input"
-                    placeholder="Repo URL"
-                    spellcheck="false"
-                    @keydown=${(e: KeyboardEvent) => this._onNewRepoKeydown(e, d)}
-                    @blur=${(e: Event) => this._commitNewRepo(d, e)}
-                  />
-                </li>
-              `
-            : nothing}
-          ${repos.length === 0 && !this._addingRepo
-            ? html`<p class="empty">No repositories in this workspace.</p>`
-            : nothing}
+          ${
+            this._addingRepo
+              ? html`
+                  <li class="dw-item dw-item--new">
+                    <input
+                      class="dw-new-input"
+                      placeholder="Repo URL"
+                      spellcheck="false"
+                      @keydown=${(e: KeyboardEvent) => this._onNewRepoKeydown(e, d)}
+                      @blur=${(e: Event) => this._commitNewRepo(d, e)}
+                    />
+                  </li>
+                `
+              : nothing
+          }
+          ${
+            repos.length === 0 && !this._addingRepo
+              ? html`<p class="empty">No repositories in this workspace.</p>`
+              : nothing
+          }
           ${repos.map(
             (repo) => html`
               <li
                 class="dw-item ${this._deleteMode ? "dw-item--selectable" : ""} ${this._selectedRepos.has(repo.url) ? "dw-item--selected" : ""}"
-                @click=${(e: Event) => { e.stopPropagation(); if (this._deleteMode) this._toggleRepoSelection(repo.url); else this._openRepo(d, repo); }}
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  if (this._deleteMode) this._toggleRepoSelection(repo.url);
+                  else this._openRepo(d, repo);
+                }}
               >
                 <span class="dw-item-name">${deriveRepoName(repo.url)}</span>
-                ${this._deleteMode
-                  ? html`<span class="dw-checkbox ${this._selectedRepos.has(repo.url) ? "dw-checkbox--checked" : ""}"></span>`
-                  : html`<span class="dw-item-meta">${repo.worktrees?.length ?? 0} worktree${(repo.worktrees?.length ?? 0) === 1 ? "" : "s"}</span>`}
+                ${
+                  this._deleteMode
+                    ? html`<span
+                        class="dw-checkbox ${this._selectedRepos.has(repo.url) ? "dw-checkbox--checked" : ""}"
+                      ></span>`
+                    : html`<span class="dw-item-meta"
+                        >${repo.worktrees?.length ?? 0}
+                        worktree${(repo.worktrees?.length ?? 0) === 1 ? "" : "s"}</span
+                      >`
+                }
               </li>
             `,
           )}
@@ -2094,32 +2726,44 @@ export class Openp41geWindowManager extends LitElement {
       const wts = repo?.worktrees ?? [];
       return html`
         <ul class="dw-list">
-          ${this._addingWorktree
-            ? html`
-                <li class="dw-item dw-item--new">
-                  <input
-                    class="dw-new-input"
-                    placeholder="Worktree branch"
-                    spellcheck="false"
-                    @keydown=${(e: KeyboardEvent) => this._onNewWorktreeKeydown(e, d)}
-                    @blur=${(e: Event) => this._commitNewWorktree(d, e)}
-                  />
-                </li>
-              `
-            : nothing}
-          ${wts.length === 0 && !this._addingWorktree
-            ? html`<p class="empty">No worktrees yet.</p>`
-            : nothing}
+          ${
+            this._addingWorktree
+              ? html`
+                  <li class="dw-item dw-item--new">
+                    <input
+                      class="dw-new-input"
+                      placeholder="Worktree branch"
+                      spellcheck="false"
+                      @keydown=${(e: KeyboardEvent) => this._onNewWorktreeKeydown(e, d)}
+                      @blur=${(e: Event) => this._commitNewWorktree(d, e)}
+                    />
+                  </li>
+                `
+              : nothing
+          }
+          ${
+            wts.length === 0 && !this._addingWorktree
+              ? html`<p class="empty">No worktrees yet.</p>`
+              : nothing
+          }
           ${wts.map(
             (wt) => html`
               <li
                 class="dw-item ${this._worktreeDeleteMode ? "dw-item--selectable" : ""} ${this._selectedWorktrees.has(wt) ? "dw-item--selected" : ""}"
-                @click=${(e: Event) => { e.stopPropagation(); if (this._worktreeDeleteMode) this._toggleWorktreeSelection(wt); else this._openWorktree(d, wt); }}
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  if (this._worktreeDeleteMode) this._toggleWorktreeSelection(wt);
+                  else this._openWorktree(d, wt);
+                }}
               >
                 <span class="dw-item-name">${wt}</span>
-                ${this._worktreeDeleteMode
-                  ? html`<span class="dw-checkbox ${this._selectedWorktrees.has(wt) ? "dw-checkbox--checked" : ""}"></span>`
-                  : html`<span class="dw-item-meta">worktree</span>`}
+                ${
+                  this._worktreeDeleteMode
+                    ? html`<span
+                        class="dw-checkbox ${this._selectedWorktrees.has(wt) ? "dw-checkbox--checked" : ""}"
+                      ></span>`
+                    : html`<span class="dw-item-meta">worktree</span>`
+                }
               </li>
             `,
           )}
@@ -2131,7 +2775,9 @@ export class Openp41geWindowManager extends LitElement {
     const repoName = d.repoUrl ? deriveRepoName(d.repoUrl) : d.title;
     return html`
       <p class="empty">${d.worktree ?? ""}</p>
-      <p class="dw-meta-block">Workspace: ${d.data.name?.trim() || "Unnamed"}<br />Repo: ${repoName}</p>
+      <p class="dw-meta-block">
+        Workspace: ${d.data.name?.trim() || "Unnamed"}<br />Repo: ${repoName}
+      </p>
     `;
   }
 }

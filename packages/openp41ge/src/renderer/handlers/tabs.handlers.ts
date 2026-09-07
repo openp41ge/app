@@ -32,7 +32,16 @@ export function createTabHandlers(commandBus: ICommandBus): Record<string, Handl
 
     "tabs/open-in-cell": async (payload) => {
       const { windowId, appType, title, config, col, insertBefore, replaceExisting } = payload;
-      commandBus.dispatch("openTabInCell", windowId, appType, title, config, col, insertBefore, replaceExisting);
+      commandBus.dispatch(
+        "openTabInCell",
+        windowId,
+        appType,
+        title,
+        config,
+        col,
+        insertBefore,
+        replaceExisting,
+      );
     },
 
     "tabs/remove-from-cell": async (payload) => {
@@ -53,38 +62,6 @@ export function createTabHandlers(commandBus: ICommandBus): Record<string, Handl
     "layout/resize-grid": async (payload) => {
       const { windowId, paneWinId, cols } = payload;
       commandBus.dispatch("resizeGrid", windowId, paneWinId, 1, cols);
-    },
-
-    // ── Editor System Tab Handlers ──────────────────────────────────
-
-    "system-tabs/open-tab": async (payload) => {
-      const { windowId, appType } = payload;
-      commandBus.dispatch("openEditorSystemTab", windowId, appType);
-      // Expand the bottom pane when a system tab is opened
-      const wv = document.querySelector("openp41ge-windowview");
-      if (wv) {
-        wv.dispatchEvent(new CustomEvent("bp-expand", { bubbles: true, composed: true }));
-      }
-    },
-
-    "system-tabs/close-tab": async (payload) => {
-      const { windowId, tabId } = payload;
-      commandBus.dispatch("closeEditorSystemTab", windowId, tabId);
-    },
-
-    "system-tabs/activate-tab": async (payload) => {
-      const { windowId, tabId } = payload;
-      commandBus.dispatch("activateEditorSystemTab", windowId, tabId);
-      // Expand the bottom pane when a system tab is activated
-      const wv = document.querySelector("openp41ge-windowview");
-      if (wv) {
-        wv.dispatchEvent(new CustomEvent("bp-expand", { bubbles: true, composed: true }));
-      }
-    },
-
-    "system-tabs/reorder-tabs": async (payload) => {
-      const { windowId, tabId, targetIndex } = payload;
-      commandBus.dispatch("reorderEditorSystemTabs", windowId, tabId, targetIndex);
     },
   };
 }

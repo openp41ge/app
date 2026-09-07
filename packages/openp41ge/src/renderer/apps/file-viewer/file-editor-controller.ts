@@ -14,7 +14,7 @@ import { BaseController } from "../../controllers/base-controller";
 import type { FileViewerController } from "../../controllers/types";
 import { shouldOpenFile, DEFAULT_EDITOR_MAX_FILE_SIZE } from "../../models/file-size-gate";
 
-const log = createLogger("FileEditorController");
+const log = createLogger("openp41ge", "FileEditorController");
 
 // Import the file-editor component (side-effect: defines <file-editor>)
 import "openp41ge-file-editor";

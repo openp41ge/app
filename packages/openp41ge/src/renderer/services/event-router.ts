@@ -4,7 +4,7 @@ import type { EventLogBuffer } from "./event-log-buffer";
 
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("event-router");
+const log = createLogger("openp41ge", "event-router");
 
 export type HandlerFn = (payload: Record<string, unknown>) => Promise<void>;
 
@@ -70,7 +70,11 @@ export class EventRouter {
       for (const handlerId of matchedEdge.to) {
         const handler = this._handlers[handlerId];
         if (!handler) {
-          handlerResults.push({ handlerId, duration: 0, error: `Handler "${handlerId}" not registered.` });
+          handlerResults.push({
+            handlerId,
+            duration: 0,
+            error: `Handler "${handlerId}" not registered.`,
+          });
           continue;
         }
         const handlerStart = performance.now();
@@ -78,7 +82,11 @@ export class EventRouter {
           await handler(payload);
           handlerResults.push({ handlerId, duration: performance.now() - handlerStart });
         } catch (err: unknown) {
-          handlerResults.push({ handlerId, duration: performance.now() - handlerStart, error: (err as Error)?.message ?? String(err) });
+          handlerResults.push({
+            handlerId,
+            duration: performance.now() - handlerStart,
+            error: (err as Error)?.message ?? String(err),
+          });
         }
       }
     }

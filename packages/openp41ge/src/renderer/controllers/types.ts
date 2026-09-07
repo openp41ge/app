@@ -91,6 +91,27 @@ export interface SystemTabController {
 }
 
 /**
+ * A system tab's own, unique settings surface (a grid tab).
+ *
+ * Every sidebar tab owns exactly one settings grid tab. The tab's settings
+ * button emits `openEvent` (a unique DOM event) to open it. This is generic so
+ * extension-provided sidebar tabs can supply their own settings.
+ */
+export interface SystemTabSettings {
+  /** Grid app type id for this tab's settings surface (e.g. "file-editor-settings"). */
+  appType: string;
+  /** Settings grid tab label. */
+  label: string;
+  /** Icon for the settings button/grid tab; defaults to a gear. */
+  icon?: string;
+  description?: string;
+  /** Unique DOM event emitted by this tab's settings button to open it. */
+  openEvent: string;
+  /** Factory that creates the settings grid tab controller. */
+  createController: (tabId: string) => TabController;
+}
+
+/**
  * Registration record for a system tab type.
  *
  * System tabs are sidebar-based app panels (Explorer, Git, Search, Projects).
@@ -105,29 +126,6 @@ export interface SystemTabRegistration {
   defaultSide: "left" | "right";
   /** Factory function to create the system tab content controller. */
   createController: (tabId: string, config?: Record<string, unknown>) => SystemTabController;
-}
-
-// ─── Editor System Tab Registration ─────────────────────────────────────
-
-/**
- * EditorSystemTabController — interface for editor-area system tab content.
- *
- * Editor system tabs override the grid. They use a simple render() pattern
- * rather than the mount/unmount lifecycle since they don't need persistence
- * across tab switches in the same way.
- */
-export interface EditorSystemTabController {
-  readonly id: string;
-  readonly appType: string;
-  readonly title: string;
-  render(): unknown;
-  /** Legacy lifecycle hooks, still used by service-modals that host controllers. */
-  mount?(container?: HTMLElement): void;
-  unmount?(): void;
-}
-
-export interface EditorSystemTabRegistration {
-  appType: string;
-  title: string;
-  createController(tabId: string): EditorSystemTabController;
+  /** This tab's own, unique settings surface (grid tab). Optional. */
+  settings?: SystemTabSettings;
 }

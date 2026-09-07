@@ -19,7 +19,7 @@ import type { Tab } from "../../layout/types";
 import { createLogger } from "openp41ge-logger";
 import { Openp41geTabsEventHandler } from "./openp41ge-tabs-event-handler";
 
-const log = createLogger("file-open-handler");
+const log = createLogger("openp41ge", "file-open-handler");
 
 export class FileOpenHandler implements IFileOpenHandler {
   private _commandBus: ICommandBus | null = null;

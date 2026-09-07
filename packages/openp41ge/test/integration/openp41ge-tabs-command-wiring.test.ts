@@ -215,6 +215,73 @@ describe("Openp41geTabsEventHandler — command wiring", () => {
     document.body.removeChild(grid);
   });
 
+  // ── Grid open tab (log-system drop) ─────────────────────────────
+
+  it("opens a system-scoped log-viewer tab on a log-system drop", () => {
+    const grid = document.createElement("tab-grid");
+    (grid as any).winId = "w1";
+    grid.style.display = "none";
+    document.body.appendChild(grid);
+
+    document.dispatchEvent(
+      new CustomEvent("grid-open-tab", {
+        detail: {
+          tabType: "log-viewer",
+          tabConfig: { system: "openp41ge" },
+          targetCol: 0,
+          pinned: true,
+        },
+      }),
+    );
+
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      "actionOpenFile",
+      "w1",
+      "log-viewer",
+      "openp41ge",
+      undefined,
+      0,
+      true,
+      { system: "openp41ge" },
+    );
+
+    document.body.removeChild(grid);
+  });
+
+  it("splits a new column on a boundary log-system drop", () => {
+    const grid = document.createElement("tab-grid");
+    (grid as any).winId = "w1";
+    grid.style.display = "none";
+    document.body.appendChild(grid);
+
+    document.dispatchEvent(
+      new CustomEvent("grid-open-tab", {
+        detail: {
+          tabType: "log-viewer",
+          tabConfig: { system: "openp41ge-terminal" },
+          targetCol: 0,
+          isBoundary: true,
+          splitCol: 0,
+          splitLeft: true,
+          pinned: true,
+        },
+      }),
+    );
+
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      "splitFileOpen",
+      "w1",
+      "log-viewer",
+      "openp41ge-terminal",
+      undefined,
+      0,
+      true,
+      { system: "openp41ge-terminal" },
+    );
+
+    document.body.removeChild(grid);
+  });
+
   // ── Tab close button click ──────────────────────────────────────
 
   it("handles click on .tab-close button and dispatches removeTabFromCell", () => {

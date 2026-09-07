@@ -15,7 +15,7 @@
  */
 
 import { createLogger, setMinLevel, LogLevel } from "openp41ge-logger";
-const log = createLogger("app");
+const log = createLogger("openp41ge", "app");
 
 // ─── Component registration (side-effect imports — must be at module level) ──
 import "./components/openp41ge-windowview";
@@ -28,9 +28,8 @@ import "./components/openp41ge-worktree-tree";
 import "./components/openp41ge-sidebar";
 import "./components/focus-section";
 import "./components/openp41ge-bottom-bar-btn";
-import "./components/debug-log-panel";
 
-import { isDebugSeed } from "./components/debug-log-panel";
+import { isDebugSeed } from "./services/log-debug";
 
 // Import openp41ge-uikit (registers <tab-grid>, <tab-bar>, <tab-content>, etc.)
 import "openp41ge-uikit";
@@ -50,6 +49,7 @@ import {
   RegisterEventListenersStep,
   FetchInitialStateStep,
   SubscribeStateUpdatesStep,
+  RegisterTabActivationRecorderStep,
   RegisterShortcutsStep,
   RegisterIpcListenersStep,
   StartQuoteControllerStep,
@@ -74,6 +74,7 @@ const steps = [
   new ResolveWindowKindStep(), // 4: Resolve window kind + workspace binding
   new InitServicesStep(), // 5: Wire cross-service dependencies
   new SubscribeStateUpdatesStep(), // 6: ** Register render subscriber BEFORE any async **
+  new RegisterTabActivationRecorderStep(), // 6b: Record tab activations into TabActivationHistory
   new RegisterEventListenersStep(), // 7: Document-level event listeners
   new FetchInitialStateStep(), // 8: ** Async: fetch + set state → subscriber fires → UI RENDERS **
   new LoadConfigStep(), // 9: Async: load config (cosmetic, after UI is visible)
@@ -140,7 +141,7 @@ export const appServices = {
 
 import { unmountAllControllers } from "./controllers/registry";
 import { resetTabDragState } from "./services/drag-context";
-import { systemOverlayService } from "./services/system-overlay-service";
+
 import { injectGlobalTailwind } from "./services/inject-global-tailwind";
 
 /**
@@ -219,7 +220,10 @@ export const renderer = {
       log.info("debug session seeded by environment flag");
       setMinLevel(LogLevel.DEBUG);
       window.openp41ge?.logs?.setDebug?.(true);
-      systemOverlayService.open("list", "logs");
+      const winId = window.openp41ge?.workspace?.getWindowId?.();
+      if (winId) {
+        window.openp41ge.workspace.dispatch("openSystemTab", winId, "right", "logs", "Logs");
+      }
     }
 
     // Inject global Tailwind utility classes before any UI renders

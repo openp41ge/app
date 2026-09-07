@@ -12,7 +12,7 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:load-config");
+const log = createLogger("openp41ge", "load-config");
 
 export class LoadConfigStep implements IStartupStep {
   readonly name = "load-config";

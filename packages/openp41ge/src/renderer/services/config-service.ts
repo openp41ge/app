@@ -8,7 +8,7 @@
 
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("config-service");
+const log = createLogger("openp41ge", "config-service");
 
 // ─── Config type (mirrors main process types) ────────────────────────────
 

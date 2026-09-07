@@ -23,7 +23,7 @@ import type { StartupContext } from "../startup-context";
 import type { Workspace } from "../../../layout/types";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:fetch-initial-state");
+const log = createLogger("openp41ge", "fetch-initial-state");
 
 export class FetchInitialStateStep implements IStartupStep {
   readonly name = "fetch-initial-state";

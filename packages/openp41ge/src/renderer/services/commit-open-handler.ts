@@ -22,7 +22,7 @@ import type { Tab } from "../../layout/types";
 import { createLogger } from "openp41ge-logger";
 import { Openp41geTabsEventHandler } from "./openp41ge-tabs-event-handler";
 
-const log = createLogger("commit-open-handler");
+const log = createLogger("openp41ge", "commit-open-handler");
 
 export class CommitOpenHandler {
   private _commandBus: ICommandBus | null = null;
@@ -186,12 +186,7 @@ export class CommitOpenHandler {
       const tab = tabs[tabId];
       if (tab && tab.appType === "commit-file-diff" && typeof tab.config?.filePath === "string") {
         const cfg = safeParseJson(tab.config.filePath);
-        if (
-          cfg &&
-          cfg.repoName === repoName &&
-          cfg.hash === hash &&
-          cfg.path === path
-        ) {
+        if (cfg && cfg.repoName === repoName && cfg.hash === hash && cfg.path === path) {
           return tabId;
         }
       }
@@ -249,9 +244,7 @@ export class CommitOpenHandler {
   }
 }
 
-function safeParseJson(
-  json: string,
-): { repoName?: string; hash?: string; path?: string } | null {
+function safeParseJson(json: string): { repoName?: string; hash?: string; path?: string } | null {
   try {
     const v = JSON.parse(json) as { repoName?: string; hash?: string; path?: string };
     return v && typeof v === "object" ? v : null;

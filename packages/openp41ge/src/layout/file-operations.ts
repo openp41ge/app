@@ -106,6 +106,7 @@ export function splitFileOpen(
   filePath?: string,
   splitCol?: number,
   splitLeft?: boolean,
+  extraConfig?: Record<string, unknown>,
 ): Workspace {
   const win = workspace.windows.find((w) => w.id === windowId);
   if (!win) return workspace;
@@ -115,7 +116,7 @@ export function splitFileOpen(
   // cell (e.g. the file landing in a new right column beside a blank left one).
   const hasTabs = win.grid.placements.some((p) => p.tabIds.length > 0);
   if (!hasTabs) {
-    return actionOpenFile(workspace, windowId, appType, fileName, filePath, 0, true);
+    return actionOpenFile(workspace, windowId, appType, fileName, filePath, 0, true, extraConfig);
   }
 
   const col = splitCol ?? 0;
@@ -123,7 +124,7 @@ export function splitFileOpen(
   const newCol = left ? col : col + 1;
 
   const tabId = makeTabId();
-  const config: Record<string, unknown> = {};
+  const config: Record<string, unknown> = { ...extraConfig };
   if (filePath) config.filePath = filePath;
   const tab = createTab(tabId, appType, fileName || appType.replace("-", " "), config);
 

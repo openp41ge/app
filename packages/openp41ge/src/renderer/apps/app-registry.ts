@@ -10,7 +10,7 @@
  * If no registration exists, PlaceholderController is used as fallback.
  */
 
-import type { AppTypeRegistration, SystemTabRegistration, EditorSystemTabRegistration } from "../controllers/types";
+import type { AppTypeRegistration, SystemTabRegistration } from "../controllers/types";
 
 // ─── Editor App Type Registry ─────────────────────────────────────────────
 
@@ -30,6 +30,17 @@ const _systemTabRegistry = new Map<string, SystemTabRegistration>();
 
 export function registerSystemTabType(reg: SystemTabRegistration): void {
   _systemTabRegistry.set(reg.id, reg);
+  // A system tab owns its settings surface as a grid app type, so registering
+  // the tab also makes the grid able to render its settings tab.
+  if (reg.settings) {
+    registerAppType({
+      id: reg.settings.appType,
+      label: reg.settings.label,
+      icon: reg.settings.icon ?? "⚙",
+      description: reg.settings.description ?? `${reg.settings.label} settings`,
+      createController: reg.settings.createController,
+    });
+  }
 }
 
 export function getSystemTabRegistration(id: string): SystemTabRegistration | undefined {
@@ -38,20 +49,4 @@ export function getSystemTabRegistration(id: string): SystemTabRegistration | un
 
 export function getAllSystemTabRegistrations(): SystemTabRegistration[] {
   return Array.from(_systemTabRegistry.values());
-}
-
-// ─── Editor System Tab Registry ────────────────────────────────────────────
-
-const _editorSystemTabRegistry = new Map<string, EditorSystemTabRegistration>();
-
-export function registerEditorSystemTabType(reg: EditorSystemTabRegistration): void {
-  _editorSystemTabRegistry.set(reg.appType, reg);
-}
-
-export function getEditorSystemTabRegistration(appType: string): EditorSystemTabRegistration | undefined {
-  return _editorSystemTabRegistry.get(appType);
-}
-
-export function getAllEditorSystemTabRegistrations(): EditorSystemTabRegistration[] {
-  return Array.from(_editorSystemTabRegistry.values());
 }

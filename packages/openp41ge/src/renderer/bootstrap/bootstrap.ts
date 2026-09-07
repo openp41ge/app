@@ -27,7 +27,7 @@ import { isOpenp41geWindowview } from "../interfaces/element-guards";
 import { createLogger } from "openp41ge-logger";
 import { installErrorCapture } from "../services/error-capture-service";
 
-const log = createLogger("bootstrap");
+const log = createLogger("openp41ge", "bootstrap");
 
 export class RendererBootstrap {
   constructor(
@@ -55,7 +55,7 @@ export class RendererBootstrap {
 
     // DEBUG: check preload bridge
     try {
-      if (typeof window.openp41ge === 'undefined') {
+      if (typeof window.openp41ge === "undefined") {
         log.error("PRELOAD BRIDGE window.openp41ge is UNDEFINED");
       } else {
         log.info("PRELOAD BRIDGE window.openp41ge is available");
@@ -67,7 +67,8 @@ export class RendererBootstrap {
     // ── Phase 1: Fire all IPC calls immediately (no await) ────────
     // Both run in the background while sync steps execute below.
     try {
-      this.context.initialStatePromise = window.openp41ge?.workspace?.getState() ?? Promise.resolve(null);
+      this.context.initialStatePromise =
+        window.openp41ge?.workspace?.getState() ?? Promise.resolve(null);
     } catch (e) {
       log.error("Failed to get initial state:", e);
       this.context.initialStatePromise = Promise.resolve("") as Promise<string>;

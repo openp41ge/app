@@ -1,7 +1,7 @@
 import type { IZoomService } from "../interfaces/zoom-service";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("zoom-service");
+const log = createLogger("openp41ge", "zoom-service");
 
 /**
  * Zoom service — manages application zoom level.

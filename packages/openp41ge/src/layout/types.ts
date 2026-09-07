@@ -14,9 +14,6 @@ export type TabId = z.infer<typeof TabId>;
 export const SystemTabId = z.string().brand("SystemTabId");
 export type SystemTabId = z.infer<typeof SystemTabId>;
 
-export const EditorSystemTabId = z.string().brand("EditorSystemTabId");
-export type EditorSystemTabId = z.infer<typeof EditorSystemTabId>;
-
 export const OverlayId = z.string().brand("OverlayId");
 export type OverlayId = z.infer<typeof OverlayId>;
 
@@ -231,20 +228,6 @@ export const SystemTabSchema = SidebarTabSchema;
 export type SystemTab = SidebarTab;
 export const createSystemTab = createSidebarTab;
 
-// ─── EditorSystemTab ────────────────────────────────────────────────────
-
-/** Editor-area system tabs override the grid (workspace manager, settings, etc.). */
-export const EditorSystemTabSchema = z.object({
-  id: EditorSystemTabId,
-  appType: z.string(),
-  title: z.string(),
-});
-export type EditorSystemTab = z.infer<typeof EditorSystemTabSchema>;
-
-export function createEditorSystemTab(id: string, appType: string, title: string): EditorSystemTab {
-  return EditorSystemTabSchema.parse({ id, appType, title });
-}
-
 // ─── SidebarState ───────────────────────────────────────────────────────────────
 
 /**
@@ -299,24 +282,11 @@ export const WindowSchema = z.object({
   grid: GridSchema,
   sidebar: SidebarStateSchema.optional().default({ activeViewId: null, width: 280 }),
   overlays: z.array(OverlaySchema).default([]),
-  /** Editor-area system tabs (override the grid when open). */
-  editorSystemTabIds: z.array(EditorSystemTabId).default([]),
-  /** Active editor-area system tab ID. */
-  editorSystemActiveTabId: EditorSystemTabId.nullable().default(null),
-  /** Bottom-pane grid layout (column-based, like main grid). */
-  bottomPaneGrid: GridSchema.default({
-    id: "bp-default",
-    rows: 1,
-    cols: 1,
-    placements: [],
-    dividers: { columns: [], rows: [] },
-  }),
 });
 export type Window = z.infer<typeof WindowSchema>;
 
 export function createWindow(id: string, bounds?: Bounds, monitor?: number): Window {
   const grid = createGrid(id, 1, 1);
-  const bpGrid = createGrid(`${id}-bp`, 1, 1);
   return WindowSchema.parse({
     id,
     bounds: bounds ?? { x: 0, y: 0, width: 1280, height: 800 },
@@ -324,7 +294,6 @@ export function createWindow(id: string, bounds?: Bounds, monitor?: number): Win
     grid,
     sidebar: { activeViewId: null, width: 280 },
     overlays: [],
-    bottomPaneGrid: bpGrid,
   });
 }
 

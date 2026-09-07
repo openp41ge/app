@@ -27,7 +27,7 @@ import { emitOpenSystemTab } from "../../components/openp41ge-worktree-controlle
  */
 export class InitEventControllerStep implements IStartupStep {
   readonly name = "init-event-controller";
-  private readonly _log = createLogger("init-event-controller");
+  private readonly _log = createLogger("openp41ge", "init-event-controller");
 
   async run(context: StartupContext): Promise<void> {
     const log = this._log;

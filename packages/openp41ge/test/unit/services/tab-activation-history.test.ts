@@ -167,4 +167,75 @@ describe("TabActivationHistory", () => {
     expect(TabActivationHistory.canGoBack("w1")).toBe(false);
     expect(TabActivationHistory.getCurrent("w2")).toBe("ta"); // still intact
   });
+
+  describe("closed-tab filtering (isOpen)", () => {
+    it("goBack skips and discards a closed tab", () => {
+      TabActivationHistory.pushActivation("w1", "t1");
+      TabActivationHistory.pushActivation("w1", "t2");
+      TabActivationHistory.pushActivation("w1", "t3");
+      // t3 is closed — goBack should land on t2, not the closed t3.
+      const isOpen = (t: string) => t !== "t3";
+      expect(TabActivationHistory.goBack("w1", isOpen)).toBe("t2");
+      expect(TabActivationHistory.getCurrent("w1")).toBe("t2");
+      // t3 was discarded from the back stack.
+      expect(TabActivationHistory.canGoBack("w1", isOpen)).toBe(true);
+    });
+
+    it("goForward skips and discards a closed tab", () => {
+      TabActivationHistory.pushActivation("w1", "t1");
+      TabActivationHistory.pushActivation("w1", "t2");
+      TabActivationHistory.pushActivation("w1", "t3");
+      TabActivationHistory.goBack("w1"); // at t2, t3 forward
+      TabActivationHistory.goBack("w1"); // at t1, t2 + t3 forward
+      // t2 closed — goForward should land on t3.
+      const isOpen = (t: string) => t !== "t2";
+      expect(TabActivationHistory.goForward("w1", isOpen)).toBe("t3");
+    });
+
+    it("canGoBack/canGoForward respect isOpen", () => {
+      TabActivationHistory.pushActivation("w1", "t1");
+      TabActivationHistory.pushActivation("w1", "t2");
+      const allClosed = () => false;
+      expect(TabActivationHistory.canGoBack("w1", allClosed)).toBe(false);
+      expect(TabActivationHistory.canGoBack("w1")).toBe(true);
+    });
+  });
+
+  describe("remove / getCloseCandidates / pruneClosed", () => {
+    it("remove drops a tab from the back stack", () => {
+      TabActivationHistory.pushActivation("w1", "t1");
+      TabActivationHistory.pushActivation("w1", "t2");
+      TabActivationHistory.pushActivation("w1", "t3");
+      TabActivationHistory.remove("w1", "t2");
+      expect(TabActivationHistory.getCloseCandidates("w1")).toEqual(["t3", "t1"]);
+    });
+
+    it("remove of the current tab clears the current pointer", () => {
+      TabActivationHistory.pushActivation("w1", "t1");
+      TabActivationHistory.pushActivation("w1", "t2");
+      TabActivationHistory.remove("w1", "t2");
+      expect(TabActivationHistory.getCurrent("w1")).toBeNull();
+    });
+
+    it("getCloseCandidates returns current first, then backStack most-recent-first", () => {
+      TabActivationHistory.pushActivation("w1", "t1");
+      TabActivationHistory.pushActivation("w1", "t2");
+      TabActivationHistory.pushActivation("w1", "t3");
+      // current=t3, backStack=[t1,t2] → [t3, t2, t1].
+      expect(TabActivationHistory.getCloseCandidates("w1")).toEqual(["t3", "t2", "t1"]);
+    });
+
+    it("getCloseCandidates is empty for an unknown window", () => {
+      expect(TabActivationHistory.getCloseCandidates("none")).toEqual([]);
+    });
+
+    it("pruneClosed removes every not-open tab", () => {
+      TabActivationHistory.pushActivation("w1", "t1");
+      TabActivationHistory.pushActivation("w1", "t2");
+      TabActivationHistory.pushActivation("w1", "t3");
+      const isOpen = (t: string) => t === "t1";
+      TabActivationHistory.pruneClosed("w1", isOpen);
+      expect(TabActivationHistory.getCloseCandidates("w1")).toEqual(["t1"]);
+    });
+  });
 });

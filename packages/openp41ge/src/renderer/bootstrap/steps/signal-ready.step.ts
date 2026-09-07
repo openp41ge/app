@@ -13,7 +13,7 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:signal-ready");
+const log = createLogger("openp41ge", "signal-ready");
 
 export class SignalReadyStep implements IStartupStep {
   readonly name = "signal-ready";
