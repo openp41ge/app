@@ -47,7 +47,7 @@
     "packages/openp41ge-terminal": {
       "project": ["src/**/*.ts"]
     },
-    "packages/openp41ge-agent-chat": {
+    "packages/openp41ge-agents": {
       "project": ["src/**/*.ts"]
     },
     "packages/openp41ge-logger": {

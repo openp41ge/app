@@ -22,6 +22,13 @@ import {
   ElectronFileSystem,
   FileWorkspaceSessionStore,
   LogFileStore,
+  ChatStoreService,
+  ChatProviderRegistry,
+  VllmChatProvider,
+  ToolRegistry,
+  registerBuiltinTools,
+  AgentRuntime,
+  type ChatProviderConfig,
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
 import { ConfigService } from "../src/main/services/config-service.js";
@@ -54,6 +61,7 @@ import { registerWorkspaceHandlers } from "./ipc-handlers/workspace-handlers.js"
 import { registerGitHandlers } from "./ipc-handlers/git-handlers.js";
 import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
 import { registerLogHandlers } from "./ipc-handlers/log-handlers.js";
+import { registerChatHandlers } from "./ipc-handlers/chat-handlers.js";
 
 // ─── Lifecycle manager ──────────────────────────────────────────────────
 import { LifecycleManager, registerLifecycleHandlers } from "./lifecycle-manager.js";
@@ -78,6 +86,10 @@ export class Openp41geApplication {
   private workspaceService!: WorkspaceService;
   private workspaceSessionStore!: FileWorkspaceSessionStore;
   private logStore!: LogFileStore;
+  private chatStore!: ChatStoreService;
+  private chatProviders!: ChatProviderRegistry;
+  private chatTools!: ToolRegistry;
+  private agentRuntime!: AgentRuntime;
   private openp41geDir!: string;
 
   /** Repos live in their own subdirectory of the app data dir. */
@@ -122,7 +134,7 @@ export class Openp41geApplication {
   // ── Step 1: Error handlers ────────────────────────────────────────────
 
   private _registerErrorHandlers(): void {
-    const log = createLogger("main-process");
+    const log = createLogger("openp41ge", "main-process");
     const isEpipe = (err: unknown): boolean => {
       if (!err || typeof err !== "object") return false;
       const e = err as { code?: string; message?: string };
@@ -218,6 +230,18 @@ export class Openp41geApplication {
     this.workspaceService = new WorkspaceService(this.gitService, this.fileSystem, reposDir);
     this.workspaceSessionStore = new FileWorkspaceSessionStore();
     this.logStore = new LogFileStore(this.openp41geDir);
+
+    // ── Chat / agent ──────────────────────────────────────────────────
+    this.chatStore = new ChatStoreService(this.openp41geDir);
+    this.chatStore.init();
+    this.chatProviders = new ChatProviderRegistry();
+    this.chatProviders.register({
+      id: "vllm",
+      label: "vLLM",
+      create: (cfg: ChatProviderConfig) => new VllmChatProvider(cfg),
+    });
+    this.chatTools = new ToolRegistry();
+    registerBuiltinTools(this.chatTools);
   }
 
   // ── Step 5: Wire cross-service dependencies ───────────────────────────
@@ -245,6 +269,40 @@ export class Openp41geApplication {
 
     setDispatcher(this.dispatcher);
     setTabNames(this.tabNames);
+
+    // ── Agent runtime ─────────────────────────────────────────────────
+    this.agentRuntime = new AgentRuntime(
+      this.chatStore,
+      this.chatProviders,
+      this.chatTools,
+      {
+        sendToWindow: (winId: string, event: string, payload: unknown) => {
+          const bw = openp41geWindows.get(winId);
+          if (!bw || bw.isDestroyed()) return;
+          try {
+            bw.webContents.send(event, JSON.stringify(payload));
+          } catch {
+            // window may be closing
+          }
+        },
+        broadcast: (event: string, payload: unknown) => {
+          for (const [, bw] of openp41geWindows) {
+            try {
+              bw.webContents.send(event, JSON.stringify(payload));
+            } catch {
+              // window may be closing
+            }
+          }
+        },
+      },
+      {
+        getProviderConfig: (providerId: string): ChatProviderConfig | null => {
+          const cfg = this.configService.get(`agent.providers.${providerId}`);
+          if (!cfg) return null;
+          return cfg as ChatProviderConfig;
+        },
+      },
+    );
 
     // Window-manager workspace windows are opened with a workspace binding. Bind
     // the store to that path so mutations save to its file, and restore the
@@ -288,6 +346,7 @@ export class Openp41geApplication {
     registerGitHandlers(this.gitCommitService, this.gitService);
     registerConfigHandlers(this.configService);
     registerLogHandlers(this.logStore);
+    registerChatHandlers(this.chatStore, this.agentRuntime, this.chatProviders, this.configService);
     registerLifecycleHandlers(this.lifecycle);
     registerDialogHandlers();
   }

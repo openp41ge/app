@@ -1,12 +1,12 @@
 /**
- * Vitest configuration for the openp41ge-agent-chat package.
+ * Vitest configuration for the openp41ge-agents package.
  */
 import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
   test: {
-    include: ["test/**/*.test.ts"],
+    include: ["test/unit/**/*.test.ts"],
     environment: "jsdom",
     globals: true,
     watch: false,
@@ -17,7 +17,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@openp41ge-agent-chat": path.resolve(__dirname, "./src"),
+      "@openp41ge-agents": path.resolve(__dirname, "./src"),
       "@openp41ge": path.resolve(__dirname, "../openp41ge/src"),
     },
   },

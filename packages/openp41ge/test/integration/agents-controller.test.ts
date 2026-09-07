@@ -1,0 +1,113 @@
+/**
+ * Integration tests for AgentsController.
+ *
+ * Drives the grid chat pane controller with TestChatStoreModel +
+ * TestChatRuntimeModel (no Electron/IPC). Verifies mount reads the chat id,
+ * send/abort route to the runtime, streamed deltas/tool/status reach the
+ * <openp41ge-agents> component, and snapshot/restore round-trips.
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { AgentsController } from "../../src/renderer/apps/agents/agents-controller";
+import { TestChatStoreModel } from "../../src/renderer/models/chat-store-model";
+import { TestChatRuntimeModel } from "../../src/renderer/models/chat-runtime-model";
+import type { Chat } from "openp41ge-agents";
+
+const flush = () => new Promise((r) => setTimeout(r, 30));
+
+function mockBridge(windowId = "win-1"): void {
+  (window as unknown as Record<string, unknown>).openp41ge = {
+    workspace: {
+      getWindowId: () => windowId,
+      getState: async () =>
+        JSON.stringify({ windows: [{ id: windowId, grid: { placements: [] } }] }),
+    },
+  };
+}
+
+function fixtureChat(): Chat {
+  return {
+    id: "chat_1",
+    title: "Fix bug",
+    providerId: "vllm",
+    createdAt: 1,
+    updatedAt: 1,
+    messages: [
+      { id: "m1", role: "user", content: "Help me", timestamp: 1 },
+      { id: "m2", role: "assistant", content: "Sure", timestamp: 2 },
+    ],
+  };
+}
+
+describe("AgentsController", () => {
+  let host: HTMLElement;
+  let controller: AgentsController;
+  let storeModel: TestChatStoreModel;
+  let runtimeModel: TestChatRuntimeModel;
+
+  beforeEach(() => {
+    mockBridge();
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    storeModel = new TestChatStoreModel([fixtureChat()]);
+    runtimeModel = new TestChatRuntimeModel();
+    controller = new AgentsController("ctab-1", "agents");
+    controller._storeModel = storeModel;
+    controller._runtimeModel = runtimeModel;
+  });
+
+  afterEach(() => {
+    controller.unmount();
+    host.remove();
+    (window as unknown as Record<string, unknown>).__pendingChatId = null;
+  });
+
+  it("mounts the chat pane and loads the transcript", async () => {
+    (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";
+    controller.mount(host);
+    await flush();
+
+    const el = host.querySelector("openp41ge-agents") as HTMLElement & {
+      messages?: readonly Chat["messages"];
+    };
+    expect(el).toBeTruthy();
+    expect(el.messages).toHaveLength(2);
+    expect(el.messages![0]).toMatchObject({ role: "user", content: "Help me" });
+  });
+
+  it("forwards a chat:send event to the runtime", async () => {
+    (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";
+    controller.mount(host);
+    await flush();
+
+    const el = host.querySelector("openp41ge-agents") as HTMLElement;
+    el.dispatchEvent(new CustomEvent("chat:send", { detail: { text: "hello" }, bubbles: true }));
+    await flush();
+
+    expect(runtimeModel.calls.some((c) => c.op === "send" && c.args[0] === "chat_1")).toBe(true);
+  });
+
+  it("appends streamed deltas to the component", async () => {
+    (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";
+    controller.mount(host);
+    await flush();
+
+    const el = host.querySelector("openp41ge-agents") as HTMLElement & {
+      messages?: readonly Chat["messages"];
+    };
+    runtimeModel.emitDelta("chat_1", "Assembling");
+    await flush();
+    // The message list now ends with the streamed assistant text.
+    const last = el.messages![el.messages!.length - 1];
+    expect(last.role).toBe("assistant");
+    expect(last.content).toContain("Assembling");
+  });
+
+  it("snapshot/restore persists the chat id", () => {
+    controller.restore({ chatId: "chat_7", cwd: "/repo" });
+    expect(controller.snapshot()).toEqual({ chatId: "chat_7" });
+    const restored = new AgentsController("ctab-2", "agents");
+    restored.restore(controller.snapshot());
+    expect(restored.chatId).toBe("chat_7");
+  });
+});

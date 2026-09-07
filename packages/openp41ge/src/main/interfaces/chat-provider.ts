@@ -1,0 +1,49 @@
+/**
+ * ChatProvider interface — provider-agnostic LLM chat streaming.
+ *
+ * A provider wraps a single backend (vLLM now; others later) and exposes a
+ * narrow contract: stream a chat completion and ping. Delta granularity is
+ * text fragments and tool-call requests, which the AgentRuntime folds into the
+ * chat transcript.
+ */
+
+import type { ChatMessage } from "openp41ge-agents";
+import type { ToolDefinition } from "./tool.js";
+
+/** Provider connection config (persisted in UserConfig.agent.providers). */
+export interface ChatProviderConfig {
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+/** Streamed delta from a provider. */
+export type ProviderDelta =
+  | { type: "text"; text: string }
+  | { type: "tool_call"; id: string; name: string; arguments: string };
+
+/** Input to a streamChat call. */
+export interface ChatStreamRequest {
+  messages: ChatMessage[];
+  tools?: ToolDefinition[];
+  signal?: AbortSignal;
+}
+
+/** A single provider implementation (registry/strategy based — Open/Closed). */
+export interface ChatProvider {
+  readonly id: string;
+  readonly label: string;
+  /** Stream a chat completion, yielding text + tool-call deltas. */
+  streamChat(req: ChatStreamRequest): AsyncIterable<ProviderDelta>;
+  /** True when the provider is reachable/configured; resolves quickly. */
+  ping(): Promise<boolean>;
+}
+
+/** A provider factory — creates a configured provider from persisted config. */
+export interface ChatProviderFactory {
+  readonly id: string;
+  readonly label: string;
+  create(config: ChatProviderConfig): ChatProvider;
+}

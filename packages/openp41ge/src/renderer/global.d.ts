@@ -1,3 +1,15 @@
+import type {
+  Chat,
+  ChatSummary,
+  ChatSearchResult,
+  ChatSearchOptions,
+  ChatDeltaPayload,
+  ChatToolPayload,
+  ChatStatusPayload,
+  ToolCall,
+  ChatRuntimeStatus,
+} from "openp41ge-agents";
+
 export {};
 
 declare global {
@@ -25,6 +37,7 @@ declare global {
         openWindowSummaries: () => Promise<Array<{ windowId: string; windowType: "workspace" | "window-manager"; workspacePath: string | null }>>;
         openWorkspaceWindow: (workspacePath: string) => void;
         focusWorkspaceWindow: (workspacePath: string) => Promise<boolean>;
+        onOpenWindowsChanged: (callback: () => void) => () => void;
       };
       workspace: {
         getState: () => Promise<string>;
@@ -233,9 +246,18 @@ declare global {
         /** Query persisted log history. Returns [] when none. */
         query: (filter?: LogQueryFilter) => Promise<PersistedLogEntryShape[]>;
         /** Get the logs directory path. */
-        getPath: () => Promise<{ logsDir: string }>;
+        getPath: () => Promise<{
+          logsDir: string;
+          /** Which log features the main process supports (absent on stale mains). */
+          capabilities?: { readBackward?: boolean };
+        }>;
         /** List log files (name, size, mtime). */
         listFiles: () => Promise<Array<{ name: string; sizeBytes: number; mtimeMs: number }>>;
+        /** Read log entries backward from the bottom of the newest daily file. */
+        readBackward: (
+          cursor: LogBackCursorShape | null,
+          limit?: number,
+        ) => Promise<LogBackPageShape>;
       };
 
       onZoomIn: (callback: () => void) => () => void;
@@ -249,6 +271,35 @@ declare global {
         get: (key?: string) => Promise<any>;
         set: (key: string, value: any) => Promise<void>;
         getAll: () => Promise<Record<string, any>>;
+      };
+
+      /** AI agent chat store + runtime bridge. */
+      chat: {
+        list: () => Promise<ChatSummary[]>;
+        get: (id: string) => Promise<Chat | null>;
+        create: (opts?: { providerId?: string; title?: string }) => Promise<Chat>;
+        delete: (id: string) => Promise<boolean>;
+        archive: (id: string) => Promise<boolean>;
+        rename: (id: string, title: string) => Promise<Chat | null>;
+        search: (q: string, opts?: ChatSearchOptions) => Promise<ChatSearchResult[]>;
+        send: (id: string, text: string, cwd?: string) => Promise<void>;
+        abort: (id: string) => Promise<void>;
+        open: (id: string) => Promise<void>;
+        close: (id: string) => Promise<void>;
+        highlight: (id: string) => Promise<void>;
+        getOpenChats: () => Promise<Record<string, string>>;
+        pingProvider: (providerId?: string) => Promise<{ ok: boolean; error?: string }>;
+        getAgentConfig: () => Promise<{
+          providerId: string;
+          providers: Record<string, { baseUrl: string; model: string; apiKey?: string }>;
+        }>;
+
+        onChanged: (callback: () => void) => () => void;
+        onDelta: (callback: (payload: ChatDeltaPayload) => void) => () => void;
+        onTool: (callback: (payload: ChatToolPayload) => void) => () => void;
+        onStatus: (callback: (payload: ChatStatusPayload) => void) => () => void;
+        onOpenState: (callback: (payload: Record<string, string>) => void) => () => void;
+        onHighlight: (callback: (payload: { chatId: string }) => void) => () => void;
       };
 
     };
@@ -353,10 +404,26 @@ declare global {
     timestamp: number;
     level: number;
     levelLabel: string;
+    system: string;
     source: string;
     message: string;
     data?: Record<string, unknown>;
     process: "main" | "renderer";
     winId?: string;
+  }
+
+  /** Backward-paging cursor for window.openp41ge.logs.readBackward(). */
+  interface LogBackCursorShape {
+    fileIndex: number;
+    lineCount: number;
+  }
+
+  interface LogBackPageShape {
+    entries: PersistedLogEntryShape[];
+    hasOlder: boolean;
+    cursor: LogBackCursorShape | null;
+    /** When hasOlder is false, an older day available only after explicit
+     * confirmation (the viewer renders a "Load yesterday's logs" row). */
+    nextDay?: { cursor: LogBackCursorShape; label: string } | null;
   }
 }

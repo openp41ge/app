@@ -191,6 +191,12 @@ contextBridge.exposeInMainWorld("openp41ge", {
     focusWorkspaceWindow: (workspacePath) => {
       return ipcRenderer.invoke("window-manager:focus-workspace-window", workspacePath);
     },
+    /** Called when an Openp41ge window opens or closes. Returns unsubscribe. */
+    onOpenWindowsChanged: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("window-manager:open-windows-changed", handler);
+      return () => ipcRenderer.removeListener("window-manager:open-windows-changed", handler);
+    },
   },
 
   drag: {
@@ -519,6 +525,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
     getPath: () => ipcRenderer.invoke("log:path"),
     /** List log files (name, size, mtime). */
     listFiles: () => ipcRenderer.invoke("log:files"),
+    /** Read log entries backward from the bottom of the newest daily file. */
+    readBackward: (cursor, limit) => ipcRenderer.invoke("log:read-backward", { cursor, limit }),
   },
 
   lifecycle: {
@@ -543,6 +551,62 @@ contextBridge.exposeInMainWorld("openp41ge", {
     get: (key) => ipcRenderer.invoke("config:get", key),
     set: (key, value) => ipcRenderer.invoke("config:set", key, value),
     getAll: () => ipcRenderer.invoke("config:get-all"),
+  },
+
+  /** AI agent chat store + runtime bridge. */
+  chat: {
+    list: () => ipcRenderer.invoke("chat:list"),
+    get: (id) => ipcRenderer.invoke("chat:get", id),
+    create: (opts) => ipcRenderer.invoke("chat:create", opts),
+    delete: (id) => ipcRenderer.invoke("chat:delete", id),
+    archive: (id) => ipcRenderer.invoke("chat:archive", id),
+    rename: (id, title) => ipcRenderer.invoke("chat:rename", id, title),
+    search: (q, opts) => ipcRenderer.invoke("chat:search", q, opts),
+    send: (id, text, cwd) => ipcRenderer.invoke("chat:send", id, text, cwd),
+    abort: (id) => ipcRenderer.invoke("chat:abort", id),
+    open: (id) => ipcRenderer.invoke("chat:open", id),
+    close: (id) => ipcRenderer.invoke("chat:close", id),
+    highlight: (id) => ipcRenderer.invoke("chat:highlight", id),
+    getOpenChats: () => ipcRenderer.invoke("chat:getOpenChats"),
+    pingProvider: (providerId) => ipcRenderer.invoke("chat:pingProvider", providerId),
+    getAgentConfig: () => ipcRenderer.invoke("chat:getAgentConfig"),
+
+    /** Subscribe to chat list/state changes. Returns an unsubscribe function. */
+    onChanged: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("chat:changed", handler);
+      return () => ipcRenderer.removeListener("chat:changed", handler);
+    },
+    /** Subscribe to streamed assistant text deltas. */
+    onDelta: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("chat:delta", handler);
+      return () => ipcRenderer.removeListener("chat:delta", handler);
+    },
+    /** Subscribe to tool-call state changes. */
+    onTool: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("chat:tool", handler);
+      return () => ipcRenderer.removeListener("chat:tool", handler);
+    },
+    /** Subscribe to streaming/provider-connection status. */
+    onStatus: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("chat:status", handler);
+      return () => ipcRenderer.removeListener("chat:status", handler);
+    },
+    /** Subscribe to open-once state broadcasts. */
+    onOpenState: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("chat:open-state", handler);
+      return () => ipcRenderer.removeListener("chat:open-state", handler);
+    },
+    /** Subscribe to highlight requests for this window's chat tabs. */
+    onHighlight: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("chat:highlight", handler);
+      return () => ipcRenderer.removeListener("chat:highlight", handler);
+    },
   },
 
   dialog: {

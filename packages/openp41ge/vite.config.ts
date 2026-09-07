@@ -52,8 +52,8 @@ export default defineConfig({
         replacement: path.resolve(__dirname, "../openp41ge-terminal/src"),
       },
       {
-        find: "openp41ge-agent-chat",
-        replacement: path.resolve(__dirname, "../openp41ge-agent-chat/src"),
+        find: "openp41ge-agents",
+        replacement: path.resolve(__dirname, "../openp41ge-agents/src"),
       },
     ],
   },

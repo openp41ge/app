@@ -236,3 +236,17 @@ export function gitIcon(size?: number): string {
   const s = size ?? 24;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="M352.5-325.5Q298-371 284-440H80v-80h204q14-69 68.5-114.5T480-680q73 0 127.5 45.5T676-520h204v80H676q-14 69-68.5 114.5T480-280q-73 0-127.5-45.5ZM480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>`;
 }
+
+/** Chat icon — speech bubble with dots (agent chat) */
+export function chatIcon(size?: number): string {
+  return icon(
+    "0 0 16 16",
+    [
+      `<path d="M2.5 2.5H13.5C14.05 2.5 14.5 2.95 14.5 3.5V10.5C14.5 11.05 14.05 11.5 13.5 11.5H6.5L3.5 14V11.5H2.5C1.95 11.5 1.5 11.05 1.5 10.5V3.5C1.5 2.95 1.95 2.5 2.5 2.5Z"/>`,
+      `<circle cx="5.5" cy="7" r="0.8" fill="currentColor" stroke="none"/>`,
+      `<circle cx="8" cy="7" r="0.8" fill="currentColor" stroke="none"/>`,
+      `<circle cx="10.5" cy="7" r="0.8" fill="currentColor" stroke="none"/>`,
+    ],
+    size,
+  );
+}

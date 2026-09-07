@@ -203,6 +203,9 @@ export function createOpenp41geWindow(
   openp41geWindows.set(openp41geWinId, win);
   openp41geWindowMeta.set(openp41geWinId, windowMeta);
 
+  // Tell any open Window Manager to refresh its "open windows" column.
+  notifyOpenWindowsChanged();
+
   win.webContents.on("did-finish-load", () => {
     if (_dispatcher) {
       win.webContents.send("openp41ge:init", {
@@ -219,6 +222,8 @@ export function createOpenp41geWindow(
     const meta = openp41geWindowMeta.get(openp41geWinId);
     openp41geWindows.delete(openp41geWinId);
     openp41geWindowMeta.delete(openp41geWinId);
+    // Tell any open Window Manager to drop the closed window immediately.
+    notifyOpenWindowsChanged();
     // Don't mutate workspace state during a full app quit — the whole session
     // (all open windows) is preserved so reopening the workspace restores them.
     if (!isMaster && _dispatcher && !_appQuitting) {
@@ -256,10 +261,8 @@ export function createOpenp41geWindow(
     win.loadURL("http://localhost:8642");
   }
 
-  // Auto-open DevTools in dev mode
-  if (isDev) {
-    win.webContents.openDevTools({ mode: "detach" });
-  }
+  // DevTools is NOT auto-opened on window load anymore. In non-production
+  // (unpackaged) builds it is available from the Window menu → Devtools.
 }
 
 // ─── Window-manager window ────────────────────────────────────────────────
@@ -313,6 +316,19 @@ export function getOpenWindowSummaries(): OpenWindowSummary[] {
     windowType: openp41geWindowMeta.get(id)?.windowType ?? "workspace",
     workspacePath: openp41geWindowMeta.get(id)?.workspacePath ?? null,
   }));
+}
+
+/**
+ * Notify every live window-manager window that the set of open windows
+ * changed, so it refreshes its "open windows" column immediately (instead of
+ * waiting for the window to regain focus).
+ */
+export function notifyOpenWindowsChanged(): void {
+  for (const [id, bw] of openp41geWindows) {
+    if (bw.isDestroyed()) continue;
+    if (openp41geWindowMeta.get(id)?.windowType !== "window-manager") continue;
+    bw.webContents.send("window-manager:open-windows-changed");
+  }
 }
 
 /** Open a workspace window bound to `workspacePath` (delegates to the app). */

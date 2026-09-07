@@ -8,7 +8,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "openp41ge-agent-chat": path.resolve(__dirname, "../../packages/openp41ge-agent-chat/src"),
+      "openp41ge-agents": path.resolve(__dirname, "../../packages/openp41ge-agents/src"),
     },
   },
 });

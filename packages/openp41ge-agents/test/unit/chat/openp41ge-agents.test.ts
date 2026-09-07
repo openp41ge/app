@@ -1,19 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import "@openp41ge-agent-chat/ui/openp41ge-agent-chat";
-import type { Openp41geAgentChat } from "@openp41ge-agent-chat/ui/openp41ge-agent-chat";
+import "@openp41ge-agents/ui/openp41ge-agents";
+import type { Openp41geAgents } from "@openp41ge-agents/ui/openp41ge-agents";
 
-describe("Openp41geAgentChat (custom element)", () => {
+describe("Openp41geAgents (custom element)", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
   });
 
   it("can be created via document.createElement", () => {
-    const el = document.createElement("openp41ge-agent-chat");
+    const el = document.createElement("openp41ge-agents");
     expect(el).toBeTruthy();
   });
 
   it("renders DOM structure when connected (with shadow DOM)", () => {
-    const el = document.createElement("openp41ge-agent-chat");
+    const el = document.createElement("openp41ge-agents");
     document.body.appendChild(el);
 
     // Should have a shadow root
@@ -21,7 +21,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("shows empty state message when no messages", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     const shadow = el.shadowRoot!;
@@ -31,7 +31,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it("adds a user message", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     el.addMessage("user", "Hello, world!");
@@ -42,7 +42,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("renders user message in the DOM", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     el.addMessage("user", "Hello!");
@@ -55,7 +55,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("renders assistant message in the DOM", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     el.addMessage("assistant", "Hi there!");
@@ -68,7 +68,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("adds multiple messages", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     el.addMessage("user", "Hello");
@@ -83,7 +83,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("clears empty state when first message is added", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     const shadow = el.shadowRoot!;
@@ -95,7 +95,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it("clearMessages removes all messages and shows empty state", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     el.addMessage("user", "Hello");
@@ -109,7 +109,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it("addMessage assigns a timestamp", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     const before = Date.now();
@@ -121,7 +121,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("does not send empty messages", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     const handler = vi.fn();
@@ -138,7 +138,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("dispatches chat-message event on send", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     const handler = vi.fn();
@@ -159,7 +159,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("sends on Enter key (without Shift)", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     const handler = vi.fn();
@@ -180,7 +180,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("does not send on Shift+Enter", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     const handler = vi.fn();
@@ -196,7 +196,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it.skip("focusInput focuses the textarea", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     // Spy on the focus method since jsdom does not track shadow DOM activeElement
@@ -209,7 +209,7 @@ describe("Openp41geAgentChat (custom element)", () => {
   });
 
   it("does not re-build on re-connect", () => {
-    const el = document.createElement("openp41ge-agent-chat") as unknown as Openp41geAgentChat;
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     const firstChildren = el.shadowRoot!.children.length;
@@ -220,12 +220,115 @@ describe("Openp41geAgentChat (custom element)", () => {
     expect(el.shadowRoot!.children.length).toBe(firstChildren);
   });
 
-  it("registerOpenp41geAgentChat is idempotent when called again", async () => {
-    const { registerOpenp41geAgentChat } =
-      await import("@openp41ge-agent-chat/ui/openp41ge-agent-chat");
+  it("registerOpenp41geAgents is idempotent when called again", async () => {
+    const { registerOpenp41geAgents } = await import("@openp41ge-agents/ui/openp41ge-agents");
     // Element is already registered by module import, so calling again
     // exercises the else branch (element already exists)
-    expect(() => registerOpenp41geAgentChat()).not.toThrow();
-    expect(customElements.get("openp41ge-agent-chat")).toBeTruthy();
+    expect(() => registerOpenp41geAgents()).not.toThrow();
+    expect(customElements.get("openp41ge-agents")).toBeTruthy();
+  });
+
+  // ── Controller imperative API (setChat / appendDelta / setToolCallState) ──
+
+  it("setChat renders the transcript and tool rows", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setChat({
+      id: "chat_1",
+      title: "Hello",
+      providerId: "vllm",
+      createdAt: 0,
+      updatedAt: 0,
+      messages: [
+        { id: "m1", role: "user", content: "hi", timestamp: 1 },
+        {
+          id: "m2",
+          role: "assistant",
+          content: "hello",
+          toolCalls: [{ id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "done" }],
+          timestamp: 2,
+        },
+      ],
+    });
+
+    await el.updateComplete;
+    const shadow = el.shadowRoot!;
+    expect(shadow.querySelectorAll(".chat-message.user")).toHaveLength(1);
+    expect(shadow.querySelectorAll(".chat-message.assistant")).toHaveLength(1);
+    const toolRow = shadow.querySelector(".tool-call-row") as HTMLElement;
+    expect(toolRow.textContent).toContain("read_file");
+    expect(toolRow.textContent).toContain("/a");
+  });
+
+  it("appendDelta creates and grows the assistant message", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.appendDelta("Hello");
+    el.appendDelta(" world");
+
+    const messages = el.messages as Array<{ role: string; content?: string }>;
+    expect(messages).toHaveLength(1);
+    expect(messages[0].role).toBe("assistant");
+    expect(messages[0].content).toBe("Hello world");
+  });
+
+  it("setToolCallState adds a running tool call then transitions to done", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setToolCallState({
+      id: "tc1",
+      name: "run_command",
+      arguments: '{"command":"ls"}',
+      status: "running",
+    });
+    const running = (el.messages as Array<{ toolCalls?: Array<{ status: string }> }>)[0]
+      .toolCalls![0];
+    expect(running.status).toBe("running");
+
+    el.setToolCallState({
+      id: "tc1",
+      name: "run_command",
+      arguments: '{"command":"ls"}',
+      status: "done",
+    });
+    const done = (el.messages as Array<{ toolCalls?: Array<{ status: string }> }>)[0].toolCalls![0];
+    expect(done.status).toBe("done");
+  });
+
+  it("dispatches chat:send with the typed text", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const handler = vi.fn();
+    el.addEventListener("chat:send", handler as EventListener);
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello agent";
+    const sendBtn = el.shadowRoot!.querySelector(".icon-btn:not(.abort)") as HTMLElement;
+    sendBtn.click();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: { text: "hello agent" } }),
+    );
+  });
+
+  it("setProviderStatus shows a status strip when unreachable", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setProviderStatus({ streaming: false, providerOk: false, providerLabel: "vLLM" });
+    await el.updateComplete;
+    const status = el.shadowRoot!.querySelector(".chat-status") as HTMLElement;
+    expect(status).toBeTruthy();
+    expect(status.textContent).toContain("unreachable");
   });
 });

@@ -72,6 +72,35 @@ export const MAX_HISTORY = 50;
 /** Filename used to persist workspace state. */
 export const WORKSPACE_STATE_FILENAME = "workspace-state.json";
 
+// ─── Chat Store ─────────────────────────────────────────────────────
+
+/** Filename used to persist the shared chat store. */
+export const CHATS_FILENAME = "chats.json";
+
+/** Maximum number of agent turns per user message (tool-call loop guard). */
+export const AGENT_MAX_TURNS = 8;
+
+/**
+ * Default title for a newly-created chat: a human-friendly date + time stamp,
+ * e.g. "Sep 4, 2026, 1:23 PM". Used instead of a generic "New chat".
+ *
+ * Lives in openp41ge-constants (not the Lit-based openp41ge-agents)
+ * because the Electron main process must never load a DOM-bound module.
+ */
+export function defaultChatTitle(now: number = Date.now()): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(now));
+  } catch {
+    return new Date(now).toLocaleString();
+  }
+}
+
 /** Default TTL for draft workspaces (7 days in ms). */
 export const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 

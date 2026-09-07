@@ -17,7 +17,7 @@ import path from "path";
 import os from "os";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("ConfigService");
+const log = createLogger("openp41ge", "ConfigService");
 
 // ─── Default config ──────────────────────────────────────────────────────
 
@@ -32,6 +32,20 @@ export interface UserConfig {
     maxFileSize: number;
   };
   syntaxThemes: Record<string, string>;
+  agent: {
+    /** Active provider id ("vllm" now; extensible later). */
+    providerId: string;
+    providers: Record<
+      string,
+      {
+        baseUrl: string;
+        model: string;
+        apiKey?: string;
+        temperature?: number;
+        maxTokens?: number;
+      }
+    >;
+  };
 }
 
 /** Default max file size the editor opens: 50 MB (VSCode's files.maxFileSize default). */
@@ -47,6 +61,15 @@ const DEFAULT_CONFIG: UserConfig = {
     maxFileSize: DEFAULT_MAX_FILE_SIZE,
   },
   syntaxThemes: {},
+  agent: {
+    providerId: "vllm",
+    providers: {
+      vllm: {
+        baseUrl: "http://localhost:8000/v1",
+        model: "",
+      },
+    },
+  },
 };
 
 // ─── Helper: deep merge ──────────────────────────────────────────────────

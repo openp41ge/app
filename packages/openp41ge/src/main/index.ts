@@ -21,3 +21,26 @@ export {
 } from "./services/workspace-session-store.js";
 export { LogFileStore } from "./services/log-file-store.js";
 export type { LogFileInfo, PersistedLogEntry } from "./services/log-file-store.js";
+
+export { ChatStoreService, searchChats, toSummary } from "./services/chat-store-service.js";
+export { ChatProviderRegistry } from "./services/chat-provider-registry.js";
+export { VllmChatProvider } from "./services/vllm-chat-provider.js";
+export { ToolRegistry } from "./services/tool-registry.js";
+export { registerBuiltinTools } from "./services/node-tool-executor.js";
+export { AgentRuntime } from "./services/agent-runtime.js";
+export type { AgentRuntimeConfig } from "./services/agent-runtime.js";
+export type { AgentRuntimeHooks } from "./services/agent-runtime-hooks.js";
+export type {
+  ChatProvider,
+  ChatProviderConfig,
+  ChatProviderFactory,
+  ProviderDelta,
+  ChatStreamRequest,
+} from "./interfaces/chat-provider.js";
+export type {
+  AgentTool,
+  ToolDefinition,
+  ToolParameters,
+  ToolExecutionContext,
+  ToolExecutionResult,
+} from "./interfaces/tool.js";

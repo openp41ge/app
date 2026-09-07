@@ -1,12 +1,12 @@
 /**
  * demo-app.ts — Standalone demo application for the agent chat component.
  *
- * Mounts a <openp41ge-agent-chat> element, provides sidebar controls to send
+ * Mounts a <openp41ge-agents> element, provides sidebar controls to send
  * predefined messages and simulate assistant responses, and logs chat-message
  * events to a console output panel.
  */
 
-import "openp41ge-agent-chat";
+import "openp41ge-agents";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,7 +37,7 @@ let chatComponent: HTMLElement | null = null;
 const mockResponses = [
   "I can help you with that! Here's what I know about the codebase:\n\nThe Openp41ge monorepo is organised into several packages, each responsible for a specific feature area. The main platform package (`openp41ge`) manages the layout data model, window management, and IPC communication.\n\nWhat would you like to know more about?",
   "Great question! Let me look into that for you.\n\nBased on my analysis, the drag-and-drop system in `openp41ge-grid.ts` uses module-level state variables to track drag operations across DOM re-creations. There are three main drop scenarios:\n\n1. **Same-tab**: Moves within the existing grid\n2. **Cross-tab**: Adds a column and places the pane\n3. **Cross-window**: Same as cross-tab but across windows\n\nYou can find the relevant code in `src/renderer/components/`.",
-  "Here's a quick summary of the project structure:\n\n```\npackages/\n├── openp41ge/                  # Electron desktop app\n├── openp41ge-file-editor/      # File editor component\n├── openp41ge-git-repository/   # Git browser\n├── openp41ge-terminal/         # Terminal emulator\n├── openp41ge-agent-chat/       # AI chat (this one!)\n└── openp41ge-logger/           # Logging utility\n```\n\nEach package communicates with the platform through DOM CustomEvents and the workspace state.",
+  "Here's a quick summary of the project structure:\n\n```\npackages/\n├── openp41ge/                  # Electron desktop app\n├── openp41ge-file-editor/      # File editor component\n├── openp41ge-git-repository/   # Git browser\n├── openp41ge-terminal/         # Terminal emulator\n├── openp41ge-agents/       # AI chat (this one!)\n└── openp41ge-logger/           # Logging utility\n```\n\nEach package communicates with the platform through DOM CustomEvents and the workspace state.",
   "Let me run that analysis for you...\n\n**Results:**\n- Build time: 12.4s\n- Bundle size: 2.3 MB\n- Total modules: 1,247\n- Unused exports found: 3\n- Circular dependencies: None\n\nWould you like me to detail any of these findings?",
   'Here\'s an example of how to register a new app type:\n\n```typescript\nimport { registerAppType } from "src/renderer/apps/app-registry";\n\nregisterAppType({\n  type: "my-app",\n  createController: (tabId) => new MyController(tabId),\n});\n```\n\nThe controller must implement the `TabController` interface with `mount`, `unmount`, `setVisible`, `snapshot`, and `restore` methods.',
 ];
@@ -88,7 +88,7 @@ function renderChatPanel(): void {
   if (!chatPanelEl) return;
   chatPanelEl.innerHTML = "";
 
-  const chat = document.createElement("openp41ge-agent-chat");
+  const chat = document.createElement("openp41ge-agents");
   chat.style.width = "100%";
   chat.style.height = "100%";
   chat.style.display = "flex";

@@ -28,7 +28,8 @@ export default defineConfig({
       "openp41ge-git": path.resolve(__dirname, "../openp41ge-git/src"),
       "openp41ge-logger": path.resolve(__dirname, "../openp41ge-logger/src"),
       "@openp41ge-terminal": path.resolve(__dirname, "../openp41ge-terminal/src"),
-      "@openp41ge-agent-chat": path.resolve(__dirname, "../openp41ge-agent-chat/src"),
+      "@openp41ge-agents": path.resolve(__dirname, "../openp41ge-agents/src"),
+      "openp41ge-agents": path.resolve(__dirname, "../openp41ge-agents/src"),
       "openp41ge-uikit": path.resolve(__dirname, "../openp41ge-uikit/src"),
       "openp41ge-syntax-highlighting": path.resolve(
         __dirname,

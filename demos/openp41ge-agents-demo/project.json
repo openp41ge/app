@@ -1,5 +1,5 @@
 {
-  "name": "openp41ge-agent-chat-demo",
+  "name": "openp41ge-agents-demo",
   "$schema": "../node_modules/nx/schemas/project-schema.json",
   "targets": {
     "dev": {

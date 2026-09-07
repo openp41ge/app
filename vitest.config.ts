@@ -66,7 +66,7 @@ export default defineConfig({
         "./packages/openp41ge-uikit/src/file-editor/**/*.ts",
         "./packages/openp41ge-logger/src/**/*.ts",
         "./packages/openp41ge-terminal/src/**/*.ts",
-        "./packages/openp41ge-agent-chat/src/**/*.ts",
+        "./packages/openp41ge-agents/src/**/*.ts",
         "./packages/openp41ge-uikit/src/git-repository/**/*.ts",
         "./packages/openp41ge-uikit/src/syntax-highlighting/**/*.ts",
         "./packages/openp41ge-uikit/src/theme/**/*.ts",
@@ -104,7 +104,7 @@ export default defineConfig({
       ),
       "@openp41ge-logger": path.resolve(__dirname, "./packages/openp41ge-logger/src"),
       "@openp41ge-terminal": path.resolve(__dirname, "./packages/openp41ge-terminal/src"),
-      "@openp41ge-agent-chat": path.resolve(__dirname, "./packages/openp41ge-agent-chat/src"),
+      "@openp41ge-agents": path.resolve(__dirname, "./packages/openp41ge-agents/src"),
       // Source alias so unit tests import openp41ge-tabs source (its dist has
       // declarations only), mirroring the main app's dev-mode aliasing.
       "openp41ge-tabs": path.resolve(__dirname, "./packages/openp41ge-tabs/src"),

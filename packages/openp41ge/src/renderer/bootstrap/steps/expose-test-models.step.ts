@@ -9,7 +9,7 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
 
-const log = createLogger("bootstrap:expose-test-models");
+const log = createLogger("openp41ge", "expose-test-models");
 
 // ── Test models (tree-shaken from production) ──────────────────────────
 import { FileDragSource } from "../../services/drag-sources/file-drag-source";
@@ -22,6 +22,8 @@ import {
   TestFileContent,
 } from "../../models/test-models";
 import { IpcCommitSearchModel, TestCommitSearchModel } from "../../models/commit-search-model";
+import { IpcChatStoreModel, TestChatStoreModel } from "../../models/chat-store-model";
+import { IpcChatRuntimeModel, TestChatRuntimeModel } from "../../models/chat-runtime-model";
 
 export class ExposeTestModelsStep implements IStartupStep {
   readonly name = "expose-test-models";
@@ -36,6 +38,10 @@ export class ExposeTestModelsStep implements IStartupStep {
       GitEntryDragSource,
       IpcCommitSearchModel,
       TestCommitSearchModel,
+      IpcChatStoreModel,
+      TestChatStoreModel,
+      IpcChatRuntimeModel,
+      TestChatRuntimeModel,
       TopBarDropTarget,
     };
     log.info("test models exposed");

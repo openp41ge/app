@@ -1,4 +1,4 @@
-import { fileIcon, docIcon, terminalIcon, gridIcon, playIcon } from "./icons";
+import { fileIcon, docIcon, terminalIcon, gridIcon, playIcon, chatIcon } from "./icons";
 
 /** Metadata for an available pane type. */
 export interface AppTypeInfo {
@@ -21,4 +21,10 @@ export const APP_TYPES: AppTypeInfo[] = [
   { id: "table", label: "Interactive Table", icon: gridIcon(16), description: "Data table" },
   { id: "video", label: "Video Stream", icon: playIcon(16), description: "Stream video" },
   { id: "file-viewer", label: "File Viewer", icon: docIcon(16), description: "View file contents" },
+  {
+    id: "agents",
+    label: "Agent Chat",
+    icon: chatIcon(16),
+    description: "Chat with an AI coding agent",
+  },
 ];
