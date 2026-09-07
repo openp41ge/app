@@ -14,6 +14,7 @@
 
 import { customElement, state } from "lit/decorators.js";
 import { LitElement, html, nothing, type TemplateResult } from "lit";
+import "openp41ge-uikit";
 import type { ConfigService } from "../services/config-service";
 import { appServices } from "../app";
 import { DEFAULT_EDITOR_MAX_FILE_SIZE } from "../models/file-size-gate";
@@ -79,14 +80,12 @@ export class Openp41geFileEditorSettings extends LitElement {
           color: var(--text-primary, #ccc);
           font-size: 13px;
         }
-        .fes-title {
-          margin: 0 0 4px;
-          font-size: 18px;
+        .fes-section-title {
+          margin: 0 0 14px;
+          font-size: 11px;
           font-weight: 600;
-          color: var(--text-primary, #e0e0e0);
-        }
-        .fes-subtitle {
-          margin: 0 0 24px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
           color: var(--text-secondary, #999);
         }
         /* Plain card hosting the max-file-size question — mirrors the cards
@@ -141,55 +140,9 @@ export class Openp41geFileEditorSettings extends LitElement {
           margin: 8px 0 0;
           color: var(--accent, #4f9cf9);
         }
-        /* Switch for the word-wrap default: hidden checkbox + track/thumb. */
-        .fes-switch {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-        }
-        .fes-switch input {
-          position: absolute;
-          opacity: 0;
-          width: 0;
-          height: 0;
-        }
-        .fes-switch-track {
-          width: 34px;
-          height: 18px;
-          border-radius: 9px;
-          background: rgba(255, 255, 255, 0.18);
-          position: relative;
-          flex-shrink: 0;
-          transition: background 0.15s;
-        }
-        .fes-switch input:checked + .fes-switch-track {
-          background: var(--accent, #007acc);
-        }
-        .fes-switch-track::after {
-          content: "";
-          position: absolute;
-          top: 2px;
-          left: 2px;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          background: #e0e0e0;
-          transition: transform 0.15s;
-        }
-        .fes-switch input:checked + .fes-switch-track::after {
-          transform: translateX(16px);
-        }
-        .fes-switch-label {
-          min-width: 28px;
-          color: var(--text-primary, #e0e0e0);
-        }
       </style>
       <div class="fes-pane">
-        <div class="fes-heading">
-          <h1 class="fes-title">Editor</h1>
-          <p class="fes-subtitle">Configure the built-in file editor.</p>
-        </div>
+        <div class="fes-section-title">General</div>
 
         <div class="fes-card" @click=${this._onCardClick}>
           <label class="fes-card-question" for="fes-maxsize">
@@ -215,25 +168,20 @@ export class Openp41geFileEditorSettings extends LitElement {
         </div>
 
         <div class="fes-card" style="margin-top:16px;">
-          <label class="fes-card-question" for="fes-wordwrap">
-            Word wrap for new files
-          </label>
+          <div class="fes-card-question">Word wrap for new files</div>
           <div class="fes-card-control">
-            <label class="fes-switch" for="fes-wordwrap">
-              <input
-                id="fes-wordwrap"
-                type="checkbox"
-                .checked=${this._wordWrapOn}
-                @change=${this._onWordWrapToggle}
-              />
-              <span class="fes-switch-track"></span>
-              <span class="fes-switch-label">${this._wordWrapOn ? "On" : "Off"}</span>
-            </label>
+            <openp41ge-toggle
+              .checked=${this._wordWrapOn}
+              label="Word wrap for new files"
+              .onLabel=${"On"}
+              .offLabel=${"Off"}
+              @change=${this._onWordWrapToggle}
+            ></openp41ge-toggle>
           </div>
           <p class="fes-card-help">
             Lines that exceed the editor width wrap to the next line instead of scrolling
-            horizontally. This is the default for files with no per-file choice — wrap is
-            remembered per file and can be toggled from each file's status bar.
+            horizontally. This is the default for files with no per-file choice — wrap is remembered
+            per file and can be toggled from each file's status bar.
           </p>
         </div>
       </div>
@@ -304,7 +252,7 @@ export class Openp41geFileEditorSettings extends LitElement {
 
   /** Persist the word-wrap default choice (on/off). */
   private _onWordWrapToggle(e: Event): void {
-    const on = (e.target as HTMLInputElement).checked;
+    const on = (e as CustomEvent<{ checked: boolean }>).detail.checked;
     this._wordWrapOn = on;
     void this.configService.set(WORD_WRAP_KEY, on);
   }
