@@ -168,6 +168,15 @@ export class Openp41geAgentSettings extends LitElement {
     return providerDisplayName(presetFor(entry[1]), entry[1]);
   }
 
+  /** The sub-title of the currently-selected default provider (model · host). */
+  private _activeProviderMeta(): string {
+    const config = this._config;
+    const id = config?.providerId;
+    const entry = Object.entries(config?.providers ?? {}).find(([key]) => key === id);
+    if (!entry) return "";
+    return this._providerMeta(entry[1]);
+  }
+
   private _providerEntries(): Array<[string, ProviderConfig]> {
     return Object.entries(this._config?.providers ?? {});
   }
@@ -177,7 +186,7 @@ export class Openp41geAgentSettings extends LitElement {
     if (p.model) parts.push(p.model);
     const host = endpointHost(p.baseUrl);
     if (host) parts.push(host);
-    return parts.length ? parts.join(" ·") : "No endpoint configured";
+    return parts.length ? parts.join(" · ") : "No endpoint configured";
   }
 
   private _openDefaultList(): void {
@@ -660,13 +669,10 @@ export class Openp41geAgentSettings extends LitElement {
         }
         .ags-default-head {
           display: flex;
-          align-items: flex-start;
-          gap: 8px;
-        }
-        .ags-default-head .ags-card-question {
-          flex: 1;
-          min-width: 0;
-          margin: 0;
+          justify-content: flex-end;
+          align-items: center;
+          min-height: 22px;
+          margin-bottom: 2px;
         }
         .ags-default-close {
           flex-shrink: 0;
@@ -693,30 +699,27 @@ export class Openp41geAgentSettings extends LitElement {
         }
         .ags-default-trigger {
           width: 100%;
-          height: 32px;
+          height: 44px;
           box-sizing: border-box;
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 0;
+          padding: 0 10px;
           font-size: 13px;
           color: var(--text-primary, #ddd);
           background: transparent;
           border: none;
+          border-bottom: 1px solid var(--divider, #2f3031);
           cursor: pointer;
           font-family: inherit;
           text-align: left;
         }
+        .ags-default-trigger:hover {
+          background: var(--bg-active, #37373d);
+        }
         .ags-default-trigger:focus,
         .ags-default-trigger:focus-visible {
           outline: none;
-        }
-        .ags-default-value {
-          flex: 1;
-          min-width: 0;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
         .ags-default-chevron {
           flex-shrink: 0;
@@ -1068,11 +1071,10 @@ export class Openp41geAgentSettings extends LitElement {
                   this._loading || entries.length === 0
                     ? html`<p class="ags-card-help">Add a provider above to set a default.</p>`
                     : html`
-                        <div class="ags-default-head">
-                          <label class="ags-card-question">Which provider is the default?</label>
-                          ${
-                            this._defaultOpen
-                              ? html`
+                        ${
+                          this._defaultOpen
+                            ? html`
+                                <div class="ags-default-head">
                                   <button
                                     class="ags-default-close"
                                     type="button"
@@ -1081,13 +1083,7 @@ export class Openp41geAgentSettings extends LitElement {
                                   >
                                     ${this._closeSvg()}
                                   </button>
-                                `
-                              : nothing
-                          }
-                        </div>
-                        ${
-                          this._defaultOpen
-                            ? html`
+                                </div>
                                 <div
                                   class="ags-default-list"
                                   ${ref(this._listEl)}
@@ -1116,16 +1112,18 @@ export class Openp41geAgentSettings extends LitElement {
                                   aria-expanded="false"
                                   @click=${() => this._openDefaultList()}
                                 >
-                                  <span class="ags-default-value"
-                                    >${this._activeProviderName()}</span
-                                  >
+                                  <div class="ags-default-row-info">
+                                    <span class="ags-default-row-name"
+                                      >${this._activeProviderName()}</span
+                                    >
+                                    <span class="ags-default-row-meta"
+                                      >${this._activeProviderMeta()}</span
+                                    >
+                                  </div>
                                   ${this._chevronSvg()}
                                 </button>
                               `
                         }
-                        <p class="ags-card-help">
-                          Chats use the default provider whenever you don't pick another.
-                        </p>
                       `
                 }
               </div>

@@ -77,9 +77,9 @@ describe("openp41ge-agent-settings", () => {
     expect(row.querySelector(".ags-provider-meta").textContent).toContain(
       "Qwen2.5-Coder-7B-Instruct",
     );
-    // No per-row selection control; the default is chosen with the second card's dropdown.
+    // No per-row selection control; the default is chosen with the second card.
     expect(row.querySelector(".ags-provider-radio")).toBeNull();
-    expect(q(el, ".ags-default-trigger .ags-default-value").textContent.trim()).toBe(
+    expect(q(el, ".ags-default-trigger .ags-default-row-name").textContent.trim()).toBe(
       "vLLM (local)",
     );
   });
@@ -184,7 +184,11 @@ describe("openp41ge-agent-settings", () => {
     const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
     const trigger = q(el, ".ags-default-trigger");
     expect(trigger).not.toBeNull();
-    expect(q(el, ".ags-default-value").textContent.trim()).toBe("vLLM (local)");
+    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("vLLM (local)");
+    // The whole card is just the selection — no intro question or footer blurb.
+    expect(q(el, ".ags-card-question")?.textContent ?? "").not.toContain(
+      "Which provider is the default",
+    );
 
     // Open the list; the card becomes an in-place list of providers.
     trigger.click();
@@ -203,7 +207,7 @@ describe("openp41ge-agent-settings", () => {
     expect(lastSet.key).toBe("agent");
     expect(lastSet.value.providerId).toBe("openai");
     expect(qa(el, ".ags-default-list")).toHaveLength(0);
-    expect(q(el, ".ags-default-value").textContent.trim()).toBe("OpenAI");
+    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("OpenAI");
   });
 
   test("closing the default list via the close button keeps the current default", async () => {
@@ -214,7 +218,7 @@ describe("openp41ge-agent-settings", () => {
     q(el, ".ags-default-close").click();
     await tick();
     expect(qa(el, ".ags-default-list")).toHaveLength(0);
-    expect(q(el, ".ags-default-value").textContent.trim()).toBe("vLLM (local)");
+    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("vLLM (local)");
   });
 
   test("the default list is virtualized — it only renders a bounded window of rows", async () => {
