@@ -13,7 +13,7 @@
  */
 
 import type { SystemTabController } from "../../controllers/types";
-import { createSettingsButton } from "../../services/settings-button";
+import { appendSettingsButton, type Side } from "../../services/settings-button";
 import {
   listLogStreams,
   subscribeLogStreams,
@@ -36,9 +36,11 @@ export class LogsSystemTabController implements SystemTabController {
   private _systems: LogSystem[] = [];
   private _unsubscribers: Array<() => void> = [];
   private _suspended = false;
+  private _side: Side = "right";
 
-  constructor(tabId: string) {
+  constructor(tabId: string, config?: Record<string, unknown>) {
     this.tabId = tabId;
+    this._side = (config?.side as Side) ?? "right";
   }
 
   mount(container: HTMLElement): void {
@@ -98,20 +100,24 @@ export class LogsSystemTabController implements SystemTabController {
     const footer = document.createElement("div");
     Object.assign(footer.style, {
       flexShrink: "0",
+      height: "24px",
       display: "flex",
       alignItems: "center",
       gap: "6px",
-      padding: "6px 10px",
-      borderTop: "1px solid var(--divider,#232323)",
-      fontSize: "11px",
-      color: "var(--text-muted,#888)",
+      padding: "0 8px",
+      borderTop: "1px solid var(--divider,#333)",
+      fontSize: "12px",
+      color: "var(--text-secondary,#999)",
+      background: "var(--bg-secondary,#252526)",
       userSelect: "none",
     });
-    const spacer = document.createElement("div");
-    Object.assign(spacer.style, { flex: "1 1 auto" });
-    footer.appendChild(spacer);
-    footer.appendChild(
-      createSettingsButton("openp41ge:open-logs-settings", "logs-settings", "Logs", "Log settings"),
+    appendSettingsButton(
+      footer,
+      this._side,
+      "openp41ge:open-logs-settings",
+      "logs-settings",
+      "Logs",
+      "Log settings",
     );
 
     view.append(list, footer);

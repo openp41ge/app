@@ -460,6 +460,26 @@ class Openp41geWorktreeTree extends LitElement {
 
   // ═══ Lit template ═══════════════════════════════════════════════════
 
+  /** The docking side of the host sidebar; defaults to right (grid windows). */
+  private get _hostSide(): "left" | "right" {
+    const attr = this.getAttribute("data-side");
+    const side = attr ?? this.closest?.("openp41ge-sidebar")?.getAttribute("side");
+    return side === "left" ? "left" : "right";
+  }
+
+  /** The Editor settings gear button, shown in the bottom bar. */
+  private _renderSettingsButton(): TemplateResult {
+    return html` <button
+      type="button"
+      title="Editor settings"
+      aria-label="Editor settings"
+      @click=${this._onSettingsClick}
+      style="height:18px;width:18px;display:flex;align-items:center;justify-content:center;padding:0;border:none;border-radius:3px;background:transparent;color:var(--text-secondary,#999);font-size:14px;line-height:1;cursor:pointer;"
+    >
+      ⚙
+    </button>`;
+  }
+
   /**
    * Lit render() outputs the outer skeleton with new sub-components.
    * The tree content (repos, worktrees) is rendered by <openp41ge-repo-tree-item>.
@@ -659,16 +679,11 @@ class Openp41geWorktreeTree extends LitElement {
           class="sb-bottom-bar"
           style="border-top:1px solid var(--divider,#333);height:24px;flex-shrink:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary,#252526);"
         >
-          <span style="flex:1"></span>
-          <button
-            type="button"
-            title="Editor settings"
-            aria-label="Editor settings"
-            @click=${this._onSettingsClick}
-            style="height:18px;width:18px;display:flex;align-items:center;justify-content:center;padding:0;border:none;border-radius:3px;background:transparent;color:var(--text-secondary,#999);font-size:14px;line-height:1;cursor:pointer;"
-          >
-            ⚙
-          </button>
+          ${
+            this._hostSide === "left"
+              ? html`${this._renderSettingsButton()}<span style="flex:1"></span>`
+              : html`<span style="flex:1"></span>${this._renderSettingsButton()}`
+          }
         </div>
       </div>
     `;

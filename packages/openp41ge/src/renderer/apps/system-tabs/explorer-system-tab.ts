@@ -5,19 +5,23 @@
  */
 
 import type { SystemTabController } from "../../controllers/types";
+import type { Side } from "../../services/settings-button";
 
 export class ExplorerSystemTabController implements SystemTabController {
   readonly tabId: string;
   readonly appType = "explorer";
   private _viewElement: HTMLElement | null = null;
+  private _side: Side = "right";
 
-  constructor(tabId: string) {
+  constructor(tabId: string, config?: Record<string, unknown>) {
     this.tabId = tabId;
+    this._side = (config?.side as Side) ?? "right";
   }
 
   async mount(container: HTMLElement): Promise<void> {
     // Create the worktree tree element
     const el = document.createElement("openp41ge-worktree-tree");
+    el.setAttribute("data-side", this._side);
     container.appendChild(el);
     this._viewElement = el;
 
@@ -41,6 +45,8 @@ export class ExplorerSystemTabController implements SystemTabController {
   /** Keep-alive hook: forward visibility so the worktree tree suspends its
    * background work (reactive loads / scroll recompute) while hidden. */
   setVisible(visible: boolean): void {
-    (this._viewElement as unknown as { setVisible?(v: boolean): void } | null)?.setVisible?.(visible);
+    (this._viewElement as unknown as { setVisible?(v: boolean): void } | null)?.setVisible?.(
+      visible,
+    );
   }
 }

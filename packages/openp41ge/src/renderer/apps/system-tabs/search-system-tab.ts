@@ -5,15 +5,17 @@
  */
 
 import type { SystemTabController } from "../../controllers/types";
-import { createSettingsButton } from "../../services/settings-button";
+import { appendSettingsButton, type Side } from "../../services/settings-button";
 
 export class SearchSystemTabController implements SystemTabController {
   readonly tabId: string;
   readonly appType = "search";
   private _element: HTMLElement | null = null;
+  private _side: Side = "right";
 
-  constructor(tabId: string) {
+  constructor(tabId: string, config?: Record<string, unknown>) {
     this.tabId = tabId;
+    this._side = (config?.side as Side) ?? "right";
   }
 
   mount(container: HTMLElement): void {
@@ -63,16 +65,13 @@ export class SearchSystemTabController implements SystemTabController {
       borderTop: "1px solid var(--divider,#333)",
       background: "var(--bg-secondary,#252526)",
     });
-    const spacer = document.createElement("div");
-    Object.assign(spacer.style, { flex: "1 1 auto" });
-    footer.appendChild(spacer);
-    footer.appendChild(
-      createSettingsButton(
-        "openp41ge:open-search-settings",
-        "search-settings",
-        "Search",
-        "Search settings",
-      ),
+    appendSettingsButton(
+      footer,
+      this._side,
+      "openp41ge:open-search-settings",
+      "search-settings",
+      "Search",
+      "Search settings",
     );
 
     wrapper.append(body, footer);

@@ -203,7 +203,7 @@ class Openp41geSidebar extends LitElement {
     if (!appType) return;
     const registration = getSystemTabRegistration(appType);
     if (!registration) return;
-    const controller = registration.createController(tabId);
+    const controller = registration.createController(tabId, { side: this.side });
     this._controllers.set(`${this.side}:${tabId}`, controller);
     void controller.mount(host);
   }

@@ -22,7 +22,7 @@ export const explorerSystemTabRegistration: SystemTabRegistration = {
   icon: "\uD83D\uDCC1",
   description: "Browse project files and folders",
   defaultSide: "right",
-  createController: (tabId: string) => new ExplorerSystemTabController(tabId),
+  createController: (tabId, config) => new ExplorerSystemTabController(tabId, config),
   settings: explorerSettings,
 };
 
@@ -32,7 +32,7 @@ export const gitSystemTabRegistration: SystemTabRegistration = {
   icon: "\u2387",
   description: "Browse commit history across repositories",
   defaultSide: "right",
-  createController: (tabId: string) => new CommitSearchSystemTabController(tabId),
+  createController: (tabId, config) => new CommitSearchSystemTabController(tabId, config),
   settings: gitSettings,
 };
 
@@ -42,7 +42,7 @@ export const searchSystemTabRegistration: SystemTabRegistration = {
   icon: "\uD83D\uDD0D",
   description: "Full-text search across files",
   defaultSide: "left",
-  createController: (tabId: string) => new SearchSystemTabController(tabId),
+  createController: (tabId, config) => new SearchSystemTabController(tabId, config),
   settings: searchSettings,
 };
 
@@ -52,7 +52,7 @@ export const agentsSystemTabRegistration: SystemTabRegistration = {
   icon: "\uD83E\uDD16",
   description: "AI agent conversations",
   defaultSide: "right",
-  createController: (tabId: string) => new AgentsSystemTabController(tabId),
+  createController: (tabId, config) => new AgentsSystemTabController(tabId, config),
   settings: agentsSettings,
 };
 
@@ -62,7 +62,7 @@ export const logsSystemTabRegistration: SystemTabRegistration = {
   icon: "\u{1F4CB}",
   description: "Browse registered application log streams",
   defaultSide: "right",
-  createController: (tabId: string) => new LogsSystemTabController(tabId),
+  createController: (tabId, config) => new LogsSystemTabController(tabId, config),
   settings: logsSettings,
 };
 

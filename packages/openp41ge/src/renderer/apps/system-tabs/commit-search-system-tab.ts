@@ -30,7 +30,7 @@ import { IpcCommitSearchModel } from "../../models/commit-search-model";
 import { workspaceFileService, deriveRepoName } from "../../services/workspace-file-service";
 import type { SearchResultCommit } from "openp41ge-git";
 import { tooltipController } from "openp41ge-uikit";
-import { createSettingsButton } from "../../services/settings-button";
+import { appendSettingsButton, type Side } from "../../services/settings-button";
 import { REGEX_ICON, CASE_ON_ICON } from "../git-commit-search/search-icons";
 
 /** 250ms input debounce — search as you type without spamming IPC per key. */
@@ -108,9 +108,11 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _suspended = false;
   private _suspendDirty = false;
   private _onGitRefresh: (() => void) | null = null;
+  private _side: Side = "right";
 
-  constructor(tabId: string) {
+  constructor(tabId: string, config?: Record<string, unknown>) {
     this.tabId = tabId;
+    this._side = (config?.side as Side) ?? "right";
   }
 
   mount(container: HTMLElement): Promise<void> | void {
@@ -457,18 +459,15 @@ export class CommitSearchSystemTabController implements SystemTabController {
       background: "var(--bg-secondary,#252526)",
       gap: "6px",
     });
-    // Right-aligned spacer + this tab's own settings button, emitting a unique
-    // event to open the History settings grid tab.
-    const spacer = document.createElement("div");
-    Object.assign(spacer.style, { flex: "1 1 auto" });
-    footer.appendChild(spacer);
-    footer.appendChild(
-      createSettingsButton(
-        "openp41ge:open-git-settings",
-        "git-settings",
-        "History",
-        "History settings",
-      ),
+    // Spacer + this tab's own settings button, with the gear on the OUTSIDE
+    // edge (right for a right sidebar, left for a left sidebar).
+    appendSettingsButton(
+      footer,
+      this._side,
+      "openp41ge:open-git-settings",
+      "git-settings",
+      "History",
+      "History settings",
     );
     wrapper.appendChild(footer);
 

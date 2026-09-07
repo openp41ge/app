@@ -1,3 +1,6 @@
+/** Which sidebar edge a panel is docked to. */
+export type Side = "left" | "right";
+
 /**
  * createSettingsButton — a tab's own settings gear button.
  *
@@ -50,4 +53,34 @@ export function createSettingsButton(
     );
   });
   return btn;
+}
+
+/**
+ * appendSettingsButton — append a settings gear to a footer, placing it on the
+ * **outside** edge relative to the sidebar side.
+ *
+ * A left sidebar's outside edge is the left; a right sidebar's is the right.
+ * A flex `flex: 1 1 auto` spacer pushes the gear toward whichever edge is
+ * outermost for the given side.
+ */
+export function appendSettingsButton(
+  footer: HTMLElement,
+  side: Side,
+  openEvent: string,
+  appType: string,
+  title: string,
+  tooltip: string = "Settings",
+): void {
+  const btn = createSettingsButton(openEvent, appType, title, tooltip);
+  const spacer = document.createElement("div");
+  Object.assign(spacer.style, { flex: "1 1 auto" });
+  if (side === "left") {
+    // Outside edge = left → gear first.
+    footer.appendChild(btn);
+    footer.appendChild(spacer);
+  } else {
+    // Outside edge = right → spacer first, gear last.
+    footer.appendChild(spacer);
+    footer.appendChild(btn);
+  }
 }

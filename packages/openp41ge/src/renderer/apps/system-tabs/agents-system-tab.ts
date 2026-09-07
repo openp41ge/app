@@ -20,7 +20,7 @@ import type { ChatStoreModel } from "../../models/chat-store-model";
 import { IpcChatStoreModel } from "../../models/chat-store-model";
 import { toastService } from "../../components/openp41ge-toast";
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
-import { createSettingsButton } from "../../services/settings-button";
+import { createSettingsButton, type Side } from "../../services/settings-button";
 import { REGEX_ICON, CASE_ON_ICON } from "../git-commit-search/search-icons";
 import { createLogger } from "openp41ge-logger";
 
@@ -53,9 +53,11 @@ export class AgentsSystemTabController implements SystemTabController {
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _unsubscribers: Array<() => void> = [];
   private _suspended = false;
+  private _side: Side = "right";
 
-  constructor(tabId: string) {
+  constructor(tabId: string, config?: Record<string, unknown>) {
     this.tabId = tabId;
+    this._side = (config?.side as Side) ?? "right";
   }
 
   mount(container: HTMLElement): Promise<void> | void {
@@ -214,17 +216,28 @@ export class AgentsSystemTabController implements SystemTabController {
       cursor: "pointer",
     });
     newBtn.addEventListener("click", () => void this._newChat());
-    footer.appendChild(newBtn);
 
-    // Right-aligned spacer + this tab's own settings button. The button emits
-    // a unique event that opens *this* tab's settings grid tab (the AI agent
-    // provider settings).
+    // Spacer + this tab's own settings button, with the gear on the OUTSIDE
+    // edge for the sidebar side: right → `[+, spacer, ⚙]`, left → `[⚙, spacer, +]`.
     const spacer = document.createElement("div");
     Object.assign(spacer.style, { flex: "1 1 auto" });
-    footer.appendChild(spacer);
-    footer.appendChild(
-      createSettingsButton("openp41ge:open-agents-settings", "agent", "Agents", "Agent settings"),
+    const settingsBtn = createSettingsButton(
+      "openp41ge:open-agents-settings",
+      "agent",
+      "Agents",
+      "Agent settings",
     );
+    if (this._side === "left") {
+      // Outside edge = left → gear first, new-chat button on the inside.
+      footer.appendChild(settingsBtn);
+      footer.appendChild(spacer);
+      footer.appendChild(newBtn);
+    } else {
+      // Outside edge = right → new-chat button on the inside, gear last.
+      footer.appendChild(newBtn);
+      footer.appendChild(spacer);
+      footer.appendChild(settingsBtn);
+    }
     wrapper.appendChild(footer);
 
     container.appendChild(wrapper);
