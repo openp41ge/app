@@ -17,6 +17,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import type { ConfigService } from "../services/config-service";
+import { showConfirmModal } from "../components/openp41ge-confirm-modal";
 import {
   PROVIDER_PRESETS,
   CUSTOM_PRESET_ID,
@@ -32,6 +33,14 @@ import {
   type ProviderPreset,
 } from "../models/agent-provider-presets";
 
+/** A draft provider config. Numeric fields are held as their raw sanitized
+ * text while editing and coerced to numbers on save, so decimal input like
+ * "0.7" or "12." is not mangled by a controlled-number round-trip. */
+type ProviderDraft = Omit<ProviderConfig, "temperature" | "maxTokens"> & {
+  temperature?: number | string;
+  maxTokens?: number | string;
+};
+
 interface DrawerState {
   id: string;
   kind: "provider";
@@ -39,7 +48,7 @@ interface DrawerState {
   editId: string | null;
   title: string;
   presetId: string;
-  draft: ProviderConfig;
+  draft: ProviderDraft;
 }
 
 /** A drawer that is animating out; keeps its last width so it exits in place. */
@@ -66,6 +75,14 @@ export class Openp41geAgentSettings extends LitElement {
   @state() private _saving = false;
   @state() private _testing = false;
   @state() private _testResult: TestResult | null = null;
+
+  /** DI seam — production shows the confirm modal; tests stub this. */
+  _confirm: (opts: {
+    message: string;
+    detail?: string;
+    confirmLabel: string;
+    confirmStyle: string;
+  }) => Promise<boolean> = (opts) => showConfirmModal(opts);
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -183,7 +200,7 @@ export class Openp41geAgentSettings extends LitElement {
     });
   }
 
-  private _setDraftField(d: DrawerState, patch: Partial<ProviderConfig>): void {
+  private _setDraftField(d: DrawerState, patch: Partial<ProviderDraft>): void {
     const cur = this._drawers.find((x) => x.id === d.id);
     if (!cur) return;
     const draft = { ...cur.draft, ...patch };
@@ -195,6 +212,42 @@ export class Openp41geAgentSettings extends LitElement {
     if (v.trim() === "") return undefined;
     const n = Number(v);
     return Number.isFinite(n) ? n : undefined;
+  }
+
+  /** Strip everything but digits and a single decimal point (temperature). */
+  private _sanitizeDecimal(v: string): string {
+    const cleaned = v.replace(/[^0-9.]/g, "");
+    const firstDot = cleaned.indexOf(".");
+    if (firstDot === -1) return cleaned;
+    return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
+  }
+
+  /** Strip everything but digits (max output tokens). */
+  private _sanitizeInt(v: string): string {
+    return v.replace(/[^0-9]/g, "");
+  }
+
+  /** The text to render in a numeric field (keeps the raw padded string). */
+  private _numDisplay(v: number | string | undefined): string {
+    if (v === undefined || v === "") return "";
+    return String(v);
+  }
+
+  /** Coerce a ProviderDraft into a clean ProviderConfig (numbers on save). */
+  private _providerFromDraft(draft: ProviderDraft): ProviderConfig {
+    const config: ProviderConfig = { baseUrl: draft.baseUrl, model: draft.model };
+    if (draft.name !== undefined) config.name = draft.name;
+    if (draft.apiKey !== undefined) config.apiKey = draft.apiKey;
+    const temperature = this._numberValue(String(draft.temperature ?? ""));
+    if (temperature !== undefined) config.temperature = temperature;
+    const maxTokens = this._numberValue(String(draft.maxTokens ?? ""));
+    if (maxTokens !== undefined) config.maxTokens = maxTokens;
+    return config;
+  }
+
+  /** Clicking anywhere on a field card focuses its input. */
+  private _focusCardInput(e: Event): void {
+    (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>("input")?.focus();
   }
 
   private _closeDrawer(id: string): void {
@@ -265,7 +318,7 @@ export class Openp41geAgentSettings extends LitElement {
     const config = this._config;
     if (!config) return;
     this._saving = true;
-    const draft = { ...d.draft };
+    const draft = this._providerFromDraft(d.draft);
     const existingIds = Object.keys(config.providers);
     const hadProviders = existingIds.length > 0;
     const base = d.presetId === CUSTOM_PRESET_ID ? CUSTOM_PRESET_ID : d.presetId;
@@ -286,6 +339,14 @@ export class Openp41geAgentSettings extends LitElement {
     if (!config) return;
     const id = d.editId;
     if (!id) return;
+    const name = d.title || "this provider";
+    const confirmed = await this._confirm({
+      message: `Delete “${name}”?`,
+      detail: "This removes the provider from your configuration.",
+      confirmLabel: "Delete",
+      confirmStyle: "danger",
+    });
+    if (!confirmed) return;
     const providers = { ...config.providers };
     delete providers[id];
     let providerId = config.providerId;
@@ -613,11 +674,11 @@ export class Openp41geAgentSettings extends LitElement {
           font-size: 12px;
           font-weight: 600;
           cursor: pointer;
-          color: #fff;
-          background: var(--accent, #2b5a9c);
+          color: var(--accent, #6fb3f2);
+          background: rgba(86, 156, 214, 0.18);
         }
         .dw-save:hover {
-          filter: brightness(1.1);
+          background: rgba(86, 156, 214, 0.3);
         }
         .dw-save:disabled {
           opacity: 0.5;
@@ -680,14 +741,19 @@ export class Openp41geAgentSettings extends LitElement {
           box-sizing: border-box;
           font-size: 13px;
           color: var(--text-primary, #ddd);
-          background: var(--bg-primary, #1e1e1e);
-          border: 1px solid var(--divider, #333);
-          border-radius: 4px;
+          background: transparent;
+          border: none;
           outline: none;
           font-family: inherit;
         }
-        .ags-input:focus {
-          border-color: var(--accent, #569cd6);
+        .ags-input:focus,
+        .ags-input:focus-visible {
+          outline: none;
+        }
+        /* Focus ring belongs on the containing card, not the input element. */
+        .ags-input-card:focus-within {
+          outline: 2px solid var(--accent, #569cd6);
+          outline-offset: 2px;
         }
         .ags-input--mono {
           font-family: ui-monospace, "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
@@ -914,7 +980,11 @@ export class Openp41geAgentSettings extends LitElement {
       <div class="ags-section-title">Provider</div>
       <div class="ags-preset-grid">${PROVIDER_PRESETS.map((p) => this._presetOption(d, p))}</div>
 
-      <div class="ags-card ags-card-gap" style="max-width:620px;">
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
         <label class="ags-card-question">What is the display name?</label>
         <input
           class="ags-input"
@@ -929,7 +999,11 @@ export class Openp41geAgentSettings extends LitElement {
         </p>
       </div>
 
-      <div class="ags-card ags-card-gap" style="max-width:620px;">
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
         <label class="ags-card-question">What base URL should be used?</label>
         <input
           class="ags-input ags-input--mono ags-baseurl-input"
@@ -944,7 +1018,11 @@ export class Openp41geAgentSettings extends LitElement {
         </p>
       </div>
 
-      <div class="ags-card ags-card-gap" style="max-width:620px;">
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
         <label class="ags-card-question">Which model should be used?</label>
         <input
           class="ags-input ags-input--mono"
@@ -957,7 +1035,11 @@ export class Openp41geAgentSettings extends LitElement {
         <p class="ags-card-help">The model id that chat requests will use.</p>
       </div>
 
-      <div class="ags-card ags-card-gap" style="max-width:620px;">
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
         <label class="ags-card-question">What API key should be used?</label>
         <input
           class="ags-input ags-input--mono"
@@ -971,36 +1053,41 @@ export class Openp41geAgentSettings extends LitElement {
         <p class="ags-card-help">Only hosted services need one; local servers usually don't.</p>
       </div>
 
-      <div class="ags-card ags-card-gap" style="max-width:620px;">
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
         <label class="ags-card-question">What temperature should be used?</label>
         <input
           class="ags-input"
-          type="number"
+          type="text"
+          inputmode="decimal"
           placeholder="0.7"
-          step="0.1"
-          min="0"
-          max="2"
-          .value=${draft.temperature ?? ""}
+          .value=${this._numDisplay(draft.temperature)}
           @input=${(e: Event) =>
             this._setDraftField(d, {
-              temperature: this._numberValue((e.target as HTMLInputElement).value),
+              temperature: this._sanitizeDecimal((e.target as HTMLInputElement).value),
             })}
         />
         <p class="ags-card-help">Optional. Controls randomness in responses.</p>
       </div>
 
-      <div class="ags-card ags-card-gap" style="max-width:620px;">
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
         <label class="ags-card-question">What is the max output tokens?</label>
         <input
           class="ags-input"
-          type="number"
+          type="text"
+          inputmode="numeric"
           placeholder="e.g. 2048"
-          step="1"
-          min="1"
-          .value=${draft.maxTokens ?? ""}
+          .value=${this._numDisplay(draft.maxTokens)}
           @input=${(e: Event) =>
             this._setDraftField(d, {
-              maxTokens: this._numberValue((e.target as HTMLInputElement).value),
+              maxTokens: this._sanitizeInt((e.target as HTMLInputElement).value),
             })}
         />
         <p class="ags-card-help">Optional. Caps the response length.</p>

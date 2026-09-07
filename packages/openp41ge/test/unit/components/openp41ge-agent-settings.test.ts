@@ -5,7 +5,7 @@
  * add/edit/delete flows, and the default-provider radio.
  */
 // @ts-nocheck
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, vi } from "vitest";
 import "../../../src/renderer/components/openp41ge-agent-settings";
 import { PROVIDER_PRESETS } from "../../../src/renderer/models/agent-provider-presets";
 
@@ -165,6 +165,8 @@ describe("openp41ge-agent-settings", () => {
     );
     row.click();
     await tick();
+    // Stub the confirm modal (production shows a real confirmation).
+    el._confirm = async () => true;
     q(el, ".dw-delete-label").click();
     await tick();
     await settleClose();
@@ -186,5 +188,37 @@ describe("openp41ge-agent-settings", () => {
     const lastSet = el.configService.sets[el.configService.sets.length - 1];
     expect(lastSet.key).toBe("agent");
     expect(lastSet.value.providerId).toBe("openai");
+  });
+
+  test("numeric fields are text inputs that strip non-numeric characters", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+
+    const temp = qa(el, ".ags-card .ags-input").find((i) => i.placeholder === "0.7");
+    expect(temp.type).toBe("text");
+    temp.value = "12.3x.4";
+    temp.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    expect(temp.value).toBe("12.34");
+
+    const max = qa(el, ".ags-card .ags-input").find((i) => i.placeholder === "e.g. 2048");
+    expect(max.type).toBe("text");
+    max.value = "20ab48";
+    max.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    expect(max.value).toBe("2048");
+  });
+
+  test("clicking anywhere on a field card focuses its input", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    const card = qa(el, ".ags-input-card")[0];
+    const input = card.querySelector(".ags-input");
+    const focus = vi.spyOn(input, "focus");
+    card.click();
+    await tick();
+    expect(focus).toHaveBeenCalledTimes(1);
   });
 });
