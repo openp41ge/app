@@ -240,7 +240,7 @@ describe("openp41ge-agent-settings", () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();
     await tick();
-    const card = qa(el, ".ags-input-card")[0];
+    const card = qa(el, ".ags-input-card").find((c) => c.querySelector(".ags-input"));
     const input = card.querySelector(".ags-input");
     const focus = vi.spyOn(input, "focus");
     card.click();

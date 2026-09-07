@@ -560,18 +560,18 @@ export class Openp41geAgentSettings extends LitElement {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 0 10px;
+          padding: 0;
           font-size: 13px;
           color: var(--text-primary, #ddd);
-          background: var(--bg-primary, #1e1e1e);
-          border: 1px solid var(--divider, #333);
-          border-radius: 6px;
+          background: transparent;
+          border: none;
           cursor: pointer;
           font-family: inherit;
           text-align: left;
         }
-        .ags-default-trigger:hover {
-          border-color: var(--accent, #569cd6);
+        .ags-default-trigger:focus,
+        .ags-default-trigger:focus-visible {
+          outline: none;
         }
         .ags-default-value {
           flex: 1;
@@ -916,7 +916,7 @@ export class Openp41geAgentSettings extends LitElement {
                 }
               </div>
 
-              <div class="ags-card ags-card-gap">
+              <div class="ags-card ags-input-card ags-card-gap">
                 <label class="ags-card-question">Which provider is the default?</label>
                 ${
                   this._loading || entries.length === 0
