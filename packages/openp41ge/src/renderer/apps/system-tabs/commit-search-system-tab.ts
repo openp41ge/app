@@ -61,7 +61,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _regexToggle: HTMLButtonElement | null = null;
   private _caseToggle: HTMLButtonElement | null = null;
   // Filter box (below the search box): icon toggles → optional config rows.
-  private _repoFilterActive = true;
+  private _repoFilterActive = false; // repo filter off by default
   private _repoFilterIcon: HTMLButtonElement | null = null;
   private _repoFilterRow: HTMLElement | null = null;
   private _repoFilterInput: HTMLInputElement | null = null;
@@ -71,8 +71,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
   // repo names with regex + case-sensitivity when those toggles are on.
   private _repoFilterRegex = false;
   private _repoFilterCase = false;
-  // Search depth limit — one active option among the icon row (default 5K).
-  private _maxCount = 5000;
+  // Search depth limit — one active option among the icon row (default 1K).
+  private _maxCount = 1000;
   private _limitOptions: HTMLButtonElement[] = [];
   /** Buttons that received a custom tooltip — detached on teardown. */
   private _tooltipTargets: Element[] = [];
@@ -96,7 +96,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
   // Commit-message search is always on; the files icon toggles changed-file-
   // path search on top of it (on = combined 'all', off = messages only). The
   // content icon additionally enables the git -G content-lines dimension.
-  private _searchFiles = true;
+  private _searchFiles = false; // changed-file-path search off by default
   private _searchContent = false;
   // Regex mode: treat the query as a regular expression.
   private _searchRegex = false;
