@@ -566,7 +566,12 @@ describe("openp41ge-agent-settings", () => {
     };
     await el._testConnection(el._drawers[0]);
     await tick();
-    expect(q(el, ".drawer .test-err").textContent).toContain("HTTP 400 Bad Request");
+    // The button reveals the result: red "Not connected" (no status line above).
+    const connBtn = [...baseCard.querySelectorAll(".ags-action-row")]
+      .map((r) => r.querySelector(".ags-action-control button"))
+      .find((b) => b?.textContent.includes("Not connected"));
+    expect(connBtn).toBeDefined();
+    expect(connBtn.classList.contains("is-failed")).toBe(true);
     // View response appears and toggles the raw JSON, regardless of success.
     const viewBtn = [...baseCard.querySelectorAll(".ags-action-row")]
       .map((r) => r.querySelector(".ags-action-control button"))

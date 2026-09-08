@@ -1326,13 +1326,21 @@ export class Openp41geAgentSettings extends LitElement {
           margin-top: 18px;
           max-width: 620px;
         }
-        .test-ok {
+        /* Test-connection button state — colour the button itself, not a
+         * separate status line. */
+        .ags-action-control .dw-cancel.is-connected {
           color: #4caf50;
-          margin-top: 6px;
+          background: rgba(76, 175, 80, 0.14);
         }
-        .test-err {
+        .ags-action-control .dw-cancel.is-connected:hover {
+          background: rgba(76, 175, 80, 0.22);
+        }
+        .ags-action-control .dw-cancel.is-failed {
           color: #f44336;
-          margin-top: 6px;
+          background: rgba(244, 67, 54, 0.14);
+        }
+        .ags-action-control .dw-cancel.is-failed:hover {
+          background: rgba(244, 67, 54, 0.22);
         }
         /* One action in a card: description on the left, control on the right. */
         .ags-action-row {
@@ -1735,30 +1743,38 @@ export class Openp41geAgentSettings extends LitElement {
     `;
   }
 
-  /** Test-connection controls, shown at the bottom of the base URL card. */
+  /** Test-connection controls, shown at the bottom of the base URL card.
+   * The button itself reveals the result (green "Connected" / red
+   * "Not connected") rather than showing a status line above the row. */
   private _testConnectionBlock(d: ProviderDrawerState): TemplateResult {
+    const status = this._testResult;
+    const buttonClass = this._testing
+      ? ""
+      : status?.ok
+        ? "is-connected"
+        : status
+          ? "is-failed"
+          : "";
+    const buttonText = this._testing
+      ? "Testing…"
+      : status?.ok
+        ? "Connected"
+        : status
+          ? "Not connected"
+          : "Test Connection";
     return html`
-      ${
-        this._testResult
-          ? html`<p class=${this._testResult.ok ? "test-ok" : "test-err"} style="margin:0 0 2px;">
-              ${
-                this._testResult.ok ? "✓ Connected" : `✗ ${this._testResult.error ?? "Unreachable"}`
-              }
-            </p>`
-          : nothing
-      }
       ${this._actionRow(
         "Test the connection to this provider.",
         html`
           <button
-            class="dw-cancel"
+            class="dw-cancel ${buttonClass}"
             ?disabled=${this._testing}
             @click=${(e: Event) => {
               e.stopPropagation();
               void this._testConnection(d);
             }}
           >
-            ${this._testing ? "Testing…" : "Test Connection"}
+            ${buttonText}
           </button>
         `,
       )}
