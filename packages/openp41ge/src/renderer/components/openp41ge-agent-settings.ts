@@ -1598,7 +1598,61 @@ export class Openp41geAgentSettings extends LitElement {
         <p class="ags-card-help">
           The OpenAI-compatible endpoint. Picking a preset above fills this in for you.
         </p>
+        ${this._testConnectionBlock(d)}
       </div>
+    `;
+  }
+
+  /** Test-connection controls, shown at the bottom of the base URL card. */
+  private _testConnectionBlock(d: ProviderDrawerState): TemplateResult {
+    return html`
+      ${
+        this._testResult
+          ? html`<p class=${this._testResult.ok ? "test-ok" : "test-err"} style="margin:0 0 2px;">
+              ${
+                this._testResult.ok ? "✓ Connected" : `✗ ${this._testResult.error ?? "Unreachable"}`
+              }
+            </p>`
+          : nothing
+      }
+      ${this._actionRow(
+        "Test the connection to this provider.",
+        html`
+          <button
+            class="dw-cancel"
+            ?disabled=${this._testing}
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              void this._testConnection(d);
+            }}
+          >
+            ${this._testing ? "Testing…" : "Test Connection"}
+          </button>
+        `,
+      )}
+      ${
+        this._testResult
+          ? this._actionRow(
+              "View the response data.",
+              html`
+                <button
+                  class="dw-cancel"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._showTestResponse = !this._showTestResponse;
+                  }}
+                >
+                  ${this._showTestResponse ? "Hide response" : "View response"}
+                </button>
+              `,
+            )
+          : nothing
+      }
+      ${
+        this._showTestResponse && this._testResult
+          ? html`<pre class="ags-response">${JSON.stringify(this._testResult, null, 2)}</pre>`
+          : nothing
+      }
     `;
   }
 
@@ -1834,58 +1888,6 @@ export class Openp41geAgentSettings extends LitElement {
       ${this._modelsCard(d, draft, models)} ${this._defaultModelCard(d, draft, models)}
       ${this._apiKeyCard(d, draft)} ${this._temperatureCard(d, draft)}
       ${this._maxTokensCard(d, draft)}
-      <div class="ags-section-title">Actions</div>
-      <div class="ags-card ags-card-gap" style="max-width:620px;">
-        <p class="ags-card-help">
-          Run a connection check or inspect the raw response to troubleshoot a provider that is not
-          responding.
-        </p>
-        ${
-          this._testResult
-            ? html`<p class=${this._testResult.ok ? "test-ok" : "test-err"} style="margin:0 0 2px;">
-                ${
-                  this._testResult.ok
-                    ? "✓ Connected"
-                    : `✗ ${this._testResult.error ?? "Unreachable"}`
-                }
-              </p>`
-            : nothing
-        }
-        ${this._actionRow(
-          "Test the connection to this provider.",
-          html`
-            <button
-              class="dw-cancel"
-              ?disabled=${this._testing}
-              @click=${() => void this._testConnection(d)}
-            >
-              ${this._testing ? "Testing…" : "Test Connection"}
-            </button>
-          `,
-        )}
-        ${
-          this._testResult
-            ? this._actionRow(
-                "View the response data.",
-                html`
-                  <button
-                    class="dw-cancel"
-                    @click=${() => {
-                      this._showTestResponse = !this._showTestResponse;
-                    }}
-                  >
-                    ${this._showTestResponse ? "Hide response" : "View response"}
-                  </button>
-                `,
-              )
-            : nothing
-        }
-        ${
-          this._showTestResponse && this._testResult
-            ? html`<pre class="ags-response">${JSON.stringify(this._testResult, null, 2)}</pre>`
-            : nothing
-        }
-      </div>
     `;
   }
 

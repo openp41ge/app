@@ -451,18 +451,19 @@ describe("openp41ge-agent-settings", () => {
     expect((window as any).openp41ge.chat.listModels).not.toHaveBeenCalled();
   });
 
-  test("Test Connection lives in an Actions card and exposes View response", async () => {
+  test("Test Connection lives at the bottom of the base URL card and exposes View response", async () => {
     const el = await mount(AGENT({ openai: OPENAI }, "openai"));
     const row = qa(el, ".ags-provider-row").find((r) =>
       r.querySelector(".ags-provider-name")?.textContent.includes("OpenAI"),
     );
     row.click();
     await tick();
-    // The drawer has an Actions section.
+    // There is no separate Actions section any more.
     const titles = qa(el, ".drawer .ags-section-title").map((t) => t.textContent.trim());
-    expect(titles).toContain("Actions");
-    // Test Connection is an action row.
-    const testRow = qa(el, ".drawer .ags-action-row").find((r) =>
+    expect(titles).not.toContain("Actions");
+    // The base URL card hosts the Test Connection action row.
+    const baseCard = q(el, ".drawer .ags-baseurl-input").closest(".ags-card");
+    const testRow = [...baseCard.querySelectorAll(".ags-action-row")].find((r) =>
       r.querySelector(".ags-action-control button")?.textContent.includes("Test Connection"),
     );
     expect(testRow).toBeDefined();
@@ -476,7 +477,7 @@ describe("openp41ge-agent-settings", () => {
     await tick();
     expect(q(el, ".drawer .test-err").textContent).toContain("HTTP 400 Bad Request");
     // View response appears and toggles the raw JSON, regardless of success.
-    const viewBtn = qa(el, ".drawer .ags-action-row")
+    const viewBtn = [...baseCard.querySelectorAll(".ags-action-row")]
       .map((r) => r.querySelector(".ags-action-control button"))
       .find((b) => b?.textContent.includes("View response"));
     expect(viewBtn).toBeDefined();
