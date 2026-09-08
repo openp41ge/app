@@ -108,8 +108,10 @@ describe("openp41ge-agent-settings", () => {
     expect(q(el, ".drawer-head")).not.toBeNull();
     expect(q(el, ".drawer-title").textContent.trim()).toBe("Provider");
     expect(q(el, ".drawer .dw-close")).not.toBeNull();
-    // No footer — Delete lives in the DANGEROUS section's action card.
-    expect(q(el, ".drawer-footer")).toBeNull();
+    // A small bottom bar (24px) is re-added, but Delete lives in the DANGEROUS
+    // section's action card, not the footer.
+    expect(q(el, ".drawer-footer")).not.toBeNull();
+    expect(q(el, ".drawer-footer .dw-delete-label")).toBeNull();
     expect(q(el, ".drawer .ags-action-card .ags-delete-btn")).not.toBeNull();
     expect(
       qa(el, ".drawer .ags-section-title").some((t) => t.textContent.trim() === "Dangerous"),

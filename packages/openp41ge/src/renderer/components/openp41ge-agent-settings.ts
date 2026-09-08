@@ -865,8 +865,36 @@ export class Openp41geAgentSettings extends LitElement {
           top: 43px;
           left: 0;
           right: 0;
-          bottom: 0;
+          bottom: 24px;
           overflow-y: auto;
+        }
+        /* Small bottom bar — matches the tiny footer on the sidebar / workspace
+         * widgets (24px), not the large 44px drawer footer. */
+        .ags-bottombar {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 0;
+          display: flex;
+          align-items: center;
+          padding: 0 8px;
+          height: 24px;
+          box-sizing: border-box;
+          border-top: 1px solid var(--divider, #333);
+          background: var(--bg-secondary, #252526);
+        }
+        .drawer-footer {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 6px;
+          flex-shrink: 0;
+          height: 24px;
+          box-sizing: border-box;
+          padding: 0 8px;
+          border-top: 1px solid var(--divider, #333);
+          background: var(--bg-secondary, #252526);
         }
         .ags-pane {
           box-sizing: border-box;
@@ -1497,6 +1525,8 @@ export class Openp41geAgentSettings extends LitElement {
             </div>
           </div>
 
+          <div class="ags-bottombar"></div>
+
           ${
             this._drawers.length > 0
               ? html`<div class="ags-base-mask" @click=${() => this._closeAllDrawers()}></div>`
@@ -1578,6 +1608,7 @@ export class Openp41geAgentSettings extends LitElement {
         <div class="drawer-body">
           ${d.kind === "model" ? this._modelDetail(d) : this._providerDetail(d)}
         </div>
+        <div class="drawer-footer"></div>
       </div>
     `;
   }
@@ -1602,6 +1633,7 @@ export class Openp41geAgentSettings extends LitElement {
         <div class="drawer-body">
           ${c.kind === "model" ? this._modelDetail(c) : this._providerDetail(c)}
         </div>
+        <div class="drawer-footer"></div>
       </div>
     `;
   }
