@@ -108,11 +108,12 @@ describe("openp41ge-agent-settings", () => {
     expect(q(el, ".drawer-head")).not.toBeNull();
     expect(q(el, ".drawer-title").textContent.trim()).toBe("Provider");
     expect(q(el, ".drawer .dw-close")).not.toBeNull();
-    // The footer has no Cancel/Save; only Delete, right-aligned.
-    expect(q(el, ".drawer .dw-close")).not.toBeNull();
-    expect(q(el, ".drawer-footer .dw-cancel")).toBeNull();
-    expect(q(el, ".drawer-footer .dw-save")).toBeNull();
-    expect(q(el, ".drawer-footer .dw-delete-label")).not.toBeNull();
+    // No footer — Delete lives in the DANGEROUS section's action card.
+    expect(q(el, ".drawer-footer")).toBeNull();
+    expect(q(el, ".drawer .ags-action-card .ags-delete-btn")).not.toBeNull();
+    expect(
+      qa(el, ".drawer .ags-section-title").some((t) => t.textContent.trim() === "Dangerous"),
+    ).toBe(true);
     // The preset card is a closed selection trigger, not a radio grid.
     expect(q(el, ".drawer .ags-default-trigger .ags-default-row-name").textContent.trim()).toBe(
       "Custom",
@@ -270,7 +271,7 @@ describe("openp41ge-agent-settings", () => {
     await tick();
     // Stub the confirm modal (production shows a real confirmation).
     el._confirm = async () => true;
-    q(el, ".dw-delete-label").click();
+    q(el, ".drawer .ags-delete-btn").click();
     await tick();
     await settleClose();
 
@@ -328,6 +329,38 @@ describe("openp41ge-agent-settings", () => {
     await tick();
     expect(qa(el, ".ags-default-list")).toHaveLength(0);
     expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("vLLM (local)");
+  });
+
+  test("clicking anywhere else closes the default list and shows the selected row", async () => {
+    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
+    q(el, ".ags-default-trigger").click();
+    await tick();
+    expect(qa(el, ".ags-default-list")).toHaveLength(1);
+
+    // Dispatch a real pointerdown on another card inside the panel.
+    const elsewhere = q(el, ".ags-card-question");
+    elsewhere.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+    await tick();
+
+    expect(qa(el, ".ags-default-list")).toHaveLength(0);
+    expect(q(el, ".ags-default-trigger")).not.toBeNull();
+    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("vLLM (local)");
+  });
+
+  test("a pointerdown on a row inside the list does not close it before selection", async () => {
+    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
+    q(el, ".ags-default-trigger").click();
+    await tick();
+    const rows = qa(el, ".ags-default-row");
+    const openaiRow = rows.find((r) => r.textContent.includes("OpenAI"));
+    openaiRow.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+    await tick();
+    // The list stays open after pointerdown; the click that follows selects.
+    expect(qa(el, ".ags-default-list")).toHaveLength(1);
+    openaiRow.click();
+    await tick();
+    expect(qa(el, ".ags-default-list")).toHaveLength(0);
+    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("OpenAI");
   });
 
   test("the default list is virtualized — it only renders a bounded window of rows", async () => {
@@ -434,7 +467,7 @@ describe("openp41ge-agent-settings", () => {
     qa(el, ".drawer .ags-provider-row")[1].click();
     await tick();
     el._confirm = async () => true;
-    qa(el, ".drawer .dw-delete-label").pop().click();
+    qa(el, ".drawer .ags-delete-btn").pop().click();
     await tick();
     await settleClose();
     const names = qa(el, ".drawer .ags-provider-row").map(

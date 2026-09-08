@@ -20,6 +20,9 @@ export class AgentSettingsTabController implements TabController {
   mount(container: HTMLElement): void {
     this._container = container;
     const el = document.createElement("openp41ge-agent-settings");
+    // The agent-settings component renders its own top bar (so a drawer can
+    // overlay it) and owns the layout, so it is mounted directly without the
+    // shared settings-tab shell.
     container.appendChild(el);
   }
 

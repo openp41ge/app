@@ -181,9 +181,13 @@ export class Openp41geAgentSettings extends LitElement {
 
   private _onDocPointerDown = (e: PointerEvent): void => {
     if (!this._defaultOpen) return;
-    // Events from inside the shadow root retarget to the host, so a target of
-    // `this` means the click was inside the component.
-    if (e.target === this) return;
+    // Shadow-DOM clicks retarget to the host, so `e.target === this` for any
+    // click inside the component. Use the composed path to tell whether the
+    // click was on the open list itself (a row / the scroll area) or anywhere
+    // else — including elsewhere inside the panel. Anything not on the list
+    // closes it and falls back to the selected row.
+    const list = this._listEl.value;
+    if (list && e.composedPath().includes(list)) return;
     this._defaultOpen = false;
   };
 
@@ -825,16 +829,40 @@ export class Openp41geAgentSettings extends LitElement {
         .ags-root ::-webkit-scrollbar-corner {
           background: transparent;
         }
-        /* The drawer layer hosts the base card and any slide-in drawers. */
+        /* The drawer layer hosts the base card and any slide-in drawers. It
+         * fills the root and is the positioning context for the top bar, the
+         * base content, and the drawers — so a drawer's own top bar overlays
+         * the base's top bar at the same vertical position. */
         .ags-drawer-layer {
-          position: relative;
-          height: 100%;
-          min-height: 0;
+          position: absolute;
+          inset: 0;
           overflow: hidden;
+        }
+        /* Top-level top bar — matches the Agents sidebar search bar height. */
+        .ags-topbar {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 43px;
+          box-sizing: border-box;
+          display: flex;
+          align-items: center;
+          padding: 0 14px;
+          border-bottom: 1px solid var(--divider, #333);
+          background: var(--bg-secondary, #252526);
+          z-index: 0;
+        }
+        .ags-topbar-title {
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--text-secondary, #999);
         }
         .ags-base {
           position: absolute;
-          top: 0;
+          top: 43px;
           left: 0;
           right: 0;
           bottom: 0;
@@ -843,7 +871,7 @@ export class Openp41geAgentSettings extends LitElement {
         .ags-pane {
           box-sizing: border-box;
           min-height: 100%;
-          padding: 28px 32px;
+          padding: 18px 18px 28px;
         }
         .ags-section-title {
           margin: 18px 0 14px;
@@ -853,7 +881,8 @@ export class Openp41geAgentSettings extends LitElement {
           letter-spacing: 0.04em;
           color: var(--text-secondary, #999);
         }
-        .drawer-body > .ags-section-title:first-child {
+        .drawer-body > .ags-section-title:first-child,
+        .ags-pane > .ags-section-title:first-child {
           margin-top: 0;
         }
         .ags-card {
@@ -1110,7 +1139,8 @@ export class Openp41geAgentSettings extends LitElement {
           align-items: center;
           justify-content: space-between;
           flex-shrink: 0;
-          height: 44px;
+          height: 43px;
+          box-sizing: border-box;
           padding: 0 14px;
           border-bottom: 1px solid var(--divider, #333);
         }
@@ -1176,19 +1206,14 @@ export class Openp41geAgentSettings extends LitElement {
           overflow-y: auto;
           padding: 18px 18px 28px;
         }
-        .drawer-footer {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          justify-content: flex-end;
-          flex-shrink: 0;
-          height: 44px;
-          padding: 0 14px;
-          border-top: 1px solid var(--divider, #333);
+        /* Dangerous action card — delete lives here, under the DANGEROUS
+         * section title, as an icon button. */
+        .ags-action-card {
+          margin-top: 16px;
         }
-        .dw-delete-label {
+        .ags-action-control .ags-delete-btn {
           border: none;
-          background: transparent;
+          background: rgba(255, 255, 255, 0.08);
           color: var(--text-primary, #ddd);
           width: 26px;
           height: 26px;
@@ -1196,14 +1221,14 @@ export class Openp41geAgentSettings extends LitElement {
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
           border-radius: 6px;
-          margin-left: auto;
+          cursor: pointer;
+          flex-shrink: 0;
         }
-        .dw-delete-label svg {
+        .ags-action-control .ags-delete-btn svg {
           display: block;
         }
-        .dw-delete-label:hover {
+        .ags-action-control .ags-delete-btn:hover {
           color: #e06c75;
           background: rgba(224, 108, 117, 0.15);
         }
@@ -1354,6 +1379,9 @@ export class Openp41geAgentSettings extends LitElement {
 
       <div class="ags-root">
         <div class="ags-drawer-layer">
+          <div class="ags-topbar">
+            <span class="ags-topbar-title">Agents</span>
+          </div>
           <div class="ags-base">
             <div class="ags-pane">
               <p class="ags-section-title">Providers</p>
@@ -1543,7 +1571,6 @@ export class Openp41geAgentSettings extends LitElement {
         <div class="drawer-body">
           ${d.kind === "model" ? this._modelDetail(d) : this._providerDetail(d)}
         </div>
-        ${this._drawerFooter(d)}
       </div>
     `;
   }
@@ -1572,25 +1599,36 @@ export class Openp41geAgentSettings extends LitElement {
     `;
   }
 
-  private _drawerFooter(d: DrawerState): TemplateResult {
+  /** The DANGEROUS section card — delete lives here as an icon action row. */
+  private _dangerousCard(d: DrawerState): TemplateResult {
     const canDelete = d.kind === "model" ? d.modelIndex !== null : d.editId !== null;
+    if (!canDelete) return nothing;
+    const isModel = d.kind === "model";
+    const description = isModel
+      ? "Delete this model permanently."
+      : "Delete this provider permanently.";
+    const explanation = isModel
+      ? "This removes the model from the provider's list. Anything already configured to use it "
+          + "will stop working. This action can't be undone."
+      : "This removes the provider and any chats that use it from your available agents. "
+          + "This action can't be undone.";
     return html`
-      <div class="drawer-footer">
-        ${
-          canDelete
-            ? html`<button
-                class="dw-delete-label"
-                @click=${(e: Event) => {
-                  e.stopPropagation();
-                  void (d.kind === "model" ? this._deleteModel(d) : this._deleteProvider(d));
-                }}
-                aria-label=${d.kind === "model" ? "Delete model" : "Delete provider"}
-                title=${d.kind === "model" ? "Delete model" : "Delete provider"}
-              >
-                ${this._deleteSvg()}
-              </button>`
-            : nothing
-        }
+      <div class="ags-card ags-action-card" style="max-width:620px;">
+        ${this._actionRow(
+          description,
+          html`<button
+            class="ags-delete-btn"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              void (isModel ? this._deleteModel(d) : this._deleteProvider(d));
+            }}
+            aria-label=${isModel ? "Delete model" : "Delete provider"}
+            title=${isModel ? "Delete model" : "Delete provider"}
+          >
+            ${this._deleteSvg()}
+          </button>`,
+        )}
+        <p class="ags-card-help">${explanation}</p>
       </div>
     `;
   }
@@ -1988,6 +2026,8 @@ export class Openp41geAgentSettings extends LitElement {
       ${this._apiKeyCard(d, draft)}
       <div class="ags-section-title">Generation</div>
       ${this._temperatureCard(d, draft)} ${this._maxTokensCard(d, draft)}
+      <div class="ags-section-title">Dangerous</div>
+      ${this._dangerousCard(d)}
     `;
   }
 
@@ -2021,6 +2061,8 @@ export class Openp41geAgentSettings extends LitElement {
           completions. Press Enter to save.
         </p>
       </div>
+      <div class="ags-section-title">Dangerous</div>
+      ${this._dangerousCard(d)}
     `;
   }
 
