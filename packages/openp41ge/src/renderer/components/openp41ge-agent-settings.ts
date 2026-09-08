@@ -55,6 +55,9 @@ interface ProviderDrawerState {
   kind: "provider";
   /** The provider key being edited; null = adding a new provider. */
   editId: string | null;
+  /** True when this provider was auto-created on "Add provider" and may be
+   * auto-deleted on close if the user supplied no data. */
+  created?: boolean;
   title: string;
   presetId: string;
   draft: ProviderDraft;
@@ -97,7 +100,6 @@ export class Openp41geAgentSettings extends LitElement {
   @state() private _loading = true;
   @state() private _drawers: DrawerState[] = [];
   @state() private _closingDrawers: ClosingDrawer[] = [];
-  @state() private _saving = false;
   @state() private _testing = false;
   @state() private _testResult: TestResult | null = null;
   @state() private _showTestResponse = false;
@@ -373,6 +375,7 @@ export class Openp41geAgentSettings extends LitElement {
         id: this._nextId(),
         kind: "provider",
         editId: id,
+        created: false,
         title: providerDisplayName(preset, draft),
         presetId: preset.id,
         draft: { ...draft },
@@ -384,7 +387,19 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _openAdd(): void {
-    const draft = applyPreset(customPreset());
+    const config = this._config;
+    if (!config) return;
+    // Seed a blank (Custom) provider. It is persisted immediately so the
+    // drawer edits a real entry; if the user closes it with no data it is
+    // auto-deleted (see _maybeDeleteEmptyProvider).
+    const draft: ProviderDraft = { baseUrl: "", model: "" };
+    const id = nextProviderId(Object.keys(config.providers), CUSTOM_PRESET_ID);
+    const providers = { ...config.providers, [id]: this._providerFromDraft(draft) };
+    let providerId = config.providerId;
+    if (!providerId) providerId = id;
+    const next = { ...config, providerId, providers };
+    this._config = next;
+    void this._persist(next);
     this._testResult = null;
     this._showTestResponse = false;
     this._drawers = [
@@ -392,7 +407,8 @@ export class Openp41geAgentSettings extends LitElement {
       {
         id: this._nextId(),
         kind: "provider",
-        editId: null,
+        editId: id,
+        created: true,
         title: "New provider",
         presetId: CUSTOM_PRESET_ID,
         draft,
@@ -422,6 +438,7 @@ export class Openp41geAgentSettings extends LitElement {
       title: draft.name || d.title,
       presetOpen: false,
     });
+    void this._syncProviderFromDraft(d.id);
   }
 
   private _setDraftField(d: ProviderDrawerState, patch: Partial<ProviderDraft>): void {
@@ -430,6 +447,7 @@ export class Openp41geAgentSettings extends LitElement {
     const draft = { ...cur.draft, ...patch };
     const title = patch.name !== undefined && patch.name.trim() ? patch.name.trim() : cur.title;
     this._updateDrawer(d.id, { draft, title });
+    void this._syncProviderFromDraft(d.id);
   }
 
   private _numberValue(v: string): number | undefined {
@@ -478,6 +496,25 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _closeDrawer(id: string): void {
+    void this._closeDrawerAsync(id);
+  }
+
+  private async _closeDrawerAsync(id: string): Promise<void> {
+    const idx = this._drawers.findIndex((d) => d.id === id);
+    if (idx === -1) return;
+    const closing = this._drawers[idx];
+    await this._commitDrawer(closing);
+    // The commit may have removed/rebound state; re-locate before sliding out.
+    const idx2 = this._drawers.findIndex((d) => d.id === id);
+    if (idx2 === -1) return;
+    const width = this._widthFor(idx2);
+    const current = this._drawers[idx2];
+    this._drawers = this._drawers.filter((d) => d.id !== id);
+    this._finalizeClose([{ ...current, width }]);
+  }
+
+  /** Close a drawer without running commit (used after Delete already persisted). */
+  private _closeDrawerNoCommit(id: string): void {
     const idx = this._drawers.findIndex((d) => d.id === id);
     if (idx === -1) return;
     const width = this._widthFor(idx);
@@ -492,6 +529,14 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _closeDeeper(index: number): void {
+    void this._closeDeeperAsync(index);
+  }
+
+  private async _closeDeeperAsync(index: number): Promise<void> {
+    const closers = this._drawers.slice(index + 1);
+    for (const d of [...closers].reverse()) {
+      await this._commitDrawer(d);
+    }
     const closing = this._drawers
       .slice(index + 1)
       .map((d, i) => ({ ...d, width: this._widthFor(index + 1 + i) }));
@@ -500,10 +545,28 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _closeAllDrawers(): void {
+    void this._closeAllDrawersAsync();
+  }
+
+  private async _closeAllDrawersAsync(): Promise<void> {
     if (this._drawers.length === 0) return;
+    const all = [...this._drawers];
+    for (const d of [...all].reverse()) {
+      await this._commitDrawer(d);
+    }
     const closing = this._drawers.map((d, i) => ({ ...d, width: this._widthFor(i) }));
     this._drawers = [];
     this._finalizeClose(closing);
+  }
+
+  /** Run the close-time side effect for a drawer (commit a model / maybe delete
+   * an empty auto-created provider). */
+  private async _commitDrawer(d: DrawerState): Promise<void> {
+    if (d.kind === "model") {
+      await this._commitModel(d);
+    } else {
+      await this._maybeDeleteEmptyProvider(d);
+    }
   }
 
   private _finalizeClose(closing: ClosingDrawer[]): void {
@@ -541,31 +604,51 @@ export class Openp41geAgentSettings extends LitElement {
     await this._persist(next);
   }
 
-  private async _saveProvider(d: ProviderDrawerState): Promise<void> {
+  /** Write the provider's on-screen draft through to the config (live). */
+  private async _syncProviderFromDraft(id: string): Promise<void> {
+    const cur = this._drawers.find((x) => x.id === id);
+    if (!cur || cur.kind !== "provider") return;
+    const creId = cur.editId;
     const config = this._config;
-    if (!config) return;
-    this._saving = true;
-    const draft = this._providerFromDraft(d.draft);
-    const existingIds = Object.keys(config.providers);
-    const hadProviders = existingIds.length > 0;
-    const base = d.presetId === CUSTOM_PRESET_ID ? CUSTOM_PRESET_ID : d.presetId;
-    const id = d.editId ?? nextProviderId(existingIds, base);
-    const providers = { ...config.providers, [id]: draft };
+    if (!creId || !config) return;
+    const providers = { ...config.providers, [creId]: this._providerFromDraft(cur.draft) };
     let providerId = config.providerId;
-    if (!hadProviders) providerId = id;
-    else if (!providers[providerId]) providerId = Object.keys(providers)[0] ?? id;
+    if (Object.keys(providers).length && !providers[providerId]) {
+      providerId = Object.keys(providers)[0];
+    }
     const next = { ...config, providerId, providers };
     this._config = next;
     await this._persist(next);
-    this._saving = false;
-    // Keep the drawer open so the user can keep editing. Rebind it to the
-    // (possibly newly created) provider id so a second Save updates rather
-    // than re-creating, and normalise the on-screen draft to what was saved.
-    this._updateDrawer(d.id, {
-      editId: id,
-      title: draft.name?.trim() || d.title,
-      draft,
-    });
+  }
+
+  /** True when a provider config carries no user data (used for auto-delete). */
+  private _isEmptyProvider(p: ProviderConfig): boolean {
+    return (
+      !p.baseUrl.trim() &&
+      !p.model.trim() &&
+      !(p.apiKey ?? "").trim() &&
+      !p.name?.trim() &&
+      (p.models ?? []).length === 0 &&
+      p.temperature === undefined &&
+      p.maxTokens === undefined
+    );
+  }
+
+  /** If an auto-created ("Add") provider was closed with no data, drop it. */
+  private async _maybeDeleteEmptyProvider(d: ProviderDrawerState): Promise<void> {
+    if (!d.created) return;
+    const config = this._config;
+    const id = d.editId;
+    if (!id || !config) return;
+    const p = config.providers[id];
+    if (!p || !this._isEmptyProvider(p)) return;
+    const providers = { ...config.providers };
+    delete providers[id];
+    let providerId = config.providerId;
+    if (providerId === id) providerId = Object.keys(providers)[0] ?? "";
+    const next = { ...config, providerId, providers };
+    this._config = next;
+    await this._persist(next);
   }
 
   private async _deleteProvider(d: ProviderDrawerState): Promise<void> {
@@ -588,28 +671,33 @@ export class Openp41geAgentSettings extends LitElement {
     const next = { ...config, providerId, providers };
     this._config = next;
     await this._persist(next);
-    this._closeDrawer(d.id);
+    // The provider is already gone from config; close without re-committing.
+    this._closeDrawerNoCommit(d.id);
   }
 
-  private async _saveModel(d: ModelDrawerState): Promise<void> {
+  /** Commit the model drawer's on-screen draft into its provider (on close). */
+  private async _commitModel(d: ModelDrawerState): Promise<void> {
     const providerDrawer = this._drawers.find((x) => x.id === d.providerDrawerId);
     if (!providerDrawer || providerDrawer.kind !== "provider") return;
     const id = d.draft.id.trim();
-    if (!id) return;
     const models = (providerDrawer.draft.models ?? []).map((m) => ({ id: m.id }));
-    const oldId = d.modelIndex === null ? null : (models[d.modelIndex]?.id ?? null);
+    let draft = providerDrawer.draft;
     if (d.modelIndex === null) {
+      // Adding: only commit a non-empty id; never hijack the default model.
+      if (!id) return;
       models.push({ id });
+      draft = { ...providerDrawer.draft, models };
     } else {
+      // Editing: only commit a non-empty id; clearing to empty is left to the
+      // Delete button, so an accidental backspace doesn't drop a model.
+      if (!id) return;
+      const oldId = models[d.modelIndex]?.id ?? null;
       models[d.modelIndex] = { id };
-    }
-    let draft = { ...providerDrawer.draft, models };
-    // When editing, keep the default in sync if it pointed at the renamed model.
-    if (d.modelIndex !== null && draft.model === oldId) {
-      draft = { ...draft, model: id };
+      draft = { ...providerDrawer.draft, models };
+      if (draft.model === oldId) draft = { ...draft, model: id };
     }
     this._updateDrawer(providerDrawer.id, { draft });
-    this._closeDrawer(d.id);
+    await this._syncProviderFromDraft(providerDrawer.id);
   }
 
   private async _deleteModel(d: ModelDrawerState): Promise<void> {
@@ -631,7 +719,9 @@ export class Openp41geAgentSettings extends LitElement {
       draft = { ...draft, model: models[0]?.id ?? "" };
     }
     this._updateDrawer(providerDrawer.id, { draft });
-    this._closeDrawer(d.id);
+    await this._syncProviderFromDraft(providerDrawer.id);
+    // Deleted already; close without re-committing the model drawer.
+    this._closeDrawerNoCommit(d.id);
   }
 
   private async _detectModels(d: ProviderDrawerState): Promise<void> {
@@ -663,6 +753,7 @@ export class Openp41geAgentSettings extends LitElement {
       const model = models.some((m) => m.id === draft.model) ? draft.model : models[0].id;
       this._updateDrawer(d.id, { draft: { ...draft, model }, defaultModelOpen: false });
       this._detectedMessage = `Detected ${ids.length} models.`;
+      void this._syncProviderFromDraft(d.id);
     } catch (err) {
       this._detectedError = (err as Error).message;
     }
@@ -995,6 +1086,39 @@ export class Openp41geAgentSettings extends LitElement {
           transition: width 0.2s ease;
           animation: ags-dw-slide 0.18s ease;
         }
+        .drawer-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-shrink: 0;
+          height: 44px;
+          padding: 0 14px;
+          border-bottom: 1px solid var(--divider, #333);
+        }
+        .drawer-title {
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--text-secondary, #999);
+        }
+        .dw-close {
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          width: 26px;
+          height: 26px;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border-radius: 6px;
+        }
+        .dw-close:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
         .drawer-mask {
           position: absolute;
           inset: 0;
@@ -1055,7 +1179,7 @@ export class Openp41geAgentSettings extends LitElement {
           justify-content: center;
           cursor: pointer;
           border-radius: 6px;
-          margin-right: auto;
+          margin-left: auto;
         }
         .dw-delete-label svg {
           display: block;
@@ -1090,23 +1214,6 @@ export class Openp41geAgentSettings extends LitElement {
           background: rgba(255, 255, 255, 0.05);
           color: var(--text-tertiary, #666);
           cursor: not-allowed;
-        }
-        .dw-save {
-          border: none;
-          border-radius: 6px;
-          padding: 4px 14px;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          color: var(--accent, #6fb3f2);
-          background: rgba(86, 156, 214, 0.18);
-        }
-        .dw-save:hover {
-          background: rgba(86, 156, 214, 0.3);
-        }
-        .dw-save:disabled {
-          opacity: 0.5;
-          cursor: default;
         }
 
         /* Preset picker grid. */
@@ -1400,6 +1507,20 @@ export class Openp41geAgentSettings extends LitElement {
               ></div>`
             : nothing
         }
+        <div class="drawer-head">
+          <span class="drawer-title">${d.kind === "model" ? "Model" : "Provider"}</span>
+          <button
+            class="dw-close"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._closeDrawer(d.id);
+            }}
+            aria-label="Close"
+            title="Close"
+          >
+            ${this._closeSvg()}
+          </button>
+        </div>
         <div class="drawer-body">
           ${d.kind === "model" ? this._modelDetail(d) : this._providerDetail(d)}
         </div>
@@ -1411,6 +1532,20 @@ export class Openp41geAgentSettings extends LitElement {
   private _renderClosingDrawer(c: ClosingDrawer): TemplateResult {
     return html`
       <div class="drawer drawer--closing" style="width:${c.width}%">
+        <div class="drawer-head">
+          <span class="drawer-title">${c.kind === "model" ? "Model" : "Provider"}</span>
+          <button
+            class="dw-close"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._closeDrawer(c.id);
+            }}
+            aria-label="Close"
+            title="Close"
+          >
+            ${this._closeSvg()}
+          </button>
+        </div>
         <div class="drawer-body">
           ${c.kind === "model" ? this._modelDetail(c) : this._providerDetail(c)}
         </div>
@@ -1419,81 +1554,24 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _drawerFooter(d: DrawerState): TemplateResult {
-    if (d.kind === "model") {
-      return html`
-        <div class="drawer-footer">
-          ${
-            d.modelIndex !== null
-              ? html`<button
-                  class="dw-delete-label"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    void this._deleteModel(d);
-                  }}
-                  aria-label="Delete model"
-                  title="Delete model"
-                >
-                  ${this._deleteSvg()}
-                </button>`
-              : nothing
-          }
-          <button
-            class="dw-cancel"
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              this._closeDrawer(d.id);
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            class="dw-save"
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              void this._saveModel(d);
-            }}
-          >
-            Save
-          </button>
-        </div>
-      `;
-    }
+    const canDelete = d.kind === "model" ? d.modelIndex !== null : d.editId !== null;
     return html`
       <div class="drawer-footer">
         ${
-          d.editId !== null
+          canDelete
             ? html`<button
                 class="dw-delete-label"
                 @click=${(e: Event) => {
                   e.stopPropagation();
-                  void this._deleteProvider(d);
+                  void (d.kind === "model" ? this._deleteModel(d) : this._deleteProvider(d));
                 }}
-                aria-label="Delete provider"
-                title="Delete provider"
+                aria-label=${d.kind === "model" ? "Delete model" : "Delete provider"}
+                title=${d.kind === "model" ? "Delete model" : "Delete provider"}
               >
                 ${this._deleteSvg()}
               </button>`
             : nothing
         }
-        <button
-          class="dw-cancel"
-          @click=${(e: Event) => {
-            e.stopPropagation();
-            this._closeDrawer(d.id);
-          }}
-        >
-          Cancel
-        </button>
-        <button
-          class="dw-save"
-          ?disabled=${this._saving}
-          @click=${(e: Event) => {
-            e.stopPropagation();
-            void this._saveProvider(d);
-          }}
-        >
-          ${this._saving ? "Saving…" : "Save"}
-        </button>
       </div>
     `;
   }
@@ -1883,11 +1961,14 @@ export class Openp41geAgentSettings extends LitElement {
     const preset = providerPreset(d.presetId) ?? customPreset();
     const models = draft.models ?? [];
     return html`
-      <div class="ags-section-title">Provider</div>
+      <div class="ags-section-title">General</div>
       ${this._presetCard(d, preset)} ${this._nameCard(d, draft)} ${this._baseUrlCard(d, draft)}
+      <div class="ags-section-title">Models</div>
       ${this._modelsCard(d, draft, models)} ${this._defaultModelCard(d, draft, models)}
-      ${this._apiKeyCard(d, draft)} ${this._temperatureCard(d, draft)}
-      ${this._maxTokensCard(d, draft)}
+      <div class="ags-section-title">Authentication</div>
+      ${this._apiKeyCard(d, draft)}
+      <div class="ags-section-title">Generation</div>
+      ${this._temperatureCard(d, draft)} ${this._maxTokensCard(d, draft)}
     `;
   }
 
@@ -1896,7 +1977,6 @@ export class Openp41geAgentSettings extends LitElement {
     const providerName =
       providerDrawer && providerDrawer.kind === "provider" ? providerDrawer.title : "";
     return html`
-      <div class="ags-section-title">Model</div>
       <div
         class="ags-card ags-input-card ags-card-gap"
         style="max-width:620px;"
@@ -1910,10 +1990,16 @@ export class Openp41geAgentSettings extends LitElement {
           .value=${d.draft.id}
           @input=${(e: Event) =>
             this._setModelDraft(d, { id: (e.target as HTMLInputElement).value })}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              this._closeDrawer(d.id);
+            }
+          }}
         />
         <p class="ags-card-help">
           The exact model id used when requesting ${providerName ? `${providerName} ` : ""}chat
-          completions.
+          completions. Press Enter to save.
         </p>
       </div>
     `;

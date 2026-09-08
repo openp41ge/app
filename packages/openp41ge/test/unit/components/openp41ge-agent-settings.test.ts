@@ -104,9 +104,15 @@ describe("openp41ge-agent-settings", () => {
     q(el, ".ags-add-row").click();
     await tick();
     expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(1);
-    // There is no header/title row; the drawer relies on its footer for close.
-    expect(q(el, ".drawer-head")).toBeNull();
-    expect(q(el, ".drawer-title")).toBeNull();
+    // The drawer has a top bar: a fixed "Provider" title and a ✕ close button.
+    expect(q(el, ".drawer-head")).not.toBeNull();
+    expect(q(el, ".drawer-title").textContent.trim()).toBe("Provider");
+    expect(q(el, ".drawer .dw-close")).not.toBeNull();
+    // The footer has no Cancel/Save; only Delete, right-aligned.
+    expect(q(el, ".drawer .dw-close")).not.toBeNull();
+    expect(q(el, ".drawer-footer .dw-cancel")).toBeNull();
+    expect(q(el, ".drawer-footer .dw-save")).toBeNull();
+    expect(q(el, ".drawer-footer .dw-delete-label")).not.toBeNull();
     // The preset card is a closed selection trigger, not a radio grid.
     expect(q(el, ".drawer .ags-default-trigger .ags-default-row-name").textContent.trim()).toBe(
       "Custom",
@@ -138,10 +144,15 @@ describe("openp41ge-agent-settings", () => {
     ).toBe("gpt-4o");
   });
 
-  test("Save adds a new provider, persists agent, and keeps the drawer open", async () => {
+  test("adding a provider creates it immediately and persists edits live", async () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();
     await tick();
+    // Opening add creates a blank (Custom) entry right away.
+    let last = el.configService.sets[el.configService.sets.length - 1];
+    expect(Object.keys(last.value.providers)).toEqual(["custom"]);
+    expect(last.value.providerId).toBe("custom");
+    // Pick the OpenAI preset; the fields persist without a Save click.
     q(el, ".drawer .ags-default-trigger").click();
     await tick();
     const openaiRow = qa(el, ".drawer .ags-default-row").find((o) =>
@@ -149,23 +160,61 @@ describe("openp41ge-agent-settings", () => {
     );
     openaiRow.click();
     await tick();
-    qa(el, ".drawer .dw-save").pop().click();
-    await tick();
-
-    const lastSet = el.configService.sets[el.configService.sets.length - 1];
-    expect(lastSet.key).toBe("agent");
-    expect(lastSet.value.providers.openai).toBeDefined();
-    expect(lastSet.value.providerId).toBe("openai");
-    // The drawer stays open after saving.
+    last = el.configService.sets[el.configService.sets.length - 1];
+    expect(last.value.providers.custom.name).toBe("OpenAI");
+    expect(last.value.providers.custom.baseUrl).toBe("https://api.openai.com/v1");
+    expect(last.value.providers.custom.model).toBe("gpt-4o");
+    expect(last.value.providerId).toBe("custom");
+    // The drawer stays open; the provider list behind it shows the new provider.
     expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(1);
-    // The provider list behind it shows the new provider.
     const names = qa(el, ".ags-provider-name").map((n) => n.textContent);
     expect(names).toContain("OpenAI");
-    // Saving again rebinds to the same provider id rather than re-creating it.
-    qa(el, ".drawer .dw-save").pop().click();
+  });
+
+  test("editing a field persists to config immediately (no Save button)", async () => {
+    const el = await mount(AGENT({ openai: OPENAI }, "openai"));
+    qa(el, ".ags-provider-row")[0].click();
     await tick();
-    const secondSet = el.configService.sets[el.configService.sets.length - 1];
-    expect(Object.keys(secondSet.value.providers)).toEqual(["openai"]);
+    const setsBefore = el.configService.sets.length;
+    const baseInput = q(el, ".drawer .ags-baseurl-input");
+    baseInput.value = "https://api.openai.com/v2";
+    baseInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    const last = el.configService.sets[el.configService.sets.length - 1];
+    expect(el.configService.sets.length).toBeGreaterThan(setsBefore);
+    expect(last.value.providers.openai.baseUrl).toBe("https://api.openai.com/v2");
+  });
+
+  test("an added provider with no data is auto-deleted when the drawer closes", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    expect(
+      Object.keys(el.configService.sets[el.configService.sets.length - 1].value.providers),
+    ).toHaveLength(1);
+    // Close with the top-bar ✕ without entering any data.
+    q(el, ".drawer .dw-close").click();
+    await tick();
+    await settleClose();
+    const last = el.configService.sets[el.configService.sets.length - 1];
+    expect(Object.keys(last.value.providers)).toHaveLength(0);
+    expect(qa(el, ".ags-provider-name")).toHaveLength(0);
+  });
+
+  test("an added provider with data survives closing", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    const baseInput = q(el, ".drawer .ags-baseurl-input");
+    baseInput.value = "http://localhost:8000/v1";
+    baseInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    q(el, ".drawer .dw-close").click();
+    await tick();
+    await settleClose();
+    expect(
+      Object.keys(el.configService.sets[el.configService.sets.length - 1].value.providers),
+    ).toHaveLength(1);
   });
 
   test("editing a provider's models persists the added/detected models", async () => {
@@ -174,14 +223,17 @@ describe("openp41ge-agent-settings", () => {
     const row = qa(el, ".ags-provider-row")[1];
     row.click();
     await tick();
-    // Add a model via the model drawer.
+    // The model drawer has its own "Model" header.
     q(el, ".drawer .ags-add-row").click();
     await tick();
+    expect(qa(el, ".drawer-title").pop().textContent.trim()).toBe("Model");
+    // Add a model via the model drawer.
     const idInput = q(el, ".drawer .ags-model-id-input");
     idInput.value = "gpt-4o-mini";
     idInput.dispatchEvent(new Event("input", { bubbles: true }));
     await tick();
-    qa(el, ".drawer .dw-save").pop().click();
+    // No Save button; closing the model drawer (top-bar ✕) commits it.
+    qa(el, ".drawer .dw-close").pop().click();
     await tick();
     await settleClose();
     // Adding a model does NOT change the default — the preset default stays.
@@ -191,10 +243,7 @@ describe("openp41ge-agent-settings", () => {
         ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
       ).textContent.trim(),
     ).toBe("gpt-4o");
-    // Save the provider.
-    qa(el, ".drawer .dw-save").pop().click();
-    await tick();
-    await settleClose();
+    // Provider edits persist live (no Save).
     const lastSet = el.configService.sets[el.configService.sets.length - 1];
     expect(lastSet.value.providers.openai.model).toBe("gpt-4o");
     expect(lastSet.value.providers.openai.models).toEqual([{ id: "gpt-4o-mini" }]);
@@ -353,9 +402,7 @@ describe("openp41ge-agent-settings", () => {
         ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
       ).textContent.trim(),
     ).toBe("m2");
-    qa(el, ".drawer .dw-save").pop().click();
-    await tick();
-    await settleClose();
+    // The default-model change persists live (no Save).
     const lastSet = el.configService.sets[el.configService.sets.length - 1];
     expect(lastSet.value.providers.vllm.model).toBe("m2");
     expect(lastSet.value.providers.vllm.models).toEqual([{ id: "m1" }, { id: "m2" }]);
