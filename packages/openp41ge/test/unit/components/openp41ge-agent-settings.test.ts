@@ -144,6 +144,17 @@ describe("openp41ge-agent-settings", () => {
     ).toBe("gpt-4o");
   });
 
+  test("does not auto-focus the base URL input when the drawer opens", async () => {
+    const el = await mount(AGENT({ openai: OPENAI }, "openai"));
+    qa(el, ".ags-provider-row")[0].click();
+    await tick();
+    const baseInput = q(el, ".drawer .ags-baseurl-input");
+    expect(el.shadowRoot.activeElement).not.toBe(baseInput);
+    // Focusing the card by hand still works.
+    baseInput.focus();
+    expect(el.shadowRoot.activeElement).toBe(baseInput);
+  });
+
   test("adding a provider creates it immediately and persists edits live", async () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();

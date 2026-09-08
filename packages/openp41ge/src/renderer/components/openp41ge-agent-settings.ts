@@ -383,7 +383,6 @@ export class Openp41geAgentSettings extends LitElement {
         defaultModelOpen: false,
       },
     ];
-    void this.updateComplete.then(() => this._focusBaseUrl());
   }
 
   private _openAdd(): void {
@@ -416,11 +415,6 @@ export class Openp41geAgentSettings extends LitElement {
         defaultModelOpen: false,
       },
     ];
-    void this.updateComplete.then(() => this._focusBaseUrl());
-  }
-
-  private _focusBaseUrl(): void {
-    this.renderRoot.querySelector<HTMLInputElement>(".ags-baseurl-input")?.focus();
   }
 
   private _updateDrawer(id: string, patch: Partial<DrawerState>): void {
@@ -805,6 +799,31 @@ export class Openp41geAgentSettings extends LitElement {
           height: 100%;
           overflow: hidden;
           background: var(--bg-primary, #1e1e1e);
+        }
+        .ags-root ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .ags-root ::-webkit-scrollbar-track {
+          background: transparent;
+          box-sizing: border-box;
+        }
+        .ags-root ::-webkit-scrollbar-track:vertical {
+          border-left: 1px solid rgba(128, 128, 128, 0.25);
+        }
+        .ags-root ::-webkit-scrollbar-track:horizontal {
+          border-top: 1px solid rgba(128, 128, 128, 0.25);
+        }
+        .ags-root ::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.16);
+          border-radius: 0;
+          min-height: 28px;
+        }
+        .ags-root ::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.34);
+        }
+        .ags-root ::-webkit-scrollbar-corner {
+          background: transparent;
         }
         /* The drawer layer hosts the base card and any slide-in drawers. */
         .ags-drawer-layer {
