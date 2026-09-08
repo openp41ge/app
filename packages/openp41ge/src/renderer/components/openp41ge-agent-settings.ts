@@ -1058,6 +1058,14 @@ export class Openp41geAgentSettings extends LitElement {
           background: var(--bg-active, #37373d);
           color: var(--text-primary, #ddd);
         }
+        /* Action-row buttons keep a permanent background, not just on hover. */
+        .ags-action-control .dw-cancel {
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-primary, #ddd);
+        }
+        .ags-action-control .dw-cancel:hover {
+          background: rgba(255, 255, 255, 0.16);
+        }
         .dw-save {
           border: none;
           border-radius: 6px;
