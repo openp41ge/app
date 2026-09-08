@@ -17,6 +17,7 @@ import { property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { plusIconThick, refreshIcon } from "../icons";
 import { classifyWorktree, worstOf, worktreeStatusLabel } from "../services/worktree-status";
+import { matchesNameFilter } from "../services/explorer-filter";
 import {
   WorktreeFileLoader,
   DirPersistenceService,
@@ -45,6 +46,15 @@ export class Openp41geRepoTreeItem extends LitElement {
   @property({ attribute: false })
   worktrees: WorktreeData[] = [];
 
+  @property({ attribute: false })
+  filter = "";
+
+  @property({ type: Boolean })
+  filterRegex = false;
+
+  @property({ type: Boolean })
+  filterCase = false;
+
   @property({ type: Boolean })
   editMode = false;
 
@@ -57,6 +67,18 @@ export class Openp41geRepoTreeItem extends LitElement {
     const name = this._addWorktreeName.trim().toLowerCase();
     if (!name) return false;
     return this.worktrees.some((wt) => wt.branch.toLowerCase() === name);
+  }
+
+  /** Whether a name passes the active filter (empty filter matches all). */
+  private _matchesFilter(name: string): boolean {
+    return matchesNameFilter(name, this.filter, this.filterRegex, this.filterCase);
+  }
+
+  /** Worktrees narrowed by the active filter (empty filter → all). */
+  private get _filteredWorktrees(): WorktreeData[] {
+    const q = this.filter.trim();
+    if (!q) return this.worktrees;
+    return this.worktrees.filter((wt) => this._matchesFilter(wt.branch));
   }
   @state() private _expandedWorktrees = new Set<string>();
   @state() private _expandedDirs = new Map<string, Set<string>>();
@@ -91,6 +113,35 @@ export class Openp41geRepoTreeItem extends LitElement {
     if (changedProperties.has("worktrees")) {
       queueMicrotask(() => this._loadRestoredFiles());
     }
+    if (
+      changedProperties.has("filter") ||
+      changedProperties.has("filterRegex") ||
+      changedProperties.has("filterCase")
+    ) {
+      this._syncAutoExpand();
+    }
+  }
+
+  /** Whether the active filter narrows the tree (empty query = no filter). */
+  private get _isFilterActive(): boolean {
+    return Boolean(this.filter.trim());
+  }
+
+  /** Load files for worktrees that match the active filter and aren't loaded yet. */
+  private _syncAutoExpand(): void {
+    const q = this.filter.trim();
+    if (!q) return;
+    for (const wt of this._filteredWorktrees) {
+      if (!wt.exists) continue;
+      if (this._fileLoader.isWorktreeLoaded(wt.branch)) continue;
+      if (this._fileLoader.isLoadingWorktree(wt.branch)) continue;
+      const path = wt.path || `${this.repoName}/${wt.branch}`;
+      this._expandedWorktrees.add(wt.branch);
+      void this._fileLoader.expandWorktreeFiles(wt.branch, path, this.repoName, () => {
+        if (this.isConnected) this.requestUpdate();
+      });
+    }
+    this.requestUpdate();
   }
 
   /** Load ahead/behind counters for this repo's branches to show sync warnings. */
@@ -376,34 +427,41 @@ export class Openp41geRepoTreeItem extends LitElement {
     const entries = this._fileLoader.getEntries(branch, parentPath);
     if (entries.length === 0) return [];
     const expandedDirs = this._expandedDirs.get(branch) ?? new Set();
-    return entries.map((entry) => {
-      const isUntracked = this._fileLoader.isUntracked(branch, entry.path);
-      if (entry.isDirectory) {
-        const isExpanded = expandedDirs.has(entry.path);
-        const isLoading = this._fileLoader.isLoadingDir(entry.path);
+    const filterActive = this._isFilterActive;
+    return entries
+      .filter((entry) => !filterActive || this._matchesFilter(entry.name))
+      .map((entry) => {
+        const isUntracked = this._fileLoader.isUntracked(branch, entry.path);
+        if (entry.isDirectory) {
+          // While filtering, auto-expand directories whose name matches so
+          // their matching descendants are visible.
+          const isExpanded = filterActive
+            ? this._matchesFilter(entry.name)
+            : expandedDirs.has(entry.path);
+          const isLoading = this._fileLoader.isLoadingDir(entry.path);
+          return {
+            id: entry.path,
+            label: entry.name,
+            icon: "folder-closed",
+            expanded: isExpanded,
+            expandable: true,
+            status: isUntracked ? ("untracked" as const) : undefined,
+            children:
+              isExpanded && this._fileLoader.dirContents.has(entry.path)
+                ? this._buildFileTreeNodes(branch, entry.path)
+                : undefined,
+            meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
+          };
+        }
         return {
           id: entry.path,
           label: entry.name,
-          icon: "folder-closed",
-          expanded: isExpanded,
-          expandable: true,
+          icon: entry.name,
+          draggable: true,
           status: isUntracked ? ("untracked" as const) : undefined,
-          children:
-            isExpanded && this._fileLoader.dirContents.has(entry.path)
-              ? this._buildFileTreeNodes(branch, entry.path)
-              : undefined,
-          meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
+          meta: { branch, filePath: entry.path },
         };
-      }
-      return {
-        id: entry.path,
-        label: entry.name,
-        icon: entry.name,
-        draggable: true,
-        status: isUntracked ? ("untracked" as const) : undefined,
-        meta: { branch, filePath: entry.path },
-      };
-    });
+      });
   }
 
   /** Icon renderer for tree nodes — renders <openp41ge-icon> for known icon names, <file-extension-svg> for files. */
@@ -636,15 +694,16 @@ export class Openp41geRepoTreeItem extends LitElement {
 
         <!-- Expanded worktrees -->
         ${
-          this._expanded
+          this._expanded || (this._isFilterActive && this._filteredWorktrees.length > 0)
             ? html`
                 ${
-                  this.worktrees.length > 0
-                    ? this.worktrees.map(
+                  this._filteredWorktrees.length > 0
+                    ? this._filteredWorktrees.map(
                         (wt) => html`
                           ${this._renderWorktree(wt)}
                           ${
-                            this._expandedWorktrees.has(wt.branch) &&
+                            (this._expandedWorktrees.has(wt.branch) ||
+                              (this._isFilterActive && this._matchesFilter(wt.branch))) &&
                             this._fileLoader.isWorktreeLoaded(wt.branch)
                               ? html`<div class="wt-expanded-wt-block border-b border-[#232323]">
                                   <openp41ge-tree

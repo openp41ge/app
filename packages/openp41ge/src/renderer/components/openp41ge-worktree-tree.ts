@@ -14,7 +14,7 @@
  *   - All IPC calls go through window.openp41ge.workspaceController.*
  */
 
-import { LitElement, html, type nothing, type TemplateResult } from "lit";
+import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { state, property } from "lit/decorators.js";
 import { toastService } from "./openp41ge-toast";
@@ -29,6 +29,13 @@ import "./openp41ge-add-worktree-dialog";
 import { appServices } from "../app";
 import type { Workspace, Tab } from "../../layout/types";
 import { Openp41geTabsEventHandler } from "../services/openp41ge-tabs-event-handler";
+import {
+  IpcExplorerSearchModel,
+  type ExplorerSearchOptions,
+  type IExplorerSearchModel,
+} from "../models/explorer-search-model";
+import { matchesNameFilter } from "../services/explorer-filter";
+import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
 
 import { worktreePersistence } from "../services/worktree-persistence";
 import { setContextMenuActive } from "../services/drag-context";
@@ -227,6 +234,19 @@ class Openp41geWorktreeTree extends LitElement {
   private _hasWorkspace = workspaceFileService.openFilePath != null;
   private _workspaceUnsub: (() => void) | null = null;
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
+
+  // ── Explorer search / filter state ──────────────────────────────────────
+  /** Content-search model — the single seam for DI/testing. */
+  _searchModel: IExplorerSearchModel = new IpcExplorerSearchModel();
+  @state() private _filterQuery = "";
+  @state() private _filterRegex = false;
+  @state() private _filterCase = false;
+  @state() private _searchResults: FileContentSearchResult[] = [];
+  @state() private _searching = false;
+  private _searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private _searchToken = 0;
+  private _filterInputEl: HTMLInputElement | null = null;
+
   constructor() {
     super();
     this._injectStyles();
@@ -307,6 +327,8 @@ class Openp41geWorktreeTree extends LitElement {
         border:2px solid #444;border-top-color:var(--accent-hover);
         border-radius:50%;animation:wt-spin 0.8s linear infinite;
       }
+      .explorer-result-file:hover { background: rgba(255,255,255,0.06); }
+      .explorer-result-match:hover { background: rgba(255,255,255,0.04); }
     `;
     document.head.appendChild(s);
   }
@@ -431,6 +453,10 @@ class Openp41geWorktreeTree extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener("resize", this._onWindowResize);
+    if (this._searchTimer) {
+      clearTimeout(this._searchTimer);
+      this._searchTimer = null;
+    }
     this._gitDisconnected = true;
 
     if (this._workspaceUnsub) {
@@ -480,6 +506,200 @@ class Openp41geWorktreeTree extends LitElement {
     </button>`;
   }
 
+  // ── Explorer search / filter ────────────────────────────────────────────
+
+  private _onFilterInput(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    this._filterQuery = input.value;
+    this._filterInputEl = input;
+    this._scheduleSearch();
+  }
+
+  private _toggleFilterRegex(): void {
+    this._filterRegex = !this._filterRegex;
+    this._scheduleSearch();
+  }
+
+  private _toggleFilterCase(): void {
+    this._filterCase = !this._filterCase;
+    this._scheduleSearch();
+  }
+
+  private _onFilterKeydown(e: KeyboardEvent): void {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (this._filterQuery) {
+        // First Escape clears the query; a second blurs.
+        this._filterQuery = "";
+        this._scheduleSearch();
+      } else if (this._filterInputEl) {
+        this._filterInputEl.blur();
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      // Run immediately on Enter, bypassing the debounce.
+      if (this._searchTimer) clearTimeout(this._searchTimer);
+      const q = this._filterQuery.trim();
+      if (q) {
+        this._searching = true;
+        const token = ++this._searchToken;
+        void this._runSearch(q, token);
+      }
+    }
+  }
+
+  private _scheduleSearch(): void {
+    if (this._searchTimer) clearTimeout(this._searchTimer);
+    const q = this._filterQuery.trim();
+    if (!q) {
+      this._searchResults = [];
+      this._searching = false;
+      return;
+    }
+    this._searching = true;
+    const token = ++this._searchToken;
+    this._searchTimer = setTimeout(() => {
+      void this._runSearch(q, token);
+    }, 200);
+  }
+
+  /** Root disk paths to content-search — everything visible in the explorer. */
+  private _rootPaths(): string[] {
+    const paths = new Set<string>();
+    for (const repo of this._repos) {
+      if (repo.path) paths.add(repo.path);
+      const wts = this._worktreesByRepo.get(repo.name) ?? [];
+      for (const wt of wts) if (wt.path) paths.add(wt.path);
+    }
+    return Array.from(paths);
+  }
+
+  private async _runSearch(query: string, token: number): Promise<void> {
+    const opts: ExplorerSearchOptions = {
+      regex: this._filterRegex,
+      caseSensitive: this._filterCase,
+    };
+    const results = await this._searchModel.searchContents(query, this._rootPaths(), opts);
+    if (token !== this._searchToken) return; // stale — superseded by a newer search
+    this._searchResults = results;
+    this._searching = false;
+  }
+
+  private _matchesFilter(name: string): boolean {
+    return matchesNameFilter(name, this._filterQuery, this._filterRegex, this._filterCase);
+  }
+
+  private _filteredRepos(): Array<{ path: string; name: string; url: string }> {
+    const q = this._filterQuery.trim();
+    if (!q) return this._repos;
+    return this._repos.filter((repo) => {
+      if (this._matchesFilter(repo.name)) return true;
+      const wts = this._worktreesByRepo.get(repo.name) ?? [];
+      return wts.some((wt) => this._matchesFilter(wt.branch));
+    });
+  }
+
+  /** Optional filter string forwarded to each repo-tree-item for worktree/file filtering. */
+  private get _filterString(): string {
+    return this._filterQuery.trim();
+  }
+
+  private _renderSearchBar(): TemplateResult {
+    const regexColor = this._filterRegex ? "rgb(227,227,227)" : "var(--text-secondary,#888)";
+    const caseColor = this._filterCase ? "rgb(227,227,227)" : "var(--text-secondary,#888)";
+    return html`
+      <div style="flex-shrink:0;padding:6px 10px;border-bottom:1px solid var(--divider,#2a2a2a);">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input
+            type="text"
+            placeholder="Filter repos and files…"
+            spellcheck="false"
+            .value=${this._filterQuery}
+            @input=${this._onFilterInput}
+            @keydown=${this._onFilterKeydown}
+            style="flex:1;min-width:0;box-sizing:border-box;height:26px;padding:0;font-size:12px;color:var(--text-primary,#ccc);background:transparent;border:none;outline:none;"
+          />
+          <button
+            type="button"
+            title="Regex filter"
+            aria-label="Regex filter"
+            data-filter-regex
+            @click=${this._toggleFilterRegex}
+            style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;cursor:pointer;background:transparent;border:1px solid transparent;border-radius:4px;color:${regexColor};"
+          >
+            ${unsafeHTML(REGEX_ICON)}
+          </button>
+          <button
+            type="button"
+            title="Match case"
+            aria-label="Match case"
+            data-filter-case
+            @click=${this._toggleFilterCase}
+            style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;cursor:pointer;background:transparent;border:1px solid transparent;border-radius:4px;color:${caseColor};"
+          >
+            ${unsafeHTML(CASE_ON_ICON)}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderSearchResults(): TemplateResult | typeof nothing {
+    const q = this._filterQuery.trim();
+    if (!q) return nothing;
+    if (this._searching) {
+      return html`<div style="padding:8px 10px;font-size:12px;color:var(--text-muted,#777);">
+        Searching…
+      </div>`;
+    }
+    if (this._searchResults.length === 0) {
+      return html`<div style="padding:8px 10px;font-size:12px;color:var(--text-muted,#777);">
+        No matches
+      </div>`;
+    }
+    return html`
+      <div style="border-top:1px solid var(--divider,#2a2a2a);">
+        ${this._searchResults.map(
+          (res) => html`
+            <div>
+              <div
+                class="explorer-result-file"
+                style="display:flex;align-items:center;height:26px;padding:0 10px;cursor:pointer;font-size:12px;color:var(--text-primary,#ccc);border-bottom:1px solid var(--divider,#2a2a2a);"
+                title=${res.path}
+                @click=${() => this._openFile(res.path, res.name, false)}
+              >
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                  >${res.name}</span
+                >
+                <span
+                  style="margin-left:auto;color:var(--text-muted,#777);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:8px;"
+                  >${res.dir}</span
+                >
+              </div>
+              ${res.matches.map(
+                (m) => html`
+                  <div
+                    class="explorer-result-match"
+                    style="display:flex;align-items:center;height:24px;padding:0 10px 0 22px;cursor:pointer;font-size:12px;color:var(--text-muted,#999);"
+                    @click=${() => this._openFile(res.path, res.name, false, m.lineNumber, m.column)}
+                  >
+                    <span
+                      style="color:var(--text-secondary,#888);min-width:22px;text-align:right;margin-right:8px;"
+                      >${m.lineNumber}</span
+                    >
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                      >${m.lineText.trim()}</span
+                    >
+                  </div>
+                `,
+              )}
+            </div>
+          `,
+        )}
+      </div>
+    `;
+  }
+
   /**
    * Lit render() outputs the outer skeleton with new sub-components.
    * The tree content (repos, worktrees) is rendered by <openp41ge-repo-tree-item>.
@@ -504,10 +724,11 @@ class Openp41geWorktreeTree extends LitElement {
       <div
         class="wt-drawer flex flex-col overflow-hidden flex-1 min-h-0 w-full bg-gutter relative select-none"
       >
+        ${this._renderSearchBar()}
         <div class="wt-tree-scroll-wrapper flex-1 relative min-h-0">
           <div class="wt-tree-scroll absolute inset-0 overflow-y-auto overflow-x-hidden">
             <div class="wt-tree-scroll-content" data-explorer-drop-zone>
-              ${this._repos.map((repo) => {
+              ${this._filteredRepos().map((repo) => {
                 const worktrees = this._worktreesByRepo.get(repo.name) ?? [];
                 return html`
                   <div class="flex items-stretch w-full">
@@ -517,6 +738,9 @@ class Openp41geWorktreeTree extends LitElement {
                       .repoUrl=${repo.url}
                       .worksetId=${this.worksetId}
                       .worktrees=${worktrees}
+                      .filter=${this._filterString}
+                      .filterRegex=${this._filterRegex}
+                      .filterCase=${this._filterCase}
                       .editMode=${this._editMode}
                       @repo-toggle-expand=${(e: CustomEvent) => {
                         const { repoName: rn, expanded } = e.detail;
@@ -666,6 +890,7 @@ class Openp41geWorktreeTree extends LitElement {
                       ><span class="add-repo-label ml-1 text-muted flex-1">add repository</span>
                     </div>`;
               })()}
+              ${this._renderSearchResults()}
             </div>
             <!-- wt-tree-scroll-content -->
           </div>
@@ -1715,12 +1940,17 @@ class Openp41geWorktreeTree extends LitElement {
 
   // ── File opening ───────────────────────────────────────────────────────
 
-  private _openFile(filePath: string, fileName: string, pinned: boolean): void {
-    document.dispatchEvent(
-      new CustomEvent("openp41ge:open-file", {
-        detail: { path: filePath, name: fileName, pinned },
-      }),
-    );
+  private _openFile(
+    filePath: string,
+    fileName: string,
+    pinned: boolean,
+    line?: number,
+    column?: number,
+  ): void {
+    const detail: Record<string, unknown> = { path: filePath, name: fileName, pinned };
+    if (line !== undefined) detail.line = line;
+    if (column !== undefined) detail.column = column;
+    document.dispatchEvent(new CustomEvent("openp41ge:open-file", { detail }));
 
     // Keep focus if unpinned
     if (!pinned && _isOpen) {

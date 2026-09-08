@@ -234,3 +234,38 @@ describe("file-editor find + external highlight", () => {
     expect(el._findMatches.length).toBe(0);
   });
 });
+
+describe("file-editor revealLine", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("moves the primary cursor to the requested 1-based line/column", async () => {
+    const el = await mountEditor();
+    el.revealLine(3, 5);
+    await tick();
+    const pos = (el as any)._cursorController.position;
+    expect(pos.lineNumber).toBe(3);
+    expect(pos.column).toBe(5);
+  });
+
+  test("clamps an out-of-range line to the last line", async () => {
+    const el = await mountEditor();
+    el.revealLine(999);
+    await tick();
+    const pos = (el as any)._cursorController.position;
+    // The document ends with a trailing newline, so lineCount is 5 (4 content
+    // lines + one empty line); moveTo clamps to the last line.
+    expect(pos.lineNumber).toBe(5);
+  });
+
+  test("clamps an over-long column to the end of the line", async () => {
+    const el = await mountEditor();
+    el.revealLine(1, 9999);
+    await tick();
+    const pos = (el as any)._cursorController.position;
+    // "const alpha = 1;" is 16 chars → column clamps to 17.
+    expect(pos.lineNumber).toBe(1);
+    expect(pos.column).toBe(17);
+  });
+});

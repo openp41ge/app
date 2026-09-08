@@ -8,6 +8,7 @@ export * from "./worktree-model";
 export * from "./repo-service";
 export * from "./commit-search-model";
 export * from "./agent-provider-presets";
+export * from "./explorer-search-model";
 export * from "./chat-store-model";
 export * from "./chat-runtime-model";
 export * from "./text-model";

@@ -472,6 +472,10 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** Search for files matching a query within the given root paths. */
     search: (query, rootPaths) => ipcRenderer.invoke("file:search", query, rootPaths),
 
+    /** Full-text CONTENT search over files within the given root paths. */
+    searchContents: (query, rootPaths, options) =>
+      ipcRenderer.invoke("file:searchContents", query, rootPaths, options),
+
     /** Get current scoped folder paths. */
     getScope: () => ipcRenderer.invoke("file:getScope"),
 

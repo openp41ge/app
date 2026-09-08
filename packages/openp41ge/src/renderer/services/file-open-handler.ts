@@ -18,6 +18,7 @@ import type { Tab } from "../../layout/types";
 
 import { createLogger } from "openp41ge-logger";
 import { Openp41geTabsEventHandler } from "./openp41ge-tabs-event-handler";
+import { getController } from "../controllers/registry";
 
 const log = createLogger("openp41ge", "file-open-handler");
 
@@ -46,6 +47,17 @@ export class FileOpenHandler implements IFileOpenHandler {
     // editor after its buffer loads.
     const search = (detail.search ?? undefined) as
       { query?: string; regex?: boolean; caseSensitive?: boolean } | undefined;
+    // Optional line/column to reveal (Explorer content-search match rows).
+    const line = typeof detail.line === "number" ? detail.line : undefined;
+    const column = typeof detail.column === "number" ? detail.column : undefined;
+    const tabConfig =
+      search || line !== undefined || column !== undefined
+        ? {
+            ...(search ? { search } : {}),
+            ...(line !== undefined ? { line } : {}),
+            ...(column !== undefined ? { column } : {}),
+          }
+        : undefined;
     log.info("open", filePath, pinned ? "pinned" : "unpinned");
 
     const myWindowId = window.openp41ge.workspace.getWindowId();
@@ -55,6 +67,22 @@ export class FileOpenHandler implements IFileOpenHandler {
     }
     const targetCol = col !== undefined ? col : this._getLastActiveCellCol();
     const fileName = e.detail.name || "";
+
+    // A content-search match click (line provided) should jump to a file that
+    // is already open anywhere in the window, reusing the tab and revealing
+    // the matching line — rather than opening a duplicate (VS Code behaviour).
+    if (line !== undefined) {
+      const existingAnywhere = this._findFileViewerAnywhere(filePath);
+      if (existingAnywhere) {
+        const ctrl = getController(existingAnywhere);
+        if (ctrl && "revealLine" in ctrl) {
+          (ctrl as unknown as { revealLine(l: number, c?: number): void }).revealLine(line, column);
+        }
+        log.info("jump to existing tab at line", existingAnywhere, line);
+        this._commandBus!.dispatch("activateTabInCell", myWindowId, existingAnywhere);
+        return;
+      }
+    }
 
     // Step 1: Check if this file is already open in the target cell.
     // - Double-click (pinned=true) on a preview tab → pin it
@@ -87,7 +115,7 @@ export class FileOpenHandler implements IFileOpenHandler {
           filePath,
           targetCol,
           false,
-          search ? { search } : undefined,
+          tabConfig,
         );
         return;
       }
@@ -103,7 +131,7 @@ export class FileOpenHandler implements IFileOpenHandler {
       filePath,
       targetCol,
       pinned,
-      search ? { search } : undefined,
+      tabConfig,
     );
   }
 
@@ -158,6 +186,25 @@ export class FileOpenHandler implements IFileOpenHandler {
       }
     }
     return 0;
+  }
+
+  /** Find a file-viewer tab for `filePath` anywhere in this window. */
+  private _findFileViewerAnywhere(filePath: string): string | null {
+    const ws = this._workspaceState!.getWorkspace();
+    if (!ws) return null;
+    const myWindowId = window.openp41ge.workspace.getWindowId();
+    const win = ws.windows.find((w) => w.id === myWindowId);
+    if (!win) return null;
+    const tabs = ws.editorTabs as Record<string, Tab | undefined>;
+    for (const pl of win.grid.placements) {
+      for (const tabId of pl.tabIds) {
+        const tab = tabs[tabId];
+        if (tab && tab.appType === "file-viewer" && tab.config?.filePath === filePath) {
+          return tabId;
+        }
+      }
+    }
+    return null;
   }
 
   private _findFileViewerInCell(filePath: string, col: number): string | null {

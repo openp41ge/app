@@ -59,10 +59,7 @@ import {
   generateGlobalEditorCSS,
 } from "openp41ge-editor-engine/themes";
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
-import {
-  InlineDiffHighlightsRenderer,
-  type InlineDiffRow,
-} from "./inline-diff-highlights";
+import { InlineDiffHighlightsRenderer, type InlineDiffRow } from "./inline-diff-highlights";
 import { InlineDiffGutterColumns, type InlineDiffGutterRows } from "./inline-diff-gutter-columns";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
@@ -317,7 +314,11 @@ export class FileEditorElement extends LitElement {
    */
   setInlineDiff(rows: readonly InlineDiffRow[] | null): void {
     this._inlineRows = rows ? [...rows] : null;
-    if (this._viewModel && this._inlineRows && this._viewModel.lineCount !== this._inlineRows.length) {
+    if (
+      this._viewModel &&
+      this._inlineRows &&
+      this._viewModel.lineCount !== this._inlineRows.length
+    ) {
       // The buffer was replaced meanwhile — decorations no longer align.
       this._inlineRows = null;
     }
@@ -365,8 +366,7 @@ export class FileEditorElement extends LitElement {
           // BEFORE (left) — the old line number. Full on context + deleted
           // rows; a GAP where the line didn't exist before (an addition). The
           // deleted row's cell is tinted red all the way across its column.
-          const left =
-            row.kind !== "added" && row.oldLine != null ? String(row.oldLine) : "";
+          const left = row.kind !== "added" && row.oldLine != null ? String(row.oldLine) : "";
           const cls = row.kind === "removed" ? "fe-inline-removed-cell" : "";
           return { leftLabel: left, cls };
         },
@@ -430,7 +430,7 @@ export class FileEditorElement extends LitElement {
     // empty scrollable space after a single very long line — without the extra
     // gutter-wide overhang that created a phantom horizontal scrollbar.
     const region = this._textRegionEl;
-    const contentWidth = region ? region.clientWidth : this._viewportEl?.clientWidth ?? 0;
+    const contentWidth = region ? region.clientWidth : (this._viewportEl?.clientWidth ?? 0);
     // Pass the same wrap mapping the number columns use so the red/green rows
     // align with the TEXT — a wrapped line's tint spans all its segments.
     const wg = this._inlineWrapGetters();
@@ -549,7 +549,9 @@ export class FileEditorElement extends LitElement {
   } {
     return {
       getViewLineStart: (modelLine: number) =>
-        this._wordWrapEnabled ? this._viewLines?.getViewLineStart(modelLine) ?? modelLine : modelLine,
+        this._wordWrapEnabled
+          ? (this._viewLines?.getViewLineStart(modelLine) ?? modelLine)
+          : modelLine,
       getViewLineCount: (modelLine: number) => {
         if (!this._wordWrapEnabled || !this._viewModel) return 1;
         const content = this._viewModel.getLineContent(modelLine);
@@ -910,8 +912,7 @@ export class FileEditorElement extends LitElement {
     // bar is hidden in CSS).
     this._hScrollTrack = document.createElement("div");
     this._hScrollTrack.className = "fe-hscroll";
-    this._hScrollTrack.style.cssText =
-      `position:absolute;left:0;right:${VERTICAL_SCROLLBAR_WIDTH}px;bottom:0;height:10px;z-index:8;display:none;user-select:none;`;
+    this._hScrollTrack.style.cssText = `position:absolute;left:0;right:${VERTICAL_SCROLLBAR_WIDTH}px;bottom:0;height:10px;z-index:8;display:none;user-select:none;`;
     this._hScrollThumb = document.createElement("div");
     this._hScrollThumb.className = "fe-hscroll-thumb";
     // Square corners (match the native bar). No border-radius.
@@ -1549,7 +1550,12 @@ export class FileEditorElement extends LitElement {
       // Create/reposition line number elements for the new visible range
       this._lineNumbersOverlay?.setVisibleRange(startLine, endLine);
       const wg = this._inlineWrapGetters();
-      this._inlineColumns?.setVisibleRange(startLine, endLine, wg.getViewLineStart, wg.getViewLineCount);
+      this._inlineColumns?.setVisibleRange(
+        startLine,
+        endLine,
+        wg.getViewLineStart,
+        wg.getViewLineCount,
+      );
       // Re-render selection highlights for the new visible lines (all cursors)
       this._renderSelectionHighlights(
         this._cursorController?.getAllCursors().map((c) => ({
@@ -2073,6 +2079,19 @@ export class FileEditorElement extends LitElement {
   clearSearchHighlight(): void {
     this._externalHighlight = null;
     this._refreshFindMatches();
+  }
+
+  /**
+   * Move the primary cursor to a 1-based line/column and scroll it into view.
+   * Used to open a file at a specific content-search match instance via the
+   * platform's open-file handler.
+   */
+  revealLine(lineNumber: number, column?: number): void {
+    if (!this._cursorController) return;
+    const line = Math.max(1, lineNumber);
+    const col = column && column > 0 ? column : 1;
+    this._cursorController.moveTo(line, col);
+    this._scrollToRevealCursor();
   }
 
   private _wireFind(): void {

@@ -192,6 +192,42 @@ describe("FileOpenHandler wiring — integration", () => {
     });
   });
 
+  describe("Content-match jump (open at line)", () => {
+    it("reuses an already-open tab and activates it instead of duplicating", () => {
+      handler.openEdit("/project/jump.ts", "jump.ts");
+      workspaceState.setState(dispatcher.getWorkspace()); // sync the view model
+      const ws1 = dispatcher.getWorkspace();
+      const tabId = ws1.windows[0].grid.placements[0].tabIds[0];
+      expect(ws1.editorTabs[tabId].config?.filePath).toBe("/project/jump.ts");
+
+      // A content-match click: no pinned flag, but line/column present.
+      const spy = vi.spyOn(commandBus, "dispatch");
+      const event = new CustomEvent("openp41ge:open-file", {
+        detail: { path: "/project/jump.ts", name: "jump.ts", line: 42, column: 7 },
+      });
+      handler.handleOpenFile(event);
+
+      const ws2 = dispatcher.getWorkspace();
+      // The existing tab is reused — no new column/tab is created.
+      expect(ws2.windows[0].grid.placements).toHaveLength(1);
+      expect(ws2.windows[0].grid.placements[0].tabIds).toContain(tabId);
+      expect(spy).toHaveBeenCalledWith("activateTabInCell", "win-ws1-0", tabId);
+    });
+
+    it("opens a new tab carrying line/column when the file isn't open yet", () => {
+      const event = new CustomEvent("openp41ge:open-file", {
+        detail: { path: "/project/new.ts", name: "new.ts", line: 5, column: 2 },
+      });
+      handler.handleOpenFile(event);
+
+      const ws = dispatcher.getWorkspace();
+      const tabId = ws.windows[0].grid.placements[0].tabIds[0];
+      // The tab config carries line/column so the editor reveals the match.
+      expect(ws.editorTabs[tabId].config?.line).toBe(5);
+      expect(ws.editorTabs[tabId].config?.column).toBe(2);
+    });
+  });
+
   describe("Error handling", () => {
     it("gracefully handles missing file path", () => {
       const event = new CustomEvent("openp41ge:open-file", {

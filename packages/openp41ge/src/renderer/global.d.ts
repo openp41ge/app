@@ -228,6 +228,11 @@ declare global {
           destroy: () => void;
         };
         search: (query: string, rootPaths: string[]) => Promise<FileSearchResult[]>;
+        searchContents: (
+          query: string,
+          rootPaths: string[],
+          options?: { regex?: boolean; caseSensitive?: boolean },
+        ) => Promise<FileContentSearchResult[]>;
         getScope: () => Promise<string[]>;
         addScope: (dirPath: string) => Promise<boolean>;
         removeScope: (dirPath: string) => Promise<boolean>;
@@ -331,6 +336,23 @@ declare global {
     path: string;
     name: string;
     dir: string;
+  }
+
+  /** One content match instance inside a file. */
+  interface FileContentMatch {
+    lineNumber: number;
+    column: number;
+    startIndex: number;
+    endIndex: number;
+    lineText: string;
+  }
+
+  /** A file that contains at least one content match, with its match instances. */
+  interface FileContentSearchResult {
+    path: string;
+    name: string;
+    dir: string;
+    matches: FileContentMatch[];
   }
 
   interface CommitEntry {

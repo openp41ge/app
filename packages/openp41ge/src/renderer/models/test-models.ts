@@ -15,6 +15,7 @@ import type {
 import type { WorktreeModel } from "./worktree-model.js";
 import type { FileEntryModel, FileContentModel, FileStatus } from "./file-model.js";
 import type { RepoService } from "./repo-service.js";
+import type { IExplorerSearchModel, ExplorerSearchOptions } from "./explorer-search-model.js";
 
 // ─── TestFileContent ─────────────────────────────────────────────────
 
@@ -279,5 +280,32 @@ export class TestRepoService implements RepoService {
 
   async removeRepo(name: string): Promise<void> {
     this._repos.delete(name);
+  }
+}
+
+// ─── TestExplorerSearchModel ──────────────────────────────────────────
+
+/** In-memory Explorer content-search — records calls, returns canned results. */
+export class TestExplorerSearchModel implements IExplorerSearchModel {
+  results: FileContentSearchResult[] = [];
+  calls: Array<{
+    query: string;
+    rootPaths: string[];
+    options?: ExplorerSearchOptions;
+  }> = [];
+
+  searchContents(
+    rawQuery: string,
+    rootPaths: string[],
+    options?: ExplorerSearchOptions,
+  ): Promise<FileContentSearchResult[]> {
+    const query = rawQuery.trim();
+    this.calls.push({ query, rootPaths, options });
+    if (!query) return Promise.resolve([]);
+    return Promise.resolve(this.results);
+  }
+
+  clearCalls(): void {
+    this.calls = [];
   }
 }

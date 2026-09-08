@@ -7,6 +7,11 @@ import fs from "fs";
 import path from "path";
 import type { OperationDispatcher } from "../../src/main/index.js";
 import type { ElectronFileSystem, NodeGitService } from "../../src/main/index.js";
+import {
+  findMatchesInText,
+  type ContentMatchOptions,
+  type FileContentMatch,
+} from "../../src/main/services/content-search.js";
 
 export function registerFileHandlers(
   fileSystem: ElectronFileSystem,
@@ -115,6 +120,85 @@ export function registerFileHandlers(
 
     return results;
   });
+
+  /**
+   * Full-text CONTENT search: read each text file under `rootPaths` and return
+   * every match instance grouped by file. Unlike `file:search` (which only
+   * matches file names), this reads file contents. Skips binary/large files.
+   */
+  ipcMain.handle(
+    "file:searchContents",
+    async (_event, query: string, rootPaths: string[], options?: ContentMatchOptions) => {
+      if (!query || typeof query !== "string" || query.length === 0) return [];
+      const MAX_FILE_BYTES = 1024 * 1024; // skip files over 1 MB
+      const MAX_FILES = 200;
+      const results: Array<{
+        path: string;
+        name: string;
+        dir: string;
+        matches: FileContentMatch[];
+      }> = [];
+      const seen = new Set<string>();
+
+      function looksBinary(content: string): boolean {
+        const sample = content.slice(0, 8000);
+        for (let i = 0; i < sample.length; i++) {
+          if (sample.charCodeAt(i) === 0) return true;
+        }
+        return false;
+      }
+
+      function walk(dir: string, depth: number): void {
+        if (depth > 6 || results.length >= MAX_FILES) return;
+        let entries: fs.Dirent[];
+        try {
+          entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+          return;
+        }
+        for (const entry of entries) {
+          if (results.length >= MAX_FILES) return;
+          if (entry.name.startsWith(".") && depth < 2) continue;
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            walk(fullPath, depth + 1);
+          } else if (entry.isFile()) {
+            if (seen.has(fullPath)) continue;
+            seen.add(fullPath);
+            let content: string;
+            try {
+              const stat = fs.statSync(fullPath);
+              if (stat.size === 0 || stat.size > MAX_FILE_BYTES) continue;
+              content = fs.readFileSync(fullPath, "utf8");
+            } catch {
+              continue;
+            }
+            if (looksBinary(content)) continue;
+            const matches = findMatchesInText(content, query, options);
+            if (matches.length > 0) {
+              results.push({
+                path: fullPath,
+                name: entry.name,
+                dir: path.dirname(fullPath),
+                matches,
+              });
+            }
+          }
+        }
+      }
+
+      for (const root of rootPaths) {
+        try {
+          walk(path.resolve(root), 0);
+        } catch {
+          // skip invalid roots
+        }
+        if (results.length >= MAX_FILES) break;
+      }
+
+      return results;
+    },
+  );
 
   /**
    * Search for recent/preferred files within the given root paths.

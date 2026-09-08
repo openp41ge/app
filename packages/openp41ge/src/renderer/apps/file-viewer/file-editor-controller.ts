@@ -178,11 +178,18 @@ export class FileEditorController extends BaseController implements FileViewerCo
   private _applyConfiguredHighlight(): void {
     const search = (this.state.search ?? undefined) as
       { query?: string; regex?: boolean; caseSensitive?: boolean } | undefined;
-    if (!search?.query || !this._editor) return;
-    this._editor.setSearchHighlight(search.query, {
-      regex: search.regex,
-      caseSensitive: search.caseSensitive,
-    });
+    if (search?.query && this._editor) {
+      this._editor.setSearchHighlight(search.query, {
+        regex: search.regex,
+        caseSensitive: search.caseSensitive,
+      });
+    }
+    // Reveal a specific content-search match instance (Explorer).
+    const line = this.state.line;
+    if (typeof line === "number" && this._editor) {
+      const column = this.state.column;
+      this._editor.revealLine(line, typeof column === "number" ? column : undefined);
+    }
   }
 
   unmount(): void {
@@ -254,6 +261,22 @@ export class FileEditorController extends BaseController implements FileViewerCo
     }
 
     return Promise.resolve();
+  }
+
+  /**
+   * Reveal a 1-based line/column on this file. Called when an Explorer
+   * content-search match row is clicked for a file that's already open: it
+   * moves the cursor there. If the editor isn't mounted yet, the position is
+   * recorded on state and applied by _applyConfiguredHighlight on mount.
+   */
+  revealLine(line: number, column?: number): void {
+    this.state.line = line;
+    if (column !== undefined) {
+      this.state.column = column;
+    }
+    if (this._editor) {
+      this._editor.revealLine(line, column);
+    }
   }
 
   /**
