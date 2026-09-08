@@ -1351,8 +1351,10 @@ export class Openp41geAgentSettings extends LitElement {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          margin-top: 10px;
-          padding-top: 10px;
+          /* Bleed the separator to the card's left/right edges (the card has
+           * 14px horizontal padding), then re-pad the row content. */
+          margin: 10px -14px 0;
+          padding: 10px 14px;
           border-top: 1px solid var(--divider, #2f3031);
         }
         .ags-action-label {
@@ -1614,6 +1616,7 @@ export class Openp41geAgentSettings extends LitElement {
           + "This action can't be undone.";
     return html`
       <div class="ags-card ags-action-card" style="max-width:620px;">
+        <p class="ags-card-help">${explanation}</p>
         ${this._actionRow(
           description,
           html`<button
@@ -1628,7 +1631,6 @@ export class Openp41geAgentSettings extends LitElement {
             ${this._deleteSvg()}
           </button>`,
         )}
-        <p class="ags-card-help">${explanation}</p>
       </div>
     `;
   }
