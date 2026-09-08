@@ -19,6 +19,8 @@ export interface ChatProviderConfig {
   maxTokens?: number;
   /** Friendly display name — settings UI only, ignored by the runtime. */
   name?: string;
+  /** Available models — settings UI only, ignored by the runtime. */
+  models?: { id: string }[];
 }
 
 /** Streamed delta from a provider. */

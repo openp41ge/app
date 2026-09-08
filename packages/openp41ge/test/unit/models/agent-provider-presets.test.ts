@@ -13,6 +13,9 @@ import {
   presetFor,
   providerDisplayName,
   endpointHost,
+  modelsFromIds,
+  providerCompatible,
+  nextModelId,
 } from "../../../src/renderer/models/agent-provider-presets";
 
 describe("agent-provider-presets", () => {
@@ -91,5 +94,30 @@ describe("agent-provider-presets", () => {
     expect(endpointHost("https://api.openai.com/v1")).toBe("api.openai.com");
     expect(endpointHost("http://localhost:8000/v1")).toBe("localhost:8000");
     expect(endpointHost("")).toBe("");
+  });
+
+  it("modelsFromIds strips blanks and builds ModelConfig objects", () => {
+    expect(modelsFromIds(["gpt-4o", "", "gpt-4o-mini", "   "])).toEqual([
+      { id: "gpt-4o" },
+      { id: "gpt-4o-mini" },
+    ]);
+    expect(modelsFromIds([])).toEqual([]);
+  });
+
+  it("providerCompatible derives the wire protocol from the endpoint", () => {
+    expect(providerCompatible({ baseUrl: "https://api.openai.com/v1", model: "" })).toBe("openai");
+    expect(providerCompatible({ baseUrl: "https://api.anthropic.com/v1", model: "" })).toBe(
+      "anthropic",
+    );
+    // Unknown endpoint → OpenAI-compatible by default.
+    expect(providerCompatible({ baseUrl: "http://localhost:8000/v1", model: "" })).toBe("openai");
+  });
+
+  it("nextModelId de-dupes against existing model ids", () => {
+    expect(nextModelId([], "gpt-4o")).toBe("gpt-4o");
+    expect(nextModelId([{ id: "gpt-4o" }], "gpt-4o")).toBe("gpt-4o-2");
+    expect(nextModelId([{ id: "gpt-4o" }, { id: "gpt-4o-2" }], "gpt-4o")).toBe("gpt-4o-3");
+    expect(nextModelId([], "GPT-4o")).toBe("gpt-4o");
+    expect(nextModelId([], "")).toBe("model");
   });
 });

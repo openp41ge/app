@@ -8,6 +8,11 @@
  * display label that the chat runtime ignores.
  */
 
+/** A single model available from a provider (settings UI only for now). */
+export interface ModelConfig {
+  id: string;
+}
+
 /** A single provider connection config (settings UI only; runtime ignores `name`). */
 export interface ProviderConfig {
   baseUrl: string;
@@ -17,6 +22,8 @@ export interface ProviderConfig {
   maxTokens?: number;
   /** Friendly display name; settings-only, ignored by the chat runtime. */
   name?: string;
+  /** All models available from this provider; `model` is the default. */
+  models?: ModelConfig[];
 }
 
 /** The persisted Agent config: the active provider id + the provider table. */
@@ -41,6 +48,25 @@ export interface ProviderPreset {
 
 /** The preset id that means "no preset — type everything by hand". */
 export const CUSTOM_PRESET_ID = "custom";
+
+/** Map a provider preset's `compatible` family onto the wire protocol it speaks. */
+export function providerCompatible(config: ProviderConfig): "openai" | "anthropic" {
+  return presetFor(config).compatible;
+}
+
+/** A unique model key for `provider.models`, derived from a base id. */
+export function nextModelId(existing: ModelConfig[], base: string): string {
+  const normalized = base.trim().toLowerCase() || "model";
+  if (!existing.some((m) => m.id.toLowerCase() === normalized)) return normalized;
+  let n = 2;
+  while (existing.some((m) => m.id.toLowerCase() === `${normalized}-${n}`)) n++;
+  return `${normalized}-${n}`;
+}
+
+/** Build `ModelConfig[]` from a list of model id strings. */
+export function modelsFromIds(ids: string[]): ModelConfig[] {
+  return ids.filter((id) => id.trim()).map((id) => ({ id }));
+}
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
   {

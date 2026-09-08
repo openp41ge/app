@@ -143,5 +143,31 @@ export function registerChatHandlers(
     return config.get("agent");
   });
 
+  // ── Model listing (auto-detect models from the provider's /models endpoint) ─
+  ipcMain.handle(
+    "chat:listModels",
+    async (_e, opts: { baseUrl: string; apiKey?: string; compatible: "openai" | "anthropic" }) => {
+      const url = `${opts.baseUrl.replace(/\/+$/, "")}/models`;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (opts.apiKey) {
+        if (opts.compatible === "anthropic") headers["x-api-key"] = opts.apiKey;
+        else headers["Authorization"] = `Bearer ${opts.apiKey}`;
+      }
+      let res: Response;
+      try {
+        res = await fetch(url, { headers });
+      } catch (err) {
+        return { ok: false, error: (err as Error).message };
+      }
+      if (!res.ok) {
+        return { ok: false, error: `Model list request failed (${res.status})` };
+      }
+      const body = (await res.json()) as { data?: Array<{ id: string }> };
+      const ids = (body.data ?? []).map((m) => m.id).filter((id) => typeof id === "string");
+      log.info(`listed ${ids.length} models from ${url}`);
+      return { ok: true, models: ids };
+    },
+  );
+
   log.info("chat handlers registered");
 }

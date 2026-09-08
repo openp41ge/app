@@ -569,6 +569,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     highlight: (id) => ipcRenderer.invoke("chat:highlight", id),
     getOpenChats: () => ipcRenderer.invoke("chat:getOpenChats"),
     pingProvider: (providerId) => ipcRenderer.invoke("chat:pingProvider", providerId),
+    listModels: (opts) => ipcRenderer.invoke("chat:listModels", opts),
     getAgentConfig: () => ipcRenderer.invoke("chat:getAgentConfig"),
 
     /** Subscribe to chat list/state changes. Returns an unsubscribe function. */

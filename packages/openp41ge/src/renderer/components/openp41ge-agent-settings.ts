@@ -30,7 +30,10 @@ import {
   nextProviderId,
   providerDisplayName,
   endpointHost,
+  providerCompatible,
+  modelsFromIds,
   type AgentConfig,
+  type ModelConfig,
   type ProviderConfig,
   type ProviderPreset,
 } from "../models/agent-provider-presets";
@@ -43,7 +46,11 @@ type ProviderDraft = Omit<ProviderConfig, "temperature" | "maxTokens"> & {
   maxTokens?: number | string;
 };
 
-interface DrawerState {
+/** A draft model config in the second-layer model drawer. */
+type ModelDraft = { id: string };
+
+/** A provider drawer: edits one provider connection. */
+interface ProviderDrawerState {
   id: string;
   kind: "provider";
   /** The provider key being edited; null = adding a new provider. */
@@ -51,12 +58,28 @@ interface DrawerState {
   title: string;
   presetId: string;
   draft: ProviderDraft;
+  /** Whether the preset selection card's list is open. */
+  presetOpen?: boolean;
+  /** Whether the default-model selection card's list is open. */
+  defaultModelOpen?: boolean;
 }
 
-/** A drawer that is animating out; keeps its last width so it exits in place. */
-interface ClosingDrawer extends DrawerState {
-  width: number;
+/** A model drawer: edits one model of a provider (second layer). */
+interface ModelDrawerState {
+  id: string;
+  kind: "model";
+  /** The provider drawer (in the stack) whose models are being edited. */
+  providerDrawerId: string;
+  /** Index into the provider's `models`; null = adding a new model. */
+  modelIndex: number | null;
+  title: string;
+  draft: ModelDraft;
 }
+
+type DrawerState = ProviderDrawerState | ModelDrawerState;
+
+/** A drawer that is animating out; keeps its last width so it exits in place. */
+type ClosingDrawer = DrawerState & { width: number };
 
 interface TestResult {
   ok: boolean;
@@ -77,6 +100,8 @@ export class Openp41geAgentSettings extends LitElement {
   @state() private _saving = false;
   @state() private _testing = false;
   @state() private _testResult: TestResult | null = null;
+  @state() private _detectedMessage: string | null = null;
+  @state() private _detectedError: string | null = null;
   @state() private _defaultOpen = false;
   @state() private _listScrollTop = 0;
 
@@ -236,11 +261,11 @@ export class Openp41geAgentSettings extends LitElement {
     await this._setActive(id);
   }
 
-  private _defaultListRow(id: string, p: ProviderConfig): TemplateResult {
+  private _defaultListRow(id: string, p: ProviderConfig, isLast = false): TemplateResult {
     const isActive = this._config?.providerId === id;
     return html`
       <div
-        class="ags-default-row ${isActive ? "is-active" : ""}"
+        class="ags-default-row ${isActive ? "is-active" : ""} ${isLast ? "is-last" : ""}"
         role="option"
         aria-selected=${isActive ? "true" : "false"}
         @click=${() => this._selectDefault(id)}
@@ -328,6 +353,8 @@ export class Openp41geAgentSettings extends LitElement {
         title: providerDisplayName(preset, draft),
         presetId: preset.id,
         draft: { ...draft },
+        presetOpen: false,
+        defaultModelOpen: false,
       },
     ];
     void this.updateComplete.then(() => this._focusBaseUrl());
@@ -345,6 +372,8 @@ export class Openp41geAgentSettings extends LitElement {
         title: "New provider",
         presetId: CUSTOM_PRESET_ID,
         draft,
+        presetOpen: false,
+        defaultModelOpen: false,
       },
     ];
     void this.updateComplete.then(() => this._focusBaseUrl());
@@ -355,22 +384,25 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _updateDrawer(id: string, patch: Partial<DrawerState>): void {
-    this._drawers = this._drawers.map((d) => (d.id === id ? { ...d, ...patch } : d));
+    this._drawers = this._drawers.map((d) =>
+      d.id === id ? ({ ...d, ...patch } as DrawerState) : d,
+    );
   }
 
-  private _selectPreset(d: DrawerState, presetId: string): void {
+  private _selectPreset(d: ProviderDrawerState, presetId: string): void {
     const preset = providerPreset(presetId) ?? customPreset();
     const draft = applyPreset(preset);
     this._updateDrawer(d.id, {
       presetId,
       draft,
       title: draft.name || d.title,
+      presetOpen: false,
     });
   }
 
-  private _setDraftField(d: DrawerState, patch: Partial<ProviderDraft>): void {
+  private _setDraftField(d: ProviderDrawerState, patch: Partial<ProviderDraft>): void {
     const cur = this._drawers.find((x) => x.id === d.id);
-    if (!cur) return;
+    if (!cur || cur.kind !== "provider") return;
     const draft = { ...cur.draft, ...patch };
     const title = patch.name !== undefined && patch.name.trim() ? patch.name.trim() : cur.title;
     this._updateDrawer(d.id, { draft, title });
@@ -410,6 +442,9 @@ export class Openp41geAgentSettings extends LitElement {
     if (temperature !== undefined) config.temperature = temperature;
     const maxTokens = this._numberValue(String(draft.maxTokens ?? ""));
     if (maxTokens !== undefined) config.maxTokens = maxTokens;
+    if (draft.models !== undefined) {
+      config.models = draft.models.map((m) => ({ id: m.id }));
+    }
     return config;
   }
 
@@ -482,7 +517,7 @@ export class Openp41geAgentSettings extends LitElement {
     await this._persist(next);
   }
 
-  private async _saveProvider(d: DrawerState): Promise<void> {
+  private async _saveProvider(d: ProviderDrawerState): Promise<void> {
     const config = this._config;
     if (!config) return;
     this._saving = true;
@@ -502,7 +537,7 @@ export class Openp41geAgentSettings extends LitElement {
     this._closeDrawer(d.id);
   }
 
-  private async _deleteProvider(d: DrawerState): Promise<void> {
+  private async _deleteProvider(d: ProviderDrawerState): Promise<void> {
     const config = this._config;
     if (!config) return;
     const id = d.editId;
@@ -525,9 +560,92 @@ export class Openp41geAgentSettings extends LitElement {
     this._closeDrawer(d.id);
   }
 
-  private async _testConnection(): Promise<void> {
-    const d = this._drawers[this._drawers.length - 1];
-    if (!d) return;
+  private async _saveModel(d: ModelDrawerState): Promise<void> {
+    const providerDrawer = this._drawers.find((x) => x.id === d.providerDrawerId);
+    if (!providerDrawer || providerDrawer.kind !== "provider") return;
+    const id = d.draft.id.trim();
+    if (!id) return;
+    const models = (providerDrawer.draft.models ?? []).map((m) => ({ id: m.id }));
+    const oldId = d.modelIndex === null ? null : (models[d.modelIndex]?.id ?? null);
+    if (d.modelIndex === null) {
+      models.push({ id });
+    } else {
+      models[d.modelIndex] = { id };
+    }
+    let draft = { ...providerDrawer.draft, models };
+    // When editing, keep the default in sync if it pointed at the renamed model.
+    if (d.modelIndex !== null && draft.model === oldId) {
+      draft = { ...draft, model: id };
+    }
+    this._updateDrawer(providerDrawer.id, { draft });
+    this._closeDrawer(d.id);
+  }
+
+  private async _deleteModel(d: ModelDrawerState): Promise<void> {
+    const providerDrawer = this._drawers.find((x) => x.id === d.providerDrawerId);
+    if (!providerDrawer || providerDrawer.kind !== "provider") return;
+    if (d.modelIndex === null) return;
+    const confirmed = await this._confirm({
+      message: "Delete this model?",
+      detail: "This removes the model from the provider.",
+      confirmLabel: "Delete",
+      confirmStyle: "danger",
+    });
+    if (!confirmed) return;
+    const cur = providerDrawer.draft.models ?? [];
+    const models = cur.filter((_, i) => i !== d.modelIndex);
+    let draft = { ...providerDrawer.draft, models };
+    // If the deleted model was the default, fall back to another model.
+    if (draft.model === cur[d.modelIndex]?.id) {
+      draft = { ...draft, model: models[0]?.id ?? "" };
+    }
+    this._updateDrawer(providerDrawer.id, { draft });
+    this._closeDrawer(d.id);
+  }
+
+  private async _detectModels(d: ProviderDrawerState): Promise<void> {
+    const baseUrl = d.draft.baseUrl.trim();
+    if (!baseUrl) return;
+    this._testing = true;
+    this._detectedError = null;
+    this._detectedMessage = null;
+    try {
+      const compatible = this._providerCompatible(d);
+      const res = (await window.openp41ge?.chat?.listModels?.({
+        baseUrl,
+        apiKey: d.draft.apiKey,
+        compatible,
+      })) ?? { ok: false, error: "Model detection unavailable" };
+      if (!res.ok) {
+        this._detectedError = res.error ?? "Model detection failed.";
+        return;
+      }
+      const ids = res.models ?? [];
+      if (ids.length === 0) {
+        this._detectedError = "No models were returned by the endpoint.";
+        return;
+      }
+      const models = modelsFromIds(ids);
+      const draft = { ...d.draft, models };
+      const model = models.some((m) => m.id === draft.model) ? draft.model : models[0].id;
+      this._updateDrawer(d.id, { draft: { ...draft, model }, defaultModelOpen: false });
+      this._detectedMessage = `Detected ${ids.length} models.`;
+    } catch (err) {
+      this._detectedError = (err as Error).message;
+    }
+    this._testing = false;
+  }
+
+  private _providerCompatible(d: ProviderDrawerState): "openai" | "anthropic" {
+    return providerCompatible({ baseUrl: d.draft.baseUrl, model: d.draft.model });
+  }
+
+  private _focusModelId(): void {
+    const el = this.renderRoot?.querySelector<HTMLInputElement>(".ags-model-id-input");
+    el?.focus();
+  }
+
+  private async _testConnection(d: ProviderDrawerState): Promise<void> {
     const providerId = d.editId ?? this._config?.providerId;
     if (!providerId) return;
     this._testing = true;
@@ -638,6 +756,28 @@ export class Openp41geAgentSettings extends LitElement {
           flex-direction: column;
           gap: 2px;
         }
+        .ags-default-badge {
+          align-self: flex-start;
+          font-size: 10px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--accent, #569cd6);
+          background: rgba(86, 156, 214, 0.14);
+          border-radius: 4px;
+          padding: 1px 6px;
+        }
+        .ags-detect-note {
+          margin: 8px 0 0;
+          font-size: 12px;
+          color: var(--accent, #569cd6);
+        }
+        .ags-detect-note--err {
+          color: #f44336;
+        }
+        .ags-detect-row {
+          margin-top: 10px;
+        }
         .ags-provider-name {
           font-size: 13px;
           font-weight: 600;
@@ -659,6 +799,7 @@ export class Openp41geAgentSettings extends LitElement {
         .ags-add-row {
           color: var(--accent, #569cd6);
           font-weight: 500;
+          border-bottom: none;
         }
         .ags-add-plus {
           font-size: 15px;
@@ -667,14 +808,13 @@ export class Openp41geAgentSettings extends LitElement {
           padding: 10px;
           color: var(--text-secondary, #999);
         }
-        .ags-default-head {
-          display: flex;
-          justify-content: flex-end;
-          align-items: center;
-          min-height: 22px;
-          margin-bottom: 2px;
+        .ags-default-card {
+          position: relative;
         }
         .ags-default-close {
+          position: absolute;
+          top: 8px;
+          right: 8px;
           flex-shrink: 0;
           width: 24px;
           height: 24px;
@@ -709,7 +849,7 @@ export class Openp41geAgentSettings extends LitElement {
           color: var(--text-primary, #ddd);
           background: transparent;
           border: none;
-          border-bottom: 1px solid var(--divider, #2f3031);
+          border-radius: 6px;
           cursor: pointer;
           font-family: inherit;
           text-align: left;
@@ -723,7 +863,7 @@ export class Openp41geAgentSettings extends LitElement {
         }
         .ags-default-chevron {
           flex-shrink: 0;
-          color: var(--text-secondary, #999);
+          color: var(--accent, #569cd6);
         }
         .ags-default-list {
           position: relative;
@@ -742,6 +882,7 @@ export class Openp41geAgentSettings extends LitElement {
           padding: 0 10px;
           cursor: pointer;
           border-bottom: 1px solid var(--divider, #2f3031);
+          border-radius: 6px;
           color: var(--text-primary, #ddd);
         }
         .ags-default-row:hover {
@@ -749,6 +890,9 @@ export class Openp41geAgentSettings extends LitElement {
         }
         .ags-default-row.is-active {
           color: var(--accent, #569cd6);
+        }
+        .ags-default-row.is-last {
+          border-bottom: none;
         }
         .ags-default-row-info {
           flex: 1;
@@ -1040,7 +1184,7 @@ export class Openp41geAgentSettings extends LitElement {
               <p class="ags-section-title">Providers</p>
               <div class="ags-card">
                 <label class="ags-card-question">
-                  Which providers should be available for chats?
+                  Which providers should be available for agents?
                 </label>
                 ${
                   this._loading
@@ -1066,7 +1210,7 @@ export class Openp41geAgentSettings extends LitElement {
                 }
               </div>
 
-              <div class="ags-card ags-input-card ags-card-gap">
+              <div class="ags-card ags-input-card ags-card-gap ags-default-card">
                 ${
                   this._loading || entries.length === 0
                     ? html`<p class="ags-card-help">Add a provider above to set a default.</p>`
@@ -1074,16 +1218,17 @@ export class Openp41geAgentSettings extends LitElement {
                         ${
                           this._defaultOpen
                             ? html`
-                                <div class="ags-default-head">
-                                  <button
-                                    class="ags-default-close"
-                                    type="button"
-                                    aria-label="Close selection"
-                                    @click=${() => this._closeDefaultList()}
-                                  >
-                                    ${this._closeSvg()}
-                                  </button>
-                                </div>
+                                <label class="ags-card-question"
+                                  >Which provider is the default?</label
+                                >
+                                <button
+                                  class="ags-default-close"
+                                  type="button"
+                                  aria-label="Close selection"
+                                  @click=${() => this._closeDefaultList()}
+                                >
+                                  ${this._closeSvg()}
+                                </button>
                                 <div
                                   class="ags-default-list"
                                   ${ref(this._listEl)}
@@ -1097,7 +1242,13 @@ export class Openp41geAgentSettings extends LitElement {
                                   ></div>
                                   ${entries
                                     .slice(this._defaultWindow().start, this._defaultWindow().end)
-                                    .map(([id, p]) => this._defaultListRow(id, p))}
+                                    .map(([id, p], i) =>
+                                      this._defaultListRow(
+                                        id,
+                                        p,
+                                        this._defaultWindow().start + i === entries.length - 1,
+                                      ),
+                                    )}
                                   <div
                                     class="ags-default-spacer"
                                     style="height:${this._defaultWindow().bottomPad}px"
@@ -1105,6 +1256,9 @@ export class Openp41geAgentSettings extends LitElement {
                                 </div>
                               `
                             : html`
+                                <label class="ags-card-question"
+                                  >Which provider is the default?</label
+                                >
                                 <button
                                   class="ags-default-trigger"
                                   type="button"
@@ -1122,6 +1276,9 @@ export class Openp41geAgentSettings extends LitElement {
                                   </div>
                                   ${this._chevronSvg()}
                                 </button>
+                                <p class="ags-card-help">
+                                  Agents use the default provider whenever you don't pick another.
+                                </p>
                               `
                         }
                       `
@@ -1210,7 +1367,9 @@ export class Openp41geAgentSettings extends LitElement {
             </button>
           </div>
         </div>
-        <div class="drawer-body">${this._providerDetail(d)}</div>
+        <div class="drawer-body">
+          ${d.kind === "model" ? this._modelDetail(d) : this._providerDetail(d)}
+        </div>
         ${this._drawerFooter(d)}
       </div>
     `;
@@ -1222,12 +1381,52 @@ export class Openp41geAgentSettings extends LitElement {
         <div class="drawer-head">
           <div class="drawer-title">${c.title}</div>
         </div>
-        <div class="drawer-body">${this._providerDetail(c)}</div>
+        <div class="drawer-body">
+          ${c.kind === "model" ? this._modelDetail(c) : this._providerDetail(c)}
+        </div>
       </div>
     `;
   }
 
   private _drawerFooter(d: DrawerState): TemplateResult {
+    if (d.kind === "model") {
+      return html`
+        <div class="drawer-footer">
+          ${
+            d.modelIndex !== null
+              ? html`<button
+                  class="dw-delete-label"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    void this._deleteModel(d);
+                  }}
+                  title="Delete model"
+                >
+                  Delete
+                </button>`
+              : nothing
+          }
+          <button
+            class="dw-cancel"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._closeDrawer(d.id);
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            class="dw-save"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              void this._saveModel(d);
+            }}
+          >
+            Save
+          </button>
+        </div>
+      `;
+    }
     return html`
       <div class="drawer-footer">
         ${
@@ -1267,31 +1466,66 @@ export class Openp41geAgentSettings extends LitElement {
     `;
   }
 
-  private _presetOption(d: DrawerState, p: ProviderPreset): TemplateResult {
-    const active = d.presetId === p.id;
+  private _presetCard(d: ProviderDrawerState, preset: ProviderPreset): TemplateResult {
     return html`
-      <label class="ags-preset-option ${active ? "ags-preset-option--active" : ""}">
-        <span class="ags-preset-top">
-          <input
-            type="radio"
-            name="ags-preset-${d.id}"
-            class="ags-preset-radio"
-            .checked=${active}
-            @change=${() => this._selectPreset(d, p.id)}
-          />
-          <span class="ags-preset-label">${p.label}</span>
-        </span>
-        ${p.description ? html`<span class="ags-preset-desc">${p.description}</span>` : nothing}
-      </label>
+      <div class="ags-card ags-input-card ags-card-gap ags-preset-card" style="max-width:620px;">
+        <label class="ags-card-question">Which provider preset is this?</label>
+        ${
+          d.presetOpen
+            ? html`
+                <button
+                  class="ags-default-close"
+                  type="button"
+                  aria-label="Close preset list"
+                  @click=${() => this._closePresetList(d)}
+                >
+                  ${this._closeSvg()}
+                </button>
+                <div class="ags-default-list" style="max-height:220px; overflow-y:auto;">
+                  ${PROVIDER_PRESETS.map((p, i) => this._presetRow(d, p, i === PROVIDER_PRESETS.length - 1))}
+                </div>
+              `
+            : html`
+                <button
+                  class="ags-default-trigger"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  @click=${() => this._openPresetList(d)}
+                >
+                  <div class="ags-default-row-info">
+                    <span class="ags-default-row-name">${preset.label}</span>
+                  </div>
+                  ${this._chevronSvg()}
+                </button>
+                <p class="ags-card-help">
+                  Picking a preset pre-fills the endpoint and default model.
+                </p>
+              `
+        }
+      </div>
     `;
   }
 
-  private _providerDetail(d: DrawerState): TemplateResult {
-    const draft = d.draft;
+  private _presetRow(d: ProviderDrawerState, p: ProviderPreset, isLast: boolean): TemplateResult {
+    const active = d.presetId === p.id;
     return html`
-      <div class="ags-section-title">Provider</div>
-      <div class="ags-preset-grid">${PROVIDER_PRESETS.map((p) => this._presetOption(d, p))}</div>
+      <div
+        class="ags-default-row ${active ? "is-active" : ""} ${isLast ? "is-last" : ""}"
+        role="option"
+        aria-selected=${active}
+        @click=${() => this._selectPreset(d, p.id)}
+      >
+        <div class="ags-default-row-info">
+          <span class="ags-default-row-name">${p.label}</span>
+        </div>
+        ${active ? html`<span class="ags-default-check">✓</span>` : nothing}
+      </div>
+    `;
+  }
 
+  private _nameCard(d: ProviderDrawerState, draft: ProviderDraft): TemplateResult {
+    return html`
       <div
         class="ags-card ags-input-card ags-card-gap"
         style="max-width:620px;"
@@ -1310,7 +1544,11 @@ export class Openp41geAgentSettings extends LitElement {
           A friendly name for this provider. Leave blank to derive one from the preset or endpoint.
         </p>
       </div>
+    `;
+  }
 
+  private _baseUrlCard(d: ProviderDrawerState, draft: ProviderDraft): TemplateResult {
+    return html`
       <div
         class="ags-card ags-input-card ags-card-gap"
         style="max-width:620px;"
@@ -1329,24 +1567,156 @@ export class Openp41geAgentSettings extends LitElement {
           The OpenAI-compatible endpoint. Picking a preset above fills this in for you.
         </p>
       </div>
+    `;
+  }
 
-      <div
-        class="ags-card ags-input-card ags-card-gap"
-        style="max-width:620px;"
-        @click=${this._focusCardInput}
-      >
-        <label class="ags-card-question">Which model should be used?</label>
-        <input
-          class="ags-input ags-input--mono"
-          type="text"
-          placeholder="e.g. gpt-4o"
-          .value=${draft.model}
-          @input=${(e: Event) =>
-            this._setDraftField(d, { model: (e.target as HTMLInputElement).value })}
-        />
-        <p class="ags-card-help">The model id that chat requests will use.</p>
+  private _modelsCard(
+    d: ProviderDrawerState,
+    draft: ProviderDraft,
+    models: ModelConfig[],
+  ): TemplateResult {
+    return html`
+      <div class="ags-card ags-card-gap" style="max-width:620px;">
+        <label class="ags-card-question">Which models are available?</label>
+        <ul class="ags-provider-list">
+          ${models.length === 0 ? html`<li class="ags-empty">No models yet.</li>` : nothing}
+          ${models.map((m, i) => this._modelRow(d, m, i))}
+          <li
+            class="ags-provider-row ags-add-row"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._openAddModel(d.id);
+            }}
+          >
+            <span class="ags-add-plus">＋</span>
+            <span>Add model</span>
+          </li>
+        </ul>
+        ${this._detectedMessage ? html`<p class="ags-detect-note">${this._detectedMessage}</p>` : nothing}
+        ${this._detectedError ? html`<p class="ags-detect-note ags-detect-note--err">${this._detectedError}</p>` : nothing}
+        <div class="ags-detect-row">
+          <button
+            class="dw-cancel"
+            ?disabled=${this._testing}
+            @click=${() => void this._detectModels(d)}
+          >
+            ${this._testing ? "Detecting…" : "Detect models"}
+          </button>
+        </div>
+        <p class="ags-card-help">Add models by hand or detect them from the endpoint.</p>
       </div>
+    `;
+  }
 
+  private _modelRow(d: ProviderDrawerState, m: ModelConfig, i: number): TemplateResult {
+    const isDefault = d.draft.model === m.id;
+    return html`
+      <li
+        class="ags-provider-row"
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          this._openEditModel(d.id, i);
+        }}
+      >
+        <div class="ags-provider-info">
+          <span class="ags-provider-name">${m.id}</span>
+          ${isDefault ? html`<span class="ags-default-badge">Default</span>` : nothing}
+        </div>
+        <svg
+          class="ags-chevron"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </li>
+    `;
+  }
+
+  private _defaultModelCard(
+    d: ProviderDrawerState,
+    draft: ProviderDraft,
+    models: ModelConfig[],
+  ): TemplateResult {
+    const current = models.find((m) => m.id === draft.model);
+    return html`
+      <div
+        class="ags-card ags-input-card ags-card-gap ags-default-model-card"
+        style="max-width:620px;"
+      >
+        <label class="ags-card-question">Which model should be the default?</label>
+        ${
+          d.defaultModelOpen
+            ? html`
+                <button
+                  class="ags-default-close"
+                  type="button"
+                  aria-label="Close model list"
+                  @click=${() => this._closeDefaultModelList(d)}
+                >
+                  ${this._closeSvg()}
+                </button>
+                <div class="ags-default-list" style="max-height:220px; overflow-y:auto;">
+                  ${
+                    models.length === 0
+                      ? html`<p class="ags-empty">Add a model above first.</p>`
+                      : models.map((m, i) => this._defaultModelRow(d, m, i === models.length - 1))
+                  }
+                </div>
+              `
+            : html`
+                <button
+                  class="ags-default-trigger"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  @click=${() => this._openDefaultModelList(d)}
+                >
+                  <div class="ags-default-row-info">
+                    <span class="ags-default-row-name"
+                      >${current?.id ?? (draft.model.trim() ? draft.model : "Select a model")}</span
+                    >
+                  </div>
+                  ${this._chevronSvg()}
+                </button>
+                <p class="ags-card-help">
+                  Chat requests start with this model unless another is chosen.
+                </p>
+              `
+        }
+      </div>
+    `;
+  }
+
+  private _defaultModelRow(
+    d: ProviderDrawerState,
+    m: ModelConfig,
+    isLast: boolean,
+  ): TemplateResult {
+    const active = d.draft.model === m.id;
+    return html`
+      <div
+        class="ags-default-row ${active ? "is-active" : ""} ${isLast ? "is-last" : ""}"
+        role="option"
+        aria-selected=${active}
+        @click=${() => this._setDefaultModel(d, m.id)}
+      >
+        <div class="ags-default-row-info">
+          <span class="ags-default-row-name">${m.id}</span>
+        </div>
+        ${active ? html`<span class="ags-default-check">✓</span>` : nothing}
+      </div>
+    `;
+  }
+
+  private _apiKeyCard(d: ProviderDrawerState, draft: ProviderDraft): TemplateResult {
+    return html`
       <div
         class="ags-card ags-input-card ags-card-gap"
         style="max-width:620px;"
@@ -1364,7 +1734,11 @@ export class Openp41geAgentSettings extends LitElement {
         />
         <p class="ags-card-help">Only hosted services need one; local servers usually don't.</p>
       </div>
+    `;
+  }
 
+  private _temperatureCard(d: ProviderDrawerState, draft: ProviderDraft): TemplateResult {
+    return html`
       <div
         class="ags-card ags-input-card ags-card-gap"
         style="max-width:620px;"
@@ -1384,7 +1758,11 @@ export class Openp41geAgentSettings extends LitElement {
         />
         <p class="ags-card-help">Optional. Controls randomness in responses.</p>
       </div>
+    `;
+  }
 
+  private _maxTokensCard(d: ProviderDrawerState, draft: ProviderDraft): TemplateResult {
+    return html`
       <div
         class="ags-card ags-input-card ags-card-gap"
         style="max-width:620px;"
@@ -1404,25 +1782,134 @@ export class Openp41geAgentSettings extends LitElement {
         />
         <p class="ags-card-help">Optional. Caps the response length.</p>
       </div>
+    `;
+  }
 
+  private _providerDetail(d: ProviderDrawerState): TemplateResult {
+    const draft = d.draft;
+    const preset = providerPreset(d.presetId) ?? customPreset();
+    const models = draft.models ?? [];
+    return html`
+      <div class="ags-section-title">Provider</div>
+      ${this._presetCard(d, preset)} ${this._nameCard(d, draft)} ${this._baseUrlCard(d, draft)}
+      ${this._modelsCard(d, draft, models)} ${this._defaultModelCard(d, draft, models)}
+      ${this._apiKeyCard(d, draft)} ${this._temperatureCard(d, draft)}
+      ${this._maxTokensCard(d, draft)}
       ${
         this._testResult
           ? html`<div
               class=${this._testResult.ok ? "test-ok" : "test-err"}
               style="max-width:620px;"
             >
-              ${
-                this._testResult.ok ? "✓ Connected" : `✗ ${this._testResult.error ?? "Unreachable"}`
-              }
+              ${this._testResult.ok ? "✓ Connected" : `✗ ${this._testResult.error ?? "Unreachable"}`}
             </div>`
           : nothing
       }
       <div class="ags-test-row">
-        <button class="dw-cancel" ?disabled=${this._testing} @click=${() => this._testConnection()}>
+        <button
+          class="dw-cancel"
+          ?disabled=${this._testing}
+          @click=${() => void this._testConnection(d)}
+        >
           ${this._testing ? "Testing…" : "Test Connection"}
         </button>
       </div>
     `;
+  }
+
+  private _modelDetail(d: ModelDrawerState): TemplateResult {
+    const providerDrawer = this._drawers.find((x) => x.id === d.providerDrawerId);
+    const providerName =
+      providerDrawer && providerDrawer.kind === "provider" ? providerDrawer.title : "";
+    return html`
+      <div class="ags-section-title">Model</div>
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
+        <label class="ags-card-question">What is the model id?</label>
+        <input
+          class="ags-input ags-input--mono ags-model-id-input"
+          type="text"
+          placeholder="e.g. gpt-4o"
+          .value=${d.draft.id}
+          @input=${(e: Event) =>
+            this._setModelDraft(d, { id: (e.target as HTMLInputElement).value })}
+        />
+        <p class="ags-card-help">
+          The exact model id used when requesting ${providerName ? `${providerName} ` : ""}chat
+          completions.
+        </p>
+      </div>
+    `;
+  }
+
+  private _setModelDraft(d: ModelDrawerState, patch: Partial<ModelDraft>): void {
+    const cur = this._drawers.find((x) => x.id === d.id);
+    if (!cur || cur.kind !== "model") return;
+    const draft = { ...cur.draft, ...patch };
+    const title = draft.id.trim() ? draft.id.trim() : cur.title;
+    this._updateDrawer(d.id, { draft, title });
+  }
+
+  private _openAddModel(providerDrawerId: string): void {
+    this._detectedMessage = null;
+    this._detectedError = null;
+    this._drawers = [
+      ...this._drawers,
+      {
+        id: this._nextId(),
+        kind: "model",
+        providerDrawerId,
+        modelIndex: null,
+        title: "New model",
+        draft: { id: "" },
+      },
+    ];
+    void this.updateComplete.then(() => this._focusModelId());
+  }
+
+  private _openEditModel(providerDrawerId: string, modelIndex: number): void {
+    const providerDrawer = this._drawers.find((x) => x.id === providerDrawerId);
+    if (!providerDrawer || providerDrawer.kind !== "provider") return;
+    const model = (providerDrawer.draft.models ?? [])[modelIndex];
+    if (!model) return;
+    this._detectedMessage = null;
+    this._detectedError = null;
+    this._drawers = [
+      ...this._drawers,
+      {
+        id: this._nextId(),
+        kind: "model",
+        providerDrawerId,
+        modelIndex,
+        title: model.id,
+        draft: { id: model.id },
+      },
+    ];
+    void this.updateComplete.then(() => this._focusModelId());
+  }
+
+  private _openPresetList(d: ProviderDrawerState): void {
+    this._updateDrawer(d.id, { presetOpen: true, defaultModelOpen: false });
+  }
+
+  private _closePresetList(d: ProviderDrawerState): void {
+    this._updateDrawer(d.id, { presetOpen: false });
+  }
+
+  private _openDefaultModelList(d: ProviderDrawerState): void {
+    this._updateDrawer(d.id, { defaultModelOpen: true, presetOpen: false });
+  }
+
+  private _closeDefaultModelList(d: ProviderDrawerState): void {
+    this._updateDrawer(d.id, { defaultModelOpen: false });
+  }
+
+  private _setDefaultModel(d: ProviderDrawerState, id: string): void {
+    this._setDraftField(d, { model: id });
+    this._closeDefaultModelList(d);
   }
 }
 

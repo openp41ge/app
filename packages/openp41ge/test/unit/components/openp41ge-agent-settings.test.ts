@@ -5,7 +5,7 @@
  * add/edit/delete flows, and the default-provider select.
  */
 // @ts-nocheck
-import { describe, test, expect, beforeEach, vi } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../../src/renderer/components/openp41ge-agent-settings";
 import { PROVIDER_PRESETS } from "../../../src/renderer/models/agent-provider-presets";
 
@@ -66,11 +66,15 @@ describe("openp41ge-agent-settings", () => {
     document.body.innerHTML = "";
   });
 
+  afterEach(() => {
+    delete (window as any).openp41ge;
+  });
+
   test("renders the Providers card and lists the default vLLM provider", async () => {
     const el = await mount(AGENT());
     expect(q(el, ".ags-card")).not.toBeNull();
     expect(q(el, ".ags-card-question").textContent).toContain(
-      "Which providers should be available for chats?",
+      "Which providers should be available for agents?",
     );
     const row = qa(el, ".ags-provider-row")[0];
     expect(row.querySelector(".ags-provider-name").textContent).toBe("vLLM (local)");
@@ -91,42 +95,55 @@ describe("openp41ge-agent-settings", () => {
     expect(q(el, ".ags-add-row").textContent).toContain("Add another provider");
   });
 
-  test("clicking Add another provider opens a drawer with preset radios", async () => {
+  test("clicking Add another provider opens a drawer with a preset selection card", async () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();
     await tick();
     expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(1);
     expect(q(el, ".drawer-title").textContent).toBe("New provider");
-    expect(qa(el, ".ags-preset-option")).toHaveLength(PROVIDER_PRESETS.length);
+    // The preset card is a closed selection trigger, not a radio grid.
+    expect(q(el, ".drawer .ags-default-trigger .ags-default-row-name").textContent.trim()).toBe(
+      "Custom",
+    );
+    // Opening it lists every preset as a selectable row.
+    q(el, ".drawer .ags-default-trigger").click();
+    await tick();
+    expect(qa(el, ".drawer .ags-default-row")).toHaveLength(PROVIDER_PRESETS.length);
   });
 
   test("selecting a preset pre-fills baseUrl and model", async () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();
     await tick();
-    const openai = qa(el, ".ags-preset-option").find((o) =>
-      o.querySelector(".ags-preset-label").textContent.includes("OpenAI"),
-    );
-    const radio = openai.querySelector(".ags-preset-radio");
-    radio.checked = true;
-    radio.dispatchEvent(new Event("change", { bubbles: true }));
+    q(el, ".drawer .ags-default-trigger").click();
     await tick();
-    expect(q(el, ".ags-baseurl-input").value).toBe("https://api.openai.com/v1");
-    // The model card's input follows the display-name + base-url cards.
-    const modelInputs = qa(el, ".ags-card").map((c) => c.querySelector(".ags-input"));
-    expect(modelInputs.some((i) => i && i.value === "gpt-4o")).toBe(true);
+    const openaiRow = qa(el, ".drawer .ags-default-row").find((o) =>
+      o.querySelector(".ags-default-row-name").textContent.includes("OpenAI"),
+    );
+    openaiRow.click();
+    await tick();
+    expect(q(el, ".drawer .ags-baseurl-input").value).toBe("https://api.openai.com/v1");
+    // The default-model card shows the preset's default model.
+    expect(
+      q(
+        el,
+        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
+      ).textContent.trim(),
+    ).toBe("gpt-4o");
   });
 
   test("Save adds a new provider, persists agent, and returns to the list", async () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();
     await tick();
-    const openai = qa(el, ".ags-preset-option").find((o) =>
-      o.querySelector(".ags-preset-label").textContent.includes("OpenAI"),
-    );
-    openai.querySelector(".ags-preset-radio").dispatchEvent(new Event("change", { bubbles: true }));
+    q(el, ".drawer .ags-default-trigger").click();
     await tick();
-    qa(el, ".dw-save")[0].click();
+    const openaiRow = qa(el, ".drawer .ags-default-row").find((o) =>
+      o.querySelector(".ags-default-row-name").textContent.includes("OpenAI"),
+    );
+    openaiRow.click();
+    await tick();
+    qa(el, ".drawer .dw-save").pop().click();
     await tick();
     await settleClose();
 
@@ -140,25 +157,36 @@ describe("openp41ge-agent-settings", () => {
     expect(names).toContain("OpenAI");
   });
 
-  test("editing an existing provider updates it and persists", async () => {
+  test("editing a provider's models persists the added/detected models", async () => {
     const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }));
-    // Open the OpenAI row (the second provider row, index 1).
+    // Open the OpenAI row.
     const row = qa(el, ".ags-provider-row")[1];
     row.click();
     await tick();
-    // Change the model field.
-    const modelInput = qa(el, ".ags-card")
-      .map((c) => c.querySelector(".ags-input"))
-      .find((i) => i && i.classList.contains("ags-input--mono") && i.value === "gpt-4o");
-    modelInput.value = "gpt-4o-mini";
-    modelInput.dispatchEvent(new Event("input", { bubbles: true }));
+    // Add a model via the model drawer.
+    q(el, ".drawer .ags-add-row").click();
     await tick();
-    qa(el, ".dw-save")[0].click();
+    const idInput = q(el, ".drawer .ags-model-id-input");
+    idInput.value = "gpt-4o-mini";
+    idInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    qa(el, ".drawer .dw-save").pop().click();
     await tick();
     await settleClose();
-
+    // Adding a model does NOT change the default — the preset default stays.
+    expect(
+      q(
+        el,
+        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
+      ).textContent.trim(),
+    ).toBe("gpt-4o");
+    // Save the provider.
+    qa(el, ".drawer .dw-save").pop().click();
+    await tick();
+    await settleClose();
     const lastSet = el.configService.sets[el.configService.sets.length - 1];
-    expect(lastSet.value.providers.openai.model).toBe("gpt-4o-mini");
+    expect(lastSet.value.providers.openai.model).toBe("gpt-4o");
+    expect(lastSet.value.providers.openai.models).toEqual([{ id: "gpt-4o-mini" }]);
   });
 
   test("Delete removes the provider and re-points the active id", async () => {
@@ -185,12 +213,15 @@ describe("openp41ge-agent-settings", () => {
     const trigger = q(el, ".ags-default-trigger");
     expect(trigger).not.toBeNull();
     expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("vLLM (local)");
-    // The whole card is just the selection — no intro question or footer blurb.
-    expect(q(el, ".ags-card-question")?.textContent ?? "").not.toContain(
+    // The closed state shows the intro question and the footer blurb again.
+    expect(q(el, ".ags-default-card .ags-card-question").textContent).toContain(
       "Which provider is the default",
     );
+    expect(q(el, ".ags-default-card .ags-card-help").textContent).toContain(
+      "Agents use the default provider",
+    );
 
-    // Open the list; the card becomes an in-place list of providers.
+    // Open the list; the card is replaced by the list (no question or blurb).
     trigger.click();
     await tick();
     const rows = qa(el, ".ags-default-row");
@@ -199,6 +230,13 @@ describe("openp41ge-agent-settings", () => {
       "OpenAI",
     ]);
     expect(rows[0].classList.contains("is-active")).toBe(true);
+    // The question stays in place over the list; only the blurb is dropped.
+    expect(q(el, ".ags-default-card .ags-card-question").textContent).toContain(
+      "Which provider is the default",
+    );
+    expect(q(el, ".ags-default-card .ags-card-help")).toBeNull();
+    // The last row drops its separator line.
+    expect(rows[rows.length - 1].classList.contains("is-last")).toBe(true);
 
     // Select OpenAI -> closes the list and persists the default.
     rows[1].click();
@@ -238,6 +276,121 @@ describe("openp41ge-agent-settings", () => {
     rows[rows.length - 1].click();
     await tick();
     expect(qa(el, ".ags-default-list")).toHaveLength(0);
+  });
+
+  test("detect models populates the models list and sets the default", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    // Set a base URL so detection has an endpoint.
+    const baseInput = q(el, ".drawer .ags-baseurl-input");
+    baseInput.value = "https://api.openai.com/v1";
+    baseInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    (window as any).openp41ge = {
+      chat: {
+        listModels: vi.fn(async () => ({ ok: true, models: ["gpt-4o", "gpt-4o-mini"] })),
+      },
+    };
+    await el._detectModels(el._drawers[0]);
+    await tick();
+    const names = qa(el, ".drawer .ags-provider-row").map(
+      (r) => r.querySelector(".ags-provider-name")?.textContent,
+    );
+    expect(names).toEqual(["gpt-4o", "gpt-4o-mini", undefined]);
+    expect(q(el, ".drawer .ags-detect-note").textContent).toContain("Detected 2 models");
+    // The default model card shows the first detected model.
+    expect(
+      q(
+        el,
+        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
+      ).textContent.trim(),
+    ).toBe("gpt-4o");
+  });
+
+  test("choosing a model from the default list sets it as the default", async () => {
+    const providers = {
+      vllm: {
+        baseUrl: "http://localhost:8000/v1",
+        model: "m1",
+        models: [{ id: "m1" }, { id: "m2" }],
+      },
+    };
+    const el = await mount(AGENT(providers, "vllm"));
+    qa(el, ".ags-provider-row")[0].click();
+    await tick();
+    q(el, ".drawer .ags-default-model-card .ags-default-trigger").click();
+    await tick();
+    const rows = qa(el, ".drawer .ags-default-model-card .ags-default-row");
+    expect(rows.map((r) => r.querySelector(".ags-default-row-name").textContent.trim())).toEqual([
+      "m1",
+      "m2",
+    ]);
+    rows[1].click();
+    await tick();
+    expect(
+      q(
+        el,
+        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
+      ).textContent.trim(),
+    ).toBe("m2");
+    qa(el, ".drawer .dw-save").pop().click();
+    await tick();
+    await settleClose();
+    const lastSet = el.configService.sets[el.configService.sets.length - 1];
+    expect(lastSet.value.providers.vllm.model).toBe("m2");
+    expect(lastSet.value.providers.vllm.models).toEqual([{ id: "m1" }, { id: "m2" }]);
+  });
+
+  test("deleting a model removes it and falls back the default", async () => {
+    const providers = {
+      vllm: {
+        baseUrl: "http://localhost:8000/v1",
+        model: "m1",
+        models: [{ id: "m1" }, { id: "m2" }],
+      },
+    };
+    const el = await mount(AGENT(providers, "vllm"));
+    qa(el, ".ags-provider-row")[0].click();
+    await tick();
+    // Open the second model's drawer (m2).
+    qa(el, ".drawer .ags-provider-row")[1].click();
+    await tick();
+    el._confirm = async () => true;
+    qa(el, ".drawer .dw-delete-label").pop().click();
+    await tick();
+    await settleClose();
+    const names = qa(el, ".drawer .ags-provider-row").map(
+      (r) => r.querySelector(".ags-provider-name")?.textContent,
+    );
+    expect(names).toEqual(["m1", undefined]);
+    expect(
+      q(
+        el,
+        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
+      ).textContent.trim(),
+    ).toBe("m1");
+  });
+
+  test("detect models shows an inline error on a failed request", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    const baseInput = q(el, ".drawer .ags-baseurl-input");
+    baseInput.value = "https://api.openai.com/v1";
+    baseInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    (window as any).openp41ge = {
+      chat: {
+        listModels: vi.fn(async () => ({ ok: false, error: "Model list request failed (401)" })),
+      },
+    };
+    await el._detectModels(el._drawers[0]);
+    await tick();
+    expect(q(el, ".drawer .ags-detect-note--err").textContent).toContain(
+      "Model list request failed (401)",
+    );
+    expect(qa(el, ".drawer .ags-provider-row").length).toBe(1); // only the add row
   });
 
   test("numeric fields are text inputs that strip non-numeric characters", async () => {

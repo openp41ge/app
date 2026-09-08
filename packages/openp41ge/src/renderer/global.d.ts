@@ -289,6 +289,11 @@ declare global {
         highlight: (id: string) => Promise<void>;
         getOpenChats: () => Promise<Record<string, string>>;
         pingProvider: (providerId?: string) => Promise<{ ok: boolean; error?: string }>;
+        listModels: (opts: {
+          baseUrl: string;
+          apiKey?: string;
+          compatible: "openai" | "anthropic";
+        }) => Promise<{ ok: boolean; models?: string[]; error?: string }>;
         getAgentConfig: () => Promise<{
           providerId: string;
           providers: Record<string, { baseUrl: string; model: string; apiKey?: string }>;

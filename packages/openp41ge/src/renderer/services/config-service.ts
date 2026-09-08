@@ -33,6 +33,7 @@ export interface UserConfig {
         temperature?: number;
         maxTokens?: number;
         name?: string;
+        models?: { id: string }[];
       }
     >;
   };
