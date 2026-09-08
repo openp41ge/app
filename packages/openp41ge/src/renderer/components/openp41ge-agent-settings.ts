@@ -751,6 +751,12 @@ export class Openp41geAgentSettings extends LitElement {
           color: var(--text-secondary, #999);
           line-height: 1.5;
         }
+        /* When a help paragraph is the first thing in a card (e.g. an action
+         or empty-state card with no question), drop its top margin so it is
+         not doubled against the card's own padding. */
+        .ags-card > .ags-card-help:first-child {
+          margin-top: 0;
+        }
         .ags-card-gap {
           margin-top: 16px;
         }
