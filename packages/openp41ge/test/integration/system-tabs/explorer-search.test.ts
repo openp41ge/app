@@ -93,21 +93,86 @@ describe("ExplorerSystemTab search", () => {
     expect(model.calls[0].options).toEqual({ regex: false, caseSensitive: false });
   });
 
-  it("renders file rows with per-match sublist rows and dispatches open at the instance", async () => {
+  it("integrates content matches as match sub-rows under file rows and dispatches open at the instance", async () => {
+    // The repo-tree-item lazily loads worktree files via window.openp41ge.file,
+    // so stub a small listing that includes both matched files.
+    const ORIG = window.openp41ge;
+    const ORIG_SCROLL = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = () => {};
+    (window as unknown as { openp41ge: unknown }).openp41ge = {
+      ...(ORIG as Record<string, unknown>),
+      file: {
+        readdir: async (dir: string) => {
+          if (dir === "/repo/main") {
+            return [
+              { path: "/repo/main/src", name: "src", isDirectory: true },
+              { path: "/repo/main/README.md", name: "README.md", isDirectory: false },
+            ];
+          }
+          if (dir === "/repo/main/src") {
+            return [{ path: "/repo/main/src/app.ts", name: "app.ts", isDirectory: false }];
+          }
+          return [];
+        },
+      },
+      workspaceController: {
+        getBranches: async () => [],
+        getUntrackedFiles: async () => [],
+      },
+    };
+
     model.results = RESULTS;
     const input = tree.querySelector("input") as HTMLInputElement;
     input.value = "alpha";
     input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     await new Promise((r) => setTimeout(r, 300));
     await tree.updateComplete;
+    // Let the repo-tree-item load the worktree + reveal the src dir.
+    await new Promise((r) => setTimeout(r, 80));
+    await tree.updateComplete;
+    await new Promise((r) => setTimeout(r, 80));
+    await tree.updateComplete;
 
-    // File rows (2) for the files that matched.
-    const fileRows = tree.querySelectorAll(".explorer-result-file");
-    expect(fileRows.length).toBe(2);
+    // The content-match map is forwarded to the repo-tree-item.
+    const item = tree.querySelector("openp41ge-repo-tree-item") as unknown as {
+      contentMatches: Map<string, { matches: unknown[] }>;
+      filter: string;
+      _expanded: boolean;
+      requestUpdate(): void;
+      updateComplete: Promise<unknown>;
+    };
+    expect(item).not.toBeNull();
+    expect(item.contentMatches.size).toBe(2);
+    expect(item.filter).toBe("alpha");
 
-    // Match sublist rows: 2 for app.ts + 1 for README.md.
-    const matchRows = tree.querySelectorAll(".explorer-result-match");
-    expect(matchRows.length).toBe(3);
+    // Expand the repo + worktree so the uikit file tree (with match sub-rows) renders.
+    item._expanded = true;
+    item.requestUpdate();
+    await item.updateComplete;
+    await new Promise((r) => setTimeout(r, 80));
+    await item.updateComplete;
+
+    // The file tree exposes its TreeNode[]; assert the matched files carry
+    // their match instances as child rows.
+    const treeEl = tree.querySelector("openp41ge-tree") as unknown as {
+      nodes: Array<{
+        label: string;
+        children?: Array<{
+          label: string;
+          meta?: { line?: number; column?: number; match?: boolean; filePath?: string };
+        }>;
+      }>;
+      dispatchEvent(e: Event): boolean;
+    };
+    expect(treeEl).not.toBeNull();
+    const readmeNode = treeEl.nodes.find((n) => n.label === "README.md");
+    expect(readmeNode?.children).toHaveLength(1);
+    expect(readmeNode?.children?.[0]?.meta?.line).toBe(1);
+
+    const srcNode = treeEl.nodes.find((n) => n.label === "src");
+    expect(srcNode).toBeDefined();
+    const appNode = srcNode?.children?.find((n) => n.label === "app.ts");
+    expect(appNode?.children).toHaveLength(2);
 
     // Clicking the second app.ts match dispatches open-file with line/column.
     const opened: Record<string, unknown> = { count: 0 };
@@ -117,13 +182,27 @@ describe("ExplorerSystemTab search", () => {
     };
     document.addEventListener("openp41ge:open-file", onOpen);
     try {
-      (matchRows[1] as HTMLElement).click();
+      const appMatch = appNode?.children?.[1]?.meta;
+      treeEl.dispatchEvent(
+        new CustomEvent("tree-node-click", {
+          bubbles: true,
+          composed: true,
+          detail: { meta: appMatch },
+        }),
+      );
       expect(opened.count).toBe(1);
       expect(opened.path).toBe("/repo/main/src/app.ts");
       expect(opened.line).toBe(9);
       expect(opened.column).toBe(3);
+      expect(opened.search).toEqual({
+        query: "alpha",
+        regex: false,
+        caseSensitive: false,
+      });
     } finally {
       document.removeEventListener("openp41ge:open-file", onOpen);
+      HTMLElement.prototype.scrollIntoView = ORIG_SCROLL;
+      (window as unknown as { openp41ge: unknown }).openp41ge = ORIG;
     }
   });
 

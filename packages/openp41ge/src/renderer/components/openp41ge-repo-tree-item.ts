@@ -58,6 +58,9 @@ export class Openp41geRepoTreeItem extends LitElement {
   @property({ type: Boolean })
   editMode = false;
 
+  @property({ attribute: false })
+  contentMatches: Map<string, FileContentSearchResult> = new Map();
+
   @state() private _expanded = false;
   @state() private _showingAddWorktree = false;
   @state() private _addWorktreeName = "";
@@ -78,11 +81,18 @@ export class Openp41geRepoTreeItem extends LitElement {
   private get _filteredWorktrees(): WorktreeData[] {
     const q = this.filter.trim();
     if (!q) return this.worktrees;
-    return this.worktrees.filter((wt) => this._matchesFilter(wt.branch));
+    return this.worktrees.filter((wt) => {
+      if (this._matchesFilter(wt.branch)) return true;
+      // A worktree with content matches is surfaced even when its branch
+      // name doesn't match, so the user can see the file rows that matched.
+      return this._worktreeHasContentMatch(wt);
+    });
   }
   @state() private _expandedWorktrees = new Set<string>();
   @state() private _expandedDirs = new Map<string, Set<string>>();
   @state() private _pullingBranches = new Set<string>();
+  /** Branches whose content-match directory chains have already been revealed. */
+  @state() private _revealedContentBranches = new Set<string>();
   /** shortName → ahead/behind counters, loaded once per repo to show sync warnings. */
   private _branchSync = new Map<string, { ahead: number; behind: number }>();
   private _syncKnown = false;
@@ -116,7 +126,8 @@ export class Openp41geRepoTreeItem extends LitElement {
     if (
       changedProperties.has("filter") ||
       changedProperties.has("filterRegex") ||
-      changedProperties.has("filterCase")
+      changedProperties.has("filterCase") ||
+      changedProperties.has("contentMatches")
     ) {
       this._syncAutoExpand();
     }
@@ -133,15 +144,84 @@ export class Openp41geRepoTreeItem extends LitElement {
     if (!q) return;
     for (const wt of this._filteredWorktrees) {
       if (!wt.exists) continue;
-      if (this._fileLoader.isWorktreeLoaded(wt.branch)) continue;
+      if (this._fileLoader.isWorktreeLoaded(wt.branch)) {
+        // Already loaded — just reveal the content-match directory chains.
+        if (wt.path) this._revealContentDirs(wt.branch, wt.path);
+        continue;
+      }
       if (this._fileLoader.isLoadingWorktree(wt.branch)) continue;
       const path = wt.path || `${this.repoName}/${wt.branch}`;
       this._expandedWorktrees.add(wt.branch);
       void this._fileLoader.expandWorktreeFiles(wt.branch, path, this.repoName, () => {
         if (this.isConnected) this.requestUpdate();
+        if (wt.path) this._revealContentDirs(wt.branch, wt.path);
       });
     }
     this.requestUpdate();
+  }
+
+  /** Whether any content match lives under this worktree's root path. */
+  private _worktreeHasContentMatch(wt: WorktreeData): boolean {
+    if (this.contentMatches.size === 0 || !wt.path) return false;
+    const prefix = wt.path.endsWith("/") ? wt.path : wt.path + "/";
+    for (const p of this.contentMatches.keys()) {
+      if (p.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
+  /** Whether any content match lives under the given directory path. */
+  private _dirContainsMatch(dirPath: string): boolean {
+    if (this.contentMatches.size === 0) return false;
+    const prefix = dirPath.endsWith("/") ? dirPath : dirPath + "/";
+    for (const p of this.contentMatches.keys()) {
+      if (p.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
+  /** Build the match sub-list nodes for a file that has content matches. */
+  private _contentMatchNodes(branch: string, filePath: string): TreeNode[] | undefined {
+    const res = this.contentMatches.get(filePath);
+    if (!res || res.matches.length === 0) return undefined;
+    return res.matches.map((m, i) => ({
+      id: `${filePath}:match:${i}`,
+      label: `${m.lineNumber}  ${m.lineText.trim()}`,
+      showChevron: false,
+      draggable: false,
+      meta: {
+        branch,
+        filePath,
+        match: true,
+        line: m.lineNumber,
+        column: m.column,
+        matchText: m.lineText.trim(),
+      },
+    }));
+  }
+
+  /** Load the ancestor directory chain for each content match under a worktree. */
+  private _revealContentDirs(branch: string, worktreePath: string): void {
+    if (this.contentMatches.size === 0 || !worktreePath) return;
+    if (this._revealedContentBranches.has(branch)) return;
+    const root = worktreePath.endsWith("/") ? worktreePath : worktreePath + "/";
+    for (const filePath of this.contentMatches.keys()) {
+      if (!filePath.startsWith(root)) continue;
+      let dir = filePath.substring(0, filePath.lastIndexOf("/"));
+      const chain: string[] = [];
+      while (dir && dir.startsWith(root) && dir.length > root.length) {
+        chain.push(dir);
+        dir = dir.substring(0, dir.lastIndexOf("/"));
+      }
+      for (const d of chain.reverse()) {
+        if (this._fileLoader.dirContents.has(d)) continue;
+        if (this._fileLoader.isLoadingDir(d)) continue;
+        void this._fileLoader.expandDir(branch, d, () => {
+          if (this.isConnected) this.requestUpdate();
+        });
+      }
+    }
+    this._revealedContentBranches.add(branch);
   }
 
   /** Load ahead/behind counters for this repo's branches to show sync warnings. */
@@ -429,14 +509,22 @@ export class Openp41geRepoTreeItem extends LitElement {
     const expandedDirs = this._expandedDirs.get(branch) ?? new Set();
     const filterActive = this._isFilterActive;
     return entries
-      .filter((entry) => !filterActive || this._matchesFilter(entry.name))
+      .filter((entry) => {
+        if (!filterActive) return true;
+        if (this._matchesFilter(entry.name)) return true;
+        // Surface a directory when a content match lives somewhere under it,
+        // and a file when it has its own content matches — even when the name
+        // doesn't match the filter.
+        if (entry.isDirectory) return this._dirContainsMatch(entry.path);
+        return this.contentMatches.has(entry.path);
+      })
       .map((entry) => {
         const isUntracked = this._fileLoader.isUntracked(branch, entry.path);
         if (entry.isDirectory) {
-          // While filtering, auto-expand directories whose name matches so
-          // their matching descendants are visible.
+          // While filtering, auto-expand directories whose name matches or
+          // that contain a content match, so matching descendants are visible.
           const isExpanded = filterActive
-            ? this._matchesFilter(entry.name)
+            ? this._matchesFilter(entry.name) || this._dirContainsMatch(entry.path)
             : expandedDirs.has(entry.path);
           const isLoading = this._fileLoader.isLoadingDir(entry.path);
           return {
@@ -453,11 +541,17 @@ export class Openp41geRepoTreeItem extends LitElement {
             meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
           };
         }
+        const matchChildren = filterActive
+          ? this._contentMatchNodes(branch, entry.path)
+          : undefined;
         return {
           id: entry.path,
           label: entry.name,
           icon: entry.name,
           draggable: true,
+          expanded: matchChildren !== undefined ? true : undefined,
+          showChevron: matchChildren !== undefined ? true : undefined,
+          children: matchChildren,
           status: isUntracked ? ("untracked" as const) : undefined,
           meta: { branch, filePath: entry.path },
         };
@@ -540,14 +634,30 @@ export class Openp41geRepoTreeItem extends LitElement {
 
   /** Handlers for uikit tree events on a given branch. */
   private _onFileClick = (e: CustomEvent): void => {
-    const meta = e.detail?.meta as { branch?: string; filePath?: string } | undefined;
+    const meta = e.detail?.meta as
+      | {
+          branch?: string;
+          filePath?: string;
+          match?: boolean;
+          line?: number;
+          column?: number;
+        }
+      | undefined;
     if (!meta?.filePath) return;
     const name = meta.filePath.split("/").pop() ?? meta.filePath;
-    document.dispatchEvent(
-      new CustomEvent("openp41ge:open-file", {
-        detail: { path: meta.filePath, name, pinned: false },
-      }),
-    );
+    const detail: Record<string, unknown> = { path: meta.filePath, name, pinned: false };
+    // A content-match row carries the line/column to jump to, plus the query
+    // so the editor highlights the search term.
+    if (meta.match) {
+      detail.line = meta.line;
+      detail.column = meta.column;
+      detail.search = {
+        query: this.filter.trim(),
+        regex: this.filterRegex,
+        caseSensitive: this.filterCase,
+      };
+    }
+    document.dispatchEvent(new CustomEvent("openp41ge:open-file", { detail }));
   };
 
   private _onFileDblClick = (e: CustomEvent): void => {

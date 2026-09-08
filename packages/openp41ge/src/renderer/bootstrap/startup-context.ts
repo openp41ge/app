@@ -134,7 +134,7 @@ export class StartupContext {
    */
   wireServices(): void {
     this.contextMenuBuilder.init(this.commandBus);
-    this.fileOpenHandler.init(this.commandBus, this.workspaceState);
+    this.fileOpenHandler.init(this.commandBus, this.workspaceState, this.tabMountManager);
     this.commitOpenHandler.init(this.commandBus, this.workspaceState);
     this.agentsOpenHandler.init(this.commandBus, this.workspaceState);
     this.logOpenHandler.init(this.commandBus, this.workspaceState);

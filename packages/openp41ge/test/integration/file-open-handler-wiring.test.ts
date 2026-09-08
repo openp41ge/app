@@ -12,6 +12,14 @@ import { FileOpenHandler } from "@openp41ge/renderer/services/file-open-handler"
 import { WorkspaceStateManager } from "@openp41ge/renderer/services/workspace-state-manager";
 import { OperationDispatcher } from "@openp41ge/main/services/operation-dispatcher";
 import type { ICommandBus } from "@openp41ge/renderer/interfaces/command-bus";
+import type { TabMountManager } from "@openp41ge/renderer/services/tab-mount-manager";
+
+/** Minimal TabMountManager that resolves controllers from a map (for tests). */
+function makeMountManager(controllers: Record<string, unknown> = {}): TabMountManager {
+  return {
+    getController: (tabId: string) => controllers[tabId],
+  } as unknown as TabMountManager;
+}
 
 // ─── Real CommandBus backed by OperationDispatcher ────────────────────────
 
@@ -38,6 +46,7 @@ describe("FileOpenHandler wiring — integration", () => {
   let commandBus: TestCommandBus;
   let dispatcher: OperationDispatcher;
   let workspaceState: WorkspaceStateManager;
+  let controllers: Record<string, unknown>;
 
   beforeEach(() => {
     // Stub window.openp41ge.workspace.getWindowId()
@@ -50,12 +59,13 @@ describe("FileOpenHandler wiring — integration", () => {
     dispatcher = new OperationDispatcher();
     commandBus = new TestCommandBus(dispatcher);
     workspaceState = new WorkspaceStateManager();
+    controllers = {};
 
     // Initialize with initial workspace from dispatcher
     workspaceState.setState(dispatcher.getWorkspace());
 
     handler = new FileOpenHandler();
-    handler.init(commandBus, workspaceState);
+    handler.init(commandBus, workspaceState, makeMountManager(controllers));
 
     // Cleanup pending file path globals
     (window as any).__pendingFilePath = null;
@@ -193,17 +203,28 @@ describe("FileOpenHandler wiring — integration", () => {
   });
 
   describe("Content-match jump (open at line)", () => {
-    it("reuses an already-open tab and activates it instead of duplicating", () => {
+    it("reuses an already-open tab, reveals the line, and activates it", () => {
       handler.openEdit("/project/jump.ts", "jump.ts");
       workspaceState.setState(dispatcher.getWorkspace()); // sync the view model
       const ws1 = dispatcher.getWorkspace();
       const tabId = ws1.windows[0].grid.placements[0].tabIds[0];
       expect(ws1.editorTabs[tabId].config?.filePath).toBe("/project/jump.ts");
 
-      // A content-match click: no pinned flag, but line/column present.
+      // A file-viewer controller is registered for the tab so the jump can
+      // reveal the line on the already-mounted editor.
+      const revealLine = vi.fn();
+      controllers[tabId] = { revealLine };
+
+      // A content-match click: no pinned flag, but line/column + search present.
       const spy = vi.spyOn(commandBus, "dispatch");
       const event = new CustomEvent("openp41ge:open-file", {
-        detail: { path: "/project/jump.ts", name: "jump.ts", line: 42, column: 7 },
+        detail: {
+          path: "/project/jump.ts",
+          name: "jump.ts",
+          line: 42,
+          column: 7,
+          search: { query: "jump", regex: false, caseSensitive: false },
+        },
       });
       handler.handleOpenFile(event);
 
@@ -212,6 +233,29 @@ describe("FileOpenHandler wiring — integration", () => {
       expect(ws2.windows[0].grid.placements).toHaveLength(1);
       expect(ws2.windows[0].grid.placements[0].tabIds).toContain(tabId);
       expect(spy).toHaveBeenCalledWith("activateTabInCell", "win-ws1-0", tabId);
+      // The controller's revealLine is invoked with line/column/search so the
+      // editor moves the cursor AND re-applies the search highlight.
+      expect(revealLine).toHaveBeenCalledWith(42, 7, {
+        query: "jump",
+        regex: false,
+        caseSensitive: false,
+      });
+    });
+
+    it("reveals with just line/column when no search is provided", () => {
+      handler.openEdit("/project/jump2.ts", "jump2.ts");
+      workspaceState.setState(dispatcher.getWorkspace());
+      const ws1 = dispatcher.getWorkspace();
+      const tabId = ws1.windows[0].grid.placements[0].tabIds[0];
+      const revealLine = vi.fn();
+      controllers[tabId] = { revealLine };
+
+      const event = new CustomEvent("openp41ge:open-file", {
+        detail: { path: "/project/jump2.ts", name: "jump2.ts", line: 5, column: 2 },
+      });
+      handler.handleOpenFile(event);
+
+      expect(revealLine).toHaveBeenCalledWith(5, 2, undefined);
     });
 
     it("opens a new tab carrying line/column when the file isn't open yet", () => {

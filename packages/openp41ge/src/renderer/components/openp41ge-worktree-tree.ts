@@ -242,6 +242,7 @@ class Openp41geWorktreeTree extends LitElement {
   @state() private _filterRegex = false;
   @state() private _filterCase = false;
   @state() private _searchResults: FileContentSearchResult[] = [];
+  @state() private _contentMatchesByPath = new Map<string, FileContentSearchResult>();
   @state() private _searching = false;
   private _searchTimer: ReturnType<typeof setTimeout> | null = null;
   private _searchToken = 0;
@@ -553,6 +554,7 @@ class Openp41geWorktreeTree extends LitElement {
     const q = this._filterQuery.trim();
     if (!q) {
       this._searchResults = [];
+      this._contentMatchesByPath = new Map();
       this._searching = false;
       return;
     }
@@ -582,6 +584,9 @@ class Openp41geWorktreeTree extends LitElement {
     const results = await this._searchModel.searchContents(query, this._rootPaths(), opts);
     if (token !== this._searchToken) return; // stale — superseded by a newer search
     this._searchResults = results;
+    const byPath = new Map<string, FileContentSearchResult>();
+    for (const r of results) byPath.set(r.path, r);
+    this._contentMatchesByPath = byPath;
     this._searching = false;
   }
 
@@ -595,8 +600,25 @@ class Openp41geWorktreeTree extends LitElement {
     return this._repos.filter((repo) => {
       if (this._matchesFilter(repo.name)) return true;
       const wts = this._worktreesByRepo.get(repo.name) ?? [];
-      return wts.some((wt) => this._matchesFilter(wt.branch));
+      if (wts.some((wt) => this._matchesFilter(wt.branch))) return true;
+      // Retain a repo when a content match lives under any of its roots, even
+      // when neither the repo nor any worktree name matches the query — so the
+      // matched file rows render in the tree.
+      return this._repoHasContentMatch(repo);
     });
+  }
+
+  /** Whether any content match lives under one of this repo's disk roots. */
+  private _repoHasContentMatch(repo: { path: string; name: string; url: string }): boolean {
+    if (this._contentMatchesByPath.size === 0) return false;
+    const roots: string[] = [];
+    if (repo.path) roots.push(repo.path);
+    const wts = this._worktreesByRepo.get(repo.name) ?? [];
+    for (const wt of wts) if (wt.path) roots.push(wt.path);
+    for (const p of this._contentMatchesByPath.keys()) {
+      if (roots.some((r) => p.startsWith(r.endsWith("/") ? r : r + "/"))) return true;
+    }
+    return false;
   }
 
   /** Optional filter string forwarded to each repo-tree-item for worktree/file filtering. */
@@ -644,7 +666,8 @@ class Openp41geWorktreeTree extends LitElement {
     `;
   }
 
-  private _renderSearchResults(): TemplateResult | typeof nothing {
+  /** Compact status line shown while a content search runs or finds nothing. */
+  private _renderSearchStatus(): TemplateResult | typeof nothing {
     const q = this._filterQuery.trim();
     if (!q) return nothing;
     if (this._searching) {
@@ -652,52 +675,14 @@ class Openp41geWorktreeTree extends LitElement {
         Searching…
       </div>`;
     }
-    if (this._searchResults.length === 0) {
+    const hasContent = this._searchResults.length > 0;
+    const hasNameMatches = this._filteredRepos().length > 0;
+    if (!hasContent && !hasNameMatches) {
       return html`<div style="padding:8px 10px;font-size:12px;color:var(--text-muted,#777);">
         No matches
       </div>`;
     }
-    return html`
-      <div style="border-top:1px solid var(--divider,#2a2a2a);">
-        ${this._searchResults.map(
-          (res) => html`
-            <div>
-              <div
-                class="explorer-result-file"
-                style="display:flex;align-items:center;height:26px;padding:0 10px;cursor:pointer;font-size:12px;color:var(--text-primary,#ccc);border-bottom:1px solid var(--divider,#2a2a2a);"
-                title=${res.path}
-                @click=${() => this._openFile(res.path, res.name, false)}
-              >
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                  >${res.name}</span
-                >
-                <span
-                  style="margin-left:auto;color:var(--text-muted,#777);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:8px;"
-                  >${res.dir}</span
-                >
-              </div>
-              ${res.matches.map(
-                (m) => html`
-                  <div
-                    class="explorer-result-match"
-                    style="display:flex;align-items:center;height:24px;padding:0 10px 0 22px;cursor:pointer;font-size:12px;color:var(--text-muted,#999);"
-                    @click=${() => this._openFile(res.path, res.name, false, m.lineNumber, m.column)}
-                  >
-                    <span
-                      style="color:var(--text-secondary,#888);min-width:22px;text-align:right;margin-right:8px;"
-                      >${m.lineNumber}</span
-                    >
-                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                      >${m.lineText.trim()}</span
-                    >
-                  </div>
-                `,
-              )}
-            </div>
-          `,
-        )}
-      </div>
-    `;
+    return nothing;
   }
 
   /**
@@ -728,6 +713,7 @@ class Openp41geWorktreeTree extends LitElement {
         <div class="wt-tree-scroll-wrapper flex-1 relative min-h-0">
           <div class="wt-tree-scroll absolute inset-0 overflow-y-auto overflow-x-hidden">
             <div class="wt-tree-scroll-content" data-explorer-drop-zone>
+              ${this._renderSearchStatus()}
               ${this._filteredRepos().map((repo) => {
                 const worktrees = this._worktreesByRepo.get(repo.name) ?? [];
                 return html`
@@ -741,6 +727,7 @@ class Openp41geWorktreeTree extends LitElement {
                       .filter=${this._filterString}
                       .filterRegex=${this._filterRegex}
                       .filterCase=${this._filterCase}
+                      .contentMatches=${this._contentMatchesByPath}
                       .editMode=${this._editMode}
                       @repo-toggle-expand=${(e: CustomEvent) => {
                         const { repoName: rn, expanded } = e.detail;
@@ -890,7 +877,6 @@ class Openp41geWorktreeTree extends LitElement {
                       ><span class="add-repo-label ml-1 text-muted flex-1">add repository</span>
                     </div>`;
               })()}
-              ${this._renderSearchResults()}
             </div>
             <!-- wt-tree-scroll-content -->
           </div>
@@ -1946,10 +1932,12 @@ class Openp41geWorktreeTree extends LitElement {
     pinned: boolean,
     line?: number,
     column?: number,
+    search?: { query: string; regex?: boolean; caseSensitive?: boolean },
   ): void {
     const detail: Record<string, unknown> = { path: filePath, name: fileName, pinned };
     if (line !== undefined) detail.line = line;
     if (column !== undefined) detail.column = column;
+    if (search?.query) detail.search = search;
     document.dispatchEvent(new CustomEvent("openp41ge:open-file", { detail }));
 
     // Keep focus if unpinned

@@ -7,10 +7,15 @@
 
 import type { ICommandBus } from "./command-bus";
 import type { IWorkspaceStateManager } from "./workspace-state-manager";
+import type { TabMountManager } from "../services/tab-mount-manager";
 
 export interface IFileOpenHandler {
   /** Initialize with dependencies. */
-  init(commandBus: ICommandBus, workspaceState: IWorkspaceStateManager): void;
+  init(
+    commandBus: ICommandBus,
+    workspaceState: IWorkspaceStateManager,
+    mountManager?: TabMountManager,
+  ): void;
 
   /** Handle the openp41ge:open-file custom event. */
   handleOpenFile(e: CustomEvent): void;

@@ -63,7 +63,7 @@ New renderer model so the heavy logic is testable and the web component stays th
 - Add a filter/search box **above the tree** in `render()`, styled flush/full-width like the commit-search box (26px input, transparent bg, no border, placeholder "Filter repos and files…"), with **regex + match-case** toggles (reuse `REGEX_ICON`/`CASE_ON_ICON` from `git-commit-search/search-icons`), both grey/off by default. Reuse the `makeIconToggle` visual pattern.
 - Wire events: input → debounced content search + name filter; **Enter** → immediate; **Escape** → clear.
 - **Name filter**: when a query is present, filter the repo/worktree list passed to each `<openp41ge-repo-tree-item>` and pass the filter string down; `openp41ge-repo-tree-item.ts` hides file/dir nodes whose name/path doesn't match (auto-expand matching branches). Preserve expansion state.
-- **Content results list**: when the query is non-empty and content results exist, render a section (below the filtered tree) of files → each match instance as a row (line no. + snippet). Empty state: "No matches" when the query matches nothing.
+- **Content results list (integrated into the tree)**: when the query is non-empty and content results exist, each match instance renders as a **child row under the file it belongs to** in the repo-tree-item's file tree. The ancestor directories of matched files are auto-loaded via `WorktreeFileLoader.expandDir` and auto-expanded so deep matches are revealed. A small status line ("Searching…" / "No matches") shows above the tree only when the query matches nothing in either name or content.
 - **Open at instance**: content match rows dispatch `openp41ge:open-file` with `detail: { path, name, line, column }`; the file row keeps the existing `file-open`/`file-preview` (open at top).
 
 ### Phase 5 — Open file at a specific instance
@@ -105,7 +105,8 @@ New renderer model so the heavy logic is testable and the web component stays th
 - `packages/openp41ge/src/renderer/apps/file-viewer/file-editor-controller.ts` — reveal configured line
 - `packages/openp41ge-uikit/src/components/file-editor/file-editor.ts` — add `revealLine()`
 - `packages/openp41ge/src/layout/workspace-file.ts` — strip obsolete (search) system tabs on migrate
-- `packages/openp41ge/src/renderer/controllers/registry.ts` — (reused) `getController` for jump-to-existing
+- `packages/openp41ge/src/renderer/bootstrap/startup-context.ts` — pass `tabMountManager` into `fileOpenHandler.init`
+- `packages/openp41ge/src/renderer/services/tab-mount-manager.ts` — **live** `getController` used for jump-to-existing (the `controllers/registry.ts` `getController` is never populated)
 - `packages/openp41ge/test/integration/system-tabs/explorer-search.test.ts` — **new**
 - `packages/openp41ge/test/unit/services/explorer-filter.test.ts` — **new**
 
@@ -124,15 +125,16 @@ New renderer model so the heavy logic is testable and the web component stays th
 
 1. **Content-search roots** — implemented as the Explorer's repo/worktree disk paths (`_repos[].path`, worktree `path`), NOT the workspace `scopedFolders` (`_rootPaths()`).
 2. **Auto-expand on name match** — implemented: matching repos/worktrees/dirs auto-expand (and auto-load files) when a name filter is active, so hits are visible without manual expand.
-3. **File already open** — implemented: a content-match click for a file already open anywhere in the window **jumps** to that tab and reveals the line (`_findFileViewerAnywhere` + `FileEditorController.revealLine` + `activateTabInCell`), rather than opening a duplicate.
+3. **File already open** — implemented: a content-match click for a file already open anywhere in the window **jumps** to that tab and reveals the line (`_findFileViewerAnywhere` + `FileEditorController.revealLine` + `activateTabInCell`), rather than opening a duplicate. The controller is resolved through `tabMountManager.getController(tabId)` (the live mount registry) — `controllers/registry.ts` `getController` is never populated, so it always returned `undefined` and silently skipped the jump.
+4. **Search highlight on jump** — implemented: the content-match click carries `search: { query, regex, caseSensitive }`; the already-open controller re-applies `setSearchHighlight` in `revealLine`, and a newly-opened tab applies the highlight via `_applyConfiguredHighlight`.
 
 ## Status — implemented
 
 All phases are implemented and verified:
 
-- **Phases 1–5 done.** Search tab + settings + Cmd+Shift+F removed; `file:searchContents` IPC; `IExplorerSearchModel`; worktree-tree filter box + name filter + content-results section; repo-tree-item name filtering + auto-expand; open-at-instance (new/preview tabs) and jump-to-existing tab.
+- **Phases 1–5 done.** Search tab + settings + Cmd+Shift+F removed; `file:searchContents` IPC; `IExplorerSearchModel`; worktree-tree filter box + name filter + tree-integrated content-match sub-rows; repo-tree-item name filtering + auto-expand + content-match dir reveal; open-at-instance (new/preview tabs) and jump-to-existing tab (via `tabMountManager`), with the search term highlighted.
 - **Persisted-workspace cleanup (added).** Because the Search tab lived in each workspace's persisted `systemTabs`/`sharedSidebars`/`windows[].sidebar`, a dead tab would linger after the registration was removed. Added a strip in `migrateWorkspaceFileData` (`packages/openp41ge/src/layout/workspace-file.ts`) that removes system tabs whose `appType` is in `OBSOLETE_SYSTEM_TAB_APPTYPES` (currently `search`), and drops the id from the sidebar lists + active-left/right-tab. Applies on next workspace load/save (the main process needs a restart to pick it up).
-- **Tests:** `1285 passed` in `packages/openp41ge` (+ `find-bar` `revealLine` tests in uikit). Lint, format:check, and build are clean. `openp41ge:typecheck` reports only the pre-existing `openp41ge-agent-settings.ts:1644` error; `nx knip` reports only pre-existing findings. Main-process `file:searchContents` and preload `searchContents` verified present.
+- **Tests:** `1286 passed` in `packages/openp41ge` (100 files) + `14 passed` in uikit `find-bar.test.ts`. Lint, format:check, and build are clean. `openp41ge:typecheck` reports only the pre-existing `openp41ge-agent-settings.ts:1644` error; `nx knip` reports only pre-existing findings. Main-process `file:searchContents` and preload `searchContents` verified present.
 
 ## Completion Criteria
 

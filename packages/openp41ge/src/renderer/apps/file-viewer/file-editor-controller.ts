@@ -266,13 +266,25 @@ export class FileEditorController extends BaseController implements FileViewerCo
   /**
    * Reveal a 1-based line/column on this file. Called when an Explorer
    * content-search match row is clicked for a file that's already open: it
-   * moves the cursor there. If the editor isn't mounted yet, the position is
-   * recorded on state and applied by _applyConfiguredHighlight on mount.
+   * moves the cursor there and (optionally) highlights the search query. If
+   * the editor isn't mounted yet, the position/highlight are recorded on
+   * state and applied by _applyConfiguredHighlight on mount.
    */
-  revealLine(line: number, column?: number): void {
+  revealLine(
+    line: number,
+    column?: number,
+    search?: { query: string; regex?: boolean; caseSensitive?: boolean },
+  ): void {
     this.state.line = line;
     if (column !== undefined) {
       this.state.column = column;
+    }
+    if (search?.query) {
+      this.state.search = search;
+      this._editor?.setSearchHighlight(search.query, {
+        regex: search.regex,
+        caseSensitive: search.caseSensitive,
+      });
     }
     if (this._editor) {
       this._editor.revealLine(line, column);

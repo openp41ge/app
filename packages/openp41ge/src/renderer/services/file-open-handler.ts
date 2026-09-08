@@ -18,17 +18,23 @@ import type { Tab } from "../../layout/types";
 
 import { createLogger } from "openp41ge-logger";
 import { Openp41geTabsEventHandler } from "./openp41ge-tabs-event-handler";
-import { getController } from "../controllers/registry";
+import type { TabMountManager } from "./tab-mount-manager";
 
 const log = createLogger("openp41ge", "file-open-handler");
 
 export class FileOpenHandler implements IFileOpenHandler {
   private _commandBus: ICommandBus | null = null;
   private _workspaceState: IWorkspaceStateManager | null = null;
+  private _mountManager: TabMountManager | null = null;
 
-  init(commandBus: ICommandBus, workspaceState: IWorkspaceStateManager): void {
+  init(
+    commandBus: ICommandBus,
+    workspaceState: IWorkspaceStateManager,
+    mountManager?: TabMountManager,
+  ): void {
     this._commandBus = commandBus;
     this._workspaceState = workspaceState;
+    this._mountManager = mountManager ?? null;
   }
 
   handleOpenFile(e: CustomEvent): void {
@@ -74,9 +80,13 @@ export class FileOpenHandler implements IFileOpenHandler {
     if (line !== undefined) {
       const existingAnywhere = this._findFileViewerAnywhere(filePath);
       if (existingAnywhere) {
-        const ctrl = getController(existingAnywhere);
+        const ctrl = this._mountManager?.getController(existingAnywhere);
         if (ctrl && "revealLine" in ctrl) {
-          (ctrl as unknown as { revealLine(l: number, c?: number): void }).revealLine(line, column);
+          (
+            ctrl as unknown as {
+              revealLine(l: number, c?: number, s?: unknown): void;
+            }
+          ).revealLine(line, column, search);
         }
         log.info("jump to existing tab at line", existingAnywhere, line);
         this._commandBus!.dispatch("activateTabInCell", myWindowId, existingAnywhere);
