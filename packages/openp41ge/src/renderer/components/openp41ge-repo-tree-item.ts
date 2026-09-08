@@ -25,6 +25,9 @@ import {
   type FileEntry,
 } from "openp41ge-filesystem";
 import type { TreeNode, IconRenderer } from "openp41ge-uikit";
+import { highlightLine, languageFromPath } from "openp41ge-uikit";
+import { getThemeById, darkPlusTheme } from "openp41ge-uikit/theme";
+import { appServices } from "../app";
 import "openp41ge-uikit";
 
 export type { WorktreeData, FileEntry };
@@ -184,11 +187,17 @@ export class Openp41geRepoTreeItem extends LitElement {
   private _contentMatchNodes(branch: string, filePath: string): TreeNode[] | undefined {
     const res = this.contentMatches.get(filePath);
     if (!res || res.matches.length === 0) return undefined;
+    // Shift the row back one indent level so it aligns near the file's name
+    // instead of sitting a full level deeper (see reduceIndent in the tree).
+    const maxDigits = Math.max(1, ...res.matches.map((m) => String(m.lineNumber ?? 1).length));
+    const language = languageFromPath(filePath);
+    const query = this.filter.trim();
     return res.matches.map((m, i) => ({
       id: `${filePath}:match:${i}`,
-      label: `${m.lineNumber}  ${m.lineText.trim()}`,
+      label: m.lineText,
       showChevron: false,
       draggable: false,
+      reduceIndent: 16,
       meta: {
         branch,
         filePath,
@@ -197,6 +206,21 @@ export class Openp41geRepoTreeItem extends LitElement {
         column: m.column,
         matchText: m.lineText.trim(),
       },
+      renderLabel: () => html`
+        <span class="cm-match-row">
+          <span class="cm-match-gutter" style=${`min-width:${maxDigits}ch`}>${m.lineNumber}</span>
+          <span class="cm-match-code"
+            >${unsafeHTML(
+              highlightLine(m.lineText.replace(/\s+$/, ""), {
+                language,
+                query,
+                regex: this.filterRegex,
+                caseSensitive: this.filterCase,
+              }),
+            )}</span
+          >
+        </span>
+      `,
     }));
   }
 
@@ -687,9 +711,27 @@ export class Openp41geRepoTreeItem extends LitElement {
     );
   };
 
+  /** Inline `--cm-*` custom properties for the tree's content-match rows,
+   *  derived from the active syntax theme (the uikit tree reads these). */
+  private _themeTokenVars(): string {
+    let theme = darkPlusTheme;
+    try {
+      const id = appServices?.configService?.getSyntaxTheme?.() ?? "openp41ge-dark";
+      theme = getThemeById(id);
+    } catch {
+      theme = darkPlusTheme;
+    }
+    const c = theme.colors;
+    return `--cm-kw:${c.kw};--cm-str:${c.str};--cm-cmt:${c.cmt};--cm-num:${c.num};--cm-type:${c.type};--cm-fun:${c.fun};--cm-op:${c.op};--cm-tag:${c.tag};--cm-atr:${c.atr};--cm-rgx:${c.rgx};--cm-gutter-bg:${c.gutterBg};`;
+  }
+
   render() {
     return html`
       <style>
+        /* Content-match rows (gutter + highlighted code) are styled inside the
+           uikit tree's shadow DOM; the tree reads --cm-* custom properties set
+           inline on the <openp41ge-tree> element. */
+
         /* End-of-row action buttons only appear when hovering the row: a flat
            fill defines the tile while visible, and hovering the row fades the
            buttons in (they are kept pointer-inert while hidden). */
@@ -817,7 +859,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                             this._fileLoader.isWorktreeLoaded(wt.branch)
                               ? html`<div class="wt-expanded-wt-block border-b border-[#232323]">
                                   <openp41ge-tree
-                                    style="--tree-font-size:12px;--tree-indent:20px"
+                                    style="--tree-font-size:12px;--tree-indent:20px;${this._themeTokenVars()}"
                                     .nodes=${this._buildFileTreeNodes(wt.branch)}
                                     .renderIcon=${this._renderIcon}
                                     .onToggle=${this._makeDirToggle(wt.branch)}

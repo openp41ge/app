@@ -7,6 +7,26 @@
 
 import type { TemplateResult } from "lit";
 
+/** Geometry passed to a node's custom label renderer so it can position its
+ *  own content (e.g. a line-number gutter) relative to the row. */
+export interface TreeNodeLabelContext {
+  /** Depth of this node in the rendered tree (0 = top-level). */
+  depth: number;
+  /** The row's computed left padding in px (rowIndent + contentPad). */
+  paddingLeft: number;
+  /** Width consumed by the chevron cell + icon cell before the label, in px. */
+  labelOffset: number;
+  /** Pixels of indentation added per depth level. */
+  indentPerLevel: number;
+}
+
+/** Renders a node's label as rich content (e.g. a code gutter + highlighted
+ *  text). Return a TemplateResult or an HTML string. */
+export type TreeNodeLabelRenderer = (
+  node: TreeNode,
+  ctx: TreeNodeLabelContext,
+) => TemplateResult | string;
+
 export interface TreeNodeAction {
   /** Unique action ID (e.g. "add", "delete", "refresh") */
   id: string;
@@ -55,6 +75,14 @@ export interface TreeNode {
   badge?: string;
   /** App-specific metadata passed through events */
   meta?: Record<string, unknown>;
+  /** Optional rich label renderer (e.g. for content-match rows). When set it
+   *  replaces the plain `label` text; it receives the row's geometry so it can
+   *  render a custom gutter/highlight layout. */
+  renderLabel?: TreeNodeLabelRenderer;
+  /** Pixels to subtract from this row's computed indentation, so a child row
+   *  (e.g. a content-match row under a file) can be pulled back toward its
+   *  parent instead of sitting a full level deeper. */
+  reduceIndent?: number;
 }
 
 /** Position of a drop relative to a target node */

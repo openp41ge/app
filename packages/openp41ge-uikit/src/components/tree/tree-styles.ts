@@ -18,6 +18,22 @@ export const treeStyles = css`
     outline: none;
     overflow-y: auto;
     overflow-x: hidden;
+
+    /* Content-match row colours — the host may override these via inline
+     * custom properties to match the active syntax theme. */
+    --cm-kw: #569cd6;
+    --cm-str: #ce9178;
+    --cm-cmt: #6a9955;
+    --cm-num: #b5cea8;
+    --cm-type: #4ec9b0;
+    --cm-fun: #dcdcaa;
+    --cm-op: #d4d4d4;
+    --cm-tag: #569cd6;
+    --cm-atr: #9cdcfe;
+    --cm-rgx: #d16969;
+    --cm-gutter-bg: #1a1a1a;
+    --cm-term-bg: rgba(234, 140, 0, 0.32);
+    --cm-term-fg: #fff;
   }
 
   .tree-root {
@@ -161,7 +177,9 @@ export const treeStyles = css`
     border-radius: 3px;
     cursor: pointer;
     color: var(--tree-action-fg, var(--text-muted, #666));
-    transition: color 0.1s ease, background 0.1s ease;
+    transition:
+      color 0.1s ease,
+      background 0.1s ease;
   }
 
   .tree-action-btn:hover {
@@ -207,6 +225,74 @@ export const treeStyles = css`
     border-radius: 2px;
     flex-shrink: 0;
     white-space: nowrap;
+  }
+
+  /* ─── Content-match rows (line gutter + highlighted code) ──── */
+
+  .cm-match-row {
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    line-height: inherit;
+    font-family: var(--fe-font, ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace);
+    font-size: var(--tree-font-size, 12px);
+  }
+  .cm-match-gutter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    box-sizing: border-box;
+    padding: 0 8px 0 6px;
+    color: var(--tree-muted, var(--text-muted, #666));
+    background: var(--cm-gutter-bg, var(--fe-gutter-bg, #1a1a1a));
+    border-right: 1px solid var(--border-divider, #2d2d2d);
+    flex-shrink: 0;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .cm-match-code {
+    display: inline-block;
+    white-space: pre;
+    padding: 0 10px 0 8px;
+    color: var(--text-primary, #d4d4d4);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cm-match-term {
+    background: var(--cm-term-bg, var(--fe-find-match-bg, rgba(234, 140, 0, 0.32)));
+    color: var(--cm-term-fg, var(--fe-find-match-fg, #fff));
+    border-radius: 1px;
+  }
+  .cm-match-code .s-kw {
+    color: var(--cm-kw);
+  }
+  .cm-match-code .s-str {
+    color: var(--cm-str);
+  }
+  .cm-match-code .s-cmt {
+    color: var(--cm-cmt);
+    font-style: italic;
+  }
+  .cm-match-code .s-num {
+    color: var(--cm-num);
+  }
+  .cm-match-code .s-type {
+    color: var(--cm-type);
+  }
+  .cm-match-code .s-fun {
+    color: var(--cm-fun);
+  }
+  .cm-match-code .s-op {
+    color: var(--cm-op);
+  }
+  .cm-match-code .s-tag {
+    color: var(--cm-tag);
+  }
+  .cm-match-code .s-atr {
+    color: var(--cm-atr);
+  }
+  .cm-match-code .s-rgx {
+    color: var(--cm-rgx);
   }
 
   /* ─── Status variants ──────────────────────────────────── */

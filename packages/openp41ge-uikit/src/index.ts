@@ -23,6 +23,10 @@ export { tailwindCSS } from "./generated/tailwind";
 // Re-export theme definitions from the merged openp41ge-themes package
 export * from "./theme";
 
+// ─── Line highlighting (syntax + search-term overlay) ─────────────────────
+export { highlightLine, languageFromPath } from "./highlight/highlight-line";
+export type { HighlightLineOptions } from "./highlight/highlight-line";
+
 // ─── Tabs (from openp41ge-tabs) ────────────────────────────────────────────
 export type {
   IDragSource,

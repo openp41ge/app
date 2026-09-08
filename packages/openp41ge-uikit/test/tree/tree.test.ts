@@ -29,10 +29,18 @@ if (typeof CSS === "undefined") {
 if (typeof DataTransfer === "undefined") {
   (globalThis as any).DataTransfer = class DataTransfer {
     _data: Record<string, string> = {};
-    setData(type: string, value: string) { this._data[type] = value; }
-    getData(type: string) { return this._data[type] || ""; }
-    get types() { return Object.keys(this._data); }
-    clearData() { this._data = {}; }
+    setData(type: string, value: string) {
+      this._data[type] = value;
+    }
+    getData(type: string) {
+      return this._data[type] || "";
+    }
+    get types() {
+      return Object.keys(this._data);
+    }
+    clearData() {
+      this._data = {};
+    }
     effectAllowed: string = "uninitialized";
     dropEffect: string = "none";
     files: File[] = [];
@@ -74,9 +82,7 @@ const sampleNodes: TreeNode[] = [
     id: "styles",
     label: "styles",
     icon: "folder",
-    children: [
-      { id: "styles/theme.css", label: "theme.css", icon: "css" },
-    ],
+    children: [{ id: "styles/theme.css", label: "theme.css", icon: "css" }],
   },
 ];
 
@@ -400,9 +406,7 @@ describe("double-click", () => {
     tree.addEventListener("tree-node-dblclick", handler);
 
     const readmeRow = getNodeRow(tree, "README.md");
-    readmeRow?.dispatchEvent(
-      new MouseEvent("dblclick", { bubbles: true }),
-    );
+    readmeRow?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler.mock.calls[0][0].detail.nodeId).toBe("README.md");
@@ -426,9 +430,7 @@ describe("double-click", () => {
 describe("status", () => {
   test("applies tree-node--status-untracked CSS class", async () => {
     const tree = await createTree();
-    tree.nodes = [
-      { id: "untracked-file", label: "untracked.ts", status: "untracked" },
-    ];
+    tree.nodes = [{ id: "untracked-file", label: "untracked.ts", status: "untracked" }];
     await (tree as any).updateComplete;
 
     const row = getNodeRow(tree, "untracked-file");
@@ -437,9 +439,7 @@ describe("status", () => {
 
   test("applies tree-node--status-pending CSS class", async () => {
     const tree = await createTree();
-    tree.nodes = [
-      { id: "pending-file", label: "pending.ts", status: "pending" },
-    ];
+    tree.nodes = [{ id: "pending-file", label: "pending.ts", status: "pending" }];
     await (tree as any).updateComplete;
 
     const row = getNodeRow(tree, "pending-file");
@@ -448,9 +448,7 @@ describe("status", () => {
 
   test("applies tree-node--status-error CSS class", async () => {
     const tree = await createTree();
-    tree.nodes = [
-      { id: "error-file", label: "error.ts", status: "error" },
-    ];
+    tree.nodes = [{ id: "error-file", label: "error.ts", status: "error" }];
     await (tree as any).updateComplete;
 
     const row = getNodeRow(tree, "error-file");
@@ -472,9 +470,7 @@ describe("status", () => {
 describe("badge", () => {
   test("renders badge text after label", async () => {
     const tree = await createTree();
-    tree.nodes = [
-      { id: "pending-node", label: "feature-x", badge: "(pending)" },
-    ];
+    tree.nodes = [{ id: "pending-node", label: "feature-x", badge: "(pending)" }];
     await (tree as any).updateComplete;
 
     const row = getNodeRow(tree, "pending-node");
@@ -582,5 +578,67 @@ describe("drag and drop", () => {
     readmeRow?.dispatchEvent(event);
 
     expect(dt.getData("text/plain")).toBe("README.md");
+  });
+});
+
+// ─── renderLabel ─────────────────────────────────────────────────────
+
+describe("renderLabel", () => {
+  test("uses the custom label renderer when the node provides one", async () => {
+    const nodes: TreeNode[] = [
+      {
+        id: "file.js",
+        label: "file.js",
+        icon: "javascript",
+        showChevron: true,
+        expanded: true,
+        children: [
+          {
+            id: "file.js:match:0",
+            label: "let drawing = false;",
+            showChevron: false,
+            renderLabel: (_node: unknown, ctx: any) => {
+              // The renderer must receive the row geometry so it can position
+              // a gutter relative to the row.
+              expect(typeof ctx.depth).toBe("number");
+              expect(typeof ctx.paddingLeft).toBe("number");
+              expect(typeof ctx.labelOffset).toBe("number");
+              expect(typeof ctx.indentPerLevel).toBe("number");
+              return `line ${ctx.depth}`;
+            },
+          },
+        ],
+      },
+    ];
+    const tree = await createTreeWithNodes(nodes);
+    const matchRow = getNodeRow(tree, "file.js:match:0");
+    const label = matchRow?.querySelector(".tree-label");
+    expect(label?.textContent?.trim()).toBe("line 1");
+  });
+
+  test("reduceIndent pulls a child row back toward its parent", async () => {
+    const nodes: TreeNode[] = [
+      {
+        id: "file.js",
+        label: "file.js",
+        icon: "javascript",
+        showChevron: true,
+        expanded: true,
+        children: [
+          {
+            id: "file.js:match:0",
+            label: "match",
+            showChevron: false,
+            reduceIndent: 16,
+            renderLabel: () => "<span class='cm-match-gutter'>1</span>",
+          },
+        ],
+      },
+    ];
+    const tree = await createTreeWithNodes(nodes);
+    const matchRow = getNodeRow(tree, "file.js:match:0");
+    const fileRow = getNodeRow(tree, "file.js");
+    // With reduceIndent the match row's left padding equals the parent file's.
+    expect(matchRow?.style.paddingLeft).toBe(fileRow?.style.paddingLeft);
   });
 });

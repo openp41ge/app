@@ -25,12 +25,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type {
-  TreeNode,
-  TreeNodeAction,
-  DropPosition,
-  IconRenderer,
-} from "./types";
+import type { TreeNode, TreeNodeAction, DropPosition, IconRenderer } from "./types";
 import { treeStyles } from "./tree-styles";
 
 export {
@@ -195,9 +190,7 @@ export class Openp41geTree extends LitElement {
     const visible = this._getVisibleNodes();
     if (visible.length === 0) return;
 
-    let idx = this.selectedId
-      ? visible.findIndex((n) => n.id === this.selectedId)
-      : -1;
+    let idx = this.selectedId ? visible.findIndex((n) => n.id === this.selectedId) : -1;
 
     switch (e.key) {
       case "ArrowDown": {
@@ -262,14 +255,20 @@ export class Openp41geTree extends LitElement {
     this._focusableNodeId = nodeId;
     this._ensureFocusableNode();
     // Scroll into view
-    const el = this.renderRoot?.querySelector(`[data-node-id="${CSS.escape(nodeId)}"]`) as HTMLElement | null;
+    const el = this.renderRoot?.querySelector(
+      `[data-node-id="${CSS.escape(nodeId)}"]`,
+    ) as HTMLElement | null;
     el?.scrollIntoView({ block: "nearest" });
     this.requestUpdate();
   }
 
   private _ensureFocusableNode(): void {
-    if (!this._focusableNodeId || !this.nodes.find((n) => this._findNode(n, this._focusableNodeId!))) {
-      this._focusableNodeId = this.nodes.length > 0 ? this._getVisibleNodes()[0]?.id ?? null : null;
+    if (
+      !this._focusableNodeId ||
+      !this.nodes.find((n) => this._findNode(n, this._focusableNodeId!))
+    ) {
+      this._focusableNodeId =
+        this.nodes.length > 0 ? (this._getVisibleNodes()[0]?.id ?? null) : null;
     }
   }
 
@@ -488,6 +487,18 @@ export class Openp41geTree extends LitElement {
 
   // ─── Icon rendering ────────────────────────────────────────────
 
+  /** Cache of chevron-cell + icon-cell widths consumed before the label. */
+  private _labelOffsetCache: number | null = null;
+
+  private _labelOffset(): number {
+    if (this._labelOffsetCache !== null) return this._labelOffsetCache;
+    const cs = getComputedStyle(this);
+    const chevron = parseInt(cs.getPropertyValue("--chevron-width").trim() || "0", 10) || 16;
+    const icon = parseInt(cs.getPropertyValue("--icon-width").trim() || "0", 10) || 16;
+    this._labelOffsetCache = chevron + icon;
+    return this._labelOffsetCache;
+  }
+
   private _resolveIcon(name: string | undefined, size: number): TemplateResult | string {
     if (!name) return "";
     if (this.renderIcon) {
@@ -498,10 +509,12 @@ export class Openp41geTree extends LitElement {
   }
 
   private _renderChevron(expanded: boolean): TemplateResult {
-    return html`
-      <span class="tree-chevron">
-        <openp41ge-icon name=${expanded ? "chevron-down" : "chevron-right"} size="10"></openp41ge-icon>
-      </span>`;
+    return html` <span class="tree-chevron">
+      <openp41ge-icon
+        name=${expanded ? "chevron-down" : "chevron-right"}
+        size="10"
+      ></openp41ge-icon>
+    </span>`;
   }
 
   // ─── Render ────────────────────────────────────────────────────
@@ -510,9 +523,7 @@ export class Openp41geTree extends LitElement {
     if (!this.nodes || this.nodes.length === 0) {
       return html`<div class="tree-empty">No items</div>`;
     }
-    return html`
-      <div class="tree-root" role="tree">${this._renderNodes(this.nodes)}</div>
-    `;
+    return html` <div class="tree-root" role="tree">${this._renderNodes(this.nodes)}</div> `;
   }
 
   private _renderNodes(nodes: TreeNode[]): TemplateResult[] {
@@ -537,8 +548,27 @@ export class Openp41geTree extends LitElement {
     const rowIndent = isSection
       ? this.depth * INDENT + SECTION_EXTRA + extraIndent
       : this.depth * INDENT + extraIndent;
-    // Content inside the row is shifted so chevron/icon start at the indent
+    // A node may opt to be pulled back toward its parent (e.g. content-match
+    // rows rendered as children of a file), reducing its effective indent.
+    const appliedIndent = Math.max(0, rowIndent - (node.reduceIndent ?? 0));
     const contentPad = isSection ? 8 : 8; // base padding on left
+
+    // Width consumed before the label by the (always-rendered) chevron cell
+    // and the icon cell / spacer. Used by custom label renderers so they can
+    // position a gutter relative to the row's left edge.
+    const labelOffset = this._labelOffset();
+
+    // Label content: a custom renderer may provide rich HTML (e.g. a gutter
+    // + highlighted code), otherwise fall back to the plain label text. The
+    // renderer receives the row geometry so it can position a gutter.
+    const labelContent = node.renderLabel
+      ? node.renderLabel(node, {
+          depth: this.depth,
+          paddingLeft: rowIndent + contentPad,
+          labelOffset,
+          indentPerLevel: INDENT,
+        })
+      : node.label;
 
     // Status CSS class
     const statusClass = node.status ? `tree-node--status-${node.status}` : "";
@@ -563,7 +593,7 @@ export class Openp41geTree extends LitElement {
           [statusClass]: !!node.status,
         })}"
         style=${styleMap({
-          paddingLeft: `${rowIndent + contentPad}px`,
+          paddingLeft: `${appliedIndent + contentPad}px`,
           paddingRight: "8px",
         })}
         role="treeitem"
@@ -577,88 +607,88 @@ export class Openp41geTree extends LitElement {
         @dblclick=${(e: MouseEvent) => this._onNodeDblClick(e, node)}
         @contextmenu=${(e: MouseEvent) => this._onContextMenu(e, node)}
         @mouseenter=${() => (this._hoveredNodeId = node.id)}
-        @mouseleave=${() =>
-          this._hoveredNodeId === node.id ? (this._hoveredNodeId = null) : null}
+        @mouseleave=${() => (this._hoveredNodeId === node.id ? (this._hoveredNodeId = null) : null)}
         @dragstart=${(e: DragEvent) => this._onDragStart(e, node)}
         @dragover=${this._onDragOver}
         @drop=${(e: DragEvent) => this._onDrop(e, node)}
       >
         <!-- Chevron (▶/▼) / Loading spinner -->
-        <span
-          class="tree-chevron-cell"
-          @click=${(e: Event) => this._onChevronClick(e, node)}
-        >
-          ${isLoading
-            ? this._renderSpinner()
-            : showChevron
-              ? this._renderChevron(expanded)
-              : nothing}
+        <span class="tree-chevron-cell" @click=${(e: Event) => this._onChevronClick(e, node)}>
+          ${
+            isLoading
+              ? this._renderSpinner()
+              : showChevron
+                ? this._renderChevron(expanded)
+                : nothing
+          }
         </span>
 
         <!-- Icon column (may be empty for section headers) -->
-        ${node.icon
-          ? html`
-              <span class="tree-icon-cell">
-                ${this._resolveIcon(node.icon, node.iconSize ?? 14)}
-              </span>
-            `
-          : html`<span class="tree-icon-spacer"></span>`}
+        ${
+          node.icon
+            ? html`
+                <span class="tree-icon-cell">
+                  ${this._resolveIcon(node.icon, node.iconSize ?? 14)}
+                </span>
+              `
+            : html`<span class="tree-icon-spacer"></span>`
+        }
 
         <!-- Label -->
-        <span class="tree-label">${node.label}</span>
+        <span class="tree-label">${labelContent}</span>
 
         <!-- Badge -->
-        ${node.badge
-          ? html`<span class="tree-badge">${node.badge}</span>`
-          : nothing}
+        ${node.badge ? html`<span class="tree-badge">${node.badge}</span>` : nothing}
 
         <!-- Actions (show on hover) -->
-        ${hovered && node.actions && node.actions.length > 0
-          ? html`<span class="tree-actions">
-              ${node.actions.map(
-                (action) => html`
-                  <span
-                    class="tree-action-btn"
-                    title=${action.label}
-                    aria-label=${action.label}
-                    role="button"
-                    tabindex="-1"
-                    @click=${(e: Event) => this._onActionClick(e, node, action)}
-                  >
-                    ${this._resolveIcon(action.icon, 14)}
-                  </span>
-                `,
-              )}
-            </span>`
-          : nothing}
+        ${
+          hovered && node.actions && node.actions.length > 0
+            ? html`<span class="tree-actions">
+                ${node.actions.map(
+                  (action) => html`
+                    <span
+                      class="tree-action-btn"
+                      title=${action.label}
+                      aria-label=${action.label}
+                      role="button"
+                      tabindex="-1"
+                      @click=${(e: Event) => this._onActionClick(e, node, action)}
+                    >
+                      ${this._resolveIcon(action.icon, 14)}
+                    </span>
+                  `,
+                )}
+              </span>`
+            : nothing
+        }
       </div>
 
       <!-- Children (recursive) -->
-      ${hasChildren && expanded && !isLoading
-        ? html`<openp41ge-tree
-            .nodes=${node.children!}
-            .selectedId=${this.selectedId}
-            .renderIcon=${this.renderIcon}
-            .onToggle=${this.onToggle}
-            .onExpandedChange=${this.onExpandedChange}
-            depth=${this.depth + 1}
-            @tree-node-click=${(e: Event) => this._forwardEvent(e, "tree-node-click")}
-            @tree-node-toggle=${(e: Event) => this._forwardEvent(e, "tree-node-toggle")}
-            @tree-node-toggle-error=${(e: Event) => this._forwardEvent(e, "tree-node-toggle-error")}
-            @tree-node-action=${(e: Event) => this._forwardEvent(e, "tree-node-action")}
-            @tree-node-dblclick=${(e: Event) => this._forwardEvent(e, "tree-node-dblclick")}
-            @tree-node-contextmenu=${(e: Event) => this._forwardEvent(e, "tree-node-contextmenu")}
-            @tree-drag-start=${(e: Event) => this._forwardEvent(e, "tree-drag-start")}
-            @tree-drop=${(e: Event) => this._forwardEvent(e, "tree-drop")}
-          ></openp41ge-tree>`
-        : nothing}
+      ${
+        hasChildren && expanded && !isLoading
+          ? html`<openp41ge-tree
+              .nodes=${node.children!}
+              .selectedId=${this.selectedId}
+              .renderIcon=${this.renderIcon}
+              .onToggle=${this.onToggle}
+              .onExpandedChange=${this.onExpandedChange}
+              depth=${this.depth + 1}
+              @tree-node-click=${(e: Event) => this._forwardEvent(e, "tree-node-click")}
+              @tree-node-toggle=${(e: Event) => this._forwardEvent(e, "tree-node-toggle")}
+              @tree-node-toggle-error=${(e: Event) => this._forwardEvent(e, "tree-node-toggle-error")}
+              @tree-node-action=${(e: Event) => this._forwardEvent(e, "tree-node-action")}
+              @tree-node-dblclick=${(e: Event) => this._forwardEvent(e, "tree-node-dblclick")}
+              @tree-node-contextmenu=${(e: Event) => this._forwardEvent(e, "tree-node-contextmenu")}
+              @tree-drag-start=${(e: Event) => this._forwardEvent(e, "tree-drag-start")}
+              @tree-drop=${(e: Event) => this._forwardEvent(e, "tree-drop")}
+            ></openp41ge-tree>`
+          : nothing
+      }
     `;
   }
 
   private _renderSpinner(): TemplateResult {
-    return html`
-      <span class="tree-spinner" part="spinner"></span>
-    `;
+    return html` <span class="tree-spinner" part="spinner"></span> `;
   }
 
   /** Forward nested tree events up through the parent component. */
