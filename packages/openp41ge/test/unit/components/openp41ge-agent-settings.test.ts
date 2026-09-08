@@ -37,7 +37,11 @@ class FakeConfig {
   }
 }
 
-const VLLM = { baseUrl: "http://localhost:8000/v1", model: "Qwen2.5-Coder-7B-Instruct" };
+const VLLM = {
+  baseUrl: "http://localhost:8000/v1",
+  model: "Qwen2.5-Coder-7B-Instruct",
+  name: "vLLM (local)",
+};
 const OPENAI = { baseUrl: "https://api.openai.com/v1", model: "gpt-4o", name: "OpenAI" };
 const AGENT = (providers = { vllm: VLLM }, providerId = "vllm") => ({ providerId, providers });
 
@@ -391,6 +395,56 @@ describe("openp41ge-agent-settings", () => {
       "Model list request failed (401)",
     );
     expect(qa(el, ".drawer .ags-provider-row").length).toBe(1); // only the add row
+  });
+
+  test("Detect models is presented as an action row under the explanation", async () => {
+    const el = await mount(AGENT());
+    qa(el, ".ags-provider-row")[0].click();
+    await tick();
+    const row = qa(el, ".drawer .ags-action-row").find((r) =>
+      r.querySelector(".ags-action-label")?.textContent.includes("Detect the models"),
+    );
+    expect(row).toBeDefined();
+    expect(row.querySelector(".ags-action-control button").textContent).toContain("Detect models");
+    // The add-model data row is exempt from the action-row treatment.
+    expect(q(el, ".drawer .ags-add-row").classList.contains("ags-action-row")).toBe(false);
+  });
+
+  test("Test Connection lives in an Actions card and exposes View response", async () => {
+    const el = await mount(AGENT({ openai: OPENAI }, "openai"));
+    const row = qa(el, ".ags-provider-row").find((r) =>
+      r.querySelector(".ags-provider-name")?.textContent.includes("OpenAI"),
+    );
+    row.click();
+    await tick();
+    // The drawer has an Actions section.
+    const titles = qa(el, ".drawer .ags-section-title").map((t) => t.textContent.trim());
+    expect(titles).toContain("Actions");
+    // Test Connection is an action row.
+    const testRow = qa(el, ".drawer .ags-action-row").find((r) =>
+      r.querySelector(".ags-action-control button")?.textContent.includes("Test Connection"),
+    );
+    expect(testRow).toBeDefined();
+    // Stub a failing ping.
+    (window as any).openp41ge = {
+      chat: {
+        pingProvider: vi.fn(async () => ({ ok: false, error: "HTTP 400 Bad Request" })),
+      },
+    };
+    await el._testConnection(el._drawers[0]);
+    await tick();
+    expect(q(el, ".drawer .test-err").textContent).toContain("HTTP 400 Bad Request");
+    // View response appears and toggles the raw JSON, regardless of success.
+    const viewBtn = qa(el, ".drawer .ags-action-row")
+      .map((r) => r.querySelector(".ags-action-control button"))
+      .find((b) => b?.textContent.includes("View response"));
+    expect(viewBtn).toBeDefined();
+    viewBtn.click();
+    await tick();
+    expect(q(el, ".drawer .ags-response").textContent).toContain("HTTP 400 Bad Request");
+    viewBtn.click();
+    await tick();
+    expect(q(el, ".drawer .ags-response")).toBeNull();
   });
 
   test("numeric fields are text inputs that strip non-numeric characters", async () => {

@@ -23,12 +23,13 @@ describe("agent-provider-presets", () => {
     const ids = PROVIDER_PRESETS.map((p) => p.id);
     expect(ids).toContain("openai");
     expect(ids).toContain("anthropic");
-    expect(ids).toContain("vllm");
-    expect(ids).toContain("ollama");
-    expect(ids).toContain("lmstudio");
     expect(ids).toContain("groq");
     expect(ids).toContain("mistral");
     expect(ids).toContain(CUSTOM_PRESET_ID);
+    // Named local servers are not presets — they are configured via Custom.
+    expect(ids).not.toContain("vllm");
+    expect(ids).not.toContain("ollama");
+    expect(ids).not.toContain("lmstudio");
   });
 
   it("looks up a preset by id and falls back to Custom", () => {
@@ -63,7 +64,8 @@ describe("agent-provider-presets", () => {
     expect(presetFor({ baseUrl: "https://api.openai.com/v1", model: "" }).id).toBe("openai");
     // Trailing slash / case are normalised.
     expect(presetFor({ baseUrl: "HTTPS://API.OPENAI.COM/V1/", model: "" }).id).toBe("openai");
-    expect(presetFor({ baseUrl: "http://localhost:8000/v1", model: "" }).id).toBe("vllm");
+    // A local/self-hosted endpoint is no longer a named preset → Custom.
+    expect(presetFor({ baseUrl: "http://localhost:8000/v1", model: "" }).id).toBe(CUSTOM_PRESET_ID);
     // Unrecognised endpoint → Custom.
     expect(presetFor({ baseUrl: "https://example.com/x/v1", model: "" }).id).toBe(CUSTOM_PRESET_ID);
     // Blank endpoint → Custom.

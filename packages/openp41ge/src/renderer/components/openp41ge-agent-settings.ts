@@ -100,6 +100,7 @@ export class Openp41geAgentSettings extends LitElement {
   @state() private _saving = false;
   @state() private _testing = false;
   @state() private _testResult: TestResult | null = null;
+  @state() private _showTestResponse = false;
   @state() private _detectedMessage: string | null = null;
   @state() private _detectedError: string | null = null;
   @state() private _defaultOpen = false;
@@ -297,6 +298,16 @@ export class Openp41geAgentSettings extends LitElement {
     `;
   }
 
+  /** One action in a card: a short description on the left, the control on the right. */
+  private _actionRow(description: string, action: TemplateResult): TemplateResult {
+    return html`
+      <div class="ags-action-row">
+        <span class="ags-action-label">${description}</span>
+        <span class="ags-action-control">${action}</span>
+      </div>
+    `;
+  }
+
   private _closeSvg(): TemplateResult {
     return html`
       <svg
@@ -344,6 +355,7 @@ export class Openp41geAgentSettings extends LitElement {
     if (!draft) return;
     const preset = presetFor(draft);
     this._testResult = null;
+    this._showTestResponse = false;
     this._drawers = [
       ...this._drawers,
       {
@@ -363,6 +375,7 @@ export class Openp41geAgentSettings extends LitElement {
   private _openAdd(): void {
     const draft = applyPreset(customPreset());
     this._testResult = null;
+    this._showTestResponse = false;
     this._drawers = [
       ...this._drawers,
       {
@@ -650,6 +663,7 @@ export class Openp41geAgentSettings extends LitElement {
     if (!providerId) return;
     this._testing = true;
     this._testResult = null;
+    this._showTestResponse = false;
     try {
       const res = await window.openp41ge?.chat?.pingProvider?.(providerId);
       this._testResult = res ?? { ok: false, error: "No test connection available" };
@@ -774,9 +788,6 @@ export class Openp41geAgentSettings extends LitElement {
         }
         .ags-detect-note--err {
           color: #f44336;
-        }
-        .ags-detect-row {
-          margin-top: 10px;
         }
         .ags-provider-name {
           font-size: 13px;
@@ -1174,6 +1185,36 @@ export class Openp41geAgentSettings extends LitElement {
         .test-err {
           color: #f44336;
           margin-top: 6px;
+        }
+        /* One action in a card: description on the left, control on the right. */
+        .ags-action-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px solid var(--divider, #2f3031);
+        }
+        .ags-action-label {
+          font-size: 12px;
+          color: var(--text-secondary, #999);
+          line-height: 1.4;
+        }
+        .ags-action-control {
+          flex-shrink: 0;
+        }
+        .ags-response {
+          margin: 12px 0 0;
+          padding: 10px;
+          max-height: 180px;
+          overflow: auto;
+          font-family: ui-monospace, "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
+          font-size: 12px;
+          color: var(--text-secondary, #999);
+          background: rgba(0, 0, 0, 0.25);
+          border-radius: 6px;
+          white-space: pre-wrap;
         }
       </style>
 
@@ -1594,16 +1635,19 @@ export class Openp41geAgentSettings extends LitElement {
         </ul>
         ${this._detectedMessage ? html`<p class="ags-detect-note">${this._detectedMessage}</p>` : nothing}
         ${this._detectedError ? html`<p class="ags-detect-note ags-detect-note--err">${this._detectedError}</p>` : nothing}
-        <div class="ags-detect-row">
-          <button
-            class="dw-cancel"
-            ?disabled=${this._testing}
-            @click=${() => void this._detectModels(d)}
-          >
-            ${this._testing ? "Detecting…" : "Detect models"}
-          </button>
-        </div>
         <p class="ags-card-help">Add models by hand or detect them from the endpoint.</p>
+        ${this._actionRow(
+          "Detect the models available from this endpoint.",
+          html`
+            <button
+              class="dw-cancel"
+              ?disabled=${this._testing}
+              @click=${() => void this._detectModels(d)}
+            >
+              ${this._testing ? "Detecting…" : "Detect models"}
+            </button>
+          `,
+        )}
       </div>
     `;
   }
@@ -1795,24 +1839,53 @@ export class Openp41geAgentSettings extends LitElement {
       ${this._modelsCard(d, draft, models)} ${this._defaultModelCard(d, draft, models)}
       ${this._apiKeyCard(d, draft)} ${this._temperatureCard(d, draft)}
       ${this._maxTokensCard(d, draft)}
-      ${
-        this._testResult
-          ? html`<div
-              class=${this._testResult.ok ? "test-ok" : "test-err"}
-              style="max-width:620px;"
+      <div class="ags-section-title">Actions</div>
+      <div class="ags-card ags-card-gap" style="max-width:620px;">
+        ${
+          this._testResult
+            ? html`<p class=${this._testResult.ok ? "test-ok" : "test-err"} style="margin:0 0 2px;">
+                ${
+                  this._testResult.ok
+                    ? "✓ Connected"
+                    : `✗ ${this._testResult.error ?? "Unreachable"}`
+                }
+              </p>`
+            : nothing
+        }
+        ${this._actionRow(
+          "Test the connection to this provider.",
+          html`
+            <button
+              class="dw-cancel"
+              ?disabled=${this._testing}
+              @click=${() => void this._testConnection(d)}
             >
-              ${this._testResult.ok ? "✓ Connected" : `✗ ${this._testResult.error ?? "Unreachable"}`}
-            </div>`
-          : nothing
-      }
-      <div class="ags-test-row">
-        <button
-          class="dw-cancel"
-          ?disabled=${this._testing}
-          @click=${() => void this._testConnection(d)}
-        >
-          ${this._testing ? "Testing…" : "Test Connection"}
-        </button>
+              ${this._testing ? "Testing…" : "Test Connection"}
+            </button>
+          `,
+        )}
+        ${
+          this._testResult
+            ? this._actionRow(
+                "View the response data.",
+                html`
+                  <button
+                    class="dw-cancel"
+                    @click=${() => {
+                      this._showTestResponse = !this._showTestResponse;
+                    }}
+                  >
+                    ${this._showTestResponse ? "Hide response" : "View response"}
+                  </button>
+                `,
+              )
+            : nothing
+        }
+        ${
+          this._showTestResponse && this._testResult
+            ? html`<pre class="ags-response">${JSON.stringify(this._testResult, null, 2)}</pre>`
+            : nothing
+        }
       </div>
     `;
   }

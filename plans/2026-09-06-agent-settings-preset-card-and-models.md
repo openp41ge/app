@@ -89,3 +89,9 @@ Mirror the `models?` field into main-process `UserConfig.agent.providers` and `C
 ## Follow-up
 
 - `openp41ge-filesystem:test` reports "No test files found" (pre-existing, unrelated to this work) — the sole `nx run-many -t test` failure.
+
+## Post-implementation refinements (2026-09-11)
+
+- **Removed the named local-server presets** (vLLM / Ollama / LM Studio) from `PROVIDER_PRESETS`. Local servers are now configured via the **Custom** preset; a self-hosted endpoint therefore displays as its host (`localhost`). `presetFor` now maps a local endpoint to Custom.
+- **Card actions are now rows** underneath the explanation text: a short description on the left, the action button on the right (`.ags-action-row`). The "Add model" data row is exempt. Extracted a reusable `_actionRow(description, control)`.
+- **Test Connection moved under a new "ACTIONS" section title** into a no-data card. The card provides action rows — Test Connection, plus a **View response** button (the JSON of the `pingProvider` result) that appears after any test, whether it succeeded or failed, so the exact failure reason is reviewable.
