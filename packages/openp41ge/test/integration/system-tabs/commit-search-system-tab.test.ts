@@ -210,7 +210,7 @@ describe("CommitSearchSystemTabController", () => {
     // config-icon row above by a full-width top border.
     const repoFilterRow = repoFilter.parentElement as HTMLElement;
     expect(repoFilterRow.style.display).toBe("flex");
-    expect(repoFilterRow.style.borderTop).toBe("1px solid var(--divider,#333)");
+    expect(repoFilterRow.style.borderTop).toBe("1px solid var(--divider,#2a2a2a)");
     // Negative side margins cancel the filter box's padding so the border runs
     // edge-to-edge, while matching side padding keeps the field content aligned
     // with the config icons. Vertical padding balances the space above/below.

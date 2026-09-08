@@ -381,7 +381,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
       display: this._repoFilterActive ? "flex" : "none",
       alignItems: "center",
       gap: "4px",
-      borderTop: "1px solid var(--divider,#333)",
+      borderTop: "1px solid var(--divider,#2a2a2a)",
       marginLeft: "-10px",
       marginRight: "-10px",
       paddingLeft: "10px",
