@@ -136,7 +136,7 @@ describe("openp41ge-agent-settings", () => {
     ).toBe("gpt-4o");
   });
 
-  test("Save adds a new provider, persists agent, and returns to the list", async () => {
+  test("Save adds a new provider, persists agent, and keeps the drawer open", async () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();
     await tick();
@@ -149,16 +149,21 @@ describe("openp41ge-agent-settings", () => {
     await tick();
     qa(el, ".drawer .dw-save").pop().click();
     await tick();
-    await settleClose();
 
     const lastSet = el.configService.sets[el.configService.sets.length - 1];
     expect(lastSet.key).toBe("agent");
     expect(lastSet.value.providers.openai).toBeDefined();
     expect(lastSet.value.providerId).toBe("openai");
-    // Drawer closed, list now shows the new provider.
-    expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(0);
+    // The drawer stays open after saving.
+    expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(1);
+    // The provider list behind it shows the new provider.
     const names = qa(el, ".ags-provider-name").map((n) => n.textContent);
     expect(names).toContain("OpenAI");
+    // Saving again rebinds to the same provider id rather than re-creating it.
+    qa(el, ".drawer .dw-save").pop().click();
+    await tick();
+    const secondSet = el.configService.sets[el.configService.sets.length - 1];
+    expect(Object.keys(secondSet.value.providers)).toEqual(["openai"]);
   });
 
   test("editing a provider's models persists the added/detected models", async () => {

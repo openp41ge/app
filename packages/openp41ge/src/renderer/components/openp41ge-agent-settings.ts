@@ -547,7 +547,14 @@ export class Openp41geAgentSettings extends LitElement {
     this._config = next;
     await this._persist(next);
     this._saving = false;
-    this._closeDrawer(d.id);
+    // Keep the drawer open so the user can keep editing. Rebind it to the
+    // (possibly newly created) provider id so a second Save updates rather
+    // than re-creating, and normalise the on-screen draft to what was saved.
+    this._updateDrawer(d.id, {
+      editId: id,
+      title: draft.name?.trim() || d.title,
+      draft,
+    });
   }
 
   private async _deleteProvider(d: ProviderDrawerState): Promise<void> {
