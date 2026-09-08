@@ -6,6 +6,7 @@
  */
 
 import type { TabController } from "../../controllers/types";
+import { createSettingsTabShell } from "../../services/settings-panel";
 import "../../components/openp41ge-file-editor-settings";
 
 export class FileEditorSettingsTabController implements TabController {
@@ -20,7 +21,7 @@ export class FileEditorSettingsTabController implements TabController {
   mount(container: HTMLElement): void {
     this._container = container;
     const el = document.createElement("openp41ge-file-editor-settings");
-    container.appendChild(el);
+    container.appendChild(createSettingsTabShell("Editor", el));
   }
 
   unmount(): void {

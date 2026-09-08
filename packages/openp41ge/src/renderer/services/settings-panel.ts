@@ -1,13 +1,12 @@
 /**
  * createSettingsPanel — minimal placeholder settings surface.
  *
- * Renders a titled panel with a short description. Used by sidebar-tab
- * settings grid tabs that don't (yet) have a bespoke settings component, so
- * every sidebar tab can provide its own settings surface. Real controls can
- * replace this when a feature's settings are fleshed out.
+ * Renders a short description for sidebar-tab settings grid tabs that don't
+ * (yet) have a bespoke settings component. The tab's name is shown by the
+ * surrounding `createSettingsTabShell` top bar, so this only renders content.
  */
 
-export function createSettingsPanel(title: string, description: string): HTMLElement {
+export function createSettingsPanel(description: string): HTMLElement {
   const root = document.createElement("div");
   root.dataset.settingsPanel = "true";
   Object.assign(root.style, {
@@ -18,15 +17,6 @@ export function createSettingsPanel(title: string, description: string): HTMLEle
     height: "100%",
     overflowY: "auto",
     boxSizing: "border-box",
-  });
-
-  const h = document.createElement("h2");
-  h.textContent = title;
-  Object.assign(h.style, {
-    fontSize: "14px",
-    fontWeight: "600",
-    margin: "0",
-    color: "var(--text-primary,#ccc)",
   });
 
   const p = document.createElement("p");
@@ -46,6 +36,74 @@ export function createSettingsPanel(title: string, description: string): HTMLEle
     color: "var(--text-muted,#888)",
   });
 
-  root.append(h, p, note);
+  root.append(p, note);
+  return root;
+}
+
+/**
+ * createSettingsTabShell — wraps a settings tab's content in a consistent
+ * chrome: a top bar showing the tab's name and an empty bottom bar.
+ *
+ * The shell is a flex column: [top bar (42px), body (flex:1), bottom bar
+ * (24px)]. The body hosts `content`, which is expected to fill it (e.g. a
+ * settings custom element whose `:host` is `height:100%`). The bottom bar is
+ * intentionally empty.
+ */
+export function createSettingsTabShell(label: string, content: HTMLElement): HTMLElement {
+  const root = document.createElement("div");
+  root.dataset.settingsTabShell = "true";
+  Object.assign(root.style, {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    minHeight: "0",
+    boxSizing: "border-box",
+    background: "var(--bg-primary,#1e1e1e)",
+  });
+
+  const topBar = document.createElement("div");
+  topBar.dataset.topBar = "true";
+  Object.assign(topBar.style, {
+    flexShrink: "0",
+    display: "flex",
+    alignItems: "center",
+    height: "43px",
+    padding: "0 14px",
+    borderBottom: "1px solid var(--divider,#333)",
+    background: "var(--bg-secondary,#252526)",
+    boxSizing: "border-box",
+  });
+
+  const title = document.createElement("span");
+  title.textContent = label;
+  Object.assign(title.style, {
+    fontSize: "11px",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    color: "var(--text-secondary,#999)",
+  });
+  topBar.appendChild(title);
+
+  const body = document.createElement("div");
+  Object.assign(body.style, {
+    flex: "1 1 auto",
+    minHeight: "0",
+    overflow: "hidden",
+    position: "relative",
+  });
+  body.appendChild(content);
+
+  const bottomBar = document.createElement("div");
+  bottomBar.dataset.bottomBar = "true";
+  Object.assign(bottomBar.style, {
+    flexShrink: "0",
+    height: "24px",
+    borderTop: "1px solid var(--divider,#333)",
+    background: "var(--bg-secondary,#252526)",
+    boxSizing: "border-box",
+  });
+
+  root.append(topBar, body, bottomBar);
   return root;
 }

@@ -5,7 +5,7 @@
  */
 
 import type { TabController } from "../../controllers/types";
-import { createSettingsPanel } from "../../services/settings-panel";
+import { createSettingsPanel, createSettingsTabShell } from "../../services/settings-panel";
 
 export class SearchSettingsTabController implements TabController {
   readonly tabId: string;
@@ -18,7 +18,9 @@ export class SearchSettingsTabController implements TabController {
 
   mount(container: HTMLElement): void {
     this._container = container;
-    container.appendChild(createSettingsPanel("Search", "Configure the Search panel."));
+    container.appendChild(
+      createSettingsTabShell("Search", createSettingsPanel("Configure the Search panel.")),
+    );
   }
 
   unmount(): void {

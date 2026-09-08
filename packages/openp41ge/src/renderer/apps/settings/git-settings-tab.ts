@@ -5,7 +5,7 @@
  */
 
 import type { TabController } from "../../controllers/types";
-import { createSettingsPanel } from "../../services/settings-panel";
+import { createSettingsPanel, createSettingsTabShell } from "../../services/settings-panel";
 
 export class HistorySettingsTabController implements TabController {
   readonly tabId: string;
@@ -18,7 +18,9 @@ export class HistorySettingsTabController implements TabController {
 
   mount(container: HTMLElement): void {
     this._container = container;
-    container.appendChild(createSettingsPanel("History", "Configure the History panel."));
+    container.appendChild(
+      createSettingsTabShell("History", createSettingsPanel("Configure the History panel.")),
+    );
   }
 
   unmount(): void {

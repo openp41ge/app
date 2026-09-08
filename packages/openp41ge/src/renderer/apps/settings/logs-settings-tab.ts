@@ -5,6 +5,7 @@
  */
 
 import type { TabController } from "../../controllers/types";
+import { createSettingsTabShell } from "../../services/settings-panel";
 import "../../components/openp41ge-logs-settings";
 
 export class LogsSettingsTabController implements TabController {
@@ -19,7 +20,7 @@ export class LogsSettingsTabController implements TabController {
   mount(container: HTMLElement): void {
     this._container = container;
     const el = document.createElement("openp41ge-logs-settings");
-    container.appendChild(el);
+    container.appendChild(createSettingsTabShell("Logs", el));
   }
 
   unmount(): void {
