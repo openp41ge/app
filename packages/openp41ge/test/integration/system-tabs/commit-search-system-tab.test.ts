@@ -207,10 +207,18 @@ describe("CommitSearchSystemTabController", () => {
     expect(repoFilter.parentElement === inputRow).toBe(false);
     // The field is flush (no card/border chrome, like the main search input)
     // and shown as its own row while the funnel icon is on, separated from the
-    // config-icon row above by a top border.
+    // config-icon row above by a full-width top border.
     const repoFilterRow = repoFilter.parentElement as HTMLElement;
     expect(repoFilterRow.style.display).toBe("flex");
     expect(repoFilterRow.style.borderTop).toBe("1px solid var(--divider,#333)");
+    // Negative side margins cancel the filter box's padding so the border runs
+    // edge-to-edge, while matching side padding keeps the field content aligned
+    // with the config icons. Vertical padding balances the space above/below.
+    expect(repoFilterRow.style.marginLeft).toBe("-10px");
+    expect(repoFilterRow.style.marginRight).toBe("-10px");
+    expect(repoFilterRow.style.paddingLeft).toBe("10px");
+    expect(repoFilterRow.style.paddingRight).toBe("10px");
+    expect(repoFilterRow.style.paddingTop).toBe("6px");
     // The field itself is chrome-free (no border/background), just like the
     // main search input, so it reads as a full-width row rather than a box.
     expect(getComputedStyle(repoFilter).borderStyle).toBe("none");
