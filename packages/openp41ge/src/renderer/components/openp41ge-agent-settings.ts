@@ -1014,47 +1014,6 @@ export class Openp41geAgentSettings extends LitElement {
           pointer-events: none;
           z-index: 1000;
         }
-        .drawer-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          flex-shrink: 0;
-          height: 44px;
-          padding: 0 14px;
-          border-bottom: 1px solid var(--divider, #333);
-        }
-        .drawer-title {
-          font-size: 13px;
-          font-weight: 600;
-          min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .drawer-actions {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-shrink: 0;
-        }
-        .dw-close {
-          border: none;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          font-size: 16px;
-          width: 26px;
-          height: 26px;
-          border-radius: 4px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
-        .dw-close:hover {
-          background: var(--bg-active, #37373d);
-          color: var(--text-primary, #ddd);
-        }
         .drawer-body {
           flex: 1;
           min-height: 0;
@@ -1408,22 +1367,6 @@ export class Openp41geAgentSettings extends LitElement {
               ></div>`
             : nothing
         }
-        <div class="drawer-head">
-          <div class="drawer-title">${d.title}</div>
-          <div class="drawer-actions">
-            <button
-              class="dw-close"
-              @click=${(e: Event) => {
-                e.stopPropagation();
-                this._closeDrawer(d.id);
-              }}
-              aria-label="Close"
-              title="Close"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
         <div class="drawer-body">
           ${d.kind === "model" ? this._modelDetail(d) : this._providerDetail(d)}
         </div>
@@ -1435,9 +1378,6 @@ export class Openp41geAgentSettings extends LitElement {
   private _renderClosingDrawer(c: ClosingDrawer): TemplateResult {
     return html`
       <div class="drawer drawer--closing" style="width:${c.width}%">
-        <div class="drawer-head">
-          <div class="drawer-title">${c.title}</div>
-        </div>
         <div class="drawer-body">
           ${c.kind === "model" ? this._modelDetail(c) : this._providerDetail(c)}
         </div>

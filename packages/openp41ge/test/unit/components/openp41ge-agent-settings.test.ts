@@ -104,7 +104,9 @@ describe("openp41ge-agent-settings", () => {
     q(el, ".ags-add-row").click();
     await tick();
     expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(1);
-    expect(q(el, ".drawer-title").textContent).toBe("New provider");
+    // There is no header/title row; the drawer relies on its footer for close.
+    expect(q(el, ".drawer-head")).toBeNull();
+    expect(q(el, ".drawer-title")).toBeNull();
     // The preset card is a closed selection trigger, not a radio grid.
     expect(q(el, ".drawer .ags-default-trigger .ags-default-row-name").textContent.trim()).toBe(
       "Custom",
