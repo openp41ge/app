@@ -195,7 +195,7 @@ describe("CommitSearchSystemTabController", () => {
     expect(repoFilterIcon).not.toBeNull();
     expect(repoFilterIcon.style.color).toBe("rgb(227, 227, 227)");
     // The repo scope is a text field (not a <select>), with its own regex +
-    // match-case toggles, bordered and below the config options row.
+    // match-case toggles, flush/full-width and below the config options row.
     const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
     expect(repoFilter).not.toBeNull();
     expect(repoFilter.tagName).toBe("INPUT"); // text field, not a native <select>
@@ -205,10 +205,15 @@ describe("CommitSearchSystemTabController", () => {
     expect(host.querySelector("[data-repo-case]")).not.toBeNull();
     // The repo filter field lives in the filter box, not on the main input row.
     expect(repoFilter.parentElement === inputRow).toBe(false);
-    // The field is bordered and shown while the funnel icon is on.
+    // The field is flush (no card/border chrome, like the main search input)
+    // and shown as its own row while the funnel icon is on.
     const repoFilterRow = repoFilter.parentElement as HTMLElement;
-    expect(repoFilterRow.style.border).not.toBe("");
+    expect(repoFilterRow.style.border).toBe("");
     expect(repoFilterRow.style.display).toBe("flex");
+    // The field itself is chrome-free (no border/background), just like the
+    // main search input, so it reads as a full-width row rather than a box.
+    expect(getComputedStyle(repoFilter).borderStyle).toBe("none");
+    expect(getComputedStyle(repoFilter).backgroundColor).toBe("rgba(0, 0, 0, 0)");
 
     // Depth-limit options: a fixed row next to the filter icon where exactly
     // one is active — ascending numerical order; 5K (5000) default white.

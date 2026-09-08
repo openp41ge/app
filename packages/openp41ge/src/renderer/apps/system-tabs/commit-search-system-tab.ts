@@ -368,21 +368,14 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
     filterBox.appendChild(filterIconRow);
 
-    // Repo filter config row — shown while the funnel icon is on. A separate
-    // text field that mirrors the main search input (full width, with its own
-    // regex + match-case toggles), bordered so it reads as a distinct filter.
+    // Repo filter config row — shown while the funnel icon is on. Mirrors the
+    // main search input: a flush, borderless full-width field with its own
+    // regex + match-case toggles, reading as its own row in the filter block.
     const repoFilterRow = document.createElement("div");
     Object.assign(repoFilterRow.style, {
-      position: "relative",
       display: this._repoFilterActive ? "flex" : "none",
       alignItems: "center",
       gap: "4px",
-      boxSizing: "border-box",
-      height: "26px",
-      padding: "0 8px",
-      border: "1px solid var(--divider,#333)",
-      borderRadius: "4px",
-      background: "var(--bg-secondary,#252526)",
     });
 
     const repoFilterInput = document.createElement("input");
@@ -394,7 +387,7 @@ export class CommitSearchSystemTabController implements SystemTabController {
       flex: "1",
       minWidth: "0",
       boxSizing: "border-box",
-      height: "100%",
+      height: "26px",
       padding: "0",
       fontSize: "12px",
       color: "var(--text-primary,#ccc)",
