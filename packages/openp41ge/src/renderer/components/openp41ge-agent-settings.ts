@@ -1352,9 +1352,10 @@ export class Openp41geAgentSettings extends LitElement {
           justify-content: space-between;
           gap: 12px;
           /* Bleed the separator to the card's left/right edges (the card has
-           * 14px horizontal padding), then re-pad the row content. */
+           * 14px horizontal padding), then re-pad the row content. No bottom
+           * padding — the card's own padding supplies the spacing below. */
           margin: 10px -14px 0;
-          padding: 10px 14px;
+          padding: 10px 14px 0;
           border-top: 1px solid var(--divider, #2f3031);
         }
         .ags-action-label {
