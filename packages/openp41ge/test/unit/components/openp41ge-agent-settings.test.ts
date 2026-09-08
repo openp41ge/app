@@ -293,6 +293,14 @@ describe("openp41ge-agent-settings", () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();
     await tick();
+    // Select the OpenAI preset; detection is disabled for the Custom default.
+    q(el, ".drawer .ags-preset-card .ags-default-trigger").click();
+    await tick();
+    const openaiPreset = qa(el, ".drawer .ags-preset-card .ags-default-row").find((o) =>
+      o.querySelector(".ags-default-row-name")?.textContent.includes("OpenAI"),
+    );
+    openaiPreset.click();
+    await tick();
     // Set a base URL so detection has an endpoint.
     const baseInput = q(el, ".drawer .ags-baseurl-input");
     baseInput.value = "https://api.openai.com/v1";
@@ -387,6 +395,14 @@ describe("openp41ge-agent-settings", () => {
     const el = await mount(AGENT({}, ""));
     q(el, ".ags-add-row").click();
     await tick();
+    // Select the OpenAI preset; detection is disabled for the Custom default.
+    q(el, ".drawer .ags-preset-card .ags-default-trigger").click();
+    await tick();
+    const openaiPreset = qa(el, ".drawer .ags-preset-card .ags-default-row").find((o) =>
+      o.querySelector(".ags-default-row-name")?.textContent.includes("OpenAI"),
+    );
+    openaiPreset.click();
+    await tick();
     const baseInput = q(el, ".drawer .ags-baseurl-input");
     baseInput.value = "https://api.openai.com/v1";
     baseInput.dispatchEvent(new Event("input", { bubbles: true }));
@@ -405,7 +421,7 @@ describe("openp41ge-agent-settings", () => {
   });
 
   test("Detect models is presented as an action row under the explanation", async () => {
-    const el = await mount(AGENT());
+    const el = await mount(AGENT({ openai: OPENAI }, "openai"));
     qa(el, ".ags-provider-row")[0].click();
     await tick();
     const row = qa(el, ".drawer .ags-action-row").find((r) =>
@@ -415,6 +431,24 @@ describe("openp41ge-agent-settings", () => {
     expect(row.querySelector(".ags-action-control button").textContent).toContain("Detect models");
     // The add-model data row is exempt from the action-row treatment.
     expect(q(el, ".drawer .ags-add-row").classList.contains("ags-action-row")).toBe(false);
+  });
+
+  test("Detect models is disabled for the custom preset", async () => {
+    const el = await mount(AGENT({}, ""));
+    q(el, ".ags-add-row").click();
+    await tick();
+    // The add-provider drawer defaults to the Custom preset.
+    const detectRow = qa(el, ".drawer .ags-action-row").find((r) =>
+      r.querySelector(".ags-action-control button")?.textContent.includes("Detect models"),
+    );
+    const btn = detectRow.querySelector(".ags-action-control button");
+    expect(btn.disabled).toBe(true);
+    expect(detectRow.querySelector(".ags-action-label").textContent).toContain("by hand");
+    // No detection is performed for a custom endpoint.
+    (window as any).openp41ge = { chat: { listModels: vi.fn() } };
+    await el._detectModels(el._drawers[0]);
+    await tick();
+    expect((window as any).openp41ge.chat.listModels).not.toHaveBeenCalled();
   });
 
   test("Test Connection lives in an Actions card and exposes View response", async () => {

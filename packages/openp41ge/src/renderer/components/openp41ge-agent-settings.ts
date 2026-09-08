@@ -626,6 +626,8 @@ export class Openp41geAgentSettings extends LitElement {
   private async _detectModels(d: ProviderDrawerState): Promise<void> {
     const baseUrl = d.draft.baseUrl.trim();
     if (!baseUrl) return;
+    // Detection isn't wired for a custom endpoint; users add models by hand.
+    if (d.presetId === CUSTOM_PRESET_ID) return;
     this._testing = true;
     this._detectedError = null;
     this._detectedMessage = null;
@@ -1065,6 +1067,11 @@ export class Openp41geAgentSettings extends LitElement {
         }
         .ags-action-control .dw-cancel:hover {
           background: rgba(255, 255, 255, 0.16);
+        }
+        .ags-action-control .dw-cancel:disabled {
+          background: rgba(255, 255, 255, 0.05);
+          color: var(--text-tertiary, #666);
+          cursor: not-allowed;
         }
         .dw-save {
           border: none;
@@ -1580,6 +1587,7 @@ export class Openp41geAgentSettings extends LitElement {
     draft: ProviderDraft,
     models: ModelConfig[],
   ): TemplateResult {
+    const isCustom = d.presetId === CUSTOM_PRESET_ID;
     return html`
       <div class="ags-card ags-card-gap" style="max-width:620px;">
         <label class="ags-card-question">Which models are available?</label>
@@ -1601,11 +1609,14 @@ export class Openp41geAgentSettings extends LitElement {
         ${this._detectedError ? html`<p class="ags-detect-note ags-detect-note--err">${this._detectedError}</p>` : nothing}
         <p class="ags-card-help">Add models by hand or detect them from the endpoint.</p>
         ${this._actionRow(
-          "Detect the models available from this endpoint.",
+          isCustom
+            ? "Add models by hand — detection isn't available for a custom endpoint."
+            : "Detect the models available from this endpoint.",
           html`
             <button
               class="dw-cancel"
-              ?disabled=${this._testing}
+              ?disabled=${this._testing || isCustom}
+              title=${isCustom ? "Custom endpoints require manual model entry." : nothing}
               @click=${() => void this._detectModels(d)}
             >
               ${this._testing ? "Detecting…" : "Detect models"}
