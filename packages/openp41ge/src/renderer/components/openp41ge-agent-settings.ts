@@ -1355,6 +1355,13 @@ export class Openp41geAgentSettings extends LitElement {
         .ags-action-control {
           flex-shrink: 0;
         }
+        /* A bare action row — used when it is the only content in a card and
+         * there is nothing above it to separate, so no top border / bleed. */
+        .ags-action-row--bare {
+          margin: 0;
+          padding: 0;
+          border-top: none;
+        }
         .ags-response {
           margin: 12px 0 0;
           padding: 10px;
@@ -1596,31 +1603,29 @@ export class Openp41geAgentSettings extends LitElement {
     const canDelete = d.kind === "model" ? d.modelIndex !== null : d.editId !== null;
     if (!canDelete) return nothing;
     const isModel = d.kind === "model";
+    // A single row: the description IS the action text, and the delete button
+    // sits beside it. No separate explanation paragraph or divider.
     const description = isModel
       ? "Delete this model permanently."
       : "Delete this provider permanently.";
-    const explanation = isModel
-      ? "This removes the model from the provider's list. Anything already configured to use it "
-          + "will stop working. This action can't be undone."
-      : "This removes the provider and any chats that use it from your available agents. "
-          + "This action can't be undone.";
     return html`
       <div class="ags-card ags-action-card" style="max-width:620px;">
-        <p class="ags-card-help">${explanation}</p>
-        ${this._actionRow(
-          description,
-          html`<button
-            class="ags-delete-btn"
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              void (isModel ? this._deleteModel(d) : this._deleteProvider(d));
-            }}
-            aria-label=${isModel ? "Delete model" : "Delete provider"}
-            title=${isModel ? "Delete model" : "Delete provider"}
-          >
-            ${this._deleteSvg()}
-          </button>`,
-        )}
+        <div class="ags-action-row ags-action-row--bare">
+          <span class="ags-action-label">${description}</span>
+          <span class="ags-action-control">
+            <button
+              class="ags-delete-btn"
+              @click=${(e: Event) => {
+                e.stopPropagation();
+                void (isModel ? this._deleteModel(d) : this._deleteProvider(d));
+              }}
+              aria-label=${isModel ? "Delete model" : "Delete provider"}
+              title=${isModel ? "Delete model" : "Delete provider"}
+            >
+              ${this._deleteSvg()}
+            </button>
+          </span>
+        </div>
       </div>
     `;
   }
