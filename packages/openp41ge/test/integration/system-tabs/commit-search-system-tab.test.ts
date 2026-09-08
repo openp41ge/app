@@ -206,10 +206,11 @@ describe("CommitSearchSystemTabController", () => {
     // The repo filter field lives in the filter box, not on the main input row.
     expect(repoFilter.parentElement === inputRow).toBe(false);
     // The field is flush (no card/border chrome, like the main search input)
-    // and shown as its own row while the funnel icon is on.
+    // and shown as its own row while the funnel icon is on, separated from the
+    // config-icon row above by a top border.
     const repoFilterRow = repoFilter.parentElement as HTMLElement;
-    expect(repoFilterRow.style.border).toBe("");
     expect(repoFilterRow.style.display).toBe("flex");
+    expect(repoFilterRow.style.borderTop).toBe("1px solid var(--divider,#333)");
     // The field itself is chrome-free (no border/background), just like the
     // main search input, so it reads as a full-width row rather than a box.
     expect(getComputedStyle(repoFilter).borderStyle).toBe("none");

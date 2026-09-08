@@ -371,11 +371,13 @@ export class CommitSearchSystemTabController implements SystemTabController {
     // Repo filter config row — shown while the funnel icon is on. Mirrors the
     // main search input: a flush, borderless full-width field with its own
     // regex + match-case toggles, reading as its own row in the filter block.
+    // A top border separates it from the config-icon row above.
     const repoFilterRow = document.createElement("div");
     Object.assign(repoFilterRow.style, {
       display: this._repoFilterActive ? "flex" : "none",
       alignItems: "center",
       gap: "4px",
+      borderTop: "1px solid var(--divider,#333)",
     });
 
     const repoFilterInput = document.createElement("input");
