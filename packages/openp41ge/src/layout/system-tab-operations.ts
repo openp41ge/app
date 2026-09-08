@@ -1,7 +1,7 @@
 /**
  * System tab operations — open, close, pin, reorder system tabs in sidebars.
  *
- * System tabs are sidebar-based app panels (Explorer, Git, Search, Projects).
+ * System tabs are sidebar-based app panels (Explorer, Git, Agents, Logs).
  * They live in `workspace.systemTabs` and each window has ordered lists of
  * system tab IDs for left and right sidebars.
  *

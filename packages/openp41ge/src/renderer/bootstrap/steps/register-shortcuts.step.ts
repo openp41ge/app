@@ -184,29 +184,6 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "View",
     });
 
-    // Cmd+Shift+F opens Search in the right sidebar
-    km.register({
-      modifiers: 12,
-      key: "f",
-      code: "KeyF",
-      handler: () => {
-        try {
-          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
-          if (!myWindowId) return;
-          emitEvent("tab-open-system", {
-            windowId: myWindowId,
-            side: "right",
-            appType: "search",
-            title: "Search",
-          });
-        } catch (_err) {
-          // ignore
-        }
-      },
-      description: "Open Search",
-      category: "View",
-    });
-
     km.register({
       modifiers: 12, // Meta + Shift
       key: "o",

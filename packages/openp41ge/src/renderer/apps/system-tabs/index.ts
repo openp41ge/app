@@ -5,16 +5,9 @@
 import type { SystemTabRegistration } from "../../controllers/types";
 import { ExplorerSystemTabController } from "./explorer-system-tab";
 import { CommitSearchSystemTabController } from "./commit-search-system-tab";
-import { SearchSystemTabController } from "./search-system-tab";
 import { AgentsSystemTabController } from "./agents-system-tab";
 import { LogsSystemTabController } from "./logs-system-tab";
-import {
-  explorerSettings,
-  agentsSettings,
-  gitSettings,
-  searchSettings,
-  logsSettings,
-} from "../settings/index";
+import { explorerSettings, agentsSettings, gitSettings, logsSettings } from "../settings/index";
 
 export const explorerSystemTabRegistration: SystemTabRegistration = {
   id: "explorer",
@@ -34,16 +27,6 @@ export const gitSystemTabRegistration: SystemTabRegistration = {
   defaultSide: "right",
   createController: (tabId, config) => new CommitSearchSystemTabController(tabId, config),
   settings: gitSettings,
-};
-
-export const searchSystemTabRegistration: SystemTabRegistration = {
-  id: "search",
-  label: "Search",
-  icon: "\uD83D\uDD0D",
-  description: "Full-text search across files",
-  defaultSide: "left",
-  createController: (tabId, config) => new SearchSystemTabController(tabId, config),
-  settings: searchSettings,
 };
 
 export const agentsSystemTabRegistration: SystemTabRegistration = {
@@ -70,7 +53,6 @@ export const logsSystemTabRegistration: SystemTabRegistration = {
 export const allSystemTabRegistrations: SystemTabRegistration[] = [
   explorerSystemTabRegistration,
   gitSystemTabRegistration,
-  searchSystemTabRegistration,
   agentsSystemTabRegistration,
   logsSystemTabRegistration,
 ];

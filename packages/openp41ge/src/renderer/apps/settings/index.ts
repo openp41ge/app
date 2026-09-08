@@ -11,7 +11,6 @@
 import { FileEditorSettingsTabController } from "./file-editor-settings-tab";
 import { AgentSettingsTabController } from "./agent-settings-tab";
 import { HistorySettingsTabController } from "./git-settings-tab";
-import { SearchSettingsTabController } from "./search-settings-tab";
 import { LogsSettingsTabController } from "./logs-settings-tab";
 import type { SystemTabSettings } from "../../controllers/types";
 
@@ -43,16 +42,6 @@ export const gitSettings: SystemTabSettings = {
   description: "Configure the History panel",
   openEvent: "openp41ge:open-git-settings",
   createController: (tabId) => new HistorySettingsTabController(tabId),
-};
-
-/** Search tab's settings. */
-export const searchSettings: SystemTabSettings = {
-  appType: "search-settings",
-  label: "Search",
-  icon: "⚙",
-  description: "Configure the Search panel",
-  openEvent: "openp41ge:open-search-settings",
-  createController: (tabId) => new SearchSettingsTabController(tabId),
 };
 
 /** Logs tab's settings. */

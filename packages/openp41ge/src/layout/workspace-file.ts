@@ -58,13 +58,67 @@ export function emptyWorkspaceSession(): WorkspaceSession {
   };
 }
 
+/** System-tab appTypes that have been removed from the product. */
+const OBSOLETE_SYSTEM_TAB_APPTYPES = new Set(["search"]);
+
+/**
+ * Strip system tabs whose appType is no longer a registered sidebar panel
+ * (e.g. the retired "Search" tab). Removes each dead tab from `systemTabs`,
+ * from the shared sidebar tab lists, and as a window's active sidebar tab.
+ * Idempotent — a clean file is returned unchanged.
+ */
+function stripObsoleteSystemTabs(data: WorkspaceFileData): WorkspaceFileData {
+  const systemTabs = { ...(data.systemTabs ?? {}) };
+  const removed = new Set<string>();
+  for (const [id, raw] of Object.entries(systemTabs)) {
+    const tab = raw as { appType?: string } | undefined;
+    if (tab?.appType && OBSOLETE_SYSTEM_TAB_APPTYPES.has(tab.appType)) {
+      removed.add(id);
+      delete systemTabs[id];
+    }
+  }
+  if (removed.size === 0) return data;
+
+  const shared = data.sharedSidebars ?? emptySharedSidebars();
+  const filterIds = (ids?: string[]): string[] => (ids ?? []).filter((id) => !removed.has(id));
+  const windows = (data.windows ?? []).map((w) => {
+    const sidebar = w.sidebar;
+    if (!sidebar) return w;
+    return {
+      ...w,
+      sidebar: {
+        ...sidebar,
+        activeLeftTab:
+          sidebar.activeLeftTab && removed.has(sidebar.activeLeftTab)
+            ? null
+            : sidebar.activeLeftTab,
+        activeRightTab:
+          sidebar.activeRightTab && removed.has(sidebar.activeRightTab)
+            ? null
+            : sidebar.activeRightTab,
+      },
+    };
+  });
+
+  return {
+    ...data,
+    systemTabs,
+    sharedSidebars: {
+      ...shared,
+      leftSidebarTabs: filterIds(shared.leftSidebarTabs),
+      rightSidebarTabs: filterIds(shared.rightSidebarTabs),
+    },
+    windows,
+  };
+}
+
 /**
  * Migrate any raw workspace-file JSON to the current v2 shape, filling defaults
  * for the manifest-only (v1) and partial inputs. Never throws.
  */
 export function migrateWorkspaceFileData(raw: unknown): WorkspaceFileData {
   const obj = (raw && typeof raw === "object" ? raw : {}) as Partial<WorkspaceFileData>;
-  return {
+  return stripObsoleteSystemTabs({
     ...obj,
     id: obj.id ?? "",
     version: WORKSPACE_FILE_VERSION,
@@ -77,7 +131,7 @@ export function migrateWorkspaceFileData(raw: unknown): WorkspaceFileData {
     scopedFolders: obj.scopedFolders ?? [],
     sharedSidebars: obj.sharedSidebars ?? emptySharedSidebars(),
     windows: obj.windows ?? [],
-  } as WorkspaceFileData;
+  } as WorkspaceFileData);
 }
 
 /** Extract the session (shared + per-window state) from a layout Workspace. */

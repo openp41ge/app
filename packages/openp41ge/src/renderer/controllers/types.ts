@@ -114,7 +114,7 @@ export interface SystemTabSettings {
 /**
  * Registration record for a system tab type.
  *
- * System tabs are sidebar-based app panels (Explorer, Git, Search, Projects).
+ * System tabs are sidebar-based app panels (Explorer, Git, Agents, Logs).
  * They are separate from editor tab types and use a simpler lifecycle.
  */
 export interface SystemTabRegistration {
