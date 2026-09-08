@@ -63,6 +63,19 @@ function makeSearchRow(repoName: string, hash: string, shortHash: string): HTMLE
   return row;
 }
 
+/** A sidebar tab button (e.g. the History tab) inside an openp41ge-sidebar. */
+function makeSidebarTab(title: string, id: string): HTMLElement {
+  const sidebar = document.createElement("openp41ge-sidebar");
+  const tab = document.createElement("div");
+  tab.setAttribute("data-sidebar-tab-id", id);
+  tab.setAttribute("data-sidebar-side", "left");
+  tab.setAttribute("data-tab-title", title);
+  tab.textContent = title;
+  sidebar.appendChild(tab);
+  document.body.appendChild(sidebar);
+  return tab;
+}
+
 function mouseDown(el: HTMLElement, opts: { x?: number; y?: number; button?: number } = {}) {
   el.dispatchEvent(
     new MouseEvent("mousedown", {
@@ -186,6 +199,35 @@ describe("git-entry drag wiring (init-drag-system)", () => {
       appType: "git-repository",
       tabConfig: { repoName: "acme", branch: "main" },
     });
+  });
+
+  it("a stale sidebar-tab click does not hijack a search-result drag bitmap", () => {
+    // A plain click on a sidebar tab (e.g. History) must NOT leave a deferred
+    // sidebar-tab start. Otherwise the first POSITION event runs the sidebar
+    // branch FIRST (it precedes _pendingGitEntryDragStart in the else-if chain)
+    // and fires drag.start with kind "sidebar-tab", capturing the sidebar tab
+    // button's bitmap instead of the searched row's.
+    const tab = makeSidebarTab("History", "sys-history");
+
+    // Click the History tab (mousedown + mouseup, no drag).
+    mouseDown(tab);
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
+
+    // Then very quickly begin a drag of a search result.
+    const row = makeSearchRow("acme", "0123456789abcdef0123456789abcdef0123456789", "0123456");
+    mouseDown(row);
+    firstPosition();
+
+    expect(dragStart).toHaveBeenCalledTimes(1);
+    const args = dragStart.mock.calls[0];
+    // Must be the search-result (open-tab) drag, not a sidebar-tab drag.
+    expect(args[11]).toBe("open-tab");
+    expect(args[15]).toEqual({
+      appType: "git-commit-search",
+      tabConfig: { repoName: "acme", hash: "0123456789abcdef0123456789abcdef0123456789" },
+    });
+    // The search-result deferred start must be consumed, not left stale.
+    expect(hooks().getGitEntryPendingStart()).toBeNull();
   });
 
   it("mouseup restores the row's native draggable and clears the deferred start", () => {
@@ -377,9 +419,18 @@ describe("git-entry drag wiring (init-drag-system)", () => {
     // the HEAD band (y=20, h=24), never the full row (which would include the
     // 40px sub-row and sit at y=0).
     head.getBoundingClientRect = () =>
-      ({ x: 0, y: 20, width: 300, height: 24, top: 20, left: 0, right: 300, bottom: 44 } as DOMRect);
+      ({
+        x: 0,
+        y: 20,
+        width: 300,
+        height: 24,
+        top: 20,
+        left: 0,
+        right: 300,
+        bottom: 44,
+      }) as DOMRect;
     row.getBoundingClientRect = () =>
-      ({ x: 0, y: 0, width: 300, height: 64, top: 0, left: 0, right: 300, bottom: 64 } as DOMRect);
+      ({ x: 0, y: 0, width: 300, height: 64, top: 0, left: 0, right: 300, bottom: 64 }) as DOMRect;
 
     mouseDown(row);
     const pending = hooks().getGitEntryPendingStart() as {

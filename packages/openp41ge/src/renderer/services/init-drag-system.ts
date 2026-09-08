@@ -876,6 +876,7 @@ export function initDragSystem(): () => void {
   // ── Mouseup: handle cross-window drops ───────────────────────────────
   const onMouseUp = async (e: MouseEvent) => {
     _pendingDragStart = null;
+    _pendingSidebarDragStart = null;
     _pendingFileDragStart = null;
     _pendingGitEntryDragStart = null;
     _pendingLogStreamDragStart = null;
@@ -1151,6 +1152,7 @@ export function initDragSystem(): () => void {
     _localFileDragActive = false;
     _pendingFileDetachPath = null;
     _fileDropHandled = false;
+    _pendingSidebarDragStart = null;
     _pendingGitEntryDragStart = null;
     _pendingLogStreamDragStart = null;
     _suppressGitEntryRowClick = false;
