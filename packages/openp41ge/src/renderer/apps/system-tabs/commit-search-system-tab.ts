@@ -64,14 +64,13 @@ export class CommitSearchSystemTabController implements SystemTabController {
   private _repoFilterActive = true;
   private _repoFilterIcon: HTMLButtonElement | null = null;
   private _repoFilterRow: HTMLElement | null = null;
-  private _repoFilter: HTMLButtonElement | null = null; // custom-select trigger
-  private _repoSelectLabel: HTMLElement | null = null;
-  private _repoOptions: HTMLElement | null = null;
-  private _repoActiveIndex = -1;
-  // Repo scope: empty set = all repos, otherwise the selected repo names.
-  private _selectedRepos = new Set<string>();
-  private _repoMenuOpen = false;
-  private _onRepoDocPointerDown: ((ev: PointerEvent) => void) | null = null;
+  private _repoFilterInput: HTMLInputElement | null = null;
+  private _repoFilterRegexBtn: HTMLButtonElement | null = null;
+  private _repoFilterCaseBtn: HTMLButtonElement | null = null;
+  // Repo filter scope: empty = all repos; otherwise a pattern matched against
+  // repo names with regex + case-sensitivity when those toggles are on.
+  private _repoFilterRegex = false;
+  private _repoFilterCase = false;
   // Search depth limit — one active option among the icon row (default 5K).
   private _maxCount = 5000;
   private _limitOptions: HTMLButtonElement[] = [];
@@ -369,67 +368,46 @@ export class CommitSearchSystemTabController implements SystemTabController {
 
     filterBox.appendChild(filterIconRow);
 
-    // Repo filter config row — shown while the funnel icon is on. A custom
-    // (non-native) select, same box look as the text input it replaces.
+    // Repo filter config row — shown while the funnel icon is on. A separate
+    // text field that mirrors the main search input (full width, with its own
+    // regex + match-case toggles), bordered so it reads as a distinct filter.
     const repoFilterRow = document.createElement("div");
     Object.assign(repoFilterRow.style, {
       position: "relative",
       display: this._repoFilterActive ? "flex" : "none",
-    });
-
-    const repoFilter = document.createElement("button");
-    repoFilter.type = "button";
-    repoFilter.dataset.repoFilter = "";
-    this._attachTooltip(repoFilter, "Filter by repo");
-    Object.assign(repoFilter.style, {
-      width: "100%",
-      boxSizing: "border-box",
-      height: "24px",
-      display: "flex",
       alignItems: "center",
-      gap: "6px",
+      gap: "4px",
+      boxSizing: "border-box",
+      height: "26px",
       padding: "0 8px",
-      fontSize: "11px",
-      color: "var(--text-primary,#ccc)",
-      background: "var(--bg-secondary,#252526)",
       border: "1px solid var(--divider,#333)",
       borderRadius: "4px",
-      outline: "none",
-      cursor: "pointer",
+      background: "var(--bg-secondary,#252526)",
     });
-    const repoSelectLabel = document.createElement("span");
-    repoSelectLabel.textContent = "All repos";
-    Object.assign(repoSelectLabel.style, {
-      flex: "1",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      textAlign: "left",
-    });
-    const repoChevron = document.createElement("span");
-    repoChevron.textContent = "▾";
-    Object.assign(repoChevron.style, { flexShrink: "0", color: "var(--text-secondary,#888)" });
-    repoFilter.appendChild(repoSelectLabel);
-    repoFilter.appendChild(repoChevron);
-    repoFilterRow.appendChild(repoFilter);
 
-    const repoOptions = document.createElement("div");
-    repoOptions.dataset.repoOptions = "";
-    Object.assign(repoOptions.style, {
-      display: "none",
-      position: "absolute",
-      top: "100%",
-      left: "0",
-      right: "0",
-      zIndex: "20",
-      maxHeight: "180px",
-      overflowY: "auto",
-      background: "var(--bg-secondary,#252526)",
-      border: "1px solid var(--divider,#333)",
-      borderRadius: "4px",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+    const repoFilterInput = document.createElement("input");
+    repoFilterInput.type = "text";
+    repoFilterInput.placeholder = "Filter repos…";
+    repoFilterInput.setAttribute("spellcheck", "false");
+    repoFilterInput.dataset.repoFilter = "";
+    Object.assign(repoFilterInput.style, {
+      flex: "1",
+      minWidth: "0",
+      boxSizing: "border-box",
+      height: "100%",
+      padding: "0",
+      fontSize: "12px",
+      color: "var(--text-primary,#ccc)",
+      background: "transparent",
+      border: "none",
+      outline: "none",
     });
-    repoFilterRow.appendChild(repoOptions);
+    const repoRegexToggle = makeIconToggle(REGEX_ICON, "Repo filter regex", "repoRegex");
+    const repoCaseToggle = makeIconToggle(CASE_ON_ICON, "Repo filter match case", "repoCase");
+
+    repoFilterRow.appendChild(repoFilterInput);
+    repoFilterRow.appendChild(repoRegexToggle);
+    repoFilterRow.appendChild(repoCaseToggle);
     filterBox.appendChild(repoFilterRow);
     wrapper.appendChild(filterBox);
 
@@ -483,9 +461,9 @@ export class CommitSearchSystemTabController implements SystemTabController {
       filterIconRow.querySelectorAll<HTMLButtonElement>("[data-limit-option]"),
     );
     this._repoFilterRow = repoFilterRow;
-    this._repoFilter = repoFilter;
-    this._repoSelectLabel = repoSelectLabel;
-    this._repoOptions = repoOptions;
+    this._repoFilterInput = repoFilterInput;
+    this._repoFilterRegexBtn = repoRegexToggle;
+    this._repoFilterCaseBtn = repoCaseToggle;
     this._results = results;
     this._footer = footer;
 
@@ -516,58 +494,30 @@ export class CommitSearchSystemTabController implements SystemTabController {
     regexToggle.addEventListener("click", () => this._toggleRegex());
     caseToggle.addEventListener("click", () => this._toggleCase());
     repoFilterIcon.addEventListener("click", () => this._toggleRepoFilter());
-    repoFilter.addEventListener("click", () => this._toggleRepoMenu());
-    repoFilter.addEventListener("keydown", (e: KeyboardEvent) => {
-      const n = this._repoOptions?.children.length ?? 0;
-      if (e.key === "ArrowDown") {
+    repoFilterInput.addEventListener("input", () => this._debounce());
+    repoFilterInput.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
         e.preventDefault();
-        if (!this._repoMenuOpen) {
-          this._openRepoMenu();
-        } else {
-          this._repoActiveIndex = n === 0 ? 0 : (this._repoActiveIndex + 1) % n;
-          this._renderRepoOptions();
-        }
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        this._repoActiveIndex = n === 0 ? 0 : Math.max(0, this._repoActiveIndex - 1);
-        this._renderRepoOptions();
-      } else if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        if (!this._repoMenuOpen) {
-          this._openRepoMenu();
-        } else {
-          const box = this._repoOptions;
-          const item = box
-            ? (box.children[this._repoActiveIndex] as HTMLElement | undefined)
-            : undefined;
-          if (item?.dataset.repoOption !== undefined) {
-            this._toggleRepo(item.dataset.repoOption);
-          }
-        }
+        this._schedule();
+        void this._runSearch();
       } else if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        this._hideRepoMenu();
+        if (repoFilterInput.value) {
+          repoFilterInput.value = "";
+          this._debounce();
+        }
       }
     });
-
-    // Close the repo menu when clicking anywhere outside it.
-    this._onRepoDocPointerDown = (ev: PointerEvent) => {
-      if (
-        this._repoMenuOpen &&
-        this._repoFilterRow &&
-        !this._repoFilterRow.contains(ev.target as Node)
-      ) {
-        this._hideRepoMenu();
-      }
-    };
-    document.addEventListener("pointerdown", this._onRepoDocPointerDown);
+    repoRegexToggle.addEventListener("click", () => this._toggleRepoFilterRegex());
+    repoCaseToggle.addEventListener("click", () => this._toggleRepoFilterCase());
 
     // Both icons default on → render them white (enabled) immediately.
     this._applyToggleStyles();
     this._applySearchToggleStyles();
     this._applyFilterIconStyle();
     this._applyLimitStyles();
+    this._applyRepoFilterToggleStyles();
 
     // Load repoNames for the repo-filter autocomplete, then render states.
     void this._loadRepos();
@@ -643,23 +593,41 @@ export class CommitSearchSystemTabController implements SystemTabController {
     // The repo scope is the current workspace's connected repos — never the
     // whole repo directory (which would include leftover/removed folders).
     this._repos = this._connectedRepoOptions();
-    // Drop selected repos that are no longer present (empty set = all).
-    for (const name of [...this._selectedRepos]) {
-      if (!this._repos.some((r) => r.name === name)) this._selectedRepos.delete(name);
-    }
-    this._updateRepoSelectLabel();
     // Repo availability changed the empty-state hint — re-render it once.
     if (!this._input?.value.trim()) {
       this._renderEmptyQuery();
     }
   }
 
-  // ── Repo filter (custom multi-select: trigger + dropdown) ────────────
+  // ── Repo filter (text field + regex/case toggles) ────────────────────
 
-  /** Current repo scope: the picked repo names, or null = all repos. */
+  /** The active repo-filter pattern, or "" when the filter is off/empty. */
+  private _repoFilterPattern(): string {
+    return this._repoFilterActive ? (this._repoFilterInput?.value ?? "").trim() : "";
+  }
+
+  /**
+   * Current repo scope: the connected repo names matching the filter pattern,
+   * or null (all repos) when the filter is off/empty. An empty array means the
+   * filter is active but matched no connected repo.
+   */
   private _repoScope(): string[] | null {
     if (!this._repoFilterActive) return null;
-    return this._selectedRepos.size > 0 ? [...this._selectedRepos] : null;
+    const pattern = this._repoFilterPattern();
+    if (!pattern) return null;
+    const names = this._connectedRepoOptions().map((r) => r.name);
+    if (this._repoFilterRegex) {
+      try {
+        const re = new RegExp(pattern, this._repoFilterCase ? "" : "i");
+        return names.filter((n) => re.test(n));
+      } catch {
+        // Invalid regex — fall through to a literal substring match below.
+      }
+    }
+    const needle = this._repoFilterCase ? pattern : pattern.toLowerCase();
+    return names.filter((n) =>
+      this._repoFilterCase ? n.includes(needle) : n.toLowerCase().includes(needle),
+    );
   }
 
   private _toggleRepoFilter(): void {
@@ -668,7 +636,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
     if (this._repoFilterRow) {
       this._repoFilterRow.style.display = this._repoFilterActive ? "flex" : "none";
     }
-    if (!this._repoFilterActive) this._hideRepoMenu();
     if (this._input?.value.trim()) {
       this._debounce();
     } else {
@@ -676,93 +643,38 @@ export class CommitSearchSystemTabController implements SystemTabController {
     }
   }
 
-  private _toggleRepoMenu(): void {
-    if (this._repoMenuOpen) {
-      this._hideRepoMenu();
-    } else {
-      this._openRepoMenu();
+  private _toggleRepoFilterRegex(): void {
+    this._repoFilterRegex = !this._repoFilterRegex;
+    this._applyRepoFilterToggleStyles();
+    if (this._input?.value.trim()) this._debounce();
+    else this._renderEmptyQuery();
+  }
+
+  private _toggleRepoFilterCase(): void {
+    this._repoFilterCase = !this._repoFilterCase;
+    this._applyRepoFilterToggleStyles();
+    if (this._input?.value.trim()) this._debounce();
+    else this._renderEmptyQuery();
+  }
+
+  private _applyRepoFilterToggleStyles(): void {
+    if (this._repoFilterRegexBtn) {
+      this._repoFilterRegexBtn.style.color = this._repoFilterRegex
+        ? "#e3e3e3"
+        : "var(--text-secondary,#888)";
     }
-  }
-
-  private _openRepoMenu(): void {
-    if (!this._repoOptions) return;
-    this._renderRepoOptions();
-    this._repoMenuOpen = true;
-  }
-
-  private _hideRepoMenu(): void {
-    if (this._repoOptions) this._repoOptions.style.display = "none";
-    this._repoMenuOpen = false;
-    this._repoActiveIndex = -1;
-  }
-
-  private _renderRepoOptions(): void {
-    const box = this._repoOptions;
-    if (!box) return;
-    box.replaceChildren();
-    const items: Array<{ value: string; label: string }> = [
-      { value: "", label: "All repos" },
-      ...this._repos.map((r) => ({ value: r.name, label: r.name })),
-    ];
-    if (items.length === 0) {
-      box.style.display = "none";
-      this._repoMenuOpen = false;
-      this._repoActiveIndex = -1;
-      return;
+    if (this._repoFilterCaseBtn) {
+      // Always render the 'match case on' glyph; the state is shown purely by
+      // colour (on = bright, off = muted). No glyph swap.
+      this._repoFilterCaseBtn.innerHTML = CASE_ON_ICON;
+      this._repoFilterCaseBtn.style.color = this._repoFilterCase
+        ? "#e3e3e3"
+        : "var(--text-secondary,#888)";
+      this._attachTooltip(
+        this._repoFilterCaseBtn,
+        this._repoFilterCase ? "Repo filter match case (on)" : "Repo filter match case (off)",
+      );
     }
-    this._repoActiveIndex = 0;
-    items.forEach((item, i) => {
-      const opt = document.createElement("div");
-      opt.dataset.repoOption = item.value;
-      const selected = item.value !== "" && this._selectedRepos.has(item.value);
-      opt.textContent = selected ? `✓ ${item.label}` : item.label;
-      Object.assign(opt.style, {
-        padding: "3px 8px",
-        fontSize: "11px",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        color: "var(--text-primary,#ccc)",
-      });
-      if (selected) opt.style.color = "#4a9eff";
-      if (i === this._repoActiveIndex) opt.style.background = "var(--bg-hover,#2a2d2e)";
-      opt.addEventListener("mousedown", (e: MouseEvent) => {
-        e.preventDefault(); // keep focus on the trigger
-        this._toggleRepo(item.value);
-      });
-      box.appendChild(opt);
-    });
-    box.style.display = "block";
-  }
-
-  /** Toggle a repo in/out of the selected set; "" clears back to All repos. */
-  private _toggleRepo(value: string): void {
-    if (value === "") {
-      this._selectedRepos.clear();
-      this._hideRepoMenu();
-    } else if (this._selectedRepos.has(value)) {
-      this._selectedRepos.delete(value);
-    } else {
-      this._selectedRepos.add(value);
-    }
-    this._updateRepoSelectLabel();
-    if (this._input?.value.trim()) {
-      this._debounce();
-    } else {
-      this._renderEmptyQuery();
-    }
-  }
-
-  private _updateRepoSelectLabel(): void {
-    if (!this._repoSelectLabel) return;
-    const names = [...this._selectedRepos];
-    this._repoSelectLabel.textContent =
-      names.length === 0
-        ? "All repos"
-        : names.length <= 2
-          ? names.join(", ")
-          : `${names[0]}, ${names[1]} +${names.length - 2}`;
   }
 
   private _applyFilterIconStyle(): void {
@@ -938,6 +850,8 @@ export class CommitSearchSystemTabController implements SystemTabController {
     results.replaceChildren();
     if (this._repos.length === 0) {
       results.appendChild(this._message("No repositories to search", "var(--text-secondary,#999)"));
+    } else if (this._repoFilterPattern() && this._repoScope()?.length === 0) {
+      results.appendChild(this._message("No repos match the filter", "var(--text-muted,#777)"));
     } else {
       results.appendChild(
         this._message(
@@ -965,10 +879,6 @@ export class CommitSearchSystemTabController implements SystemTabController {
       document.removeEventListener("git:refresh", this._onGitRefresh);
       this._onGitRefresh = null;
     }
-    if (this._onRepoDocPointerDown) {
-      document.removeEventListener("pointerdown", this._onRepoDocPointerDown);
-      this._onRepoDocPointerDown = null;
-    }
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
     this._searchToken += 1; // cancel any in-flight search
@@ -983,10 +893,9 @@ export class CommitSearchSystemTabController implements SystemTabController {
     this._caseToggle = null;
     this._repoFilterIcon = null;
     this._repoFilterRow = null;
-    this._repoFilter = null;
-    this._repoSelectLabel = null;
-    this._repoOptions = null;
-    this._selectedRepos.clear();
+    this._repoFilterInput = null;
+    this._repoFilterRegexBtn = null;
+    this._repoFilterCaseBtn = null;
     this._limitOptions = [];
     this._results = null;
     this._footer = null;

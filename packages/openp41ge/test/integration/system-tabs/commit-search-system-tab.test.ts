@@ -85,7 +85,7 @@ const testOpenData = (repos: WorkspaceFileData["repos"]): WorkspaceFileData =>
     version: 1,
     dataDir: "/data",
     repos,
-  } as WorkspaceFileData);
+  }) as WorkspaceFileData;
 
 type Events = { openCommit: CustomEvent[]; openFile: CustomEvent[]; openCommitFile: CustomEvent[] };
 
@@ -194,13 +194,21 @@ describe("CommitSearchSystemTabController", () => {
     const repoFilterIcon = host.querySelector<HTMLButtonElement>('[data-filter-icon="repo"]')!;
     expect(repoFilterIcon).not.toBeNull();
     expect(repoFilterIcon.style.color).toBe("rgb(227, 227, 227)");
-    const repoFilter = host.querySelector<HTMLButtonElement>("[data-repo-filter]")!;
+    // The repo scope is a text field (not a <select>), with its own regex +
+    // match-case toggles, bordered and below the config options row.
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
     expect(repoFilter).not.toBeNull();
-    expect(repoFilter.tagName).toBe("BUTTON"); // custom select, not a native <select>
-    expect(repoFilter.textContent).toContain("All repos");
+    expect(repoFilter.tagName).toBe("INPUT"); // text field, not a native <select>
+    expect(repoFilter.placeholder).toContain("Filter repos");
     expect(host.querySelector("[data-repo-filter] select")).toBeNull();
-    // The repo filter lives in the filter box, not on the main input row.
+    expect(host.querySelector("[data-repo-regex]")).not.toBeNull();
+    expect(host.querySelector("[data-repo-case]")).not.toBeNull();
+    // The repo filter field lives in the filter box, not on the main input row.
     expect(repoFilter.parentElement === inputRow).toBe(false);
+    // The field is bordered and shown while the funnel icon is on.
+    const repoFilterRow = repoFilter.parentElement as HTMLElement;
+    expect(repoFilterRow.style.border).not.toBe("");
+    expect(repoFilterRow.style.display).toBe("flex");
 
     // Depth-limit options: a fixed row next to the filter icon where exactly
     // one is active — ascending numerical order; 5K (5000) default white.
@@ -244,22 +252,24 @@ describe("CommitSearchSystemTabController", () => {
     const configButtons = [
       find('[data-search-into="files"]'),
       find('[data-search-into="content"]'),
-      find('[data-search-regex]'),
-      find('[data-search-case]'),
+      find("[data-search-regex]"),
+      find("[data-search-case]"),
       find('[data-filter-icon="repo"]'),
       find('[data-limit-option="5000"]'),
-      find('[data-repo-filter]'),
+      find("[data-repo-regex]"),
+      find("[data-repo-case]"),
     ];
     // No native tooltip anywhere on the config controls — the custom system
     // replaces it.
     for (const b of configButtons) expect(b.hasAttribute("title")).toBe(false);
 
     // Hovering a toggle surfaces the custom tooltip with its descriptive label.
-    const caseBtn = find('[data-search-case]');
+    const caseBtn = find("[data-search-case]");
     caseBtn.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 180));
-    const popup =
-      document.querySelector("openp41ge-tooltip-host")?.querySelector('[role="tooltip"]');
+    const popup = document
+      .querySelector("openp41ge-tooltip-host")
+      ?.querySelector('[role="tooltip"]');
     expect(popup).not.toBeNull();
     expect(popup?.querySelector(".tt-panel")?.textContent).toContain("Match case");
     caseBtn.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
@@ -313,44 +323,87 @@ describe("CommitSearchSystemTabController", () => {
     expect(model.calls.at(-1)?.options.query).toBe("readme");
   });
 
-  it("repo filter is a custom multi-select: pick several repos, clear with All repos", async () => {
-    const repoFilter = host.querySelector<HTMLButtonElement>("[data-repo-filter]")!;
-    repoFilter.click(); // opens the dropdown
-    const opts = Array.from(
-      host.querySelectorAll<HTMLElement>("[data-repo-options] [data-repo-option]"),
-    );
-    // "All repos" first, then each workspace repo.
-    expect(opts.map((o) => o.dataset.repoOption)).toEqual(["", "acme", "globex", "innova"]);
-    expect(opts[0].textContent).toContain("All repos"); // empty selection default
-
+  it("repo filter is a text field: empty means all repos, a typed name scopes the search", async () => {
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
     const model = controller["_searchModel"] as TestCommitSearchModel;
 
-    // Pick two repos — the menu stays open so more can be toggled.
-    opts[1].dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); // acme
-    expect(repoFilter.textContent).toContain("acme");
-    opts[2].dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); // globex
-    expect(repoFilter.textContent).toContain("acme");
-    expect(repoFilter.textContent).toContain("globex");
-
+    // Empty filter → every connected repo is searched.
     await search(controller, "readme");
-    expect(model.calls.at(-1)?.repoNames).toEqual(["acme", "globex"]);
+    expect(model.calls.at(-1)?.repoNames).toEqual(connectedRepos.map((r) => r.url));
 
-    // Picking "All repos" clears the multi-selection back to all connected repos.
-    repoFilter.click(); // menu closed after All repos → reopen
-    host
-      .querySelector<HTMLElement>('[data-repo-options] [data-repo-option=""]')!
-      .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    // A typed name scopes the search to the matching repo.
+    repoFilter.value = "acme";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
+    await search(controller, "readme");
+    expect(model.calls.at(-1)?.repoNames).toEqual(["acme"]);
+
+    // A substring matches repo names (case-insensitive by default).
+    repoFilter.value = "GLOB";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
+    await search(controller, "readme");
+    expect(model.calls.at(-1)?.repoNames).toEqual(["globex"]);
+
+    // Clearing the field returns to all repos.
+    repoFilter.value = "";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
     await search(controller, "readme");
     expect(model.calls.at(-1)?.repoNames).toEqual(connectedRepos.map((r) => r.url));
   });
 
+  it("repo filter regex + match-case toggles scope the repo list by pattern", async () => {
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    const repoRegex = host.querySelector<HTMLButtonElement>("[data-repo-regex]")!;
+    const repoCase = host.querySelector<HTMLButtonElement>("[data-repo-case]")!;
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+
+    await search(controller, "readme");
+    expect(model.calls.at(-1)?.repoNames).toEqual(connectedRepos.map((r) => r.url));
+
+    // Regex mode: ^g matches only repos starting with "g" (globex).
+    repoFilter.value = "^g";
+    repoRegex.click();
+    expect(repoRegex.style.color).toBe("rgb(227, 227, 227)"); // regex on
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
+    await search(controller, "readme");
+    expect(model.calls.at(-1)?.repoNames).toEqual(["globex"]);
+
+    // Case-sensitive (off by default) — "GLOB" matches globex case-insensitively.
+    repoFilter.value = "GLOB";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
+    await search(controller, "readme");
+    expect(model.calls.at(-1)?.repoNames).toEqual(["globex"]);
+
+    repoCase.click();
+    expect(repoCase.style.color).toBe("rgb(227, 227, 227)"); // case on
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
+    await search(controller, "readme");
+    // Case-sensitive regex "GLOB" no longer matches the lowercase "globex"
+    // repo, so the scope is empty and no search is dispatched — the no-match
+    // hint is shown instead.
+    expect(host.textContent).toContain("No repos match the filter");
+  });
+
+  it("repo filter matching no repo renders a no-repos-match hint and never searches", async () => {
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    const model = controller["_searchModel"] as TestCommitSearchModel;
+
+    repoFilter.value = "zzz-no-such-repo";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
+    await search(controller, "readme");
+
+    expect(host.textContent).toContain("No repos match the filter");
+    // No search is dispatched for an empty repo scope.
+    const callsBefore = model.calls.length;
+    await search(controller, "readme");
+    expect(model.calls.length).toBe(callsBefore);
+  });
+
   it("toggling the repo filter icon off hides the row and searches all repos", async () => {
     const repoFilterIcon = host.querySelector<HTMLButtonElement>('[data-filter-icon="repo"]')!;
-    const repoFilter = host.querySelector<HTMLButtonElement>("[data-repo-filter]")!;
-    repoFilter.click();
-    host
-      .querySelector<HTMLElement>('[data-repo-options] [data-repo-option="acme"]')!
-      .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    // A typed scope that is ignored once the filter is toggled off.
+    repoFilter.value = "acme";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
 
     repoFilterIcon.click();
     expect(repoFilterIcon.style.color).toBe("var(--text-secondary,#888)"); // grey = off
@@ -511,11 +564,9 @@ describe("CommitSearchSystemTabController", () => {
   });
 
   it("message line windows around the search hit, highlights it, and shows the +N more / matched-file meta", async () => {
-    const repoFilter = host.querySelector<HTMLButtonElement>("[data-repo-filter]")!;
-    repoFilter.click();
-    host
-      .querySelector<HTMLElement>('[data-repo-options] [data-repo-option="innova"]')!
-      .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    repoFilter.value = "innova";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
     await search(controller, "engine");
     const model = controller["_searchModel"] as TestCommitSearchModel;
     expect(model.calls.at(-1)?.repoNames).toEqual(["innova"]); // scoped via the repo filter
@@ -534,11 +585,9 @@ describe("CommitSearchSystemTabController", () => {
   });
 
   it("file sub-rows get coloured +adds/−dels and highlight the matched path", async () => {
-    const repoFilter = host.querySelector<HTMLButtonElement>("[data-repo-filter]")!;
-    repoFilter.click();
-    host
-      .querySelector<HTMLElement>('[data-repo-options] [data-repo-option="innova"]')!
-      .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    repoFilter.value = "innova";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
     await search(controller, "engine");
     const row = host.querySelector<HTMLElement>("[data-commit-row]")!;
     row.click();
@@ -588,7 +637,7 @@ describe("CommitSearchSystemTabController", () => {
 
   it("file sub-row double-click / Enter emit openp41ge:open-commit-file pinned", async () => {
     await search(controller, "a");
-    (host.querySelector<HTMLElement>("[data-commit-row]")!).click();
+    host.querySelector<HTMLElement>("[data-commit-row]")!.click();
     await flush();
     const fileRow = host.querySelector<HTMLElement>(".commit-file-row")!;
 
@@ -655,7 +704,7 @@ describe("CommitSearchSystemTabController", () => {
 
     // Expand a commit and activate a file — the sidebar must only ever hold
     // the search results; no diff/hunk content is rendered below the rows.
-    (host.querySelector<HTMLElement>("[data-commit-row]")!).click();
+    host.querySelector<HTMLElement>("[data-commit-row]")!.click();
     await flush();
     const fileRow = [...host.querySelectorAll<HTMLElement>(".commit-file-row")].find((r) =>
       r.textContent?.includes("README.md"),
@@ -677,7 +726,7 @@ describe("CommitSearchSystemTabController", () => {
 
   it("excludes leftover repos that exist on disk but are not in the workspace repo list", async () => {
     // The repo-dir scan also sees an "orphan" folder, but the scope is the
-    // workspace repo list — orphan must never appear in the filter or a search.
+    // workspace repo list — orphan must never appear in a search scope.
     (window.openp41ge.workspaceController.listRepos as ReturnType<typeof vi.fn>).mockResolvedValue([
       { path: "/w/acme", name: "acme", url: "git@example.com:acme.git" },
       { path: "/w/orphan", name: "orphan", url: "git@example.com:orphan.git" },
@@ -690,14 +739,18 @@ describe("CommitSearchSystemTabController", () => {
     controller.mount(host);
     await flush();
 
-    const repoFilter = host.querySelector<HTMLButtonElement>("[data-repo-filter]")!;
-    repoFilter.click();
-    const opts = Array.from(
-      host.querySelectorAll<HTMLElement>("[data-repo-options] [data-repo-option]"),
-    );
-    expect(opts.map((o) => o.dataset.repoOption)).toEqual(["", "acme", "globex", "innova"]);
-    expect(opts.map((o) => o.dataset.repoOption)).not.toContain("orphan");
+    const repoFilter = host.querySelector<HTMLInputElement>("[data-repo-filter]")!;
+    // A filter matching only the orphan finds no connected repo — the orphan is
+    // never part of the workspace scope, so no search is dispatched.
+    repoFilter.value = "orph";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
+    await search(controller, "readme");
+    expect(host.textContent).toContain("No repos match the filter");
 
+    // With an empty filter, the search scope is exactly the workspace repo list
+    // (never the orphan).
+    repoFilter.value = "";
+    repoFilter.dispatchEvent(new Event("input", { bubbles: true }));
     await search(controller, "readme");
     const model = controller["_searchModel"] as TestCommitSearchModel;
     expect(model.calls.at(-1)?.repoNames).toEqual(connectedRepos.map((r) => r.url));
