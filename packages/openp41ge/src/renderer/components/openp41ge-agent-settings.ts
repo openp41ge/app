@@ -723,12 +723,15 @@ export class Openp41geAgentSettings extends LitElement {
           padding: 28px 32px;
         }
         .ags-section-title {
-          margin: 0 0 14px;
+          margin: 18px 0 14px;
           font-size: 11px;
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.04em;
           color: var(--text-secondary, #999);
+        }
+        .drawer-body > .ags-section-title:first-child {
+          margin-top: 0;
         }
         .ags-card {
           box-sizing: border-box;
@@ -1848,6 +1851,10 @@ export class Openp41geAgentSettings extends LitElement {
       ${this._maxTokensCard(d, draft)}
       <div class="ags-section-title">Actions</div>
       <div class="ags-card ags-card-gap" style="max-width:620px;">
+        <p class="ags-card-help">
+          Run a connection check or inspect the raw response to troubleshoot a provider that is not
+          responding.
+        </p>
         ${
           this._testResult
             ? html`<p class=${this._testResult.ok ? "test-ok" : "test-err"} style="margin:0 0 2px;">
