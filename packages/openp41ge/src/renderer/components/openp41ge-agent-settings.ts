@@ -938,17 +938,6 @@ export class Openp41geAgentSettings extends LitElement {
           flex-direction: column;
           gap: 2px;
         }
-        .ags-default-badge {
-          align-self: flex-start;
-          font-size: 10px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: var(--accent, #569cd6);
-          background: rgba(86, 156, 214, 0.14);
-          border-radius: 4px;
-          padding: 1px 6px;
-        }
         .ags-detect-note {
           margin: 8px 0 0;
           font-size: 12px;
@@ -1840,7 +1829,6 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _modelRow(d: ProviderDrawerState, m: ModelConfig, i: number): TemplateResult {
-    const isDefault = d.draft.model === m.id;
     return html`
       <li
         class="ags-provider-row"
@@ -1851,7 +1839,6 @@ export class Openp41geAgentSettings extends LitElement {
       >
         <div class="ags-provider-info">
           <span class="ags-provider-name">${m.id}</span>
-          ${isDefault ? html`<span class="ags-default-badge">Default</span>` : nothing}
         </div>
         <svg
           class="ags-chevron"
