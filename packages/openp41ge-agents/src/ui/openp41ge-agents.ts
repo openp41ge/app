@@ -674,15 +674,14 @@ class Openp41geAgents extends LitElement {
         .composer-content code {
           font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
           font-size: 12px;
-          background: rgba(255, 255, 255, 0.08);
-          border-radius: 3px;
-          padding: 1px 4px;
           color: #e5c07b;
         }
         .composer-content .composer-highlight {
           background: var(--fe-selection-bg, rgba(87, 145, 217, 0.3));
           color: inherit;
-          border-radius: 2px;
+          /* No radius so adjacent highlight spans (e.g. across a code
+             boundary) form one continuous highlight with no notch. */
+          border-radius: 0;
           /* Reset so the highlight never affects layout (a global <mark> rule
              adds padding/border/font that would shift the text). */
           padding: 0;
