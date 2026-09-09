@@ -52,8 +52,15 @@ class Openp41geAgents extends LitElement {
   /** Anchor used while dragging a mouse selection. */
   private _selAnchor = 0;
   private _draggingSelection = false;
-  /** Maps rendered-content offsets to raw-text offsets (dropped backticks). */
-  private _contentSegments: { rawStart: number; rawEnd: number; contentStart: number; contentEnd: number }[] = [];
+  /** Maps rendered-content offsets to raw-text offsets (backticks dropped). */
+  private _contentSegments: {
+    isCode: boolean;
+    text: string;
+    rawStart: number;
+    rawEnd: number;
+    contentStart: number;
+    contentEnd: number;
+  }[] = [];
   @state() private _providers: ComposerProvider[] = [];
   @state() private _providerId = "";
   @state() private _activeTools: string[] = [];
@@ -369,52 +376,108 @@ class Openp41geAgents extends LitElement {
   }
 
   /**
+   * Split draft text into render units. Only *paired* backticks create inline
+   * code; an unclosed (orphan) backtick is rendered as a literal character so
+   * it never switches styling to the end of the line.
+   */
+  private _parseSegments(
+    text: string,
+  ): { isCode: boolean; text: string; rawStart: number; rawEnd: number; contentStart: number; contentEnd: number }[] {
+    const segments: {
+      isCode: boolean;
+      text: string;
+      rawStart: number;
+      rawEnd: number;
+      contentStart: number;
+      contentEnd: number;
+    }[] = [];
+    const parts = text.split("`");
+    const n = parts.length;
+    const backtickCount = n - 1;
+    // An odd backtick count leaves the final backtick unpaired.
+    const orphanDelimiter = backtickCount % 2 === 1 ? backtickCount - 1 : -1;
+    let raw = 0;
+    let content = 0;
+    for (let i = 0; i < n; i++) {
+      const seg = parts[i];
+      // Odd-indexed part is code only when a closing backtick follows it.
+      const isCode = i % 2 === 1 && i < n - 1;
+      if (seg.length > 0) {
+        segments.push({
+          isCode,
+          text: seg,
+          rawStart: raw,
+          rawEnd: raw + seg.length,
+          contentStart: content,
+          contentEnd: content + seg.length,
+        });
+      }
+      raw += seg.length;
+      content += seg.length;
+      if (i < n - 1) {
+        if (i === orphanDelimiter) {
+          // Unclosed opening backtick — show it literally (no styling).
+          segments.push({
+            isCode: false,
+            text: "`",
+            rawStart: raw,
+            rawEnd: raw + 1,
+            contentStart: content,
+            contentEnd: content + 1,
+          });
+          raw += 1;
+          content += 1;
+        } else {
+          raw += 1; // matched delimiter — dropped from rendered text
+        }
+      }
+    }
+    return segments;
+  }
+
+  /**
    * Render the draft as visible HTML, wrapping the selected raw range in a
-   * highlight span and inserting the caret at the raw caret position. Backticks
-   * become inline <code> and are dropped from the rendered text, so we record
-   * segment metadata to map rendered-content offsets back to raw-text offsets
-   * for mouse selection (and caret placement).
+   * highlight span. Backticks become inline <code> (and are dropped from the
+   * rendered text), so segment metadata maps rendered-content offsets back to
+   * raw-text offsets for mouse selection (and caret placement).
    */
   private _contentHtml(text: string, selStart = -1, selEnd = -1): string {
     const escape = (s: string): string =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const hasSel = selStart >= 0 && selEnd >= 0 && selStart < selEnd;
 
-    const segs: { rawStart: number; rawEnd: number; contentStart: number; contentEnd: number }[] = [];
-    const parts = text.split("`");
-    let rawPos = 0;
-    let contentPos = 0;
+    const segs = this._parseSegments(text);
     let html = "";
-    for (let i = 0; i < parts.length; i++) {
-      const seg = parts[i];
-      const isCode = i % 2 === 1;
-      const rawStart = rawPos;
-      const rawEnd = rawPos + seg.length;
-      const contentStart = contentPos;
-      const contentEnd = contentPos + seg.length;
-      rawPos = rawEnd + 1; // skip the dropped backtick delimiter
-      contentPos = contentEnd; // backtick contributes no rendered char
-      segs.push({ rawStart, rawEnd, contentStart, contentEnd });
-
-      let pre = seg;
-      let mid = "";
-      let post = "";
-      if (hasSel) {
-        const s = Math.max(rawStart, selStart);
-        const e = Math.min(rawEnd, selEnd);
-        if (s < e) {
-          const a = Math.max(0, s - rawStart);
-          const b = Math.min(seg.length, e - rawStart);
+    for (const sgm of segs) {
+      const seg = sgm.text;
+      const s = Math.max(sgm.rawStart, selStart);
+      const e = Math.min(sgm.rawEnd, selEnd);
+      const isSel = hasSel && s < e;
+      if (sgm.isCode) {
+        // Highlight the whole code chip as a unit so its chip padding falls
+        // inside the selection — keeps the highlight continuous across the
+        // code boundary (no 3px notch) while preserving partial per-char
+        // highlighting for plain text.
+        html += isSel
+          ? `<span class="composer-highlight"><code>${escape(seg)}</code></span>`
+          : `<code>${escape(seg)}</code>`;
+      } else {
+        let pre = seg;
+        let mid = "";
+        let post = "";
+        if (isSel) {
+          const a = Math.max(0, s - sgm.rawStart);
+          const b = Math.min(seg.length, e - sgm.rawStart);
           pre = seg.slice(0, a);
           mid = seg.slice(a, b);
           post = seg.slice(b);
         }
+        const inner =
+          mid !== ""
+            ? escape(pre) + `<span class="composer-highlight">${escape(mid)}</span>` + escape(post)
+            : escape(seg);
+        html += inner;
       }
-      const inner =
-        mid !== ""
-          ? escape(pre) + `<span class="composer-highlight">${escape(mid)}</span>` + escape(post)
-          : escape(seg);
-      html += isCode ? `<code>${inner}</code>` : inner;
     }
     this._contentSegments = segs;
     return html;
@@ -434,21 +497,15 @@ class Openp41geAgents extends LitElement {
 
   /** Convert a raw-text offset (with backticks) to a rendered-content offset. */
   private _contentOffsetFromRaw(raw: number): number {
-    const text = this._draft;
-    if (!text || raw <= 0) return 0;
-    let content = 0;
-    let rawPos = 0;
-    const parts = text.split("`");
-    for (let i = 0; i < parts.length; i++) {
-      const seg = parts[i];
-      const rawEnd = rawPos + seg.length;
-      if (raw <= rawEnd) {
-        return content + Math.max(0, raw - rawPos);
+    if (raw <= 0) return 0;
+    for (const seg of this._contentSegments) {
+      if (raw <= seg.rawEnd) {
+        return seg.contentStart + Math.max(0, raw - seg.rawStart);
       }
-      rawPos = rawEnd + 1; // skip the dropped backtick delimiter
-      content += seg.length;
     }
-    return content;
+    return this._contentSegments.length
+      ? this._contentSegments[this._contentSegments.length - 1].contentEnd
+      : 0;
   }
 
   /** Find the text node + offset for a rendered-content offset (for caret math). */
@@ -829,6 +886,12 @@ class Openp41geAgents extends LitElement {
           font-family: inherit;
           font-size: inherit;
           color: #e5c07b;
+          /* Inline-code chip: a subtle background box behind the token. */
+          background: rgba(255, 255, 255, 0.06);
+          border-radius: 3px;
+          /* Horizontal padding only (no vertical) so the line box height stays
+             identical to body text and the highlight stays one uniform height. */
+          padding: 0 3px;
         }
         .composer-content .composer-highlight {
           background: var(--fe-selection-bg, rgba(87, 145, 217, 0.3));

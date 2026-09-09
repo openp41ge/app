@@ -373,8 +373,10 @@ describe("Openp41geAgents (custom element)", () => {
 
     const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
     const code = content.querySelector("code") as HTMLElement;
-    const sel = code.querySelector(".composer-highlight") as HTMLElement;
+    // The highlight wraps the whole code chip as a unit so it stays continuous.
+    const sel = content.querySelector(".composer-highlight") as HTMLElement;
     expect(sel.textContent).toBe("read_file");
+    expect(sel.querySelector("code")).toBe(code);
     expect(content.querySelectorAll(".composer-highlight")).toHaveLength(1);
     expect(content.textContent).toContain("use");
     expect(content.textContent).toContain("now");
@@ -639,6 +641,62 @@ describe("Openp41geAgents (custom element)", () => {
     expect(code?.textContent).toBe("read_file");
     expect(content.querySelector(".composer-caret")).toBeTruthy();
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(7);
+  });
+
+  it("does not style text from an unclosed backtick to the end of the line", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    // A single opening backtick with no closing one: nothing should be styled
+    // as code, and the backtick itself should stay readable (not vanish).
+    (inputEl as { value: string }).value = "use `read_file now";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    expect(content.querySelector("code")).toBeNull();
+    expect(content.textContent).toBe("use `read_file now");
+    // Submit should be enabled since there is real, non-code text.
+    expect(
+      (el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("only styles between matched backtick pairs, ignoring an unclosed trailing one", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    // "b" is a matched pair; the trailing "d" after the lone backtick is not.
+    (inputEl as { value: string }).value = "a `b` c `d";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    expect(content.querySelectorAll("code")).toHaveLength(1);
+    expect(content.querySelector("code")?.textContent).toBe("b");
+    expect(content.textContent).toBe("a b c `d");
+  });
+
+  it("renders backtick content inside an element carrying a background chip", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "use `read_file` now";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    expect(content.querySelector("code")).toBeTruthy();
+    // jsdom doesn't apply shadow-DOM styles to getComputedStyle, so assert the
+    // chip backdrop is declared in the component's stylesheet.
+    const css = el.shadowRoot!.querySelector("style")?.textContent ?? "";
+    expect(css).toMatch(/composer-content code[^{]*\{[^}]*background: rgba\(255, 255, 255, 0\.06\)/);
   });
 
   it("drops the blinking caret when the composer loses focus but keeps the highlight", async () => {
