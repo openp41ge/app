@@ -482,12 +482,9 @@ class Openp41geAgents extends LitElement {
           background: var(--bg-primary, #1e1e1e);
           border-top: 1px solid var(--border-color, #2a2a2a);
         }
-        .composer:focus-within {
-          border-top-color: var(--accent, #4a9eff);
-        }
         .composer-content {
           position: relative;
-          padding: 10px 12px;
+          padding: 10px 12px 4px;
           line-height: 20px;
           font-size: 13px;
           color: var(--text-primary, #d4d4d4);
@@ -514,21 +511,27 @@ class Openp41geAgents extends LitElement {
           display: inline-block;
           vertical-align: text-bottom;
           width: 2px;
-          height: 15px;
+          height: 14px;
           margin-left: 1px;
-          background: var(--accent, #4a9eff);
-          animation: composer-blink 1s steps(2) infinite;
+          background: var(--fe-cursor-color, #d4d4d4);
+          animation: composer-blink 1s step-end infinite;
         }
         @keyframes composer-blink {
-          to {
-            visibility: hidden;
+          0% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0;
+          }
+          100% {
+            opacity: 1;
           }
         }
         .composer-toolbar {
           display: flex;
           align-items: center;
           gap: 4px;
-          padding: 5px 6px;
+          padding: 2px 6px 6px;
           background: transparent;
         }
         .composer-select {
@@ -584,6 +587,7 @@ class Openp41geAgents extends LitElement {
         }
         .composer-send {
           flex: 0 0 auto;
+          align-self: center;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -591,21 +595,28 @@ class Openp41geAgents extends LitElement {
           height: 20px;
           border: none;
           border-radius: 6px;
-          background: var(--accent, #2b5a9c);
-          color: #fff;
+          background: transparent;
+          color: var(--text-muted, #777);
           cursor: pointer;
-          transition: opacity 0.1s, background 0.1s;
+          transition: opacity 0.1s, background-color 0.1s, color 0.1s;
           user-select: none;
         }
-        .composer-send:hover:not(:disabled) {
-          background: #3a6cb5;
+        .composer-send:not(:disabled) {
+          background: var(--bg-hover, #2a2d2e);
+          color: var(--text-primary, #d4d4d4);
+        }
+        .composer-send:not(:disabled):hover {
+          background: var(--bg-secondary, #3a3a3a);
         }
         .composer-send:disabled {
-          opacity: 0.35;
+          background: transparent;
+          color: var(--text-muted, #555);
+          opacity: 0.4;
           cursor: default;
         }
         .composer-send.abort {
           background: #c0392b;
+          color: #fff;
         }
         .composer-send.abort:hover {
           background: #e74c3c;
