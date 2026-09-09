@@ -45,6 +45,7 @@ class Openp41geAgents extends LitElement {
   @state() private _providerId = "";
   @state() private _activeTools: string[] = [];
   @state() private _showTools = false;
+  private _docListenerAttached = false;
   @query(".chat-input") private _inputEl!: HTMLTextAreaElement;
   @query(".composer-content") private _contentEl!: HTMLElement;
 
@@ -131,6 +132,39 @@ class Openp41geAgents extends LitElement {
   focusInput(): void {
     this._inputEl?.focus();
   }
+
+  // ─── Lifecycle / outside-click blur ────────────────────────────────
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (!this._docListenerAttached) {
+      document.addEventListener("pointerdown", this._onDocPointerDown);
+      this._docListenerAttached = true;
+    }
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    if (this._docListenerAttached) {
+      document.removeEventListener("pointerdown", this._onDocPointerDown);
+      this._docListenerAttached = false;
+    }
+  }
+
+  private _onDocPointerDown = (e: PointerEvent): void => {
+    // Clicking anywhere outside the composer card should drop the caret and
+    // clear the focus outline. The off-screen textarea may not naturally blur
+    // when the click lands on a non-focusable area (e.g. the transcript), so
+    // we blur explicitly.
+    const composer = this.renderRoot?.querySelector(".composer") as HTMLElement | null;
+    const target = e.target as Node | null;
+    if (!composer || !target || composer.contains(target)) return;
+    if (this._composerFocused) {
+      this._composerFocused = false;
+      this._renderComposerContent();
+    }
+    if (this._inputEl && this.isConnected) this._inputEl.blur();
+  };
 
   // ─── Send / abort ───────────────────────────────────────────────────
 
@@ -499,8 +533,7 @@ class Openp41geAgents extends LitElement {
           align-items: center;
           gap: 4px;
           padding: 5px 6px;
-          border-top: 1px solid var(--border-color, #333);
-          background: var(--bg-tertiary, #1c1c1c);
+          background: transparent;
         }
         .composer-select {
           flex: 0 0 auto;
@@ -558,10 +591,10 @@ class Openp41geAgents extends LitElement {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 30px;
-          height: 30px;
+          width: 20px;
+          height: 20px;
           border: none;
-          border-radius: 8px;
+          border-radius: 6px;
           background: var(--accent, #2b5a9c);
           color: #fff;
           cursor: pointer;
@@ -582,8 +615,8 @@ class Openp41geAgents extends LitElement {
           background: #e74c3c;
         }
         .composer-send svg {
-          width: 16px;
-          height: 16px;
+          width: 13px;
+          height: 13px;
           fill: none;
           stroke: currentColor;
           stroke-width: 2;
@@ -605,8 +638,7 @@ class Openp41geAgents extends LitElement {
         }
         .composer-tools {
           padding: 6px 12px;
-          border-top: 1px solid var(--border-color, #333);
-          background: var(--bg-tertiary, #1c1c1c);
+          background: transparent;
           font-size: 11px;
           color: var(--text-secondary, #aaa);
         }
@@ -687,8 +719,11 @@ class Openp41geAgents extends LitElement {
                   @click=${() => this._sendMessage()}
                 >
                   <svg viewBox="0 0 24 24">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    <path
+                      d="M12 4l-7 7h5v9h4v-9h5z"
+                      fill="currentColor"
+                      stroke="none"
+                    />
                   </svg>
                 </button>`
           }
