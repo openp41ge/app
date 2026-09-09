@@ -494,7 +494,7 @@ describe("Openp41geAgents (custom element)", () => {
     expect(toolsBtn.querySelector(".tool-badge")?.textContent).toBe("2");
   });
 
-  it("sends on Enter (without Shift) and not on Shift+Enter", async () => {
+  it("sends on Enter (without Shift) and does not send on Shift+Enter", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
     await el.updateComplete;
@@ -510,6 +510,87 @@ describe("Openp41geAgents (custom element)", () => {
     (inputEl as { value: string }).value = "again";
     inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: true }));
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("inserts a newline on Shift+Enter and keeps the caret after it", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const handler = vi.fn();
+    el.addEventListener("chat:send", handler as EventListener);
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "first line";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.setSelectionRange(10, 10);
+    await el.updateComplete;
+
+    inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: true }));
+    await el.updateComplete;
+
+    expect(inputEl.value).toBe("first line\n");
+    expect(inputEl.selectionStart).toBe(11);
+    expect(inputEl.selectionEnd).toBe(11);
+    expect(handler).not.toHaveBeenCalled();
+    // The composer renders the newline as a line break and grows.
+    expect(
+      el.shadowRoot!.querySelector(".composer-content")!.textContent,
+    ).toBe("first line\n");
+  });
+
+  it("inserts a newline at the caret (not the end) on Shift+Enter", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello world";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    // Place the caret after "hello".
+    inputEl.setSelectionRange(5, 5);
+    await el.updateComplete;
+
+    inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: true }));
+    await el.updateComplete;
+
+    expect(inputEl.value).toBe("hello\n world");
+    expect(inputEl.selectionStart).toBe(6);
+    expect(inputEl.selectionEnd).toBe(6);
+  });
+
+  it("moves the caret to the moving edge even when selectionDirection is 'none'", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello world foo";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    // Anchor the caret at 6 (before "world") so the previous selection is 6,6.
+    inputEl.setSelectionRange(6, 6);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(6);
+
+    // Cmd+Shift+Right extends the selection to 11; the browser may leave
+    // direction as "none" (macOS word/line select).
+    inputEl.setSelectionRange(6, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+
+    // Cmd+Shift+Left extends backward to 4; caret must ride the leading edge.
+    inputEl.setSelectionRange(4, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    inputEl.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowLeft", shiftKey: true, metaKey: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(4);
   });
 
   it("setProviderStatus shows a status strip when unreachable", async () => {

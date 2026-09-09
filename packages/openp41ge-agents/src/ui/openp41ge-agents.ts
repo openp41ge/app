@@ -49,6 +49,10 @@ class Openp41geAgents extends LitElement {
    *  rendered caret follows the moving edge instead of sitting frozen at the
    *  end of the highlight. */
   private _caretRaw = 0;
+  /** Previous selection, used to infer the moving/focus edge when the browser
+   *  leaves `selectionDirection` as "none" (e.g. macOS Cmd+Shift+Arrow). */
+  private _prevSelStart = 0;
+  private _prevSelEnd = 0;
   /** Anchor used while dragging a mouse selection. */
   private _selAnchor = 0;
   private _draggingSelection = false;
@@ -229,6 +233,8 @@ class Openp41geAgents extends LitElement {
     this._selStart = 0;
     this._selEnd = 0;
     this._caretRaw = 0;
+    this._prevSelStart = 0;
+    this._prevSelEnd = 0;
     this._renderComposerContent();
     this._updateComposerState();
     this.addMessage("user", text);
@@ -325,6 +331,8 @@ class Openp41geAgents extends LitElement {
     this._selStart = ta.selectionStart;
     this._selEnd = ta.selectionEnd;
     this._caretRaw = ta.selectionEnd;
+    this._prevSelStart = ta.selectionStart;
+    this._prevSelEnd = ta.selectionEnd;
     this._renderComposerContent();
     this._updateComposerState();
   }
@@ -333,19 +341,56 @@ class Openp41geAgents extends LitElement {
   private _syncSelection(): void {
     const ta = this._inputEl;
     if (!ta) return;
-    this._selStart = ta.selectionStart;
-    this._selEnd = ta.selectionEnd;
+    const newStart = ta.selectionStart;
+    const newEnd = ta.selectionEnd;
+    this._selStart = newStart;
+    this._selEnd = newEnd;
     // The focus/moving edge of a Shift+arrow selection is `selectionEnd` when
     // selecting forward and `selectionStart` when selecting backward. Place the
     // rendered caret on that moving edge so it tracks the actual caret.
-    this._caretRaw = ta.selectionDirection === "backward" ? ta.selectionStart : ta.selectionEnd;
+    const dir = ta.selectionDirection;
+    if (dir === "backward") {
+      this._caretRaw = newStart;
+    } else if (dir === "forward") {
+      this._caretRaw = newEnd;
+    } else {
+      // `selectionDirection` is "none" for some browser selections (notably
+      // macOS Cmd+Shift+Arrow word/line selects). Infer the moving edge from
+      // which endpoint actually moved since the last selection.
+      const startMoved = newStart !== this._prevSelStart;
+      const endMoved = newEnd !== this._prevSelEnd;
+      if (!startMoved && !endMoved) {
+        // Nothing changed (e.g. a follow-up keyup): keep the current caret.
+        this._renderComposerContent();
+        return;
+      }
+      if (startMoved && !endMoved) this._caretRaw = newStart;
+      else if (endMoved && !startMoved) this._caretRaw = newEnd;
+      else this._caretRaw = newEnd; // both moved — collapsed to a caret
+    }
+    this._prevSelStart = newStart;
+    this._prevSelEnd = newEnd;
     this._renderComposerContent();
   }
 
+  /** Insert a newline at the caret without submitting (Shift+Enter). */
+  private _insertNewline(): void {
+    const ta = this._inputEl;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const value = ta.value;
+    ta.value = value.slice(0, start) + "\n" + value.slice(end);
+    const pos = start + 1;
+    ta.setSelectionRange(pos, pos);
+    ta.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  }
+
   private _onComposerKeydown(e: KeyboardEvent): void {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter") {
       e.preventDefault();
-      this._sendMessage();
+      if (e.shiftKey) this._insertNewline();
+      else this._sendMessage();
     }
   }
 
@@ -632,6 +677,8 @@ class Openp41geAgents extends LitElement {
     this._selStart = raw;
     this._selEnd = raw;
     this._caretRaw = raw;
+    this._prevSelStart = raw;
+    this._prevSelEnd = raw;
     this._inputEl?.setSelectionRange(raw, raw);
     this._draggingSelection = true;
     try {
@@ -653,6 +700,8 @@ class Openp41geAgents extends LitElement {
     this._selEnd = end;
     // The caret/focus follows the pointer (the moving edge of the drag).
     this._caretRaw = raw;
+    this._prevSelStart = start;
+    this._prevSelEnd = end;
     this._inputEl?.setSelectionRange(start, end);
     this._renderComposerContent();
   };
@@ -676,6 +725,8 @@ class Openp41geAgents extends LitElement {
     this._selStart = start;
     this._selEnd = end;
     this._caretRaw = end;
+    this._prevSelStart = start;
+    this._prevSelEnd = end;
     this._inputEl?.setSelectionRange(start, end);
     this._renderComposerContent();
   };
