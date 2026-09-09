@@ -587,12 +587,13 @@ class Openp41geAgents extends LitElement {
         }
         .composer-send {
           flex: 0 0 auto;
-          align-self: center;
+          align-self: flex-end;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           width: 20px;
           height: 20px;
+          padding: 0;
           border: none;
           border-radius: 6px;
           background: transparent;
@@ -622,13 +623,11 @@ class Openp41geAgents extends LitElement {
           background: #e74c3c;
         }
         .composer-send svg {
-          width: 13px;
-          height: 13px;
-          fill: none;
-          stroke: currentColor;
-          stroke-width: 2;
-          stroke-linecap: round;
-          stroke-linejoin: round;
+          flex: 0 0 auto;
+          width: 17px;
+          height: 17px;
+          fill: currentColor;
+          stroke: none;
         }
         .composer-input {
           position: absolute;
@@ -725,12 +724,12 @@ class Openp41geAgents extends LitElement {
                   ?disabled=${this._sendDisabled}
                   @click=${() => this._sendMessage()}
                 >
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M12 4l-7 7h5v9h4v-9h5z"
-                      fill="currentColor"
-                      stroke="none"
-                    />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 -960 960 960"
+                    fill="currentColor"
+                  >
+                    <path d="m256-240-56-56 384-384H240v-80h480v480h-80v-344L256-240Z" />
                   </svg>
                 </button>`
           }
