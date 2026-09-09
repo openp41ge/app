@@ -597,22 +597,22 @@ class Openp41geAgents extends LitElement {
           border: none;
           border-radius: 6px;
           background: transparent;
-          color: var(--text-muted, #777);
+          color: var(--text-secondary, #999);
           cursor: pointer;
           transition: opacity 0.1s, background-color 0.1s, color 0.1s;
           user-select: none;
         }
         .composer-send:not(:disabled) {
-          background: var(--bg-hover, #2a2d2e);
-          color: var(--text-primary, #d4d4d4);
+          background: var(--bg-active, #37373d);
+          color: #fff;
         }
         .composer-send:not(:disabled):hover {
-          background: var(--bg-secondary, #3a3a3a);
+          background: #454545;
         }
         .composer-send:disabled {
           background: transparent;
-          color: var(--text-muted, #555);
-          opacity: 0.4;
+          color: var(--text-secondary, #999);
+          opacity: 0.6;
           cursor: default;
         }
         .composer-send.abort {
