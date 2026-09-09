@@ -479,15 +479,11 @@ class Openp41geAgents extends LitElement {
           flex-shrink: 0;
           display: flex;
           flex-direction: column;
-          margin: 8px 12px 6px;
-          background: var(--bg-secondary, #252526);
-          border: 1px solid var(--border-color, #3a3a3a);
-          border-radius: 12px;
-          overflow: hidden;
-          transition: border-color 0.1s;
+          background: var(--bg-primary, #1e1e1e);
+          border-top: 1px solid var(--border-color, #2a2a2a);
         }
         .composer:focus-within {
-          border-color: var(--accent, #2b5a9c);
+          border-top-color: var(--accent, #4a9eff);
         }
         .composer-content {
           position: relative;
