@@ -356,6 +356,33 @@ describe("Openp41geAgents (custom element)", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("tooltips the submit button when it is deactivated", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    const sendBtn = el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement;
+
+    // Deactivated (empty draft): a tooltip explains why the button is inert.
+    expect(sendBtn.disabled).toBe(true);
+    expect(sendBtn.getAttribute("title")).toBe("Type a message to send");
+
+    // Activate: the tooltip reverts to the send action label.
+    (inputEl as { value: string }).value = "hello";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(sendBtn.disabled).toBe(false);
+    expect(sendBtn.getAttribute("title")).toBe("Send message");
+
+    // Clearing the draft deactivates it again.
+    (inputEl as { value: string }).value = "";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(sendBtn.disabled).toBe(true);
+    expect(sendBtn.getAttribute("title")).toBe("Type a message to send");
+  });
+
   it("setComposerContext populates providers and active tools", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);

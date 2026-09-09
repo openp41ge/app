@@ -285,7 +285,12 @@ class Openp41geAgents extends LitElement {
 
   private _updateComposerState(): void {
     const sendBtn = this.renderRoot.querySelector<HTMLButtonElement>(".composer-send");
-    if (sendBtn) sendBtn.disabled = this._sendDisabled;
+    if (sendBtn) {
+      sendBtn.disabled = this._sendDisabled;
+      // Explain the disabled state via a native tooltip (Chrome shows `title`
+      // even on a disabled button, and the composer's other controls use title).
+      sendBtn.title = this._sendDisabled ? "Type a message to send" : "Send message";
+    }
     const el = this._contentEl;
     if (el) {
       // Toggle an overflow marker once the content passes 10 lines.
