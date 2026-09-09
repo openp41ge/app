@@ -521,4 +521,117 @@ describe("Openp41geAgents (custom element)", () => {
     expect(status).toBeTruthy();
     expect(status.textContent).toContain("unreachable");
   });
+
+  it("renders the caret at the text-area's caret position, not at the end", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello world";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    // Collapsed caret in the middle of the text.
+    inputEl.setSelectionRange(6, 6);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    expect(content.innerHTML).toBe('hello <span class="composer-caret"></span>world');
+  });
+
+  it("syncs the highlight + caret when the text-area selection changes (Shift+Arrow)", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello world";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    // Select "world" and mirror the keyboard path (select + keyup both sync).
+    inputEl.setSelectionRange(6, 11);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    inputEl.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight", shiftKey: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    const sel = content.querySelector(".composer-highlight");
+    expect(sel?.textContent).toBe("world");
+    // Caret sits at the end of the selection.
+    const caret = content.querySelector(".composer-caret");
+    expect(caret).toBeTruthy();
+    const caretText = content.innerHTML;
+    expect(caretText.indexOf("world")).toBeLessThan(caretText.indexOf("composer-caret"));
+  });
+
+  it("collapses the selection (deselect) when an arrow key moves the caret", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello world";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    inputEl.setSelectionRange(6, 11);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")).toBeTruthy();
+
+    // Arrow without shift collapses to a caret (no highlight).
+    inputEl.setSelectionRange(11, 11);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")).toBeNull();
+  });
+
+  it("places the caret inside a code token when it sits within one", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "use `read_file` now";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    // raw offset 7 is inside "read_file" (after "re").
+    inputEl.setSelectionRange(7, 7);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const code = el.shadowRoot!.querySelector(".composer-content")!.querySelector("code");
+    expect(code?.innerHTML).toBe('re<span class="composer-caret"></span>ad_file');
+  });
+
+  it("drops the blinking caret when the composer loses focus but keeps the highlight", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello world";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    inputEl.setSelectionRange(6, 11);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Blur: caret disappears, highlight remains.
+    inputEl.dispatchEvent(new FocusEvent("blur"));
+    await el.updateComplete;
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    expect(content.querySelector(".composer-caret")).toBeNull();
+    expect(content.querySelector(".composer-highlight")?.textContent).toBe("world");
+  });
 });

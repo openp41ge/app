@@ -54,6 +54,7 @@ class Openp41geAgents extends LitElement {
   @state() private _activeTools: string[] = [];
   @state() private _showTools = false;
   private _docListenerAttached = false;
+  private _composerResizeObserver: ResizeObserver | null = null;
   @query(".chat-input") private _inputEl!: HTMLTextAreaElement;
   @query(".composer-content") private _contentEl!: HTMLElement;
 
@@ -157,6 +158,33 @@ class Openp41geAgents extends LitElement {
       document.removeEventListener("pointerdown", this._onDocPointerDown);
       this._docListenerAttached = false;
     }
+    this._composerResizeObserver?.disconnect();
+    this._composerResizeObserver = null;
+  }
+
+  /** Keep the hidden text-area's soft-wrap identical to the rendered content
+   *  so up/down arrow caret movement matches the visible lines. Lazy-set up so
+   *  it runs after the @query fields resolve on first render. */
+  private _ensureComposerObserver(): void {
+    const content = this._contentEl;
+    if (!content || this._composerResizeObserver) return;
+    // jsdom/test env has no ResizeObserver; skip gracefully.
+    if (typeof ResizeObserver === "undefined") return;
+    this._composerResizeObserver = new ResizeObserver(() => {
+      this._syncComposerInputWidth();
+    });
+    this._composerResizeObserver.observe(content);
+    this._syncComposerInputWidth();
+  }
+
+  /** Match the hidden text-area's content width to the rendered content. */
+  private _syncComposerInputWidth(): void {
+    const el = this._contentEl;
+    const ta = this._inputEl;
+    if (!el || !ta) return;
+    const cs = getComputedStyle(el);
+    const w = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    ta.style.width = `${Math.max(w, 8)}px`;
   }
 
   private _onDocPointerDown = (e: PointerEvent): void => {
@@ -264,11 +292,18 @@ class Openp41geAgents extends LitElement {
 
   private _focusComposer(): void {
     this._inputEl?.focus();
+    // The hidden text-area's `focus` event is unreliable in Chrome, so mark it
+    // focused here (its real activation path) and sync the caret/selection.
+    this._composerFocused = true;
+    this._syncSelection();
   }
 
   private _onComposerFocus(focused: boolean): void {
     this._composerFocused = focused;
-    this._renderComposerContent();
+    // On focus, pull the text-area's current selection so the rendered caret /
+    // highlight start out correct. On blur we just drop the caret.
+    if (focused) this._syncSelection();
+    else this._renderComposerContent();
   }
 
   private _onComposerInput(e: Event): void {
@@ -299,9 +334,11 @@ class Openp41geAgents extends LitElement {
   private _renderComposerContent(): void {
     const el = this._contentEl;
     if (!el) return;
-    const body = this._draft ? this._contentHtml(this._draft, this._selStart, this._selEnd) : "";
-    const caret = this._composerFocused ? `<span class="composer-caret"></span>` : "";
-    el.innerHTML = body + caret;
+    // Render the blinking caret at the text-area's caret position rather than
+    // always at the end, so arrow-key caret movement + Shift+arrow selection
+    // are visible in the rendered content.
+    const caretRaw = this._composerFocused ? this._selEnd : -1;
+    el.innerHTML = this._contentHtml(this._draft || "", this._selStart, this._selEnd, caretRaw);
   }
 
   private _updateComposerState(): void {
@@ -321,20 +358,27 @@ class Openp41geAgents extends LitElement {
 
   /**
    * Render the draft as visible HTML, wrapping the selected raw range in a
-   * highlight <mark>. Backticks become inline <code> and are dropped from the
-   * rendered text, so we record segment metadata to map rendered-content
-   * offsets back to raw-text offsets for mouse selection.
+   * highlight span and inserting the caret at the raw caret position. Backticks
+   * become inline <code> and are dropped from the rendered text, so we record
+   * segment metadata to map rendered-content offsets back to raw-text offsets
+   * for mouse selection (and caret placement).
    */
-  private _contentHtml(text: string, selStart = -1, selEnd = -1): string {
+  private _contentHtml(text: string, selStart = -1, selEnd = -1, caretRaw = -1): string {
     const escape = (s: string): string =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const hasSel = selStart >= 0 && selEnd >= 0 && selStart < selEnd;
+    const CARET = `<span class="composer-caret"></span>`;
+
+    // Insert the caret span after `off` chars of an unescaped text run.
+    const caretRun = (run: string, off: number): string =>
+      escape(run.slice(0, off)) + CARET + escape(run.slice(off));
 
     const segs: { rawStart: number; rawEnd: number; contentStart: number; contentEnd: number }[] = [];
     const parts = text.split("`");
     let rawPos = 0;
     let contentPos = 0;
     let html = "";
+    let caretPlaced = false;
     for (let i = 0; i < parts.length; i++) {
       const seg = parts[i];
       const isCode = i % 2 === 1;
@@ -360,11 +404,35 @@ class Openp41geAgents extends LitElement {
           post = seg.slice(b);
         }
       }
-      const inner =
-        mid !== ""
-          ? escape(pre) + `<span class="composer-highlight">${escape(mid)}</span>` + escape(post)
-          : escape(seg);
+
+      let inner: string;
+      if (!caretPlaced && caretRaw >= 0 && caretRaw >= rawStart && caretRaw <= rawEnd) {
+        // The caret falls in this segment's raw range; place it at the
+        // corresponding content offset (backticks are dropped).
+        let off = caretRaw - rawStart;
+        if (off > seg.length) off = seg.length;
+        const hlMid = mid !== "" ? `<span class="composer-highlight">${escape(mid)}</span>` : "";
+        if (off <= pre.length) {
+          inner = caretRun(pre, off) + hlMid + escape(post);
+        } else if (off <= pre.length + mid.length) {
+          const c = off - pre.length;
+          inner = escape(pre) + `<span class="composer-highlight">${caretRun(mid, c)}</span>` + escape(post);
+        } else {
+          const c = off - pre.length - mid.length;
+          inner = escape(pre) + hlMid + caretRun(post, c);
+        }
+        caretPlaced = true;
+      } else {
+        inner =
+          mid !== ""
+            ? escape(pre) + `<span class="composer-highlight">${escape(mid)}</span>` + escape(post)
+            : escape(seg);
+      }
       html += isCode ? `<code>${inner}</code>` : inner;
+    }
+    // Caret at the very end (or empty content) — append it directly.
+    if (!caretPlaced && caretRaw >= 0) {
+      html += CARET;
     }
     this._contentSegments = segs;
     return html;
@@ -480,6 +548,8 @@ class Openp41geAgents extends LitElement {
     // composer content; repopulate it so typed text and caret survive re-renders.
     this._renderComposerContent();
     this._updateComposerState();
+    this._ensureComposerObserver();
+    this._syncComposerInputWidth();
   }
 
   // ─── Rendering ──────────────────────────────────────────────────────
@@ -828,6 +898,13 @@ class Openp41geAgents extends LitElement {
           resize: none;
           overflow: hidden;
           outline: none;
+          /* Match the rendered content so the hidden text-area soft-wraps the
+             same way and up/down arrow navigation tracks the visible lines. */
+          white-space: pre-wrap;
+          word-break: break-word;
+          font-size: 13px;
+          line-height: 20px;
+          font-family: inherit;
         }
         .composer-tools {
           padding: 6px 12px;
@@ -952,6 +1029,7 @@ class Openp41geAgents extends LitElement {
           rows="1"
           @input=${(e: Event) => this._onComposerInput(e)}
           @select=${() => this._syncSelection()}
+          @keyup=${() => this._syncSelection()}
           @keydown=${(e: KeyboardEvent) => this._onComposerKeydown(e)}
           @focus=${() => this._onComposerFocus(true)}
           @blur=${() => this._onComposerFocus(false)}
