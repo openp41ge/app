@@ -6,6 +6,8 @@
  *  - a quick drag that crosses the threshold cancels the pending long-press and
  *    starts the drag from the move handler
  *  - a quick click (down + up before the hold) never starts a drag
+ *  - a fast flick is a drag-out, not a carousel swipe, and a swipe that pulls off
+ *    the row or is released outside the window becomes a drag-out
  *
  * The drag IPC (`window.openp41ge.drag.*`) is stubbed so we can assert when a
  * native drag session is started/activated/ended without a real Electron main
@@ -23,11 +25,13 @@ function stubWindow(): {
   dragActivate: ReturnType<typeof vi.fn>;
   dragMove: ReturnType<typeof vi.fn>;
   dragEnd: ReturnType<typeof vi.fn>;
+  openWorkspaceWindow: ReturnType<typeof vi.fn>;
 } {
   const dragStart = vi.fn();
   const dragActivate = vi.fn();
   const dragMove = vi.fn();
   const dragEnd = vi.fn();
+  const openWorkspaceWindow = vi.fn();
   (window as unknown as { openp41ge: unknown }).openp41ge = {
     drag: {
       start: dragStart,
@@ -40,9 +44,17 @@ function stubWindow(): {
     windowManager: {
       openWindowSummaries: vi.fn().mockResolvedValue([]),
       onOpenWindowsChanged: vi.fn(() => () => {}),
+      openWorkspaceWindow,
     },
   };
-  return { dragStart, dragActivate, dragMove, dragEnd };
+  return { dragStart, dragActivate, dragMove, dragEnd, openWorkspaceWindow };
+}
+
+/** A workspace with `n` window skeletons, so the carousel gesture is available. */
+function withWindows(wm: Wm, path: string, n: number): void {
+  wm._workspaces = [
+    { filePath: path, data: { name: "Two", windows: Array.from({ length: n }, () => ({})) } },
+  ] as never;
 }
 
 /** A fake drag source element for the pointer events. */
@@ -113,7 +125,7 @@ describe("Openp41geWindowManager skeleton drag", () => {
 
   it("cancels the pending long-press and starts the drag on a quick move past threshold", () => {
     down(wm, "/w/two", 50, 40, 200, 300);
-    move(wm, 53, 100, 203, 360); // vertical → open, crosses the 8px threshold
+    move(wm, 53, 100, 203, 360); // vertical → open, crosses the threshold
 
     expect(wm._holdTimer).toBeNull();
     expect((wm._drag as { active: boolean }).active).toBe(true);
@@ -212,6 +224,78 @@ describe("Openp41geWindowManager skeleton drag", () => {
     expect(wm._carouselLive).toBe(true);
     (wm as Wm)._teardownDrag();
     expect(wm._carouselLive).toBe(false);
+  });
+
+  it("opens on a fast sideways flick — a one-window workspace has no carousel to page", () => {
+    // Regression: the gesture used to be split on the dominant axis alone, so a
+    // quick drag-out (the skeleton sits at the left edge of the row, so it travels
+    // mostly sideways) was read as a carousel swipe and simply did nothing.
+    down(wm, "/w/one", 50, 40, 200, 300);
+    move(wm, 10, 42, 160, 302); // dx -40, dy 2 → sideways
+
+    expect((wm._drag as { mode: string }).mode).toBe("open");
+    expect(drags.dragStart).toHaveBeenCalledTimes(1);
+    expect(drags.dragActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens when a flick reaches the window edge, even with a carousel to page", () => {
+    withWindows(wm, "/w/two", 2);
+    down(wm, "/w/two", 50, 40, 200, 300);
+    move(wm, 1, 42, 151, 302); // already at the left edge → on its way out
+
+    expect((wm._drag as { mode: string }).mode).toBe("open");
+    expect(drags.dragStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("still swipes the carousel on a deliberate sideways drag inside the row", () => {
+    withWindows(wm, "/w/two", 2);
+    down(wm, "/w/two", 300, 40, 450, 300);
+    move(wm, 230, 42, 380, 302); // a page's worth sideways, well inside the window
+
+    expect((wm._drag as { mode: string }).mode).toBe("carousel");
+    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);
+    expect(drags.dragStart).not.toHaveBeenCalled();
+  });
+
+  it("promotes a swipe to a drag-out once the pointer leaves the row", () => {
+    withWindows(wm, "/w/two", 2);
+    down(wm, "/w/two", 300, 40, 450, 300);
+    move(wm, 230, 42, 380, 302); // reads as a swipe on the first coarse sample
+    expect((wm._drag as { mode: string }).mode).toBe("carousel");
+
+    move(wm, 225, 110, 375, 370); // pulls off the row (dy > 3/4 of the skeleton)
+
+    expect((wm._drag as { mode: string }).mode).toBe("open");
+    // The carousel snaps back to where the press started — the swipe never happened.
+    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(0);
+    expect(wm._carouselLive).toBe(false);
+    expect(drags.dragStart).toHaveBeenCalledTimes(1);
+    expect(drags.dragActivate).toHaveBeenCalledTimes(1);
+    expect(drags.dragMove).toHaveBeenCalled();
+  });
+
+  it("opens on a release outside the window even if the gesture read as a swipe", () => {
+    // A flick fast enough to leave the window before the next pointermove lands is
+    // still in carousel mode at release; the drop point is the real intent.
+    withWindows(wm, "/w/two", 2);
+    down(wm, "/w/two", 300, 40, 450, 300);
+    move(wm, 230, 42, 380, 302);
+    expect((wm._drag as { mode: string }).mode).toBe("carousel");
+
+    up(wm, 230, 42, window.screenX + window.outerWidth + 50, 302);
+
+    expect(drags.openWorkspaceWindow).toHaveBeenCalledWith("/w/two");
+    // No ghost session was ever started, so there is nothing to end.
+    expect(drags.dragEnd).not.toHaveBeenCalled();
+  });
+
+  it("does not open when a swipe is released inside the window", () => {
+    withWindows(wm, "/w/two", 2);
+    down(wm, "/w/two", 300, 40, 450, 300);
+    move(wm, 230, 42, 380, 302);
+    up(wm, 230, 42, 380, 302);
+
+    expect(drags.openWorkspaceWindow).not.toHaveBeenCalled();
   });
 });
 

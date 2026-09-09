@@ -13,6 +13,11 @@ import type { Chat } from "openp41ge-agents";
 
 const flush = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
+/** Click the footer search tool so the search box becomes active. */
+function openAgentSearch(host: HTMLElement): void {
+  (host.querySelector('button[aria-label="Search chats"]') as HTMLButtonElement).click();
+}
+
 function fixtureChats(): Chat[] {
   return [
     {
@@ -70,21 +75,21 @@ describe("AgentsSystemTabController", () => {
     host.remove();
   });
 
-  it("mounts and lists chats; the footer holds the New Chat button and this tab's settings button", async () => {
+  it("mounts and lists chats; the footer holds the search tool and this tab's settings button", async () => {
     controller.mount(host);
     await flush();
 
     const rows = host.querySelectorAll(".chat-row");
     expect(rows.length).toBe(2);
 
-    // The New Chat "+" is in the footer, and the chat-count text is gone.
-    const plus = host.querySelector('button[title="New chat"]') as HTMLButtonElement;
-    expect(plus).toBeTruthy();
+    // The New Chat is a clickable row at the top of the tab.
+    const newChatRow = host.querySelector('button.chat-new-row') as HTMLButtonElement;
+    expect(newChatRow).toBeTruthy();
 
-    // Each tab owns its own settings button: it emits this tab's unique event
-    // to open the Agents settings grid tab.
-    const settingsBtn = host.querySelector('button[title="Agent settings"]') as HTMLButtonElement;
+    // The footer holds the search tool (new) + this tab's own settings gear.
+    const settingsBtn = host.querySelector('button[aria-label="Agent settings"]') as HTMLButtonElement;
     expect(settingsBtn).toBeTruthy();
+    expect(host.querySelector('button[aria-label="Search chats"]')).toBeTruthy();
     const openEventSpy = vi.fn();
     document.addEventListener("openp41ge:open-agents-settings", openEventSpy);
     settingsBtn.click();
@@ -95,27 +100,55 @@ describe("AgentsSystemTabController", () => {
     expect(detail.title).toBe("Agents");
   });
 
-  it("shows a full-width search with regex/match-case toggles and New Chat in the footer", async () => {
+  it("creates a new chat when the top New chat row is clicked", async () => {
+    controller.mount(host);
+    await flush();
+
+    const before = storeModel.calls.filter((c) => c.op === "create").length;
+    const openChatSpy = vi.fn();
+    document.addEventListener("openp41ge:open-chat", openChatSpy);
+    (host.querySelector('button.chat-new-row') as HTMLButtonElement).click();
+    await flush();
+    document.removeEventListener("openp41ge:open-chat", openChatSpy);
+
+    expect(storeModel.calls.filter((c) => c.op === "create")).toHaveLength(before + 1);
+    expect(openChatSpy).toHaveBeenCalledOnce();
+    const detail = (openChatSpy.mock.calls[0][0] as CustomEvent).detail;
+    expect(typeof detail.chatId).toBe("string");
+    expect(detail.pinned).toBe(true);
+  });
+
+  it("hides the search box by default and reveals it via the footer search tool", async () => {
     controller.mount(host);
     await flush();
 
     const input = host.querySelector("input") as HTMLInputElement;
     expect(input).toBeTruthy();
+    // The search box is hidden until the search tool is toggled on.
+    expect(input?.parentElement?.style.display).toBe("none");
 
-    // The search header contains the regex + match-case toggles.
+    // The New Chat is a clickable row at the top, NOT a footer button.
+    expect(host.querySelector('button.chat-new-row')).toBeTruthy();
+
+    // Toggling the footer search tool reveals the search box with toggles.
+    const searchBtn = host.querySelector('button[aria-label="Search chats"]') as HTMLButtonElement;
+    searchBtn.click();
+    await flush();
+    expect(input?.parentElement?.style.display).toBe("flex");
     const header = input?.parentElement;
     expect(header?.querySelector('button[title="Regex search"]')).toBeTruthy();
     expect(header?.querySelector('button[title="Match case (case-sensitive)"]')).toBeTruthy();
 
-    // The New Chat "+" is in the footer, NOT the search header.
-    const plus = host.querySelector('button[title="New chat"]');
-    expect(plus).toBeTruthy();
-    expect(header?.contains(plus)).toBe(false);
+    // Toggling off hides it again.
+    searchBtn.click();
+    await flush();
+    expect(input?.parentElement?.style.display).toBe("none");
   });
 
   it("passes regex/case options to the store search", async () => {
     controller.mount(host);
     await flush();
+    openAgentSearch(host);
 
     const input = host.querySelector("input") as HTMLInputElement;
     input.value = "tests";
@@ -146,6 +179,7 @@ describe("AgentsSystemTabController", () => {
   it("filters by search query (message text)", async () => {
     controller.mount(host);
     await flush();
+    openAgentSearch(host);
 
     const input = host.querySelector("input") as HTMLInputElement;
     input.value = "tests";

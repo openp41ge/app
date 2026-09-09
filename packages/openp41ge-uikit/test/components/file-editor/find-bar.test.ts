@@ -75,6 +75,15 @@ describe("file-editor find + external highlight", () => {
     expect(renderedSpans(el)).toHaveLength(0);
   });
 
+  test("setSearchHighlight with an activeIndex emphasises that instance", async () => {
+    const el = await mountEditor();
+    // Index 2 → the third "alpha" match should be the emphasised/navigated one.
+    el.setSearchHighlight("alpha", undefined, 2);
+    await tick();
+    expect(el._findMatches.length).toBe(3);
+    expect(el._findActiveIndex).toBe(2);
+  });
+
   test("external highlight options (case-sensitive) narrow the match set", async () => {
     const el = await mountEditor();
     // Case-insensitive: "alpha" (x2) + "Alpha" (x1).

@@ -21,7 +21,7 @@
  *   tree-drop         — { targetNodeId, position, dragData }
  */
 
-import { LitElement, html, nothing, type TemplateResult } from "lit";
+import { LitElement, html, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
@@ -92,6 +92,48 @@ export class Openp41geTree extends LitElement {
   @state()
   private _loadingNodeIds: Set<string> = new Set();
 
+  /**
+   * Virtualize the tree: render only the visible rows (plus an overscan
+   * buffer) into a single flat scroll container instead of recursively
+   * materialising the whole DOM. Enable for large/expanded trees (e.g. content
+   * search results). Falls back to full rendering when the container has no
+   * measurable height (e.g. jsdom/tests).
+   */
+  @property({ type: Boolean })
+  virtualize = false;
+
+  /** Fixed row height in px used by the virtualized layout. */
+  @property({ type: Number })
+  rowHeight = 26;
+
+  /**
+   * Scroll container to virtualize against, when the tree does NOT own its own
+   * scroller — e.g. the Explorer, which stacks several trees inside one panel
+   * scroll area. The window is then computed from where this tree sits within
+   * that container's content, and the root renders as a plain block.
+   */
+  @property({ attribute: false })
+  scrollContainer: HTMLElement | null = null;
+
+  /** Rows to render above/below the visible viewport as a buffer. */
+  @property({ type: Number })
+  overscan = 6;
+
+  /** Scroll offset (px) of the virtualized container. */
+  @state()
+  private _scrollTop = 0;
+
+  /** Measured client height (px) of the virtualized container. */
+  @state()
+  private _viewportHeight = 0;
+
+  private _scrollEl: HTMLElement | null = null;
+  private _virtualResizeObserver: ResizeObserver | null = null;
+  private _scrollRaf: number | null = null;
+  /** Node ids in the most recently rendered virtual window. */
+  private _windowNodeIds: string[] = [];
+  private _lastWindowKey = "";
+
   // @ts-expect-error unused - kept for potential future use
   private _rootEl: HTMLElement | null = null;
 
@@ -110,11 +152,59 @@ export class Openp41geTree extends LitElement {
     super.disconnectedCallback();
     this.removeEventListener("keydown", this._onKeyDown);
     this.removeEventListener("focus", this._onFocus);
+    this._teardownVirtualScroll();
   }
 
   firstUpdated(): void {
     this._rootEl = this.renderRoot?.querySelector(".tree-root") as HTMLElement | null;
     this._ensureFocusableNode();
+    this._setupVirtualScroll();
+  }
+
+  protected updated(changed: PropertyValues): void {
+    // Virtualization can switch on after the first render (a tree grows past
+    // its consumer's threshold) and the scroll container can be swapped, so
+    // rebind rather than leaving the listener attached to the old target.
+    if (changed.has("virtualize") || changed.has("scrollContainer")) {
+      this._teardownVirtualScroll();
+      this._setupVirtualScroll();
+    }
+    this._notifyWindowChange();
+  }
+
+  /**
+   * Announce which rows the virtual window currently holds, so a consumer can
+   * load what scrolled into view (the Explorer prefetches match lines this
+   * way). Only fires while windowing, and only when the set actually changes.
+   */
+  private _notifyWindowChange(): void {
+    if (!this.virtualize || this._viewportHeight <= 0) return;
+    const key = this._windowNodeIds.join("\u0000");
+    if (key === this._lastWindowKey) return;
+    this._lastWindowKey = key;
+    this.dispatchEvent(
+      new CustomEvent("tree-visible-nodes", {
+        bubbles: true,
+        composed: true,
+        detail: { nodeIds: [...this._windowNodeIds] },
+      }),
+    );
+  }
+
+  private _teardownVirtualScroll(): void {
+    if (this._scrollEl) {
+      this._scrollEl.removeEventListener("scroll", this._onVirtualScroll);
+      this._scrollEl = null;
+    }
+    if (this._scrollRaf !== null) {
+      if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(this._scrollRaf);
+      else clearTimeout(this._scrollRaf);
+      this._scrollRaf = null;
+    }
+    if (this._virtualResizeObserver) {
+      this._virtualResizeObserver.disconnect();
+      this._virtualResizeObserver = null;
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────────
@@ -135,6 +225,86 @@ export class Openp41geTree extends LitElement {
 
   private _isSection(node: TreeNode): boolean {
     return node.variant === "section";
+  }
+
+  // ─── Virtualized layout ──────────────────────────────────────
+
+  private _setupVirtualScroll(): void {
+    if (!this.virtualize) return;
+    this._scrollEl =
+      this.scrollContainer ??
+      (this.renderRoot?.querySelector(".tree-root--virtual") as HTMLElement | null);
+    if (!this._scrollEl) return;
+    this._scrollEl.addEventListener("scroll", this._onVirtualScroll, { passive: true });
+    this._measureViewport();
+    if (typeof ResizeObserver !== "undefined") {
+      this._virtualResizeObserver = new ResizeObserver(() => this._measureViewport());
+      // Observe whatever defines the viewport height so we detect when it
+      // becomes measurable (0 → N) and can switch from the fallback full
+      // render to the virtualized window.
+      this._virtualResizeObserver.observe(this.scrollContainer ?? this);
+    }
+  }
+
+  private _onVirtualScroll = (): void => {
+    // Coalesce a scroll burst into one measurement per frame.
+    if (this._scrollRaf !== null) return;
+    const raf =
+      typeof requestAnimationFrame === "function"
+        ? requestAnimationFrame
+        : (fn: () => void) => setTimeout(fn, 16) as unknown as number;
+    this._scrollRaf = raf(() => {
+      this._scrollRaf = null;
+      this._measureViewport();
+    }) as unknown as number;
+  };
+
+  /**
+   * Offset (px) of this tree's first row within the scroll container's
+   * content. Zero when the tree owns its scroller.
+   */
+  private _offsetWithinScroller(): number {
+    const el = this.scrollContainer;
+    if (!el || el !== this._scrollEl) return 0; // the tree owns its scroller
+    const host = this.getBoundingClientRect();
+    const container = el.getBoundingClientRect();
+    return host.top - container.top + el.scrollTop;
+  }
+
+  private _measureViewport(): void {
+    const el = this._scrollEl;
+    if (!el) return;
+    // With an external scroller the window is the slice of the container's
+    // viewport that overlaps this tree, so subtract where the tree starts.
+    const offset = this._offsetWithinScroller();
+    const scrollTop = Math.max(0, el.scrollTop - offset);
+    const h = this.scrollContainer ? el.clientHeight : this.clientHeight;
+    if (this._scrollTop !== scrollTop || this._viewportHeight !== h) {
+      this._scrollTop = scrollTop;
+      // Re-render if the viewport became measurable (0 → N) so we switch from
+      // the fallback full render to the virtualized window.
+      this._viewportHeight = h;
+    }
+  }
+
+  /** Flatten visible nodes with their global (flattened) depth. */
+  private _collectVisibleWithDepth(): Array<{ node: TreeNode; depth: number }> {
+    const result: Array<{ node: TreeNode; depth: number }> = [];
+    this._collectVisibleDepth(this.nodes, 0, result);
+    return result;
+  }
+
+  private _collectVisibleDepth(
+    nodes: TreeNode[],
+    depth: number,
+    out: Array<{ node: TreeNode; depth: number }>,
+  ): void {
+    for (const node of nodes) {
+      out.push({ node, depth });
+      if (this._hasChildren(node) && this._isExpandedLocal(node)) {
+        this._collectVisibleDepth(node.children!, depth + 1, out);
+      }
+    }
   }
 
   // ─── Flatten visible nodes for keyboard nav ──────────────────────
@@ -523,14 +693,105 @@ export class Openp41geTree extends LitElement {
     if (!this.nodes || this.nodes.length === 0) {
       return html`<div class="tree-empty">No items</div>`;
     }
-    return html` <div class="tree-root" role="tree">${this._renderNodes(this.nodes)}</div> `;
+    // Virtualized mode renders a single flat scroll container. When it has no
+    // measurable viewport (jsdom / tests, or before layout) it falls back to
+    // rendering every row so the DOM stays predictable for assertions.
+    if (this.virtualize) {
+      return this._renderVirtualized();
+    }
+    return html`
+      <div class="tree-root" role="tree">${this._renderNodes(this.nodes, this.depth)}</div>
+    `;
   }
 
-  private _renderNodes(nodes: TreeNode[]): TemplateResult[] {
-    return nodes.map((node) => this._renderNode(node));
+  private _renderNodes(nodes: TreeNode[], depth: number): TemplateResult[] {
+    return nodes.map((node) => this._renderNode(node, depth));
   }
 
-  private _renderNode(node: TreeNode): TemplateResult {
+  private _renderNode(node: TreeNode, depth: number): TemplateResult {
+    const row = this._renderRow(node, depth);
+    const expanded = this._isExpandedLocal(node);
+    const hasChildren = this._hasChildren(node);
+    const isLoading = this._loadingNodeIds.has(node.id);
+
+    return html`${row}${this._renderChildren(node, depth, expanded, hasChildren, isLoading)}`;
+  }
+
+  private _renderChildren(
+    node: TreeNode,
+    depth: number,
+    expanded: boolean,
+    hasChildren: boolean,
+    isLoading: boolean,
+  ): TemplateResult | typeof nothing {
+    if (!(hasChildren && expanded && !isLoading)) return nothing;
+    return html`<openp41ge-tree
+      .nodes=${node.children!}
+      .selectedId=${this.selectedId}
+      .renderIcon=${this.renderIcon}
+      .onToggle=${this.onToggle}
+      .onExpandedChange=${this.onExpandedChange}
+      depth=${depth + 1}
+      @tree-node-click=${(e: Event) => this._forwardEvent(e, "tree-node-click")}
+      @tree-node-toggle=${(e: Event) => this._forwardEvent(e, "tree-node-toggle")}
+      @tree-node-toggle-error=${(e: Event) => this._forwardEvent(e, "tree-node-toggle-error")}
+      @tree-node-action=${(e: Event) => this._forwardEvent(e, "tree-node-action")}
+      @tree-node-dblclick=${(e: Event) => this._forwardEvent(e, "tree-node-dblclick")}
+      @tree-node-contextmenu=${(e: Event) => this._forwardEvent(e, "tree-node-contextmenu")}
+      @tree-drag-start=${(e: Event) => this._forwardEvent(e, "tree-drag-start")}
+      @tree-drop=${(e: Event) => this._forwardEvent(e, "tree-drop")}
+    ></openp41ge-tree>`;
+  }
+
+  private _renderVirtualized(): TemplateResult {
+    const visible = this._collectVisibleWithDepth();
+    const total = visible.length;
+    // With an external scroller the root is a plain block inside someone
+    // else's scroll area; only the self-scrolling variant owns a scrollbar.
+    const rootClass = this.scrollContainer
+      ? "tree-root tree-root--virtual-external"
+      : "tree-root tree-root--virtual";
+
+    // Fallback: no measurable viewport → render every row (tests/jsdom/0-size).
+    if (this._viewportHeight <= 0) {
+      return html`
+        <div class=${rootClass} role="tree" @scroll=${this._onVirtualScroll}>
+          ${visible.map((entry) => this._renderRow(entry.node, entry.depth))}
+        </div>
+      `;
+    }
+
+    // Windowed render: only the visible rows plus an overscan buffer.
+    const rowH = Math.max(1, this.rowHeight);
+    const overscan = Math.max(0, this.overscan);
+    const first = Math.max(0, Math.floor(this._scrollTop / rowH) - overscan);
+    const last = Math.min(
+      total,
+      Math.ceil((this._scrollTop + this._viewportHeight) / rowH) + overscan,
+    );
+    const slice = visible.slice(first, last);
+    this._windowNodeIds = slice.map((entry) => entry.node.id);
+    return html`
+      <div class=${rootClass} role="tree" @scroll=${this._onVirtualScroll}>
+        ${
+          first > 0
+            ? html`<div class="tree-virtual-spacer" style="height:${first * rowH}px"></div>`
+            : nothing
+        }
+        ${slice.map((entry) => this._renderRow(entry.node, entry.depth))}
+        ${
+          last < total
+            ? html`<div
+                class="tree-virtual-spacer"
+                style="height:${(total - last) * rowH}px"
+              ></div>`
+            : nothing
+        }
+      </div>
+    `;
+  }
+
+  private _renderRow(node: TreeNode, depth: number): TemplateResult {
     const expanded = this._isExpandedLocal(node);
     const hasChildren = this._hasChildren(node);
     const showChevron = this._showChevron(node);
@@ -546,8 +807,8 @@ export class Openp41geTree extends LitElement {
       10,
     );
     const rowIndent = isSection
-      ? this.depth * INDENT + SECTION_EXTRA + extraIndent
-      : this.depth * INDENT + extraIndent;
+      ? depth * INDENT + SECTION_EXTRA + extraIndent
+      : depth * INDENT + extraIndent;
     // A node may opt to be pulled back toward its parent (e.g. content-match
     // rows rendered as children of a file), reducing its effective indent.
     const appliedIndent = Math.max(0, rowIndent - (node.reduceIndent ?? 0));
@@ -563,7 +824,7 @@ export class Openp41geTree extends LitElement {
     // renderer receives the row geometry so it can position a gutter.
     const labelContent = node.renderLabel
       ? node.renderLabel(node, {
-          depth: this.depth,
+          depth,
           paddingLeft: rowIndent + contentPad,
           labelOffset,
           indentPerLevel: INDENT,
@@ -590,6 +851,7 @@ export class Openp41geTree extends LitElement {
           "is-section": isSection,
           "has-children": hasChildren,
           "is-loading": isLoading,
+          "tree-node--cm": !!node.renderLabel,
           [statusClass]: !!node.status,
         })}"
         style=${styleMap({
@@ -662,28 +924,6 @@ export class Openp41geTree extends LitElement {
             : nothing
         }
       </div>
-
-      <!-- Children (recursive) -->
-      ${
-        hasChildren && expanded && !isLoading
-          ? html`<openp41ge-tree
-              .nodes=${node.children!}
-              .selectedId=${this.selectedId}
-              .renderIcon=${this.renderIcon}
-              .onToggle=${this.onToggle}
-              .onExpandedChange=${this.onExpandedChange}
-              depth=${this.depth + 1}
-              @tree-node-click=${(e: Event) => this._forwardEvent(e, "tree-node-click")}
-              @tree-node-toggle=${(e: Event) => this._forwardEvent(e, "tree-node-toggle")}
-              @tree-node-toggle-error=${(e: Event) => this._forwardEvent(e, "tree-node-toggle-error")}
-              @tree-node-action=${(e: Event) => this._forwardEvent(e, "tree-node-action")}
-              @tree-node-dblclick=${(e: Event) => this._forwardEvent(e, "tree-node-dblclick")}
-              @tree-node-contextmenu=${(e: Event) => this._forwardEvent(e, "tree-node-contextmenu")}
-              @tree-drag-start=${(e: Event) => this._forwardEvent(e, "tree-drag-start")}
-              @tree-drop=${(e: Event) => this._forwardEvent(e, "tree-drop")}
-            ></openp41ge-tree>`
-          : nothing
-      }
     `;
   }
 

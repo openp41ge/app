@@ -15,7 +15,11 @@ import type {
 import type { WorktreeModel } from "./worktree-model.js";
 import type { FileEntryModel, FileContentModel, FileStatus } from "./file-model.js";
 import type { RepoService } from "./repo-service.js";
-import type { IExplorerSearchModel, ExplorerSearchOptions } from "./explorer-search-model.js";
+import type {
+  IExplorerSearchModel,
+  ExplorerSearchOptions,
+  ContentSearchSession,
+} from "./explorer-search-model.js";
 
 // ─── TestFileContent ─────────────────────────────────────────────────
 
@@ -287,12 +291,45 @@ export class TestRepoService implements RepoService {
 
 /** In-memory Explorer content-search — records calls, returns canned results. */
 export class TestExplorerSearchModel implements IExplorerSearchModel {
+  /** Canned per-file results; the index is derived from them. */
   results: FileContentSearchResult[] = [];
   calls: Array<{
     query: string;
     rootPaths: string[];
     options?: ExplorerSearchOptions;
   }> = [];
+  /** Per-file match-line fetches, in order — the lazy half of the search. */
+  fetchCalls: Array<{ filePath: string; query: string }> = [];
+
+  /** When true, `searchContentsStreaming` returns a pending session whose `done`
+   *  the test resolves manually (via `pendingStreaming`), so supersession can be
+   *  observed: a newer search must `cancel()` the previous one.
+   */
+  deferStreaming = false;
+  /** Session handles for deferred (pending) searches, in start order.
+   *  `emit` delivers one batch of index entries to that session. */
+  pendingStreaming: Array<
+    ContentSearchSession & {
+      resolve: (value: unknown) => void;
+      emit: (entries: ContentMatchIndexEntry[]) => void;
+      query: string;
+    }
+  > = [];
+  /** Queries whose streaming session was cancelled via `session.cancel()`.
+   *  Present because `TestExplorerSearchModel` is also used for the default
+   *  (non-deferred) synchronous path. */
+  cancelledStreaming: string[] = [];
+
+  /** The index entries the canned `results` correspond to. */
+  get indexEntries(): ContentMatchIndexEntry[] {
+    return this.results.map((r) => ({
+      path: r.path,
+      name: r.name,
+      dir: r.dir,
+      count: r.matches.length,
+      truncated: r.truncated,
+    }));
+  }
 
   searchContents(
     rawQuery: string,
@@ -305,7 +342,44 @@ export class TestExplorerSearchModel implements IExplorerSearchModel {
     return Promise.resolve(this.results);
   }
 
+  searchContentsStreaming(
+    rawQuery: string,
+    rootPaths: string[],
+    options: ExplorerSearchOptions | undefined,
+    callbacks: { onEntries: (entries: ContentMatchIndexEntry[]) => void },
+  ): ContentSearchSession {
+    const query = rawQuery.trim();
+    this.calls.push({ query, rootPaths, options });
+    if (this.deferStreaming) {
+      let resolve!: (value: unknown) => void;
+      const done = new Promise<unknown>((r) => {
+        resolve = r;
+      });
+      const session = {
+        done,
+        resolve,
+        query,
+        emit: (entries: ContentMatchIndexEntry[]) => callbacks.onEntries(entries),
+        cancel: () => {
+          this.cancelledStreaming.push(query);
+        },
+      };
+      this.pendingStreaming.push(session);
+      return session;
+    }
+    // Deliver the whole index in one batch, mirroring the real IPC ordering.
+    callbacks.onEntries(this.indexEntries);
+    return { done: Promise.resolve({ total: this.results.length }), cancel: () => undefined };
+  }
+
+  fetchMatches(filePath: string, rawQuery: string): Promise<FileContentMatch[]> {
+    this.fetchCalls.push({ filePath, query: rawQuery.trim() });
+    const hit = this.results.find((r) => r.path === filePath);
+    return Promise.resolve(hit ? hit.matches : []);
+  }
+
   clearCalls(): void {
     this.calls = [];
+    this.fetchCalls = [];
   }
 }

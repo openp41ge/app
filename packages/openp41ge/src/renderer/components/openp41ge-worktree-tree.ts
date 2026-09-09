@@ -17,9 +17,10 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { state, property } from "lit/decorators.js";
+import { tooltipController } from "openp41ge-uikit";
 import { toastService } from "./openp41ge-toast";
 import { repoTreeRenderer } from "../services/repo-tree-renderer";
-import { plusIconThick } from "../icons";
+import { plusIconThick, searchIcon, settingsIcon } from "../icons";
 import { showConfirmModal } from "./openp41ge-confirm-modal";
 import "./openp41ge-repo-tree-item";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
@@ -27,12 +28,14 @@ import { TabActivationHistory } from "../services/tab-activation-history";
 import "./openp41ge-clone-dialog";
 import "./openp41ge-add-worktree-dialog";
 import { appServices } from "../app";
+import { subscribeSettingsTabState } from "../services/settings-tab-state";
 import type { Workspace, Tab } from "../../layout/types";
 import { Openp41geTabsEventHandler } from "../services/openp41ge-tabs-event-handler";
 import {
   IpcExplorerSearchModel,
   type ExplorerSearchOptions,
   type IExplorerSearchModel,
+  type ContentSearchSession,
 } from "../models/explorer-search-model";
 import { matchesNameFilter } from "../services/explorer-filter";
 import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
@@ -42,6 +45,20 @@ import { setContextMenuActive } from "../services/drag-context";
 import type { RepoService } from "../models/repo-service";
 import { IpcRepoService } from "../models/ipc-repo-service";
 import { GitService, IpcGitAdapter } from "openp41ge-git";
+
+// ─── Explorer search tuning ─────────────────────────────────────────────
+
+/** Idle time after the last keystroke before a content search is issued. */
+const SEARCH_DEBOUNCE_MS = 200;
+/** Fallback batching interval when requestAnimationFrame is unavailable. */
+const FLUSH_INTERVAL_MS = 16;
+/**
+ * Matched files whose match rows open automatically, in walk order.
+ *
+ * Small result sets should look exactly as they did when every match was sent
+ * eagerly; beyond this the rows stay collapsed behind their count badge.
+ */
+const AUTO_EXPAND_MATCH_FILES = 20;
 
 // ─── Module-level state (survives DOM teardown) ─────────────────────────
 
@@ -233,6 +250,11 @@ class Openp41geWorktreeTree extends LitElement {
   /** Gate: without a selected workspace the explorer shows a disabled hint. */
   private _hasWorkspace = workspaceFileService.openFilePath != null;
   private _workspaceUnsub: (() => void) | null = null;
+  /** Whether the file-editor settings grid tab is open (keeps the gear lit). */
+  @state() private _settingsOpen = false;
+  private _settingsUnsub: (() => void) | null = null;
+  /** Footer buttons that received a custom tooltip — detached on teardown. */
+  private _tooltipTargets: Element[] = [];
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
 
   // ── Explorer search / filter state ──────────────────────────────────────
@@ -241,12 +263,39 @@ class Openp41geWorktreeTree extends LitElement {
   @state() private _filterQuery = "";
   @state() private _filterRegex = false;
   @state() private _filterCase = false;
-  @state() private _searchResults: FileContentSearchResult[] = [];
-  @state() private _contentMatchesByPath = new Map<string, FileContentSearchResult>();
+  /**
+   * The explorer tool whose panel is open below the tools bar. Only one tool is
+   * active at a time; clicking the active tool's icon toggles it off. `null`
+   * (the default) leaves every tools-bar icon inactive and the tree unfiltered.
+   */
+  @state() private _activeTool: "search" | null = null;
+  /** Matching files, in walk order — counts only, no match lines. */
+  @state() private _contentIndex: ContentMatchIndexEntry[] = [];
+  /** The same entries keyed by disk path, for badge/filter lookups. */
+  @state() private _contentIndexByPath = new Map<string, ContentMatchIndexEntry>();
+  /** Match lines fetched so far, keyed by disk path (the lazy half). */
+  @state() private _matchDetailsByPath = new Map<string, FileContentMatch[]>();
+  /** Matched files whose match rows are expanded in the tree. */
+  @state() private _expandedMatchFiles = new Set<string>();
   @state() private _searching = false;
   private _searchTimer: ReturnType<typeof setTimeout> | null = null;
   private _searchToken = 0;
+  private _activeSearch: ContentSearchSession | null = null;
   private _filterInputEl: HTMLInputElement | null = null;
+  /** Paths with a match-line fetch in flight, so rows don't request twice. */
+  private _matchFetchesInFlight = new Set<string>();
+  /**
+   * Index entries that have streamed in but are not yet applied to state.
+   *
+   * Applying each chunk on arrival re-rendered the whole tree — rebuilding a
+   * syntax-highlighted row for every match of every file found so far — once
+   * per file. That is quadratic, and with a short query ("d", "dr") it starved
+   * the main thread so badly that keystrokes never got through. Chunks are
+   * instead buffered and applied at most once per frame.
+   */
+  private _pendingEntries: ContentMatchIndexEntry[] = [];
+  private _flushHandle: number | null = null;
+  private _flushViaRaf = false;
 
   constructor() {
     super();
@@ -330,6 +379,50 @@ class Openp41geWorktreeTree extends LitElement {
       }
       .explorer-result-file:hover { background: rgba(255,255,255,0.06); }
       .explorer-result-match:hover { background: rgba(255,255,255,0.04); }
+      /* Tool buttons in the bottom bar. Only one tool is active at a time;
+         grey when off, white when on or hovered — no button background. */
+      .wt-tool-btn {
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary, #999);
+        cursor: pointer;
+      }
+      .wt-tool-btn:hover {
+        color: var(--text-primary, #fff);
+      }
+      .wt-tool-btn.wt-tool-active {
+        color: var(--text-primary, #fff);
+      }
+      /* Settings gear button in the bottom bar — grey off, white on hover or
+         while its settings grid tab is open. */
+      .wt-settings-btn {
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: none;
+        border-radius: 3px;
+        background: transparent;
+        color: var(--text-secondary, #999);
+        cursor: pointer;
+      }
+      .wt-settings-btn:hover {
+        color: var(--text-primary, #ccc);
+      }
+      .wt-settings-btn.wt-settings-active {
+        color: var(--text-primary, #ccc);
+      }
+      .wt-settings-btn.wt-settings-active:hover {
+        color: var(--text-primary, #ccc);
+      }
     `;
     document.head.appendChild(s);
   }
@@ -431,6 +524,14 @@ class Openp41geWorktreeTree extends LitElement {
     // (worksetId is often "" when the tree is first created).
     this._syncExplorerState();
 
+    // Keep the settings gear lit while the file-editor settings grid tab is
+    // open (subscribe fires once immediately with the current state).
+    this._settingsUnsub = subscribeSettingsTabState("file-editor-settings", (open) => {
+      if (open === this._settingsOpen) return;
+      this._settingsOpen = open;
+      this.requestUpdate();
+    });
+
     // Workspace gate: show a disabled hint until a workspace is selected. When
     // the selection changes (top-bar workspace picker) revalidate in place.
     this._workspaceUnsub = workspaceFileService.onChange(() => {
@@ -458,12 +559,23 @@ class Openp41geWorktreeTree extends LitElement {
       clearTimeout(this._searchTimer);
       this._searchTimer = null;
     }
+    // Stop any in-flight walk in the main process; a detached tree has nothing
+    // to render its chunks into.
+    this._searchToken++;
+    this._cancelActiveSearch();
+    this._searching = false;
     this._gitDisconnected = true;
 
     if (this._workspaceUnsub) {
       this._workspaceUnsub();
       this._workspaceUnsub = null;
     }
+    if (this._settingsUnsub) {
+      this._settingsUnsub();
+      this._settingsUnsub = null;
+    }
+    for (const el of this._tooltipTargets) tooltipController.detach(el);
+    this._tooltipTargets = [];
 
     if (this._scrollResizeObserver) {
       this._scrollResizeObserver.disconnect();
@@ -487,23 +599,18 @@ class Openp41geWorktreeTree extends LitElement {
 
   // ═══ Lit template ═══════════════════════════════════════════════════
 
-  /** The docking side of the host sidebar; defaults to right (grid windows). */
-  private get _hostSide(): "left" | "right" {
-    const attr = this.getAttribute("data-side");
-    const side = attr ?? this.closest?.("openp41ge-sidebar")?.getAttribute("side");
-    return side === "left" ? "left" : "right";
-  }
-
-  /** The Editor settings gear button, shown in the bottom bar. */
+  /** The Explorer settings gear button, shown in the bottom bar. */
   private _renderSettingsButton(): TemplateResult {
+    const active = this._settingsOpen;
     return html` <button
       type="button"
-      title="Editor settings"
-      aria-label="Editor settings"
+      data-tip="Explorer Settings"
+      aria-label="Explorer Settings"
+      aria-pressed=${active}
+      class="wt-settings-btn${active ? " wt-settings-active" : ""}"
       @click=${this._onSettingsClick}
-      style="height:18px;width:18px;display:flex;align-items:center;justify-content:center;padding:0;border:none;border-radius:3px;background:transparent;color:var(--text-secondary,#999);font-size:14px;line-height:1;cursor:pointer;"
     >
-      ⚙
+      ${unsafeHTML(settingsIcon(14))}
     </button>`;
   }
 
@@ -526,6 +633,42 @@ class Openp41geWorktreeTree extends LitElement {
     this._scheduleSearch();
   }
 
+  /**
+   * Toggle a tools-bar tool. Only one tool is active at a time; clicking the
+   * active tool's icon turns it off. Turning search on reveals the search bar
+   * below the tools bar (restoring the previous query + results); turning it
+   * off unfilters the tree while keeping the query text for the next time.
+   */
+  private _toggleTool(tool: "search"): void {
+    const turningOn = this._activeTool !== tool;
+    this._activeTool = turningOn ? tool : null;
+    if (tool !== "search") return;
+    if (turningOn) {
+      // Re-apply the preserved query's results and focus the input.
+      if (this._filterQuery.trim()) this._scheduleSearch();
+      this._focusFilterInput();
+    } else {
+      // Search tool off — unfilter the tree and drop live results/state, but
+      // keep the query text so toggling back on restores the search.
+      if (this._searchTimer) {
+        clearTimeout(this._searchTimer);
+        this._searchTimer = null;
+      }
+      this._cancelActiveSearch();
+      this._resetSearchState();
+      this._searching = false;
+    }
+  }
+
+  /** Focus the search input once the search bar has rendered below the tools bar. */
+  private _focusFilterInput(): void {
+    requestAnimationFrame(() => {
+      const input = this.querySelector<HTMLInputElement>("#wt-filter-input");
+      this._filterInputEl = input ?? null;
+      input?.focus();
+    });
+  }
+
   private _onFilterKeydown(e: KeyboardEvent): void {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -540,29 +683,53 @@ class Openp41geWorktreeTree extends LitElement {
       e.preventDefault();
       // Run immediately on Enter, bypassing the debounce.
       if (this._searchTimer) clearTimeout(this._searchTimer);
+      this._searchTimer = null;
       const q = this._filterQuery.trim();
       if (q) {
-        this._searching = true;
         const token = ++this._searchToken;
+        this._cancelActiveSearch();
+        this._searching = true;
         void this._runSearch(q, token);
       }
     }
   }
 
+  /**
+   * Stop the in-flight search and drop anything it had buffered.
+   *
+   * Called the moment the search config changes (query text, regex, case) so a
+   * superseded walk stops streaming immediately instead of running for the
+   * whole debounce window alongside its replacement.
+   */
+  private _cancelActiveSearch(): void {
+    this._activeSearch?.cancel();
+    this._activeSearch = null;
+    this._pendingEntries = [];
+    if (this._flushHandle !== null) {
+      if (this._flushViaRaf) cancelAnimationFrame(this._flushHandle);
+      else clearTimeout(this._flushHandle);
+      this._flushHandle = null;
+    }
+  }
+
   private _scheduleSearch(): void {
     if (this._searchTimer) clearTimeout(this._searchTimer);
+    this._searchTimer = null;
+    // Bump the token first: it invalidates callbacks from the outgoing search
+    // even if its cancel hasn't taken effect in the main process yet.
+    const token = ++this._searchToken;
+    this._cancelActiveSearch();
     const q = this._filterQuery.trim();
     if (!q) {
-      this._searchResults = [];
-      this._contentMatchesByPath = new Map();
+      this._resetSearchState();
       this._searching = false;
       return;
     }
     this._searching = true;
-    const token = ++this._searchToken;
     this._searchTimer = setTimeout(() => {
+      this._searchTimer = null;
       void this._runSearch(q, token);
-    }, 200);
+    }, SEARCH_DEBOUNCE_MS);
   }
 
   /** Root disk paths to content-search — everything visible in the explorer. */
@@ -581,21 +748,157 @@ class Openp41geWorktreeTree extends LitElement {
       regex: this._filterRegex,
       caseSensitive: this._filterCase,
     };
-    const results = await this._searchModel.searchContents(query, this._rootPaths(), opts);
-    if (token !== this._searchToken) return; // stale — superseded by a newer search
-    this._searchResults = results;
-    const byPath = new Map<string, FileContentSearchResult>();
-    for (const r of results) byPath.set(r.path, r);
-    this._contentMatchesByPath = byPath;
+    const roots = this._rootPaths();
+    if (!query) {
+      this._resetSearchState();
+      this._searching = false;
+      return;
+    }
+
+    // Reset per-search accumulation. Any previous search was already cancelled
+    // by _scheduleSearch / _onFilterKeydown before this ran.
+    this._cancelActiveSearch();
+    this._resetSearchState();
+    this._searching = true;
+
+    // Buffer streamed index entries and apply them in batches: one state
+    // update and one render per frame, however fast the chunks arrive.
+    const applyEntries = (entries: ContentMatchIndexEntry[]): void => {
+      if (token !== this._searchToken) return; // stale — superseded
+      this._pendingEntries.push(...entries);
+      this._scheduleFlush(token);
+    };
+
+    try {
+      this._activeSearch = this._searchModel.searchContentsStreaming(query, roots, opts, {
+        onEntries: applyEntries,
+      });
+      await this._activeSearch.done;
+    } catch {
+      // A cancelled/invalid search resolves or rejects; treat as finished.
+    }
+    if (token !== this._searchToken) return; // superseded
+    this._flushPendingEntries(token);
     this._searching = false;
+    this._activeSearch = null;
+  }
+
+  /** Drop every result of the previous search, including fetched match lines. */
+  private _resetSearchState(): void {
+    this._contentIndex = [];
+    this._contentIndexByPath = new Map();
+    this._matchDetailsByPath = new Map();
+    this._expandedMatchFiles = new Set();
+    this._matchFetchesInFlight.clear();
+  }
+
+  /** Queue a batched apply of `_pendingEntries` on the next frame. */
+  private _scheduleFlush(token: number): void {
+    if (this._flushHandle !== null) return;
+    const run = () => {
+      this._flushHandle = null;
+      this._flushPendingEntries(token);
+    };
+    if (typeof requestAnimationFrame === "function") {
+      this._flushViaRaf = true;
+      this._flushHandle = requestAnimationFrame(run);
+    } else {
+      this._flushViaRaf = false;
+      this._flushHandle = setTimeout(run, FLUSH_INTERVAL_MS) as unknown as number;
+    }
+  }
+
+  /** Apply every buffered index entry in one state update (one re-render). */
+  private _flushPendingEntries(token: number): void {
+    if (this._pendingEntries.length === 0) return;
+    const batch = this._pendingEntries;
+    this._pendingEntries = [];
+    if (token !== this._searchToken) return; // superseded while queued
+    // Fresh references so Lit sees the change and streams the batch into view.
+    this._contentIndex = [...this._contentIndex, ...batch];
+    const byPath = new Map(this._contentIndexByPath);
+    for (const entry of batch) byPath.set(entry.path, entry);
+    this._contentIndexByPath = byPath;
+    this._autoExpandLeadingMatches();
+  }
+
+  // ── Lazy match lines ────────────────────────────────────────────────────
+
+  /**
+   * Expand (and fetch lines for) the first few matched files.
+   *
+   * A handful of hits is the common case, and there the tree should look
+   * exactly as if everything had been sent eagerly. Past that the rows stay
+   * collapsed behind their count badge until the reader opens one, so a broad
+   * query costs a short list of file rows rather than thousands of code rows.
+   */
+  private _autoExpandLeadingMatches(): void {
+    const expanded = new Set(this._expandedMatchFiles);
+    let changed = false;
+    for (const entry of this._contentIndex.slice(0, AUTO_EXPAND_MATCH_FILES)) {
+      if (expanded.has(entry.path)) continue;
+      expanded.add(entry.path);
+      changed = true;
+      void this._ensureMatchLines(entry.path);
+    }
+    if (changed) this._expandedMatchFiles = expanded;
+  }
+
+  /** Toggle one file's match rows, fetching its lines the first time. */
+  private _onToggleMatchFile = (e: CustomEvent): void => {
+    const filePath = (e.detail as { filePath?: string })?.filePath;
+    if (!filePath) return;
+    const expanded = new Set(this._expandedMatchFiles);
+    if (expanded.has(filePath)) {
+      expanded.delete(filePath);
+    } else {
+      expanded.add(filePath);
+      void this._ensureMatchLines(filePath);
+    }
+    this._expandedMatchFiles = expanded;
+  };
+
+  /**
+   * Matched files that scrolled into the tree's virtual window: load their
+   * lines now so opening a row is instant. Fetches are deduplicated and
+   * cached, so re-entering the same window costs nothing.
+   */
+  private _onPrefetchMatches = (e: CustomEvent): void => {
+    const filePaths = (e.detail as { filePaths?: string[] })?.filePaths;
+    if (!filePaths) return;
+    for (const filePath of filePaths) void this._ensureMatchLines(filePath);
+  };
+
+  /** Fetch a file's match lines once, for the query the search ran with. */
+  private async _ensureMatchLines(filePath: string): Promise<void> {
+    if (this._matchDetailsByPath.has(filePath)) return;
+    if (this._matchFetchesInFlight.has(filePath)) return;
+    const token = this._searchToken;
+    const query = this._filterQuery.trim();
+    if (!query) return;
+    this._matchFetchesInFlight.add(filePath);
+    try {
+      const matches = await this._searchModel.fetchMatches(filePath, query, {
+        regex: this._filterRegex,
+        caseSensitive: this._filterCase,
+      });
+      if (token !== this._searchToken) return; // superseded — the query moved on
+      const byPath = new Map(this._matchDetailsByPath);
+      byPath.set(filePath, matches);
+      this._matchDetailsByPath = byPath;
+    } catch {
+      // A missing/unreadable file simply renders no match rows.
+    } finally {
+      this._matchFetchesInFlight.delete(filePath);
+    }
   }
 
   private _matchesFilter(name: string): boolean {
-    return matchesNameFilter(name, this._filterQuery, this._filterRegex, this._filterCase);
+    return matchesNameFilter(name, this._activeFilterQuery, this._filterRegex, this._filterCase);
   }
 
   private _filteredRepos(): Array<{ path: string; name: string; url: string }> {
-    const q = this._filterQuery.trim();
+    const q = this._activeFilterQuery;
     if (!q) return this._repos;
     return this._repos.filter((repo) => {
       if (this._matchesFilter(repo.name)) return true;
@@ -610,20 +913,53 @@ class Openp41geWorktreeTree extends LitElement {
 
   /** Whether any content match lives under one of this repo's disk roots. */
   private _repoHasContentMatch(repo: { path: string; name: string; url: string }): boolean {
-    if (this._contentMatchesByPath.size === 0) return false;
+    if (this._contentIndexByPath.size === 0) return false;
     const roots: string[] = [];
     if (repo.path) roots.push(repo.path);
     const wts = this._worktreesByRepo.get(repo.name) ?? [];
     for (const wt of wts) if (wt.path) roots.push(wt.path);
-    for (const p of this._contentMatchesByPath.keys()) {
+    for (const p of this._contentIndexByPath.keys()) {
       if (roots.some((r) => p.startsWith(r.endsWith("/") ? r : r + "/"))) return true;
     }
     return false;
   }
 
+  /** True while the search tool is toggled on (its bar shows below the tools bar). */
+  private get _searchActive(): boolean {
+    return this._activeTool === "search";
+  }
+
+  /** The query that actually filters the tree — empty while the search tool is off. */
+  private get _activeFilterQuery(): string {
+    return this._searchActive ? this._filterQuery.trim() : "";
+  }
+
   /** Optional filter string forwarded to each repo-tree-item for worktree/file filtering. */
   private get _filterString(): string {
-    return this._filterQuery.trim();
+    return this._activeFilterQuery;
+  }
+
+  /** Tool icons shown in the bottom bar. Only one tool is active at a time;
+   * the search tool reveals the search bar at the top of the explorer. */
+  private _renderToolButtons(): TemplateResult {
+    return html` ${this._renderToolButton("search", searchIcon(14), "Search files")} `;
+  }
+
+  private _renderToolButton(tool: "search", icon: string, title: string): TemplateResult {
+    const active = this._activeTool === tool;
+    return html`
+      <button
+        type="button"
+        data-tip=${title}
+        aria-label=${title}
+        aria-pressed=${active}
+        data-explorer-tool=${tool}
+        class="wt-tool-btn${active ? " wt-tool-active" : ""}"
+        @click=${() => this._toggleTool(tool)}
+      >
+        ${unsafeHTML(icon)}
+      </button>
+    `;
   }
 
   private _renderSearchBar(): TemplateResult {
@@ -633,6 +969,7 @@ class Openp41geWorktreeTree extends LitElement {
       <div style="flex-shrink:0;padding:6px 10px;border-bottom:1px solid var(--divider,#2a2a2a);">
         <div style="display:flex;align-items:center;gap:4px;">
           <input
+            id="wt-filter-input"
             type="text"
             placeholder="Filter repos and files…"
             spellcheck="false"
@@ -675,7 +1012,7 @@ class Openp41geWorktreeTree extends LitElement {
         Searching…
       </div>`;
     }
-    const hasContent = this._searchResults.length > 0;
+    const hasContent = this._contentIndex.length > 0;
     const hasNameMatches = this._filteredRepos().length > 0;
     if (!hasContent && !hasNameMatches) {
       return html`<div style="padding:8px 10px;font-size:12px;color:var(--text-muted,#777);">
@@ -709,7 +1046,7 @@ class Openp41geWorktreeTree extends LitElement {
       <div
         class="wt-drawer flex flex-col overflow-hidden flex-1 min-h-0 w-full bg-gutter relative select-none"
       >
-        ${this._renderSearchBar()}
+        ${this._searchActive ? this._renderSearchBar() : nothing}
         <div class="wt-tree-scroll-wrapper flex-1 relative min-h-0">
           <div class="wt-tree-scroll absolute inset-0 overflow-y-auto overflow-x-hidden">
             <div class="wt-tree-scroll-content" data-explorer-drop-zone>
@@ -727,7 +1064,11 @@ class Openp41geWorktreeTree extends LitElement {
                       .filter=${this._filterString}
                       .filterRegex=${this._filterRegex}
                       .filterCase=${this._filterCase}
-                      .contentMatches=${this._contentMatchesByPath}
+                      .contentIndex=${this._contentIndexByPath}
+                      .matchDetails=${this._matchDetailsByPath}
+                      .expandedMatchFiles=${this._expandedMatchFiles}
+                      @content-match-toggle=${this._onToggleMatchFile}
+                      @content-match-prefetch=${this._onPrefetchMatches}
                       .editMode=${this._editMode}
                       @repo-toggle-expand=${(e: CustomEvent) => {
                         const { repoName: rn, expanded } = e.detail;
@@ -890,11 +1231,9 @@ class Openp41geWorktreeTree extends LitElement {
           class="sb-bottom-bar"
           style="border-top:1px solid var(--divider,#333);height:24px;flex-shrink:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary,#252526);"
         >
-          ${
-            this._hostSide === "left"
-              ? html`${this._renderSettingsButton()}<span style="flex:1"></span>`
-              : html`<span style="flex:1"></span>${this._renderSettingsButton()}`
-          }
+          ${this._renderSettingsButton()}
+          <span style="flex:1"></span>
+          ${this._renderToolButtons()}
         </div>
       </div>
     `;
@@ -1049,6 +1388,26 @@ class Openp41geWorktreeTree extends LitElement {
       this._pendingLoadAfterTreeReady = false;
       this._loadRepos();
     }
+
+    // Attach the custom tooltips to the footer buttons (replaces native title).
+    this._syncFooterTooltips();
+  }
+
+  /** Register custom tooltips on the bottom-bar buttons via data-tip. */
+  private _syncFooterTooltips(): void {
+    const btns = this.querySelectorAll<HTMLElement>(".sb-bottom-bar [data-tip]");
+    const live = new Set<Element>();
+    for (const btn of btns) {
+      const text = btn.getAttribute("data-tip");
+      if (text) {
+        tooltipController.attach(btn, { type: "simple", text });
+        live.add(btn);
+      }
+    }
+    for (const el of this._tooltipTargets) {
+      if (!live.has(el)) tooltipController.detach(el);
+    }
+    this._tooltipTargets = [...live];
   }
 
   private _onScrollbarTrackMousedown = (e: MouseEvent): void => {

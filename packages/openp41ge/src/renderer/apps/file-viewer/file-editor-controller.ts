@@ -178,11 +178,17 @@ export class FileEditorController extends BaseController implements FileViewerCo
   private _applyConfiguredHighlight(): void {
     const search = (this.state.search ?? undefined) as
       { query?: string; regex?: boolean; caseSensitive?: boolean } | undefined;
+    const matchIndex =
+      typeof this.state.matchIndex === "number" ? this.state.matchIndex : undefined;
     if (search?.query && this._editor) {
-      this._editor.setSearchHighlight(search.query, {
-        regex: search.regex,
-        caseSensitive: search.caseSensitive,
-      });
+      this._editor.setSearchHighlight(
+        search.query,
+        {
+          regex: search.regex,
+          caseSensitive: search.caseSensitive,
+        },
+        matchIndex,
+      );
     }
     // Reveal a specific content-search match instance (Explorer).
     const line = this.state.line;
@@ -274,6 +280,7 @@ export class FileEditorController extends BaseController implements FileViewerCo
     line: number,
     column?: number,
     search?: { query: string; regex?: boolean; caseSensitive?: boolean },
+    matchIndex?: number,
   ): void {
     this.state.line = line;
     if (column !== undefined) {
@@ -281,10 +288,17 @@ export class FileEditorController extends BaseController implements FileViewerCo
     }
     if (search?.query) {
       this.state.search = search;
-      this._editor?.setSearchHighlight(search.query, {
-        regex: search.regex,
-        caseSensitive: search.caseSensitive,
-      });
+      if (typeof matchIndex === "number") {
+        this.state.matchIndex = matchIndex;
+      }
+      this._editor?.setSearchHighlight(
+        search.query,
+        {
+          regex: search.regex,
+          caseSensitive: search.caseSensitive,
+        },
+        matchIndex,
+      );
     }
     if (this._editor) {
       this._editor.revealLine(line, column);

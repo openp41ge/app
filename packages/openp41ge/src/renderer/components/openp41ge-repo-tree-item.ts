@@ -25,12 +25,44 @@ import {
   type FileEntry,
 } from "openp41ge-filesystem";
 import type { TreeNode, IconRenderer } from "openp41ge-uikit";
-import { highlightLine, languageFromPath } from "openp41ge-uikit";
+import { highlightLine, languageFromPath, cropLine } from "openp41ge-uikit";
 import { getThemeById, darkPlusTheme } from "openp41ge-uikit/theme";
 import { appServices } from "../app";
 import "openp41ge-uikit";
 
 export type { WorktreeData, FileEntry };
+
+/** Rows a node list would render, following expanded children. */
+function countVisibleRows(nodes: TreeNode[]): number {
+  let n = 0;
+  for (const node of nodes) {
+    n += 1;
+    if (node.expanded && node.children) n += countVisibleRows(node.children);
+  }
+  return n;
+}
+
+/**
+ * Upper bound on inline content-match rows built in a single render.
+ *
+ * Sized well above what fits in the sidebar viewport, but low enough that a
+ * two-character query (which can match in every walked file) still renders in
+ * a few milliseconds and never blocks typing.
+ */
+const MAX_RENDERED_MATCH_ROWS = 500;
+
+/**
+ * Flattened row count past which a worktree's file tree renders virtualized.
+ *
+ * Below it the tree renders every row, exactly as it always has — normal
+ * browsing never takes the windowed path. Above it (a broad search that
+ * reveals hundreds of matched files and their lines) only the rows overlapping
+ * the panel's viewport are built.
+ */
+const VIRTUALIZE_ROW_THRESHOLD = 150;
+
+/** Row height in px, matching the uikit tree's --tree-row-height default. */
+const TREE_ROW_HEIGHT = 26;
 
 export class Openp41geRepoTreeItem extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -61,8 +93,28 @@ export class Openp41geRepoTreeItem extends LitElement {
   @property({ type: Boolean })
   editMode = false;
 
+  /** Matching files keyed by disk path — counts only, no match lines. */
   @property({ attribute: false })
-  contentMatches: Map<string, FileContentSearchResult> = new Map();
+  contentIndex: Map<string, ContentMatchIndexEntry> = new Map();
+
+  /** Match lines fetched so far, keyed by disk path. */
+  @property({ attribute: false })
+  matchDetails: Map<string, FileContentMatch[]> = new Map();
+
+  /** Matched files whose match rows are open. */
+  @property({ attribute: false })
+  expandedMatchFiles: Set<string> = new Set();
+
+  /**
+   * Remaining match rows this render may build, reset at the top of render().
+   *
+   * Each match row is a syntax-highlighted template, and a short query can
+   * match tens of thousands of times across the walked files. Building them all
+   * on every streamed batch is what froze the Explorer, so rendering stops at
+   * MAX_RENDERED_MATCH_ROWS: files past the budget still show as file rows with
+   * their match-count badge, they just don't expand their matches inline.
+   */
+  private _matchRowBudget = MAX_RENDERED_MATCH_ROWS;
 
   @state() private _expanded = false;
   @state() private _showingAddWorktree = false;
@@ -94,8 +146,6 @@ export class Openp41geRepoTreeItem extends LitElement {
   @state() private _expandedWorktrees = new Set<string>();
   @state() private _expandedDirs = new Map<string, Set<string>>();
   @state() private _pullingBranches = new Set<string>();
-  /** Branches whose content-match directory chains have already been revealed. */
-  @state() private _revealedContentBranches = new Set<string>();
   /** shortName → ahead/behind counters, loaded once per repo to show sync warnings. */
   private _branchSync = new Map<string, { ahead: number; behind: number }>();
   private _syncKnown = false;
@@ -130,7 +180,7 @@ export class Openp41geRepoTreeItem extends LitElement {
       changedProperties.has("filter") ||
       changedProperties.has("filterRegex") ||
       changedProperties.has("filterCase") ||
-      changedProperties.has("contentMatches")
+      changedProperties.has("contentIndex")
     ) {
       this._syncAutoExpand();
     }
@@ -165,9 +215,9 @@ export class Openp41geRepoTreeItem extends LitElement {
 
   /** Whether any content match lives under this worktree's root path. */
   private _worktreeHasContentMatch(wt: WorktreeData): boolean {
-    if (this.contentMatches.size === 0 || !wt.path) return false;
+    if (this.contentIndex.size === 0 || !wt.path) return false;
     const prefix = wt.path.endsWith("/") ? wt.path : wt.path + "/";
-    for (const p of this.contentMatches.keys()) {
+    for (const p of this.contentIndex.keys()) {
       if (p.startsWith(prefix)) return true;
     }
     return false;
@@ -175,61 +225,123 @@ export class Openp41geRepoTreeItem extends LitElement {
 
   /** Whether any content match lives under the given directory path. */
   private _dirContainsMatch(dirPath: string): boolean {
-    if (this.contentMatches.size === 0) return false;
+    if (this.contentIndex.size === 0) return false;
     const prefix = dirPath.endsWith("/") ? dirPath : dirPath + "/";
-    for (const p of this.contentMatches.keys()) {
+    for (const p of this.contentIndex.keys()) {
       if (p.startsWith(prefix)) return true;
     }
     return false;
   }
 
-  /** Build the match sub-list nodes for a file that has content matches. */
-  private _contentMatchNodes(branch: string, filePath: string): TreeNode[] | undefined {
-    const res = this.contentMatches.get(filePath);
-    if (!res || res.matches.length === 0) return undefined;
-    // Shift the row back one indent level so it aligns near the file's name
-    // instead of sitting a full level deeper (see reduceIndent in the tree).
-    const maxDigits = Math.max(1, ...res.matches.map((m) => String(m.lineNumber ?? 1).length));
-    const language = languageFromPath(filePath);
-    const query = this.filter.trim();
-    return res.matches.map((m, i) => ({
-      id: `${filePath}:match:${i}`,
-      label: m.lineText,
-      showChevron: false,
-      draggable: false,
-      reduceIndent: 16,
-      meta: {
-        branch,
-        filePath,
-        match: true,
-        line: m.lineNumber,
-        column: m.column,
-        matchText: m.lineText.trim(),
-      },
-      renderLabel: () => html`
-        <span class="cm-match-row">
-          <span class="cm-match-gutter" style=${`min-width:${maxDigits}ch`}>${m.lineNumber}</span>
-          <span class="cm-match-code"
-            >${unsafeHTML(
-              highlightLine(m.lineText.replace(/\s+$/, ""), {
-                language,
-                query,
-                regex: this.filterRegex,
-                caseSensitive: this.filterCase,
-              }),
-            )}</span
-          >
-        </span>
-      `,
-    }));
+  /** Badge text for a single file's match count ("12", or "200+" when capped). */
+  private _fileMatchBadge(filePath: string): string | undefined {
+    const entry = this.contentIndex.get(filePath);
+    if (!entry || entry.count === 0) return undefined;
+    return `${entry.count}${entry.truncated ? "+" : ""}`;
   }
 
-  /** Load the ancestor directory chain for each content match under a worktree. */
+  /** Badge text for the matches under a directory (all descendants). */
+  private _dirMatchBadge(dirPath: string): string | undefined {
+    if (this.contentIndex.size === 0) return undefined;
+    const prefix = dirPath.endsWith("/") ? dirPath : dirPath + "/";
+    let count = 0;
+    let truncated = false;
+    for (const [p, entry] of this.contentIndex) {
+      if (!p.startsWith(prefix)) continue;
+      count += entry.count;
+      if (entry.truncated) truncated = true;
+    }
+    if (count === 0) return undefined;
+    return `${count}${truncated ? "+" : ""}`;
+  }
+
+  /**
+   * Build the match sub-list nodes for an expanded file.
+   *
+   * Returns `undefined` when the file's rows are collapsed, its lines haven't
+   * arrived yet, or this render has spent its row budget — in each case the
+   * file row still shows its match-count badge.
+   */
+  private _contentMatchNodes(branch: string, filePath: string): TreeNode[] | undefined {
+    if (!this.expandedMatchFiles.has(filePath)) return undefined;
+    const matches = this.matchDetails.get(filePath);
+    if (!matches || matches.length === 0) return undefined;
+    if (this._matchRowBudget <= 0) return undefined;
+    const shown = matches.slice(0, this._matchRowBudget);
+    this._matchRowBudget -= shown.length;
+    // Shift the row back one indent level so it aligns near the file's name
+    // instead of sitting a full level deeper (see reduceIndent in the tree).
+    const maxDigits = Math.max(1, ...shown.map((m) => String(m.lineNumber ?? 1).length));
+    const language = languageFromPath(filePath);
+    // Fixed gutter width: one `ch` per digit plus the horizontal padding, so
+    // every row in this file shares the same gutter box → line numbers are
+    // right-aligned by place value and the right borders connect.
+    const gutterWidth = `calc(${maxDigits}ch + 14px)`;
+    // Overhang the gutter left so its RIGHT edge lands on the start of the file
+    // row's text. The match row's label left edge equals the file row's label
+    // left edge, and the file's label carries 4px of leading padding, so the
+    // gutter is pushed back by (width - 4px).
+    const gutterOverhang = `calc(-${maxDigits}ch - 10px)`;
+    return shown.map((m, i) => {
+      const rawLine = m.lineText.replace(/\s+$/, "");
+      const safeStart = Math.min(m.startIndex ?? 0, rawLine.length);
+      const safeEnd = Math.min(m.endIndex ?? safeStart, rawLine.length);
+      // Keep the match near the left (small leading context) so it is visible
+      // even in the narrow explorer drawer, with trailing context after it.
+      const cropped = cropLine(rawLine, safeStart, safeEnd, {
+        maxChars: 44,
+        before: 6,
+        after: 38,
+      });
+      return {
+        id: `${filePath}:match:${i}`,
+        label: m.lineText,
+        showChevron: false,
+        draggable: false,
+        reduceIndent: 16,
+        meta: {
+          branch,
+          filePath,
+          match: true,
+          line: m.lineNumber,
+          column: m.column,
+          matchIndex: i,
+          matchText: m.lineText.trim(),
+        },
+        renderLabel: () => html`
+          <span class="cm-match-row">
+            <span
+              class="cm-match-gutter"
+              style=${`width:${gutterWidth};margin-left:${gutterOverhang}`}
+              ><span class="cm-match-gutter-num">${m.lineNumber}</span></span
+            >
+            <span class="cm-match-code"
+              >${unsafeHTML(
+                highlightLine(cropped.text, {
+                  language,
+                  matchStart: cropped.matchStart,
+                  matchEnd: cropped.matchEnd,
+                }),
+              )}</span
+            >
+          </span>
+        `,
+      };
+    });
+  }
+
+  /** Load the ancestor directory chain for each content match under a worktree.
+   *
+   * Runs on every `contentIndex` change (search results stream in). The set of
+   * matched files grows over time, so a one-time “already revealed” guard would
+   * skip directories that only appear in later chunks and leave those rows
+   * showing an open folder with no children. `expandDir` is idempotent — it
+   * skips directories that are already loaded or currently loading — so this is
+   * safe to call repeatedly. */
   private _revealContentDirs(branch: string, worktreePath: string): void {
-    if (this.contentMatches.size === 0 || !worktreePath) return;
-    if (this._revealedContentBranches.has(branch)) return;
+    if (this.contentIndex.size === 0 || !worktreePath) return;
     const root = worktreePath.endsWith("/") ? worktreePath : worktreePath + "/";
-    for (const filePath of this.contentMatches.keys()) {
+    for (const filePath of this.contentIndex.keys()) {
       if (!filePath.startsWith(root)) continue;
       let dir = filePath.substring(0, filePath.lastIndexOf("/"));
       const chain: string[] = [];
@@ -245,7 +357,6 @@ export class Openp41geRepoTreeItem extends LitElement {
         });
       }
     }
-    this._revealedContentBranches.add(branch);
   }
 
   /** Load ahead/behind counters for this repo's branches to show sync warnings. */
@@ -540,7 +651,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         // and a file when it has its own content matches — even when the name
         // doesn't match the filter.
         if (entry.isDirectory) return this._dirContainsMatch(entry.path);
-        return this.contentMatches.has(entry.path);
+        return this.contentIndex.has(entry.path);
       })
       .map((entry) => {
         const isUntracked = this._fileLoader.isUntracked(branch, entry.path);
@@ -551,6 +662,7 @@ export class Openp41geRepoTreeItem extends LitElement {
             ? this._matchesFilter(entry.name) || this._dirContainsMatch(entry.path)
             : expandedDirs.has(entry.path);
           const isLoading = this._fileLoader.isLoadingDir(entry.path);
+          const dirBadge = filterActive ? this._dirMatchBadge(entry.path) : undefined;
           return {
             id: entry.path,
             label: entry.name,
@@ -558,6 +670,7 @@ export class Openp41geRepoTreeItem extends LitElement {
             expanded: isExpanded,
             expandable: true,
             status: isUntracked ? ("untracked" as const) : undefined,
+            badge: dirBadge,
             children:
               isExpanded && this._fileLoader.dirContents.has(entry.path)
                 ? this._buildFileTreeNodes(branch, entry.path)
@@ -565,19 +678,24 @@ export class Openp41geRepoTreeItem extends LitElement {
             meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
           };
         }
-        const matchChildren = filterActive
-          ? this._contentMatchNodes(branch, entry.path)
-          : undefined;
+        const hasMatches = filterActive && this.contentIndex.has(entry.path);
+        const matchChildren = hasMatches ? this._contentMatchNodes(branch, entry.path) : undefined;
+        const fileBadge = filterActive ? this._fileMatchBadge(entry.path) : undefined;
+        const matchesExpanded = hasMatches && this.expandedMatchFiles.has(entry.path);
         return {
           id: entry.path,
           label: entry.name,
           icon: entry.name,
           draggable: true,
-          expanded: matchChildren !== undefined ? true : undefined,
-          showChevron: matchChildren !== undefined ? true : undefined,
+          // A matched file is expandable even before its lines are fetched:
+          // opening the row is what asks for them.
+          expandable: hasMatches ? true : undefined,
+          expanded: hasMatches ? matchesExpanded : undefined,
+          showChevron: hasMatches ? true : undefined,
           children: matchChildren,
+          badge: fileBadge,
           status: isUntracked ? ("untracked" as const) : undefined,
-          meta: { branch, filePath: entry.path },
+          meta: { branch, filePath: entry.path, hasMatches },
         };
       });
   }
@@ -595,7 +713,13 @@ export class Openp41geRepoTreeItem extends LitElement {
   /** Build an onToggle handler for a given branch — expands/collapses directories asynchronously. */
   private _makeDirToggle(branch: string): (node: TreeNode) => Promise<void> {
     return async (node: TreeNode) => {
-      const meta = node.meta as { filePath: string; isDirectory?: boolean } | undefined;
+      const meta = node.meta as
+        { filePath: string; isDirectory?: boolean; hasMatches?: boolean } | undefined;
+      // A matched file row: opening it is what asks for its match lines.
+      if (meta?.hasMatches && !meta.isDirectory) {
+        this._emitMatchToggle(meta.filePath);
+        return;
+      }
       if (!meta?.isDirectory) return;
 
       const dirPath = meta.filePath;
@@ -639,8 +763,24 @@ export class Openp41geRepoTreeItem extends LitElement {
   }
 
   /** Sync _expandedDirs when user collapses a dir node (via the uikit tree's internal toggle). */
+  /** Ask the panel to open/close one file's match rows (and fetch its lines). */
+  private _emitMatchToggle(filePath: string): void {
+    this.dispatchEvent(
+      new CustomEvent("content-match-toggle", {
+        bubbles: true,
+        composed: true,
+        detail: { filePath },
+      }),
+    );
+  }
+
   private _makeDirExpandedChange(branch: string): (nodeId: string, expanded: boolean) => void {
     return (nodeId: string, expanded: boolean) => {
+      // Matched file rows collapse through here; they expand via onToggle.
+      if (this.contentIndex.has(nodeId)) {
+        if (!expanded && this.expandedMatchFiles.has(nodeId)) this._emitMatchToggle(nodeId);
+        return;
+      }
       if (expanded) return; // Expansion is handled by onToggle
       const dirs = this._expandedDirs.get(branch);
       if (!dirs || !dirs.has(nodeId)) return;
@@ -665,6 +805,7 @@ export class Openp41geRepoTreeItem extends LitElement {
           match?: boolean;
           line?: number;
           column?: number;
+          matchIndex?: number;
         }
       | undefined;
     if (!meta?.filePath) return;
@@ -675,6 +816,7 @@ export class Openp41geRepoTreeItem extends LitElement {
     if (meta.match) {
       detail.line = meta.line;
       detail.column = meta.column;
+      detail.matchIndex = meta.matchIndex;
       detail.search = {
         query: this.filter.trim(),
         regex: this.filterRegex,
@@ -722,10 +864,67 @@ export class Openp41geRepoTreeItem extends LitElement {
       theme = darkPlusTheme;
     }
     const c = theme.colors;
-    return `--cm-kw:${c.kw};--cm-str:${c.str};--cm-cmt:${c.cmt};--cm-num:${c.num};--cm-type:${c.type};--cm-fun:${c.fun};--cm-op:${c.op};--cm-tag:${c.tag};--cm-atr:${c.atr};--cm-rgx:${c.rgx};--cm-gutter-bg:${c.gutterBg};`;
+    // The content-match rows sit on the explorer panel (--bg-primary #1e1e1e in
+    // dark), NOT on the editor background the syntax theme's gutterBg targets
+    // (#161616). The editor gutter colour is too close to the panel to read as a
+    // distinct rail, so darken it for dark themes; keep the light grey for light.
+    const matchGutterBg =
+      theme.type === "light" ? c.gutterBg : `color-mix(in srgb, ${c.gutterBg} 70%, black)`;
+    return `--cm-kw:${c.kw};--cm-str:${c.str};--cm-cmt:${c.cmt};--cm-num:${c.num};--cm-type:${c.type};--cm-var:${c.var};--cm-fun:${c.fun};--cm-op:${c.op};--cm-pun:${c.pun};--cm-ent:${c.ent};--cm-sup:${c.sup};--cm-lbl:${c.lbl};--cm-te:${c.te};--cm-scl:${c.scl};--cm-tag:${c.tag};--cm-atr:${c.atr};--cm-rgx:${c.rgx};--cm-gutter-bg:${matchGutterBg};--cm-gutter-fg:var(--text-secondary, #999);`;
+  }
+
+  /**
+   * One worktree's file tree. Large trees (a broad search) render virtualized
+   * against the Explorer panel's scroll container, so only the rows in view are
+   * built; small trees keep the plain full render.
+   */
+  private _renderWorktreeFileTree(branch: string): TemplateResult {
+    const nodes = this._buildFileTreeNodes(branch);
+    const virtualize = countVisibleRows(nodes) > VIRTUALIZE_ROW_THRESHOLD;
+    return html`<div class="wt-expanded-wt-block border-b border-[#232323]">
+      <openp41ge-tree
+        style="--tree-font-size:12px;--tree-indent:20px;${this._themeTokenVars()}"
+        .nodes=${nodes}
+        .renderIcon=${this._renderIcon}
+        .onToggle=${this._makeDirToggle(branch)}
+        .onExpandedChange=${this._makeDirExpandedChange(branch)}
+        .virtualize=${virtualize}
+        .scrollContainer=${virtualize ? this._panelScrollContainer() : null}
+        .rowHeight=${TREE_ROW_HEIGHT}
+        depth="0"
+        @tree-node-click=${this._onFileClick}
+        @tree-node-dblclick=${this._onFileDblClick}
+        @tree-node-contextmenu=${this._onFileContextMenu}
+        @tree-visible-nodes=${this._onVisibleNodes}
+      ></openp41ge-tree>
+    </div>`;
+  }
+
+  /**
+   * Rows scrolled into the virtual window: ask the panel to load match lines
+   * for the matched files among them, so opening one is instant.
+   */
+  private _onVisibleNodes = (e: Event): void => {
+    const ids = (e as CustomEvent).detail?.nodeIds as string[] | undefined;
+    if (!ids || this.contentIndex.size === 0) return;
+    const filePaths = ids.filter((id) => this.contentIndex.has(id));
+    if (filePaths.length === 0) return;
+    this.dispatchEvent(
+      new CustomEvent("content-match-prefetch", {
+        bubbles: true,
+        composed: true,
+        detail: { filePaths },
+      }),
+    );
+  };
+
+  /** The Explorer panel's scroll area, which virtualized trees measure against. */
+  private _panelScrollContainer(): HTMLElement | null {
+    return this.closest(".wt-tree-scroll") as HTMLElement | null;
   }
 
   render() {
+    this._matchRowBudget = MAX_RENDERED_MATCH_ROWS;
     return html`
       <style>
         /* Content-match rows (gutter + highlighted code) are styled inside the
@@ -857,19 +1056,7 @@ export class Openp41geRepoTreeItem extends LitElement {
                             (this._expandedWorktrees.has(wt.branch) ||
                               (this._isFilterActive && this._matchesFilter(wt.branch))) &&
                             this._fileLoader.isWorktreeLoaded(wt.branch)
-                              ? html`<div class="wt-expanded-wt-block border-b border-[#232323]">
-                                  <openp41ge-tree
-                                    style="--tree-font-size:12px;--tree-indent:20px;${this._themeTokenVars()}"
-                                    .nodes=${this._buildFileTreeNodes(wt.branch)}
-                                    .renderIcon=${this._renderIcon}
-                                    .onToggle=${this._makeDirToggle(wt.branch)}
-                                    .onExpandedChange=${this._makeDirExpandedChange(wt.branch)}
-                                    depth="0"
-                                    @tree-node-click=${this._onFileClick}
-                                    @tree-node-dblclick=${this._onFileDblClick}
-                                    @tree-node-contextmenu=${this._onFileContextMenu}
-                                  ></openp41ge-tree>
-                                </div>`
+                              ? this._renderWorktreeFileTree(wt.branch)
                               : ""
                           }
                         `,

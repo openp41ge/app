@@ -24,8 +24,12 @@ export { tailwindCSS } from "./generated/tailwind";
 export * from "./theme";
 
 // ─── Line highlighting (syntax + search-term overlay) ─────────────────────
-export { highlightLine, languageFromPath } from "./highlight/highlight-line";
-export type { HighlightLineOptions } from "./highlight/highlight-line";
+export { highlightLine, languageFromPath, cropLine } from "./highlight/highlight-line";
+export type {
+  HighlightLineOptions,
+  CropLineOptions,
+  CropLineResult,
+} from "./highlight/highlight-line";
 
 // ─── Tabs (from openp41ge-tabs) ────────────────────────────────────────────
 export type {

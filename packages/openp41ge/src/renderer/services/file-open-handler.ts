@@ -56,12 +56,14 @@ export class FileOpenHandler implements IFileOpenHandler {
     // Optional line/column to reveal (Explorer content-search match rows).
     const line = typeof detail.line === "number" ? detail.line : undefined;
     const column = typeof detail.column === "number" ? detail.column : undefined;
+    const matchIndex = typeof detail.matchIndex === "number" ? detail.matchIndex : undefined;
     const tabConfig =
-      search || line !== undefined || column !== undefined
+      search || line !== undefined || column !== undefined || matchIndex !== undefined
         ? {
             ...(search ? { search } : {}),
             ...(line !== undefined ? { line } : {}),
             ...(column !== undefined ? { column } : {}),
+            ...(matchIndex !== undefined ? { matchIndex } : {}),
           }
         : undefined;
     log.info("open", filePath, pinned ? "pinned" : "unpinned");
@@ -84,9 +86,9 @@ export class FileOpenHandler implements IFileOpenHandler {
         if (ctrl && "revealLine" in ctrl) {
           (
             ctrl as unknown as {
-              revealLine(l: number, c?: number, s?: unknown): void;
+              revealLine(l: number, c?: number, s?: unknown, mi?: number): void;
             }
-          ).revealLine(line, column, search);
+          ).revealLine(line, column, search, matchIndex);
         }
         log.info("jump to existing tab at line", existingAnywhere, line);
         this._commandBus!.dispatch("activateTabInCell", myWindowId, existingAnywhere);

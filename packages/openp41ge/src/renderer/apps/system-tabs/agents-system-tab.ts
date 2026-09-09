@@ -21,6 +21,8 @@ import { IpcChatStoreModel } from "../../models/chat-store-model";
 import { toastService } from "../../components/openp41ge-toast";
 import { showConfirmModal } from "../../components/openp41ge-confirm-modal";
 import { createSettingsButton, type Side } from "../../services/settings-button";
+import { plusIcon, searchIcon } from "../../icons";
+import { tooltipController } from "openp41ge-uikit";
 import { REGEX_ICON, CASE_ON_ICON } from "../git-commit-search/search-icons";
 import { createLogger } from "openp41ge-logger";
 
@@ -42,6 +44,9 @@ export class AgentsSystemTabController implements SystemTabController {
   private _regexToggle: HTMLButtonElement | null = null;
   private _caseToggle: HTMLButtonElement | null = null;
   private _container: HTMLElement | null = null;
+  private _searchBox: HTMLElement | null = null;
+  private _searchBtn: HTMLButtonElement | null = null;
+  private _activeTool: "search" | null = null;
 
   private _chats: ChatSummary[] = [];
   private _searchHits = new Map<string, ChatSearchResult>();
@@ -52,6 +57,7 @@ export class AgentsSystemTabController implements SystemTabController {
   private _openChats: Record<string, string> = {};
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _unsubscribers: Array<() => void> = [];
+  private _resizeObserver: ResizeObserver | null = null;
   private _suspended = false;
   private _side: Side = "right";
 
@@ -72,6 +78,10 @@ export class AgentsSystemTabController implements SystemTabController {
     this._unsubscribers = [];
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
     this._debounceTimer = null;
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
+    }
     if (this._view && this._view.parentNode) this._view.parentNode.removeChild(this._view);
     this._view = null;
     this._list = null;
@@ -79,6 +89,9 @@ export class AgentsSystemTabController implements SystemTabController {
     this._input = null;
     this._regexToggle = null;
     this._caseToggle = null;
+    this._searchBox = null;
+    this._searchBtn = null;
+    this._activeTool = null;
     this._container = null;
   }
 
@@ -100,15 +113,37 @@ export class AgentsSystemTabController implements SystemTabController {
       overflow: "hidden",
     });
 
-    // ── Header: full-width search with regex / match-case toggles ──────
-    const header = document.createElement("div");
-    Object.assign(header.style, {
-      padding: "8px 10px",
+    // ── New chat row (top): click to create a chat ─────────────────────
+    const newChatRow = document.createElement("button");
+    newChatRow.type = "button";
+    newChatRow.className = "chat-new-row";
+    newChatRow.title = "New chat";
+    newChatRow.innerHTML = `${plusIcon(14)}<span>New chat</span>`;
+    Object.assign(newChatRow.style, {
       display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      width: "100%",
+      padding: "7px 10px",
+      fontSize: "12px",
+      border: "none",
+      borderBottom: "1px solid var(--divider,#2a2a2a)",
+      cursor: "pointer",
+      textAlign: "left",
+      flexShrink: "0",
+    });
+    newChatRow.addEventListener("click", () => void this._newChat());
+    wrapper.appendChild(newChatRow);
+
+    // ── Search box (hidden until the footer search tool is toggled on) ──
+    const searchBox = document.createElement("div");
+    Object.assign(searchBox.style, {
+      padding: "8px 10px",
       alignItems: "center",
       gap: "4px",
       flexShrink: "0",
       borderBottom: "1px solid var(--divider,#2a2a2a)",
+      display: "none",
     });
 
     const input = document.createElement("input");
@@ -136,7 +171,7 @@ export class AgentsSystemTabController implements SystemTabController {
         void this._refresh();
       }
     });
-    header.appendChild(input);
+    searchBox.appendChild(input);
 
     const makeIconToggle = (icon: string, title: string): HTMLButtonElement => {
       const btn = document.createElement("button");
@@ -161,17 +196,19 @@ export class AgentsSystemTabController implements SystemTabController {
     };
     const regexToggle = makeIconToggle(REGEX_ICON, "Regex search");
     regexToggle.addEventListener("click", () => this._toggleRegex());
-    header.appendChild(regexToggle);
+    searchBox.appendChild(regexToggle);
     const caseToggle = makeIconToggle(CASE_ON_ICON, "Match case (case-sensitive)");
     caseToggle.addEventListener("click", () => this._toggleCase());
-    header.appendChild(caseToggle);
-    wrapper.appendChild(header);
+    searchBox.appendChild(caseToggle);
+    wrapper.appendChild(searchBox);
 
     this._regexToggle = regexToggle;
     this._caseToggle = caseToggle;
+    this._searchBox = searchBox;
 
     // ── Chat list ──────────────────────────────────────────────────────
     const list = document.createElement("div");
+    list.className = "chat-list";
     Object.assign(list.style, {
       flex: "1",
       minHeight: "0",
@@ -182,7 +219,12 @@ export class AgentsSystemTabController implements SystemTabController {
     });
     wrapper.appendChild(list);
 
-    // ── Footer: New Chat button (left aligned) ─────────────────────────
+    // Re-evaluate overflow (to toggle the bottom separator) when the list
+    // container resizes — content changes are handled in _renderList.
+    this._resizeObserver = new ResizeObserver(() => this._syncScrollState());
+    this._resizeObserver.observe(list);
+
+    // ── Footer: settings gear (outside) + search tool toggle ───────────
     const footer = document.createElement("div");
     Object.assign(footer.style, {
       flexShrink: "0",
@@ -190,35 +232,11 @@ export class AgentsSystemTabController implements SystemTabController {
       display: "flex",
       alignItems: "center",
       justifyContent: "flex-start",
-      padding: "0 8px 0 4px",
+      padding: "0 8px",
       borderTop: "1px solid var(--divider,#333)",
       background: "var(--bg-secondary,#252526)",
     });
 
-    const newBtn = document.createElement("button");
-    newBtn.type = "button";
-    newBtn.className = "chat-new-btn";
-    newBtn.title = "New chat";
-    newBtn.textContent = "+";
-    Object.assign(newBtn.style, {
-      flexShrink: "0",
-      width: "18px",
-      height: "18px",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "0",
-      fontSize: "14px",
-      lineHeight: "1",
-      background: "transparent",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-    });
-    newBtn.addEventListener("click", () => void this._newChat());
-
-    // Spacer + this tab's own settings button, with the gear on the OUTSIDE
-    // edge for the sidebar side: right → `[+, spacer, ⚙]`, left → `[⚙, spacer, +]`.
     const spacer = document.createElement("div");
     Object.assign(spacer.style, { flex: "1 1 auto" });
     const settingsBtn = createSettingsButton(
@@ -227,14 +245,17 @@ export class AgentsSystemTabController implements SystemTabController {
       "Agents",
       "Agent settings",
     );
+    const searchBtn = this._makeFooterToolButton(searchIcon(14), "Search chats");
+    searchBtn.addEventListener("click", () => this._toggleSearch());
+    this._searchBtn = searchBtn;
     if (this._side === "left") {
-      // Outside edge = left → gear first, new-chat button on the inside.
+      // Outside edge = left → gear first, search tool on the inside.
       footer.appendChild(settingsBtn);
       footer.appendChild(spacer);
-      footer.appendChild(newBtn);
+      footer.appendChild(searchBtn);
     } else {
-      // Outside edge = right → new-chat button on the inside, gear last.
-      footer.appendChild(newBtn);
+      // Outside edge = right → search tool on the inside, gear last.
+      footer.appendChild(searchBtn);
       footer.appendChild(spacer);
       footer.appendChild(settingsBtn);
     }
@@ -251,6 +272,9 @@ export class AgentsSystemTabController implements SystemTabController {
     style.textContent = `
       [data-system-tab="agents"] .chat-row-head:hover { background: var(--bg-hover,#2a2d2e); }
       [data-system-tab="agents"] .chat-row.open { background: var(--bg-hover,#282828); }
+      [data-system-tab="agents"] .chat-row + .chat-row { border-top: 1px solid var(--divider,#2a2a2a); }
+      [data-system-tab="agents"] .chat-row:last-child { border-bottom: 1px solid var(--divider,#2a2a2a); }
+      [data-system-tab="agents"] .chat-list.is-overflowing .chat-row:last-child { border-bottom: none; }
       [data-system-tab="agents"] .chat-archive {
         opacity: 0; pointer-events: none;
         background: transparent; border: none;
@@ -264,12 +288,14 @@ export class AgentsSystemTabController implements SystemTabController {
         background: rgba(229,62,62,0.14); color: var(--error,#e53e3e);
       }
       [data-system-tab="agents"] .chat-archive:active { background: rgba(229,62,62,0.28); }
-      [data-system-tab="agents"] .chat-new-btn { color: var(--text-secondary,#999); }
-      [data-system-tab="agents"] .chat-new-btn:hover { color: #fff; }
+      [data-system-tab="agents"] .chat-new-row { color: var(--text-secondary,#999); background: transparent; }
+      [data-system-tab="agents"] .chat-new-row:hover { background: var(--bg-hover,#2a2d2e); color: var(--text-primary,#fff); }
+      [data-system-tab="agents"] .chat-new-row span { pointer-events: none; }
+      [data-system-tab="agents"] .agent-tool-btn { color: var(--text-secondary,#999); }
+      [data-system-tab="agents"] .agent-tool-btn:hover,
+      [data-system-tab="agents"] .agent-tool-btn.active { color: var(--text-primary,#fff); }
     `;
     wrapper.appendChild(style);
-
-    requestAnimationFrame(() => input.focus());
   }
 
   // ── Data ─────────────────────────────────────────────────────────────
@@ -298,6 +324,53 @@ export class AgentsSystemTabController implements SystemTabController {
     }, DEBOUNCE_MS);
   }
 
+  private get _searchActive(): boolean {
+    return this._activeTool === "search";
+  }
+
+  /** Build a footer tool button (icon-only, grey off / white on hover or active). */
+  private _makeFooterToolButton(icon: string, title: string): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("aria-label", title);
+    btn.dataset.tip = title;
+    btn.innerHTML = icon;
+    btn.className = "agent-tool-btn";
+    Object.assign(btn.style, {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: "18px",
+      height: "18px",
+      padding: "0",
+      border: "none",
+      background: "transparent",
+      borderRadius: "3px",
+      cursor: "pointer",
+      flexShrink: "0",
+    });
+    tooltipController.attach(btn, { type: "simple", text: title });
+    return btn;
+  }
+
+  private _toggleSearch(): void {
+    this._activeTool = this._activeTool === "search" ? null : "search";
+    this._applySearchVisibility();
+    if (this._searchActive) {
+      requestAnimationFrame(() => this._input?.focus());
+    }
+    void this._refresh();
+  }
+
+  private _applySearchVisibility(): void {
+    if (this._searchBox) {
+      this._searchBox.style.display = this._searchActive ? "flex" : "none";
+    }
+    if (this._searchBtn) {
+      this._searchBtn.classList.toggle("active", this._searchActive);
+    }
+  }
+
   private _toggleRegex(): void {
     this._searchRegex = !this._searchRegex;
     this._applySearchToggleStyles();
@@ -321,7 +394,7 @@ export class AgentsSystemTabController implements SystemTabController {
 
   private async _refresh(): Promise<void> {
     if (!this._list || !this._footer) return;
-    this._query = this._input ? this._input.value.trim() : "";
+    this._query = this._searchActive && this._input ? this._input.value.trim() : "";
     const empty = this._message("Loading chats…", "var(--text-muted,#777)");
     this._list.replaceChildren(empty);
 
@@ -383,11 +456,26 @@ export class AgentsSystemTabController implements SystemTabController {
       list.replaceChildren(
         this._message(this._query ? "No matching chats" : "No chats yet", "var(--text-muted,#777)"),
       );
+      this._syncScrollState();
       return;
     }
 
     list.replaceChildren();
     for (const chat of chats) list.appendChild(this._chatRow(chat));
+    this._syncScrollState();
+  }
+
+  /** Toggle `is-overflowing` when the content reaches the bottom of the list
+   * so the last row's separator is suppressed (avoids a double border against
+   * the footer's top border). True on overflow or exact fill. */
+  private _syncScrollState(): void {
+    const list = this._list;
+    if (!list) return;
+    const last = list.lastElementChild as HTMLElement | null;
+    const listBottom = list.getBoundingClientRect().bottom;
+    const reachesBottom = !!last && last.getBoundingClientRect().bottom >= listBottom - 1;
+    const overflowing = list.scrollHeight > list.clientHeight;
+    list.classList.toggle("is-overflowing", overflowing || reachesBottom);
   }
 
   private _chatRow(chat: ChatSummary): HTMLElement {

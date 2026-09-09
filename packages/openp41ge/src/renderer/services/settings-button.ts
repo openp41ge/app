@@ -1,3 +1,7 @@
+import { settingsIcon } from "../icons";
+import { tooltipController } from "openp41ge-uikit";
+import { subscribeSettingsTabState } from "./settings-tab-state";
+
 /** Which sidebar edge a panel is docked to. */
 export type Side = "left" | "right";
 
@@ -19,8 +23,8 @@ export function createSettingsButton(
   const btn = document.createElement("button");
   btn.type = "button";
   btn.setAttribute("aria-label", tooltip);
-  btn.title = tooltip;
-  btn.textContent = "⚙";
+  btn.dataset.tip = tooltip;
+  btn.innerHTML = settingsIcon(14);
   Object.assign(btn.style, {
     display: "flex",
     alignItems: "center",
@@ -32,17 +36,32 @@ export function createSettingsButton(
     borderRadius: "3px",
     background: "transparent",
     color: "var(--text-secondary,#999)",
-    fontSize: "14px",
-    lineHeight: "1",
     cursor: "pointer",
     flexShrink: "0",
   });
+
+  const state = { active: false, hover: false };
+  const applyColor = () => {
+    btn.style.color = state.active || state.hover
+      ? "var(--text-primary,#ccc)"
+      : "var(--text-secondary,#999)";
+  };
+
   btn.addEventListener("mouseenter", () => {
-    btn.style.color = "var(--text-primary,#ccc)";
+    state.hover = true;
+    applyColor();
   });
   btn.addEventListener("mouseleave", () => {
-    btn.style.color = "var(--text-secondary,#999)";
+    state.hover = false;
+    applyColor();
   });
+
+  // Keep the icon lit (white) while its own settings grid tab is open.
+  subscribeSettingsTabState(appType, (open) => {
+    state.active = open;
+    applyColor();
+  });
+
   btn.addEventListener("click", () => {
     document.dispatchEvent(
       new CustomEvent(openEvent, {
@@ -52,6 +71,8 @@ export function createSettingsButton(
       }),
     );
   });
+  // Custom tooltip (replaces native title) from the data-tip attribute.
+  tooltipController.attach(btn, { type: "simple", text: tooltip });
   return btn;
 }
 

@@ -118,6 +118,11 @@ export default defineConfig({
         __dirname,
         "./packages/openp41ge-syntax-highlighting/src",
       ),
+      // Source aliases so renderer code importing the uikit package and its
+      // subpaths resolves to source (the dist only ships declaration files
+      // for some subpaths such as file-editor).
+      "openp41ge-uikit": path.resolve(__dirname, "./packages/openp41ge-uikit/src"),
+      "openp41ge-uikit/theme": path.resolve(__dirname, "./packages/openp41ge-uikit/src/theme"),
     },
   },
 });

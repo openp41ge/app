@@ -642,3 +642,109 @@ describe("renderLabel", () => {
     expect(matchRow?.style.paddingLeft).toBe(fileRow?.style.paddingLeft);
   });
 });
+
+describe("virtualization", () => {
+  function manyChildren(n: number): TreeNode[] {
+    return Array.from({ length: n }, (_, i) => ({
+      id: `f${i}`,
+      label: `file${i}.ts`,
+      icon: "typescript",
+    }));
+  }
+
+  test("renders every row when the viewport is not measurable (fallback)", async () => {
+    const tree = await createTreeWithNodes([
+      { id: "src", label: "src", icon: "folder", expanded: true, children: manyChildren(40) },
+    ]);
+    tree.virtualize = true;
+    await tree.updateComplete;
+    const rows = queryAllInTree(tree, ".tree-node");
+    expect(rows.length).toBe(41); // folder + 40 children
+  });
+
+  test("renders only a window of rows when the viewport is measurable", async () => {
+    const tree = await createTreeWithNodes([
+      { id: "src", label: "src", icon: "folder", expanded: true, children: manyChildren(200) },
+    ]);
+    tree.virtualize = true;
+    await tree.updateComplete;
+    // Simulate a measurable 300px viewport → a ~13-row window + overscan.
+    (tree as any)._viewportHeight = 300;
+    (tree as any)._scrollTop = 0;
+    await tree.updateComplete;
+    const rows = queryAllInTree(tree, ".tree-node");
+    expect(rows.length).toBeGreaterThan(5);
+    expect(rows.length).toBeLessThan(201);
+    // A bottom spacer keeps the full scrollable height.
+    expect(queryInTree(tree, ".tree-virtual-spacer")).not.toBeNull();
+  });
+
+  test("virtualizes against an external scroll container", async () => {
+    // The Explorer stacks several trees inside one panel scroller, so the tree
+    // must be able to window against a container it does not own.
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const tree = await createTreeWithNodes([
+      { id: "src", label: "src", icon: "folder", expanded: true, children: manyChildren(200) },
+    ]);
+    container.appendChild(tree);
+    tree.scrollContainer = container;
+    tree.virtualize = true;
+    await tree.updateComplete;
+
+    // The root is a plain block — the container owns the scrollbar.
+    expect(queryInTree(tree, ".tree-root--virtual-external")).not.toBeNull();
+    expect(queryInTree(tree, ".tree-root--virtual")).toBeNull();
+
+    (tree as any)._viewportHeight = 300;
+    (tree as any)._scrollTop = 0;
+    await tree.updateComplete;
+    const rows = queryAllInTree(tree, ".tree-node");
+    expect(rows.length).toBeGreaterThan(5);
+    expect(rows.length).toBeLessThan(201);
+    container.remove();
+  });
+
+  test("binds the scroll container when virtualization switches on later", async () => {
+    // The Explorer flips `virtualize` on once a tree grows past its threshold,
+    // which is after the first render — the listener must still attach.
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const tree = await createTreeWithNodes([
+      { id: "src", label: "src", icon: "folder", expanded: true, children: manyChildren(200) },
+    ]);
+    container.appendChild(tree);
+    await tree.updateComplete;
+    expect((tree as any)._scrollEl).toBeNull();
+
+    const added: string[] = [];
+    const origAdd = container.addEventListener.bind(container);
+    container.addEventListener = ((type: string, ...rest: unknown[]) => {
+      added.push(type);
+      return (origAdd as any)(type, ...rest);
+    }) as typeof container.addEventListener;
+
+    tree.scrollContainer = container;
+    tree.virtualize = true;
+    await tree.updateComplete;
+    expect((tree as any)._scrollEl).toBe(container);
+    expect(added).toContain("scroll");
+    container.remove();
+  });
+
+  test("scrolls the virtual window as scrollTop advances", async () => {
+    const tree = await createTreeWithNodes([
+      { id: "src", label: "src", icon: "folder", expanded: true, children: manyChildren(200) },
+    ]);
+    tree.virtualize = true;
+    await tree.updateComplete;
+    (tree as any)._viewportHeight = 300;
+    (tree as any)._scrollTop = 2000;
+    await tree.updateComplete;
+    const rows = queryAllInTree(tree, ".tree-node");
+    // Scroll into the middle of the list — the first row is no longer rendered.
+    const ids = rows.map((r) => (r as any).dataset.nodeId);
+    expect(ids).not.toContain("src");
+    expect(ids).toContain("f80");
+  });
+});

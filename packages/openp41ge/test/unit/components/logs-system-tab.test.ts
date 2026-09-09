@@ -88,7 +88,7 @@ describe("LogsSystemTabController", () => {
 
   it("footer keeps the settings button and no longer carries the Debug checkbox", () => {
     // The debug-logging toggle moved into the Logs settings grid tab.
-    const settingsBtn = host.querySelector('button[title="Log settings"]');
+    const settingsBtn = host.querySelector('button[aria-label="Log settings"]');
     expect(settingsBtn).toBeTruthy();
     expect(host.querySelector('input[type="checkbox"]')).toBeNull();
   });

@@ -2064,6 +2064,7 @@ export class FileEditorElement extends LitElement {
   setSearchHighlight(
     query: string,
     options?: { regex?: boolean; caseSensitive?: boolean; wholeWord?: boolean },
+    activeIndex?: number,
   ): void {
     this._externalHighlight = query.trim()
       ? {
@@ -2074,6 +2075,23 @@ export class FileEditorElement extends LitElement {
         }
       : null;
     this._refreshFindMatches();
+    // Emphasise a specific instance (e.g. an Explorer content-match row that
+    // was just clicked) rather than defaulting to the first match.
+    if (typeof activeIndex === "number" && activeIndex >= 0) {
+      this._setActiveFindIndex(activeIndex);
+    }
+  }
+
+  /** Make the match at `index` the emphasised/navigated one and reveal it. */
+  private _setActiveFindIndex(index: number): void {
+    if (this._findMatches.length === 0) return;
+    this._findActiveIndex = Math.max(0, Math.min(index, this._findMatches.length - 1));
+    if (this._findOpen) {
+      this._statusBar?.setFindCount(`${this._findActiveIndex + 1}/${this._findMatches.length}`);
+    }
+    this._renderFindHighlights();
+    const current = this._findMatches[this._findActiveIndex];
+    if (current) this._scrollToMatch(current);
   }
 
   clearSearchHighlight(): void {

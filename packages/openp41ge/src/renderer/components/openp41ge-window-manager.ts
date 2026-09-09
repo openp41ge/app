@@ -24,6 +24,15 @@ import { workspaceFileService, deriveRepoName } from "../services/workspace-file
 const HOLD_MS = 350;
 /** Pointer travel past this many px starts an immediate drag (below the long-press hold). */
 const DRAG_THRESHOLD = 4;
+/** A carousel swipe has to be this much more horizontal than vertical. The skeleton
+ *  sits at the left edge of the row, so pulling a workspace out of the window is
+ *  itself a mostly-horizontal move — only a decisively sideways one is a swipe. */
+const SWIPE_AXIS_RATIO = 1.6;
+/** Vertical travel past this fraction of the skeleton's height ends a swipe: the
+ *  pointer has left the row, so the gesture is a drag-out after all. */
+const SWIPE_EXIT_DY = 0.75;
+/** Within this many px of a window edge the pointer counts as on its way out. */
+const WINDOW_EDGE_MARGIN = 2;
 
 interface OpenWindowSummary {
   windowId: string;
@@ -266,11 +275,26 @@ export class Openp41geWindowManager extends LitElement {
     if (!drag || drag.active) return;
     drag.active = true;
     this._suppressClick = true;
+    this._startOpenDrag(drag.startScreenX, drag.startScreenY);
+    window.openp41ge.drag.move(drag.startScreenX, drag.startScreenY);
+  }
+
+  /**
+   * Put the in-flight gesture into open mode: start a real (native) drag so the
+   * ghost can leave the window. Passes the skeleton's capture rect so the main
+   * process swaps in a bitmap of the actual skeleton (not just a label). The
+   * window opens on the drop, only if the cursor is outside this window at
+   * release. Called from the long-press, from the first move past the threshold,
+   * and when a carousel swipe turns out to be a drag-out.
+   */
+  private _startOpenDrag(screenX: number, screenY: number): void {
+    const drag = this._drag;
+    if (!drag) return;
     drag.mode = "open";
     window.openp41ge.drag.start(
       drag.label,
-      drag.startScreenX,
-      drag.startScreenY,
+      screenX,
+      screenY,
       "🗂",
       undefined,
       undefined,
@@ -285,7 +309,6 @@ export class Openp41geWindowManager extends LitElement {
       0,
     );
     window.openp41ge.drag.activate();
-    window.openp41ge.drag.move(drag.startScreenX, drag.startScreenY);
   }
 
   private _clearHoldTimer(): void {
@@ -295,7 +318,38 @@ export class Openp41geWindowManager extends LitElement {
     }
   }
 
-  /** Once the drag passes the threshold, decide the gesture by dominant axis. */
+  /** True once the pointer is at (or past) a window edge, so the gesture is on its
+   * way out of the window rather than staying in the row. */
+  private _headingOutOfWindow(x: number, y: number): boolean {
+    const m = WINDOW_EDGE_MARGIN;
+    return x <= m || y <= m || x >= window.innerWidth - m || y >= window.innerHeight - m;
+  }
+
+  /** True when a carousel swipe has stopped looking like one: the pointer left the
+   * row vertically, or it is heading out of the window. Either way the user is
+   * pulling the workspace out, not paging its windows. */
+  private _swipeBroken(x: number, y: number): boolean {
+    const drag = this._drag;
+    if (!drag) return false;
+    const rect = drag.captureRect;
+    if (rect && Math.abs(y - drag.startY) > rect.height * SWIPE_EXIT_DY) return true;
+    return this._headingOutOfWindow(x, y);
+  }
+
+  /**
+   * Once the drag passes the threshold, decide the gesture.
+   *
+   * Everything is a drag-out unless it reads unmistakably as a carousel swipe: a
+   * workspace with more than one window, a decisively horizontal move, and a
+   * pointer still inside the window. A drag-out starts from a skeleton at the left
+   * edge of the row, so it is mostly horizontal too — the old "dominant axis" split
+   * handed a fast sideways flick to the carousel (and to nothing at all for a
+   * single-window workspace, which has no carousel to page).
+   *
+   * The call also stays revisable: the first pointermove of a fast flick is one
+   * coarse sample, so a "swipe" that later leaves the row or reaches the window
+   * edge is promoted to a drag-out mid-gesture.
+   */
   private _onThumbPointerMove(e: PointerEvent): void {
     const drag = this._drag;
     if (!drag) return;
@@ -312,32 +366,17 @@ export class Openp41geWindowManager extends LitElement {
       // it so the drawer doesn't pop open over the drag. Cleared by the next
       // pointerdown (see _onPointerDown) or by the row click itself.
       this._suppressClick = true;
-      // Horizontal swipe → carousel; vertical drag → open the workspace window.
-      drag.mode = Math.abs(dx) > Math.abs(dy) ? "carousel" : "open";
-      if (drag.mode === "open") {
-        // Start a real (native) drag so it can leave the window. Pass the
-        // skeleton's capture rect so the main process swaps in a bitmap of the
-        // actual skeleton (not just a label). The window opens on the drop, only
-        // if the cursor is outside this window at release.
-        window.openp41ge.drag.start(
-          drag.label,
-          e.screenX,
-          e.screenY,
-          "🗂",
-          undefined,
-          undefined,
-          undefined,
-          132,
-          84,
-          drag.offsetX,
-          drag.offsetY,
-          "workspace",
-          drag.path,
-          drag.captureRect ?? undefined,
-          0,
-        );
-        window.openp41ge.drag.activate();
-      }
+      const isSwipe =
+        drag.windowCount > 1 &&
+        Math.abs(dx) > Math.abs(dy) * SWIPE_AXIS_RATIO &&
+        !this._swipeBroken(e.clientX, e.clientY);
+      if (isSwipe) drag.mode = "carousel";
+      else this._startOpenDrag(e.screenX, e.screenY);
+    } else if (drag.mode === "carousel" && this._swipeBroken(e.clientX, e.clientY)) {
+      // The swipe turned into a pull away from the row — snap the carousel back to
+      // where the press started and pick the workspace up instead.
+      this._setCarouselIndex(drag.path, drag.baseIndex, false);
+      this._startOpenDrag(e.screenX, e.screenY);
     }
     if (drag.mode === "open") {
       window.openp41ge.drag.move(e.screenX, e.screenY);
@@ -357,19 +396,23 @@ export class Openp41geWindowManager extends LitElement {
     if (!drag) return;
     const { mode, path } = drag;
     this._teardownDrag();
-    if (mode === "open") {
-      // Compute outside synchronously (window.screenX/screenY match the main
-      // process window bounds) and end the drag in the same tick. Awaiting an
-      // IPC before drag.end() left a window in which a second drag could start
-      // and have its session/ghost clobbered by the delayed drag.end().
-      const outside =
-        e.screenX < window.screenX ||
-        e.screenX > window.screenX + window.outerWidth ||
-        e.screenY < window.screenY ||
-        e.screenY > window.screenY + window.outerHeight;
-      window.openp41ge.drag.end();
-      if (outside) this._openWorkspaceWindow(path);
-    }
+    if (mode === null) return;
+    // Compute outside synchronously (window.screenX/screenY match the main
+    // process window bounds) and end the drag in the same tick. Awaiting an
+    // IPC before drag.end() left a window in which a second drag could start
+    // and have its session/ghost clobbered by the delayed drag.end().
+    const outside =
+      e.screenX < window.screenX ||
+      e.screenX > window.screenX + window.outerWidth ||
+      e.screenY < window.screenY ||
+      e.screenY > window.screenY + window.outerHeight;
+    // Only an open drag has a ghost session to tear down.
+    if (mode === "open") window.openp41ge.drag.end();
+    // A release outside this window opens the workspace whatever we read the
+    // gesture as. A flick fast enough to leave the window before the next
+    // pointermove lands can still be sitting in carousel mode here, and the drop
+    // point is the real signal of intent.
+    if (outside) this._openWorkspaceWindow(path);
   }
 
   private _onThumbPointerCancel(): void {

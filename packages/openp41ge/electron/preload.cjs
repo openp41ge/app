@@ -476,6 +476,67 @@ contextBridge.exposeInMainWorld("openp41ge", {
     searchContents: (query, rootPaths, options) =>
       ipcRenderer.invoke("file:searchContents", query, rootPaths, options),
 
+    /**
+     * Match lines for a single file — the on-demand half of the streaming
+     * search (the walk streams counts only).
+     */
+    contentMatchesForFile: (filePath, query, options) =>
+      ipcRenderer.invoke("file:contentMatchesForFile", filePath, query, options),
+
+    /**
+     * Streaming CONTENT search INDEX. Returns an object with:
+     *   promise  - resolves to { total, cancelled } when the walk is complete
+     *   onChunk  - subscribe to { type: 'chunk', entries } / { type: 'done', total },
+     *              returns unsubscribe fn. `entries` are batches of
+     *              { path, name, dir, count } — match lines are fetched
+     *              separately with contentMatchesForFile.
+     *   destroy  - cancels the walk in the main process AND removes the listener.
+     *              Call this to stop a superseded search (prevents partial
+     *              keystrokes from piling up full un-cancellable walks).
+     */
+    searchContentsStream: (query, rootPaths, options) => {
+      const handlers = new Set();
+      const searchId = `s${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+      let destroyed = false;
+      // The chunk channel is shared by every in-flight search, so drop any
+      // payload that belongs to a different (typically superseded) walk —
+      // otherwise a stale search's results leak into the current one.
+      const chunkHandler = (_event, payload) => {
+        if (destroyed) return;
+        if (payload && payload.searchId && payload.searchId !== searchId) return;
+        for (const h of handlers) h(payload);
+      };
+      ipcRenderer.on("file:searchContentsChunk", chunkHandler);
+      const invocation = ipcRenderer.invoke(
+        "file:searchContentsStream",
+        query,
+        rootPaths,
+        options,
+        searchId,
+      );
+      // Always detach the listener once the walk ends, so rapid typing cannot
+      // accumulate listeners on the shared channel.
+      invocation
+        .catch(() => undefined)
+        .finally(() => ipcRenderer.removeListener("file:searchContentsChunk", chunkHandler));
+      return {
+        promise: invocation,
+        onChunk: (fn) => {
+          handlers.add(fn);
+          return () => handlers.delete(fn);
+        },
+        // Stops delivery in the renderer immediately and asks the main process
+        // to abandon the walk. Safe to call more than once.
+        destroy: () => {
+          if (destroyed) return;
+          destroyed = true;
+          ipcRenderer.send("file:cancelContentSearch", searchId);
+          ipcRenderer.removeListener("file:searchContentsChunk", chunkHandler);
+          handlers.clear();
+        },
+      };
+    },
+
     /** Get current scoped folder paths. */
     getScope: () => ipcRenderer.invoke("file:getScope"),
 

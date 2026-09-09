@@ -233,6 +233,24 @@ declare global {
           rootPaths: string[],
           options?: { regex?: boolean; caseSensitive?: boolean },
         ) => Promise<FileContentSearchResult[]>;
+        searchContentsStream: (
+          query: string,
+          rootPaths: string[],
+          options?: { regex?: boolean; caseSensitive?: boolean },
+        ) => {
+          promise: Promise<{ total: number; cancelled?: boolean }>;
+          onChunk: (
+            fn: (payload:
+              | { type: "chunk"; searchId?: string; entries: ContentMatchIndexEntry[] }
+              | { type: "done"; searchId?: string; total: number }) => void,
+          ) => () => void;
+          destroy: () => void;
+        };
+        contentMatchesForFile: (
+          filePath: string,
+          query: string,
+          options?: { regex?: boolean; caseSensitive?: boolean },
+        ) => Promise<{ matches: FileContentMatch[]; truncated?: boolean }>;
         getScope: () => Promise<string[]>;
         addScope: (dirPath: string) => Promise<boolean>;
         removeScope: (dirPath: string) => Promise<boolean>;
@@ -347,12 +365,28 @@ declare global {
     lineText: string;
   }
 
+  /**
+   * A file with content matches, as reported by the streaming search walk:
+   * enough to render the row, its badge and its ancestor chain, without the
+   * match lines (fetched per file via `contentMatchesForFile`).
+   */
+  interface ContentMatchIndexEntry {
+    path: string;
+    name: string;
+    dir: string;
+    count: number;
+    /** True when the file has more matches than the per-file cap. */
+    truncated?: boolean;
+  }
+
   /** A file that contains at least one content match, with its match instances. */
   interface FileContentSearchResult {
     path: string;
     name: string;
     dir: string;
     matches: FileContentMatch[];
+    /** True when the file had more matches than the per-file cap. */
+    truncated?: boolean;
   }
 
   interface CommitEntry {

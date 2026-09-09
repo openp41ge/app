@@ -223,6 +223,7 @@ describe("FileOpenHandler wiring — integration", () => {
           name: "jump.ts",
           line: 42,
           column: 7,
+          matchIndex: 3,
           search: { query: "jump", regex: false, caseSensitive: false },
         },
       });
@@ -233,13 +234,19 @@ describe("FileOpenHandler wiring — integration", () => {
       expect(ws2.windows[0].grid.placements).toHaveLength(1);
       expect(ws2.windows[0].grid.placements[0].tabIds).toContain(tabId);
       expect(spy).toHaveBeenCalledWith("activateTabInCell", "win-ws1-0", tabId);
-      // The controller's revealLine is invoked with line/column/search so the
-      // editor moves the cursor AND re-applies the search highlight.
-      expect(revealLine).toHaveBeenCalledWith(42, 7, {
-        query: "jump",
-        regex: false,
-        caseSensitive: false,
-      });
+      // The controller's revealLine is invoked with line/column/search (and the
+      // clicked match's index) so the editor moves the cursor, re-applies the
+      // search highlight, AND emphasises the specific instance the user clicked.
+      expect(revealLine).toHaveBeenCalledWith(
+        42,
+        7,
+        {
+          query: "jump",
+          regex: false,
+          caseSensitive: false,
+        },
+        3,
+      );
     });
 
     it("reveals with just line/column when no search is provided", () => {
@@ -255,7 +262,7 @@ describe("FileOpenHandler wiring — integration", () => {
       });
       handler.handleOpenFile(event);
 
-      expect(revealLine).toHaveBeenCalledWith(5, 2, undefined);
+      expect(revealLine).toHaveBeenCalledWith(5, 2, undefined, undefined);
     });
 
     it("opens a new tab carrying line/column when the file isn't open yet", () => {

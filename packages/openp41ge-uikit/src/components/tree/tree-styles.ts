@@ -26,12 +26,21 @@ export const treeStyles = css`
     --cm-cmt: #6a9955;
     --cm-num: #b5cea8;
     --cm-type: #4ec9b0;
+    --cm-var: #9cdcfe;
     --cm-fun: #dcdcaa;
     --cm-op: #d4d4d4;
+    --cm-pun: #d4d4d4;
+    --cm-ent: #4ec9b0;
+    --cm-sup: #9cdcfe;
+    --cm-lbl: #c586c0;
+    --cm-te: #ce9178;
+    --cm-scl: #4ec9b0;
     --cm-tag: #569cd6;
     --cm-atr: #9cdcfe;
     --cm-rgx: #d16969;
     --cm-gutter-bg: #1a1a1a;
+    --cm-gutter-fg: #858585;
+    --cm-gutter-border: #2d2d2d;
     --cm-term-bg: rgba(234, 140, 0, 0.32);
     --cm-term-fg: #fff;
   }
@@ -217,22 +226,97 @@ export const treeStyles = css`
     display: inline-flex;
     align-items: center;
     margin-left: 4px;
-    padding: 0 4px;
+    padding: 0 5px;
     font-size: 10px;
-    line-height: 1.4;
-    color: var(--tree-badge-fg, var(--text-muted, #888));
-    background: var(--tree-badge-bg, transparent);
-    border-radius: 2px;
+    line-height: 1.5;
+    color: var(--tree-badge-fg, var(--text-muted, #999));
+    background: var(--tree-badge-bg, rgba(128, 128, 128, 0.14));
+    border-radius: 8px;
     flex-shrink: 0;
     white-space: nowrap;
   }
 
   /* ─── Content-match rows (line gutter + highlighted code) ──── */
 
-  .cm-match-row {
-    display: inline-flex;
-    align-items: center;
+  /* A node with a rich renderLabel (e.g. a content-match row) spans the full
+     row height so its gutter background/border can form a continuous block
+     across consecutive rows. The default label padding / ellipsis is removed
+     because the match code crops around the match itself. */
+  .tree-node--cm {
+    align-items: stretch;
+    /* Anchor the row highlight and let the line-number gutter hang left into
+       the indentation groove. Establish a stacking context so the
+       selection/focus indicator (::after) paints OVER the gutter rail but
+       BELOW the row text. */
+    position: relative;
+    isolation: isolate;
+  }
+  .tree-node--cm .tree-label {
+    display: flex;
+    align-items: stretch;
+    padding: 0;
+    /* Visible so the gutter can overhang left to align under the file text. */
+    overflow: visible;
+  }
+  /* Hover highlight stays a background BEHIND the content (never covers text);
+     the gutter blends with it (below). */
+  .tree-node--cm:hover {
+    background: var(--tree-hover-bg, var(--bg-hover, rgba(255, 255, 255, 0.06)));
+  }
+  /* The keyboard/focus selection indicator (blue, moved with arrows) is drawn
+     on an ::after layer that sits ABOVE the gutter rail but BELOW the row text,
+     so it is visible across the whole row instead of being hidden behind the
+     line numbers. The selected row's own background is left transparent here
+     because the ::after layer carries the selection fill. */
+  .tree-node--cm.selected {
+    background: transparent;
+  }
+  .tree-node--cm.selected::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: var(--tree-selected-bg, rgba(74, 158, 255, 0.12));
+  }
+  .tree-node--cm:focus-visible {
+    box-shadow: none;
+  }
+  .tree-node--cm:focus-visible::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px var(--tree-focus, var(--border-focus, #4a9eff));
+  }
+
+  /* ─── Virtualized tree — flat scroll container ─────────────── */
+  .tree-root--virtual {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
     height: 100%;
+    min-height: 0;
+    contain: strict;
+  }
+  /* Virtualized inside someone else's scroll container: no scrollbar, no
+     height clamp — the spacers give the block its full scroll height. */
+  .tree-root--virtual-external {
+    display: flex;
+    flex-direction: column;
+  }
+  .tree-virtual-spacer {
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+
+  .cm-match-row {
+    display: flex;
+    align-items: stretch;
+    flex: 1;
+    min-width: 0;
     line-height: inherit;
     font-family: var(--fe-font, ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace);
     font-size: var(--tree-font-size, 12px);
@@ -243,20 +327,52 @@ export const treeStyles = css`
     justify-content: flex-end;
     box-sizing: border-box;
     padding: 0 8px 0 6px;
-    color: var(--tree-muted, var(--text-muted, #666));
-    background: var(--cm-gutter-bg, var(--fe-gutter-bg, #1a1a1a));
-    border-right: 1px solid var(--border-divider, #2d2d2d);
     flex-shrink: 0;
     user-select: none;
     font-variant-numeric: tabular-nums;
+    position: relative;
+    /* Width is set inline to the file's max line-number digit count so all
+       rows in a file share the same gutter box → place-value alignment. */
+  }
+  /* The opaque rail sits behind the gutter text. It lives on ::before (z:-1) so
+     the row's selection/focus ::after (z:2) paints OVER it while the line
+     number (z:3) stays on top — the rail no longer hides the blue indicator. */
+  .cm-match-gutter::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--cm-gutter-bg, var(--bg-gutter, #1a1a1a));
+    border-right: 1px solid var(--cm-gutter-border, var(--border-divider, #2d2d2d));
+  }
+  .cm-match-gutter-num {
+    position: relative;
+    z-index: 3;
+    color: var(--cm-gutter-fg, var(--tree-muted, var(--text-muted, #666)));
+  }
+  /* Hover blend — the gutter keeps a hint of the rail but shows the hover
+     highlight across it (no longer a solid opaque cut-off). At rest the
+     element background is transparent so the ::before rail shows. */
+  .tree-node--cm:hover .cm-match-gutter {
+    background: color-mix(
+      in srgb,
+      var(--cm-gutter-bg, var(--bg-gutter, #1a1a1a)) 35%,
+      var(--tree-hover-bg, var(--bg-hover, #2a2d2e))
+    );
   }
   .cm-match-code {
     display: inline-block;
+    flex: 1;
+    min-width: 0;
     white-space: pre;
+    position: relative;
+    z-index: 3;
     padding: 0 10px 0 8px;
+    /* Vertically centre the matched text in the row. */
+    line-height: var(--tree-row-height, 26px);
     color: var(--text-primary, #d4d4d4);
     overflow: hidden;
-    text-overflow: ellipsis;
+    text-overflow: clip;
   }
   .cm-match-term {
     background: var(--cm-term-bg, var(--fe-find-match-bg, rgba(234, 140, 0, 0.32)));
@@ -279,11 +395,32 @@ export const treeStyles = css`
   .cm-match-code .s-type {
     color: var(--cm-type);
   }
+  .cm-match-code .s-var {
+    color: var(--cm-var);
+  }
   .cm-match-code .s-fun {
     color: var(--cm-fun);
   }
   .cm-match-code .s-op {
     color: var(--cm-op);
+  }
+  .cm-match-code .s-pun {
+    color: var(--cm-pun);
+  }
+  .cm-match-code .s-ent {
+    color: var(--cm-ent);
+  }
+  .cm-match-code .s-sup {
+    color: var(--cm-sup);
+  }
+  .cm-match-code .s-lbl {
+    color: var(--cm-lbl);
+  }
+  .cm-match-code .s-te {
+    color: var(--cm-te);
+  }
+  .cm-match-code .s-scl {
+    color: var(--cm-scl);
   }
   .cm-match-code .s-tag {
     color: var(--cm-tag);
