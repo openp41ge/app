@@ -41,6 +41,14 @@ class Openp41geAgents extends LitElement {
   // would reset focus and clear the rendered content).
   private _draft = "";
   private _composerFocused = false;
+  /** Text-area selection (raw text offsets, including backticks) for the highlight. */
+  private _selStart = 0;
+  private _selEnd = 0;
+  /** Anchor used while dragging a mouse selection. */
+  private _selAnchor = 0;
+  private _draggingSelection = false;
+  /** Maps rendered-content offsets to raw-text offsets (dropped backticks). */
+  private _contentSegments: { rawStart: number; rawEnd: number; contentStart: number; contentEnd: number }[] = [];
   @state() private _providers: ComposerProvider[] = [];
   @state() private _providerId = "";
   @state() private _activeTools: string[] = [];
@@ -178,6 +186,8 @@ class Openp41geAgents extends LitElement {
     if (!text) return;
     this._inputEl.value = "";
     this._draft = "";
+    this._selStart = 0;
+    this._selEnd = 0;
     this._renderComposerContent();
     this._updateComposerState();
     this.addMessage("user", text);
@@ -264,8 +274,19 @@ class Openp41geAgents extends LitElement {
   private _onComposerInput(e: Event): void {
     const ta = e.target as HTMLTextAreaElement;
     this._draft = ta.value;
+    this._selStart = ta.selectionStart;
+    this._selEnd = ta.selectionEnd;
     this._renderComposerContent();
     this._updateComposerState();
+  }
+
+  /** Mirror the text-area's own selection (keyboard: arrows, shift, cmd+a). */
+  private _syncSelection(): void {
+    const ta = this._inputEl;
+    if (!ta) return;
+    this._selStart = ta.selectionStart;
+    this._selEnd = ta.selectionEnd;
+    this._renderComposerContent();
   }
 
   private _onComposerKeydown(e: KeyboardEvent): void {
@@ -278,7 +299,7 @@ class Openp41geAgents extends LitElement {
   private _renderComposerContent(): void {
     const el = this._contentEl;
     if (!el) return;
-    const body = this._draft ? this._contentHtml(this._draft) : "";
+    const body = this._draft ? this._contentHtml(this._draft, this._selStart, this._selEnd) : "";
     const caret = this._composerFocused ? `<span class="composer-caret"></span>` : "";
     el.innerHTML = body + caret;
   }
@@ -298,17 +319,161 @@ class Openp41geAgents extends LitElement {
     }
   }
 
-  private _contentHtml(text: string): string {
-    const escaped = text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-    return escaped
-      .split("`")
-      .map((part, i) => (i % 2 === 1 ? `<code>${part}</code>` : part))
-      .join("");
+  /**
+   * Render the draft as visible HTML, wrapping the selected raw range in a
+   * highlight <mark>. Backticks become inline <code> and are dropped from the
+   * rendered text, so we record segment metadata to map rendered-content
+   * offsets back to raw-text offsets for mouse selection.
+   */
+  private _contentHtml(text: string, selStart = -1, selEnd = -1): string {
+    const escape = (s: string): string =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const hasSel = selStart >= 0 && selEnd >= 0 && selStart < selEnd;
+
+    const segs: { rawStart: number; rawEnd: number; contentStart: number; contentEnd: number }[] = [];
+    const parts = text.split("`");
+    let rawPos = 0;
+    let contentPos = 0;
+    let html = "";
+    for (let i = 0; i < parts.length; i++) {
+      const seg = parts[i];
+      const isCode = i % 2 === 1;
+      const rawStart = rawPos;
+      const rawEnd = rawPos + seg.length;
+      const contentStart = contentPos;
+      const contentEnd = contentPos + seg.length;
+      rawPos = rawEnd + 1; // skip the dropped backtick delimiter
+      contentPos = contentEnd; // backtick contributes no rendered char
+      segs.push({ rawStart, rawEnd, contentStart, contentEnd });
+
+      let pre = seg;
+      let mid = "";
+      let post = "";
+      if (hasSel) {
+        const s = Math.max(rawStart, selStart);
+        const e = Math.min(rawEnd, selEnd);
+        if (s < e) {
+          const a = Math.max(0, s - rawStart);
+          const b = Math.min(seg.length, e - rawStart);
+          pre = seg.slice(0, a);
+          mid = seg.slice(a, b);
+          post = seg.slice(b);
+        }
+      }
+      const inner =
+        mid !== ""
+          ? escape(pre) + `<mark class="composer-select">${escape(mid)}</mark>` + escape(post)
+          : escape(seg);
+      html += isCode ? `<code>${inner}</code>` : inner;
+    }
+    this._contentSegments = segs;
+    return html;
   }
+
+  /** Convert a rendered-content offset to a raw-text offset using segment metadata. */
+  private _rawOffsetFromContent(content: number): number {
+    for (const seg of this._contentSegments) {
+      if (content >= seg.contentStart && content <= seg.contentEnd) {
+        return seg.rawStart + (content - seg.contentStart);
+      }
+    }
+    return this._contentSegments.length
+      ? this._contentSegments[this._contentSegments.length - 1].rawEnd
+      : 0;
+  }
+
+  /**
+   * Hit-test a viewport point against the rendered content to a content offset,
+   * e.g. to place a caret or start a selection. `caretRangeFromPoint` does not
+   * penetrate the shadow root, so we measure each character's box instead.
+   */
+  private _contentOffsetFromPoint(clientX: number, clientY: number): number {
+    const el = this._contentEl;
+    if (!el) return this._draft.length;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let contentOffset = 0;
+    let bestContent = 0;
+    let bestDist = Infinity;
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      const tn = node as Text;
+      const data = tn.data || "";
+      const len = data.length;
+      for (let i = 0; i < len; i++) {
+        const r = document.createRange();
+        r.setStart(tn, i);
+        r.setEnd(tn, i + 1);
+        const rect = r.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+        const midX = rect.left + rect.width / 2;
+        const midY = rect.top + rect.height / 2;
+        if (Math.abs(midY - clientY) > rect.height) continue; // off this line
+        const dist = Math.abs(midX - clientX);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestContent = contentOffset + i + (clientX > midX ? 1 : 0);
+        }
+      }
+      contentOffset += len;
+    }
+    return bestDist < Infinity ? bestContent : contentOffset;
+  }
+
+  // ─── Mouse selection on the visible composer content ───────────────
+  private _onContentPointerDown = (e: PointerEvent): void => {
+    if (e.button !== 0) return;
+    // Do NOT preventDefault: canceling pointerdown would suppress the compat
+    // `mousedown` that focuses the textarea. Native selection is already
+    // disabled via `user-select: none`, so the <mark> highlight is ours.
+    const content = this._contentOffsetFromPoint(e.clientX, e.clientY);
+    const raw = this._rawOffsetFromContent(content);
+    this._selAnchor = raw;
+    this._selStart = raw;
+    this._selEnd = raw;
+    this._inputEl?.setSelectionRange(raw, raw);
+    this._draggingSelection = true;
+    try {
+      this._contentEl?.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* synthetic or inactive pointer id — capture is best-effort */
+    }
+    this._renderComposerContent();
+  };
+
+  private _onContentPointerMove = (e: PointerEvent): void => {
+    if (!this._draggingSelection) return;
+    e.preventDefault();
+    const content = this._contentOffsetFromPoint(e.clientX, e.clientY);
+    const raw = this._rawOffsetFromContent(content);
+    const start = Math.min(this._selAnchor, raw);
+    const end = Math.max(this._selAnchor, raw);
+    this._selStart = start;
+    this._selEnd = end;
+    this._inputEl?.setSelectionRange(start, end);
+    this._renderComposerContent();
+  };
+
+  private _onContentPointerUp = (): void => {
+    this._draggingSelection = false;
+  };
+
+  /** Double-click selects the word under the pointer (like the file editor). */
+  private _onContentDoubleClick = (e: MouseEvent): void => {
+    const content = this._contentOffsetFromPoint(e.clientX, e.clientY);
+    const raw = this._rawOffsetFromContent(content);
+    const text = this._draft;
+    if (!text) return;
+    const isWord = (c: string) => /[\w]/.test(c);
+    let start = raw;
+    let end = raw;
+    while (start > 0 && isWord(text[start - 1])) start--;
+    while (end < text.length && isWord(text[end])) end++;
+    if (start === end) return; // no word at the point
+    this._selStart = start;
+    this._selEnd = end;
+    this._inputEl?.setSelectionRange(start, end);
+    this._renderComposerContent();
+  };
 
   protected updated(): void {
     // Any re-render (e.g. a streaming delta, or a toggle) clears the imperative
@@ -499,6 +664,8 @@ class Openp41geAgents extends LitElement {
           max-height: 200px; /* 10 lines */
           overflow-y: auto;
           cursor: text;
+          user-select: none;
+          -webkit-user-select: none;
         }
         .composer-content:empty::before {
           content: "Type a message...";
@@ -511,6 +678,11 @@ class Openp41geAgents extends LitElement {
           border-radius: 3px;
           padding: 1px 4px;
           color: #e5c07b;
+        }
+        .composer-content mark.composer-select {
+          background: var(--fe-selection-bg, rgba(87, 145, 217, 0.3));
+          color: inherit;
+          border-radius: 2px;
         }
         .composer-caret {
           display: inline-block;
@@ -680,7 +852,15 @@ class Openp41geAgents extends LitElement {
       </div>
 
       <div class="composer">
-        <div class="composer-content" @mousedown=${() => this._focusComposer()}></div>
+        <div
+          class="composer-content"
+          @mousedown=${() => this._focusComposer()}
+          @pointerdown=${this._onContentPointerDown}
+          @pointermove=${this._onContentPointerMove}
+          @pointerup=${this._onContentPointerUp}
+          @pointercancel=${this._onContentPointerUp}
+          @dblclick=${this._onContentDoubleClick}
+        ></div>
         <div class="composer-toolbar">
           <select
             class="composer-select"
@@ -761,6 +941,7 @@ class Openp41geAgents extends LitElement {
           class="chat-input composer-input"
           rows="1"
           @input=${(e: Event) => this._onComposerInput(e)}
+          @select=${() => this._syncSelection()}
           @keydown=${(e: KeyboardEvent) => this._onComposerKeydown(e)}
           @focus=${() => this._onComposerFocus(true)}
           @blur=${() => this._onComposerFocus(false)}

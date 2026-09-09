@@ -356,6 +356,74 @@ describe("Openp41geAgents (custom element)", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("highlights the selected textarea range in the composer content", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "use `read_file` now";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Select the backticked token (raw range "`read_file`").
+    inputEl.setSelectionRange(4, 15);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    const code = content.querySelector("code") as HTMLElement;
+    const mark = code.querySelector("mark.composer-select") as HTMLElement;
+    expect(mark.textContent).toBe("read_file");
+    expect(content.querySelectorAll("mark.composer-select")).toHaveLength(1);
+    expect(content.textContent).toContain("use");
+    expect(content.textContent).toContain("now");
+  });
+
+  it("splits a selection that crosses a code boundary into per-segment marks", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "a `b` c";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Select from 'a ' into the code token: raw range "a `b`".
+    inputEl.setSelectionRange(0, 5);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    const marks = Array.from(content.querySelectorAll("mark.composer-select")).map(
+      (m) => m.textContent,
+    );
+    expect(marks).toEqual(["a ", "b"]);
+  });
+
+  it("clears the highlight when the selection collapses to a caret", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello world";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    inputEl.setSelectionRange(0, 5);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelectorAll("mark.composer-select")).toHaveLength(1);
+
+    // Collapse back to a caret (e.g. clicking once).
+    inputEl.setSelectionRange(3, 3);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelectorAll("mark.composer-select")).toHaveLength(0);
+  });
+
   it("tooltips the submit button when it is deactivated", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
