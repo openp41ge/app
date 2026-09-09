@@ -373,14 +373,14 @@ describe("Openp41geAgents (custom element)", () => {
 
     const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
     const code = content.querySelector("code") as HTMLElement;
-    const mark = code.querySelector("mark.composer-select") as HTMLElement;
-    expect(mark.textContent).toBe("read_file");
-    expect(content.querySelectorAll("mark.composer-select")).toHaveLength(1);
+    const sel = code.querySelector(".composer-highlight") as HTMLElement;
+    expect(sel.textContent).toBe("read_file");
+    expect(content.querySelectorAll(".composer-highlight")).toHaveLength(1);
     expect(content.textContent).toContain("use");
     expect(content.textContent).toContain("now");
   });
 
-  it("splits a selection that crosses a code boundary into per-segment marks", async () => {
+  it("splits a selection that crosses a code boundary into per-segment highlights", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
     await el.updateComplete;
@@ -396,10 +396,31 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
 
     const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
-    const marks = Array.from(content.querySelectorAll("mark.composer-select")).map(
+    const sel = Array.from(content.querySelectorAll(".composer-highlight")).map(
       (m) => m.textContent,
     );
-    expect(marks).toEqual(["a ", "b"]);
+    expect(sel).toEqual(["a ", "b"]);
+  });
+
+  it("uses a span (not a styled mark) so the highlight never shifts layout", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "use `read_file` now";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    inputEl.setSelectionRange(4, 15);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    // The global <mark> rule adds padding/border/font that shifts the text;
+    // the highlight must be a plain <span> so layout stays stable.
+    expect(content.innerHTML).not.toContain("<mark");
+    expect(content.querySelectorAll("span.composer-highlight")).toHaveLength(1);
   });
 
   it("clears the highlight when the selection collapses to a caret", async () => {
@@ -415,13 +436,13 @@ describe("Openp41geAgents (custom element)", () => {
     inputEl.setSelectionRange(0, 5);
     inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
     await el.updateComplete;
-    expect(el.shadowRoot!.querySelectorAll("mark.composer-select")).toHaveLength(1);
+    expect(el.shadowRoot!.querySelectorAll(".composer-highlight")).toHaveLength(1);
 
     // Collapse back to a caret (e.g. clicking once).
     inputEl.setSelectionRange(3, 3);
     inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
     await el.updateComplete;
-    expect(el.shadowRoot!.querySelectorAll("mark.composer-select")).toHaveLength(0);
+    expect(el.shadowRoot!.querySelectorAll(".composer-highlight")).toHaveLength(0);
   });
 
   it("tooltips the submit button when it is deactivated", async () => {

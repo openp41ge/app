@@ -362,7 +362,7 @@ class Openp41geAgents extends LitElement {
       }
       const inner =
         mid !== ""
-          ? escape(pre) + `<mark class="composer-select">${escape(mid)}</mark>` + escape(post)
+          ? escape(pre) + `<span class="composer-highlight">${escape(mid)}</span>` + escape(post)
           : escape(seg);
       html += isCode ? `<code>${inner}</code>` : inner;
     }
@@ -679,10 +679,17 @@ class Openp41geAgents extends LitElement {
           padding: 1px 4px;
           color: #e5c07b;
         }
-        .composer-content mark.composer-select {
+        .composer-content .composer-highlight {
           background: var(--fe-selection-bg, rgba(87, 145, 217, 0.3));
           color: inherit;
           border-radius: 2px;
+          /* Reset so the highlight never affects layout (a global <mark> rule
+             adds padding/border/font that would shift the text). */
+          padding: 0;
+          margin: 0;
+          border: none;
+          font: inherit;
+          text-decoration: none;
         }
         .composer-caret {
           display: inline-block;
