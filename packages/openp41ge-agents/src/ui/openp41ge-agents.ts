@@ -672,8 +672,12 @@ class Openp41geAgents extends LitElement {
           color: var(--text-muted, #666);
         }
         .composer-content code {
-          font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
-          font-size: 12px;
+          /* Inherit the body font + size so the highlight boxes share the same
+             vertical metrics and form one flush, uniform-height highlight.
+             A mono font has a different ascent, which offsets its background
+             box by ~1px and visibly breaks the highlight across code spans. */
+          font-family: inherit;
+          font-size: inherit;
           color: #e5c07b;
         }
         .composer-content .composer-highlight {
