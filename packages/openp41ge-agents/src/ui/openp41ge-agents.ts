@@ -44,6 +44,11 @@ class Openp41geAgents extends LitElement {
   /** Text-area selection (raw text offsets, including backticks) for the highlight. */
   private _selStart = 0;
   private _selEnd = 0;
+  /** Actual caret/focus position (raw offset). Differs from _selEnd when the
+   *  selection is anchored at the end (backward, e.g. Shift+Left), so the
+   *  rendered caret follows the moving edge instead of sitting frozen at the
+   *  end of the highlight. */
+  private _caretRaw = 0;
   /** Anchor used while dragging a mouse selection. */
   private _selAnchor = 0;
   private _draggingSelection = false;
@@ -216,6 +221,7 @@ class Openp41geAgents extends LitElement {
     this._draft = "";
     this._selStart = 0;
     this._selEnd = 0;
+    this._caretRaw = 0;
     this._renderComposerContent();
     this._updateComposerState();
     this.addMessage("user", text);
@@ -311,6 +317,7 @@ class Openp41geAgents extends LitElement {
     this._draft = ta.value;
     this._selStart = ta.selectionStart;
     this._selEnd = ta.selectionEnd;
+    this._caretRaw = ta.selectionEnd;
     this._renderComposerContent();
     this._updateComposerState();
   }
@@ -321,6 +328,10 @@ class Openp41geAgents extends LitElement {
     if (!ta) return;
     this._selStart = ta.selectionStart;
     this._selEnd = ta.selectionEnd;
+    // The focus/moving edge of a Shift+arrow selection is `selectionEnd` when
+    // selecting forward and `selectionStart` when selecting backward. Place the
+    // rendered caret on that moving edge so it tracks the actual caret.
+    this._caretRaw = ta.selectionDirection === "backward" ? ta.selectionStart : ta.selectionEnd;
     this._renderComposerContent();
   }
 
@@ -334,11 +345,12 @@ class Openp41geAgents extends LitElement {
   private _renderComposerContent(): void {
     const el = this._contentEl;
     if (!el) return;
-    // Render the blinking caret at the text-area's caret position rather than
-    // always at the end, so arrow-key caret movement + Shift+arrow selection
-    // are visible in the rendered content.
-    const caretRaw = this._composerFocused ? this._selEnd : -1;
-    el.innerHTML = this._contentHtml(this._draft || "", this._selStart, this._selEnd, caretRaw);
+    // Render the text (with the selection highlight), then draw the caret as an
+    // overlay on top of the gap at the caret position. Keeping it a separate
+    // positioned element (rather than an inline span) means it never pushes the
+    // surrounding text out of the way.
+    el.innerHTML = this._contentHtml(this._draft || "", this._selStart, this._selEnd);
+    this._positionCaret();
   }
 
   private _updateComposerState(): void {
@@ -363,22 +375,16 @@ class Openp41geAgents extends LitElement {
    * segment metadata to map rendered-content offsets back to raw-text offsets
    * for mouse selection (and caret placement).
    */
-  private _contentHtml(text: string, selStart = -1, selEnd = -1, caretRaw = -1): string {
+  private _contentHtml(text: string, selStart = -1, selEnd = -1): string {
     const escape = (s: string): string =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const hasSel = selStart >= 0 && selEnd >= 0 && selStart < selEnd;
-    const CARET = `<span class="composer-caret"></span>`;
-
-    // Insert the caret span after `off` chars of an unescaped text run.
-    const caretRun = (run: string, off: number): string =>
-      escape(run.slice(0, off)) + CARET + escape(run.slice(off));
 
     const segs: { rawStart: number; rawEnd: number; contentStart: number; contentEnd: number }[] = [];
     const parts = text.split("`");
     let rawPos = 0;
     let contentPos = 0;
     let html = "";
-    let caretPlaced = false;
     for (let i = 0; i < parts.length; i++) {
       const seg = parts[i];
       const isCode = i % 2 === 1;
@@ -404,35 +410,11 @@ class Openp41geAgents extends LitElement {
           post = seg.slice(b);
         }
       }
-
-      let inner: string;
-      if (!caretPlaced && caretRaw >= 0 && caretRaw >= rawStart && caretRaw <= rawEnd) {
-        // The caret falls in this segment's raw range; place it at the
-        // corresponding content offset (backticks are dropped).
-        let off = caretRaw - rawStart;
-        if (off > seg.length) off = seg.length;
-        const hlMid = mid !== "" ? `<span class="composer-highlight">${escape(mid)}</span>` : "";
-        if (off <= pre.length) {
-          inner = caretRun(pre, off) + hlMid + escape(post);
-        } else if (off <= pre.length + mid.length) {
-          const c = off - pre.length;
-          inner = escape(pre) + `<span class="composer-highlight">${caretRun(mid, c)}</span>` + escape(post);
-        } else {
-          const c = off - pre.length - mid.length;
-          inner = escape(pre) + hlMid + caretRun(post, c);
-        }
-        caretPlaced = true;
-      } else {
-        inner =
-          mid !== ""
-            ? escape(pre) + `<span class="composer-highlight">${escape(mid)}</span>` + escape(post)
-            : escape(seg);
-      }
+      const inner =
+        mid !== ""
+          ? escape(pre) + `<span class="composer-highlight">${escape(mid)}</span>` + escape(post)
+          : escape(seg);
       html += isCode ? `<code>${inner}</code>` : inner;
-    }
-    // Caret at the very end (or empty content) — append it directly.
-    if (!caretPlaced && caretRaw >= 0) {
-      html += CARET;
     }
     this._contentSegments = segs;
     return html;
@@ -448,6 +430,100 @@ class Openp41geAgents extends LitElement {
     return this._contentSegments.length
       ? this._contentSegments[this._contentSegments.length - 1].rawEnd
       : 0;
+  }
+
+  /** Convert a raw-text offset (with backticks) to a rendered-content offset. */
+  private _contentOffsetFromRaw(raw: number): number {
+    const text = this._draft;
+    if (!text || raw <= 0) return 0;
+    let content = 0;
+    let rawPos = 0;
+    const parts = text.split("`");
+    for (let i = 0; i < parts.length; i++) {
+      const seg = parts[i];
+      const rawEnd = rawPos + seg.length;
+      if (raw <= rawEnd) {
+        return content + Math.max(0, raw - rawPos);
+      }
+      rawPos = rawEnd + 1; // skip the dropped backtick delimiter
+      content += seg.length;
+    }
+    return content;
+  }
+
+  /** Find the text node + offset for a rendered-content offset (for caret math). */
+  private _textNodeAtContentOffset(offset: number): { node: Text; offset: number } | null {
+    const el = this._contentEl;
+    if (!el) return null;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const nodes: { node: Text; start: number; end: number }[] = [];
+    let node: Node | null;
+    let total = 0;
+    while ((node = walker.nextNode())) {
+      const len = node.textContent?.length ?? 0;
+      if (len > 0) {
+        nodes.push({ node: node as Text, start: total, end: total + len });
+        total += len;
+      }
+    }
+    if (!nodes.length) return null;
+    const o = Math.max(0, Math.min(offset, total));
+    for (const n of nodes) {
+      if (o <= n.end) {
+        return { node: n.node, offset: Math.max(0, Math.min(o - n.start, n.node.textContent!.length)) };
+      }
+    }
+    const last = nodes[nodes.length - 1];
+    return { node: last.node, offset: last.node.textContent!.length };
+  }
+
+  /**
+   * Paint the blinking caret as an overlay over the gap at the caret position.
+   * It is measured from a collapsed Range so it tracks the actual caret offset
+   * *without being an inline element*, so it never shifts the text around it.
+   */
+  private _positionCaret(): void {
+    const el = this._contentEl;
+    if (!el) return;
+    let caret = el.querySelector<HTMLElement>(".composer-caret");
+    if (!this._composerFocused) {
+      caret?.remove();
+      return;
+    }
+    const offset = this._contentOffsetFromRaw(this._caretRaw);
+    const target = this._textNodeAtContentOffset(offset);
+    const elRect = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    let left = parseFloat(cs.paddingLeft);
+    let top = parseFloat(cs.paddingTop);
+    let caretH = 14;
+    if (target) {
+      try {
+        const range = document.createRange();
+        range.setStart(target.node, target.offset);
+        range.setEnd(target.node, target.offset);
+        const rects = Array.from(range.getClientRects());
+        if (rects.length) {
+          const r = rects[0];
+          left = r.left - elRect.left + el.scrollLeft;
+          top = r.top - elRect.top + el.scrollTop;
+          // Center a 14px caret within the measured line box.
+          if (r.height) caretH = Math.max(12, Math.min(20, r.height));
+          top += (caretH - 14) / 2;
+        }
+      } catch {
+        /* measurement failures are best-effort */
+      }
+    }
+    if (!caret) {
+      caret = document.createElement("span");
+      caret.className = "composer-caret";
+      caret.setAttribute("aria-hidden", "true");
+      el.appendChild(caret);
+    }
+    caret.style.left = `${Math.max(0, left)}px`;
+    caret.style.top = `${Math.max(0, top)}px`;
+    caret.style.height = `${Math.round(caretH)}px`;
   }
 
   /**
@@ -498,6 +574,7 @@ class Openp41geAgents extends LitElement {
     this._selAnchor = raw;
     this._selStart = raw;
     this._selEnd = raw;
+    this._caretRaw = raw;
     this._inputEl?.setSelectionRange(raw, raw);
     this._draggingSelection = true;
     try {
@@ -517,6 +594,8 @@ class Openp41geAgents extends LitElement {
     const end = Math.max(this._selAnchor, raw);
     this._selStart = start;
     this._selEnd = end;
+    // The caret/focus follows the pointer (the moving edge of the drag).
+    this._caretRaw = raw;
     this._inputEl?.setSelectionRange(start, end);
     this._renderComposerContent();
   };
@@ -539,6 +618,7 @@ class Openp41geAgents extends LitElement {
     if (start === end) return; // no word at the point
     this._selStart = start;
     this._selEnd = end;
+    this._caretRaw = end;
     this._inputEl?.setSelectionRange(start, end);
     this._renderComposerContent();
   };
@@ -765,13 +845,12 @@ class Openp41geAgents extends LitElement {
           text-decoration: none;
         }
         .composer-caret {
-          display: inline-block;
-          vertical-align: text-bottom;
+          position: absolute;
           width: 2px;
-          height: 14px;
-          margin-left: 1px;
           background: var(--fe-cursor-color, #d4d4d4);
           animation: composer-blink 1s step-end infinite;
+          /* Overlay: never intercepts clicks and never affects layout. */
+          pointer-events: none;
         }
         @keyframes composer-blink {
           0% {
