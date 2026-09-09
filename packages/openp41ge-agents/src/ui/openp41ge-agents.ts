@@ -9,6 +9,8 @@
  * Event contract (bubbles, composed):
  *   - `chat:send`   detail `{ text }` — user submitted a message.
  *   - `chat:abort`  — user clicked the abort button while streaming.
+ *   - `chat:provider-change` detail `{ providerId }` — user picked a provider/model.
+ *   - `chat:add-content` — user clicked the “+ / add content” button.
  */
 
 import { LitElement, html, type TemplateResult } from "lit";
@@ -22,12 +24,29 @@ function deepCloneMessage(m: ChatMessage): ChatMessage {
   };
 }
 
+/** A selectable provider/model shown in the composer's config row. */
+interface ComposerProvider {
+  id: string;
+  label: string;
+  model: string;
+}
+
 class Openp41geAgents extends LitElement {
   @state() private _messages: ChatMessage[] = [];
   @state() private _streaming = false;
   @state() private _status: ChatRuntimeStatus | null = null;
   @state() private _title = "";
+  // These two are intentionally NOT @state: the composer content and caret are
+  // updated imperatively so keystrokes never trigger a full re-render (which
+  // would reset focus and clear the rendered content).
+  private _draft = "";
+  private _composerFocused = false;
+  @state() private _providers: ComposerProvider[] = [];
+  @state() private _providerId = "";
+  @state() private _activeTools: string[] = [];
+  @state() private _showTools = false;
   @query(".chat-input") private _inputEl!: HTMLTextAreaElement;
+  @query(".composer-content") private _contentEl!: HTMLElement;
 
   get messages(): readonly ChatMessage[] {
     return this._messages;
@@ -43,6 +62,7 @@ class Openp41geAgents extends LitElement {
     this._title = chat.title;
     this._messages = chat.messages.map(deepCloneMessage);
     this._streaming = false;
+    this._providerId = chat.providerId;
   }
 
   appendDelta(text: string): void {
@@ -114,12 +134,18 @@ class Openp41geAgents extends LitElement {
 
   // ─── Send / abort ───────────────────────────────────────────────────
 
+  private get _sendDisabled(): boolean {
+    return !this._draft.trim();
+  }
+
   private _sendMessage(): void {
     if (!this._inputEl || this._streaming) return;
     const text = this._inputEl.value.trim();
     if (!text) return;
     this._inputEl.value = "";
-    this._inputEl.style.height = "auto";
+    this._draft = "";
+    this._renderComposerContent();
+    this._updateComposerState();
     this.addMessage("user", text);
     this._streaming = true;
     this.dispatchEvent(
@@ -134,6 +160,122 @@ class Openp41geAgents extends LitElement {
   private _abort(): void {
     this._streaming = false;
     this.dispatchEvent(new CustomEvent("chat:abort", { bubbles: true, composed: true }));
+  }
+
+  // ─── Composer ───────────────────────────────────────────────────────
+
+  /**
+   * Controller-facing API: populate the provider/model selector and the set of
+   * tools active for the current chat. Called by the agents controller which
+   * has access to provider/config data; the component itself stays UI-only.
+   */
+  setComposerContext(ctx: {
+    providers?: ComposerProvider[];
+    activeProviderId?: string;
+    activeTools?: string[];
+  }): void {
+    if (ctx.providers) {
+      this._providers = ctx.providers;
+      if (!ctx.activeProviderId && this._providers.length)
+        this._providerId = this._providers[0].id;
+    }
+    if (ctx.activeProviderId) this._providerId = ctx.activeProviderId;
+    if (ctx.activeTools) this._activeTools = ctx.activeTools;
+    this.requestUpdate();
+  }
+
+  private _providerOptions(): TemplateResult[] {
+    const providers = [...this._providers];
+    if (this._providerId && !providers.some((p) => p.id === this._providerId)) {
+      // Keep the select's value valid even when the active provider isn't in
+      // the configured table (e.g. a migrated chat referencing a removed id).
+      providers.unshift({ id: this._providerId, label: this._providerId, model: "" });
+    }
+    if (providers.length === 0) {
+      return [html`<option value="">Default model</option>`];
+    }
+    return providers.map(
+      (p) => html`<option value=${p.id}>${p.label}${p.model ? ` · ${p.model}` : ""}</option>`,
+    );
+  }
+
+  private _onProviderChange(e: Event): void {
+    const value = (e.target as HTMLSelectElement).value;
+    this.dispatchEvent(
+      new CustomEvent("chat:provider-change", {
+        bubbles: true,
+        composed: true,
+        detail: { providerId: value },
+      }),
+    );
+  }
+
+  private _onAddContent(): void {
+    this.dispatchEvent(new CustomEvent("chat:add-content", { bubbles: true, composed: true }));
+  }
+
+  private _toggleTools(): void {
+    this._showTools = !this._showTools;
+  }
+
+  private _focusComposer(): void {
+    this._inputEl?.focus();
+  }
+
+  private _onComposerFocus(focused: boolean): void {
+    this._composerFocused = focused;
+    this._renderComposerContent();
+  }
+
+  private _onComposerInput(e: Event): void {
+    const ta = e.target as HTMLTextAreaElement;
+    this._draft = ta.value;
+    this._renderComposerContent();
+    this._updateComposerState();
+  }
+
+  private _onComposerKeydown(e: KeyboardEvent): void {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      this._sendMessage();
+    }
+  }
+
+  private _renderComposerContent(): void {
+    const el = this._contentEl;
+    if (!el) return;
+    const body = this._draft ? this._contentHtml(this._draft) : "";
+    const caret = this._composerFocused ? `<span class="composer-caret"></span>` : "";
+    el.innerHTML = body + caret;
+  }
+
+  private _updateComposerState(): void {
+    const sendBtn = this.renderRoot.querySelector<HTMLButtonElement>(".composer-send");
+    if (sendBtn) sendBtn.disabled = this._sendDisabled;
+    const el = this._contentEl;
+    if (el) {
+      // Toggle an overflow marker once the content passes 10 lines.
+      el.classList.toggle("composer-overflow", el.scrollHeight > 200);
+    }
+  }
+
+  private _contentHtml(text: string): string {
+    const escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    return escaped
+      .split("`")
+      .map((part, i) => (i % 2 === 1 ? `<code>${part}</code>` : part))
+      .join("");
+  }
+
+  protected updated(): void {
+    // Any re-render (e.g. a streaming delta, or a toggle) clears the imperative
+    // composer content; repopulate it so typed text and caret survive re-renders.
+    this._renderComposerContent();
+    this._updateComposerState();
   }
 
   // ─── Rendering ──────────────────────────────────────────────────────
@@ -299,62 +441,147 @@ class Openp41geAgents extends LitElement {
           color: var(--text-muted, #555);
           font-style: italic;
         }
-        .chat-input-area {
+        .composer {
+          flex-shrink: 0;
           display: flex;
-          align-items: flex-end;
-          gap: 8px;
-          padding: 8px 12px;
-          border-top: 1px solid var(--border-color, #2a2a2a);
-          background: var(--bg-primary, #1e1e1e);
+          flex-direction: column;
+          margin: 8px 12px 6px;
+          background: var(--bg-secondary, #252526);
+          border: 1px solid var(--border-color, #3a3a3a);
+          border-radius: 12px;
+          overflow: hidden;
+          transition: border-color 0.1s;
         }
-        .chat-input {
-          flex: 1;
-          resize: none;
+        .composer:focus-within {
+          border-color: var(--accent, #2b5a9c);
+        }
+        .composer-content {
+          position: relative;
+          padding: 10px 12px;
+          line-height: 20px;
+          font-size: 13px;
+          color: var(--text-primary, #d4d4d4);
+          white-space: pre-wrap;
+          word-break: break-word;
+          min-height: 20px;
+          max-height: 200px; /* 10 lines */
+          overflow-y: auto;
+          cursor: text;
+        }
+        .composer-content:empty::before {
+          content: "Type a message...";
+          color: var(--text-muted, #666);
+        }
+        .composer-content code {
+          font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+          font-size: 12px;
+          background: rgba(255, 255, 255, 0.08);
+          border-radius: 3px;
+          padding: 1px 4px;
+          color: #e5c07b;
+        }
+        .composer-caret {
+          display: inline-block;
+          vertical-align: text-bottom;
+          width: 2px;
+          height: 15px;
+          margin-left: 1px;
+          background: var(--accent, #4a9eff);
+          animation: composer-blink 1s steps(2) infinite;
+        }
+        @keyframes composer-blink {
+          to {
+            visibility: hidden;
+          }
+        }
+        .composer-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 5px 6px;
+          border-top: 1px solid var(--border-color, #333);
+          background: var(--bg-tertiary, #1c1c1c);
+        }
+        .composer-select {
+          flex: 0 0 auto;
+          max-width: 180px;
+          min-width: 96px;
           background: var(--bg-secondary, #252526);
           color: var(--text-primary, #d4d4d4);
           border: 1px solid var(--border-color, #3a3a3a);
-          border-radius: 4px;
-          padding: 8px 10px;
-          font-family: inherit;
-          font-size: 13px;
-          min-height: 36px;
-          max-height: 120px;
+          border-radius: 6px;
+          font-size: 11px;
+          padding: 3px 6px;
           outline: none;
+          cursor: pointer;
         }
-        .chat-input:focus {
-          border-color: var(--accent, #2b5a9c);
-        }
-        .chat-input::placeholder {
-          color: var(--text-muted, #666);
-        }
-        .icon-btn {
-          flex-shrink: 0;
-          width: 32px;
-          height: 32px;
-          display: flex;
+        .composer-tool {
+          flex: 0 0 auto;
+          position: relative;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
-          background: var(--accent, #2b5a9c);
+          width: 26px;
+          height: 26px;
           border: none;
-          border-radius: 4px;
-          color: #fff;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--text-secondary, #aaa);
           cursor: pointer;
-          transition: background 0.1s;
+          font-size: 16px;
+          line-height: 1;
           user-select: none;
         }
-        .icon-btn:hover {
+        .composer-tool:hover {
+          background: var(--bg-hover, #2a2d2e);
+          color: #fff;
+        }
+        .composer-tool .tool-badge {
+          position: absolute;
+          top: -2px;
+          right: -2px;
+          min-width: 14px;
+          height: 14px;
+          padding: 0 3px;
+          border-radius: 7px;
+          background: var(--accent, #2b5a9c);
+          color: #fff;
+          font-size: 9px;
+          line-height: 14px;
+          text-align: center;
+        }
+        .composer-spacer {
+          flex: 1 1 auto;
+        }
+        .composer-send {
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+          height: 30px;
+          border: none;
+          border-radius: 8px;
+          background: var(--accent, #2b5a9c);
+          color: #fff;
+          cursor: pointer;
+          transition: opacity 0.1s, background 0.1s;
+          user-select: none;
+        }
+        .composer-send:hover:not(:disabled) {
           background: #3a6cb5;
         }
-        .icon-btn:active {
-          background: #1f4a80;
+        .composer-send:disabled {
+          opacity: 0.35;
+          cursor: default;
         }
-        .icon-btn.abort {
+        .composer-send.abort {
           background: #c0392b;
         }
-        .icon-btn.abort:hover {
+        .composer-send.abort:hover {
           background: #e74c3c;
         }
-        .icon-btn svg {
+        .composer-send svg {
           width: 16px;
           height: 16px;
           fill: none;
@@ -362,6 +589,40 @@ class Openp41geAgents extends LitElement {
           stroke-width: 2;
           stroke-linecap: round;
           stroke-linejoin: round;
+        }
+        .composer-input {
+          position: absolute;
+          top: 0;
+          left: -9999px;
+          width: 1px;
+          height: 1px;
+          opacity: 0;
+          padding: 0;
+          border: none;
+          resize: none;
+          overflow: hidden;
+          outline: none;
+        }
+        .composer-tools {
+          padding: 6px 12px;
+          border-top: 1px solid var(--border-color, #333);
+          background: var(--bg-tertiary, #1c1c1c);
+          font-size: 11px;
+          color: var(--text-secondary, #aaa);
+        }
+        .composer-tools .tools-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          margin-top: 4px;
+        }
+        .composer-tools .tool-chip {
+          padding: 2px 6px;
+          border-radius: 4px;
+          background: var(--bg-hover, #2a2d2e);
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: 10px;
+          color: var(--text-primary, #d4d4d4);
         }
       </style>
 
@@ -375,40 +636,89 @@ class Openp41geAgents extends LitElement {
         }
       </div>
 
-      <div class="chat-input-area">
-        <textarea
-          class="chat-input"
-          rows="1"
-          placeholder=${this._streaming ? "Agent is responding…" : "Type a message..."}
-          @keydown=${(e: KeyboardEvent) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              this._sendMessage();
-            }
-          }}
-        ></textarea>
+      <div class="composer">
+        <div class="composer-content" @mousedown=${() => this._focusComposer()}></div>
+        <div class="composer-toolbar">
+          <select
+            class="composer-select"
+            title="Provider / model"
+            .value=${this._providerId}
+            @change=${(e: Event) => this._onProviderChange(e)}
+          >
+            ${this._providerOptions()}
+          </select>
+          <button
+            class="composer-tool"
+            title="Add files or content"
+            @click=${() => this._onAddContent()}
+          >
+            ＋
+          </button>
+          <button
+            class="composer-tool"
+            title="Active tools"
+            @click=${() => this._toggleTools()}
+          >
+            ⚙
+            ${this._activeTools.length
+              ? html`<span class="tool-badge">${this._activeTools.length}</span>`
+              : ""}
+          </button>
+          <span class="composer-spacer"></span>
+          ${
+            this._streaming
+              ? html`<button class="composer-send abort" title="Stop" @click=${() => this._abort()}>
+                  <svg viewBox="0 0 24 24">
+                    <rect
+                      x="6"
+                      y="6"
+                      width="12"
+                      height="12"
+                      rx="1"
+                      fill="currentColor"
+                      stroke="none"
+                    />
+                  </svg>
+                </button>`
+              : html`<button
+                  class="composer-send"
+                  title="Send message"
+                  ?disabled=${this._sendDisabled}
+                  @click=${() => this._sendMessage()}
+                >
+                  <svg viewBox="0 0 24 24">
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                </button>`
+          }
+        </div>
         ${
-          this._streaming
-            ? html`<div class="icon-btn abort" title="Stop" @click=${() => this._abort()}>
-                <svg viewBox="0 0 24 24">
-                  <rect
-                    x="6"
-                    y="6"
-                    width="12"
-                    height="12"
-                    rx="1"
-                    fill="currentColor"
-                    stroke="none"
-                  />
-                </svg>
+          this._showTools
+            ? html`<div class="composer-tools">
+                <div>
+                  ${this._activeTools.length
+                    ? `Active tools for this chat:`
+                    : `No active tools configured.`}
+                </div>
+                ${this._activeTools.length
+                  ? html`<div class="tools-list">
+                      ${this._activeTools.map(
+                        (t) => html`<span class="tool-chip">${t}</span>`,
+                      )}
+                    </div>`
+                  : ""}
               </div>`
-            : html`<div class="icon-btn" title="Send message" @click=${() => this._sendMessage()}>
-                <svg viewBox="0 0 24 24">
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </div>`
+            : ""
         }
+        <textarea
+          class="chat-input composer-input"
+          rows="1"
+          @input=${(e: Event) => this._onComposerInput(e)}
+          @keydown=${(e: KeyboardEvent) => this._onComposerKeydown(e)}
+          @focus=${() => this._onComposerFocus(true)}
+          @blur=${() => this._onComposerFocus(false)}
+        ></textarea>
       </div>
 
       <div class="chat-bottombar">${this._title || "Agent chat"}</div>

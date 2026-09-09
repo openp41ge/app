@@ -103,6 +103,33 @@ describe("AgentsController", () => {
     expect(last.content).toContain("Assembling");
   });
 
+  it("populates the composer provider/model selector from the agent config", async () => {
+    (window as unknown as Record<string, unknown>).openp41ge = {
+      ...(window as unknown as Record<string, unknown>).openp41ge,
+      chat: {
+        getAgentConfig: async () => ({
+          providerId: "vllm",
+          providers: {
+            vllm: { baseUrl: "http://localhost:8000/v1", model: "vicuna-13b", name: "vLLM" },
+          },
+        }),
+      },
+    };
+    (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";
+    controller.mount(host);
+    await flush();
+
+    const el = host.querySelector("openp41ge-agents") as HTMLElement;
+    await flush();
+    const select = (el.shadowRoot as ShadowRoot).querySelector(
+      ".composer-select",
+    ) as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    expect(select.options).toHaveLength(1);
+    expect(select.options[0].textContent).toContain("vLLM");
+    expect(select.value).toBe("vllm");
+  });
+
   it("snapshot/restore persists the chat id", () => {
     controller.restore({ chatId: "chat_7", cwd: "/repo" });
     expect(controller.snapshot()).toEqual({ chatId: "chat_7" });

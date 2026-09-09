@@ -311,13 +311,87 @@ describe("Openp41geAgents (custom element)", () => {
 
     const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
     (inputEl as { value: string }).value = "hello agent";
-    const sendBtn = el.shadowRoot!.querySelector(".icon-btn:not(.abort)") as HTMLElement;
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    const sendBtn = el.shadowRoot!.querySelector(".composer-send") as HTMLElement;
     sendBtn.click();
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({ detail: { text: "hello agent" } }),
     );
+  });
+
+  it("renders typed text into the composer content and enables submit", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    expect(
+      (el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    (inputEl as { value: string }).value = "use `read_file` to inspect";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
+    expect(content.textContent).toContain("use");
+    expect(content.querySelector("code")?.textContent).toBe("read_file");
+    expect(
+      (el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("does not send when the composer is empty", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const handler = vi.fn();
+    el.addEventListener("chat:send", handler as EventListener);
+
+    (el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).click();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("setComposerContext populates providers and active tools", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setComposerContext({
+      providers: [{ id: "vllm", label: "vLLM", model: "vicuna-13b" }],
+      activeTools: ["read_file", "run_command"],
+    });
+    await el.updateComplete;
+
+    const select = el.shadowRoot!.querySelector(".composer-select") as HTMLSelectElement;
+    expect(select.options).toHaveLength(1);
+    expect(select.options[0].textContent).toContain("vLLM");
+    expect(select.value).toBe("vllm");
+
+    const toolsBtn = el.shadowRoot!.querySelector(".composer-tool[title='Active tools']") as HTMLElement;
+    expect(toolsBtn.querySelector(".tool-badge")?.textContent).toBe("2");
+  });
+
+  it("sends on Enter (without Shift) and not on Shift+Enter", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const handler = vi.fn();
+    el.addEventListener("chat:send", handler as EventListener);
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello";
+    inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: false }));
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    (inputEl as { value: string }).value = "again";
+    inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: true }));
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it("setProviderStatus shows a status strip when unreachable", async () => {

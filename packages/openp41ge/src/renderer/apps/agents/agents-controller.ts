@@ -149,6 +149,7 @@ export class AgentsController extends BaseController implements TabController {
       if (!this._component) return;
       if (chat) {
         this._component.setChat(chat);
+        void this._loadComposerContext(chat.providerId ?? "vllm");
       } else {
         this._component.setChat({
           id: this.chatId,
@@ -161,6 +162,26 @@ export class AgentsController extends BaseController implements TabController {
       }
     } catch (err) {
       log.warn("failed to load chat", (err as Error).message);
+    }
+  }
+
+  /** Populate the composer's provider/model selector and active-tools list. */
+  private async _loadComposerContext(activeProviderId: string): Promise<void> {
+    // v1 toolset exposed by the backend executor (main process).
+    const ACTIVE_TOOLS = ["read_file", "search_files", "run_command"];
+    try {
+      const cfg = await window.openp41ge.chat.getAgentConfig();
+      const providers = Object.entries(cfg.providers).map(([id, p]) => ({
+        id,
+        label: (p as { name?: string }).name ?? id,
+        model: p.model ?? "",
+      }));
+      if (!providers.some((p) => p.id === activeProviderId)) {
+        providers.push({ id: activeProviderId, label: activeProviderId, model: "" });
+      }
+      this._component?.setComposerContext({ providers, activeProviderId, activeTools: ACTIVE_TOOLS });
+    } catch (err) {
+      log.warn("failed to load agent composer context", (err as Error).message);
     }
   }
 
