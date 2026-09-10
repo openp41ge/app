@@ -56,6 +56,13 @@ class Openp41geAgents extends LitElement {
   /** Anchor used while dragging a mouse selection. */
   private _selAnchor = 0;
   private _draggingSelection = false;
+  /** Direction of the last navigation key (1 = down/right, -1 = up/left, 0 =
+   *  none). On macOS a Cmd+Shift+Arrow reports `selectionDirection` as "none"
+   *  and, when the whole document is already selected, leaves the endpoints
+   *  unchanged — so the only way to know which edge the caret should ride is
+   *  the arrow key itself.
+   */
+  private _caretHint = 0;
   /** Maps rendered-content offsets to raw-text offsets (backticks dropped). */
   private _contentSegments: {
     isCode: boolean;
@@ -334,6 +341,7 @@ class Openp41geAgents extends LitElement {
     this._selAnchor = ta.selectionEnd;
     this._prevSelStart = ta.selectionStart;
     this._prevSelEnd = ta.selectionEnd;
+    this._caretHint = 0;
     this._renderComposerContent();
     this._updateComposerState();
   }
@@ -388,9 +396,21 @@ class Openp41geAgents extends LitElement {
       } else if (ta.selectionDirection === "forward") {
         anchor = newStart;
         caret = newEnd;
+      } else if (this._caretHint > 0) {
+        // Direction is "none" and a down/right navigation key is the latest
+        // editor command (e.g. Cmd+Shift+Down): ride the trailing edge. This
+        // also covers the boundary case where the whole document is selected
+        // and the endpoints therefore do not change.
+        anchor = newStart;
+        caret = newEnd;
+      } else if (this._caretHint < 0) {
+        // Direction is "none" and an up/left navigation key (Cmd+Shift+Up).
+        anchor = newEnd;
+        caret = newStart;
       } else if (endpointsChanged) {
-        // Direction is "none" and the endpoints moved. Infer the moving edge
-        // from which endpoint of the selection actually moved.
+        // Direction is "none" and the endpoints moved (no key hint — e.g. a
+        // programmatic selection). Infer the moving edge from which endpoint
+        // of the selection actually moved.
         const startMoved = newStart !== this._prevSelStart;
         const endMoved = newEnd !== this._prevSelEnd;
         if (startMoved && !endMoved) {
@@ -406,8 +426,8 @@ class Openp41geAgents extends LitElement {
           anchor = newStart;
         }
       } else {
-        // Direction is "none" and the endpoints did not move: nothing new to
-        // infer (e.g. a follow-up keyup) — keep the current caret/anchor.
+        // Direction is "none", endpoints did not move, no key hint (e.g. a
+        // follow-up keyup): nothing new to infer — keep the current caret.
         this._renderComposerContent();
         return;
       }
@@ -431,6 +451,7 @@ class Openp41geAgents extends LitElement {
     const pos = start + 1;
     ta.setSelectionRange(pos, pos);
     ta.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    this._caretHint = 0;
   }
 
   private _onComposerKeydown(e: KeyboardEvent): void {
@@ -445,6 +466,25 @@ class Openp41geAgents extends LitElement {
     // key is held (auto-repeat), so schedule a sync after the browser applies
     // the caret move; that keeps the rendered caret (and scroll) live.
     if (this._isNavigationKey(e)) {
+      // Record the direction of the key so a direction-less ("none") selection
+      // — e.g. macOS Cmd+Shift+Arrow at the whole-document boundary — can still
+      // ride the correct edge even when the endpoints do not change.
+      switch (e.key) {
+        case "ArrowUp":
+        case "ArrowLeft":
+        case "Home":
+        case "PageUp":
+          this._caretHint = -1;
+          break;
+        case "ArrowDown":
+        case "ArrowRight":
+        case "End":
+        case "PageDown":
+          this._caretHint = 1;
+          break;
+        default:
+          this._caretHint = 0;
+      }
       setTimeout(() => this._syncSelection(), 0);
     }
   }
@@ -866,6 +906,7 @@ class Openp41geAgents extends LitElement {
     this._caretRaw = raw;
     this._prevSelStart = raw;
     this._prevSelEnd = raw;
+    this._caretHint = 0;
     this._inputEl?.setSelectionRange(raw, raw);
     this._draggingSelection = true;
     try {
@@ -915,6 +956,7 @@ class Openp41geAgents extends LitElement {
     this._selAnchor = start;
     this._prevSelStart = start;
     this._prevSelEnd = end;
+    this._caretHint = 0;
     this._inputEl?.setSelectionRange(start, end);
     this._renderComposerContent();
   };

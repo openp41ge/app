@@ -704,6 +704,43 @@ describe("Openp41geAgents (custom element)", () => {
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
   });
 
+  it("rides the arrow edge on a direction-'none' boundary flip (macOS Cmd+Shift+Arrow)", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "aaa\nbbb\nccc";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    // The whole document is selected and, on macOS, Cmd+Shift+Arrow leaves
+    // `selectionDirection` as "none" with the endpoints unchanged — so the
+    // arrow key itself is the only signal for which edge the caret rides.
+    inputEl.setSelectionRange(0, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Cmd+Shift+Up: the keydown sets the "up" hint; the caret rides the start
+    // even though (0,11) is unchanged and direction is "none".
+    inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", shiftKey: true, metaKey: true }));
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(11);
+
+    // Cmd+Shift+Down flips the caret back to the end (same unchanged endpoints).
+    inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", shiftKey: true, metaKey: true }));
+    inputEl.setSelectionRange(0, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(0);
+  });
+
   it("setProviderStatus shows a status strip when unreachable", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
