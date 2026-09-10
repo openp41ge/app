@@ -16,7 +16,9 @@
 
 import { LitElement, html, type TemplateResult } from "lit";
 import { state, query } from "lit/decorators.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Chat, ChatMessage, ChatRuntimeStatus, ToolCall } from "../types";
+import { renderMarkdown } from "./markdown.js";
 
 function deepCloneMessage(m: ChatMessage): ChatMessage {
   return {
@@ -1436,27 +1438,103 @@ class Openp41geAgents extends LitElement {
           gap: 8px;
         }
         .chat-message {
-          padding: 8px 12px;
-          border-radius: 6px;
-          max-width: 88%;
           word-wrap: break-word;
-          white-space: pre-wrap;
           line-height: 1.4;
         }
+        /* User messages are grey bubbles: 3 medium-rounded corners with a
+           smaller bottom-right, sized to their content (max 90% width). */
         .chat-message.user {
           align-self: flex-end;
-          background: var(--accent, #2b5a9c);
-          color: #fff;
-        }
-        .chat-message.assistant {
-          align-self: flex-start;
-          background: var(--bg-secondary, #2d2d2d);
+          max-width: 90%;
+          width: fit-content;
+          padding: 4px 12px;
+          background: var(--bg-active, #37373d);
           color: var(--text-primary, #d4d4d4);
-          border: 1px solid var(--border-color, #3a3a3a);
+          border-radius: 12px 12px 4px 12px;
+          white-space: pre-wrap;
+        }
+        /* Assistant responses are inline text — no bubble — rendered as
+           markdown, so they span the full width and flow like prose. */
+        .chat-message.assistant {
+          align-self: stretch;
+          background: transparent;
+          border: none;
+          padding: 0;
+          max-width: 100%;
+          white-space: normal;
+        }
+        .chat-message.assistant .msg-content {
+          white-space: normal;
         }
         .msg-content {
           white-space: pre-wrap;
           word-wrap: break-word;
+        }
+        .chat-message.assistant .msg-content p {
+          margin: 0 0 8px;
+        }
+        .chat-message.assistant .msg-content p:last-child {
+          margin-bottom: 0;
+        }
+        .chat-message.assistant .msg-content h1,
+        .chat-message.assistant .msg-content h2,
+        .chat-message.assistant .msg-content h3,
+        .chat-message.assistant .msg-content h4,
+        .chat-message.assistant .msg-content h5,
+        .chat-message.assistant .msg-content h6 {
+          margin: 12px 0 6px;
+          line-height: 1.3;
+        }
+        .chat-message.assistant .msg-content ul,
+        .chat-message.assistant .msg-content ol {
+          margin: 0 0 8px;
+          padding-left: 20px;
+        }
+        .chat-message.assistant .msg-content li {
+          margin: 2px 0;
+        }
+        .chat-message.assistant .msg-content blockquote {
+          margin: 0 0 8px;
+          padding: 2px 12px;
+          border-left: 3px solid var(--border-color, #3a3a3a);
+          color: var(--text-secondary, #999);
+        }
+        .chat-message.assistant .msg-content code {
+          padding: 1px 4px;
+          border-radius: 4px;
+          background: var(--bg-tertiary, #222);
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: 12px;
+        }
+        .chat-message.assistant .msg-content pre {
+          margin: 0 0 8px;
+          padding: 8px 10px;
+          border-radius: 6px;
+          overflow-x: auto;
+          background: var(--bg-tertiary, #222);
+          border: 1px solid var(--border-color, #2a2a2a);
+        }
+        .chat-message.assistant .msg-content pre code {
+          padding: 0;
+          background: transparent;
+          border-radius: 0;
+          font-size: 12px;
+        }
+        .chat-message.assistant .msg-content a {
+          color: var(--accent, #4a9eff);
+          text-decoration: none;
+        }
+        .chat-message.assistant .msg-content a:hover {
+          text-decoration: underline;
+        }
+        .chat-message.assistant .msg-content img {
+          max-width: 100%;
+          border-radius: 6px;
+        }
+        .chat-message.assistant .msg-content hr {
+          margin: 10px 0;
+          border: none;
+          border-top: 1px solid var(--border-color, #2a2a2a);
         }
         .caret {
           display: inline-block;
@@ -2101,7 +2179,9 @@ class Openp41geAgents extends LitElement {
     return html`
       <div class="chat-message assistant">
         <div class="msg-content">
-          ${msg.content || ""}${this._streaming ? html`<span class="caret"></span>` : ""}
+          ${msg.content ? unsafeHTML(renderMarkdown(msg.content)) : ""}${
+            this._streaming ? html`<span class="caret"></span>` : ""
+          }
         </div>
         ${
           toolCalls.length > 0

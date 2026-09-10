@@ -44,57 +44,44 @@ describe("Openp41geAgents (custom element)", () => {
     expect(messages[0].content).toBe("Hello, world!");
   });
 
-  it.skip("renders user message in the DOM", () => {
+  it("renders a user message as a bubble in the DOM", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     el.addMessage("user", "Hello!");
+    await el.updateComplete;
 
-    const shadow = el.shadowRoot!;
-    const msgEls = shadow.querySelectorAll(".chat-message");
+    const msgEls = el.shadowRoot!.querySelectorAll(".chat-message");
     expect(msgEls).toHaveLength(1);
-    expect(msgEls[0].textContent).toBe("Hello!");
+    expect(msgEls[0].querySelector(".msg-content")!.textContent!.trim()).toBe("Hello!");
     expect(msgEls[0].classList.contains("user")).toBe(true);
   });
 
-  it.skip("renders assistant message in the DOM", () => {
+  it("renders an assistant message inline with markdown in the DOM", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
-    el.addMessage("assistant", "Hi there!");
+    el.addMessage("assistant", "Hi **there**!");
+    await el.updateComplete;
 
-    const shadow = el.shadowRoot!;
-    const msgEls = shadow.querySelectorAll(".chat-message");
+    const msgEls = el.shadowRoot!.querySelectorAll(".chat-message");
     expect(msgEls).toHaveLength(1);
-    expect(msgEls[0].textContent).toBe("Hi there!");
     expect(msgEls[0].classList.contains("assistant")).toBe(true);
+    // Assistant responses are rendered as inline markdown, not a bubble.
+    expect(msgEls[0].querySelector(".msg-content strong")).not.toBeNull();
   });
 
-  it.skip("adds multiple messages", () => {
+  it("adds multiple messages", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     el.addMessage("user", "Hello");
     el.addMessage("assistant", "Hi");
     el.addMessage("user", "How are you?");
+    await el.updateComplete;
 
     expect(el.messages).toHaveLength(3);
-
-    const shadow = el.shadowRoot!;
-    const msgEls = shadow.querySelectorAll(".chat-message");
-    expect(msgEls).toHaveLength(3);
-  });
-
-  it.skip("clears empty state when first message is added", () => {
-    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
-    document.body.appendChild(el);
-
-    const shadow = el.shadowRoot!;
-    expect(shadow.querySelector(".chat-empty")).toBeTruthy();
-
-    el.addMessage("user", "Hello");
-
-    expect(shadow.querySelector(".chat-empty")).toBeNull();
+    expect(el.shadowRoot!.querySelectorAll(".chat-message")).toHaveLength(3);
   });
 
   it("clearMessages removes all messages and shows empty state", () => {
