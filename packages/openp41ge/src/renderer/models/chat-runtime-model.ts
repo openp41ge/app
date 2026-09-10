@@ -12,7 +12,13 @@ import type { ChatDeltaPayload, ChatStatusPayload, ChatToolPayload } from "openp
 
 /** Narrow send/abort + subscribe contract for the agent runtime. */
 export interface ChatRuntimeModel {
-  send(id: string, text: string, cwd?: string): Promise<void>;
+  send(
+    id: string,
+    text: string,
+    cwd?: string,
+    tools?: string[],
+    thinkingLevel?: string,
+  ): Promise<void>;
   abort(id: string): Promise<void>;
   onDelta(cb: (payload: ChatDeltaPayload) => void): () => void;
   onTool(cb: (payload: ChatToolPayload) => void): () => void;
@@ -22,8 +28,14 @@ export interface ChatRuntimeModel {
 // ─── Production: IPC-backed ───────────────────────────────────────────────
 
 export class IpcChatRuntimeModel implements ChatRuntimeModel {
-  send(id: string, text: string, cwd?: string): Promise<void> {
-    return window.openp41ge.chat.send(id, text, cwd);
+  send(
+    id: string,
+    text: string,
+    cwd?: string,
+    tools?: string[],
+    thinkingLevel?: string,
+  ): Promise<void> {
+    return window.openp41ge.chat.send(id, text, cwd, tools, thinkingLevel);
   }
   abort(id: string): Promise<void> {
     return window.openp41ge.chat.abort(id);

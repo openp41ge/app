@@ -11,6 +11,14 @@
 /** A single model available from a provider (settings UI only for now). */
 export interface ModelConfig {
   id: string;
+  /** A list of strings describing the model's accepted input (e.g. modalities). */
+  input?: string[];
+  /** Key/value pairs describing the model's thinking configuration. */
+  thinking?: Record<string, string>;
+  /** Maximum number of output tokens for this model. */
+  maxTokens?: number;
+  /** Context window size in tokens. */
+  contextWindow?: number;
 }
 
 /** A single provider connection config (settings UI only; runtime ignores `name`). */

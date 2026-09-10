@@ -23,6 +23,23 @@ import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("openp41ge", "VllmChatProvider");
 
+/** Map the composer's thinking level to the provider's reasoning_effort value.
+ *  "Off" and unknown levels resolve to undefined (provider default). */
+function reasoningEffortForLevel(level?: string): string | undefined {
+  switch (level) {
+    case "Off":
+      return undefined;
+    case "Low":
+      return "low";
+    case "Medium":
+      return "medium";
+    case "High":
+      return "high";
+    default:
+      return undefined;
+  }
+}
+
 /** Convert our chat messages to the OpenAI chat-completions wire format. */
 export function toOpenAIMessages(messages: ChatMessage[]): Array<Record<string, unknown>> {
   return messages.map((m) => {
@@ -106,6 +123,11 @@ export class VllmChatProvider implements ChatProvider {
       body.tools = toOpenAITools(req.tools);
       body.tool_choice = "auto";
     }
+    // Map the composer's thinking level to the provider's reasoning effort.
+    // "Off" (and unknown values) leave the setting absent so the model
+    // applies its default behaviour.
+    const effort = reasoningEffortForLevel(req.thinking);
+    if (effort) body.reasoning_effort = effort;
 
     let res: Response;
     try {

@@ -328,9 +328,9 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
 
     const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
-    expect(
-      (el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
 
     (inputEl as { value: string }).value = "use `read_file` to inspect";
     inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
@@ -339,9 +339,9 @@ describe("Openp41geAgents (custom element)", () => {
     const content = el.shadowRoot!.querySelector(".composer-content") as HTMLElement;
     expect(content.textContent).toContain("use");
     expect(content.querySelector("code")?.textContent).toBe("read_file");
-    expect(
-      (el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled,
-    ).toBe(false);
+    expect((el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   it("does not send when the composer is empty", async () => {
@@ -480,25 +480,48 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
 
     el.setComposerContext({
-      providers: [{ id: "vllm", label: "vLLM", model: "vicuna-13b" }],
+      providers: [
+        {
+          id: "vllm",
+          label: "vLLM",
+          model: "vicuna-13b",
+          baseUrl: "http://localhost:8000/v1",
+          models: [{ id: "vicuna-13b" }, { id: "llama-2", contextWindow: 128000 }],
+        },
+      ],
       activeTools: ["read_file", "run_command"],
     });
     await el.updateComplete;
 
     const providerBtn = el.shadowRoot!.querySelector(".composer-select") as HTMLButtonElement;
+    const modelBtn = el.shadowRoot!.querySelector(
+      ".composer-select.composer-model-select",
+    ) as HTMLButtonElement;
     expect(providerBtn.querySelector(".composer-select-label")?.textContent).toContain("vLLM");
-    expect(providerBtn.querySelector(".composer-select-label")?.textContent).toContain("vicuna-13b");
+    expect(modelBtn.querySelector(".composer-select-label")?.textContent).toContain("vicuna-13b");
 
-    // Clicking the selector opens a custom dropdown list over the text area.
+    // Clicking the provider selector opens a provider list over the text area.
     providerBtn.click();
     await el.updateComplete;
     const items = el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item");
     expect(items).toHaveLength(1);
-    expect(items[0].textContent).toContain("vLLM");
-    expect(items[0].textContent).toContain("vicuna-13b");
+    // Two-row layout: name on the first row, base URL + model count on the second.
+    expect(items[0].querySelector(".row-name")?.textContent).toContain("vLLM");
+    expect(items[0].querySelector(".row-sub")?.textContent).toContain("http://localhost:8000/v1");
+    expect(items[0].querySelector(".row-sub")?.textContent).toContain("2 models");
 
-    const toolsBtn = el.shadowRoot!.querySelector(".composer-tool[title='Active tools']") as HTMLElement;
-    expect(toolsBtn.querySelector(".tool-badge")?.textContent).toBe("2");
+    // Clicking the model selector opens a model list for the active provider.
+    modelBtn.click();
+    await el.updateComplete;
+    const modelItems = el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item");
+    expect(modelItems).toHaveLength(2);
+    expect(modelItems[0].textContent).toContain("vicuna-13b");
+
+    const toolsBtn = el.shadowRoot!.querySelector(
+      ".composer-tool[title='Active tools']",
+    ) as HTMLElement;
+    // The tools button shows no floating count badge.
+    expect(toolsBtn.querySelector(".tool-badge")).toBeNull();
   });
 
   it("selecting a provider dispatches chat:provider-change and closes the dropdown", async () => {
@@ -518,7 +541,9 @@ describe("Openp41geAgents (custom element)", () => {
     const providerBtn = el.shadowRoot!.querySelector(".composer-select") as HTMLButtonElement;
     providerBtn.click();
     await el.updateComplete;
-    expect(el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item")).toHaveLength(2);
+    expect(el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item")).toHaveLength(
+      2,
+    );
 
     const handler = vi.fn();
     el.addEventListener("chat:provider-change", handler as EventListener);
@@ -528,12 +553,186 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
 
     expect(handler).toHaveBeenCalledOnce();
-    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({ providerId: "openai" });
-    // The dropdown closes and the button label reflects the choice.
-    expect(el.shadowRoot!.querySelector(".composer-provider-menu")).toBeNull();
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      providerId: "openai",
+      modelId: "gpt-4",
+    });
+    // The dropdown stays open (like the tools multi-select); it closes only
+    // when the user clicks outside the composer.
+    expect(el.shadowRoot!.querySelector(".composer-provider-menu")).not.toBeNull();
     expect(providerBtn.querySelector(".composer-select-label")?.textContent).toContain("OpenAI");
-    // The button shows the model selector without a border/background by default.
+    // The selector buttons are plain buttons (no border/background by default).
     expect(providerBtn.tagName).toBe("BUTTON");
+  });
+
+  it("hides the thinking selector and sends nothing when the model has no thinking entries", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setComposerContext({
+      providers: [{ id: "vllm", label: "vLLM", model: "m1" }],
+      activeProviderId: "vllm",
+    });
+    await el.updateComplete;
+
+    // No thinking selector in the toolbar.
+    expect(el.shadowRoot!.querySelector(".composer-thinking-select")).toBeNull();
+
+    const handler = vi.fn();
+    el.addEventListener("chat:send", handler as EventListener);
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hi";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    (el.shadowRoot!.querySelector(".composer-send") as HTMLElement).click();
+
+    // No thinkingLevel is sent.
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({ text: "hi" });
+  });
+
+  it("shows only the model's thinking entries and keeps the menu open on select", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setComposerContext({
+      providers: [
+        {
+          id: "vllm",
+          label: "vLLM",
+          model: "m1",
+          models: [{ id: "m1", thinking: { Light: "low", Deep: "high" }, contextWindow: 128000 }],
+        },
+      ],
+      activeProviderId: "vllm",
+    });
+    await el.updateComplete;
+
+    const thinkingBtn = el.shadowRoot!.querySelector(
+      ".composer-thinking-select",
+    ) as HTMLButtonElement;
+    expect(thinkingBtn).not.toBeNull();
+    // First entry is shown by default.
+    expect(thinkingBtn.querySelector(".composer-select-label")?.textContent).toBe("Light");
+
+    // Only the model's entries are listed.
+    thinkingBtn.click();
+    await el.updateComplete;
+    const items = el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item");
+    expect(items).toHaveLength(2);
+    expect(items[0].textContent).toContain("Light");
+    expect(items[1].textContent).toContain("Deep");
+
+    const handler = vi.fn();
+    el.addEventListener("chat:thinking-change", handler as EventListener);
+    // Selecting an entry updates the button and keeps the menu open.
+    (items[1] as HTMLElement).click();
+    await el.updateComplete;
+    expect(handler).toHaveBeenCalledOnce();
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({ thinkingKey: "Deep" });
+    expect(el.shadowRoot!.querySelector(".composer-provider-menu")).not.toBeNull();
+    expect(thinkingBtn.querySelector(".composer-select-label")?.textContent).toBe("Deep");
+
+    // Sending includes the selected entry's value.
+    const sendHandler = vi.fn();
+    el.addEventListener("chat:send", sendHandler as EventListener);
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hi";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    (el.shadowRoot!.querySelector(".composer-send") as HTMLElement).click();
+    expect((sendHandler.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      text: "hi",
+      thinkingLevel: "high",
+    });
+  });
+
+  it("selecting a model dispatches chat:model-change and updates the model label", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setComposerContext({
+      providers: [
+        {
+          id: "vllm",
+          label: "vLLM",
+          model: "vicuna-13b",
+          models: [{ id: "vicuna-13b" }, { id: "qwen-25" }],
+        },
+      ],
+      activeProviderId: "vllm",
+      activeModelId: "vicuna-13b",
+    });
+    await el.updateComplete;
+
+    const modelBtn = el.shadowRoot!.querySelector(
+      ".composer-select.composer-model-select",
+    ) as HTMLButtonElement;
+    expect(modelBtn.querySelector(".composer-select-label")?.textContent).toContain("vicuna-13b");
+
+    const handler = vi.fn();
+    el.addEventListener("chat:model-change", handler as EventListener);
+
+    modelBtn.click();
+    await el.updateComplete;
+    const items = el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item");
+    expect(items).toHaveLength(2);
+
+    (items[1] as HTMLElement).click();
+    await el.updateComplete;
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({ modelId: "qwen-25" });
+    expect(modelBtn.querySelector(".composer-select-label")?.textContent).toContain("qwen-25");
+    // The model dropdown stays open (closes only on outside click).
+    expect(el.shadowRoot!.querySelector(".composer-provider-menu")).not.toBeNull();
+  });
+
+  it("tools multi-select lists all tools, toggles them, and keeps the menu open", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setComposerContext({
+      availableTools: [
+        { name: "read_file", description: "Read a file." },
+        { name: "search_files", description: "Search files." },
+        { name: "run_command", description: "Run a command." },
+      ],
+      activeTools: ["read_file", "run_command"],
+    });
+    await el.updateComplete;
+
+    const toolsBtn = el.shadowRoot!.querySelector(
+      ".composer-tool[title='Active tools']",
+    ) as HTMLButtonElement;
+    toolsBtn.click();
+    await el.updateComplete;
+
+    const items = el.shadowRoot!.querySelectorAll(".composer-tools-menu .tool-item");
+    expect(items).toHaveLength(3);
+    expect((items[0] as HTMLElement).classList.contains("active")).toBe(true);
+    expect((items[1] as HTMLElement).classList.contains("active")).toBe(false);
+    // Two-row layout: name row + description row, checkbox icon present.
+    expect(items[0].querySelector(".tool-name")?.textContent).toBe("read_file");
+    expect(items[0].querySelector(".tool-desc")?.textContent).toBe("Read a file.");
+    expect(items[0].querySelector(".tool-check svg")).toBeTruthy();
+    expect(items[1].querySelector(".tool-check svg")).toBeTruthy();
+
+    const handler = vi.fn();
+    el.addEventListener("chat:tools-change", handler as EventListener);
+
+    // Toggling the middle (disabled) tool enables it and leaves the menu open.
+    (items[1] as HTMLElement).click();
+    await el.updateComplete;
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      tools: ["read_file", "run_command", "search_files"],
+    });
+    expect(el.shadowRoot!.querySelector(".composer-tools-menu")).toBeTruthy();
   });
 
   it("sends on Enter (without Shift) and does not send on Shift+Enter", async () => {
@@ -576,9 +775,7 @@ describe("Openp41geAgents (custom element)", () => {
     expect(inputEl.selectionEnd).toBe(11);
     expect(handler).not.toHaveBeenCalled();
     // The composer renders the newline as a line break and grows.
-    expect(
-      el.shadowRoot!.querySelector(".composer-content")!.textContent,
-    ).toBe("first line\n");
+    expect(el.shadowRoot!.querySelector(".composer-content")!.textContent).toBe("first line\n");
   });
 
   it("inserts a newline at the caret (not the end) on Shift+Enter", async () => {
@@ -630,7 +827,9 @@ describe("Openp41geAgents (custom element)", () => {
     inputEl.setSelectionRange(4, 11);
     (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
     inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
-    inputEl.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowLeft", shiftKey: true, metaKey: true }));
+    inputEl.dispatchEvent(
+      new KeyboardEvent("keyup", { key: "ArrowLeft", shiftKey: true, metaKey: true }),
+    );
     await el.updateComplete;
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(4);
   });
@@ -668,7 +867,10 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
     expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(4);
-    expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")?.textContent).toBe("aaa\n");
+    expect(
+      el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")
+        ?.textContent,
+    ).toBe("aaa\n");
   });
 
   it("returns the caret to the top when Cmd+Shift+Up re-anchors with a stale 'forward' direction", async () => {
@@ -703,7 +905,10 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
     expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(4);
-    expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")?.textContent).toBe("aaa\n");
+    expect(
+      el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")
+        ?.textContent,
+    ).toBe("aaa\n");
   });
 
   it("moves the caret on a boundary flip even though the endpoints do not change", async () => {
@@ -988,13 +1193,17 @@ describe("Openp41geAgents (custom element)", () => {
     inputEl.setSelectionRange(6, 11);
     inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
     await el.updateComplete;
-    expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")).toBeTruthy();
+    expect(
+      el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight"),
+    ).toBeTruthy();
 
     // Arrow without shift collapses to a caret (no highlight).
     inputEl.setSelectionRange(11, 11);
     inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
     await el.updateComplete;
-    expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")).toBeNull();
+    expect(
+      el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight"),
+    ).toBeNull();
   });
 
   it("schedules a selection sync after a navigation keydown (auto-repeat)", async () => {
@@ -1079,9 +1288,9 @@ describe("Openp41geAgents (custom element)", () => {
     expect(content.querySelector("code")).toBeNull();
     expect(content.textContent).toBe("use `read_file now");
     // Submit should be enabled since there is real, non-code text.
-    expect(
-      (el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled,
-    ).toBe(false);
+    expect((el.shadowRoot!.querySelector(".composer-send") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   it("only styles between matched backtick pairs, ignoring an unclosed trailing one", async () => {
@@ -1116,7 +1325,9 @@ describe("Openp41geAgents (custom element)", () => {
     // jsdom doesn't apply shadow-DOM styles to getComputedStyle, so assert the
     // chip backdrop is declared in the component's stylesheet.
     const css = el.shadowRoot!.querySelector("style")?.textContent ?? "";
-    expect(css).toMatch(/composer-content code[^{]*\{[^}]*background: rgba\(255, 255, 255, 0\.06\)/);
+    expect(css).toMatch(
+      /composer-content code[^{]*\{[^}]*background: rgba\(255, 255, 255, 0\.06\)/,
+    );
   });
 
   it("drops the blinking caret when the composer loses focus but keeps the highlight", async () => {

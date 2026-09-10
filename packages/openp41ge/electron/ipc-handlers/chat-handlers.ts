@@ -90,11 +90,21 @@ export function registerChatHandlers(
   );
 
   // ── Send / abort (agent runtime) ─────────────────────────────────────
-  ipcMain.handle("chat:send", async (event, id: string, text: string, cwd?: string) => {
-    const winId = winIdFromSender(event.sender) ?? store.getOpenWin(id) ?? "";
-    if (!winId) return;
-    await runtime.send(id, winId, text, cwd);
-  });
+  ipcMain.handle(
+    "chat:send",
+    async (
+      event,
+      id: string,
+      text: string,
+      cwd?: string,
+      tools?: string[],
+      thinkingLevel?: string,
+    ) => {
+      const winId = winIdFromSender(event.sender) ?? store.getOpenWin(id) ?? "";
+      if (!winId) return;
+      await runtime.send(id, winId, text, cwd, tools, thinkingLevel);
+    },
+  );
 
   ipcMain.handle("chat:abort", async (_e, id: string) => {
     await runtime.abort(id);
@@ -142,6 +152,8 @@ export function registerChatHandlers(
   ipcMain.handle("chat:getAgentConfig", async () => {
     return config.get("agent");
   });
+
+  ipcMain.handle("chat:listTools", async () => runtime.listTools());
 
   // ── Model listing (auto-detect models from the provider's /models endpoint) ─
   ipcMain.handle(

@@ -7,9 +7,10 @@
  * store — data flows through the platform controller's imperative API.
  *
  * Event contract (bubbles, composed):
- *   - `chat:send`   detail `{ text }` — user submitted a message.
+ *   - `chat:send`   detail `{ text, thinkingLevel }` — user submitted a message.
  *   - `chat:abort`  — user clicked the abort button while streaming.
  *   - `chat:provider-change` detail `{ providerId }` — user picked a provider/model.
+ *   - `chat:thinking-change` detail `{ thinkingLevel }` — user picked a thinking level.
  *   - `chat:add-content` — user clicked the “+ / add content” button.
  */
 
@@ -24,11 +25,49 @@ function deepCloneMessage(m: ChatMessage): ChatMessage {
   };
 }
 
-/** A selectable provider/model shown in the composer's config row. */
+/** A selectable provider shown in the composer's config row. */
 interface ComposerProvider {
   id: string;
   label: string;
+  /** The provider's default/current model id. */
   model: string;
+  /** All models available from this provider (optional). */
+  models?: ComposerModel[];
+  /** The endpoint/base URL for this provider (optional). */
+  baseUrl?: string;
+}
+
+/** A selectable model shown in the composer's model dropdown. */
+interface ComposerModel {
+  id: string;
+  /** Thinking config (key/value pairs) if the model declares one. */
+  thinking?: Record<string, string>;
+  /** Context window size in tokens (optional). */
+  contextWindow?: number;
+  /** Max output tokens (optional). */
+  maxTokens?: number;
+}
+
+/** A selectable tool shown in the composer's multi-select dropdown. */
+interface ComposerTool {
+  name: string;
+  /** Optional one-line summary shown beneath the name. */
+  description?: string;
+}
+
+/** The thinking-level options come from the active model's configured thinking
+ *  entries (key/value pairs in the Agent settings). No entries → no selector
+ *  and nothing is sent, so there is no fixed level set here. */
+
+/** Format a token count for display (e.g. 128000 → "128k", 1000000 → "1M"). */
+function formatTokens(n?: number): string {
+  if (!n || n <= 0) return "";
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `${Number.isInteger(m) ? m : m.toFixed(1)}M`;
+  }
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return `${n}`;
 }
 
 class Openp41geAgents extends LitElement {
@@ -74,10 +113,15 @@ class Openp41geAgents extends LitElement {
   }[] = [];
   @state() private _providers: ComposerProvider[] = [];
   @state() private _providerId = "";
+  /** The selected model id for the active provider (may be empty until set). */
+  @state() private _modelId = "";
+  /** All tools exposed to the composer (the selectable universe). */
+  @state() private _availableTools: ComposerTool[] = [];
   @state() private _activeTools: string[] = [];
-  @state() private _showTools = false;
-  /** Whether the custom provider/model dropdown is open. */
-  @state() private _providerMenuOpen = false;
+  /** The selected thinking entry's key (null → use the first available entry). */
+  @state() private _thinkingKey: string | null = null;
+  /** Which custom dropdown (provider, model, thinking or tools) is open, or null. */
+  @state() private _menuOpen: "provider" | "model" | "thinking" | "tools" | null = null;
   private _docListenerAttached = false;
   private _composerResizeObserver: ResizeObserver | null = null;
   @query(".chat-input") private _inputEl!: HTMLTextAreaElement;
@@ -98,6 +142,7 @@ class Openp41geAgents extends LitElement {
     this._messages = chat.messages.map(deepCloneMessage);
     this._streaming = false;
     this._providerId = chat.providerId;
+    this._modelId = "";
   }
 
   appendDelta(text: string): void {
@@ -218,14 +263,20 @@ class Openp41geAgents extends LitElement {
     // when the click lands on a non-focusable area (e.g. the transcript), so
     // we blur explicitly.
     const composer = this.renderRoot?.querySelector(".composer") as HTMLElement | null;
-    const target = e.target as Node | null;
-    if (!composer || !target || composer.contains(target)) return;
-    if (this._providerMenuOpen) this._providerMenuOpen = false;
-    if (this._composerFocused) {
-      this._composerFocused = false;
-      this._renderComposerContent();
+    // Use the composed path instead of e.target: events crossing the shadow
+    // boundary have their target retargeted to the host element, which would
+    // make `.contains(host)` fail even for clicks inside the composer (e.g.
+    // toggling a tool in the multi-select). `composedPath()` preserves the
+    // inner nodes, so clicks inside the composer (including its menus) are
+    // correctly treated as "inside" and never close the dropdown.
+    if (!composer || !e.composedPath().includes(composer)) {
+      if (this._menuOpen) this._menuOpen = null;
+      if (this._composerFocused) {
+        this._composerFocused = false;
+        this._renderComposerContent();
+      }
+      if (this._inputEl && this.isConnected) this._inputEl.blur();
     }
-    if (this._inputEl && this.isConnected) this._inputEl.blur();
   };
 
   // ─── Send / abort ───────────────────────────────────────────────────
@@ -250,7 +301,15 @@ class Openp41geAgents extends LitElement {
     this.addMessage("user", text);
     this._streaming = true;
     this.dispatchEvent(
-      new CustomEvent("chat:send", { bubbles: true, composed: true, detail: { text } }),
+      new CustomEvent("chat:send", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          text,
+          // Only send a thinking level when the model exposes thinking entries.
+          ...(this._currentThinking() ? { thinkingLevel: this._currentThinking()!.value } : {}),
+        },
+      }),
     );
     // Back-compat alias (older consumer tests listened for chat-message).
     this.dispatchEvent(
@@ -273,14 +332,26 @@ class Openp41geAgents extends LitElement {
   setComposerContext(ctx: {
     providers?: ComposerProvider[];
     activeProviderId?: string;
+    /** The model to preselect for the active provider (defaults to its model). */
+    activeModelId?: string;
+    /** The full set of tools available to enable/disable. */
+    availableTools?: ComposerTool[];
+    /** The tools currently enabled (the multi-select selection). */
     activeTools?: string[];
   }): void {
     if (ctx.providers) {
       this._providers = ctx.providers;
-      if (!ctx.activeProviderId && this._providers.length)
-        this._providerId = this._providers[0].id;
+      if (!ctx.activeProviderId && this._providers.length) this._providerId = this._providers[0].id;
     }
     if (ctx.activeProviderId) this._providerId = ctx.activeProviderId;
+    if (ctx.activeModelId) this._modelId = ctx.activeModelId;
+    // Fall back to the active provider's configured default model so the
+    // model selector always has a sensible value.
+    if (!this._modelId) {
+      const p = this._effectiveProviders().find((x) => x.id === this._providerId);
+      this._modelId = p?.model ?? "";
+    }
+    if (ctx.availableTools) this._availableTools = ctx.availableTools;
     if (ctx.activeTools) this._activeTools = ctx.activeTools;
     this.requestUpdate();
   }
@@ -298,17 +369,93 @@ class Openp41geAgents extends LitElement {
     return providers;
   }
 
-  /** The label shown on the model-selector button for the active provider. */
+  /** The label shown on the provider-selector button. */
   private _currentProviderLabel(): string {
     const p = this._effectiveProviders().find((x) => x.id === this._providerId);
-    if (p) return p.label + (p.model ? ` · ${p.model}` : "");
-    return this._providerId || "Default model";
+    if (p) return p.label;
+    return this._providerId || "Default provider";
   }
 
-  /** Dropdown height (px) so the composer can grow to reveal the whole list. */
-  private _toggleProviderMenu(): void {
-    this._providerMenuOpen = !this._providerMenuOpen;
-    if (this._providerMenuOpen) {
+  /** The second row shown under each provider in the dropdown: the base URL,
+   *  plus the model count when the provider exposes its model list. */
+  private _providerSub(p: ComposerProvider): string {
+    const bits: string[] = [];
+    if (p.baseUrl?.trim()) bits.push(p.baseUrl.trim());
+    if (p.models?.length) bits.push(`${p.models.length} model${p.models.length === 1 ? "" : "s"}`);
+    return bits.join(" · ");
+  }
+
+  /** Checked/unchecked checkbox icon for the tools multi-select. */
+  private _checkboxIcon(checked: boolean) {
+    const path = checked
+      ? "m424-312 282-282-56-56-226 226-114-114-56 56 170 170ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"
+      : "M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Z";
+    return html`<svg
+      xmlns="http://www.w3.org/2000/svg"
+      height="24px"
+      viewBox="0 -960 960 960"
+      width="24px"
+      fill="#e3e3e3"
+    >
+      <path d="${path}" />
+    </svg>`;
+  }
+
+  /** Checked/unchecked radio icon for the single-select provider/model menus. */
+  private _radioIcon(checked: boolean) {
+    const path = checked
+      ? "m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"
+      : "M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z";
+    return html`<svg
+      xmlns="http://www.w3.org/2000/svg"
+      height="24px"
+      viewBox="0 -960 960 960"
+      width="24px"
+      fill="#e3e3e3"
+    >
+      <path d="${path}" />
+    </svg>`;
+  }
+
+  /** The label shown on the model-selector button for the active provider. */
+  private _currentModelLabel(): string {
+    const p = this._effectiveProviders().find((x) => x.id === this._providerId);
+    const model = this._modelId || p?.model || "";
+    return model || "Default model";
+  }
+
+  /** The model id currently selected (falls back to the provider's default). */
+  private _currentModelId(): string {
+    const p = this._effectiveProviders().find((x) => x.id === this._providerId);
+    return this._modelId || p?.model || "";
+  }
+
+  /** The model list actually shown for the active provider. Falls back to the
+   *  provider's single configured model, then to a single empty default. */
+  private _effectiveModels(): ComposerModel[] {
+    const p = this._effectiveProviders().find((x) => x.id === this._providerId);
+    if (p?.models?.length) return p.models;
+    if (p?.model) return [{ id: p.model }];
+    return [{ id: "" }];
+  }
+
+  /** The second row shown under each model: default thinking ("server default"
+   *  when unset) plus the context window / max token sizes when provided. */
+  private _modelSub(m: ComposerModel): string {
+    const bits: string[] = [];
+    const keys = m.thinking ? Object.keys(m.thinking) : [];
+    bits.push(keys.length ? `thinking: ${keys[0]}` : "thinking: server default");
+    const ctx = formatTokens(m.contextWindow);
+    if (ctx) bits.push(`context: ${ctx}`);
+    const max = formatTokens(m.maxTokens);
+    if (max) bits.push(`max: ${max}`);
+    return bits.join(" · ");
+  }
+
+  /** Toggle the given composer dropdown (provider, model, thinking or tools). */
+  private _toggleMenu(menu: "provider" | "model" | "thinking" | "tools"): void {
+    this._menuOpen = this._menuOpen === menu ? null : menu;
+    if (this._menuOpen) {
       // Opening the dropdown moves focus onto the selector button. Drop the
       // composer caret so typing doesn't go to a dead text-area and the caret
       // doesn't blink behind the list.
@@ -323,25 +470,97 @@ class Openp41geAgents extends LitElement {
   private _selectProvider(id: string): void {
     if (id !== this._providerId) {
       this._providerId = id;
+      // Reset the model to the provider's configured default when switching.
+      const p = this._providers.find((x) => x.id === id);
+      const defaultModel = p?.model ?? this._modelId;
+      this._modelId = defaultModel;
       this.dispatchEvent(
         new CustomEvent("chat:provider-change", {
           bubbles: true,
           composed: true,
-          detail: { providerId: id },
+          detail: { providerId: id, modelId: defaultModel },
         }),
       );
     }
-    this._providerMenuOpen = false;
-    // Return focus to the composer so the user can keep typing.
-    this._focusComposer();
+    // Keep the menu open (like the tools multi-select) so the user can compare
+    // options; it closes only when clicking outside the composer.
+  }
+
+  private _selectModel(model: string): void {
+    if (model !== this._modelId) {
+      this._modelId = model;
+      this.dispatchEvent(
+        new CustomEvent("chat:model-change", {
+          bubbles: true,
+          composed: true,
+          detail: { modelId: model },
+        }),
+      );
+    }
+    // Keep the menu open (like the tools multi-select) so the user can compare
+    // options; it closes only when clicking outside the composer.
+  }
+
+  /** The thinking entry options for the active model ([] when none configured). */
+  private _thinkingOptions(): Array<{ key: string; value: string }> {
+    const model = this._effectiveModels().find((m) => m.id === this._currentModelId());
+    const thinking = model?.thinking;
+    if (!thinking) return [];
+    return Object.entries(thinking).map(([key, value]) => ({ key, value }));
+  }
+
+  /** The currently selected thinking entry, or null when the model has none. */
+  private _currentThinking(): { key: string; value: string } | null {
+    const options = this._thinkingOptions();
+    if (options.length === 0) return null;
+    const selected =
+      this._thinkingKey !== null ? options.find((o) => o.key === this._thinkingKey) : undefined;
+    return selected ?? options[0];
+  }
+
+  /** The label shown on the thinking-level selector button. */
+  private _currentThinkingLabel(): string {
+    return this._currentThinking()?.key ?? "";
+  }
+
+  /** Select a thinking entry by its key. Keeps the menu open (like the tools
+   *  multi-select) so the user can compare options; closes on outside click. */
+  private _selectThinking(key: string): void {
+    if (key !== this._thinkingKey) {
+      this._thinkingKey = key;
+      this.dispatchEvent(
+        new CustomEvent("chat:thinking-change", {
+          bubbles: true,
+          composed: true,
+          detail: { thinkingKey: key },
+        }),
+      );
+    }
   }
 
   private _onAddContent(): void {
     this.dispatchEvent(new CustomEvent("chat:add-content", { bubbles: true, composed: true }));
   }
 
-  private _toggleTools(): void {
-    this._showTools = !this._showTools;
+  /** The tool list shown in the tools dropdown (the selectable universe). */
+  private _effectiveTools(): ComposerTool[] {
+    if (this._availableTools.length) return this._availableTools;
+    return this._activeTools.map((name) => ({ name }));
+  }
+
+  /** Toggle a single tool on/off in the multi-select (keeps the menu open). */
+  private _toggleTool(name: string): void {
+    const tools = this._activeTools.includes(name)
+      ? this._activeTools.filter((t) => t !== name)
+      : [...this._activeTools, name];
+    this._activeTools = tools;
+    this.dispatchEvent(
+      new CustomEvent("chat:tools-change", {
+        bubbles: true,
+        composed: true,
+        detail: { tools },
+      }),
+    );
   }
 
   private _focusComposer(): void {
@@ -405,8 +624,7 @@ class Openp41geAgents extends LitElement {
       anchor = newStart;
     } else {
       const prevCollapsed = this._prevSelStart === this._prevSelEnd;
-      const endpointsChanged =
-        newStart !== this._prevSelStart || newEnd !== this._prevSelEnd;
+      const endpointsChanged = newStart !== this._prevSelStart || newEnd !== this._prevSelEnd;
       const anchorPreserved =
         !prevCollapsed &&
         endpointsChanged &&
@@ -594,7 +812,13 @@ class Openp41geAgents extends LitElement {
     if (!elRect.height) return fallback;
     const target = this._textNodeAtContentOffset(this._contentOffsetFromRaw(raw));
     if (!target) return fallback;
-    const rect = this._caretTargetRect(target.node, target.offset, el, elRect, getComputedStyle(el));
+    const rect = this._caretTargetRect(
+      target.node,
+      target.offset,
+      el,
+      elRect,
+      getComputedStyle(el),
+    );
     if (!rect) return fallback;
     const y = elRect.top + rect.top - el.scrollTop + rect.height / 2;
     const x = dir < 0 ? elRect.left - 10000 : elRect.right + 10000;
@@ -692,9 +916,14 @@ class Openp41geAgents extends LitElement {
    * code; an unclosed (orphan) backtick is rendered as a literal character so
    * it never switches styling to the end of the line.
    */
-  private _parseSegments(
-    text: string,
-  ): { isCode: boolean; text: string; rawStart: number; rawEnd: number; contentStart: number; contentEnd: number }[] {
+  private _parseSegments(text: string): {
+    isCode: boolean;
+    text: string;
+    rawStart: number;
+    rawEnd: number;
+    contentStart: number;
+    contentEnd: number;
+  }[] {
     const segments: {
       isCode: boolean;
       text: string;
@@ -839,7 +1068,10 @@ class Openp41geAgents extends LitElement {
     const o = Math.max(0, Math.min(offset, total));
     for (const n of nodes) {
       if (o <= n.end) {
-        return { node: n.node, offset: Math.max(0, Math.min(o - n.start, n.node.textContent!.length)) };
+        return {
+          node: n.node,
+          offset: Math.max(0, Math.min(o - n.start, n.node.textContent!.length)),
+        };
       }
     }
     const last = nodes[nodes.length - 1];
@@ -1126,15 +1358,15 @@ class Openp41geAgents extends LitElement {
     this._syncProviderMenuHeight();
   }
 
-  /** When the provider dropdown is open, size the text area so the composer can
-   *  grow to reveal the whole list (pushing the top border up when the text is
-   *  short). The list is positioned over the text area, so its measured height
-   *  becomes the content's minimum height; if the text is already taller the
-   *  list simply covers the top of it, aligned to the top. */
+  /** When a provider/model dropdown is open, size the text area so the composer
+   *  can grow to reveal the whole list (pushing the top border up when the text
+   *  is short). The list is positioned over the text area, so its measured
+   *  height becomes the content's minimum height; if the text is already taller
+   *  the list simply covers the top of it, aligned to the top. */
   private _syncProviderMenuHeight(): void {
     const content = this._contentEl;
     if (!content) return;
-    if (!this._providerMenuOpen) {
+    if (!this._menuOpen) {
       content.style.minHeight = "";
       return;
     }
@@ -1367,12 +1599,13 @@ class Openp41geAgents extends LitElement {
           box-sizing: border-box;
           background: var(--bg-primary, #1e1e1e);
           border-bottom: 1px solid var(--border-color, #2a2a2a);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
         }
         .composer-provider-menu .provider-item {
-          display: block;
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
           width: 100%;
-          padding: 5px 10px;
+          padding: 2px 10px;
           border: none;
           background: transparent;
           color: var(--text-primary, #d4d4d4);
@@ -1384,16 +1617,53 @@ class Openp41geAgents extends LitElement {
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .composer-provider-menu .provider-item:hover,
-        .composer-provider-menu .provider-item.active {
+        .composer-provider-menu .provider-item:hover {
           background: var(--bg-hover, #2a2d2e);
           color: #fff;
         }
         .composer-provider-menu .provider-item:first-child {
-          margin-top: 2px;
+          margin-top: 0;
         }
         .composer-provider-menu .provider-item:last-child {
-          margin-bottom: 2px;
+          margin-bottom: 0;
+        }
+        /* Two-row layout: provider name on the first row, base URL + model
+           count on the second. */
+        .composer-provider-menu .row-check {
+          flex: 0 0 auto;
+          width: 16px;
+          /* Height = the name line, so the icon sits centered in the first
+             row rather than across a two-row item. */
+          height: 18px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .composer-provider-menu .row-check svg,
+        .composer-tools-menu .tool-check svg {
+          width: 14px;
+          height: 14px;
+          flex: 0 0 auto;
+        }
+        .composer-provider-menu .provider-item .row-body {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        .composer-provider-menu .provider-item .row-name {
+          font-size: 11px;
+          line-height: 18px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .composer-provider-menu .provider-item .row-sub {
+          font-size: 10px;
+          line-height: 14px;
+          color: var(--text-secondary, #999);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .composer-content .composer-highlight {
           background: var(--fe-selection-bg, rgba(87, 145, 217, 0.3));
@@ -1441,28 +1711,37 @@ class Openp41geAgents extends LitElement {
           align-items: center;
           gap: 4px;
           max-width: 180px;
-          min-width: 96px;
+          width: auto;
+          height: 26px;
           background: transparent;
-          color: var(--text-primary, #d4d4d4);
+          color: var(--text-secondary, #aaa);
           border: none;
           border-radius: 4px;
           font-size: 11px;
-          padding: 3px 6px;
+          padding: 0 6px;
           outline: none;
           cursor: pointer;
           white-space: nowrap;
         }
         .composer-select:hover {
-          background: var(--bg-active, #37373d);
+          background: var(--bg-hover, #2a2d2e);
           color: #fff;
         }
         .composer-select-label {
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .composer-select-caret {
-          color: var(--text-secondary, #999);
-          font-size: 9px;
+        .composer-select.composer-model-select {
+          color: var(--text-secondary, #aaa);
+        }
+        .composer-select.composer-model-select:hover {
+          color: #fff;
+        }
+        .composer-select.composer-thinking-select {
+          color: var(--text-secondary, #aaa);
+        }
+        .composer-select.composer-thinking-select:hover {
+          color: #fff;
         }
         .composer-tool {
           flex: 0 0 auto;
@@ -1485,19 +1764,12 @@ class Openp41geAgents extends LitElement {
           background: var(--bg-hover, #2a2d2e);
           color: #fff;
         }
-        .composer-tool .tool-badge {
-          position: absolute;
-          top: -2px;
-          right: -2px;
-          min-width: 14px;
-          height: 14px;
-          padding: 0 3px;
-          border-radius: 7px;
-          background: var(--accent, #2b5a9c);
-          color: #fff;
-          font-size: 9px;
-          line-height: 14px;
-          text-align: center;
+        .composer-tool svg {
+          flex: 0 0 auto;
+          width: 16px;
+          height: 16px;
+          fill: currentColor;
+          stroke: none;
         }
         .composer-spacer {
           flex: 1 1 auto;
@@ -1516,7 +1788,10 @@ class Openp41geAgents extends LitElement {
           background: transparent;
           color: var(--text-secondary, #999);
           cursor: pointer;
-          transition: opacity 0.1s, background-color 0.1s, color 0.1s;
+          transition:
+            opacity 0.1s,
+            background-color 0.1s,
+            color 0.1s;
           user-select: none;
         }
         .composer-send:not(:disabled) {
@@ -1566,25 +1841,59 @@ class Openp41geAgents extends LitElement {
           line-height: 20px;
           font-family: inherit;
         }
-        .composer-tools {
-          padding: 6px 12px;
-          background: transparent;
-          font-size: 11px;
-          color: var(--text-secondary, #aaa);
-        }
-        .composer-tools .tools-list {
+        .composer-tools-menu .tool-item {
           display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
-          margin-top: 4px;
+          align-items: flex-start;
+          gap: 6px;
         }
-        .composer-tools .tool-chip {
-          padding: 2px 6px;
-          border-radius: 4px;
-          background: var(--bg-hover, #2a2d2e);
-          font-family: var(--font-mono, ui-monospace, monospace);
-          font-size: 10px;
+        /* Enabled tools are indicated by the checkmark, not a persistent row
+           background — otherwise every checked row stays highlighted and you
+           can't tell which one the pointer is over. */
+        .composer-provider-menu .tool-item.active {
+          background: transparent;
           color: var(--text-primary, #d4d4d4);
+        }
+        /* A clear, distinct hover highlight so you always know which row the
+           pointer is on. Declared after the .active override so it wins. */
+        .composer-provider-menu .tool-item:hover {
+          background: var(--bg-hover, #2a2d2e);
+          color: #fff;
+        }
+        .composer-tools-menu .tool-check {
+          flex: 0 0 auto;
+          width: 16px;
+          /* Height = the name line, so the icon sits centered in the first
+             row rather than across the whole two-row item. */
+          height: 18px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .composer-tools-menu .tool-body {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        .composer-tools-menu .tool-name {
+          font-size: 11px;
+          line-height: 18px;
+          color: inherit;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .composer-tools-menu .tool-desc {
+          font-size: 10px;
+          line-height: 14px;
+          color: var(--text-secondary, #999);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 240px;
+        }
+        .composer-tool.active {
+          background: var(--bg-active, #37373d);
+          color: #fff;
         }
       </style>
 
@@ -1598,7 +1907,7 @@ class Openp41geAgents extends LitElement {
         }
       </div>
 
-      <div class="composer ${this._providerMenuOpen ? "menu-open" : ""}">
+      <div class="composer ${this._menuOpen ? "menu-open" : ""}">
         <div
           class="composer-content"
           @mousedown=${() => this._focusComposer()}
@@ -1609,28 +1918,94 @@ class Openp41geAgents extends LitElement {
           @dblclick=${this._onContentDoubleClick}
         ></div>
         ${
-          this._providerMenuOpen
+          this._menuOpen === "provider"
             ? html`<div class="composer-provider-menu" role="listbox">
-                ${this._effectiveProviders().map(
-                  (p) => html`<button
-                    class="provider-item ${p.id === this._providerId ? "active" : ""}"
+                ${this._effectiveProviders().map((p) => {
+                  const active = p.id === this._providerId;
+                  return html`<button
+                    class="provider-item ${active ? "active" : ""}"
                     role="option"
-                    aria-selected="${p.id === this._providerId}"
+                    aria-selected="${active}"
                     @click=${() => this._selectProvider(p.id)}
-                  >${p.label}${p.model ? ` · ${p.model}` : ""}</button>`,
-                )}
+                  >
+                    <span class="row-check">${this._radioIcon(active)}</span
+                    ><span class="row-body">
+                      <span class="row-name">${p.label}</span>
+                      <span class="row-sub">${this._providerSub(p)}</span>
+                    </span>
+                  </button>`;
+                })}
+              </div>`
+            : ""
+        }
+        ${
+          this._menuOpen === "model"
+            ? html`<div class="composer-provider-menu" role="listbox">
+                ${this._effectiveModels().map((m) => {
+                  const active = m.id === this._currentModelId();
+                  return html`<button
+                    class="provider-item ${active ? "active" : ""}"
+                    role="option"
+                    aria-selected="${active}"
+                    @click=${() => this._selectModel(m.id)}
+                  >
+                    <span class="row-check">${this._radioIcon(active)}</span
+                    ><span class="row-body">
+                      <span class="row-name">${m.id || "Default model"}</span>
+                      <span class="row-sub">${this._modelSub(m)}</span>
+                    </span>
+                  </button>`;
+                })}
+              </div>`
+            : ""
+        }
+        ${
+          this._menuOpen === "thinking" && this._thinkingOptions().length > 0
+            ? html`<div class="composer-provider-menu" role="listbox">
+                ${this._thinkingOptions().map((option) => {
+                  const active = option.key === this._currentThinking()?.key;
+                  return html`<button
+                    class="provider-item ${active ? "active" : ""}"
+                    role="option"
+                    aria-selected="${active}"
+                    @click=${() => this._selectThinking(option.key)}
+                  >
+                    <span class="row-check">${this._radioIcon(active)}</span
+                    ><span class="row-body"
+                      ><span class="row-name">${option.key}</span
+                      >${option.value ? html`<span class="row-sub">${option.value}</span>` : ""}</span
+                    >
+                  </button>`;
+                })}
+              </div>`
+            : ""
+        }
+        ${
+          this._menuOpen === "tools"
+            ? html`<div
+                class="composer-provider-menu composer-tools-menu"
+                role="listbox"
+                aria-multiselectable="true"
+              >
+                ${this._effectiveTools().map((t) => {
+                  const active = this._activeTools.includes(t.name);
+                  return html`<button
+                    class="provider-item tool-item ${active ? "active" : ""}"
+                    role="option"
+                    aria-selected="${active}"
+                    @click=${() => this._toggleTool(t.name)}
+                  >
+                    <span class="tool-check">${this._checkboxIcon(active)}</span
+                    ><span class="tool-body"
+                      ><span class="tool-name">${t.name}</span
+                      >${t.description ? html`<span class="tool-desc">${t.description}</span>` : ""}</span
+                    >
+                  </button>`;
+                })}
               </div>`
             : ""
         }
         <div class="composer-toolbar">
-          <button
-            class="composer-select"
-            title="Provider / model"
-            @click=${() => this._toggleProviderMenu()}
-          >
-            <span class="composer-select-label">${this._currentProviderLabel()}</span>
-            <span class="composer-select-caret">▾</span>
-          </button>
           <button
             class="composer-tool"
             title="Add files or content"
@@ -1639,14 +2014,40 @@ class Openp41geAgents extends LitElement {
             ＋
           </button>
           <button
-            class="composer-tool"
-            title="Active tools"
-            @click=${() => this._toggleTools()}
+            class="composer-select"
+            title="Provider"
+            @click=${() => this._toggleMenu("provider")}
           >
-            ⚙
-            ${this._activeTools.length
-              ? html`<span class="tool-badge">${this._activeTools.length}</span>`
-              : ""}
+            <span class="composer-select-label">${this._currentProviderLabel()}</span>
+          </button>
+          <button
+            class="composer-select composer-model-select"
+            title="Model"
+            @click=${() => this._toggleMenu("model")}
+          >
+            <span class="composer-select-label">${this._currentModelLabel()}</span>
+          </button>
+          ${
+            this._thinkingOptions().length > 0
+              ? html`<button
+                  class="composer-select composer-thinking-select"
+                  title="Thinking level"
+                  @click=${() => this._toggleMenu("thinking")}
+                >
+                  <span class="composer-select-label">${this._currentThinkingLabel()}</span>
+                </button>`
+              : ""
+          }
+          <button
+            class="composer-tool ${this._menuOpen === "tools" ? "active" : ""}"
+            title="Active tools"
+            @click=${() => this._toggleMenu("tools")}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+              <path
+                d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"
+              />
+            </svg>
           </button>
           <span class="composer-spacer"></span>
           ${
@@ -1680,24 +2081,6 @@ class Openp41geAgents extends LitElement {
                 </button>`
           }
         </div>
-        ${
-          this._showTools
-            ? html`<div class="composer-tools">
-                <div>
-                  ${this._activeTools.length
-                    ? `Active tools for this chat:`
-                    : `No active tools configured.`}
-                </div>
-                ${this._activeTools.length
-                  ? html`<div class="tools-list">
-                      ${this._activeTools.map(
-                        (t) => html`<span class="tool-chip">${t}</span>`,
-                      )}
-                    </div>`
-                  : ""}
-              </div>`
-            : ""
-        }
         <textarea
           class="chat-input composer-input"
           rows="1"

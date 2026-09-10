@@ -113,6 +113,11 @@ describe("AgentsController", () => {
             vllm: { baseUrl: "http://localhost:8000/v1", model: "vicuna-13b", name: "vLLM" },
           },
         }),
+        listTools: async () => [
+          { name: "read_file", description: "Read a file." },
+          { name: "search_files", description: "Search files." },
+          { name: "run_command", description: "Run a command." },
+        ],
       },
     };
     (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";

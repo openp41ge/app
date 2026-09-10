@@ -74,7 +74,7 @@ export class AgentsOpenHandler {
     // Step 2 + 3: set the pending chat id so AgentsController mount picks it
     // up, then open a preview (replaces the cell's preview slot when unpinned)
     // or a permanent tab.
-    // The tab handle reads "Agents" (not the chat's title); the pane itself loads
+    // The tab handle reads "Agent" (not the chat's title); the pane itself loads
     // the chat by chatId and shows its own header/title.
     (window as unknown as Record<string, unknown>).__pendingChatId = chatId;
     log.info("open chat tab", chatId, pinned ? "pinned" : "unpinned");
@@ -82,7 +82,7 @@ export class AgentsOpenHandler {
       "actionOpenFile",
       myWindowId,
       "agents",
-      "Agents",
+      "Agent",
       chatId,
       targetCol,
       pinned,

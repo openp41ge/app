@@ -33,6 +33,8 @@ export interface ChatStreamRequest {
   messages: ChatMessage[];
   tools?: ToolDefinition[];
   signal?: AbortSignal;
+  /** Reasoning-effort level selected in the composer ("Off"/"Low"/"Medium"/"High"). */
+  thinking?: string;
 }
 
 /** A single provider implementation (registry/strategy based — Open/Closed). */

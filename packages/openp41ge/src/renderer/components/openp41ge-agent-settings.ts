@@ -47,7 +47,54 @@ type ProviderDraft = Omit<ProviderConfig, "temperature" | "maxTokens"> & {
 };
 
 /** A draft model config in the second-layer model drawer. */
-type ModelDraft = { id: string };
+type ModelDraft = {
+  id: string;
+  input?: string[];
+  thinking?: Array<{ key: string; value: string }>;
+  maxTokens?: number | string;
+  contextWindow?: number | string;
+};
+
+/** Copy the model-drawer draft into a ModelConfig (only defined fields). */
+function modelConfigFromDraft(draft: ModelDraft): ModelConfig {
+  const m: ModelConfig = { id: draft.id.trim() };
+  if (draft.input !== undefined) m.input = draft.input.filter((s) => s.trim() !== "");
+  if (draft.thinking !== undefined) {
+    m.thinking = Object.fromEntries(
+      draft.thinking.map((p) => [p.key.trim(), p.value] as const).filter(([k]) => k !== ""),
+    );
+  }
+  const maxTokens = Number(draft.maxTokens ?? "");
+  if (
+    draft.maxTokens !== undefined &&
+    String(draft.maxTokens).trim() !== "" &&
+    !Number.isNaN(maxTokens)
+  ) {
+    m.maxTokens = maxTokens;
+  }
+  const ctx = Number(draft.contextWindow ?? "");
+  if (
+    draft.contextWindow !== undefined &&
+    String(draft.contextWindow).trim() !== "" &&
+    !Number.isNaN(ctx)
+  ) {
+    m.contextWindow = ctx;
+  }
+  return m;
+}
+
+/** Copy a ModelConfig into a model-drawer draft (load for editing). */
+function draftFromModelConfig(model?: ModelConfig): ModelDraft {
+  return {
+    id: model?.id ?? "",
+    input: model?.input ? [...model.input] : undefined,
+    thinking: model?.thinking
+      ? Object.entries(model.thinking).map(([key, value]) => ({ key, value }))
+      : undefined,
+    maxTokens: model?.maxTokens ?? undefined,
+    contextWindow: model?.contextWindow ?? undefined,
+  };
+}
 
 /** A provider drawer: edits one provider connection. */
 interface ProviderDrawerState {
@@ -483,14 +530,57 @@ export class Openp41geAgentSettings extends LitElement {
     const maxTokens = this._numberValue(String(draft.maxTokens ?? ""));
     if (maxTokens !== undefined) config.maxTokens = maxTokens;
     if (draft.models !== undefined) {
-      config.models = draft.models.map((m) => ({ id: m.id }));
+      config.models = draft.models.map((m) => ({ ...m }));
     }
     return config;
   }
 
-  /** Clicking anywhere on a field card focuses its input. */
+  /** Clicking on a field card focuses the clicked half/row, or — when the
+   *  card has multiple rows and the click lands on whitespace — plays a
+   *  cascade highlight across each row to show where to click.
+   *  Single-row cards just focus that row's input. */
   private _focusCardInput(e: Event): void {
-    (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>("input")?.focus();
+    const target = e.target as HTMLElement | null;
+    const card = e.currentTarget as HTMLElement;
+    // Ignore clicks on add/remove buttons.
+    if (target?.closest("button")) return;
+    // A key/value half — focus that specific side's input.
+    const half = target?.closest("[data-half]") as HTMLElement | null;
+    if (half) {
+      (half.querySelector("input") as HTMLInputElement | null)?.focus();
+      return;
+    }
+    // A single-input row — focus its input.
+    const row = target?.closest(".ags-kv-row") as HTMLElement | null;
+    if (row) {
+      (row.querySelector("input") as HTMLInputElement | null)?.focus();
+      return;
+    }
+    // Clicked card whitespace.
+    const rows = [...card.querySelectorAll<HTMLElement>(".ags-kv-row")];
+    if (rows.length === 0) {
+      (card.querySelector("input") as HTMLInputElement | null)?.focus();
+      return;
+    }
+    if (rows.length > 1) {
+      this._cascadeRows(rows);
+    } else {
+      (rows[0].querySelector("input") as HTMLInputElement | null)?.focus();
+    }
+  }
+
+  /** Sequentially flash each row's background to point out where to click.
+   *  Rows use an overlapping start offset, so the next row fades in while the
+   *  previous is still fading out (rather than one-after-another). */
+  private _cascadeRows(rows: HTMLElement[]): void {
+    const DUR = 520;
+    const START = 240;
+    rows.forEach((row, i) => {
+      window.setTimeout(() => {
+        row.classList.add("ags-row-flash");
+        window.setTimeout(() => row.classList.remove("ags-row-flash"), DUR);
+      }, i * START);
+    });
   }
 
   private _closeDrawer(id: string): void {
@@ -678,19 +768,19 @@ export class Openp41geAgentSettings extends LitElement {
     const providerDrawer = this._drawers.find((x) => x.id === d.providerDrawerId);
     if (!providerDrawer || providerDrawer.kind !== "provider") return;
     const id = d.draft.id.trim();
-    const models = (providerDrawer.draft.models ?? []).map((m) => ({ id: m.id }));
+    const models = (providerDrawer.draft.models ?? []).map((m) => ({ ...m }));
     let draft = providerDrawer.draft;
     if (d.modelIndex === null) {
       // Adding: only commit a non-empty id; never hijack the default model.
       if (!id) return;
-      models.push({ id });
+      models.push(modelConfigFromDraft(d.draft));
       draft = { ...providerDrawer.draft, models };
     } else {
       // Editing: only commit a non-empty id; clearing to empty is left to the
       // Delete button, so an accidental backspace doesn't drop a model.
       if (!id) return;
       const oldId = models[d.modelIndex]?.id ?? null;
-      models[d.modelIndex] = { id };
+      models[d.modelIndex] = modelConfigFromDraft(d.draft);
       draft = { ...providerDrawer.draft, models };
       if (draft.model === oldId) draft = { ...draft, model: id };
     }
@@ -1350,6 +1440,112 @@ export class Openp41geAgentSettings extends LitElement {
         .ags-input--mono {
           font-family: ui-monospace, "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
         }
+        .ags-kv-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+          padding: 8px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+        .ags-kv-row:hover {
+          background: var(--bg-active, #37373d);
+        }
+        .ags-kv-row:first-child {
+          margin-top: 4px;
+        }
+        .ags-kv-row input {
+          padding: 0;
+        }
+        .ags-kv-row .ags-input--grow {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+        .ags-kv-row--thinking {
+          gap: 0;
+        }
+        .ags-kv-half {
+          flex: 1 1 auto;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          height: 100%;
+        }
+        .ags-kv-half--key {
+          flex: 1 1 40%;
+        }
+        .ags-kv-half--value {
+          flex: 1 1 60%;
+        }
+        .ags-kv-half input {
+          width: 100%;
+          padding: 0;
+        }
+        .ags-kv-half--value input {
+          padding-left: 10px;
+        }
+        .ags-kv-divider {
+          flex: 0 0 1px;
+          align-self: stretch;
+          background: var(--divider, #2f3031);
+        }
+        .ags-kv-row--thinking .ags-remove-btn {
+          margin-left: 8px;
+        }
+        .ags-kv-row.ags-row-flash {
+          animation: ags-cascade-flash 0.5s ease;
+        }
+        @keyframes ags-cascade-flash {
+          0% {
+            background: transparent;
+          }
+          35% {
+            background: var(--bg-active, #37373d);
+          }
+          100% {
+            background: transparent;
+          }
+        }
+        .ags-remove-btn {
+          flex: 0 0 auto;
+          width: 26px;
+          height: 26px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          line-height: 1;
+          color: var(--text-secondary, #999);
+          background: transparent;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 16px;
+          font-family: inherit;
+        }
+        .ags-remove-btn:hover {
+          background: var(--bg-active, #37373d);
+          color: #fff;
+        }
+        .ags-add-btn {
+          margin-top: 4px;
+          width: 100%;
+          box-sizing: border-box;
+          padding: 6px 10px;
+          color: var(--accent, #569cd6);
+          background: transparent;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 13px;
+          font-family: inherit;
+          text-align: left;
+        }
+        .ags-add-btn:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--accent, #569cd6);
+        }
         .ags-test-row {
           margin-top: 18px;
           max-width: 620px;
@@ -1410,6 +1606,7 @@ export class Openp41geAgentSettings extends LitElement {
           border-radius: 6px;
           white-space: pre-wrap;
         }
+        /* Dangerous delete card (model / provider). */
       </style>
 
       <div class="ags-root">
@@ -1639,12 +1836,12 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   /** The DANGEROUS section card — delete lives here as an icon action row. */
-  private _dangerousCard(d: DrawerState): TemplateResult {
+  private _dangerousCard(d: DrawerState): TemplateResult | typeof nothing {
     const canDelete = d.kind === "model" ? d.modelIndex !== null : d.editId !== null;
     if (!canDelete) return nothing;
     const isModel = d.kind === "model";
     // A single row: the description IS the action text, and the delete button
-    // sits beside it. No separate explanation paragraph or divider.
+    // sits beside it. Matches the other dangerous action cards.
     const description = isModel
       ? "Delete this model permanently."
       : "Delete this provider permanently.";
@@ -2104,6 +2301,10 @@ export class Openp41geAgentSettings extends LitElement {
           completions. Press Enter to save.
         </p>
       </div>
+      <div class="ags-section-title">Model capabilities</div>
+      ${this._modelInputCard(d)} ${this._modelThinkingCard(d)}
+      <div class="ags-section-title">Limits</div>
+      ${this._modelMaxTokensCard(d)} ${this._modelContextWindowCard(d)}
       <div class="ags-section-title">Dangerous</div>
       ${this._dangerousCard(d)}
     `;
@@ -2115,6 +2316,182 @@ export class Openp41geAgentSettings extends LitElement {
     const draft = { ...cur.draft, ...patch };
     const title = draft.id.trim() ? draft.id.trim() : cur.title;
     this._updateDrawer(d.id, { draft, title });
+  }
+
+  /** Set one string in the model's input list. */
+  private _setModelInput(d: ModelDrawerState, index: number, value: string): void {
+    const input = [...(d.draft.input ?? [])];
+    input[index] = value;
+    this._setModelDraft(d, { input });
+  }
+  private _addModelInput(d: ModelDrawerState): void {
+    this._setModelDraft(d, { input: [...(d.draft.input ?? []), ""] });
+    void this.updateComplete.then(() => this._focusLastKv(".ags-model-input-card"));
+  }
+  private _removeModelInput(d: ModelDrawerState, index: number): void {
+    const input = [...(d.draft.input ?? [])];
+    input.splice(index, 1);
+    this._setModelDraft(d, { input });
+  }
+
+  /** The thinking config as an ordered list of key/value entries. */
+  private _thinkingEntries(d: ModelDrawerState): Array<{ key: string; value: string }> {
+    return d.draft.thinking ?? [];
+  }
+  private _setModelThinkingKey(d: ModelDrawerState, index: number, key: string): void {
+    const entries = this._thinkingEntries(d).map((p, i) => (i === index ? { ...p, key } : p));
+    this._setModelDraft(d, { thinking: entries });
+  }
+  private _setModelThinkingValue(d: ModelDrawerState, index: number, value: string): void {
+    const entries = this._thinkingEntries(d).map((p, i) => (i === index ? { ...p, value } : p));
+    this._setModelDraft(d, { thinking: entries });
+  }
+  private _addModelThinking(d: ModelDrawerState): void {
+    this._setModelDraft(d, { thinking: [...this._thinkingEntries(d), { key: "", value: "" }] });
+    void this.updateComplete.then(() => this._focusLastKv(".ags-model-thinking-card"));
+  }
+  private _removeModelThinking(d: ModelDrawerState, index: number): void {
+    const entries = this._thinkingEntries(d);
+    entries.splice(index, 1);
+    this._setModelDraft(d, { thinking: entries });
+  }
+
+  /** Focus the last kv-row input inside a model-drawer card. */
+  private _focusLastKv(cardClass: string): void {
+    const card = this.shadowRoot?.querySelector(cardClass);
+    const inputs = card?.querySelectorAll<HTMLInputElement>(".ags-kv-row input");
+    const last = inputs?.[inputs.length - 1];
+    last?.focus();
+  }
+
+  private _modelInputCard(d: ModelDrawerState): TemplateResult {
+    const input = d.draft.input ?? [];
+    return html`
+      <div
+        class="ags-card ags-input-card ags-card-gap ags-model-input-card"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
+        <label class="ags-card-question">Input</label>
+        <p class="ags-card-help">A list of strings describing this model's accepted input.</p>
+        ${input.map(
+          (val, i) => html`
+            <div class="ags-kv-row ags-input-row">
+              <input
+                class="ags-input ags-input--grow"
+                type="text"
+                placeholder="e.g. text"
+                .value=${val}
+                @input=${(e: Event) => this._setModelInput(d, i, (e.target as HTMLInputElement).value)}
+              />
+              <button
+                class="ags-remove-btn"
+                title="Remove"
+                @click=${() => this._removeModelInput(d, i)}
+              >
+                ×
+              </button>
+            </div>
+          `,
+        )}
+        <button class="ags-add-btn" @click=${() => this._addModelInput(d)}>＋ Add input</button>
+      </div>
+    `;
+  }
+
+  private _modelThinkingCard(d: ModelDrawerState): TemplateResult {
+    const entries = this._thinkingEntries(d);
+    return html`
+      <div
+        class="ags-card ags-input-card ags-card-gap ags-model-thinking-card"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
+        <label class="ags-card-question">Thinking</label>
+        <p class="ags-card-help">Key/value pairs describing this model's thinking configuration.</p>
+        ${entries.map(
+          (e, i) => html`
+            <div class="ags-kv-row ags-kv-row--thinking">
+              <div class="ags-kv-half ags-kv-half--key" data-half="key">
+                <input
+                  class="ags-input ags-kv-key"
+                  type="text"
+                  placeholder="key"
+                  .value=${e.key}
+                  @input=${(ev: Event) => this._setModelThinkingKey(d, i, (ev.target as HTMLInputElement).value)}
+                />
+              </div>
+              <div class="ags-kv-divider"></div>
+              <div class="ags-kv-half ags-kv-half--value" data-half="value">
+                <input
+                  class="ags-input ags-kv-value"
+                  type="text"
+                  placeholder="value"
+                  .value=${e.value}
+                  @input=${(ev: Event) => this._setModelThinkingValue(d, i, (ev.target as HTMLInputElement).value)}
+                />
+              </div>
+              <button
+                class="ags-remove-btn"
+                title="Remove"
+                @click=${() => this._removeModelThinking(d, i)}
+              >
+                ×
+              </button>
+            </div>
+          `,
+        )}
+        <button class="ags-add-btn" @click=${() => this._addModelThinking(d)}>＋ Add pair</button>
+      </div>
+    `;
+  }
+
+  private _modelMaxTokensCard(d: ModelDrawerState): TemplateResult {
+    return html`
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
+        <label class="ags-card-question">What is the max tokens?</label>
+        <input
+          class="ags-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="e.g. 8192"
+          .value=${this._numDisplay(d.draft.maxTokens)}
+          @input=${(e: Event) =>
+            this._setModelDraft(d, {
+              maxTokens: this._sanitizeInt((e.target as HTMLInputElement).value),
+            })}
+        />
+        <p class="ags-card-help">Optional. Caps the number of output tokens for this model.</p>
+      </div>
+    `;
+  }
+
+  private _modelContextWindowCard(d: ModelDrawerState): TemplateResult {
+    return html`
+      <div
+        class="ags-card ags-input-card ags-card-gap"
+        style="max-width:620px;"
+        @click=${this._focusCardInput}
+      >
+        <label class="ags-card-question">What is the context window?</label>
+        <input
+          class="ags-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="e.g. 128000"
+          .value=${this._numDisplay(d.draft.contextWindow)}
+          @input=${(e: Event) =>
+            this._setModelDraft(d, {
+              contextWindow: this._sanitizeInt((e.target as HTMLInputElement).value),
+            })}
+        />
+        <p class="ags-card-help">Optional. The context window size in tokens.</p>
+      </div>
+    `;
   }
 
   private _openAddModel(providerDrawerId: string): void {
@@ -2149,7 +2526,7 @@ export class Openp41geAgentSettings extends LitElement {
         providerDrawerId,
         modelIndex,
         title: model.id,
-        draft: { id: model.id },
+        draft: draftFromModelConfig(model),
       },
     ];
     void this.updateComplete.then(() => this._focusModelId());

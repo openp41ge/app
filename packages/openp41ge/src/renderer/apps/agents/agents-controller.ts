@@ -38,6 +38,8 @@ export class AgentsController extends BaseController implements TabController {
   private _component: Openp41geAgents | null = null;
   private _unsubscribers: Array<() => void> = [];
   private _boundHandlers: Array<{ type: string; handler: EventListener }> = [];
+  /** Tools currently enabled for this chat (the composer multi-select). */
+  private _activeTools: string[] = [];
 
   constructor(tabId: string, appType: string) {
     super(tabId, appType);
@@ -69,9 +71,11 @@ export class AgentsController extends BaseController implements TabController {
     // Wire send/abort.
     el.addEventListener("chat:send", this._onSend as EventListener);
     el.addEventListener("chat:abort", this._onAbort as EventListener);
+    el.addEventListener("chat:tools-change", this._onToolsChange as EventListener);
     this._boundHandlers.push(
       { type: "chat:send", handler: this._onSend as EventListener },
       { type: "chat:abort", handler: this._onAbort as EventListener },
+      { type: "chat:tools-change", handler: this._onToolsChange as EventListener },
     );
 
     // Open the chat (opened-once bookkeeping) and fetch its transcript.
@@ -168,27 +172,96 @@ export class AgentsController extends BaseController implements TabController {
   /** Populate the composer's provider/model selector and active-tools list. */
   private async _loadComposerContext(activeProviderId: string): Promise<void> {
     // v1 toolset exposed by the backend executor (main process).
-    const ACTIVE_TOOLS = ["read_file", "search_files", "run_command"];
+    const DEFAULT_TOOLS: Array<{ name: string; description: string }> = [
+      { name: "read_file", description: "Read the contents of a text file." },
+      { name: "search_files", description: "Search for files matching a substring." },
+      { name: "run_command", description: "Run a shell command in the working directory." },
+    ];
     try {
       const cfg = await window.openp41ge.chat.getAgentConfig();
-      const providers = Object.entries(cfg.providers).map(([id, p]) => ({
-        id,
-        label: (p as { name?: string }).name ?? id,
-        model: p.model ?? "",
-      }));
+      const providers = Object.entries(cfg.providers).map(([id, p]) => {
+        const pv = p as {
+          name?: string;
+          model?: string;
+          baseUrl?: string;
+          models?: Array<{
+            id: string;
+            thinking?: Record<string, string>;
+            contextWindow?: number;
+            maxTokens?: number;
+          }>;
+        };
+        return {
+          id,
+          label: pv.name ?? id,
+          model: pv.model ?? "",
+          models: (pv.models ?? []).map((m) => ({
+            id: m.id,
+            thinking: m.thinking,
+            contextWindow: m.contextWindow,
+            maxTokens: m.maxTokens,
+          })),
+          baseUrl: pv.baseUrl ?? "",
+        };
+      });
       if (!providers.some((p) => p.id === activeProviderId)) {
-        providers.push({ id: activeProviderId, label: activeProviderId, model: "" });
+        providers.push({
+          id: activeProviderId,
+          label: activeProviderId,
+          model: "",
+          models: [],
+          baseUrl: "",
+        });
       }
-      this._component?.setComposerContext({ providers, activeProviderId, activeTools: ACTIVE_TOOLS });
+      const active = providers.find((p) => p.id === activeProviderId);
+      // Resolve the selectable toolset from the backend registry. Fall back to
+      // the built-in set when the IPC is unavailable, so the composer always
+      // has a list to show.
+      let availableTools: Array<{ name: string; description: string }> = [];
+      try {
+        availableTools = await window.openp41ge.chat.listTools();
+      } catch {
+        availableTools = [];
+      }
+      if (!availableTools.length) availableTools = [...DEFAULT_TOOLS];
+      // Preserve any user selection; otherwise default to the whole set.
+      if (this._activeTools.length) {
+        this._activeTools = this._activeTools.filter((n) =>
+          availableTools.some((t) => t.name === n),
+        );
+      } else {
+        this._activeTools = availableTools.map((t) => t.name);
+      }
+      this._component?.setComposerContext({
+        providers,
+        activeProviderId,
+        activeModelId: active?.model ?? "",
+        availableTools,
+        activeTools: this._activeTools,
+      });
     } catch (err) {
       log.warn("failed to load agent composer context", (err as Error).message);
     }
   }
 
+  private _onToolsChange = (e: Event): void => {
+    const tools = (e as CustomEvent<{ tools?: string[] }>).detail?.tools;
+    if (tools) this._activeTools = tools;
+  };
+
   private _onSend = (e: Event): void => {
-    const text = (e as CustomEvent<{ text?: string }>).detail?.text;
+    const detail = (e as CustomEvent<{ text?: string; thinkingLevel?: string }>).detail;
+    const text = detail?.text;
     if (!text) return;
-    void this._runtimeModel.send(this.chatId, text, this._cwd);
+    // Only forward a thinking level when the composer provided one (i.e. the
+    // active model has thinking entries). When absent, nothing is sent.
+    void this._runtimeModel.send(
+      this.chatId,
+      text,
+      this._cwd,
+      this._activeTools,
+      detail?.thinkingLevel,
+    );
   };
 
   private _onAbort = (): void => {

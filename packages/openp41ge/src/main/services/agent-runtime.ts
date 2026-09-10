@@ -64,7 +64,20 @@ export class AgentRuntime {
     return this._streaming.has(chatId);
   }
 
-  async send(chatId: string, winId: string, userText: string, cwd?: string): Promise<void> {
+  /** Name + description of all tools registered in the runtime (for the
+   *  composer selector, which shows a name row and a description row). */
+  listTools(): Array<{ name: string; description: string }> {
+    return this._tools.list().map((t) => ({ name: t.name, description: t.description }));
+  }
+
+  async send(
+    chatId: string,
+    winId: string,
+    userText: string,
+    cwd?: string,
+    enabledTools?: string[],
+    thinkingLevel?: string,
+  ): Promise<void> {
     const text = userText.trim();
     if (!text) return;
     if (this._streaming.has(chatId)) return;
@@ -129,7 +142,15 @@ export class AgentRuntime {
       this._setStatus(winId, chatId, { streaming: true, providerOk: ping });
 
       // 3. Agent loop.
-      await this._runLoop(chatId, winId, provider, controller.signal, cwd);
+      await this._runLoop(
+        chatId,
+        winId,
+        provider,
+        controller.signal,
+        cwd,
+        enabledTools,
+        thinkingLevel,
+      );
 
       this._setStatus(winId, chatId, { streaming: false, providerOk: ping });
     } catch (err) {
@@ -167,6 +188,8 @@ export class AgentRuntime {
     provider: ChatProvider,
     signal: AbortSignal,
     cwd?: string,
+    enabledTools?: string[],
+    thinkingLevel?: string,
   ): Promise<void> {
     let turns = 0;
     while (!signal.aborted && turns < AGENT_MAX_TURNS) {
@@ -185,10 +208,15 @@ export class AgentRuntime {
       let toolCalls: PendingToolCall[] = [];
       let currentAssistant: ChatMessage | null = null;
 
+      const toolDefs = this._tools.definitions();
+      const tools = enabledTools?.length
+        ? toolDefs.filter((t) => enabledTools.includes(t.name))
+        : toolDefs;
       for await (const delta of provider.streamChat({
         messages: requestMessages,
-        tools: this._tools.definitions(),
+        tools,
         signal,
+        thinking: thinkingLevel,
       })) {
         if (signal.aborted) break;
         if (delta.type === "text" && delta.text) {

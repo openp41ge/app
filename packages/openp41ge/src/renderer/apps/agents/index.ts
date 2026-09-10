@@ -12,7 +12,7 @@ import { AgentsController } from "./agents-controller";
 
 export const agentsAppRegistration: AppTypeRegistration = {
   id: "agents",
-  label: "Agents",
+  label: "Agent",
   icon: "\uD83E\uDD16",
   description: "Chat with an AI coding agent",
   createController: (tabId: string) => new AgentsController(tabId, "agents"),

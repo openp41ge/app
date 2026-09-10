@@ -305,7 +305,7 @@ declare global {
         archive: (id: string) => Promise<boolean>;
         rename: (id: string, title: string) => Promise<Chat | null>;
         search: (q: string, opts?: ChatSearchOptions) => Promise<ChatSearchResult[]>;
-        send: (id: string, text: string, cwd?: string) => Promise<void>;
+        send: (id: string, text: string, cwd?: string, tools?: string[], thinkingLevel?: string) => Promise<void>;
         abort: (id: string) => Promise<void>;
         open: (id: string) => Promise<void>;
         close: (id: string) => Promise<void>;
@@ -321,6 +321,7 @@ declare global {
           providerId: string;
           providers: Record<string, { baseUrl: string; model: string; apiKey?: string }>;
         }>;
+        listTools: () => Promise<Array<{ name: string; description: string }>>;
 
         onChanged: (callback: () => void) => () => void;
         onDelta: (callback: (payload: ChatDeltaPayload) => void) => () => void;
