@@ -600,21 +600,11 @@ class Openp41geAgents extends LitElement {
     let top = parseFloat(cs.paddingTop);
     let caretH = 14;
     if (target) {
-      try {
-        const range = document.createRange();
-        range.setStart(target.node, target.offset);
-        range.setEnd(target.node, target.offset);
-        const rects = Array.from(range.getClientRects());
-        if (rects.length) {
-          const r = rects[0];
-          left = r.left - elRect.left + el.scrollLeft;
-          top = r.top - elRect.top + el.scrollTop;
-          // Center a 14px caret within the measured line box.
-          if (r.height) caretH = Math.max(12, Math.min(20, r.height));
-          top += (caretH - 14) / 2;
-        }
-      } catch {
-        /* measurement failures are best-effort */
+      const rect = this._caretTargetRect(target.node, target.offset, el, elRect, cs);
+      if (rect) {
+        left = rect.left;
+        top = rect.top;
+        caretH = rect.height;
       }
     }
     if (!caret) {
@@ -626,6 +616,105 @@ class Openp41geAgents extends LitElement {
     caret.style.left = `${Math.max(0, left)}px`;
     caret.style.top = `${Math.max(0, top)}px`;
     caret.style.height = `${Math.round(caretH)}px`;
+  }
+
+  /**
+   * Compute the rendered caret rectangle (content-relative left/top/height) for
+   * a content offset. A collapsed Range normally yields a usable rect, but on a
+   * blank line (two consecutive newlines) there is no glyph at the caret, so
+   * the collapsed Range is empty and the caret would snap to the first line.
+   * In that case we anchor to the nearest rendered line and step by whole line
+   * boxes so the caret still rides the blank line it is actually on.
+   */
+  private _caretTargetRect(
+    node: Text,
+    offset: number,
+    el: HTMLElement,
+    elRect: DOMRect,
+    cs: CSSStyleDeclaration,
+  ): { left: number; top: number; height: number } | null {
+    const lineHeight = parseFloat(cs.lineHeight) || 20;
+
+    // Fast path: a collapsed Range at the caret normally has a rect.
+    try {
+      const range = document.createRange();
+      range.setStart(node, offset);
+      range.setEnd(node, offset);
+      const rects = Array.from(range.getClientRects());
+      if (rects.length) {
+        const r = rects[0];
+        let h = 14;
+        if (r.height) h = Math.max(12, Math.min(20, r.height));
+        return {
+          left: r.left - elRect.left + el.scrollLeft,
+          top: r.top - elRect.top + el.scrollTop + (h - 14) / 2,
+          height: h,
+        };
+      }
+    } catch {
+      /* best-effort */
+    }
+
+    // Blank line: no glyph at the caret. Anchor to a neighbouring rendered
+    // line and step by whole line boxes to the caret's (blank) line. All of the
+    // values below are content coordinates (scroll already folded in), so the
+    // returned top is used directly as the absolutely positioned caret's top.
+    const data = node.data;
+    const padLeft = parseFloat(cs.paddingLeft);
+    const lineBoxTop = (charIndex: number): number | null => {
+      if (charIndex < 0 || charIndex >= data.length) return null;
+      try {
+        const r = document.createRange();
+        r.setStart(node, charIndex);
+        r.setEnd(node, charIndex + 1);
+        const rs = Array.from(r.getClientRects());
+        if (!rs.length) return null;
+        const cr = rs[0];
+        const charTop = cr.top - elRect.top + el.scrollTop;
+        // Convert the character box top to its line box top (the character is
+        // vertically centered within the line box).
+        return charTop - (lineHeight - cr.height) / 2;
+      } catch {
+        return null;
+      }
+    };
+
+    // The newline *at* the caret is the last glyph of the blank line the caret
+    // is on, so a Range over it lands on that blank line's box (e.g. the caret
+    // sits just before a trailing newline with nothing but newlines after it).
+    if (offset < data.length && data[offset] === "\n") {
+      const hereBoxTop = lineBoxTop(offset);
+      if (hereBoxTop != null) {
+        const caretTop = hereBoxTop + (lineHeight - 14) / 2;
+        return { left: padLeft, top: caretTop, height: 14 };
+      }
+    }
+
+    // Forward: the caret sits on a blank line above the next rendered line.
+    let next = offset;
+    while (next < data.length && data[next] === "\n") next++;
+    if (next < data.length) {
+      const nextLineTop = lineBoxTop(next);
+      if (nextLineTop != null) {
+        const blankCount = next - offset;
+        const caretTop = nextLineTop - blankCount * lineHeight + (lineHeight - 14) / 2;
+        return { left: padLeft, top: caretTop, height: 14 };
+      }
+    }
+
+    // Backward: the caret is on a trailing blank line at the end of the text.
+    let prev = Math.min(offset, data.length) - 1;
+    while (prev >= 0 && data[prev] === "\n") prev--;
+    if (prev >= 0) {
+      const prevLineTop = lineBoxTop(prev);
+      if (prevLineTop != null) {
+        const trailingNewlines = data.length - (prev + 1);
+        const caretTop = prevLineTop + trailingNewlines * lineHeight + (lineHeight - 14) / 2;
+        return { left: padLeft, top: caretTop, height: 14 };
+      }
+    }
+
+    return null;
   }
 
   /**
