@@ -593,6 +593,42 @@ describe("Openp41geAgents (custom element)", () => {
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(4);
   });
 
+  it("re-anchors the caret to the top when Cmd+Shift+Up undoes Cmd+Shift+Down", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "aaa\nbbb\nccc";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    // Anchor the caret at 4 (start of "bbb") — previous selection is 4,4.
+    inputEl.setSelectionRange(4, 4);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Cmd+Shift+Down selects 4..end with the browser leaving direction "none";
+    // the caret rides the (moving) end at 11.
+    inputEl.setSelectionRange(4, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(4);
+
+    // Cmd+Shift+Up re-anchors to the top: 0..4, both endpoints moved. The caret
+    // must ride the leading edge (0) back to the top, not freeze at the anchor.
+    inputEl.setSelectionRange(0, 4);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(4);
+    expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")?.textContent).toBe("aaa\n");
+  });
+
   it("setProviderStatus shows a status strip when unreachable", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);

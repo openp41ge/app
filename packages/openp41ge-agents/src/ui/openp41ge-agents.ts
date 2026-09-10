@@ -331,6 +331,7 @@ class Openp41geAgents extends LitElement {
     this._selStart = ta.selectionStart;
     this._selEnd = ta.selectionEnd;
     this._caretRaw = ta.selectionEnd;
+    this._selAnchor = ta.selectionEnd;
     this._prevSelStart = ta.selectionStart;
     this._prevSelEnd = ta.selectionEnd;
     this._renderComposerContent();
@@ -345,14 +346,22 @@ class Openp41geAgents extends LitElement {
     const newEnd = ta.selectionEnd;
     this._selStart = newStart;
     this._selEnd = newEnd;
-    // The focus/moving edge of a Shift+arrow selection is `selectionEnd` when
-    // selecting forward and `selectionStart` when selecting backward. Place the
-    // rendered caret on that moving edge so it tracks the actual caret.
-    const dir = ta.selectionDirection;
-    if (dir === "backward") {
-      this._caretRaw = newStart;
-    } else if (dir === "forward") {
-      this._caretRaw = newEnd;
+
+    // The focus/moving edge of a selection is `selectionEnd` when selecting
+    // forward and `selectionStart` when selecting backward. We track both the
+    // caret (focus, moves as you extend) and the anchor (the fixed end).
+    let caret: number;
+    let anchor: number;
+    if (newStart === newEnd) {
+      // Collapsed caret (typing, plain arrow, click).
+      caret = newStart;
+      anchor = newStart;
+    } else if (ta.selectionDirection === "backward") {
+      caret = newStart;
+      anchor = newEnd;
+    } else if (ta.selectionDirection === "forward") {
+      caret = newEnd;
+      anchor = newStart;
     } else {
       // `selectionDirection` is "none" for some browser selections (notably
       // macOS Cmd+Shift+Arrow word/line selects). Infer the moving edge from
@@ -364,10 +373,32 @@ class Openp41geAgents extends LitElement {
         this._renderComposerContent();
         return;
       }
-      if (startMoved && !endMoved) this._caretRaw = newStart;
-      else if (endMoved && !startMoved) this._caretRaw = newEnd;
-      else this._caretRaw = newEnd; // both moved — collapsed to a caret
+      if (startMoved && !endMoved) {
+        caret = newStart;
+        anchor = newEnd;
+      } else if (endMoved && !startMoved) {
+        caret = newEnd;
+        anchor = newStart;
+      } else {
+        // Both endpoints moved: a re-anchor (e.g. Cmd+Shift+Up undoing a
+        // Cmd+Shift+Down). The endpoint that is still the previous anchor is
+        // the fixed end; the caret rides the other (moving) endpoint.
+        const prevAnchor = this._selAnchor;
+        if (newStart === prevAnchor) {
+          caret = newEnd;
+          anchor = newStart;
+        } else if (newEnd === prevAnchor) {
+          caret = newStart;
+          anchor = newEnd;
+        } else {
+          caret = newEnd;
+          anchor = newStart;
+        }
+      }
     }
+
+    this._caretRaw = caret;
+    this._selAnchor = anchor;
     this._prevSelStart = newStart;
     this._prevSelEnd = newEnd;
     this._renderComposerContent();
@@ -865,6 +896,7 @@ class Openp41geAgents extends LitElement {
     this._selStart = start;
     this._selEnd = end;
     this._caretRaw = end;
+    this._selAnchor = start;
     this._prevSelStart = start;
     this._prevSelEnd = end;
     this._inputEl?.setSelectionRange(start, end);
