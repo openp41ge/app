@@ -121,13 +121,20 @@ describe("AgentsController", () => {
 
     const el = host.querySelector("openp41ge-agents") as HTMLElement;
     await flush();
-    const select = (el.shadowRoot as ShadowRoot).querySelector(
+    const providerBtn = (el.shadowRoot as ShadowRoot).querySelector(
       ".composer-select",
-    ) as HTMLSelectElement;
-    expect(select).toBeTruthy();
-    expect(select.options).toHaveLength(1);
-    expect(select.options[0].textContent).toContain("vLLM");
-    expect(select.value).toBe("vllm");
+    ) as HTMLButtonElement;
+    expect(providerBtn).toBeTruthy();
+    expect(providerBtn.querySelector(".composer-select-label")?.textContent).toContain("vLLM");
+
+    // Clicking the selector opens the custom provider dropdown list.
+    providerBtn.click();
+    await flush();
+    const item = (el.shadowRoot as ShadowRoot).querySelector(
+      ".composer-provider-menu .provider-item",
+    );
+    expect(item).toBeTruthy();
+    expect(item?.textContent).toContain("vLLM");
   });
 
   it("snapshot/restore persists the chat id", () => {

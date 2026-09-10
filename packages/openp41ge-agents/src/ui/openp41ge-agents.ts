@@ -76,6 +76,8 @@ class Openp41geAgents extends LitElement {
   @state() private _providerId = "";
   @state() private _activeTools: string[] = [];
   @state() private _showTools = false;
+  /** Whether the custom provider/model dropdown is open. */
+  @state() private _providerMenuOpen = false;
   private _docListenerAttached = false;
   private _composerResizeObserver: ResizeObserver | null = null;
   @query(".chat-input") private _inputEl!: HTMLTextAreaElement;
@@ -218,6 +220,7 @@ class Openp41geAgents extends LitElement {
     const composer = this.renderRoot?.querySelector(".composer") as HTMLElement | null;
     const target = e.target as Node | null;
     if (!composer || !target || composer.contains(target)) return;
+    if (this._providerMenuOpen) this._providerMenuOpen = false;
     if (this._composerFocused) {
       this._composerFocused = false;
       this._renderComposerContent();
@@ -282,30 +285,55 @@ class Openp41geAgents extends LitElement {
     this.requestUpdate();
   }
 
-  private _providerOptions(): TemplateResult[] {
+  /** The provider list actually shown in the dropdown (keeps the active
+   *  provider valid even when it isn't in the configured table). */
+  private _effectiveProviders(): ComposerProvider[] {
     const providers = [...this._providers];
     if (this._providerId && !providers.some((p) => p.id === this._providerId)) {
-      // Keep the select's value valid even when the active provider isn't in
-      // the configured table (e.g. a migrated chat referencing a removed id).
       providers.unshift({ id: this._providerId, label: this._providerId, model: "" });
     }
     if (providers.length === 0) {
-      return [html`<option value="">Default model</option>`];
+      return [{ id: "", label: "Default model", model: "" }];
     }
-    return providers.map(
-      (p) => html`<option value=${p.id}>${p.label}${p.model ? ` · ${p.model}` : ""}</option>`,
-    );
+    return providers;
   }
 
-  private _onProviderChange(e: Event): void {
-    const value = (e.target as HTMLSelectElement).value;
-    this.dispatchEvent(
-      new CustomEvent("chat:provider-change", {
-        bubbles: true,
-        composed: true,
-        detail: { providerId: value },
-      }),
-    );
+  /** The label shown on the model-selector button for the active provider. */
+  private _currentProviderLabel(): string {
+    const p = this._effectiveProviders().find((x) => x.id === this._providerId);
+    if (p) return p.label + (p.model ? ` · ${p.model}` : "");
+    return this._providerId || "Default model";
+  }
+
+  /** Dropdown height (px) so the composer can grow to reveal the whole list. */
+  private _toggleProviderMenu(): void {
+    this._providerMenuOpen = !this._providerMenuOpen;
+    if (this._providerMenuOpen) {
+      // Opening the dropdown moves focus onto the selector button. Drop the
+      // composer caret so typing doesn't go to a dead text-area and the caret
+      // doesn't blink behind the list.
+      this._composerFocused = false;
+      this._inputEl?.blur();
+      this._renderComposerContent();
+    } else {
+      this._focusComposer();
+    }
+  }
+
+  private _selectProvider(id: string): void {
+    if (id !== this._providerId) {
+      this._providerId = id;
+      this.dispatchEvent(
+        new CustomEvent("chat:provider-change", {
+          bubbles: true,
+          composed: true,
+          detail: { providerId: id },
+        }),
+      );
+    }
+    this._providerMenuOpen = false;
+    // Return focus to the composer so the user can keep typing.
+    this._focusComposer();
   }
 
   private _onAddContent(): void {
@@ -454,6 +482,126 @@ class Openp41geAgents extends LitElement {
     this._caretHint = 0;
   }
 
+  /**
+   * Cmd(+Shift)+Arrow — document / line navigation driven by our own
+   * anchor+focus model instead of the browser's.
+   *
+   * A text-area implements these as macOS editing commands that do not preserve
+   * an anchor: the browser reports `selectionDirection` as "none", so pressing
+   * the opposite arrow re-extends the selection instead of unselecting it, and
+   * once the whole document is selected nothing moves at all. Owning the keys
+   * restores file-editor behaviour — the anchor stays put and only the focus
+   * edge moves, so Cmd+Shift+Down after a Cmd+Shift+Up collapses the selection
+   * back onto the anchor and then extends the other way, and the caret still
+   * moves when there is nothing left to select. The result is written back with
+   * an explicit direction so a follow-up plain Shift+Arrow keeps extending from
+   * the same edge.
+   *
+   * Returns true when the key was handled (and its default suppressed).
+   */
+  private _handleDocumentNav(e: KeyboardEvent): boolean {
+    const ta = this._inputEl;
+    if (!ta || !e.metaKey || e.ctrlKey || e.altKey) return false;
+    const from = this._focusOffset(ta);
+    let focus: number;
+    switch (e.key) {
+      case "ArrowUp":
+        focus = 0;
+        break;
+      case "ArrowDown":
+        focus = ta.value.length;
+        break;
+      case "ArrowLeft":
+        focus = this._lineBound(from, -1);
+        break;
+      case "ArrowRight":
+        focus = this._lineBound(from, 1);
+        break;
+      default:
+        return false;
+    }
+    e.preventDefault();
+    // Without Shift the selection collapses onto the destination. With Shift the
+    // anchor is kept and only the focus edge moves — it may cross the anchor and
+    // flip the selection to the other side, exactly like a file editor.
+    this._applySelection(e.shiftKey ? this._anchorOffset(ta) : focus, focus);
+    return true;
+  }
+
+  /** The moving (focus) edge of the text-area's current selection. */
+  private _focusOffset(ta: HTMLTextAreaElement): number {
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    if (start === end) return start;
+    if (ta.selectionDirection === "backward") return start;
+    if (ta.selectionDirection === "forward") return end;
+    // Direction-less selection (mouse drag, Cmd+A, a macOS editing command):
+    // our own tracked caret answers it as long as it is still an edge.
+    if (this._caretRaw === start || this._caretRaw === end) return this._caretRaw;
+    return end;
+  }
+
+  /** The fixed (anchor) edge of the text-area's current selection. */
+  private _anchorOffset(ta: HTMLTextAreaElement): number {
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    if (start === end) return start;
+    if (ta.selectionDirection === "backward") return end;
+    if (ta.selectionDirection === "forward") return start;
+    if (this._selAnchor === start || this._selAnchor === end) return this._selAnchor;
+    return this._focusOffset(ta) === end ? start : end;
+  }
+
+  /** Write an anchor/focus pair to the text-area and the rendered composer. */
+  private _applySelection(anchor: number, focus: number): void {
+    const ta = this._inputEl;
+    if (!ta) return;
+    const max = ta.value.length;
+    const a = Math.max(0, Math.min(anchor, max));
+    const f = Math.max(0, Math.min(focus, max));
+    const start = Math.min(a, f);
+    const end = Math.max(a, f);
+    ta.setSelectionRange(start, end, a <= f ? "forward" : "backward");
+    this._selStart = start;
+    this._selEnd = end;
+    this._selAnchor = a;
+    this._caretRaw = f;
+    this._prevSelStart = start;
+    this._prevSelEnd = end;
+    // We are authoritative here — no edge has to be guessed from a key hint.
+    this._caretHint = 0;
+    this._renderComposerContent();
+  }
+
+  /**
+   * The start (dir -1) or end (dir 1) of the line containing `raw`.
+   *
+   * macOS's Cmd+Left/Right stop at the *visual* line, so we hit-test the
+   * rendered content out past the left/right edge on the caret's own line and
+   * clamp the result to the hard line. The clamp keeps the caret on the correct
+   * side of a newline and gives the right answer when there is no layout to
+   * measure (an unrendered composer, tests).
+   */
+  private _lineBound(raw: number, dir: -1 | 1): number {
+    const text = this._draft;
+    const hardStart = raw <= 0 ? 0 : text.lastIndexOf("\n", raw - 1) + 1;
+    const nextNewline = text.indexOf("\n", raw);
+    const hardEnd = nextNewline === -1 ? text.length : nextNewline;
+    const fallback = dir < 0 ? hardStart : hardEnd;
+    const el = this._contentEl;
+    if (!el) return fallback;
+    const elRect = el.getBoundingClientRect();
+    if (!elRect.height) return fallback;
+    const target = this._textNodeAtContentOffset(this._contentOffsetFromRaw(raw));
+    if (!target) return fallback;
+    const rect = this._caretTargetRect(target.node, target.offset, el, elRect, getComputedStyle(el));
+    if (!rect) return fallback;
+    const y = elRect.top + rect.top - el.scrollTop + rect.height / 2;
+    const x = dir < 0 ? elRect.left - 10000 : elRect.right + 10000;
+    const probe = this._rawOffsetFromContent(this._contentOffsetFromPoint(x, y));
+    return Math.min(hardEnd, Math.max(hardStart, probe));
+  }
+
   private _onComposerKeydown(e: KeyboardEvent): void {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -461,6 +609,9 @@ class Openp41geAgents extends LitElement {
       else this._sendMessage();
       return;
     }
+    // Cmd+Arrow (document / line jumps) is ours: the browser's implementation
+    // loses the selection anchor, so it cannot unselect or flip direction.
+    if (this._handleDocumentNav(e)) return;
     // Arrow / Home / End / PageUp / PageDown move the text-area's caret as
     // their default action. The `select`/`keyup` events are unreliable while a
     // key is held (auto-repeat), so schedule a sync after the browser applies
@@ -486,6 +637,10 @@ class Openp41geAgents extends LitElement {
           this._caretHint = 0;
       }
       setTimeout(() => this._syncSelection(), 0);
+    } else {
+      // Any other key (typing, Cmd+A, …) invalidates the arrow-key hint so it
+      // can never be applied to a selection it did not cause.
+      this._caretHint = 0;
     }
   }
 
@@ -968,6 +1123,25 @@ class Openp41geAgents extends LitElement {
     this._updateComposerState();
     this._ensureComposerObserver();
     this._syncComposerInputWidth();
+    this._syncProviderMenuHeight();
+  }
+
+  /** When the provider dropdown is open, size the text area so the composer can
+   *  grow to reveal the whole list (pushing the top border up when the text is
+   *  short). The list is positioned over the text area, so its measured height
+   *  becomes the content's minimum height; if the text is already taller the
+   *  list simply covers the top of it, aligned to the top. */
+  private _syncProviderMenuHeight(): void {
+    const content = this._contentEl;
+    if (!content) return;
+    if (!this._providerMenuOpen) {
+      content.style.minHeight = "";
+      return;
+    }
+    const menu = this.renderRoot.querySelector<HTMLElement>(".composer-provider-menu");
+    if (menu) {
+      content.style.minHeight = `${menu.getBoundingClientRect().height}px`;
+    }
   }
 
   // ─── Rendering ──────────────────────────────────────────────────────
@@ -1135,6 +1309,7 @@ class Openp41geAgents extends LitElement {
         }
         .composer {
           flex-shrink: 0;
+          position: relative;
           display: flex;
           flex-direction: column;
           background: var(--bg-primary, #1e1e1e);
@@ -1142,13 +1317,14 @@ class Openp41geAgents extends LitElement {
         }
         .composer-content {
           position: relative;
+          box-sizing: border-box;
           padding: 10px 12px 4px;
           line-height: 20px;
           font-size: 13px;
           color: var(--text-primary, #d4d4d4);
           white-space: pre-wrap;
           word-break: break-word;
-          min-height: 20px;
+          min-height: 34px;
           max-height: 200px; /* 10 lines */
           overflow-y: auto;
           cursor: text;
@@ -1173,6 +1349,51 @@ class Openp41geAgents extends LitElement {
           /* Horizontal padding only (no vertical) so the line box height stays
              identical to body text and the highlight stays one uniform height. */
           padding: 0 3px;
+        }
+        /* When the provider dropdown is open and the typed text is short, grow
+           the composer so the list is fully revealed (the top border is pushed
+           up). If the text already has many lines, the list simply covers the
+           top of it, aligned to the top. The min-height is set imperatively to
+           the measured menu height from updated().
+        */
+        .composer-provider-menu {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 10;
+          max-height: 200px;
+          overflow-y: auto;
+          box-sizing: border-box;
+          background: var(--bg-primary, #1e1e1e);
+          border-bottom: 1px solid var(--border-color, #2a2a2a);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        .composer-provider-menu .provider-item {
+          display: block;
+          width: 100%;
+          padding: 5px 10px;
+          border: none;
+          background: transparent;
+          color: var(--text-primary, #d4d4d4);
+          font-size: 11px;
+          line-height: 18px;
+          text-align: left;
+          cursor: pointer;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .composer-provider-menu .provider-item:hover,
+        .composer-provider-menu .provider-item.active {
+          background: var(--bg-hover, #2a2d2e);
+          color: #fff;
+        }
+        .composer-provider-menu .provider-item:first-child {
+          margin-top: 2px;
+        }
+        .composer-provider-menu .provider-item:last-child {
+          margin-bottom: 2px;
         }
         .composer-content .composer-highlight {
           background: var(--fe-selection-bg, rgba(87, 145, 217, 0.3));
@@ -1216,16 +1437,32 @@ class Openp41geAgents extends LitElement {
         }
         .composer-select {
           flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
           max-width: 180px;
           min-width: 96px;
-          background: var(--bg-secondary, #252526);
+          background: transparent;
           color: var(--text-primary, #d4d4d4);
-          border: 1px solid var(--border-color, #3a3a3a);
-          border-radius: 6px;
+          border: none;
+          border-radius: 4px;
           font-size: 11px;
           padding: 3px 6px;
           outline: none;
           cursor: pointer;
+          white-space: nowrap;
+        }
+        .composer-select:hover {
+          background: var(--bg-active, #37373d);
+          color: #fff;
+        }
+        .composer-select-label {
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .composer-select-caret {
+          color: var(--text-secondary, #999);
+          font-size: 9px;
         }
         .composer-tool {
           flex: 0 0 auto;
@@ -1361,7 +1598,7 @@ class Openp41geAgents extends LitElement {
         }
       </div>
 
-      <div class="composer">
+      <div class="composer ${this._providerMenuOpen ? "menu-open" : ""}">
         <div
           class="composer-content"
           @mousedown=${() => this._focusComposer()}
@@ -1371,15 +1608,29 @@ class Openp41geAgents extends LitElement {
           @pointercancel=${this._onContentPointerUp}
           @dblclick=${this._onContentDoubleClick}
         ></div>
+        ${
+          this._providerMenuOpen
+            ? html`<div class="composer-provider-menu" role="listbox">
+                ${this._effectiveProviders().map(
+                  (p) => html`<button
+                    class="provider-item ${p.id === this._providerId ? "active" : ""}"
+                    role="option"
+                    aria-selected="${p.id === this._providerId}"
+                    @click=${() => this._selectProvider(p.id)}
+                  >${p.label}${p.model ? ` · ${p.model}` : ""}</button>`,
+                )}
+              </div>`
+            : ""
+        }
         <div class="composer-toolbar">
-          <select
+          <button
             class="composer-select"
             title="Provider / model"
-            .value=${this._providerId}
-            @change=${(e: Event) => this._onProviderChange(e)}
+            @click=${() => this._toggleProviderMenu()}
           >
-            ${this._providerOptions()}
-          </select>
+            <span class="composer-select-label">${this._currentProviderLabel()}</span>
+            <span class="composer-select-caret">▾</span>
+          </button>
           <button
             class="composer-tool"
             title="Add files or content"

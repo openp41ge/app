@@ -485,13 +485,55 @@ describe("Openp41geAgents (custom element)", () => {
     });
     await el.updateComplete;
 
-    const select = el.shadowRoot!.querySelector(".composer-select") as HTMLSelectElement;
-    expect(select.options).toHaveLength(1);
-    expect(select.options[0].textContent).toContain("vLLM");
-    expect(select.value).toBe("vllm");
+    const providerBtn = el.shadowRoot!.querySelector(".composer-select") as HTMLButtonElement;
+    expect(providerBtn.querySelector(".composer-select-label")?.textContent).toContain("vLLM");
+    expect(providerBtn.querySelector(".composer-select-label")?.textContent).toContain("vicuna-13b");
+
+    // Clicking the selector opens a custom dropdown list over the text area.
+    providerBtn.click();
+    await el.updateComplete;
+    const items = el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item");
+    expect(items).toHaveLength(1);
+    expect(items[0].textContent).toContain("vLLM");
+    expect(items[0].textContent).toContain("vicuna-13b");
 
     const toolsBtn = el.shadowRoot!.querySelector(".composer-tool[title='Active tools']") as HTMLElement;
     expect(toolsBtn.querySelector(".tool-badge")?.textContent).toBe("2");
+  });
+
+  it("selecting a provider dispatches chat:provider-change and closes the dropdown", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setComposerContext({
+      providers: [
+        { id: "vllm", label: "vLLM", model: "vicuna-13b" },
+        { id: "openai", label: "OpenAI", model: "gpt-4" },
+      ],
+      activeProviderId: "vllm",
+    });
+    await el.updateComplete;
+
+    const providerBtn = el.shadowRoot!.querySelector(".composer-select") as HTMLButtonElement;
+    providerBtn.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item")).toHaveLength(2);
+
+    const handler = vi.fn();
+    el.addEventListener("chat:provider-change", handler as EventListener);
+
+    const other = el.shadowRoot!.querySelectorAll(".composer-provider-menu .provider-item")[1];
+    (other as HTMLElement).click();
+    await el.updateComplete;
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({ providerId: "openai" });
+    // The dropdown closes and the button label reflects the choice.
+    expect(el.shadowRoot!.querySelector(".composer-provider-menu")).toBeNull();
+    expect(providerBtn.querySelector(".composer-select-label")?.textContent).toContain("OpenAI");
+    // The button shows the model selector without a border/background by default.
+    expect(providerBtn.tagName).toBe("BUTTON");
   });
 
   it("sends on Enter (without Shift) and does not send on Shift+Enter", async () => {
@@ -704,41 +746,147 @@ describe("Openp41geAgents (custom element)", () => {
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
   });
 
-  it("rides the arrow edge on a direction-'none' boundary flip (macOS Cmd+Shift+Arrow)", async () => {
+  const mountWithText = async (text: string) => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
     await el.updateComplete;
-
     const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
-    (inputEl as { value: string }).value = "aaa\nbbb\nccc";
+    (inputEl as { value: string }).value = text;
     inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     inputEl.focus();
     await el.updateComplete;
+    return { el, inputEl };
+  };
 
-    // The whole document is selected and, on macOS, Cmd+Shift+Arrow leaves
-    // `selectionDirection` as "none" with the endpoints unchanged — so the
-    // arrow key itself is the only signal for which edge the caret rides.
-    inputEl.setSelectionRange(0, 11);
-    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
+  const cmdArrow = (inputEl: HTMLTextAreaElement, key: string, shift: boolean) =>
+    inputEl.dispatchEvent(
+      new KeyboardEvent("keydown", { key, shiftKey: shift, metaKey: true, cancelable: true }),
+    );
+
+  it("Cmd+Shift+Up/Down extends from a fixed anchor and unselects on the way back", async () => {
+    // "aaa\nbbb\nccc" — the caret starts at 4 (start of "bbb").
+    const { el, inputEl } = await mountWithText("aaa\nbbb\nccc");
+    inputEl.setSelectionRange(4, 4);
     inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
     await el.updateComplete;
 
-    // Cmd+Shift+Up: the keydown sets the "up" hint; the caret rides the start
-    // even though (0,11) is unchanged and direction is "none".
-    inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", shiftKey: true, metaKey: true }));
-    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    // Down: anchor stays at 4, the focus edge runs to the end.
+    cmdArrow(inputEl, "ArrowDown", true);
     await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([4, 11]);
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(4);
+
+    // Up: the focus edge crosses the anchor — the old selection is dropped and
+    // the text above the anchor is selected instead (not re-extended downward).
+    cmdArrow(inputEl, "ArrowUp", true);
+    await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([0, 4]);
+    expect(inputEl.selectionDirection).toBe("backward");
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
-    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(11);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(4);
 
-    // Cmd+Shift+Down flips the caret back to the end (same unchanged endpoints).
-    inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", shiftKey: true, metaKey: true }));
+    // Down again: back to the same selection below the anchor.
+    cmdArrow(inputEl, "ArrowDown", true);
+    await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([4, 11]);
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+  });
+
+  it("collapses the selection onto the anchor when Cmd+Shift+Arrow reverses onto it", async () => {
+    const { el, inputEl } = await mountWithText("aaa\nbbb\nccc");
+    // Caret at the very end: Cmd+Shift+Up selects the whole document.
+    inputEl.setSelectionRange(11, 11);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    cmdArrow(inputEl, "ArrowUp", true);
+    await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([0, 11]);
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
+
+    // Cmd+Shift+Down brings the focus edge back onto the anchor: the selection
+    // is fully unselected and the caret sits at the bottom again.
+    cmdArrow(inputEl, "ArrowDown", true);
+    await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([11, 11]);
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+    expect(el.shadowRoot!.querySelector(".composer-highlight")).toBeNull();
+  });
+
+  it("moves the caret with Cmd+Shift+Arrow even when there is nothing left to select", async () => {
+    const { el, inputEl } = await mountWithText("aaa\nbbb\nccc");
+    // Whole document selected downward from the top: the anchor is at 0.
+    inputEl.setSelectionRange(0, 0);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
     inputEl.setSelectionRange(0, 11);
-    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "none";
     inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
     await el.updateComplete;
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+
+    // Nothing further to select upward, but the caret must still travel to the
+    // top (the selection collapses onto the anchor).
+    cmdArrow(inputEl, "ArrowUp", true);
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
+
+    cmdArrow(inputEl, "ArrowDown", true);
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([0, 11]);
+  });
+
+  it("collapses to the destination on Cmd+Arrow without Shift", async () => {
+    const { el, inputEl } = await mountWithText("aaa\nbbb\nccc");
+    inputEl.setSelectionRange(4, 11);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    cmdArrow(inputEl, "ArrowUp", false);
+    await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([0, 0]);
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
     expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(0);
+  });
+
+  it("Cmd+Shift+Left/Right selects to the line edges without crossing a newline", async () => {
+    const { el, inputEl } = await mountWithText("aaa\nbbbbb\nccc");
+    // Caret inside "bbbbb" (offset 6 = after the first "b").
+    inputEl.setSelectionRange(6, 6);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    cmdArrow(inputEl, "ArrowRight", true);
+    await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([6, 9]);
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(9);
+
+    // Back across the anchor to the start of the same line.
+    cmdArrow(inputEl, "ArrowLeft", true);
+    await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([4, 6]);
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(4);
+  });
+
+  it("keeps the anchor when a plain Shift+Arrow follows a Cmd+Shift+Arrow", async () => {
+    const { el, inputEl } = await mountWithText("hello world");
+    inputEl.setSelectionRange(6, 6);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Cmd+Shift+Left leaves an explicit "backward" direction, so the browser's
+    // own Shift+Right afterwards shrinks the selection from the leading edge.
+    cmdArrow(inputEl, "ArrowLeft", true);
+    await el.updateComplete;
+    expect([inputEl.selectionStart, inputEl.selectionEnd]).toEqual([0, 6]);
+    expect(inputEl.selectionDirection).toBe("backward");
+
+    inputEl.setSelectionRange(1, 6, "backward");
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(1);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(6);
   });
 
   it("setProviderStatus shows a status strip when unreachable", async () => {
