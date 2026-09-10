@@ -1451,7 +1451,7 @@ class Openp41geAgents extends LitElement {
           background: var(--bg-active, #37373d);
           color: var(--text-primary, #d4d4d4);
           border-radius: 12px 12px 4px 12px;
-          white-space: pre-wrap;
+          white-space: normal;
         }
         /* Assistant responses are inline text — no bubble — rendered as
            markdown, so they span the full width and flow like prose. */
