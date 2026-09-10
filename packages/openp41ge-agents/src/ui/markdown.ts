@@ -2,8 +2,8 @@
  * Lightweight markdown → HTML renderer for chat responses.
  *
  * Covers the common constructs a coding agent emits: headings, fenced + inline
- * code, paragraphs, unordered/ordered lists, blockquotes, horizontal rules,
- * bold/italic/strikethrough, links and images.
+ * code, paragraphs, unordered/ordered lists, blockquotes, GFM pipe tables,
+ * horizontal rules, bold/italic/strikethrough, links and images.
  *
  * All text is HTML-escaped and only a fixed set of tags is emitted, so the
  * LLM's output cannot inject arbitrary HTML (no raw `<script>` etc.).
@@ -78,6 +78,66 @@ function renderInline(text: string): string {
 /** A parsed block: either a raw HTML string or a code block to be wrapped. */
 type Block = { kind: "html"; value: string } | { kind: "code"; value: string; language: string };
 
+/** True when a line is a GFM table delimiter row (e.g. `| --- | :--: | ---: |`). */
+function isDelimiterRow(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|")) return false;
+  const cells = trimmed.replace(/^\|/, "").replace(/\|$/, "").split("|");
+  return cells.length > 0 && cells.every((c) => /^:?-{3,}:?$/.test(c.trim()));
+}
+
+/** Split a pipe-table row into its trimmed cell values (strips outer pipes). */
+function parseTableRow(line: string): string[] {
+  let s = line.trim();
+  if (s.startsWith("|")) s = s.slice(1);
+  if (s.endsWith("|")) s = s.slice(0, -1);
+  return s.split("|").map((c) => c.trim());
+}
+
+/** Try to render a table starting at `start` (header + delimiter + body rows).
+ *  Returns the HTML and the index of the first line after the table, or null
+ *  if the lines at `start` are not a table. */
+function tryRenderTable(lines: string[], start: number): { html: string; next: number } | null {
+  const headerLine = lines[start];
+  if (!headerLine.includes("|")) return null;
+  const delimLine = lines[start + 1];
+  if (start + 1 >= lines.length || !isDelimiterRow(delimLine)) return null;
+
+  const header = parseTableRow(headerLine);
+  const aligns = parseTableRow(delimLine).map((cell) => {
+    if (cell.startsWith(":") && cell.endsWith(":")) return "center";
+    if (cell.endsWith(":")) return "right";
+    if (cell.startsWith(":")) return "left";
+    return "left";
+  });
+
+  const body: string[][] = [];
+  let j = start + 2;
+  while (j < lines.length) {
+    const line = lines[j];
+    if (line.trim() === "" || !line.includes("|")) break;
+    body.push(parseTableRow(line));
+    j++;
+  }
+
+  const cell = (row: string[], idx: number, tag: "th" | "td"): string => {
+    const text = renderInline(row[idx] ?? "");
+    const align = aligns[idx];
+    const style = align && align !== "left" ? ` style="text-align:${align}"` : "";
+    return `<${tag}${style}>${text}</${tag}>`;
+  };
+
+  let html = "<table><thead><tr>";
+  html += header.map((_, idx) => cell(header, idx, "th")).join("");
+  html += "</tr></thead><tbody>";
+  html += body
+    .map((row) => `<tr>${header.map((_, idx) => cell(row, idx, "td")).join("")}</tr>`)
+    .join("");
+  html += "</tbody></table>";
+
+  return { html, next: j };
+}
+
 /** Split markdown into top-level blocks and render them. */
 function renderBlocks(md: string): Block[] {
   const lines = md.split("\n");
@@ -112,6 +172,16 @@ function renderBlocks(md: string): Block[] {
       blocks.push({ kind: "html", value: "<hr />" });
       i++;
       continue;
+    }
+
+    // Table (a header row immediately followed by a delimiter row).
+    if (i + 1 < lines.length && isDelimiterRow(lines[i + 1])) {
+      const table = tryRenderTable(lines, i);
+      if (table) {
+        blocks.push({ kind: "html", value: table.html });
+        i = table.next;
+        continue;
+      }
     }
 
     // Heading.

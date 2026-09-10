@@ -1559,6 +1559,25 @@ class Openp41geAgents extends LitElement {
           border: none;
           border-top: 1px solid var(--border-color, #2a2a2a);
         }
+        .chat-message.assistant .msg-content table {
+          margin: 0 0 8px;
+          border-collapse: collapse;
+          width: 100%;
+          font-size: 12px;
+        }
+        .chat-message.assistant .msg-content th,
+        .chat-message.assistant .msg-content td {
+          padding: 4px 8px;
+          border: 1px solid var(--border-color, #2a2a2a);
+          text-align: left;
+        }
+        .chat-message.assistant .msg-content th {
+          background: var(--bg-tertiary, #222);
+          font-weight: 600;
+        }
+        .chat-message.assistant .msg-content tbody tr:nth-child(even) td {
+          background: var(--bg-tertiary, #222);
+        }
         .caret {
           display: inline-block;
           width: 7px;

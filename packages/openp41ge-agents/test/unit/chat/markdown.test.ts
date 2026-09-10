@@ -53,4 +53,47 @@ describe("renderMarkdown", () => {
   it("returns an empty string for empty input", () => {
     expect(renderMarkdown("")).toBe("");
   });
+
+  it("renders a GFM pipe table", () => {
+    const md = "| Name | Value |\n| --- | --- |\n| a | 1 |\n| b | 2 |";
+    expect(renderMarkdown(md)).toBe(
+      "<table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody>" +
+        "<tr><td>a</td><td>1</td></tr><tr><td>b</td><td>2</td></tr></tbody></table>",
+    );
+  });
+
+  it("handles tables without leading/trailing pipes", () => {
+    const md = "Name | Value\n--- | ---\na | 1";
+    expect(renderMarkdown(md)).toBe(
+      "<table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody>" +
+        "<tr><td>a</td><td>1</td></tr></tbody></table>",
+    );
+  });
+
+  it("applies column alignment from the delimiter row", () => {
+    const md = "| a | b | c |\n| :--- | ---: | :---: |\n| 1 | 2 | 3 |";
+    expect(renderMarkdown(md)).toBe(
+      "<table><thead><tr>" +
+        '<th>a</th><th style="text-align:right">b</th><th style="text-align:center">c</th>' +
+        "</tr></thead><tbody><tr>" +
+        '<td>1</td><td style="text-align:right">2</td><td style="text-align:center">3</td>' +
+        "</tr></tbody></table>",
+    );
+  });
+
+  it("renders inline markdown inside table cells", () => {
+    const md = "| Cmd | Status |\n| --- | --- |\n| `npm test` | **ok** |";
+    expect(renderMarkdown(md)).toBe(
+      "<table><thead><tr><th>Cmd</th><th>Status</th></tr></thead><tbody>" +
+        "<tr><td><code>npm test</code></td><td><strong>ok</strong></td></tr></tbody></table>",
+    );
+  });
+
+  it("fills missing trailing cells with empty content", () => {
+    const md = "| a | b |\n| --- | --- |\n| 1 |";
+    expect(renderMarkdown(md)).toBe(
+      "<table><thead><tr><th>a</th><th>b</th></tr></thead><tbody>" +
+        "<tr><td>1</td><td></td></tr></tbody></table>",
+    );
+  });
 });
