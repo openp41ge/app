@@ -352,11 +352,15 @@ class Openp41geAgents extends LitElement {
     // fresh selection, but it is unreliable for a cumulatively-extended
     // Cmd+Shift+Arrow selection: macOS reports "none", and some editing
     // commands leave a stale "forward"/"backward" pointing at the wrong end.
-    // So when the previous selection was itself a non-collapsed selection and
-    // an endpoint of the new selection is still at the previous anchor, we
-    // treat that as a re-anchor (e.g. Cmd+Shift+Up undoing a Cmd+Shift+Down)
-    // and ride the *other*, moving endpoint as the caret — regardless of the
-    // (stale) direction.
+    //
+    // Two distinct cases need handling:
+    //  1. Re-anchor — the endpoints moved (e.g. Cmd+Shift+Up undoing a
+    //     Cmd+Shift+Down): one endpoint is still the previous anchor, so we
+    //     ride the *other*, moving endpoint regardless of a stale direction.
+    //  2. Boundary flip — the endpoints are unchanged but the focus direction
+    //     reversed (e.g. the whole document is selected and Cmd+Shift+Up flips
+    //     the caret from the end to the start): here we must trust direction,
+    //     otherwise a stale anchor pins the caret to the wrong end.
     let caret: number;
     let anchor: number;
     if (newStart === newEnd) {
@@ -365,8 +369,11 @@ class Openp41geAgents extends LitElement {
       anchor = newStart;
     } else {
       const prevCollapsed = this._prevSelStart === this._prevSelEnd;
+      const endpointsChanged =
+        newStart !== this._prevSelStart || newEnd !== this._prevSelEnd;
       const anchorPreserved =
         !prevCollapsed &&
+        endpointsChanged &&
         (newStart === this._selAnchor || newEnd === this._selAnchor);
 
       if (anchorPreserved && newStart === this._selAnchor) {
@@ -381,16 +388,11 @@ class Openp41geAgents extends LitElement {
       } else if (ta.selectionDirection === "forward") {
         anchor = newStart;
         caret = newEnd;
-      } else {
-        // Direction is "none" and no anchor is preserved. Infer the moving
-        // edge from which endpoint of the selection actually moved.
+      } else if (endpointsChanged) {
+        // Direction is "none" and the endpoints moved. Infer the moving edge
+        // from which endpoint of the selection actually moved.
         const startMoved = newStart !== this._prevSelStart;
         const endMoved = newEnd !== this._prevSelEnd;
-        if (!startMoved && !endMoved) {
-          // Nothing changed (e.g. a follow-up keyup): keep the current caret.
-          this._renderComposerContent();
-          return;
-        }
         if (startMoved && !endMoved) {
           caret = newStart;
           anchor = newEnd;
@@ -403,6 +405,11 @@ class Openp41geAgents extends LitElement {
           caret = newEnd;
           anchor = newStart;
         }
+      } else {
+        // Direction is "none" and the endpoints did not move: nothing new to
+        // infer (e.g. a follow-up keyup) — keep the current caret/anchor.
+        this._renderComposerContent();
+        return;
       }
     }
 

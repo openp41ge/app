@@ -664,6 +664,46 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")?.textContent).toBe("aaa\n");
   });
 
+  it("moves the caret on a boundary flip even though the endpoints do not change", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "aaa\nbbb\nccc";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    // Caret at the very top.
+    inputEl.setSelectionRange(0, 0);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Cmd+Shift+Down selects the whole document; caret rides the end.
+    inputEl.setSelectionRange(0, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "forward";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+
+    // Cmd+Shift+Up flips the focus to the start even though (0,11) is unchanged.
+    // The caret must ride the start, not stay pinned to the (now-stale) anchor.
+    inputEl.setSelectionRange(0, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "backward";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(11);
+
+    // Cmd+Shift+Down flips the focus back to the end.
+    inputEl.setSelectionRange(0, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "forward";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+  });
+
   it("setProviderStatus shows a status strip when unreachable", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
