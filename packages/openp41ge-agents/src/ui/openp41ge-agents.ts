@@ -347,50 +347,59 @@ class Openp41geAgents extends LitElement {
     this._selStart = newStart;
     this._selEnd = newEnd;
 
-    // The focus/moving edge of a selection is `selectionEnd` when selecting
-    // forward and `selectionStart` when selecting backward. We track both the
-    // caret (focus, moves as you extend) and the anchor (the fixed end).
+    // The focus/moving edge of a selection is whatever the user just moved;
+    // the anchor is the fixed end. `selectionDirection` is authoritative for a
+    // fresh selection, but it is unreliable for a cumulatively-extended
+    // Cmd+Shift+Arrow selection: macOS reports "none", and some editing
+    // commands leave a stale "forward"/"backward" pointing at the wrong end.
+    // So when the previous selection was itself a non-collapsed selection and
+    // an endpoint of the new selection is still at the previous anchor, we
+    // treat that as a re-anchor (e.g. Cmd+Shift+Up undoing a Cmd+Shift+Down)
+    // and ride the *other*, moving endpoint as the caret — regardless of the
+    // (stale) direction.
     let caret: number;
     let anchor: number;
     if (newStart === newEnd) {
       // Collapsed caret (typing, plain arrow, click).
       caret = newStart;
       anchor = newStart;
-    } else if (ta.selectionDirection === "backward") {
-      caret = newStart;
-      anchor = newEnd;
-    } else if (ta.selectionDirection === "forward") {
-      caret = newEnd;
-      anchor = newStart;
     } else {
-      // `selectionDirection` is "none" for some browser selections (notably
-      // macOS Cmd+Shift+Arrow word/line selects). Infer the moving edge from
-      // which endpoint actually moved since the last selection.
-      const startMoved = newStart !== this._prevSelStart;
-      const endMoved = newEnd !== this._prevSelEnd;
-      if (!startMoved && !endMoved) {
-        // Nothing changed (e.g. a follow-up keyup): keep the current caret.
-        this._renderComposerContent();
-        return;
-      }
-      if (startMoved && !endMoved) {
-        caret = newStart;
-        anchor = newEnd;
-      } else if (endMoved && !startMoved) {
-        caret = newEnd;
+      const prevCollapsed = this._prevSelStart === this._prevSelEnd;
+      const anchorPreserved =
+        !prevCollapsed &&
+        (newStart === this._selAnchor || newEnd === this._selAnchor);
+
+      if (anchorPreserved && newStart === this._selAnchor) {
         anchor = newStart;
+        caret = newEnd;
+      } else if (anchorPreserved && newEnd === this._selAnchor) {
+        anchor = newEnd;
+        caret = newStart;
+      } else if (ta.selectionDirection === "backward") {
+        anchor = newEnd;
+        caret = newStart;
+      } else if (ta.selectionDirection === "forward") {
+        anchor = newStart;
+        caret = newEnd;
       } else {
-        // Both endpoints moved: a re-anchor (e.g. Cmd+Shift+Up undoing a
-        // Cmd+Shift+Down). The endpoint that is still the previous anchor is
-        // the fixed end; the caret rides the other (moving) endpoint.
-        const prevAnchor = this._selAnchor;
-        if (newStart === prevAnchor) {
-          caret = newEnd;
-          anchor = newStart;
-        } else if (newEnd === prevAnchor) {
+        // Direction is "none" and no anchor is preserved. Infer the moving
+        // edge from which endpoint of the selection actually moved.
+        const startMoved = newStart !== this._prevSelStart;
+        const endMoved = newEnd !== this._prevSelEnd;
+        if (!startMoved && !endMoved) {
+          // Nothing changed (e.g. a follow-up keyup): keep the current caret.
+          this._renderComposerContent();
+          return;
+        }
+        if (startMoved && !endMoved) {
           caret = newStart;
           anchor = newEnd;
+        } else if (endMoved && !startMoved) {
+          caret = newEnd;
+          anchor = newStart;
         } else {
+          // Both endpoints moved and neither matches the previous anchor:
+          // prefer the end so the caret sits at the visible trailing edge.
           caret = newEnd;
           anchor = newStart;
         }

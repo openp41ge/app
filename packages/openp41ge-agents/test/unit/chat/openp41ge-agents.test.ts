@@ -629,6 +629,41 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")?.textContent).toBe("aaa\n");
   });
 
+  it("returns the caret to the top when Cmd+Shift+Up re-anchors with a stale 'forward' direction", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "aaa\nbbb\nccc";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    inputEl.setSelectionRange(4, 4);
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Cmd+Shift+Down selects 4..end; Chrome may leave direction "forward" here.
+    inputEl.setSelectionRange(4, 11);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "forward";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(11);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(4);
+
+    // Cmd+Shift+Up re-anchors to 0..4 but CHROME REPORTING direction "forward"
+    // (stale). The previous anchor (4) is still the fixed end, so the caret must
+    // ride the moving edge (0) back to the top.
+    inputEl.setSelectionRange(0, 4);
+    (inputEl as unknown as { selectionDirection: string }).selectionDirection = "forward";
+    inputEl.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(0);
+    expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(4);
+    expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")?.textContent).toBe("aaa\n");
+  });
+
   it("setProviderStatus shows a status strip when unreachable", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
