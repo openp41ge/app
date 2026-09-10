@@ -1534,11 +1534,6 @@ class Openp41geAgents extends LitElement {
           max-height: 120px;
           overflow-y: auto;
         }
-        .tool-empty {
-          align-self: flex-start;
-          color: var(--text-muted, #555);
-          font-style: italic;
-        }
         .composer {
           flex-shrink: 0;
           position: relative;
@@ -1899,13 +1894,7 @@ class Openp41geAgents extends LitElement {
 
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
-      <div class="chat-messages">
-        ${
-          this._messages.length === 0
-            ? html`<div class="tool-empty">Start a conversation by typing a message below.</div>`
-            : this._messages.map((msg) => this._renderMessage(msg))
-        }
-      </div>
+      <div class="chat-messages">${this._messages.map((msg) => this._renderMessage(msg))}</div>
 
       <div class="composer ${this._menuOpen ? "menu-open" : ""}">
         <div

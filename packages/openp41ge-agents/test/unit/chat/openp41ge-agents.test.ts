@@ -20,14 +20,17 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot).toBeTruthy();
   });
 
-  it.skip("shows empty state message when no messages", () => {
+  it("shows no empty-state placeholder when there are no messages", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
+    await el.updateComplete;
 
-    const shadow = el.shadowRoot!;
-    const empty = shadow.querySelector(".chat-empty");
-    expect(empty).toBeTruthy();
-    expect(empty!.textContent).toContain("Start a conversation");
+    const messages = el.shadowRoot!.querySelector(".chat-messages");
+    expect(messages).toBeTruthy();
+    // The placeholder text was removed — the message container is empty until
+    // the first message is added.
+    expect(messages!.querySelector(".tool-empty")).toBeNull();
+    expect(messages!.querySelector(".chat-message")).toBeNull();
   });
 
   it("adds a user message", () => {
