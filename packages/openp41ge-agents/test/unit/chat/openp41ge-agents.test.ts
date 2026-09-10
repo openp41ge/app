@@ -701,6 +701,49 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot!.querySelector(".composer-content")!.querySelector(".composer-highlight")).toBeNull();
   });
 
+  it("schedules a selection sync after a navigation keydown (auto-repeat)", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hello world";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    inputEl.focus();
+    await el.updateComplete;
+
+    // Spy on the plain-ish `_syncSelection` (accessible at runtime) and drive
+    // the keydown handler directly. Navigation keys must schedule a sync so the
+    // rendered caret/scroll stay live while a key is held (auto-repeat).
+    const spy = vi.fn((el as unknown as { _syncSelection: () => void })._syncSelection.bind(el));
+    (el as unknown as Record<string, unknown>)._syncSelection = spy;
+
+    (el as unknown as { _onComposerKeydown: (e: KeyboardEvent) => void })._onComposerKeydown(
+      new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, composed: true }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not schedule a selection sync for a non-navigation keydown", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    inputEl.focus();
+    await el.updateComplete;
+
+    const spy = vi.fn((el as unknown as { _syncSelection: () => void })._syncSelection.bind(el));
+    (el as unknown as Record<string, unknown>)._syncSelection = spy;
+
+    (el as unknown as { _onComposerKeydown: (e: KeyboardEvent) => void })._onComposerKeydown(
+      new KeyboardEvent("keydown", { key: "x", bubbles: true, composed: true }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(spy).not.toHaveBeenCalled();
+  });
+
   it("keeps a code token intact and overlays the caret when it sits inside one", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);

@@ -391,6 +391,31 @@ class Openp41geAgents extends LitElement {
       e.preventDefault();
       if (e.shiftKey) this._insertNewline();
       else this._sendMessage();
+      return;
+    }
+    // Arrow / Home / End / PageUp / PageDown move the text-area's caret as
+    // their default action. The `select`/`keyup` events are unreliable while a
+    // key is held (auto-repeat), so schedule a sync after the browser applies
+    // the caret move; that keeps the rendered caret (and scroll) live.
+    if (this._isNavigationKey(e)) {
+      setTimeout(() => this._syncSelection(), 0);
+    }
+  }
+
+  /** Keys that move the text-area's selection without inserting text. */
+  private _isNavigationKey(e: KeyboardEvent): boolean {
+    switch (e.key) {
+      case "ArrowUp":
+      case "ArrowDown":
+      case "ArrowLeft":
+      case "ArrowRight":
+      case "Home":
+      case "End":
+      case "PageUp":
+      case "PageDown":
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -616,6 +641,32 @@ class Openp41geAgents extends LitElement {
     caret.style.left = `${Math.max(0, left)}px`;
     caret.style.top = `${Math.max(0, top)}px`;
     caret.style.height = `${Math.round(caretH)}px`;
+    // Keep the caret within the composer's visible area (e.g. when arrow keys
+    // move it past the top/bottom edge of the overflow region).
+    this._scrollCaretIntoView(left, top, caretH);
+  }
+
+  /**
+   * Scroll the composer content vertically so the caret stays in view. The
+   * caret coordinates are content-relative (already folded into scroll), and
+   * the composer is the scroll container (`overflow-y: auto`), so we only need
+   * to move `scrollTop` when the caret drifts outside the visible band.
+   */
+  private _scrollCaretIntoView(left: number, top: number, height: number): void {
+    const el = this._contentEl;
+    if (!el) return;
+    // Nothing to scroll unless the content overflows the fixed-height composer.
+    if (el.scrollHeight <= el.clientHeight) return;
+    const pad = 12;
+    const viewTop = el.scrollTop;
+    const viewBottom = viewTop + el.clientHeight;
+    let next = el.scrollTop;
+    if (top < viewTop + pad) {
+      next = Math.max(0, top - pad);
+    } else if (top + height > viewBottom - pad) {
+      next = top + height - el.clientHeight + pad;
+    }
+    if (next !== el.scrollTop) el.scrollTop = next;
   }
 
   /**
