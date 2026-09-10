@@ -9,6 +9,8 @@
  * LLM's output cannot inject arbitrary HTML (no raw `<script>` etc.).
  */
 
+import { detectLanguage, highlight, langLabel, normalizeLanguage } from "./syntax-highlight.js";
+
 /** Escape text for embedding as HTML text content. */
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -77,6 +79,14 @@ function renderInline(text: string): string {
 
 /** A parsed block: either a raw HTML string or a code block to be wrapped. */
 type Block = { kind: "html"; value: string } | { kind: "code"; value: string; language: string };
+
+/** Options for rendering markdown (in particular per-code-block language overrides). */
+export interface MarkdownRenderOptions {
+  /** Language override keyed by code-block index (0-based, in order of appearance). */
+  codeLanguages?: Record<number, string>;
+  /** Message id stamped on each code block so the UI can route language clicks. */
+  msgId?: string;
+}
 
 /** True when a line is a GFM table delimiter row (e.g. `| --- | :--: | ---: |`). */
 function isDelimiterRow(line: string): boolean {
@@ -252,10 +262,53 @@ function renderBlocks(md: string): Block[] {
   return blocks;
 }
 
+/** Render a single fenced code block with a language badge + highlighted code. */
+function renderCodeBlock(
+  code: string,
+  explicitLang: string,
+  index: number,
+  overrideLang: string | undefined,
+  msgId: string | undefined,
+): string {
+  let langId: string;
+  let inferred: boolean;
+  if (overrideLang) {
+    langId = overrideLang;
+    inferred = false;
+  } else if (explicitLang.trim()) {
+    const normalized = normalizeLanguage(explicitLang);
+    if (normalized) {
+      langId = normalized;
+      inferred = false;
+    } else {
+      langId = detectLanguage(code);
+      inferred = true;
+    }
+  } else {
+    langId = detectLanguage(code);
+    inferred = true;
+  }
+
+  const label = langLabel(langId);
+  const msgAttr = msgId ? ` data-msg-id="${escapeAttr(msgId)}"` : "";
+  const inferredAttr = inferred ? ` data-code-inferred="true"` : "";
+  const highlighted = highlight(code, langId);
+  return `<div class="code-block" data-code-index="${index}" data-code-lang="${escapeAttr(langId)}"${msgAttr}${inferredAttr}>
+  <button type="button" class="code-lang" data-code-index="${index}" title="Change language">${escapeHtml(label)}</button>
+  <pre><code>${highlighted}</code></pre>
+</div>`;
+}
+
 /** Render markdown text into an HTML string. */
-export function renderMarkdown(md: string): string {
+export function renderMarkdown(md: string, options?: MarkdownRenderOptions): string {
   if (!md) return "";
+  const codeLanguages = options?.codeLanguages ?? {};
+  let codeIndex = 0;
   return renderBlocks(md)
-    .map((b) => (b.kind === "code" ? `<pre><code>${escapeHtml(b.value)}</code></pre>` : b.value))
+    .map((b) => {
+      if (b.kind !== "code") return b.value;
+      const index = codeIndex++;
+      return renderCodeBlock(b.value, b.language, index, codeLanguages[index], options?.msgId);
+    })
     .join("");
 }

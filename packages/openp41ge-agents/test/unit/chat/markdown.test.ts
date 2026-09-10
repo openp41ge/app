@@ -21,8 +21,37 @@ describe("renderMarkdown", () => {
     expect(renderMarkdown("use `a * b` here")).toBe("<p>use <code>a * b</code> here</p>");
   });
 
-  it("renders fenced code blocks", () => {
-    expect(renderMarkdown("```js\nconst x = 1;\n```")).toBe("<pre><code>const x = 1;</code></pre>");
+  it("renders fenced code blocks with a language badge and highlighted code", () => {
+    const html = renderMarkdown("```js\nconst x = 1;\n```");
+    expect(html).toContain('class="code-block"');
+    expect(html).toContain('data-code-lang="javascript"');
+    expect(html).toContain('class="code-lang"');
+    expect(html).toContain(">JS<");
+    expect(html).toContain('<span class="hl-key">const</span>');
+    expect(html).toContain('<span class="hl-number">1</span>');
+  });
+
+  it("marks a code block as inferred when no language is written", () => {
+    const html = renderMarkdown("```\nconst x = 1;\n```");
+    expect(html).toContain('data-code-inferred="true"');
+    expect(html).toContain('data-code-lang="javascript"');
+  });
+
+  it("does not mark an explicitly-tagged code block as inferred", () => {
+    const html = renderMarkdown("```py\nprint(1)\n```");
+    expect(html).toContain('data-code-lang="python"');
+    expect(html).not.toContain('data-code-inferred="true"');
+  });
+
+  it("applies a language override from the codeLanguages option", () => {
+    const html = renderMarkdown("```\nprint(1)\n```", { codeLanguages: { 0: "python" } });
+    expect(html).toContain('data-code-lang="python"');
+    expect(html).toContain(">PY<");
+  });
+
+  it("stamps msgId onto code blocks when provided", () => {
+    const html = renderMarkdown("```\ncode\n```", { msgId: "m1" });
+    expect(html).toContain('data-msg-id="m1"');
   });
 
   it("renders unordered and ordered lists", () => {

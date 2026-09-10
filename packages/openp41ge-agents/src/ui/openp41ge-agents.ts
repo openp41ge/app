@@ -19,6 +19,7 @@ import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Chat, ChatMessage, ChatRuntimeStatus, ToolCall } from "../types";
 import { renderMarkdown } from "./markdown.js";
+import { cycleLanguage } from "./syntax-highlight.js";
 
 function deepCloneMessage(m: ChatMessage): ChatMessage {
   return {
@@ -77,6 +78,8 @@ class Openp41geAgents extends LitElement {
   @state() private _streaming = false;
   @state() private _status: ChatRuntimeStatus | null = null;
   @state() private _title = "";
+  /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
+  @state() private _codeLangOverrides: Record<string, string> = {};
   // These two are intentionally NOT @state: the composer content and caret are
   // updated imperatively so keystrokes never trigger a full re-render (which
   // would reset focus and clear the rendered content).
@@ -1530,18 +1533,86 @@ class Openp41geAgents extends LitElement {
           font-size: 12px;
         }
         .chat-message.assistant .msg-content pre {
-          margin: 0 0 8px;
-          padding: 8px 10px;
-          border-radius: 6px;
+          margin: 0;
+          padding: 0;
+          border: none;
+          background: transparent;
           overflow-x: auto;
-          background: var(--bg-tertiary, #222);
-          border: 1px solid var(--border-color, #2a2a2a);
+          border-radius: 0;
         }
-        .chat-message.assistant .msg-content pre code {
+        /* Fenced code blocks: a bordered surface with a language badge pinned
+           in the top-right. The badge is clickable and cycles the highlight. */
+        .chat-message.assistant .msg-content .code-block {
+          position: relative;
+          margin: 0 0 8px;
+          border: 1px solid var(--border-color, #2a2a2a);
+          border-radius: 6px;
+          background: var(--bg-tertiary, #222);
+          overflow: hidden;
+        }
+        .chat-message.assistant .msg-content .code-block pre {
+          margin: 0;
+          padding: 24px 10px 8px;
+          border: none;
+          background: transparent;
+        }
+        .chat-message.assistant .msg-content .code-block code {
           padding: 0;
           background: transparent;
           border-radius: 0;
           font-size: 12px;
+        }
+        .chat-message.assistant .msg-content .code-lang {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          padding: 1px 6px;
+          font-size: 10px;
+          line-height: 1.4;
+          color: var(--text-secondary, #999);
+          background: var(--bg-active, #2d2d2d);
+          border: 1px solid var(--border-color, #3a3a3a);
+          border-radius: 3px;
+          cursor: pointer;
+          opacity: 0.85;
+        }
+        .chat-message.assistant .msg-content .code-lang:hover {
+          opacity: 1;
+          color: var(--text-primary, #d4d4d4);
+        }
+        .chat-message.assistant .msg-content .hl-key {
+          color: #7ec6f0;
+        }
+        .chat-message.assistant .msg-content .hl-string {
+          color: #ce9178;
+        }
+        .chat-message.assistant .msg-content .hl-number {
+          color: #b5cea8;
+        }
+        .chat-message.assistant .msg-content .hl-bool,
+        .chat-message.assistant .msg-content .hl-null {
+          color: #569cd6;
+        }
+        .chat-message.assistant .msg-content .hl-punct {
+          color: #808080;
+        }
+        .chat-message.assistant .msg-content .hl-text {
+          color: #d4d4d4;
+        }
+        .chat-message.assistant .msg-content .hl-comment {
+          color: #6a9955;
+        }
+        .chat-message.assistant .msg-content .hl-escape {
+          color: #d7ba7d;
+        }
+        .chat-message.assistant .msg-content .hl-bracket {
+          color: #ffd700;
+        }
+        .chat-message.assistant .msg-content .hl-method {
+          color: #dcdcaa;
+        }
+        .chat-message.assistant .msg-content .hl-type {
+          color: #4ec9b0;
         }
         .chat-message.assistant .msg-content a {
           color: var(--accent, #4a9eff);
@@ -2218,12 +2289,15 @@ class Openp41geAgents extends LitElement {
     }
     // assistant
     const toolCalls = msg.toolCalls ?? [];
+    const overrides = this._codeLangForMessage(msg.id);
     return html`
       <div class="chat-message assistant">
-        <div class="msg-content">
-          ${msg.content ? unsafeHTML(renderMarkdown(msg.content)) : ""}${
-            this._streaming ? html`<span class="caret"></span>` : ""
-          }
+        <div class="msg-content" @click=${this._onMsgContentClick}>
+          ${
+            msg.content
+              ? unsafeHTML(renderMarkdown(msg.content, { codeLanguages: overrides, msgId: msg.id }))
+              : ""
+          }${this._streaming ? html`<span class="caret"></span>` : ""}
         </div>
         ${
           toolCalls.length > 0
@@ -2232,6 +2306,32 @@ class Openp41geAgents extends LitElement {
         }
       </div>
     `;
+  }
+
+  /** Build the per-message code-language override map for renderMarkdown. */
+  private _codeLangForMessage(msgId: string): Record<number, string> {
+    const prefix = `${msgId}::`;
+    const map: Record<number, string> = {};
+    for (const [key, value] of Object.entries(this._codeLangOverrides)) {
+      if (key.startsWith(prefix)) {
+        map[Number(key.slice(prefix.length))] = value;
+      }
+    }
+    return map;
+  }
+
+  /** Delegate clicks on a code block's language badge to cycle its highlight. */
+  private _onMsgContentClick(e: Event): void {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>(".code-lang");
+    if (!btn) return;
+    const block = btn.closest<HTMLElement>(".code-block");
+    if (!block) return;
+    const msgId = block.dataset.msgId;
+    const index = Number(block.dataset.codeIndex);
+    if (!msgId || Number.isNaN(index)) return;
+    const current = block.dataset.codeLang ?? "text";
+    const next = cycleLanguage(current);
+    this._codeLangOverrides = { ...this._codeLangOverrides, [`${msgId}::${index}`]: next };
   }
 
   private _renderToolCall(tc: ToolCall): TemplateResult {

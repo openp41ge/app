@@ -84,6 +84,27 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot!.querySelectorAll(".chat-message")).toHaveLength(3);
   });
 
+  it("cycles the code block language when its badge is clicked", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+
+    el.addMessage("assistant", "```\nconst x = 1;\n```");
+    await el.updateComplete;
+
+    const block = el.shadowRoot!.querySelector(".code-block") as HTMLElement;
+    expect(block).not.toBeNull();
+    expect(block.dataset.codeLang).toBe("javascript");
+    expect(block.dataset.codeInferred).toBe("true");
+
+    const badge = el.shadowRoot!.querySelector(".code-lang") as HTMLElement;
+    expect(badge).not.toBeNull();
+    badge.click();
+    await el.updateComplete;
+
+    const block2 = el.shadowRoot!.querySelector(".code-block") as HTMLElement;
+    expect(block2.dataset.codeLang).toBe("python");
+  });
+
   it("clearMessages removes all messages and shows empty state", () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
