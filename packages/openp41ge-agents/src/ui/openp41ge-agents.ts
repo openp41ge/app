@@ -1436,6 +1436,29 @@ class Openp41geAgents extends LitElement {
           display: flex;
           flex-direction: column;
           gap: 8px;
+          /* Firefox / future: thin scrollbar with theme colours. */
+          scrollbar-width: thin;
+          scrollbar-color: var(--scrollbar-thumb, #424242) var(--scrollbar-track, transparent);
+        }
+        /* Custom webkit scrollbar — the chat window lives in a shadow root, so
+           the platform's global scrollbar styles don't reach it. */
+        .chat-messages::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+          background: var(--scrollbar-track, transparent);
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+          background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.16));
+          border-radius: 0;
+          min-height: 28px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+          background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.34));
+        }
+        .chat-messages::-webkit-scrollbar-corner {
+          background: transparent;
         }
         .chat-message {
           word-wrap: break-word;
