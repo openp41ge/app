@@ -140,6 +140,7 @@ class Openp41geAgents extends LitElement {
   @state() private _menuOpen: "provider" | "model" | "thinking" | "tools" | null = null;
   private _docListenerAttached = false;
   private _composerResizeObserver: ResizeObserver | null = null;
+  private _chatResizeObserver: ResizeObserver | null = null;
   @query(".chat-input") private _inputEl!: HTMLTextAreaElement;
   @query(".composer-content") private _contentEl!: HTMLElement;
 
@@ -246,6 +247,8 @@ class Openp41geAgents extends LitElement {
     }
     this._composerResizeObserver?.disconnect();
     this._composerResizeObserver = null;
+    this._chatResizeObserver?.disconnect();
+    this._chatResizeObserver = null;
   }
 
   /** Keep the hidden text-area's soft-wrap identical to the rendered content
@@ -1372,6 +1375,8 @@ class Openp41geAgents extends LitElement {
     this._ensureComposerObserver();
     this._syncComposerInputWidth();
     this._syncProviderMenuHeight();
+    this._ensureChatScrollObserver();
+    this._updateChatScrollbar();
   }
 
   /** When a provider/model dropdown is open, size the text area so the composer
@@ -1443,11 +1448,15 @@ class Openp41geAgents extends LitElement {
           background: var(--bg-tertiary, #222);
           border-bottom: 1px solid var(--border-color, #2a2a2a);
         }
-        .chat-messages {
+        .chat-scroll {
           flex: 1;
-          /* Allow the scroll container to shrink below its content height so
-             overflow-y: auto (and the column-reverse bottom anchoring) works. */
           min-height: 0;
+          position: relative;
+          overflow: hidden;
+        }
+        .chat-messages {
+          position: absolute;
+          inset: 0;
           overflow-y: auto;
           padding: 12px;
           display: flex;
@@ -1456,31 +1465,37 @@ class Openp41geAgents extends LitElement {
              anchored to the bottom even when the page is reloaded during dev. */
           flex-direction: column-reverse;
           gap: 8px;
-          /* NOTE: deliberately NO scrollbar-width / scrollbar-color here.
-             Chrome 121+ honors those standardized properties and they override
-             the legacy ::-webkit-scrollbar styling below, falling back to a
-             native auto-hiding thin scrollbar. Relying on ::-webkit-scrollbar
-             keeps the themed, always-visible custom scrollbar. */
+          /* Hide the native scrollbar entirely. A custom floating thumb
+             overlays the content (.chat-scrollbar) instead, so it never
+             reserves a gutter that would make the left/right padding
+             asymmetric. */
+          scrollbar-width: none;
         }
-        /* Custom webkit scrollbar — the chat window lives in a shadow root, so
-           the platform's global scrollbar styles don't reach it. */
         .chat-messages::-webkit-scrollbar {
+          display: none;
+        }
+        /* Floating overlay scrollbar — sits on top of the content on the right
+           edge and does not push the messages aside. The thumb is sized and
+           positioned imperatively from JS (see _updateChatScrollbar). */
+        .chat-scrollbar {
+          position: absolute;
+          top: 8px;
+          right: 3px;
+          bottom: 8px;
           width: 8px;
-          height: 8px;
+          z-index: 2;
+          cursor: pointer;
         }
-        .chat-messages::-webkit-scrollbar-track {
-          background: var(--scrollbar-track, transparent);
-        }
-        .chat-messages::-webkit-scrollbar-thumb {
-          background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.16));
-          border-radius: 0;
+        .chat-scrollbar-thumb {
+          position: absolute;
+          left: 0;
+          right: 0;
+          border-radius: 4px;
+          background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.22));
           min-height: 28px;
         }
-        .chat-messages::-webkit-scrollbar-thumb:hover {
+        .chat-scrollbar:hover .chat-scrollbar-thumb {
           background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.34));
-        }
-        .chat-messages::-webkit-scrollbar-corner {
-          background: transparent;
         }
         .chat-message {
           word-wrap: break-word;
@@ -2181,11 +2196,16 @@ class Openp41geAgents extends LitElement {
 
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
-      <div class="chat-messages">
-        ${this._messages
-          .slice()
-          .reverse()
-          .map((msg) => this._renderMessage(msg))}
+      <div class="chat-scroll">
+        <div class="chat-messages" @scroll=${this._onChatScroll}>
+          ${this._messages
+            .slice()
+            .reverse()
+            .map((msg) => this._renderMessage(msg))}
+        </div>
+        <div class="chat-scrollbar" @pointerdown=${this._onScrollbarPointerDown}>
+          <div class="chat-scrollbar-thumb"></div>
+        </div>
       </div>
 
       <div class="composer ${this._menuOpen ? "menu-open" : ""}">
@@ -2561,6 +2581,64 @@ class Openp41geAgents extends LitElement {
       // So keep the list anchored by resetting to 0, not setting scrollHeight.
       if (el) el.scrollTop = 0;
     });
+  }
+
+  private _onChatScroll(): void {
+    this._updateChatScrollbar();
+  }
+
+  /** Size and position the floating overlay thumb. With column-reverse the
+   *  scroll range is negative: scrollTop 0 is the bottom (newest) and it goes
+   *  increasingly negative toward the top (oldest). The thumb therefore sits at
+   *  the track's bottom at scrollTop 0 and moves up as older messages appear. */
+  private _updateChatScrollbar(): void {
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    const track = this.renderRoot.querySelector<HTMLElement>(".chat-scrollbar");
+    const thumb = this.renderRoot.querySelector<HTMLElement>(".chat-scrollbar-thumb");
+    if (!list || !track || !thumb) return;
+    if (list.scrollHeight <= list.clientHeight + 1) {
+      track.style.display = "none";
+      return;
+    }
+    track.style.display = "";
+    const trackH = track.clientHeight;
+    const thumbH = Math.max(28, (trackH * list.clientHeight) / list.scrollHeight);
+    const travel = trackH - thumbH;
+    const denom = list.scrollHeight - list.clientHeight;
+    const frac = denom > 0 ? -list.scrollTop / denom : 0; // 0=bottom(newest), 1=top(oldest)
+    thumb.style.height = `${thumbH}px`;
+    thumb.style.top = `${(1 - frac) * travel}px`;
+  }
+
+  /** Drag the floating thumb to scroll the list (column-reverse uses a negative
+   *  scroll range: 0 at the bottom/newest, negative toward the top/oldest). */
+  private _onScrollbarPointerDown(e: PointerEvent): void {
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    const track = this.renderRoot.querySelector<HTMLElement>(".chat-scrollbar");
+    if (!list || !track) return;
+    e.preventDefault();
+    const rect = track.getBoundingClientRect();
+    const onMove = (ev: PointerEvent) => {
+      const p = Math.min(1, Math.max(0, (ev.clientY - rect.top) / rect.height));
+      const denom = list.scrollHeight - list.clientHeight;
+      if (denom > 0) list.scrollTop = (p - 1) * denom;
+      this._updateChatScrollbar();
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    onMove(e);
+  }
+
+  private _ensureChatScrollObserver(): void {
+    if (this._chatResizeObserver) return;
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    if (!list || typeof ResizeObserver === "undefined") return;
+    this._chatResizeObserver = new ResizeObserver(() => this._updateChatScrollbar());
+    this._chatResizeObserver.observe(list);
   }
 
   private _id(): string {
