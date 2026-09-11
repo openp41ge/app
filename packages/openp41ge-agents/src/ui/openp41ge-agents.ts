@@ -1386,6 +1386,10 @@ class Openp41geAgents extends LitElement {
         axis: "vertical",
         container,
         styleTarget: root,
+        // Fill the track width (not a skinny 6px thumb in a 10px track) —
+        // matches the file editor's overlay scrollbar so the bar spans the
+        // full track, leaving only the 1px faded content-edge border.
+        size: 9,
       });
     }
     // Anchor the freshly-loaded chat to the newest message (content is now
