@@ -29,6 +29,7 @@ const log = createLogger("openp41ge", "cross-window-drag");
 import { FileDragSource } from "./drag-sources/file-drag-source";
 import { GitEntryDragSource } from "./drag-sources/git-entry-drag-source";
 import { LogStreamDragSource } from "./drag-sources/log-stream-drag-source";
+import { ChatDragSource } from "./drag-sources/chat-drag-source";
 import { ClosedSidebarDropTarget } from "./drop-targets/closed-sidebar-drop-target";
 import { ExplorerReorderDropTarget } from "./drop-targets/explorer-reorder-drop-target";
 import {
@@ -282,6 +283,26 @@ let _pendingLogStreamDragStart: {
   captureRect: { x: number; y: number; width: number; height: number };
 } | null = null;
 
+/**
+ * Deferred drag:start params for chat (Agents sidebar row) drags — captured on
+ * mousedown, fired on the first POSITION event exactly like file/tab/git/log
+ * backlog. The open-tab payload rides `openTabData` so a TARGET window's
+ * cross-window drop can open an agents pane scoped to the dropped chat.
+ */
+let _pendingChatDragStart: {
+  label: string;
+  screenX: number;
+  screenY: number;
+  chatId: string;
+  winId: string;
+  offsetX: number;
+  offsetY: number;
+  elementWidth: number;
+  elementHeight: number;
+  /** Source row rect (viewport coords) for the main-process capturePage snapshot. */
+  captureRect: { x: number; y: number; width: number; height: number };
+} | null = null;
+
 /** Set to true when a git-entry drag engages so the trailing browser `click`
  * on the source row can be suppressed — otherwise releasing back over the
  * explorer after a drag is seen as a click and toggles the repo/worktree.
@@ -299,6 +320,17 @@ let _gitEntryRowSuppressedDrag: HTMLElement | null = null;
  * were a plain click. A stream should only open on an explicit grid drop (or
  * a plain click that never became a drag). */
 let _suppressLogStreamRowClick = false;
+
+/** Set to true when a chat drag engages so the trailing browser `click` on the
+ * source chat row can be suppressed — otherwise releasing back over the
+ * Agents sidebar after a drag is seen as a click and re-opens the chat as if
+ * it were a plain click. A chat should only open on an explicit grid drop (or
+ * a plain click that never became a drag). */
+let _suppressChatRowClick = false;
+
+/** Set true while an Agents chat drag is in flight, so the POSITION handler
+ * can arm click suppression the moment the drag threshold is met. */
+let _pendingChatDragActive = false;
 
 /**
  * The window ID of this renderer, resolved lazily.
@@ -492,6 +524,74 @@ function onLogStreamMouseDown(e: MouseEvent): void {
   };
 }
 
+// ─── Mousedown: initiate chat (Agents sidebar row) drags ────────────────
+// Module-level so the synthetic Mousedown test hooks can drive it directly.
+function onChatMouseDown(e: MouseEvent): void {
+  // Only the primary (left) button engages drags — right/middle clicks must
+  // never start a drag or interrupt an existing one.
+  if (e.button !== 0) return;
+
+  // Agents sidebar chat rows carry a data-chat-id attribute. The archive /
+  // highlight / chevron buttons stopPropagation on mousedown, so this handler
+  // is only reached for the row head (title / description) — exactly where a
+  // drag should begin.
+  const row = e
+    .composedPath()
+    .find(
+      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-chat-id"),
+    );
+  if (!row) return;
+
+  // New gesture — clear any unconsumed suppression flag from a previous drag.
+  _suppressChatRowClick = false;
+
+  // Prevent text-selection / native text drag on the row during the gesture.
+  e.preventDefault();
+
+  const chatId = row.getAttribute("data-chat-id") || "";
+  if (!chatId) return;
+  const title = row.getAttribute("data-chat-title") || chatId;
+  const winId = _resolveMyWinId();
+
+  // Calculate offset from cursor to element's top-left corner (screen coords).
+  const rect = row.getBoundingClientRect();
+  const elScreenX = window.screenX + rect.left;
+  const elScreenY = window.screenY + rect.top;
+  const offsetX = e.screenX - elScreenX;
+  const offsetY = e.screenY - elScreenY;
+
+  const dragSource = new ChatDragSource(chatId, title);
+  dragSource.setOffset(offsetX, offsetY);
+  _currentSource = dragSource;
+  _sidebarTabDragSide = null; // not a sidebar-tab drag
+  _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
+
+  // Defer drag:start until the first POSITION event (after threshold met),
+  // mirroring the file/tab/git/log pattern so the main process captures a
+  // pixel-accurate bitmap of the source row.
+  _pendingChatDragStart = {
+    label: title,
+    screenX: e.screenX,
+    screenY: e.screenY,
+    chatId,
+    winId,
+    offsetX,
+    offsetY,
+    elementWidth: row.offsetWidth,
+    elementHeight: row.offsetHeight,
+    captureRect: {
+      x: rect.x + TAB_GHOST_CAPTURE_INSET,
+      y: rect.y + TAB_GHOST_CAPTURE_INSET,
+      width: Math.max(1, rect.width - TAB_GHOST_CAPTURE_INSET * 2),
+      height: Math.max(1, rect.height - TAB_GHOST_CAPTURE_INSET * 2),
+    },
+  };
+
+  // Mark this drag as a chat drag so the POSITION handler can arm click
+  // suppression once the threshold is met.
+  _pendingChatDragActive = true;
+}
+
 // ─── Dummy drag source for cross-window ghost preview ────────────────────
 
 /**
@@ -657,6 +757,10 @@ export function initDragSystem(): () => void {
   document.addEventListener("mousedown", onLogStreamMouseDown);
   cleanups.push(() => document.removeEventListener("mousedown", onLogStreamMouseDown));
 
+  // ── Mousedown: initiate chat (Agents sidebar row) drags ───────────────
+  document.addEventListener("mousedown", onChatMouseDown);
+  cleanups.push(() => document.removeEventListener("mousedown", onChatMouseDown));
+
   // ── Suppress native HTML5 drag for file rows while a custom file drag runs ──
   // Explorer file rows are natively draggable (uikit <openp41ge-tree>). Once
   // onFileMouseDown starts the custom orchestrator drag, cancel the native
@@ -754,6 +858,27 @@ export function initDragSystem(): () => void {
   };
   document.addEventListener("click", onLogStreamRowClickSuppress, true);
   cleanups.push(() => document.removeEventListener("click", onLogStreamRowClickSuppress, true));
+
+  // ── Suppress the trailing click after a chat drag ─────────────────────
+  // Once a chat drag engages (threshold met -> _suppressChatRowClick true),
+  // the browser may still synthesize a `click` on the source row if press and
+  // release stayed within the click slop. That click would open the chat via
+  // the row's @click handler. Capture phase, consumed once.
+  const onChatRowClickSuppress = (e: MouseEvent) => {
+    if (!_suppressChatRowClick) return;
+    _suppressChatRowClick = false;
+    const hasChatRow = e
+      .composedPath()
+      .some(
+        (el) => el instanceof HTMLElement && el.hasAttribute("data-chat-id"),
+      );
+    if (hasChatRow) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  };
+  document.addEventListener("click", onChatRowClickSuppress, true);
+  cleanups.push(() => document.removeEventListener("click", onChatRowClickSuppress, true));
 
   // ── Mousedown: initiate sidebar tab drags ────────────────────────────
   const onSidebarTabMouseDown = (e: MouseEvent) => {
@@ -880,6 +1005,8 @@ export function initDragSystem(): () => void {
     _pendingFileDragStart = null;
     _pendingGitEntryDragStart = null;
     _pendingLogStreamDragStart = null;
+    _pendingChatDragStart = null;
+    _pendingChatDragActive = false;
     if (_localDragActive) {
       clearGridGhost();
 
@@ -969,6 +1096,11 @@ export function initDragSystem(): () => void {
         // And for log-stream rows: releasing back over the Logs sidebar must not
         // re-open the stream as if it were a plain click.
         _suppressLogStreamRowClick = !!_pendingLogStreamDragStart;
+        // And for chat rows: releasing back over the Agents sidebar must not
+        // re-open the chat as if it were a plain click. Consume the active
+        // chat-drag marker once the threshold is met.
+        _suppressChatRowClick = _pendingChatDragActive;
+        _pendingChatDragActive = false;
         if (_pendingFileDragStart) {
           _pendingFileDetachPath = _pendingFileDragStart.filePath;
         }
@@ -1128,6 +1260,33 @@ export function initDragSystem(): () => void {
             { appType: "log-viewer", tabConfig: { system: p.system } },
           );
           _pendingLogStreamDragStart = null;
+        } else if (_pendingChatDragStart) {
+          const p = _pendingChatDragStart;
+          // Chat ghost: identical bitmap treatment to files/git/log entries
+          // — the main process captures the source Agents sidebar row and
+          // renders it in the DragGhostManager window at the row's exact
+          // dimensions. The open-tab payload (appType/tabConfig) rides
+          // `openTabData` so a TARGET window's cross-window drop can open a
+          // chat-scoped agents pane without seeing the source row.
+          window.openp41ge.drag.start(
+            p.label,
+            p.screenX,
+            p.screenY,
+            undefined,
+            undefined,
+            p.winId,
+            undefined,
+            p.elementWidth,
+            p.elementHeight,
+            p.offsetX,
+            p.offsetY,
+            "open-tab",
+            undefined,
+            p.captureRect,
+            TAB_GHOST_CAPTURE_INSET,
+            { appType: "agents", tabConfig: { chatId: p.chatId } },
+          );
+          _pendingChatDragStart = null;
         }
         window.openp41ge.drag.activate();
       }
@@ -1155,8 +1314,11 @@ export function initDragSystem(): () => void {
     _pendingSidebarDragStart = null;
     _pendingGitEntryDragStart = null;
     _pendingLogStreamDragStart = null;
+    _pendingChatDragStart = null;
+    _pendingChatDragActive = false;
     _suppressGitEntryRowClick = false;
     _suppressLogStreamRowClick = false;
+    _suppressChatRowClick = false;
     _currentSource = null;
     _restoreFileRowDraggable();
     _restoreGitEntryRowDraggable();
@@ -1368,7 +1530,10 @@ export function initDragSystem(): () => void {
     _localFileDragActive = false;
     _pendingFileDetachPath = null;
     _pendingLogStreamDragStart = null;
+    _pendingChatDragStart = null;
+    _pendingChatDragActive = false;
     _suppressLogStreamRowClick = false;
+    _suppressChatRowClick = false;
     _orchestrator?.cancelDrag();
     window.openp41ge.drag.end();
     clearGridGhost();
@@ -1530,6 +1695,63 @@ async function _handleCrossWindowDrop(
               targetCol,
               true,
               { system },
+            );
+          }
+        }
+        window.openp41ge.drag.endSession();
+        return;
+      }
+
+      // ── Agent chat drop (cross-window): open an agents pane scoped to the
+      // dropped chat at the target grid column. Mirrors the same-window path
+      // in Openp41geTabsEventHandler's grid-open-tab handler.
+      if (appType === "agents") {
+        const chatId = (tabConfig as { chatId?: string }).chatId;
+        if (!chatId) {
+          window.openp41ge.drag.endSession();
+          return;
+        }
+        (window as unknown as Record<string, unknown>).__pendingChatId = chatId;
+        const gridEl = (target as IDropTarget & { element: HTMLElement }).element.closest(
+          "tab-grid",
+        ) as HTMLElement | null;
+        if (gridEl) {
+          const gridRect = gridEl.getBoundingClientRect();
+          const relX = clientX - gridRect.left;
+          const cols = (gridEl as HTMLElement & { cols?: number }).cols || 1;
+          const pos = computeDropTarget(gridEl, relX, gridRect.width, cols);
+          const targetCol = pos.col;
+          const winId = (gridEl as HTMLElement & { winId?: string }).winId || _resolveMyWinId();
+
+          if (pos.isBoundary) {
+            const splitLeft =
+              pos.boundaryIndex === 0
+                ? true
+                : pos.boundaryIndex >= cols
+                  ? false
+                  : targetCol >= pos.boundaryIndex;
+            const splitCol =
+              pos.boundaryIndex === 0 ? 0 : pos.boundaryIndex >= cols ? cols - 1 : targetCol;
+            window.openp41ge.workspace.dispatch(
+              "splitFileOpen",
+              winId,
+              "agents",
+              "Agent",
+              chatId,
+              splitCol,
+              splitLeft,
+              { chatId },
+            );
+          } else {
+            window.openp41ge.workspace.dispatch(
+              "actionOpenFile",
+              winId,
+              "agents",
+              "Agent",
+              chatId,
+              targetCol,
+              true,
+              { chatId },
             );
           }
         }
@@ -1819,6 +2041,7 @@ if (typeof window !== "undefined") {
     gridEl: () => document.querySelector("tab-grid") as HTMLElement | null,
     getGitEntryPendingStart: () => _pendingGitEntryDragStart,
     getLogStreamPendingStart: () => _pendingLogStreamDragStart,
+    getChatPendingStart: () => _pendingChatDragStart,
     getCurrentDragSourceType: () => _currentSource?.type ?? null,
     getCurrentDragData: () => _currentSource?.getDragData() ?? null,
     hasGitEntryRowSuppressed: () => _gitEntryRowSuppressedDrag !== null,
@@ -1831,9 +2054,12 @@ if (typeof window !== "undefined") {
       _pendingSidebarDragStart = null;
       _pendingGitEntryDragStart = null;
       _pendingLogStreamDragStart = null;
+      _pendingChatDragStart = null;
+      _pendingChatDragActive = false;
       _gitEntryRowSuppressedDrag = null;
       _suppressGitEntryRowClick = false;
       _suppressLogStreamRowClick = false;
+      _suppressChatRowClick = false;
       _localDragActive = false;
       _localFileDragActive = false;
       _sidebarTabDragSide = null;

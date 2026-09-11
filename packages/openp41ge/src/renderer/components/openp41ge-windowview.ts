@@ -10,6 +10,10 @@ import { property, state } from "lit/decorators.js";
 import type { Window, Workspace, Rect, SystemTabId } from "../../layout/types";
 import { emitEvent } from "../app";
 
+import { settingsIcon } from "../icons";
+import { getFileIcon } from "../icons/material-icons";
+import { getAllSystemTabRegistrations } from "../apps/app-registry";
+
 import { setContextMenuActive } from "../services/drag-context";
 import {
   MIN_SIDEBAR_WIDTH,
@@ -227,6 +231,56 @@ class Openp41geWindowView extends LitElement {
     return sysTab?.pinned ?? false;
   }
 
+  // ═══ Grid tab prefix icons ─────────────────────────────────────────────
+
+  /**
+   * Compute the prefix icon for a grid tab.
+   *
+   * Only two tab kinds get icons, per the design decision that grid tabs are
+   * otherwise indistinguishable from one another:
+   *   - Settings grid tabs (a sidebar tab's own settings surface) use the
+   *     settings gear icon from the sidebar's settings buttons.
+   *   - File editor tabs use the same file-type icon as the explorer sidebar.
+   *
+   * All other grid tabs (terminal, git repository, etc.) get no icon.
+   */
+  private _gridTabIcon(tab: { appType: string; config?: Record<string, unknown> }): string | undefined {
+    // Settings grid tabs: any appType that is a registered sidebar tab's
+    // settings surface. Matched against the registry at render time so
+    // extension-provided settings tabs are covered too.
+    if (this._isSettingsGridAppType(tab.appType)) {
+      return settingsIcon(14);
+    }
+
+    // File editor tabs: reuse the explorer's file-type icon (by filename).
+    if (tab.appType === "file-viewer") {
+      const filePath = tab.config?.filePath;
+      if (typeof filePath === "string" && filePath) {
+        return this._sizeIcon(getFileIcon(this._fileNameFromPath(filePath)), 14);
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Material icon SVGs carry only a viewBox (no intrinsic size), so they
+   * otherwise render at the browser's default 300x150. Inject explicit
+   * width/height (mirroring <file-extension-svg> in the explorer).
+   */
+  private _sizeIcon(svg: string, size: number): string {
+    return svg.replace("<svg", `<svg width="${size}" height="${size}"`);
+  }
+
+  private _isSettingsGridAppType(appType: string): boolean {
+    return getAllSystemTabRegistrations().some((reg) => reg.settings?.appType === appType);
+  }
+
+  private _fileNameFromPath(filePath: string): string {
+    const parts = filePath.split(/[\\/]/).filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : filePath;
+  }
+
   // ═══ Render ──────────────────────────────────────────────────────────
 
   render(): TemplateResult | typeof nothing {
@@ -235,7 +289,10 @@ class Openp41geWindowView extends LitElement {
     if (!win) return nothing;
 
     // Build tab-data and active-tab-ids for <tab-grid>
-    const tabData: Record<string, { title: string; content: string; pinned: boolean }> = {};
+    const tabData: Record<
+      string,
+      { title: string; content: string; pinned: boolean; icon?: string }
+    > = {};
     const activeTabIds: Record<string, string> = {};
     for (const p of win.grid.placements) {
       const col = String(p.position.col);
@@ -244,7 +301,12 @@ class Openp41geWindowView extends LitElement {
         const tidStr = String(tabId);
         const tab = ws?.editorTabs?.[tabId];
         const pinned = tab ? !tab.isPreview : true;
-        tabData[tidStr] = { title: tab?.title ?? "untitled", content: "", pinned };
+        tabData[tidStr] = {
+          title: tab?.title ?? "untitled",
+          content: "",
+          pinned,
+          icon: tab ? this._gridTabIcon(tab) : undefined,
+        };
       }
     }
 

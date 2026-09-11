@@ -35,6 +35,8 @@ export interface GridState {
       pinned?: boolean;
       ephemeral?: boolean;
       ephemeralPinned?: boolean;
+      /** Optional prefix icon (SVG markup) rendered before the tab title. */
+      icon?: string;
     }
   >;
   activeTabIds: Record<string, string>;
@@ -55,6 +57,8 @@ export class TabGrid extends LitElement {
       pinned?: boolean;
       ephemeral?: boolean;
       ephemeralPinned?: boolean;
+      /** Optional prefix icon (SVG markup) rendered before the tab title. */
+      icon?: string;
     }
   > = {};
   @property({ type: Object }) activeTabIds: Record<string, string> = {};

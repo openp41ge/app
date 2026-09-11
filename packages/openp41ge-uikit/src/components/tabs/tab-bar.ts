@@ -8,6 +8,7 @@
 
 import { LitElement, html, nothing } from "lit";
 import { property } from "lit/decorators.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { TabBarDropTarget } from "openp41ge-tabs/targets/tab-bar-drop-target";
 import { getDropIndexInBar, getTabButtonsInBar } from "openp41ge-tabs/boundary";
 
@@ -21,7 +22,14 @@ export class TabBar extends LitElement {
   @property({ type: Array }) tabIds: string[] = [];
   @property({ type: Object }) tabs: Record<
     string,
-    { title: string; pinned?: boolean; ephemeral?: boolean; ephemeralPinned?: boolean }
+    {
+      title: string;
+      pinned?: boolean;
+      ephemeral?: boolean;
+      ephemeralPinned?: boolean;
+      /** Optional prefix icon (SVG markup) rendered before the tab title. */
+      icon?: string;
+    }
   > = {};
   @property({ type: String }) activeTabId: string = "";
   @property({ type: String }) winId: string = "";
@@ -278,8 +286,8 @@ export class TabBar extends LitElement {
           line-height: 1;
           color: #666;
           cursor: pointer;
-          width: 16px;
-          height: 16px;
+          width: 20px;
+          height: 20px;
           flex-shrink: 0;
           border-radius: 4px;
           transition:
@@ -289,7 +297,7 @@ export class TabBar extends LitElement {
         .tab-close-x {
           display: block;
           line-height: 1;
-          /* Font metrics leave the ✕ glyph low in its 16px button;
+          /* Font metrics leave the ✕ glyph low in its 20px button;
              lift just the glyph (the button itself stays put). */
           transform: translateY(-1px);
         }
@@ -375,8 +383,9 @@ export class TabBar extends LitElement {
               id in this._localEphemeralPinned
                 ? this._localEphemeralPinned[id]
                 : tab?.ephemeralPinned ?? false;
+            const hasIcon = !!tab?.icon;
             const tabStyle = [
-              'display:inline-flex;align-items:center;flex-shrink:0;min-width:var(--tab-min-width,120px);max-width:75%;height:34px;padding:0 8px;border-right:1px solid #333;cursor:pointer;font-size:12px;line-height:34px;user-select:none;white-space:nowrap;',
+              `display:inline-flex;align-items:center;flex-shrink:0;min-width:${hasIcon ? 'calc(var(--tab-min-width,120px) + 24px)' : 'var(--tab-min-width,120px)'};max-width:75%;height:34px;padding:0 8px;border-right:1px solid #333;cursor:pointer;font-size:12px;line-height:34px;user-select:none;white-space:nowrap;`,
               `font-style:${!isEphemeral && !tab?.pinned ? 'italic' : 'normal'};`,
               isActive && this.focused && isEphemeral
                 ? isEphemeralPinned
@@ -397,6 +406,13 @@ export class TabBar extends LitElement {
                   class="tab-text-container"
                   style="flex:1;overflow:hidden;min-width:0;padding:0 0 0 8px;display:flex;align-items:center;"
                 >
+                  ${tab?.icon
+                    ? html`<span
+                        class="tab-icon"
+                        style="display:inline-flex;align-items:center;flex-shrink:0;margin-right:6px;line-height:1;color:inherit;"
+                        >${unsafeHTML(tab.icon)}</span
+                      >`
+                    : nothing}
                   <span
                     class="tab-text-inner"
                     style="white-space:nowrap;display:inline-block;overflow:hidden;text-overflow:ellipsis;"

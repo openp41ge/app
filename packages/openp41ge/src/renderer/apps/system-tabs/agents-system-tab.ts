@@ -482,6 +482,7 @@ export class AgentsSystemTabController implements SystemTabController {
     const row = document.createElement("div");
     row.className = "chat-row";
     row.dataset.chatId = chat.id;
+    row.dataset.chatTitle = chat.title;
     if (this._expanded.has(chat.id)) row.classList.add("open");
     Object.assign(row.style, {
       display: "flex",

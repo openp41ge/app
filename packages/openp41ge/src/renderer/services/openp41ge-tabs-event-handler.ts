@@ -156,6 +156,7 @@ export class Openp41geTabsEventHandler {
           shortHash?: string;
           source?: string;
           system?: string;
+          chatId?: string;
         };
         targetCol: number;
         isBoundary?: boolean;
@@ -295,6 +296,48 @@ export class Openp41geTabsEventHandler {
             targetCol,
             pinned ?? true,
             { system },
+          );
+        }
+        return;
+      }
+
+      // ── Agent chat drop: open a chat pane scoped to the dropped chat ───
+      if (_tabType === "agents") {
+        const chatId = tabConfig.chatId;
+        if (!chatId) return;
+
+        // Set the pending chat so AgentsController picks it up on mount.
+        (window as unknown as Record<string, unknown>).__pendingChatId = chatId;
+        const tabName = "Agent";
+
+        const chatFocusCol = isBoundary
+          ? (splitLeft ?? true)
+            ? (splitCol ?? targetCol)
+            : (splitCol ?? targetCol) + 1
+          : targetCol;
+        Openp41geTabsEventHandler.lastFocusedCol[winId] = chatFocusCol;
+
+        if (isBoundary) {
+          this._dispatch(
+            "splitFileOpen",
+            winId,
+            "agents",
+            tabName,
+            chatId,
+            splitCol ?? targetCol,
+            splitLeft ?? true,
+            { chatId },
+          );
+        } else {
+          this._dispatch(
+            "actionOpenFile",
+            winId,
+            "agents",
+            tabName,
+            chatId,
+            targetCol,
+            pinned ?? true,
+            { chatId },
           );
         }
         return;
