@@ -1445,10 +1445,16 @@ class Openp41geAgents extends LitElement {
         }
         .chat-messages {
           flex: 1;
+          /* Allow the scroll container to shrink below its content height so
+             overflow-y: auto (and the column-reverse bottom anchoring) works. */
+          min-height: 0;
           overflow-y: auto;
           padding: 12px;
           display: flex;
-          flex-direction: column;
+          /* column-reverse keeps the newest message pinned to the bottom edge
+             and lets the scroll position start there, so the chat stays
+             anchored to the bottom even when the page is reloaded during dev. */
+          flex-direction: column-reverse;
           gap: 8px;
           /* Firefox / future: thin scrollbar with theme colours. */
           scrollbar-width: thin;
@@ -2173,7 +2179,12 @@ class Openp41geAgents extends LitElement {
 
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
-      <div class="chat-messages">${this._messages.map((msg) => this._renderMessage(msg))}</div>
+      <div class="chat-messages">
+        ${this._messages
+          .slice()
+          .reverse()
+          .map((msg) => this._renderMessage(msg))}
+      </div>
 
       <div class="composer ${this._menuOpen ? "menu-open" : ""}">
         <div
@@ -2542,7 +2553,11 @@ class Openp41geAgents extends LitElement {
   private _scrollToBottom(): void {
     requestAnimationFrame(() => {
       const el = this.renderRoot.querySelector(".chat-messages");
-      if (el) el.scrollTop = el.scrollHeight;
+      // The messages list uses `flex-direction: column-reverse`, which inverts
+      // the scroll range: the newest message is pinned to the bottom at
+      // scrollTop 0, and older messages overflow upward (increasing scrollTop).
+      // So keep the list anchored by resetting to 0, not setting scrollHeight.
+      if (el) el.scrollTop = 0;
     });
   }
 
