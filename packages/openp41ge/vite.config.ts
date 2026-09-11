@@ -22,6 +22,10 @@ export default defineConfig({
         replacement: path.resolve(__dirname, "../openp41ge-constants/src"),
       },
       {
+        find: "openp41ge-scrollbar",
+        replacement: path.resolve(__dirname, "../openp41ge-scrollbar/src"),
+      },
+      {
         find: "openp41ge-filesystem",
         replacement: path.resolve(__dirname, "../openp41ge-filesystem/src"),
       },

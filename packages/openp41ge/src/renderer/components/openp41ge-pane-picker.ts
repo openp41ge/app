@@ -11,8 +11,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { state, query } from "lit/decorators.js";
 import { APP_TYPES } from "../app-types";
 import type { AppTypeInfo } from "../app-types";
-import { Openp41geScrollbar } from "./openp41ge-scrollbar";
-
+import { Openp41geScrollbar } from "openp41ge-scrollbar";
 
 const SEARCH_DEBOUNCE_MS = 150;
 
@@ -128,11 +127,7 @@ class Openp41gePanePicker extends LitElement {
               class="flex-1 overflow-y-overlay py-1 border-r border-divider"
             ></div>
             <div id="openp41ge-picker-files" class="flex-1 overflow-y-overlay py-1">
-              <div
-                class="px-4 pt-2 pb-1 text-2xs text-muted uppercase tracking-wider"
-              >
-                Files
-              </div>
+              <div class="px-4 pt-2 pb-1 text-2xs text-muted uppercase tracking-wider">Files</div>
             </div>
           </div>
           <div

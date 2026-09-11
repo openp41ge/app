@@ -165,6 +165,9 @@ importers:
       openp41ge-piece-tree:
         specifier: workspace:*
         version: link:../openp41ge-piece-tree
+      openp41ge-scrollbar:
+        specifier: workspace:*
+        version: link:../openp41ge-scrollbar
       openp41ge-uikit:
         specifier: workspace:*
         version: link:../openp41ge-uikit
@@ -196,6 +199,9 @@ importers:
       lit:
         specifier: ^3.3.3
         version: 3.3.3
+      openp41ge-scrollbar:
+        specifier: workspace:*
+        version: link:../openp41ge-scrollbar
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -270,6 +276,19 @@ importers:
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/openp41ge-piece-tree:
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/openp41ge-scrollbar:
+    dependencies:
+      openp41ge-constants:
+        specifier: workspace:*
+        version: link:../openp41ge-constants
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -490,6 +509,9 @@ packages:
         integrity: sha512-KVtQRtc00ES/y+Sc3vYXeP6pCIcNlBJCZOwvqSy8ZpVGmbM5+IG+AfhuTKQ2oXmIVqZJewaGMMpzPkywC6xg0w==,
       }
     engines: { node: ">=20.0.0" }
+    deprecated: |-
+      Deprecated due to Document number parsing bug in JSON, see
+        https://github.com/aws/aws-sdk-js-v3/issues/8246. Newer version available.
 
   "@aws-sdk/credential-provider-env@3.972.61":
     resolution:

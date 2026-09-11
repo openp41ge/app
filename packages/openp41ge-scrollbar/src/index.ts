@@ -8,14 +8,20 @@
  * - Both vertical and horizontal scrollbar support.
  * - Optional auto-hide behaviour (replaces the older ScrollbarActivity
  *   overlay-strip approach).
+ * - Works inside shadow roots: pass `styleTarget: shadowRoot` so the
+ *   shared styles are injected into the shadow tree (global styles do
+ *   not reach shadow-DOM scrollbars).
  *
- * Global styles are injected once into the document head.  Each
- * scrollable container gets the proper `overflow` and `scrollbar-gutter`
- * CSS so scrollbars always occupy layout space and never obscure borders
- * or outlines.
+ * Styles are injected once per target (document head by default).
+ * Each scrollable container gets the proper `overflow` and
+ * `scrollbar-gutter` CSS so scrollbars always occupy layout space and
+ * never obscure borders or outlines.
  *
- * Usage – apply to an existing element:
+ * Usage – apply to an existing element (light DOM):
  *   Openp41geScrollbar.apply(el, { axis: "vertical" });
+ *
+ * Usage – apply inside a shadow root (e.g. the agents chat panel):
+ *   Openp41geScrollbar.apply(el, { axis: "vertical", styleTarget: shadowRoot });
  *
  * Usage – create a new scrollable viewport inside a parent:
  *   const vp = Openp41geScrollbar.createViewport(parent, { axis: "both" });
@@ -35,34 +41,53 @@ export interface ScrollbarOptions {
   autoHide?: boolean;
   /** Background color for the auto-hide overlay strip. */
   bgColor?: string;
+  /** Where to inject the shared scrollbar styles.  Pass a `ShadowRoot`
+   *  when the target element lives in a shadow tree, otherwise the
+   *  styles are injected (once) into `document.head`. */
+  styleTarget?: Document | ShadowRoot;
 }
 
 const AUTO_HIDE_IDLE = 600;
 
+const STYLE_ID = "openp41ge-scrollbar-style";
 
-// ── Global style injection ──
+const STYLE_TEXT = [
+  "::-webkit-scrollbar { width: 8px; height: 8px; }",
+  "::-webkit-scrollbar-track { background: transparent; box-sizing: border-box; }",
+  "::-webkit-scrollbar-track:vertical { border-left: 1px solid rgba(128,128,128,0.25); }",
+  "::-webkit-scrollbar-track:horizontal { border-top: 1px solid rgba(128,128,128,0.25); }",
+  "::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16); border-radius: 0; min-height: 28px; }",
+  "::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.34); }",
+  "::-webkit-scrollbar-corner { background: transparent; }",
+].join("\n");
 
-let _injected = false;
+// ── Style injection ──
 
-function injectStyles(): void {
-  if (_injected) return;
-  _injected = true;
+let _injectedDocument = false;
 
-  const id = "openp41ge-scrollbar-style";
-  if (document.getElementById(id)) return;
+function injectStyles(target?: Document | ShadowRoot): void {
+  if (target instanceof ShadowRoot) {
+    // Each shadow root carries its own copy of the stylesheet, because
+    // global (document-level) styles never reach shadow-DOM scrollbars.
+    if (target.getElementById(STYLE_ID)) return;
+    const s = document.createElement("style");
+    s.id = STYLE_ID;
+    s.textContent = STYLE_TEXT;
+    target.appendChild(s);
+    return;
+  }
+
+  if (_injectedDocument) return;
+  _injectedDocument = true;
+
+  const head = (target ?? document).head;
+  if (!head) return;
+  if (document.getElementById(STYLE_ID)) return;
 
   const s = document.createElement("style");
-  s.id = id;
-  s.textContent = [
-    "::-webkit-scrollbar { width: 8px; height: 8px; }",
-    "::-webkit-scrollbar-track { background: transparent; box-sizing: border-box; }",
-    "::-webkit-scrollbar-track:vertical { border-left: 1px solid rgba(128,128,128,0.25); }",
-    "::-webkit-scrollbar-track:horizontal { border-top: 1px solid rgba(128,128,128,0.25); }",
-    "::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16); border-radius: 0; min-height: 28px; }",
-    "::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.34); }",
-    "::-webkit-scrollbar-corner { background: transparent; }",
-  ].join("\n");
-  document.head.appendChild(s);
+  s.id = STYLE_ID;
+  s.textContent = STYLE_TEXT;
+  head.appendChild(s);
 }
 
 function axisOverflow(axis: "vertical" | "horizontal" | "both"): {
@@ -97,7 +122,7 @@ export class Openp41geScrollbar {
    * occupies layout space.
    */
   static apply(el: HTMLElement, options?: ScrollbarOptions): void {
-    injectStyles();
+    injectStyles(options?.styleTarget);
     const axis = options?.axis ?? "vertical";
     const ov = axisOverflow(axis);
     el.style.overflowY = ov.overflowY;
@@ -131,7 +156,7 @@ export class Openp41geScrollbar {
    * Call `destroy()` to clean up listeners and the overlay strip.
    */
   constructor(el: HTMLElement, options?: ScrollbarOptions) {
-    injectStyles();
+    injectStyles(options?.styleTarget);
     this._el = el;
     this._axis = options?.axis ?? "vertical";
     this._autoHide = options?.autoHide ?? false;

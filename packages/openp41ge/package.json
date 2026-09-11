@@ -27,6 +27,7 @@
     "openp41ge-git": "workspace:*",
     "openp41ge-logger": "workspace:*",
     "openp41ge-constants": "workspace:*",
+    "openp41ge-scrollbar": "workspace:*",
     "openp41ge-filesystem": "workspace:*",
     "zod": "^3.24.0",
     "openp41ge-agents": "workspace:*"
