@@ -17,7 +17,7 @@
 import { LitElement, html, type TemplateResult } from "lit";
 import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { Openp41geScrollbar } from "openp41ge-scrollbar";
+import { OverlayScrollbar } from "openp41ge-scrollbar";
 import type { Chat, ChatMessage, ChatRuntimeStatus, ToolCall } from "../types";
 import { renderMarkdownSegments, type MarkdownSegment, type CodeBlockSegment } from "./markdown.js";
 import {
@@ -141,6 +141,7 @@ class Openp41geAgents extends LitElement {
   @state() private _menuOpen: "provider" | "model" | "thinking" | "tools" | null = null;
   private _docListenerAttached = false;
   private _composerResizeObserver: ResizeObserver | null = null;
+  private _chatScrollbar: OverlayScrollbar | null = null;
   @query(".chat-input") private _inputEl!: HTMLTextAreaElement;
   @query(".composer-content") private _contentEl!: HTMLElement;
 
@@ -160,6 +161,7 @@ class Openp41geAgents extends LitElement {
     this._streaming = false;
     this._providerId = chat.providerId;
     this._modelId = "";
+    this._scrollToBottom();
   }
 
   appendDelta(text: string): void {
@@ -247,6 +249,8 @@ class Openp41geAgents extends LitElement {
     }
     this._composerResizeObserver?.disconnect();
     this._composerResizeObserver = null;
+    this._chatScrollbar?.destroy();
+    this._chatScrollbar = null;
   }
 
   /** Keep the hidden text-area's soft-wrap identical to the rendered content
@@ -1366,16 +1370,27 @@ class Openp41geAgents extends LitElement {
   };
 
   protected firstUpdated(): void {
-    // Apply the shared Openp41geScrollbar to the messages list. The chat lives
-    // in a shadow root, so we inject the shared styles into that root (global
-    // styles never reach shadow-DOM scrollbars). `apply` also sets overflow and
-    // scrollbar-gutter on the element. Runs once; `Openp41geScrollbar` keeps the
-    // native scrollbar as-is (classic `::-webkit-scrollbar` styling).
+    // Attach the shared floating OverlayScrollbar (the same component the file
+    // editor uses) to the message list. It hides the native bar and draws its
+    // own translucent thumb that floats over the content, so the left/right
+    // padding stays symmetric. The chat lives in a shadow root, so pass the
+    // shadow root as styleTarget for the overlay styles. The track/thumb are
+    // placed in `.chat-scroll` (position:relative, not the scroll target).
     const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
-    if (list) {
+    const container = this.renderRoot.querySelector<HTMLElement>(".chat-scroll");
+    // jsdom/test env has no ResizeObserver; skip attaching gracefully.
+    if (typeof ResizeObserver === "undefined") return;
+    if (list && container) {
       const root = this.renderRoot instanceof ShadowRoot ? this.renderRoot : undefined;
-      Openp41geScrollbar.apply(list, { axis: "vertical", styleTarget: root });
+      this._chatScrollbar = OverlayScrollbar.attach(list, {
+        axis: "vertical",
+        container,
+        styleTarget: root,
+      });
     }
+    // Anchor the freshly-loaded chat to the newest message (content is now
+    // laid out, so the rAF in `_scrollToBottom` reads a real scrollHeight).
+    this._scrollToBottom();
   }
 
   protected updated(): void {
@@ -1457,17 +1472,20 @@ class Openp41geAgents extends LitElement {
           background: var(--bg-tertiary, #222);
           border-bottom: 1px solid var(--border-color, #2a2a2a);
         }
-        .chat-messages {
+        .chat-scroll {
           flex: 1;
           min-height: 0;
+          position: relative;
+          overflow: hidden;
+        }
+        .chat-messages {
+          position: absolute;
+          inset: 0;
           box-sizing: border-box;
           overflow-y: auto;
           padding: 12px;
           display: flex;
-          /* column-reverse keeps the newest message pinned to the bottom edge
-             and lets the scroll position start there, so the chat stays
-             anchored to the bottom even when the page is reloaded during dev. */
-          flex-direction: column-reverse;
+          flex-direction: column;
           gap: 8px;
         }
         .chat-message {
@@ -2169,11 +2187,10 @@ class Openp41geAgents extends LitElement {
 
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
-      <div class="chat-messages">
-        ${this._messages
-          .slice()
-          .reverse()
-          .map((msg) => this._renderMessage(msg))}
+      <div class="chat-scroll">
+        <div class="chat-messages">
+          ${this._messages.map((msg) => this._renderMessage(msg))}
+        </div>
       </div>
 
       <div class="composer ${this._menuOpen ? "menu-open" : ""}">
@@ -2543,11 +2560,18 @@ class Openp41geAgents extends LitElement {
   private _scrollToBottom(): void {
     requestAnimationFrame(() => {
       const el = this.renderRoot.querySelector(".chat-messages");
-      // The messages list uses `flex-direction: column-reverse`, which inverts
-      // the scroll range: the newest message is pinned to the bottom at
-      // scrollTop 0, and older messages overflow upward (increasing scrollTop).
-      // So keep the list anchored by resetting to 0, not setting scrollHeight.
-      if (el) el.scrollTop = 0;
+      // The list scrolls normally (top-down); keep it anchored to the newest
+      // message by scrolling to the bottom. `OverlayScrollbar` observes the
+      // change and repaints the floating thumb.
+      if (el) el.scrollTop = el.scrollHeight;
+      // On the very first render the content may not be laid out yet, so the
+      // assignment above is a no-op (scrollHeight ~ clientHeight). Detect the
+      // overflow-but-unscrolled case and retry next frame.
+      if (el && el.scrollHeight - el.clientHeight > 0 && el.scrollTop === 0) {
+        requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight;
+        });
+      }
     });
   }
 

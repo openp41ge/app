@@ -10,11 +10,11 @@ export {
   OverlayScrollbar,
   computeThumbLength,
   computeThumbPosition,
-} from "./components/scrollbar/overlay-scrollbar";
+} from "openp41ge-scrollbar";
 export type {
   ScrollbarAxis,
   OverlayScrollbarOptions,
-} from "./components/scrollbar/overlay-scrollbar";
+} from "openp41ge-scrollbar";
 export { installGlobalScrollbarStyles } from "./components/scrollbar/global-scrollbar-styles";
 
 // Re-export the inline tailwind CSS for component static styles

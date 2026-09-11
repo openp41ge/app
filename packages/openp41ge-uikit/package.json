@@ -21,7 +21,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "style": "dist/styles.css",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build:css": "tailwindcss -i src/styles.css -o dist/styles.css",
     "build:inline": "node scripts/inline-css.mjs",
@@ -37,7 +39,8 @@
     "openp41ge-editor-engine": "workspace:*",
     "openp41ge-git": "workspace:*",
     "vscode-textmate": "^9.3.2",
-    "vscode-oniguruma": "^2.0.1"
+    "vscode-oniguruma": "^2.0.1",
+    "openp41ge-scrollbar": "workspace:*"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",

@@ -8,7 +8,7 @@
 
 import { LitElement, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { OverlayScrollbar } from "../scrollbar/overlay-scrollbar";
+import { OverlayScrollbar } from "openp41ge-scrollbar";
 
 import {
   EVENT_TITLE_CHANGED,
