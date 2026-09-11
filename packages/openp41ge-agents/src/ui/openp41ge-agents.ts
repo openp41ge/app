@@ -1563,15 +1563,16 @@ class Openp41geAgents extends LitElement {
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: 4px;
-          margin-bottom: 4px;
+          gap: 6px;
+          margin-bottom: 6px;
         }
         .chat-message.assistant .msg-content .code-lang {
           display: inline-flex;
           align-items: center;
-          padding: 1px 8px;
+          height: 20px;
+          padding: 0 8px;
           font-size: 11px;
-          line-height: 1.6;
+          line-height: 1;
           color: var(--text-secondary, #999);
           background: var(--bg-active, #2d2d2d);
           border: 1px solid var(--border-color, #3a3a3a);
@@ -1590,7 +1591,7 @@ class Openp41geAgents extends LitElement {
           align-items: center;
           justify-content: center;
           width: 20px;
-          height: 18px;
+          height: 20px;
           padding: 0;
           color: var(--text-secondary, #999);
           background: var(--bg-active, #2d2d2d);
@@ -2414,17 +2415,6 @@ class Openp41geAgents extends LitElement {
         <div class="code-block-toolbar">
           <button
             type="button"
-            class="code-lang ${menuOpen ? "active" : ""}"
-            title="Change language"
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              this._toggleLangMenu(key);
-            }}
-          >
-            ${label}
-          </button>
-          <button
-            type="button"
             class="code-wrap ${wrapped ? "active" : ""}"
             title="Toggle line wrap"
             @click=${(e: Event) => {
@@ -2433,6 +2423,17 @@ class Openp41geAgents extends LitElement {
             }}
           >
             ${unsafeHTML(this._wrapIcon(wrapped))}
+          </button>
+          <button
+            type="button"
+            class="code-lang ${menuOpen ? "active" : ""}"
+            title="Change language"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._toggleLangMenu(key);
+            }}
+          >
+            ${label}
           </button>
           ${
             menuOpen
