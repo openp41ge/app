@@ -1456,9 +1456,11 @@ class Openp41geAgents extends LitElement {
              anchored to the bottom even when the page is reloaded during dev. */
           flex-direction: column-reverse;
           gap: 8px;
-          /* Firefox / future: thin scrollbar with theme colours. */
-          scrollbar-width: thin;
-          scrollbar-color: var(--scrollbar-thumb, #424242) var(--scrollbar-track, transparent);
+          /* NOTE: deliberately NO scrollbar-width / scrollbar-color here.
+             Chrome 121+ honors those standardized properties and they override
+             the legacy ::-webkit-scrollbar styling below, falling back to a
+             native auto-hiding thin scrollbar. Relying on ::-webkit-scrollbar
+             keeps the themed, always-visible custom scrollbar. */
         }
         /* Custom webkit scrollbar — the chat window lives in a shadow root, so
            the platform's global scrollbar styles don't reach it. */
