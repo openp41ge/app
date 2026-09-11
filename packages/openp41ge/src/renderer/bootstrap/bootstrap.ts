@@ -56,7 +56,7 @@ export class RendererBootstrap {
     // DEBUG: check preload bridge
     try {
       if (typeof window.openp41ge === "undefined") {
-        log.error("PRELOAD BRIDGE window.openp41ge is UNDEFINED");
+        log.warn("PRELOAD BRIDGE window.openp41ge is UNDEFINED (browser dev mode)");
       } else {
         log.info("PRELOAD BRIDGE window.openp41ge is available");
       }

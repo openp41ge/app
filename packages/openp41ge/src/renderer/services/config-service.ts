@@ -57,6 +57,14 @@ export class ConfigService {
 
   private async _doLoad(): Promise<void> {
     try {
+      // Renderer-only / browser dev runs without the Electron preload bridge,
+      // so config can't be fetched. Skip gracefully instead of erroring (the
+      // error-capture overlay treats console.error as a blocking failure).
+      if (typeof window.openp41ge === "undefined") {
+        log.warn("preload bridge not available, skipping config load");
+        this._loaded = false;
+        return;
+      }
       const raw = await window.openp41ge.config.getAll();
       this._config = raw as UserConfig;
       this._loaded = true;
