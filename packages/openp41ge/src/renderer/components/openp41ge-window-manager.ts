@@ -179,6 +179,12 @@ export class Openp41geWindowManager extends LitElement {
           container: layer,
           inset: { top: "44px" },
           zIndex: 0,
+          size: 9,
+          autoHide: true,
+          // The track lives in this component's shadow root, so inject the
+          // overlay styles there (document-level styles don't cross the
+          // shadow boundary).
+          styleTarget: this.shadowRoot ?? undefined,
         });
       }
     }
