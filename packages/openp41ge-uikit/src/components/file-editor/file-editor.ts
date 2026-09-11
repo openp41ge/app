@@ -79,6 +79,8 @@ export type FileEditorState = "loading" | "ready" | "error" | "empty" | "too-lar
 // .fe-hscroll bar stops this far short of the right edge so the two bars never
 // overlap in the bottom-right corner.
 const VERTICAL_SCROLLBAR_WIDTH = 10;
+// Delay before the custom horizontal bar fades out after the cursor leaves.
+const HSCROLL_AUTO_HIDE_DELAY = 2500;
 
 @customElement("file-editor")
 export class FileEditorElement extends LitElement {
@@ -301,6 +303,13 @@ export class FileEditorElement extends LitElement {
   /** Custom horizontal scrollbar confined to the CONTENT area. */
   private _hScrollTrack: HTMLElement | null = null;
   private _hScrollThumb: HTMLElement | null = null;
+  // Auto-hide (fade) state for the custom horizontal scrollbar. Matches the
+  // vertical OverlayScrollbar's autoHide so both bars fade together after the
+  // cursor leaves the editor content area.
+  private _hScrollHideTimer = 0;
+  private _hScrollPointerInside = false;
+  private _onContentPointerEnter: () => void = () => {};
+  private _onContentPointerLeave: () => void = () => {};
 
   /** True while the editor is showing an inline commit diff. */
   get hasInlineDiff(): boolean {
@@ -521,6 +530,8 @@ export class FileEditorElement extends LitElement {
       return;
     }
     if (track.style.display !== "") track.style.display = "";
+    // Activity (scroll / layout) keeps the bar visible then re-arms the fade.
+    this._hScrollPoke();
     const left = this._gutterGroupEl ? this._gutterGroupEl.offsetWidth : 0;
     if (track.style.left !== `${left}px`) track.style.left = `${left}px`;
     // Only stop short of the right edge when the vertical scrollbar is present.
@@ -537,6 +548,44 @@ export class FileEditorElement extends LitElement {
     if (thumb.style.width !== `${thumbW}px`) thumb.style.width = `${thumbW}px`;
     const thumbLeft = Math.round(frac * (trackW - thumbW));
     if (thumb.style.left !== `${thumbLeft}px`) thumb.style.left = `${thumbLeft}px`;
+  }
+
+  /** Show the custom horizontal bar and cancel any pending auto-hide. */
+  private _hScrollShow(): void {
+    this._hScrollSetVisible(true);
+    this._hScrollClearHideTimer();
+  }
+
+  /** Show on scroll activity, then re-arm the fade timer. */
+  private _hScrollPoke(): void {
+    this._hScrollSetVisible(true);
+    this._hScrollScheduleHide();
+  }
+
+  /** Start (or restart) the delay before fading out after the cursor leaves. */
+  private _hScrollScheduleHide(): void {
+    this._hScrollClearHideTimer();
+    this._hScrollHideTimer = window.setTimeout(() => {
+      this._hScrollHideTimer = 0;
+      // Keep it visible while the cursor is inside the editor content area.
+      if (this._hScrollPointerInside) {
+        this._hScrollSetVisible(true);
+        return;
+      }
+      this._hScrollSetVisible(false);
+    }, HSCROLL_AUTO_HIDE_DELAY);
+  }
+
+  private _hScrollSetVisible(visible: boolean): void {
+    if (!this._hScrollTrack) return;
+    this._hScrollTrack.classList.toggle("fe-hscroll-hidden", !visible);
+  }
+
+  private _hScrollClearHideTimer(): void {
+    if (this._hScrollHideTimer) {
+      window.clearTimeout(this._hScrollHideTimer);
+      this._hScrollHideTimer = 0;
+    }
   }
 
   /** Word-wrap view mapping for the BEFORE (left) column — mirrors the normal
@@ -730,6 +779,13 @@ export class FileEditorElement extends LitElement {
         box-sizing: border-box;
         /* Faded content-facing (top) edge on the whole scroll zone. */
         border-top: 1px solid rgba(128,128,128,0.25);
+        /* Fade in/out with the vertical bar when the cursor leaves. */
+        opacity: 1;
+        transition: opacity 250ms ease;
+      }
+      .fe-hscroll.fe-hscroll-hidden {
+        opacity: 0;
+        pointer-events: none;
       }
       .fe-hscroll-thumb {
         background: ${isLight ? "#c1c1c1" : "#424242"};
@@ -923,6 +979,20 @@ export class FileEditorElement extends LitElement {
     this._hScrollTrack.addEventListener("pointerdown", this._onHScrollPointerDown);
     this._viewportEl.addEventListener("scroll", this._onViewportScroll);
 
+    // Auto-hide the custom horizontal bar (and the vertical OverlayScrollbar)
+    // when the cursor leaves the editor content area. Both listen on the same
+    // hover zone so they fade out together after a short delay.
+    this._onContentPointerEnter = () => {
+      this._hScrollPointerInside = true;
+      this._hScrollShow();
+    };
+    this._onContentPointerLeave = () => {
+      this._hScrollPointerInside = false;
+      this._hScrollScheduleHide();
+    };
+    viewportContainer.addEventListener("pointerenter", this._onContentPointerEnter);
+    viewportContainer.addEventListener("pointerleave", this._onContentPointerLeave);
+
     // Mouse-over highlight for the line-number cells (both columns highlight
     // the hovered row together).
     this._gutterGroupEl.addEventListener("mouseover", this._onGutterCellMouseOver);
@@ -978,6 +1048,14 @@ export class FileEditorElement extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._teardownPipeline();
+    // Remove the horizontal scrollbar auto-hide listeners (kept across in-connect
+    // rebuilds, removed only when the editor fully disconnects).
+    this._hScrollClearHideTimer();
+    const hoverZone = this._viewportEl?.parentElement;
+    if (hoverZone) {
+      hoverZone.removeEventListener("pointerenter", this._onContentPointerEnter);
+      hoverZone.removeEventListener("pointerleave", this._onContentPointerLeave);
+    }
   }
 
   // ── Public API ──
@@ -2745,6 +2823,8 @@ export class FileEditorElement extends LitElement {
       // corner the horizontal bar overlays the vertical thumb rather than
       // under it.
       zIndex: 5,
+      // Fade the bar out a few seconds after the cursor leaves the editor.
+      autoHide: true,
     });
   }
 
@@ -2773,6 +2853,7 @@ export class FileEditorElement extends LitElement {
     this._scrollManager = null;
     this._verticalScrollbar?.destroy();
     this._verticalScrollbar = null;
+    this._hScrollClearHideTimer();
     this._viewportResizeObserver?.disconnect();
     this._viewportResizeObserver = null;
     this._clipboardHandler?.dispose();
