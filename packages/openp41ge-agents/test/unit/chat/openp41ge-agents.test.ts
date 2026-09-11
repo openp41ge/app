@@ -84,25 +84,51 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot!.querySelectorAll(".chat-message")).toHaveLength(3);
   });
 
-  it("cycles the code block language when its badge is clicked", async () => {
+  it("shows only detected language matches and lets the user pick one", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
 
     el.addMessage("assistant", "```\nconst x = 1;\n```");
     await el.updateComplete;
 
-    const block = el.shadowRoot!.querySelector(".code-block") as HTMLElement;
-    expect(block).not.toBeNull();
-    expect(block.dataset.codeLang).toBe("javascript");
-    expect(block.dataset.codeInferred).toBe("true");
-
+    // Inferred block: badge shows the detected language full name.
     const badge = el.shadowRoot!.querySelector(".code-lang") as HTMLElement;
     expect(badge).not.toBeNull();
+    expect(badge.textContent!.trim()).toBe("JavaScript");
+
+    // Open the picker; it should only list detected matches (not all languages).
     badge.click();
     await el.updateComplete;
+    const options = el.shadowRoot!.querySelectorAll(".code-lang-option");
+    expect(options.length).toBe(2);
+    expect(Array.from(options).map((o) => o.textContent!.trim())).toEqual([
+      "JavaScript",
+      "TypeScript",
+    ]);
 
-    const block2 = el.shadowRoot!.querySelector(".code-block") as HTMLElement;
-    expect(block2.dataset.codeLang).toBe("python");
+    // Pick TypeScript → the badge label updates and the picker closes.
+    const option = Array.from(options).find((o) => o.textContent!.trim() === "TypeScript")!;
+    option.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".code-lang")!.textContent!.trim()).toBe("TypeScript");
+    expect(el.shadowRoot!.querySelector(".code-lang-menu")).toBeNull();
+  });
+
+  it("toggles line wrapping on a code block", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+
+    el.addMessage("assistant", "```js\nconst x = 1;\n```");
+    await el.updateComplete;
+
+    const block = el.shadowRoot!.querySelector(".code-block") as HTMLElement;
+    expect(block.classList.contains("wrap")).toBe(false);
+
+    const wrapBtn = el.shadowRoot!.querySelector(".code-wrap") as HTMLElement;
+    expect(wrapBtn).not.toBeNull();
+    wrapBtn.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".code-block")!.classList.contains("wrap")).toBe(true);
   });
 
   it("clearMessages removes all messages and shows empty state", () => {

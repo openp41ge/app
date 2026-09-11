@@ -651,19 +651,19 @@ export interface SupportedLanguage {
 }
 
 export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
-  { id: "typescript", label: "TS" },
-  { id: "javascript", label: "JS" },
-  { id: "python", label: "PY" },
-  { id: "bash", label: "sh" },
+  { id: "typescript", label: "TypeScript" },
+  { id: "javascript", label: "JavaScript" },
+  { id: "python", label: "Python" },
+  { id: "bash", label: "Bash" },
   { id: "json", label: "JSON" },
   { id: "yaml", label: "YAML" },
   { id: "css", label: "CSS" },
   { id: "html", label: "HTML" },
   { id: "go", label: "Go" },
-  { id: "rust", label: "RS" },
+  { id: "rust", label: "Rust" },
   { id: "sql", label: "SQL" },
-  { id: "markdown", label: "MD" },
-  { id: "text", label: "text" },
+  { id: "markdown", label: "Markdown" },
+  { id: "text", label: "Plain text" },
 ];
 
 const ALIASES: Record<string, string> = {
@@ -732,48 +732,65 @@ export function highlight(code: string, langId: string): string {
     .join("\n");
 }
 
-/** Best-effort detect the language of a code snippet from its content. */
-export function detectLanguage(code: string): string {
-  const trimmed = code.trim();
-  if (!trimmed) return "text";
-  const head = trimmed.slice(0, 2000);
+/** Ordered detection rules, most-specific language families first. */
+const DETECTION_RULES: Array<{ id: string; test: (head: string) => boolean }> = [
+  {
+    id: "html",
+    test: (h) =>
+      /^\s*<!doctype\s+html/i.test(h) || (/<[a-z][\s\S]*>/i.test(h) && /<\/?[a-z]/.test(h)),
+  },
+  { id: "json", test: (h) => /^\s*\{[\s\n]*"[^"]+"\s*:/m.test(h) },
+  {
+    id: "yaml",
+    test: (h) =>
+      /^\s*-?\s*\w+\s*:\s/m.test(h) &&
+      !/\b(function|const|let|var|import|export|def|class)\b/.test(h),
+  },
+  {
+    id: "bash",
+    test: (h) =>
+      /^\s*(#!\/bin\/|.*\$\s*|export\s+\w+=|cd\s+\S+)/m.test(h) ||
+      /^\s*\[[a-z0-9_]+\s*:\s*[^\]]+\]|\b(bind|script)\b/.test(h),
+  },
+  {
+    id: "sql",
+    test: (h) => /\b(select\s+[\s\S]+from|insert\s+into|update\s+\S+\s+set)\b/i.test(h),
+  },
+  { id: "rust", test: (h) => /\b(fn\s+\w+\s*\(|use\s+std::|^\s*pub\s+fn\b)/m.test(h) },
+  { id: "go", test: (h) => /\b(package\s+main|func\s+\w+\s*\(|go\s+func)\b/m.test(h) },
+  {
+    id: "python",
+    test: (h) =>
+      /\b(def\s+\w+\s*\(|^\s*import\s+\w+\s*$|^\s*from\s+\S+\s+import\b|:\s*$)/m.test(h) &&
+      /\b(start|if|elif|else|for|while|def)\b/.test(h),
+  },
+  {
+    id: "css",
+    test: (h) => /\b(@media|^\s*[.#\w][^{}]*\{\s*$|^\s*[a-z-]+\s*:\s*[^;]+;\s*$)/m.test(h),
+  },
+];
 
-  if (
-    /^\s*<!doctype\s+html/i.test(head) ||
-    (/<[a-z][\s\S]*>/i.test(head) && /<\/?[a-z]/.test(head))
-  ) {
-    return "html";
+/** JavaScript/TypeScript are handled together (TS is a superset of JS). */
+const JS_RE = /\b(import\s+|export\s+|const\s+|let\s+|function\s+|=>\s*\{)/;
+const TS_RE = /\b(interface|type\s+\w+\s*[={]|:\s*(string|number|boolean)\b)/;
+
+/** Return the language ids whose detector matched, most-specific first. */
+export function detectLanguageCandidates(code: string): string[] {
+  const head = code.trim().slice(0, 2000);
+  if (!head) return ["text"];
+  const ids: string[] = [];
+  for (const rule of DETECTION_RULES) {
+    if (rule.test(head)) ids.push(rule.id);
   }
-  if (/^\s*\{[\s\n]*"[^"]+"\s*:/m.test(head)) return "json";
-  if (
-    /^\s*[-]?\s*\w+\s*:\s/m.test(head) &&
-    !/\b(function|const|let|var|import|export|def|class)\b/.test(head)
-  ) {
-    return "yaml";
+  if (JS_RE.test(head)) {
+    if (TS_RE.test(head)) ids.unshift("typescript", "javascript");
+    else ids.unshift("javascript", "typescript");
   }
-  if (/^\s*(#!\/bin\/|.*\$\s*|export\s+\w+=|cd\s+\S+)/m.test(head)) return "bash";
-  if (/\b(select\s+[\s\S]+from|insert\s+into|update\s+\S+\s+set)\b/i.test(head)) return "sql";
-  if (/\b(fn\s+\w+\s*\(|use\s+std::|^\s*pub\s+fn\b)/m.test(head)) return "rust";
-  if (/\b(package\s+main|func\s+\w+\s*\(|go\s+func)\b/m.test(head)) return "go";
-  if (
-    /\b(def\s+\w+\s*\(|^\s*import\s+\w+\s*$|^\s*from\s+\S+\s+import\b|:\s*$)/m.test(head) &&
-    /\b(start|if|elif|else|for|while|def)\b/.test(head)
-  )
-    return "python";
-  if (/\b(import\s+|export\s+|const\s+|let\s+|function\s+|=>\s*\{)/.test(head)) {
-    if (/\b(interface|type\s+\w+\s*[={]|:\s*(string|number|boolean)\b)/.test(head))
-      return "typescript";
-    return "javascript";
-  }
-  if (/\b(@media|^\s*[.#\w][^{}]*\{\s*$|^\s*[a-z-]+\s*:\s*[^;]+;\s*$)/m.test(head)) return "css";
-  if (/^\s*\[[a-z0-9_]+\s*:\s*[^\]]+\]|\b(bind|script)\b/.test(head)) return "bash";
-  return "text";
-  return "text";
+  const unique = [...new Set(ids)];
+  return unique.length ? unique : ["text"];
 }
 
-/** Cycle to the next supported language for the badge. */
-export function cycleLanguage(current: string): string {
-  const ids = SUPPORTED_LANGUAGES.map((l) => l.id);
-  const idx = ids.indexOf(current);
-  return ids[(idx + 1) % ids.length] ?? "text";
+/** Best-effort detect the single most likely language of a code snippet. */
+export function detectLanguage(code: string): string {
+  return detectLanguageCandidates(code)[0] ?? "text";
 }

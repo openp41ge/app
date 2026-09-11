@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderMarkdown } from "@openp41ge-agents/ui/markdown";
+import { renderMarkdown, renderMarkdownSegments } from "@openp41ge-agents/ui/markdown";
 
 describe("renderMarkdown", () => {
   it("renders paragraphs", () => {
@@ -21,37 +21,46 @@ describe("renderMarkdown", () => {
     expect(renderMarkdown("use `a * b` here")).toBe("<p>use <code>a * b</code> here</p>");
   });
 
-  it("renders fenced code blocks with a language badge and highlighted code", () => {
+  it("renders fenced code blocks as highlighted static pre in renderMarkdown", () => {
     const html = renderMarkdown("```js\nconst x = 1;\n```");
-    expect(html).toContain('class="code-block"');
-    expect(html).toContain('data-code-lang="javascript"');
-    expect(html).toContain('class="code-lang"');
-    expect(html).toContain(">JS<");
+    expect(html).toContain("<pre><code>");
     expect(html).toContain('<span class="hl-key">const</span>');
     expect(html).toContain('<span class="hl-number">1</span>');
   });
 
+  it("returns code blocks as structured segments with language + inferred flags", () => {
+    const segments = renderMarkdownSegments("```js\nconst x = 1;\n```");
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toEqual({
+      type: "code",
+      code: "const x = 1;",
+      language: "javascript",
+      inferred: false,
+      index: 0,
+      msgId: undefined,
+    });
+  });
+
   it("marks a code block as inferred when no language is written", () => {
-    const html = renderMarkdown("```\nconst x = 1;\n```");
-    expect(html).toContain('data-code-inferred="true"');
-    expect(html).toContain('data-code-lang="javascript"');
+    const segments = renderMarkdownSegments("```\nconst x = 1;\n```");
+    expect(segments[0]).toMatchObject({ language: "javascript", inferred: true });
   });
 
   it("does not mark an explicitly-tagged code block as inferred", () => {
-    const html = renderMarkdown("```py\nprint(1)\n```");
-    expect(html).toContain('data-code-lang="python"');
-    expect(html).not.toContain('data-code-inferred="true"');
+    const segments = renderMarkdownSegments("```py\nprint(1)\n```");
+    expect(segments[0]).toMatchObject({ language: "python", inferred: false });
   });
 
   it("applies a language override from the codeLanguages option", () => {
-    const html = renderMarkdown("```\nprint(1)\n```", { codeLanguages: { 0: "python" } });
-    expect(html).toContain('data-code-lang="python"');
-    expect(html).toContain(">PY<");
+    const segments = renderMarkdownSegments("```\nprint(1)\n```", {
+      codeLanguages: { 0: "python" },
+    });
+    expect(segments[0]).toMatchObject({ language: "python", inferred: false });
   });
 
-  it("stamps msgId onto code blocks when provided", () => {
-    const html = renderMarkdown("```\ncode\n```", { msgId: "m1" });
-    expect(html).toContain('data-msg-id="m1"');
+  it("stamps msgId onto code block segments when provided", () => {
+    const segments = renderMarkdownSegments("```\ncode\n```", { msgId: "m1" });
+    expect(segments[0]).toMatchObject({ msgId: "m1" });
   });
 
   it("renders unordered and ordered lists", () => {

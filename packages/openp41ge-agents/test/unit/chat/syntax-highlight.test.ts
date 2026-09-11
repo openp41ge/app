@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   detectLanguage,
+  detectLanguageCandidates,
   highlight,
   normalizeLanguage,
-  cycleLanguage,
   langLabel,
 } from "@openp41ge-agents/ui/syntax-highlight";
 
@@ -50,14 +50,19 @@ describe("syntax-highlight", () => {
     expect(detectLanguage("just some words")).toBe("text");
   });
 
-  it("cycles through supported languages", () => {
-    expect(cycleLanguage("text")).toBe("typescript");
-    expect(cycleLanguage("typescript")).toBe("javascript");
-    expect(cycleLanguage("markdown")).toBe("text");
+  it("returns only matching candidate languages, most-specific first", () => {
+    expect(detectLanguageCandidates("const x = 1;")).toEqual(["javascript", "typescript"]);
+    expect(detectLanguageCandidates("export interface Foo { a: string }")).toEqual([
+      "typescript",
+      "javascript",
+    ]);
+    expect(detectLanguageCandidates("def foo():\n    return 1")).toEqual(["python"]);
+    expect(detectLanguageCandidates("just some words")).toEqual(["text"]);
+    expect(detectLanguageCandidates("")).toEqual(["text"]);
   });
 
   it("returns a human label for language ids", () => {
-    expect(langLabel("typescript")).toBe("TS");
-    expect(langLabel("python")).toBe("PY");
+    expect(langLabel("typescript")).toBe("TypeScript");
+    expect(langLabel("python")).toBe("Python");
   });
 });

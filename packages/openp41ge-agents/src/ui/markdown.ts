@@ -9,7 +9,7 @@
  * LLM's output cannot inject arbitrary HTML (no raw `<script>` etc.).
  */
 
-import { detectLanguage, highlight, langLabel, normalizeLanguage } from "./syntax-highlight.js";
+import { detectLanguage, highlight, normalizeLanguage } from "./syntax-highlight.js";
 
 /** Escape text for embedding as HTML text content. */
 function escapeHtml(s: string): string {
@@ -87,6 +87,25 @@ export interface MarkdownRenderOptions {
   /** Message id stamped on each code block so the UI can route language clicks. */
   msgId?: string;
 }
+
+/** A code block segment, rendered interactively by the UI. */
+export interface CodeBlockSegment {
+  type: "code";
+  code: string;
+  language: string;
+  inferred: boolean;
+  /** 0-based index of the block within its message. */
+  index: number;
+  msgId?: string;
+}
+
+/** A plain HTML segment (headings, paragraphs, lists, tables, …). */
+export interface HtmlSegment {
+  type: "html";
+  html: string;
+}
+
+export type MarkdownSegment = HtmlSegment | CodeBlockSegment;
 
 /** True when a line is a GFM table delimiter row (e.g. `| --- | :--: | ---: |`). */
 function isDelimiterRow(line: string): boolean {
@@ -262,53 +281,41 @@ function renderBlocks(md: string): Block[] {
   return blocks;
 }
 
-/** Render a single fenced code block with a language badge + highlighted code. */
-function renderCodeBlock(
+/** Resolve the effective language for a fenced block, honoring any override. */
+function resolveCodeLanguage(
   code: string,
   explicitLang: string,
-  index: number,
   overrideLang: string | undefined,
-  msgId: string | undefined,
-): string {
-  let langId: string;
-  let inferred: boolean;
-  if (overrideLang) {
-    langId = overrideLang;
-    inferred = false;
-  } else if (explicitLang.trim()) {
+): { language: string; inferred: boolean } {
+  if (overrideLang) return { language: overrideLang, inferred: false };
+  if (explicitLang.trim()) {
     const normalized = normalizeLanguage(explicitLang);
-    if (normalized) {
-      langId = normalized;
-      inferred = false;
-    } else {
-      langId = detectLanguage(code);
-      inferred = true;
-    }
-  } else {
-    langId = detectLanguage(code);
-    inferred = true;
+    if (normalized) return { language: normalized, inferred: false };
   }
-
-  const label = langLabel(langId);
-  const msgAttr = msgId ? ` data-msg-id="${escapeAttr(msgId)}"` : "";
-  const inferredAttr = inferred ? ` data-code-inferred="true"` : "";
-  const highlighted = highlight(code, langId);
-  return `<div class="code-block" data-code-index="${index}" data-code-lang="${escapeAttr(langId)}"${msgAttr}${inferredAttr}>
-  <button type="button" class="code-lang" data-code-index="${index}" title="Change language">${escapeHtml(label)}</button>
-  <pre><code>${highlighted}</code></pre>
-</div>`;
+  return { language: detectLanguage(code), inferred: true };
 }
 
-/** Render markdown text into an HTML string. */
-export function renderMarkdown(md: string, options?: MarkdownRenderOptions): string {
-  if (!md) return "";
+/** Split markdown into renderable segments (plain HTML + interactive code blocks). */
+export function renderMarkdownSegments(
+  md: string,
+  options?: MarkdownRenderOptions,
+): MarkdownSegment[] {
+  if (!md) return [];
   const codeLanguages = options?.codeLanguages ?? {};
   let codeIndex = 0;
-  return renderBlocks(md)
-    .map((b) => {
-      if (b.kind !== "code") return b.value;
-      const index = codeIndex++;
-      return renderCodeBlock(b.value, b.language, index, codeLanguages[index], options?.msgId);
-    })
+  return renderBlocks(md).map((b): MarkdownSegment => {
+    if (b.kind === "html") return { type: "html", html: b.value };
+    const index = codeIndex++;
+    const { language, inferred } = resolveCodeLanguage(b.value, b.language, codeLanguages[index]);
+    return { type: "code", code: b.value, language, inferred, index, msgId: options?.msgId };
+  });
+}
+
+/** Render markdown into a static HTML string (code blocks render as plain pre). */
+export function renderMarkdown(md: string, options?: MarkdownRenderOptions): string {
+  return renderMarkdownSegments(md, options)
+    .map((s) =>
+      s.type === "html" ? s.html : `<pre><code>${highlight(s.code, s.language)}</code></pre>`,
+    )
     .join("");
 }

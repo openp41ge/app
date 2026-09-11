@@ -18,8 +18,13 @@ import { LitElement, html, type TemplateResult } from "lit";
 import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Chat, ChatMessage, ChatRuntimeStatus, ToolCall } from "../types";
-import { renderMarkdown } from "./markdown.js";
-import { cycleLanguage } from "./syntax-highlight.js";
+import { renderMarkdownSegments, type MarkdownSegment, type CodeBlockSegment } from "./markdown.js";
+import {
+  highlight,
+  langLabel,
+  detectLanguageCandidates,
+  SUPPORTED_LANGUAGES,
+} from "./syntax-highlight.js";
 
 function deepCloneMessage(m: ChatMessage): ChatMessage {
   return {
@@ -80,6 +85,12 @@ class Openp41geAgents extends LitElement {
   @state() private _title = "";
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
+
+  /** Per code-block line-wrap toggle, keyed by `${msgId}::${index}`. */
+  @state() private _codeWrap: Record<string, boolean> = {};
+
+  /** The code-block language picker that is currently open, or null. */
+  @state() private _openLangMenu: string | null = null;
   // These two are intentionally NOT @state: the composer content and caret are
   // updated imperatively so keystrokes never trigger a full re-render (which
   // would reset focus and clear the rendered content).
@@ -1540,11 +1551,63 @@ class Openp41geAgents extends LitElement {
           overflow-x: auto;
           border-radius: 0;
         }
-        /* Fenced code blocks: a bordered surface with a language badge pinned
-           in the top-right. The badge is clickable and cycles the highlight. */
-        .chat-message.assistant .msg-content .code-block {
+        /* Fenced code blocks: a bordered surface with a toolbar above it. The
+           toolbar holds the language badge (full name) and a line-wrap toggle;
+           clicking the badge opens an inline language picker. */
+        .chat-message.assistant .msg-content .code-block-wrap {
           position: relative;
-          margin: 0 0 8px;
+          margin: 0 0 10px;
+        }
+        .chat-message.assistant .msg-content .code-block-toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 4px;
+          margin-bottom: 4px;
+        }
+        .chat-message.assistant .msg-content .code-lang {
+          display: inline-flex;
+          align-items: center;
+          padding: 1px 8px;
+          font-size: 11px;
+          line-height: 1.6;
+          color: var(--text-secondary, #999);
+          background: var(--bg-active, #2d2d2d);
+          border: 1px solid var(--border-color, #3a3a3a);
+          border-radius: 4px;
+          cursor: pointer;
+          opacity: 0.9;
+        }
+        .chat-message.assistant .msg-content .code-lang:hover,
+        .chat-message.assistant .msg-content .code-lang.active {
+          opacity: 1;
+          color: var(--text-primary, #d4d4d4);
+          border-color: var(--border-color, #4a4a4a);
+        }
+        .chat-message.assistant .msg-content .code-wrap {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 20px;
+          height: 18px;
+          padding: 0;
+          color: var(--text-secondary, #999);
+          background: var(--bg-active, #2d2d2d);
+          border: 1px solid var(--border-color, #3a3a3a);
+          border-radius: 4px;
+          cursor: pointer;
+          opacity: 0.9;
+        }
+        .chat-message.assistant .msg-content .code-wrap:hover {
+          opacity: 1;
+          color: var(--text-primary, #d4d4d4);
+        }
+        .chat-message.assistant .msg-content .code-wrap.active {
+          opacity: 1;
+          color: #4b9fff;
+          border-color: #4b9fff;
+        }
+        .chat-message.assistant .msg-content .code-block {
           border: 1px solid var(--border-color, #2a2a2a);
           border-radius: 6px;
           background: var(--bg-tertiary, #222);
@@ -1552,7 +1615,7 @@ class Openp41geAgents extends LitElement {
         }
         .chat-message.assistant .msg-content .code-block pre {
           margin: 0;
-          padding: 24px 10px 8px;
+          padding: 8px 10px;
           border: none;
           background: transparent;
         }
@@ -1562,23 +1625,46 @@ class Openp41geAgents extends LitElement {
           border-radius: 0;
           font-size: 12px;
         }
-        .chat-message.assistant .msg-content .code-lang {
+        .chat-message.assistant .msg-content .code-block.wrap pre {
+          white-space: pre-wrap;
+          word-break: break-word;
+          overflow-x: hidden;
+        }
+        .chat-message.assistant .msg-content .code-block.wrap code {
+          white-space: pre-wrap;
+        }
+        .chat-message.assistant .msg-content .code-lang-menu {
           position: absolute;
-          top: 4px;
-          right: 4px;
-          padding: 1px 6px;
-          font-size: 10px;
-          line-height: 1.4;
-          color: var(--text-secondary, #999);
+          top: 100%;
+          right: 0;
+          z-index: 20;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          margin-top: 4px;
+          min-width: 140px;
+          padding: 4px;
           background: var(--bg-active, #2d2d2d);
           border: 1px solid var(--border-color, #3a3a3a);
-          border-radius: 3px;
-          cursor: pointer;
-          opacity: 0.85;
+          border-radius: 6px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
-        .chat-message.assistant .msg-content .code-lang:hover {
-          opacity: 1;
+        .chat-message.assistant .msg-content .code-lang-option {
+          display: block;
+          text-align: left;
+          width: 100%;
+          padding: 4px 8px;
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 11px;
+        }
+        .chat-message.assistant .msg-content .code-lang-option:hover,
+        .chat-message.assistant .msg-content .code-lang-option.selected {
           color: var(--text-primary, #d4d4d4);
+          background: #3a3a3a;
         }
         .chat-message.assistant .msg-content .hl-key {
           color: #7ec6f0;
@@ -2290,14 +2376,15 @@ class Openp41geAgents extends LitElement {
     // assistant
     const toolCalls = msg.toolCalls ?? [];
     const overrides = this._codeLangForMessage(msg.id);
+    const segments = msg.content
+      ? renderMarkdownSegments(msg.content, { codeLanguages: overrides, msgId: msg.id })
+      : [];
     return html`
       <div class="chat-message assistant">
         <div class="msg-content" @click=${this._onMsgContentClick}>
-          ${
-            msg.content
-              ? unsafeHTML(renderMarkdown(msg.content, { codeLanguages: overrides, msgId: msg.id }))
-              : ""
-          }${this._streaming ? html`<span class="caret"></span>` : ""}
+          ${segments.map((seg) => this._renderSegment(seg))}${
+            this._streaming ? html`<span class="caret"></span>` : ""
+          }
         </div>
         ${
           toolCalls.length > 0
@@ -2308,7 +2395,73 @@ class Openp41geAgents extends LitElement {
     `;
   }
 
-  /** Build the per-message code-language override map for renderMarkdown. */
+  /** Render one markdown segment (plain HTML or an interactive code block). */
+  private _renderSegment(seg: MarkdownSegment): unknown {
+    if (seg.type === "html") return unsafeHTML(seg.html);
+    return this._renderCodeBlock(seg);
+  }
+
+  /** Render an interactive fenced code block with a toolbar + language picker. */
+  private _renderCodeBlock(seg: CodeBlockSegment): TemplateResult {
+    const key = `${seg.msgId ?? ""}::${seg.index}`;
+    const wrapped = !!this._codeWrap[key];
+    const menuOpen = this._openLangMenu === key;
+    const candidates = this._languageCandidates(seg);
+    const label = langLabel(seg.language);
+    return html`
+      <div class="code-block-wrap" data-code-index=${seg.index}>
+        <div class="code-block-toolbar">
+          <button
+            type="button"
+            class="code-lang ${menuOpen ? "active" : ""}"
+            title="Change language"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._toggleLangMenu(key);
+            }}
+          >
+            ${label}
+          </button>
+          <button
+            type="button"
+            class="code-wrap ${wrapped ? "active" : ""}"
+            title="Toggle line wrap"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this._toggleWrap(key);
+            }}
+          >
+            ${unsafeHTML(this._wrapIcon(wrapped))}
+          </button>
+        </div>
+        <div class="code-block ${wrapped ? "wrap" : ""}">
+          <pre><code>${unsafeHTML(highlight(seg.code, seg.language))}</code></pre>
+        </div>
+        ${
+          menuOpen
+            ? html`
+                <div class="code-lang-menu" @click=${(e: Event) => e.stopPropagation()}>
+                  ${candidates.map(
+                    (id) => html`
+                      <button
+                        type="button"
+                        class="code-lang-option ${id === seg.language ? "selected" : ""}"
+                        data-lang=${id}
+                        @click=${(e: Event) => this._pickLang(e, seg, id)}
+                      >
+                        ${langLabel(id)}
+                      </button>
+                    `,
+                  )}
+                </div>
+              `
+            : ""
+        }
+      </div>
+    `;
+  }
+
+  /** Build the per-message code-language override map for the markdown renderer. */
   private _codeLangForMessage(msgId: string): Record<number, string> {
     const prefix = `${msgId}::`;
     const map: Record<number, string> = {};
@@ -2320,18 +2473,44 @@ class Openp41geAgents extends LitElement {
     return map;
   }
 
-  /** Delegate clicks on a code block's language badge to cycle its highlight. */
+  /** Close any open code-language menu when clicking outside it. */
   private _onMsgContentClick(e: Event): void {
-    const btn = (e.target as HTMLElement).closest<HTMLElement>(".code-lang");
-    if (!btn) return;
-    const block = btn.closest<HTMLElement>(".code-block");
-    if (!block) return;
-    const msgId = block.dataset.msgId;
-    const index = Number(block.dataset.codeIndex);
-    if (!msgId || Number.isNaN(index)) return;
-    const current = block.dataset.codeLang ?? "text";
-    const next = cycleLanguage(current);
-    this._codeLangOverrides = { ...this._codeLangOverrides, [`${msgId}::${index}`]: next };
+    if (!this._openLangMenu) return;
+    const target = e.target as HTMLElement;
+    if (target.closest(".code-lang") || target.closest(".code-lang-menu")) return;
+    this._openLangMenu = null;
+  }
+
+  /** Toggle the language picker for a code block. */
+  private _toggleLangMenu(key: string): void {
+    this._openLangMenu = this._openLangMenu === key ? null : key;
+  }
+
+  /** Toggle line wrapping for a code block. */
+  private _toggleWrap(key: string): void {
+    this._codeWrap = { ...this._codeWrap, [key]: !this._codeWrap[key] };
+  }
+
+  /** Select a language from the picker for a code block. */
+  private _pickLang(e: Event, seg: CodeBlockSegment, lang: string): void {
+    e.stopPropagation();
+    const key = `${seg.msgId ?? ""}::${seg.index}`;
+    this._codeLangOverrides = { ...this._codeLangOverrides, [key]: lang };
+    this._openLangMenu = null;
+  }
+
+  /** For inferred blocks show only the detector matches; otherwise all languages. */
+  private _languageCandidates(seg: CodeBlockSegment): string[] {
+    if (seg.inferred) {
+      const matches = detectLanguageCandidates(seg.code);
+      return matches.length ? matches : SUPPORTED_LANGUAGES.map((l) => l.id);
+    }
+    return SUPPORTED_LANGUAGES.map((l) => l.id);
+  }
+
+  /** A small inline SVG icon for the line-wrap toggle. */
+  private _wrapIcon(active: boolean): string {
+    return `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h6"/><path d="${active ? "M8 12l2 2 2-2" : "M11 10l3 2-3 2"}"/></svg>`;
   }
 
   private _renderToolCall(tc: ToolCall): TemplateResult {
