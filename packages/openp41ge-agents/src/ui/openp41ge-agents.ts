@@ -1390,6 +1390,8 @@ class Openp41geAgents extends LitElement {
         // matches the file editor's overlay scrollbar so the bar spans the
         // full track, leaving only the 1px faded content-edge border.
         size: 9,
+        // Fade the bar out after the cursor leaves the chat for a few seconds.
+        autoHide: true,
       });
     }
     // Anchor the freshly-loaded chat to the newest message (content is now

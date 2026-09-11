@@ -272,6 +272,10 @@ export interface OverlayScrollbarOptions {
   /** Where to inject the overlay styles.  Pass a `ShadowRoot` when the target
    *  element lives in a shadow tree (global styles never reach it). */
   styleTarget?: Document | ShadowRoot;
+  /** Fade the scrollbar out after the cursor leaves the scroll area (default false). */
+  autoHide?: boolean;
+  /** Milliseconds to wait after the cursor leaves before fading out (default 2500). */
+  autoHideDelay?: number;
 }
 
 /** A spring-like, overshooting CSS easing for the thicken/brighter animation. */
@@ -282,6 +286,8 @@ const OVERLAY_DEFAULT_HOVER_SIZE = 10;
 const OVERLAY_DEFAULT_MIN_THUMB = 24;
 const OVERLAY_DEFAULT_THUMB_COLOR = "rgba(255,255,255,0.22)";
 const OVERLAY_DEFAULT_THUMB_HOVER_COLOR = "rgba(255,255,255,0.42)";
+const OVERLAY_DEFAULT_AUTO_HIDE_DELAY = 2500;
+const OVERLAY_FADE_MS = 250;
 
 // ─── Pure geometry (unit-testable) ─────────────────────────────────────
 
@@ -343,6 +349,12 @@ export class OverlayScrollbar {
   private _styleTarget: Document | ShadowRoot | undefined;
   private _axes: Partial<Record<ScrollbarAxis, AxisState>> = {};
   private _destroyed = false;
+  private _autoHide = false;
+  private _autoHideDelay = OVERLAY_DEFAULT_AUTO_HIDE_DELAY;
+  private _hideTimer = 0;
+  private _pointerInside = false;
+  private _onPointerEnter: () => void = () => {};
+  private _onPointerLeave: () => void = () => {};
   private _onScroll: () => void = () => {};
   private _ro: ResizeObserver | null = null;
   private _mo: MutationObserver | null = null;
@@ -360,6 +372,8 @@ export class OverlayScrollbar {
     this._thumbColor = options.thumbColor ?? OVERLAY_DEFAULT_THUMB_COLOR;
     this._thumbHoverColor = options.thumbHoverColor ?? OVERLAY_DEFAULT_THUMB_HOVER_COLOR;
     this._styleTarget = options.styleTarget;
+    this._autoHide = options.autoHide ?? false;
+    this._autoHideDelay = options.autoHideDelay ?? OVERLAY_DEFAULT_AUTO_HIDE_DELAY;
   }
 
   static attach(target: HTMLElement, options: OverlayScrollbarOptions = {}): OverlayScrollbar {
@@ -395,7 +409,10 @@ export class OverlayScrollbar {
     if (this._axis === "vertical" || this._axis === "both") this._buildAxis("vertical");
     if (this._axis === "horizontal" || this._axis === "both") this._buildAxis("horizontal");
 
-    this._onScroll = () => this.update();
+    this._onScroll = () => {
+      this.update();
+      this._poke();
+    };
     this._target.addEventListener("scroll", this._onScroll, { passive: true });
     this._ro = new ResizeObserver(() => this.update());
     this._ro.observe(this._target);
@@ -407,6 +424,23 @@ export class OverlayScrollbar {
       });
     });
     this._mo.observe(this._target, { childList: true, subtree: true });
+
+    if (this._autoHide) {
+      this._onPointerEnter = () => {
+        this._pointerInside = true;
+        this._show();
+      };
+      this._onPointerLeave = () => {
+        this._pointerInside = false;
+        this._scheduleHide();
+      };
+      this._container.addEventListener("pointerenter", this._onPointerEnter);
+      this._container.addEventListener("pointerleave", this._onPointerLeave);
+      // Start visible, then fade if the cursor hasn't entered after the delay.
+      this._setVisible(true);
+      this._scheduleHide();
+    }
+
     this.update();
   }
 
@@ -414,7 +448,9 @@ export class OverlayScrollbar {
     const id = "overlay-scrollbar-style";
     const text = `
       [data-overlay-scrollbar]::-webkit-scrollbar { width: 0 !important; height: 0 !important; }
-      .os-track { position: absolute; z-index: 20; pointer-events: auto; box-sizing: border-box; }
+      .os-track { position: absolute; z-index: 20; pointer-events: auto; box-sizing: border-box;
+        opacity: 1; transition: opacity ${OVERLAY_FADE_MS}ms ease; }
+      .os-track.os-hidden { opacity: 0; pointer-events: none; }
       .os-track--v { border-left: 1px solid rgba(128,128,128,0.25); }
       .os-track--h { border-top: 1px solid rgba(128,128,128,0.25); }
       .os-thumb {
@@ -550,6 +586,58 @@ export class OverlayScrollbar {
     this._paintAxis("horizontal");
   }
 
+  /** Show the scrollbar and cancel any pending auto-hide. */
+  private _show(): void {
+    if (!this._autoHide) return;
+    this._setVisible(true);
+    this._clearHideTimer();
+  }
+
+  /** Show on scroll activity, then re-arm the auto-hide timer. */
+  private _poke(): void {
+    if (!this._autoHide) return;
+    this._setVisible(true);
+    this._scheduleHide();
+  }
+
+  /** Start (or restart) the delay before fading out after the cursor leaves. */
+  private _scheduleHide(): void {
+    if (!this._autoHide) return;
+    this._clearHideTimer();
+    this._hideTimer = window.setTimeout(() => {
+      this._hideTimer = 0;
+      if (this._destroyed) return;
+      // Keep it visible while the cursor is inside, or while the user is dragging.
+      if (this._pointerInside || this._isDragging()) {
+        this._setVisible(true);
+        return;
+      }
+      this._setVisible(false);
+    }, this._autoHideDelay);
+  }
+
+  private _setVisible(visible: boolean): void {
+    for (const key of Object.keys(this._axes) as ScrollbarAxis[]) {
+      const state = this._axes[key];
+      if (state) state.track.classList.toggle("os-hidden", !visible);
+    }
+  }
+
+  private _isDragging(): boolean {
+    for (const key of Object.keys(this._axes) as ScrollbarAxis[]) {
+      const state = this._axes[key];
+      if (state?.thumb.classList.contains("dragging")) return true;
+    }
+    return false;
+  }
+
+  private _clearHideTimer(): void {
+    if (this._hideTimer) {
+      window.clearTimeout(this._hideTimer);
+      this._hideTimer = 0;
+    }
+  }
+
   private _paintAxis(axis: ScrollbarAxis): void {
     const state = this._axes[axis];
     if (!state) return;
@@ -592,6 +680,11 @@ export class OverlayScrollbar {
     if (this._destroyed) return;
     this._destroyed = true;
     this._target.removeEventListener("scroll", this._onScroll);
+    if (this._autoHide) {
+      this._clearHideTimer();
+      this._container.removeEventListener("pointerenter", this._onPointerEnter);
+      this._container.removeEventListener("pointerleave", this._onPointerLeave);
+    }
     this._ro?.disconnect();
     this._ro = null;
     this._mo?.disconnect();
