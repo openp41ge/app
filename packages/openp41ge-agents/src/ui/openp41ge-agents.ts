@@ -1559,6 +1559,7 @@ class Openp41geAgents extends LitElement {
           margin: 0 0 10px;
         }
         .chat-message.assistant .msg-content .code-block-toolbar {
+          position: relative;
           display: flex;
           align-items: center;
           justify-content: flex-end;
@@ -2433,30 +2434,30 @@ class Openp41geAgents extends LitElement {
           >
             ${unsafeHTML(this._wrapIcon(wrapped))}
           </button>
+          ${
+            menuOpen
+              ? html`
+                  <div class="code-lang-menu" @click=${(e: Event) => e.stopPropagation()}>
+                    ${candidates.map(
+                      (id) => html`
+                        <button
+                          type="button"
+                          class="code-lang-option ${id === seg.language ? "selected" : ""}"
+                          data-lang=${id}
+                          @click=${(e: Event) => this._pickLang(e, seg, id)}
+                        >
+                          ${langLabel(id)}
+                        </button>
+                      `,
+                    )}
+                  </div>
+                `
+              : ""
+          }
         </div>
         <div class="code-block ${wrapped ? "wrap" : ""}">
           <pre><code>${unsafeHTML(highlight(seg.code, seg.language))}</code></pre>
         </div>
-        ${
-          menuOpen
-            ? html`
-                <div class="code-lang-menu" @click=${(e: Event) => e.stopPropagation()}>
-                  ${candidates.map(
-                    (id) => html`
-                      <button
-                        type="button"
-                        class="code-lang-option ${id === seg.language ? "selected" : ""}"
-                        data-lang=${id}
-                        @click=${(e: Event) => this._pickLang(e, seg, id)}
-                      >
-                        ${langLabel(id)}
-                      </button>
-                    `,
-                  )}
-                </div>
-              `
-            : ""
-        }
       </div>
     `;
   }
