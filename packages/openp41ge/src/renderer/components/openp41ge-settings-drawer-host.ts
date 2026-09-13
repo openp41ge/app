@@ -505,6 +505,11 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     // Listen on document so Escape closes the drawer regardless of where focus
     // currently sits (the drawer may not have keyboard focus).
     document.addEventListener("keydown", this._onKeydown);
+    // Listen on document (capture) so clicking outside the drawer closes it
+    // even if the grid element swallows the click. Uses pointerdown so the
+    // drawer dismisses as soon as the user presses outside it, matching the
+    // standard click-away behavior for an overlay panel.
+    document.addEventListener("pointerdown", this._onDocumentPointerDown, true);
     // Force the drawer widths back inside their allowed range when the window
     // (and thus the grid) is resized, so a drawer can't be left overrunning the
     // halfway point after a shrink.
@@ -514,6 +519,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener("keydown", this._onKeydown);
+    document.removeEventListener("pointerdown", this._onDocumentPointerDown, true);
     window.removeEventListener("resize", this._onWindowResize);
   }
 
@@ -522,6 +528,32 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     if (!this.isOpen) return;
     e.preventDefault();
     this.closeTop();
+  };
+
+  /**
+   * Click-away: close the open drawer when the user presses on the grid area
+   * outside it.
+   *
+   * The host is a transparent full-grid overlay with `pointer-events: none`, so
+   * only the drawers block pointer events. A press on the grid that a drawer
+   * does NOT cover lands on the grid itself (a sibling of the host, not a
+   * child), so `this.contains(e.target)` is false there. We listen on document
+   * and, when the press is inside the host's bounding box (the grid area) but
+   * not on a drawer, close the whole stack. Pressing a drawer (this.contains)
+   * is left alone, and presses outside the grid (sidebars / titlebar) don't
+   * fall inside the grid area so they are ignored too — that way the sidebar
+   * settings gear that opened the drawer can still toggle it closed.
+   */
+  private _onDocumentPointerDown = (e: PointerEvent): void => {
+    if (!this.isOpen) return;
+    // A press on a drawer (its head, body, resize handle, or parent mask) must
+    // not dismiss the panel.
+    if (this.contains(e.target as Node)) return;
+    const rect = this.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
+    this.closeAll();
   };
 
   /**
