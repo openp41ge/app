@@ -277,7 +277,7 @@ class FeStatusBar extends LitElement {
         }
         <div
           class="sbb-row"
-          style="position:relative;display:flex;flex-shrink:0;align-items:center;height:24px;background:var(--fe-gutter-bg, #1e1e1e);border-top:1px solid var(--fe-border-color, #2a2a2a);padding:0 0 0 8px;gap:8px;font-size:11px;color:var(--fe-secondary-color, #888);"
+          style="position:relative;display:flex;flex-shrink:0;align-items:center;height:34px;background:var(--fe-gutter-bg, #1e1e1e);border-top:1px solid var(--fe-border-color, #2a2a2a);padding:0 0 0 8px;gap:8px;font-size:11px;color:var(--fe-secondary-color, #888);"
         >
           ${
             this._emptyMessage !== null

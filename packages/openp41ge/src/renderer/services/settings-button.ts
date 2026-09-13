@@ -19,6 +19,7 @@ export function createSettingsButton(
   appType: string,
   title: string,
   tooltip: string = "Settings",
+  side?: Side,
 ): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -67,7 +68,7 @@ export function createSettingsButton(
       new CustomEvent(openEvent, {
         bubbles: true,
         composed: true,
-        detail: { appType, title },
+        detail: { appType, title, side },
       }),
     );
   });
@@ -77,12 +78,42 @@ export function createSettingsButton(
 }
 
 /**
- * appendSettingsButton — append a settings gear to a footer, placing it on the
- * **outside** edge relative to the sidebar side.
+ * Place footer action icons on the INSIDE edge of a sidebar (the edge facing
+ * the grid/content): a left sidebar's inside edge is the RIGHT; a right
+ * sidebar's is the LEFT. A flex spacer on the outer side pushes the icon
+ * group inward.
  *
- * A left sidebar's outside edge is the left; a right sidebar's is the right.
- * A flex `flex: 1 1 auto` spacer pushes the gear toward whichever edge is
- * outermost for the given side.
+ * The displayed order is the same regardless of side — reading outward from
+ * the innermost (grid-facing) edge it is always settings, then search — but
+ * because the group is mirrored per side the DOM/visual order is reversed for
+ * the left sidebar. The settings icon is always the innermost one.
+ */
+export function layoutFooterIcons(
+  footer: HTMLElement,
+  side: Side,
+  buttons: HTMLElement[],
+): void {
+  const spacer = document.createElement("div");
+  Object.assign(spacer.style, { flex: "1 1 auto" });
+  if (side === "left") {
+    // Inside edge = right → spacer on the far left, then the icon group reading
+    // toward the inside edge. The group is reversed so the settings icon ends
+    // up innermost (closest to the grid).
+    footer.appendChild(spacer);
+    for (const b of [...buttons].reverse()) footer.appendChild(b);
+  } else {
+    // Inside edge = left → icon group first (settings innermost), then spacer.
+    for (const b of buttons) footer.appendChild(b);
+    footer.appendChild(spacer);
+  }
+}
+
+/**
+ * appendSettingsButton — append a settings gear to a footer, placing it on the
+ * **inside** edge relative to the sidebar side (the edge facing the grid).
+ *
+ * A left sidebar's inside edge is the right; a right sidebar's is the left.
+ * A flex spacer pushes the gear toward whichever edge is innermost.
  */
 export function appendSettingsButton(
   footer: HTMLElement,
@@ -92,16 +123,6 @@ export function appendSettingsButton(
   title: string,
   tooltip: string = "Settings",
 ): void {
-  const btn = createSettingsButton(openEvent, appType, title, tooltip);
-  const spacer = document.createElement("div");
-  Object.assign(spacer.style, { flex: "1 1 auto" });
-  if (side === "left") {
-    // Outside edge = left → gear first.
-    footer.appendChild(btn);
-    footer.appendChild(spacer);
-  } else {
-    // Outside edge = right → spacer first, gear last.
-    footer.appendChild(spacer);
-    footer.appendChild(btn);
-  }
+  const btn = createSettingsButton(openEvent, appType, title, tooltip, side);
+  layoutFooterIcons(footer, side, [btn]);
 }

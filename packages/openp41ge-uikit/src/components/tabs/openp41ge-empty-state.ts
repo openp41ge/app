@@ -30,7 +30,7 @@ export class Openp41geEmptyState extends LitElement {
       align-items: flex-start;
       justify-content: flex-start;
       height: 100%;
-      background: var(--bg-primary, #1e1e1e);
+      background: var(--bg-primary, #161616);
       padding: 40px 32px;
       box-sizing: border-box;
       overflow: hidden;
@@ -64,7 +64,7 @@ export class Openp41geEmptyState extends LitElement {
       padding: 8px 16px;
       border: 1px solid var(--border-color, #444);
       border-radius: 6px;
-      background: var(--bg-secondary, #252526);
+      background: var(--bg-secondary, #161616);
       color: var(--text-primary, #e0e0e0);
       font-size: 13px;
       font-family: inherit;

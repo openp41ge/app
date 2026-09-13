@@ -37,7 +37,7 @@ export class TabContent extends LitElement {
           class="tab-content-empty"
           style="
             height:100%;
-            background:var(--bg-primary, #1e1e1e);
+            background:var(--bg-primary, #161616);
             display:flex;
             flex-direction:column;
             align-items:center;

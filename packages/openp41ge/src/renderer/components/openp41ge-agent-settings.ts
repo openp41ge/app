@@ -892,7 +892,7 @@ export class Openp41geAgentSettings extends LitElement {
           position: relative;
           height: 100%;
           overflow: hidden;
-          background: var(--bg-primary, #1e1e1e);
+          background: var(--bg-primary, #161616);
         }
         .ags-root ::-webkit-scrollbar {
           width: 8px;
@@ -940,7 +940,7 @@ export class Openp41geAgentSettings extends LitElement {
           align-items: center;
           padding: 0 14px;
           border-bottom: 1px solid var(--divider, #333);
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
           z-index: 0;
         }
         .ags-topbar-title {
@@ -955,11 +955,12 @@ export class Openp41geAgentSettings extends LitElement {
           top: 43px;
           left: 0;
           right: 0;
-          bottom: 24px;
+          bottom: 34px;
           overflow-y: auto;
         }
-        /* Small bottom bar — matches the tiny footer on the sidebar / workspace
-         * widgets (24px), not the large 44px drawer footer. */
+        /* Bottom bar for the agents settings pane (grid tab / drawer), matching
+         * the other grid-tab bottom bars (34px) — not the compact 24px sidebar
+         * footers, nor the large 88px drawer footer. */
         .ags-bottombar {
           position: absolute;
           left: 0;
@@ -969,10 +970,10 @@ export class Openp41geAgentSettings extends LitElement {
           display: flex;
           align-items: center;
           padding: 0 8px;
-          height: 24px;
+          height: 34px;
           box-sizing: border-box;
           border-top: 1px solid var(--divider, #333);
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
         }
         .drawer-footer {
           display: flex;
@@ -980,11 +981,11 @@ export class Openp41geAgentSettings extends LitElement {
           justify-content: flex-end;
           gap: 6px;
           flex-shrink: 0;
-          height: 24px;
+          height: 48px;
           box-sizing: border-box;
           padding: 0 8px;
           border-top: 1px solid var(--divider, #333);
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
         }
         .ags-pane {
           box-sizing: border-box;
@@ -1236,7 +1237,7 @@ export class Openp41geAgentSettings extends LitElement {
           display: flex;
           flex-direction: column;
           min-width: 0;
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
           border-left: 1px solid var(--divider, #444);
           transition: width 0.2s ease;
           animation: ags-dw-slide 0.18s ease;

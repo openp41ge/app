@@ -22,6 +22,8 @@ import {
   NOTCH_OVERFLOW,
 } from "openp41ge-constants";
 
+import type { Openp41geSettingsDrawerHost } from "./openp41ge-settings-drawer-host";
+
 import "./openp41ge-sidebar";
 
 class Openp41geWindowView extends LitElement {
@@ -62,6 +64,22 @@ class Openp41geWindowView extends LitElement {
    * the handle tracks the mouse every move, without a full re-render per mousemove). */
   private _dragLeftWidth = 280;
   private _dragRightWidth = 280;
+
+  /** Drawer width on the dragged side at drag start (so widening the sidebar
+   * can take that space from the open drawer). */
+  private _dragStartDrawerWidth = 0;
+  /** True while the sidebar is over-dragged into resistance (drawer at min). */
+  private _isOverdriven = false;
+  /** Sidebar width the drag springs back to on release when overdriven. */
+  private _overdragTarget = 0;
+  /** True while the sidebar rubber-bands past its OWN max width. */
+  private _isOverMax = false;
+  private _overMaxTarget = 0;
+  /** True while the sidebar rubber-bands below its OWN min width. */
+  private _isOverMin = false;
+  private _overMinTarget = 0;
+  /** Resistance factor for the small "give" while over-dragging (0..1). */
+  private readonly _RESISTANCE = 0.2;
 
   // ── Context menu ─────────────────────────────────────────────────────
 
@@ -137,6 +155,18 @@ class Openp41geWindowView extends LitElement {
     this._dragStartRightWidth = this._rightWidth;
     this._dragLeftWidth = this._leftWidth;
     this._dragRightWidth = this._rightWidth;
+    // Snapshot the open drawer width for the dragged side so widening the
+    // sidebar can take space from the drawer (and stop at its minimum).
+    const host = this._drawerHost();
+    this._dragStartDrawerWidth = host ? host.drawerWidthFor(handle) : 0;
+    this._isOverdriven = false;
+    this._overdragTarget = 0;
+    this._isOverMax = false;
+    this._overMaxTarget = 0;
+    this._isOverMin = false;
+    this._overMinTarget = 0;
+    // Keep the notch's blue indicator lit for the whole drag (not just hover).
+    this.querySelector(`.wv-notch-v.${handle}-notch`)?.classList.add("dragging");
 
     document.addEventListener("mousemove", this._onResizeMove);
     document.addEventListener("mouseup", this._onResizeEnd);
@@ -151,25 +181,115 @@ class Openp41geWindowView extends LitElement {
 
     switch (this._activeHandle) {
       case "left": {
-        const newWidth = Math.max(
-          MIN_SIDEBAR_WIDTH,
-          Math.min(MAX_SIDEBAR_WIDTH, this._dragStartLeftWidth + dx),
-        );
+        const { newWidth, drawerWidth } = this._sidebarMove("left", dx);
         this._dragLeftWidth = newWidth;
         this._applyWidth("left", newWidth);
+        if (drawerWidth !== null) {
+          this._drawerHost()?.setDrawerWidthFor("left", drawerWidth);
+        }
         break;
       }
       case "right": {
-        const newWidth = Math.max(
-          MIN_SIDEBAR_WIDTH,
-          Math.min(MAX_SIDEBAR_WIDTH, this._dragStartRightWidth - dx),
-        );
+        // Right handle: dragging left (dx<0) widens the right sidebar.
+        const { newWidth, drawerWidth } = this._sidebarMove("right", dx);
         this._dragRightWidth = newWidth;
         this._applyWidth("right", newWidth);
+        if (drawerWidth !== null) {
+          this._drawerHost()?.setDrawerWidthFor("right", drawerWidth);
+        }
         break;
       }
     }
   };
+
+  /**
+   * Compute the sidebar width (and matching drawer width) for a drag move.
+   *
+   * Widening the sidebar takes the space from the open drawer on that side
+   * (the drawer shrinks by the same amount), so the drawer's far edge stays
+   * where it was instead of sliding into the grid. Once the drawer reaches its
+   * minimum width the sidebar stops growing — a small resistive "give" is
+   * allowed, and it springs back on release.
+   *
+   * Returns `drawerWidth: null` when no drawer is open on that side.
+   */
+  private _sidebarMove(
+    handle: "left" | "right",
+    dx: number,
+  ): { newWidth: number; drawerWidth: number | null } {
+    const host = this._drawerHost();
+    const open = !!host?.isDrawerOpen(handle);
+    const drawerStart = this._dragStartDrawerWidth;
+    const minWidth = open ? host!.drawerMinWidth : MIN_SIDEBAR_WIDTH;
+    const startWidth = handle === "left" ? this._dragStartLeftWidth : this._dragStartRightWidth;
+    // Widening the sidebar is +dx for left, -dx for right.
+    const desired = handle === "left" ? startWidth + dx : startWidth - dx;
+    // The sidebar's effective max is the smaller of MAX_SIDEBAR_WIDTH and the
+    // 35% viewport cap (the same constraint the template's `max-width` uses),
+    // so the rubber band fires at the width the sidebar actually renders to.
+    const maxSidebar = this._sidebarMax();
+    // Headroom: how much the drawer can shrink (the space the sidebar can take).
+    const allowance = open ? Math.max(0, drawerStart - minWidth) : 0;
+    const maxSidebarByDrawer = startWidth + allowance;
+
+    let newWidth: number;
+    let drawerWidth = drawerStart;
+    this._isOverMax = false;
+    this._isOverMin = false;
+    this._isOverdriven = false;
+    this._overMaxTarget = 0;
+    this._overMinTarget = 0;
+    this._overdragTarget = 0;
+
+    if (desired < MIN_SIDEBAR_WIDTH) {
+      // Below its own minimum — rubber band down, spring back on release.
+      newWidth = MIN_SIDEBAR_WIDTH - (MIN_SIDEBAR_WIDTH - desired) * this._RESISTANCE;
+      this._isOverMin = true;
+      this._overMinTarget = MIN_SIDEBAR_WIDTH;
+      if (open) {
+        const growth = newWidth - startWidth;
+        drawerWidth = Math.max(minWidth, Math.min(drawerStart, drawerStart - growth));
+      }
+    } else if (open && maxSidebarByDrawer < maxSidebar && desired > maxSidebarByDrawer) {
+      // Drawer is at its minimum — resist: a small give, then spring back.
+      const overdrag = desired - maxSidebarByDrawer;
+      newWidth = Math.min(maxSidebar, maxSidebarByDrawer + overdrag * this._RESISTANCE);
+      drawerWidth = minWidth;
+      this._isOverdriven = true;
+      this._overdragTarget = maxSidebarByDrawer;
+    } else {
+      newWidth = Math.min(maxSidebar, desired);
+      if (open) {
+        // Take the sidebar's growth from the drawer (keep their sum constant),
+        // so the drawer's far edge stays put. Narrowing grows it back up to the
+        // width it had when the drag started.
+        const growth = newWidth - startWidth;
+        drawerWidth = Math.max(minWidth, Math.min(drawerStart, drawerStart - growth));
+      }
+      // Above its own max — rubber band up, spring back on release.
+      if (desired > maxSidebar) {
+        newWidth = maxSidebar + (desired - maxSidebar) * this._RESISTANCE;
+        this._isOverMax = true;
+        this._overMaxTarget = maxSidebar;
+      }
+    }
+
+    return { newWidth, drawerWidth: open ? drawerWidth : null };
+  }
+
+  /**
+   * The effective max width a sidebar can render to: the smaller of
+   * `MAX_SIDEBAR_WIDTH` and the 35% viewport cap used by the template.
+   */
+  private _sidebarMax(): number {
+    return Math.min(MAX_SIDEBAR_WIDTH, Math.round(window.innerWidth * 0.35));
+  }
+
+  private _drawerHost(): Openp41geSettingsDrawerHost | null {
+    return this.querySelector(
+      "openp41ge-settings-drawer-host",
+    ) as Openp41geSettingsDrawerHost | null;
+  }
 
   /**
    * Write a sidebar width straight to its DOM host element. Bypasses Lit
@@ -180,11 +300,32 @@ class Openp41geWindowView extends LitElement {
     const el = this.querySelector<HTMLElement>(`openp41ge-sidebar[side="${side}"]`);
     if (!el) return;
     el.style.flex = `0 1 ${width}px`;
-    // Mirror the template's max-width clamp (sidebar fills up to 35% viewport).
-    el.style.maxWidth = `min(${width}px, 35vw)`;
+    // Let the (possibly rubber-banded) width render exactly, so the overshoot is
+    // visible during the drag. Committed widths are already capped by
+    // `_sidebarMove` at `min(MAX_SIDEBAR_WIDTH, 35vw)`, so this never persists
+    // a width beyond the design cap.
+    el.style.maxWidth = `${width}px`;
+  }
+
+  /**
+   * Animate the sidebar spring-back by temporarily enabling a width transition
+   * on the element, applying the target width, and clearing it after the
+   * transition completes. This makes the rubber-band overshoot ease back to
+   * the limit (and the inner content/scrollbars follow the animation) rather
+   * than snapping instantly.
+   */
+  private _springWidth(side: "left" | "right", width: number): void {
+    const el = this.querySelector<HTMLElement>(`openp41ge-sidebar[side="${side}"]`);
+    if (!el) return;
+    el.classList.add("wv-springing");
+    this._applyWidth(side, width);
+    window.setTimeout(() => {
+      el.classList.remove("wv-springing");
+    }, 200);
   }
 
   private _onResizeEnd = (): void => {
+    const handle = this._activeHandle;
     this._activeHandle = null;
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
@@ -192,11 +333,40 @@ class Openp41geWindowView extends LitElement {
     // Reset cursor
     document.body.style.cursor = "";
 
+    // If the drag was over-driven into resistance, snap the sidebar back to the
+    // maximum it can be given the drawer is at its minimum.
+    if (this._isOverdriven && this._overdragTarget > 0 && handle) {
+      this._dragLeftWidth = handle === "left" ? this._overdragTarget : this._dragLeftWidth;
+      this._dragRightWidth = handle === "right" ? this._overdragTarget : this._dragRightWidth;
+      this._springWidth("left", this._dragLeftWidth);
+      this._springWidth("right", this._dragRightWidth);
+    }
+    // If the sidebar rubber-banded past its own max, spring it back to the max.
+    if (this._isOverMax && this._overMaxTarget > 0 && handle) {
+      this._dragLeftWidth = handle === "left" ? this._overMaxTarget : this._dragLeftWidth;
+      this._dragRightWidth = handle === "right" ? this._overMaxTarget : this._dragRightWidth;
+      this._springWidth("left", this._dragLeftWidth);
+      this._springWidth("right", this._dragRightWidth);
+    }
+    // If the sidebar rubber-banded below its own min, spring it back to the min.
+    if (this._isOverMin && this._overMinTarget > 0 && handle) {
+      this._dragLeftWidth = handle === "left" ? this._overMinTarget : this._dragLeftWidth;
+      this._dragRightWidth = handle === "right" ? this._overMinTarget : this._dragRightWidth;
+      this._springWidth("left", this._dragLeftWidth);
+      this._springWidth("right", this._dragRightWidth);
+    }
+
     // Commit the final drag width into reactive state (single render) and persist
     this._leftWidth = this._dragLeftWidth;
     this._rightWidth = this._dragRightWidth;
     localStorage.setItem("openp41ge:sidebar-width-left", String(this._leftWidth));
     localStorage.setItem("openp41ge:sidebar-width-right", String(this._rightWidth));
+
+    // Clear the drag indicator and overrun state.
+    this.querySelector(".wv-notch-v.dragging")?.classList.remove("dragging");
+    this._isOverdriven = false;
+    this._isOverMax = false;
+    this._isOverMin = false;
   };
 
   // ═══ Helpers ─────────────────────────────────────────────────────────
@@ -366,6 +536,13 @@ class Openp41geWindowView extends LitElement {
         .wv-notch-v.dragging::before {
           opacity: 1;
         }
+        /* Animated spring-back for the sidebar when released after a rubber-band
+           overrun. The class is added just before the width change and removed
+           once the transition finishes; during the drag itself it is absent so
+           the sidebar tracks the pointer without lag. */
+        openp41ge-sidebar.wv-springing {
+          transition: flex-basis 0.18s ease, max-width 0.18s ease;
+        }
         .wv-notch-v.left-notch::before {
           left: 1px;
         }
@@ -412,6 +589,9 @@ class Openp41geWindowView extends LitElement {
                 .tabData=${tabData}
                 .activeTabIds=${activeTabIds}
               ></tab-grid>
+              <!-- Experimental "negative drawer" settings host: overlays the
+                   grid from the sidebar edge instead of opening a settings tab. -->
+              <openp41ge-settings-drawer-host></openp41ge-settings-drawer-host>
             </div>
           </div>
 

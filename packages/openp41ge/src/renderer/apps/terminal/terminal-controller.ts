@@ -85,11 +85,11 @@ export class TerminalController extends BaseController implements TabController 
       fontSize: 14,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: "#1e1e1e",
+        background: "#161616",
         foreground: "#d4d4d4",
         cursor: "#d4d4d4",
         selectionBackground: "#264f78",
-        black: "#1e1e1e",
+        black: "#161616",
         red: "#f44747",
         green: "#4ec9b0",
         yellow: "#dcdcaa",

@@ -95,12 +95,12 @@ export class LogsSystemTabController implements SystemTabController {
     });
     empty.textContent = "No log systems yet";
 
-    // Footer: this tab's own settings button, emitting a unique event to open
-    // the Logs settings grid tab.
+    // Footer: this tab's own settings button on the INSIDE edge (facing the
+    // grid). Emits a unique event to open the Logs settings drawer.
     const footer = document.createElement("div");
     Object.assign(footer.style, {
       flexShrink: "0",
-      height: "24px",
+      height: "34px",
       display: "flex",
       alignItems: "center",
       gap: "6px",
@@ -108,13 +108,13 @@ export class LogsSystemTabController implements SystemTabController {
       borderTop: "1px solid var(--divider,#333)",
       fontSize: "12px",
       color: "var(--text-secondary,#999)",
-      background: "var(--bg-secondary,#252526)",
+      background: "var(--bg-secondary, #161616)",
       userSelect: "none",
     });
     appendSettingsButton(
       footer,
       this._side,
-      "openp41ge:open-logs-settings",
+      "openp41ge:open-logs-settings-drawer",
       "logs-settings",
       "Logs",
       "Log settings",
@@ -225,7 +225,7 @@ export class LogsSystemTabController implements SystemTabController {
       flexShrink: "0",
       color: "var(--text-muted,#888)",
       fontSize: "11px",
-      background: "var(--bg-secondary,#252526)",
+      background: "var(--bg-secondary, #161616)",
       borderRadius: "8px",
       padding: "1px 7px",
     });

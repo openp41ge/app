@@ -14,11 +14,18 @@ import type { TabBar } from "./tab-bar";
 import type { TabContent } from "./tab-content";
 import "./tab-bar";
 import "./tab-content";
+import { OverlayScrollbar } from "openp41ge-scrollbar";
 
 /** Repo-row drag MIME (value: repoName). */
 const REPO_DRAG_TYPE = "application/x-openp41ge-repo";
 /** Worktree-row drag MIME (value: "<repoName>\u0000<branch>"). */
 const WORKTREE_DRAG_TYPE = "application/x-openp41ge-worktree";
+/** Bottom-space reserved for the floating horizontal grid scrollbar (px),
+ *  exposed as `--grid-bb-reserve` so bottom bars — including those living in
+ *  shadow DOM (e.g. the Agents chat-bottombar), which the scoped <style> can't
+ *  pierce — can nudge their content up via `padding-bottom: var(--grid-bb-reserve)`.
+ *  Matches the value used by the scoped `.grid-hover-reserve` rule. */
+const GRID_BB_RESERVE_PX = 10;
 
 export interface GridState {
   winId: string;
@@ -95,10 +102,14 @@ export class TabGrid extends LitElement {
   /** Per-column flex-basis widths (px). 0 means auto/shared. */
   @state() private _cellWidths: number[] = [];
   private _resizeCol = -1;
+  /** Column currently springing back into range after a rubber-band overrun. */
+  @state() private _snapbackCol = -1;
   private _resizeStartX = 0;
   private _resizeStartWidth = 200;
   private _onCellResizeMove: ((e: PointerEvent) => void) | null = null;
   private _onCellResizeUp: ((e: PointerEvent) => void) | null = null;
+  /** Floating horizontal overlay scrollbar for the grid (no layout space). */
+  private _gridHScrollbar: OverlayScrollbar | null = null;
   private _boundOnClick: ((e: MouseEvent) => void) | null = null;
   private _boundOnDragOver: ((e: DragEvent) => void) | null = null;
   private _boundOnDragLeave: ((e: DragEvent) => void) | null = null;
@@ -109,9 +120,29 @@ export class TabGrid extends LitElement {
   private _boundOnTabBarReorder: ((e: Event) => void) | null = null;
   private _boundOnGridPin: ((e: Event) => void) | null = null;
   private _boundOnSidebarFocus: ((e: Event) => void) | null = null;
+  private _boundOnGridEnter: ((e: PointerEvent) => void) | null = null;
+  private _boundOnGridLeave: ((e: PointerEvent) => void) | null = null;
+  private _gridResizeObserver: ResizeObserver | null = null;
+  /** Watches the grid container's subtree so overflow can be re-detected when
+   *  cells/tabs/content change without the container's own box size changing. */
+  private _gridMutationObserver: MutationObserver | null = null;
+  private _gridMutationFrame = 0;
+
+  /** Whether the grid content overflows horizontally (shows a floating bar). */
+  private _gridHasHScroll = false;
 
   get dropTarget(): GridDropTarget | null {
     return this._dropTarget;
+  }
+
+  /**
+   * The max width a cell may be dragged to — 50% of the window width, so the
+   * divider cannot be dragged past the window's midpoint. Held as a property
+   * (not the grid's own width) so overshoot, clamping, and window-shrink
+   * reflow all share one source of truth.
+   */
+  private _cellMaxWidth(): number {
+    return Math.round(window.innerWidth * 0.5);
   }
 
   getBarForCol(col: number): TabBar | null {
@@ -161,6 +192,39 @@ export class TabGrid extends LitElement {
 
   firstUpdated() {
     this._setupDropTarget();
+    this._attachHorizontalScrollbar();
+    this._setupGridHover();
+  }
+
+  /**
+   * Drive the hover-reserve behaviour: watch for horizontal overflow and react
+   * to the pointer entering/leaving the grid so content can shift up/shrink to
+   * make room for the floating horizontal scrollbar.
+   */
+  private _setupGridHover(): void {
+    // The pointer enter/leave listeners are added in connectedCallback so they
+    // survive reconnects; here we watch the scroll container so we always know
+    // whether the grid overflows horizontally (i.e. shows a floating bar).
+    const target = this.querySelector<HTMLElement>(".grid-container");
+    if (target && !this._gridResizeObserver) {
+      this._gridResizeObserver = new ResizeObserver(() => this._updateGridHScrollState());
+      this._gridResizeObserver.observe(target);
+    }
+    // The overlay scrollbar detects overflow via a subtree MutationObserver on
+    // the container (its own box size doesn't change when cells/tabs grow).
+    // Mirror that here so `_gridHasHScroll` never goes stale; rAF-debounced so
+    // editor keystrokes don't force a synchronous layout on every mutation.
+    if (target && !this._gridMutationObserver) {
+      this._gridMutationObserver = new MutationObserver(() => {
+        if (this._gridMutationFrame) return;
+        this._gridMutationFrame = requestAnimationFrame(() => {
+          this._gridMutationFrame = 0;
+          this._updateGridHScrollState();
+        });
+      });
+      this._gridMutationObserver.observe(target, { childList: true, subtree: true });
+    }
+    this._updateGridHScrollState();
   }
 
   updated(changedProperties: Map<string, unknown>) {
@@ -175,6 +239,15 @@ export class TabGrid extends LitElement {
       // Reset per-cell widths when the column count changes.
       this._cellWidths = [];
     }
+    // Recompute the floating horizontal scrollbar after any re-render.  Cell
+    // width changes / tab add-remove alter the grid `scrollWidth` without
+    // changing the container's own box size or child-list, which the overlay's
+    // observers don't catch — so refresh its thumb geometry here.
+    this._gridHScrollbar?.update();
+    this._updateGridHScrollState();
+    // A re-render may have recreated the scroll container, so re-apply the
+    // hover-reserve class (bars stay put; only bar content shifts).
+    this._updateGridHoverReserve();
   }
 
   // The (this as X) casts are duck-type properties consumed by
@@ -329,12 +402,58 @@ export class TabGrid extends LitElement {
     super.connectedCallback();
     this.style.position = "relative";
     this._setupListeners();
+    this._boundOnGridEnter = () => {
+      // Recompute overflow fresh at the moment of pointer-enter so the reserve
+      // class reflects the CURRENT scroll state (not a stale value from an
+      // earlier render, e.g. before controllers/content had been mounted).
+      this._updateGridHScrollState();
+    };
+    this._boundOnGridLeave = () => {
+      // Remainder of the reserve state is driven purely by overflow; nothing
+      // to toggle here. Kept so the enter/leave listeners stay symmetric.
+    };
+    this.addEventListener("pointerenter", this._boundOnGridEnter);
+    this.addEventListener("pointerleave", this._boundOnGridLeave);
+    window.addEventListener("resize", this._onWindowResize);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this._teardownListeners();
+    if (this._boundOnGridEnter) {
+      this.removeEventListener("pointerenter", this._boundOnGridEnter);
+      this._boundOnGridEnter = null;
+    }
+    if (this._boundOnGridLeave) {
+      this.removeEventListener("pointerleave", this._boundOnGridLeave);
+      this._boundOnGridLeave = null;
+    }
+    this._gridResizeObserver?.disconnect();
+    this._gridResizeObserver = null;
+    this._gridMutationObserver?.disconnect();
+    this._gridMutationObserver = null;
+    if (this._gridMutationFrame) {
+      cancelAnimationFrame(this._gridMutationFrame);
+      this._gridMutationFrame = 0;
+    }
+    window.removeEventListener("resize", this._onWindowResize);
+    this._gridHScrollbar?.destroy();
+    this._gridHScrollbar = null;
   }
+
+  /**
+   * When the window shrinks, any cell wider than 50% of the new viewport must
+   * be pulled back into range so a previously-dragged cell never exceeds the
+   * new midpoint.
+   */
+  private _onWindowResize = (): void => {
+    const max = this._cellMaxWidth();
+    const widths = this._cellWidths.map((w) => (w > max ? max : w));
+    if (widths.some((w, i) => w !== this._cellWidths[i])) {
+      this._cellWidths = widths;
+    }
+    this._updateGridHScrollState();
+  };
 
   private _setupListeners(): void {
     // ── Tab click: activate ─────────────────────────────────
@@ -762,9 +881,79 @@ export class TabGrid extends LitElement {
     }
   }
 
+  /**
+   * Attach a floating horizontal OverlayScrollbar to the grid.
+   *
+   * The native horizontal bar on `.grid-container` (overflow-x:auto) reserves
+   * ~15px of layout height at the bottom, which shrinks every grid cell and
+   * pushes each tab's bottom/status bar upward.  Hiding it and replacing it
+   * with the shared overlay scrollbar lets the bar float OVER the bottom of
+   * the grid (over the per-tab status bars) instead of consuming space, and it
+   * auto-hides when the cursor leaves.
+   */
+  /**
+   * Recompute whether the grid content overflows horizontally. When it does,
+   * the floating horizontal scrollbar is shown and — on hover — the grid
+   * content moves up/shrinks slightly to reserve space for it (so it no
+   * longer covers the per-tab bottom bars).
+   */
+  private _updateGridHScrollState(): void {
+    const target = this.querySelector<HTMLElement>(".grid-container");
+    if (!target) return;
+    const has = target.scrollWidth > target.clientWidth + 1;
+    if (has !== this._gridHasHScroll) {
+      this._gridHasHScroll = has;
+      // The floating bar visibility depends on overflow, so re-apply the
+      // reserve class (which only nudges the bottom-bar content, NOT the bars).
+      this._updateGridHoverReserve();
+    }
+  }
+
+  /**
+   * Toggle the hover-reserve class on the grid container. Whenever the grid
+   * content overflows horizontally — i.e. the floating horizontal scrollbar is
+   * present — the bottom-bar CONTENT is nudged up (via scoped CSS: bottom
+   * padding = scrollbar height, content vertically centred above it) so the
+   * scrollbar never covers it. The bars themselves stay pinned in place.
+   */
+  private _updateGridHoverReserve(): void {
+    const target = this.querySelector<HTMLElement>(".grid-container");
+    if (!target) return;
+    target.classList.toggle("grid-hover-reserve", this._gridHasHScroll);
+    // Expose the reserve amount as a CSS custom property. It inherits across
+    // shadow boundaries, so bottom bars rendered in shadow DOM (e.g. the
+    // Agents chat-bottombar, which the scoped <style> cannot pierce) can react
+    // via `padding-bottom: var(--grid-bb-reserve)`.
+    target.style.setProperty(
+      "--grid-bb-reserve",
+      this._gridHasHScroll ? `${GRID_BB_RESERVE_PX}px` : "0px",
+    );
+  }
+
+  private _attachHorizontalScrollbar(): void {
+    // (Re)bind the floating horizontal overlay bar to the grid's scroll area.
+    this._gridHScrollbar?.destroy();
+    this._gridHScrollbar = null;
+    const target = this.querySelector(".grid-container") as HTMLElement | null;
+    if (!target || !target.isConnected) return;
+    this._gridHScrollbar = OverlayScrollbar.attach(target, {
+      axis: "horizontal",
+      // The grid host is position:relative and does not itself scroll, so the
+      // track floats over the bottom edge of the grid (over the status bars)
+      // rather than inside the scrolling content where it would move sideways.
+      container: this,
+      inset: { left: "0", right: "0", bottom: "0" },
+      autoHide: true,
+      autoHideDelay: 600,
+      size: 9,
+      hoverSize: 10,
+      zIndex: 1001,
+    });
+  }
+
   render() {
     const gridStyle =
-      "display:flex;flex-direction:row;height:100%;background:#1e1e1e;overflow-x:auto;overflow-y:hidden;";
+      "display:flex;flex-direction:row;height:100%;background:var(--bg-primary, #161616);overflow-x:auto;overflow-y:hidden;";
 
     return html`
       <style>
@@ -800,8 +989,29 @@ export class TabGrid extends LitElement {
         .grid-resize-handle.dragging::before {
           opacity: 1;
         }
+        /* Animated spring-back for a cell returning from a rubber-band overrun.
+           The class is present only during the return (set on release, cleared
+           shortly after), so during the active drag the cell tracks the pointer
+           without lag. */
+        .grid-cell.sdw-snapback {
+          transition: flex-basis 0.18s ease;
+        }
+        /* Whenever the grid overflows horizontally (a horizontal scrollbar is
+           present), keep the per-tab bottom bars pinned in place (cells do NOT
+           shift) but move the CONTENT inside the bars up — bottom padding
+           equals the scrollbar height and the content stays vertically centred
+           above it — so the floating scrollbar never covers it. !important
+           overrides the components' inline padding (e.g. fe-status-bar's
+           'padding:0 0 0 8px'), which would otherwise beat this rule. */
+        .grid-container.grid-hover-reserve fe-status-bar .sbb-row,
+        .grid-container.grid-hover-reserve [data-bottom-bar],
+        .grid-container.grid-hover-reserve .bottom-bar {
+          box-sizing: border-box;
+          transition: padding-bottom 0.18s ease;
+          padding-bottom: 10px !important;
+        }
       </style>
-      <div class="grid-container" style=${gridStyle}>
+      <div class="grid-container" style=${gridStyle} >
         ${Array.from({ length: this.cols }, (_, i) =>
           html`${this._renderColumn(i)}${i < this.cols - 1 ? this._renderResizeHandle(i) : ""}`,
         )}
@@ -815,8 +1025,22 @@ export class TabGrid extends LitElement {
         class="grid-resize-handle ${this._resizeCol === colIndex ? "dragging" : ""}"
         data-resize-col=${colIndex}
         @pointerdown=${(e: PointerEvent) => this._onCellResizeStart(e, colIndex)}
+        @dblclick=${(e: MouseEvent) => this._onCellResizeDblClick(e)}
+        title="Drag to resize column. Double-click to equalize all columns"
       ></div>
     `;
+  }
+
+  /**
+   * Double-clicking any column divider re-lays the cells out to share space
+   * evenly. Clearing `_cellWidths` makes every column fall back to `flex:1`, so
+   * they divide the grid equally (e.g. 2 cells → divider at the centre).
+   */
+  private _onCellResizeDblClick(e: MouseEvent): void {
+    e.preventDefault();
+    e.stopPropagation();
+    this._cellWidths = [];
+    this.requestUpdate();
   }
 
   private _onCellResizeStart(e: PointerEvent, colIndex: number): void {
@@ -828,7 +1052,13 @@ export class TabGrid extends LitElement {
     this._resizeStartWidth = cell?.getBoundingClientRect().width ?? this._cellWidths[colIndex] ?? 200;
     this._onCellResizeMove = (ev: PointerEvent) => {
       const dx = ev.clientX - this._resizeStartX;
-      const next = Math.max(200, this._resizeStartWidth + dx);
+      const min = 200;
+      const max = this._cellMaxWidth();
+      // Rubber-band once the cell passes its min/max so the drag gives way
+      // elastically instead of hitting a hard wall; it springs back on release.
+      let next = this._resizeStartWidth + dx;
+      if (max && next > max) next = max + (next - max) * 0.2;
+      else if (next < min) next = min - (min - next) * 0.2;
       const widths = this._cellWidths.slice();
       widths[colIndex] = next;
       this._cellWidths = widths;
@@ -839,6 +1069,23 @@ export class TabGrid extends LitElement {
       if (this._onCellResizeUp) window.removeEventListener("pointerup", this._onCellResizeUp);
       this._onCellResizeMove = null;
       this._onCellResizeUp = null;
+      // Snap the cell back into its allowed range if the drag overshot a limit,
+      // animating the return to the limit via the snapback class.
+      const min = 200;
+      const max = this._cellMaxWidth();
+      const cur = this._cellWidths[this._resizeCol];
+      if (cur !== undefined) {
+        const clamped = Math.max(min, Math.min(max, cur));
+        if (clamped !== cur) {
+          const widths = this._cellWidths.slice();
+          widths[this._resizeCol] = clamped;
+          this._snapbackCol = this._resizeCol;
+          this._cellWidths = widths;
+          window.setTimeout(() => {
+            this._snapbackCol = -1;
+          }, 260);
+        }
+      }
       this._resizeCol = -1;
       this.requestUpdate();
     };
@@ -849,13 +1096,25 @@ export class TabGrid extends LitElement {
   private _renderColumn(colIndex: number) {
     const w = this._cellWidths[colIndex];
     const flex = w ? `flex:0 0 ${w}px;` : "flex:1;";
-    const colStyle = `display:flex;flex-direction:column;min-width:200px;${flex}border-right:${colIndex < this.cols - 1 ? "1px solid #333" : "none"};overflow:hidden;`;
+    // The active drag + the spring-back need the 200px floor relaxed so the
+    // elastic overshoot (below the min) and the animated return are visible;
+    // otherwise `min-width:200px` hard-clamps the rendered width and hides the
+    // rubber band entirely.
+    const minW =
+      colIndex === this._resizeCol || colIndex === this._snapbackCol
+        ? "min-width:0"
+        : "min-width:200px";
+    const colStyle = `display:flex;flex-direction:column;${minW};${flex}border-right:${colIndex < this.cols - 1 ? "1px solid #333" : "none"};overflow:hidden;`;
     const placement = this.placements.find((p) => p.position.col === colIndex);
     const tabIds = placement ? placement.tabIds : [];
     const activeTabId = this.activeTabIds[String(colIndex)] || tabIds[0] || "";
 
     return html`
-      <div class="grid-cell" data-cell-col=${colIndex} style=${colStyle}>
+      <div
+        class="grid-cell ${this._snapbackCol === colIndex ? "sdw-snapback" : ""}"
+        data-cell-col=${colIndex}
+        style=${colStyle}
+      >
         <tab-bar
           .tabIds=${tabIds}
           .tabs=${this.tabData}

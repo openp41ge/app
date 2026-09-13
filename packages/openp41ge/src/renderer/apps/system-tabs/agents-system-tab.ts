@@ -13,6 +13,7 @@
  * property for test injection — production IpcChatStoreModel, tests
  * TestChatStoreModel). Tool-call sublists are loaded lazily on expand.
  */
+/* marker:footer-icons-inside-edge */
 
 import type { SystemTabController } from "../../controllers/types";
 import type { ChatSearchResult, ChatSummary } from "openp41ge-agents";
@@ -224,40 +225,49 @@ export class AgentsSystemTabController implements SystemTabController {
     this._resizeObserver = new ResizeObserver(() => this._syncScrollState());
     this._resizeObserver.observe(list);
 
-    // ── Footer: settings gear (outside) + search tool toggle ───────────
+    // ── Footer: settings gear + search tool toggle (both on the inside edge) ──
     const footer = document.createElement("div");
     Object.assign(footer.style, {
       flexShrink: "0",
-      height: "24px",
+      height: "34px",
       display: "flex",
       alignItems: "center",
       justifyContent: "flex-start",
       padding: "0 8px",
       borderTop: "1px solid var(--divider,#333)",
-      background: "var(--bg-secondary,#252526)",
+      background: "var(--bg-secondary, #161616)",
     });
 
-    const spacer = document.createElement("div");
-    Object.assign(spacer.style, { flex: "1 1 auto" });
+    // EXPERIMENTAL: the Agents gear now opens the new "negative drawer" system
+    // (openp41ge:open-agents-settings-drawer) instead of a settings grid tab.
+    // The old grid-tab path (openp41ge:open-agents-settings) is left intact and
+    // easily reverted by flipping this event string back.
     const settingsBtn = createSettingsButton(
-      "openp41ge:open-agents-settings",
+      "openp41ge:open-agents-settings-drawer",
       "agent",
       "Agents",
       "Agent settings",
+      this._side,
     );
     const searchBtn = this._makeFooterToolButton(searchIcon(14), "Search chats");
     searchBtn.addEventListener("click", () => this._toggleSearch());
     this._searchBtn = searchBtn;
+    // Both icons sit on the INSIDE edge (facing the grid), settings first then
+    // search, regardless of which side the sidebar is docked to. A flex spacer
+    // on the outer side pushes the group toward the grid.
+    const spacer = document.createElement("div");
+    Object.assign(spacer.style, { flex: "1 1 auto" });
     if (this._side === "left") {
-      // Outside edge = left → gear first, search tool on the inside.
-      footer.appendChild(settingsBtn);
+      // Inside edge = right → spacer on the left, then the icon group reading
+      // toward the inside edge (settings innermost, search outward).
       footer.appendChild(spacer);
       footer.appendChild(searchBtn);
+      footer.appendChild(settingsBtn);
     } else {
-      // Outside edge = right → search tool on the inside, gear last.
+      // Inside edge = left → settings innermost, then search, then spacer.
+      footer.appendChild(settingsBtn);
       footer.appendChild(searchBtn);
       footer.appendChild(spacer);
-      footer.appendChild(settingsBtn);
     }
     wrapper.appendChild(footer);
 

@@ -759,20 +759,80 @@ const DETECTION_RULES: Array<{ id: string; test: (head: string) => boolean }> = 
   { id: "rust", test: (h) => /\b(fn\s+\w+\s*\(|use\s+std::|^\s*pub\s+fn\b)/m.test(h) },
   { id: "go", test: (h) => /\b(package\s+main|func\s+\w+\s*\(|go\s+func)\b/m.test(h) },
   {
-    id: "python",
-    test: (h) =>
-      /\b(def\s+\w+\s*\(|^\s*import\s+\w+\s*$|^\s*from\s+\S+\s+import\b|:\s*$)/m.test(h) &&
-      /\b(start|if|elif|else|for|while|def)\b/.test(h),
-  },
-  {
     id: "css",
     test: (h) => /\b(@media|^\s*[.#\w][^{}]*\{\s*$|^\s*[a-z-]+\s*:\s*[^;]+;\s*$)/m.test(h),
   },
 ];
 
-/** JavaScript/TypeScript are handled together (TS is a superset of JS). */
-const JS_RE = /\b(import\s+|export\s+|const\s+|let\s+|function\s+|=>\s*\{)/;
-const TS_RE = /\b(interface|type\s+\w+\s*[={]|:\s*(string|number|boolean)\b)/;
+/**
+ * JavaScript, TypeScript and Python share a lot of surface syntax (`import`,
+ * `export`, `for`, `if`, block-ish headers) and bare `import X` is valid in both
+ * JS and Python, so a "first rule wins" detector mislists Python as JS/TS.
+ * Instead we count language-specific signals and let the strongest family win.
+ * JS/TS are kept together (TS is a superset of JS); which of the two leads is
+ * decided by TypeScript-specific signals.
+ */
+
+interface Signal {
+  re: RegExp;
+  w: number;
+}
+
+function signalScore(text: string, signals: Signal[]): number {
+  let score = 0;
+  for (const { re, w } of signals) {
+    if (re.test(text)) score += w;
+  }
+  return score;
+}
+
+/** Python-specific signals (no plain `if`/`return` — those are shared). */
+const PY_SIGNALS: Signal[] = [
+  { re: /\bdef\s+\w+\s*\(/, w: 4 },
+  { re: /\bclass\s+\w+\s*:/, w: 4 },
+  { re: /if\s+__name__/, w: 4 },
+  { re: /^\s*from\s+\S+\s+import\b/m, w: 4 },
+  { re: /^\s*import\s+\w+(?!\s+from\b)/m, w: 3 },
+  { re: /\bprint\s*\(/, w: 3 },
+  { re: /\belif\b/, w: 3 },
+  { re: /\bexcept\b/, w: 3 },
+  { re: /^\s*for\s+\w+\s+in\s+/m, w: 3 },
+  { re: /:\s*\n\s{2,}\S/m, w: 3 },
+  { re: /^\s*with\s+\w+/m, w: 2 },
+  { re: /\blambda\b/, w: 2 },
+  { re: /\bself\b/, w: 2 },
+  { re: /\brange\s*\(/, w: 2 },
+  { re: /\blen\s*\(/, w: 2 },
+  { re: /\byield\b/, w: 2 },
+  { re: /\braise\s/, w: 2 },
+];
+
+/** JavaScript signals — ESM import requires `from`, so a bare `import os` (Python) does not match. */
+const JS_SIGNALS: Signal[] = [
+  { re: /\bconst\s+\w+\s*=/, w: 4 },
+  { re: /\blet\s+\w+\s*=/, w: 4 },
+  { re: /\bvar\s+\w+\s*=/, w: 3 },
+  { re: /\bfunction\s+\w*\s*\(/, w: 4 },
+  { re: /=>/, w: 3 },
+  { re: /\bconsole\.log/, w: 3 },
+  { re: /\bexport\s+(default\s+)?(const|let|var|function|class)\b/, w: 3 },
+  { re: /^\s*import\s+[{\w][^;]*?from\s+['"]/m, w: 3 },
+  { re: /\brequire\s*\(/, w: 3 },
+  { re: /\bmodule\.exports/, w: 3 },
+  { re: /\bnew\s+\w+\s*\(/, w: 2 },
+  { re: /\.forEach\s*\(/, w: 2 },
+];
+
+/** TypeScript-specific signals that promote TS above JS. */
+const TS_SIGNALS: Signal[] = [
+  { re: /\binterface\s+\w+/, w: 4 },
+  { re: /\btype\s+\w+\s*=/, w: 4 },
+  { re: /\b(enum|namespace|declare|abstract|implements)\s+\w+/, w: 3 },
+  { re: /\w+\s*:\s*(string|number|boolean|any|void|unknown)\b/, w: 3 },
+];
+
+/** Families that are unambiguous on their own and short-circuit JS/TS/Python. */
+const DEFINITIVE = new Set(["html", "json", "yaml", "bash", "sql", "rust", "go", "css"]);
 
 /** Return the language ids whose detector matched, most-specific first. */
 export function detectLanguageCandidates(code: string): string[] {
@@ -782,10 +842,25 @@ export function detectLanguageCandidates(code: string): string[] {
   for (const rule of DETECTION_RULES) {
     if (rule.test(head)) ids.push(rule.id);
   }
-  if (JS_RE.test(head)) {
-    if (TS_RE.test(head)) ids.unshift("typescript", "javascript");
+  // An unambiguous family (a shebang script, JSON, SQL, …) is definitive; don't
+  // re-interpret it as JS/TS/Python (e.g. a bash heredoc containing Python).
+  if (ids.some((id) => DEFINITIVE.has(id))) {
+    const unique = [...new Set(ids)];
+    return unique.length ? unique : ["text"];
+  }
+
+  const py = signalScore(head, PY_SIGNALS);
+  const js = signalScore(head, JS_SIGNALS);
+  const ts = signalScore(head, TS_SIGNALS);
+
+  if (py > js && py > ts) {
+    ids.unshift("python");
+  } else if (js > 0 || ts > 0) {
+    // JS/TS are reported together; TS leads when its own signals are strongest.
+    if (ts > js) ids.unshift("typescript", "javascript");
     else ids.unshift("javascript", "typescript");
   }
+
   const unique = [...new Set(ids)];
   return unique.length ? unique : ["text"];
 }

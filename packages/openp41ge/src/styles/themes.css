@@ -14,8 +14,8 @@ body {
 /* ═══ Dark theme (default) ═══ */
 [data-app-theme="dark"],
 :root {
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #181818;
+  --bg-primary: #161616;
+  --bg-secondary: #161616;
   --bg-tertiary: #2a2a2a;
   --bg-surface: #161616;
   --bg-hover: #2a2d2e;
@@ -23,11 +23,11 @@ body {
   --bg-input: #3c3c3c;
   --bg-modal: #252526;
   --bg-dropdown: #252526;
-  --bg-tab-active: #1e1e1e;
-  --bg-tab-inactive: #2d2d2d;
+  --bg-tab-active: #2d2d2d;
+  --bg-tab-inactive: #161616;
   --bg-tab-hover: #353535;
-  --bg-pane: #1e1e1e;
-  --bg-gutter: #1a1a1a;
+  --bg-pane: #161616;
+  --bg-gutter: #161616;
   --bg-cell: #161616;
   --bg-overlay: rgba(0, 0, 0, 0.55);
   --bg-selection: #444;

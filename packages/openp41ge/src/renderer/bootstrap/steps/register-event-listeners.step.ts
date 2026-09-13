@@ -61,6 +61,23 @@ export class RegisterEventListenersStep implements IStartupStep {
       }) as EventListener);
     }
 
+    // EXPERIMENTAL: the new "negative drawer" settings surface. Each sidebar
+    // tab's gear now dispatches one of these events so its settings open from
+    // the sidebar edge over the grid. The existing grid-tab settings path above
+    // stays intact (the old open events are preserved and revertible).
+    document.addEventListener("openp41ge:open-agents-settings-drawer", ((e: CustomEvent) => {
+      context.settingsDrawerOpenHandler.handleOpenDrawer(e);
+    }) as EventListener);
+    document.addEventListener("openp41ge:open-explorer-settings-drawer", ((e: CustomEvent) => {
+      context.settingsDrawerOpenHandler.handleOpenDrawer(e);
+    }) as EventListener);
+    document.addEventListener("openp41ge:open-logs-settings-drawer", ((e: CustomEvent) => {
+      context.settingsDrawerOpenHandler.handleOpenDrawer(e);
+    }) as EventListener);
+    document.addEventListener("openp41ge:open-git-settings-drawer", ((e: CustomEvent) => {
+      context.settingsDrawerOpenHandler.handleOpenDrawer(e);
+    }) as EventListener);
+
     // Worktree tab close events
     document.addEventListener("openp41ge:close-worktree-tabs", ((e: CustomEvent) => {
       const detail = e.detail as { pathPrefix: string; repoName: string; branch: string };

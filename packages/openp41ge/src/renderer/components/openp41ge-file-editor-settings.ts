@@ -75,8 +75,13 @@ export class Openp41geFileEditorSettings extends LitElement {
           box-sizing: border-box;
           height: 100%;
           overflow: auto;
-          padding: 28px 32px;
-          background: var(--bg-primary, #1e1e1e);
+          /* 28px is the pane's own padding when used as a grid tab. In the
+           * settings drawer, the host surface sets --settings-pane-padding to
+           * the agent-matching 18px so all drawers read consistently. */
+          padding: var(--settings-pane-padding, 28px 32px);
+          /* Use the drawer/sidebar background in the drawer; fall back to the
+           * component's own bg-primary when used as a grid tab. */
+          background: var(--settings-pane-bg, var(--bg-primary, #161616));
           color: var(--text-primary, #ccc);
           font-size: 13px;
         }

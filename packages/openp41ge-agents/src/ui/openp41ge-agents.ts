@@ -142,6 +142,10 @@ class Openp41geAgents extends LitElement {
   private _docListenerAttached = false;
   private _composerResizeObserver: ResizeObserver | null = null;
   private _chatScrollbar: OverlayScrollbar | null = null;
+  /** Horizontal overlay scrollbars attached to code-block `<pre>`s, keyed by
+   *  the target element so they can be re-synced across re-renders (a new
+   *  block gets one; a removed or now-wrapped block has it destroyed). */
+  private _codeScrollbars = new Map<HTMLElement, OverlayScrollbar>();
   @query(".chat-input") private _inputEl!: HTMLTextAreaElement;
   @query(".composer-content") private _contentEl!: HTMLElement;
 
@@ -251,6 +255,7 @@ class Openp41geAgents extends LitElement {
     this._composerResizeObserver = null;
     this._chatScrollbar?.destroy();
     this._chatScrollbar = null;
+    this._destroyCodeBlockScrollbars();
   }
 
   /** Keep the hidden text-area's soft-wrap identical to the rendered content
@@ -1407,6 +1412,65 @@ class Openp41geAgents extends LitElement {
     this._ensureComposerObserver();
     this._syncComposerInputWidth();
     this._syncProviderMenuHeight();
+    this._syncCodeBlockScrollbars();
+  }
+
+  /**
+   * Attach the shared floating OverlayScrollbar (the same component used for the
+   * chat transcript and the file editor) to each code block's `<pre>` for
+   * horizontal scrolling, replacing the native bar with a translucent thumb that
+   * fades out. A scrollbar is only attached when line-wrap is OFF — a wrapped
+   * block reflows and never overflows horizontally. The track is overlaid in the
+   * code block's border box (`.code-block`, position:relative), so it never
+   * pushes the content or the toolbar around.
+   */
+  private _syncCodeBlockScrollbars(): void {
+    // jsdom/test env has no ResizeObserver; skip attaching gracefully.
+    if (typeof ResizeObserver === "undefined") return;
+    const root = this.renderRoot instanceof ShadowRoot ? this.renderRoot : undefined;
+
+    // A code block should show a horizontal scrollbar when its line-wrap is off.
+    const desired = new Set<HTMLElement>();
+    this.renderRoot.querySelectorAll<HTMLElement>(".code-block-wrap").forEach((wrap) => {
+      const block = wrap.querySelector<HTMLElement>(".code-block");
+      const pre = block?.querySelector<HTMLElement>("pre");
+      if (!pre || !block) return;
+      if (block.classList.contains("wrap")) return; // wrapped → reflows, no h-scroll
+      desired.add(pre);
+    });
+
+    // Attach scrollbars to any block that doesn't already have one.
+    for (const pre of desired) {
+      if (this._codeScrollbars.has(pre)) continue;
+      const container = pre.parentElement as HTMLElement;
+      this._codeScrollbars.set(
+        pre,
+        OverlayScrollbar.attach(pre, {
+          axis: "horizontal",
+          container,
+          styleTarget: root,
+          // Fill the track's content height (9px inside the 10px track, leaving
+          // the faded 1px content-edge border) so the bar isn't a skinny 6px
+          // thumb floating in a 10px channel — matches the file editor's bar.
+          size: 9,
+          // Fade the bar out after the cursor leaves the code block.
+          autoHide: true,
+        }),
+      );
+    }
+
+    // Drop scrollbars for blocks that were removed, or whose wrap was toggled on.
+    for (const [pre, sb] of [...this._codeScrollbars]) {
+      if (!desired.has(pre) || !pre.isConnected) {
+        sb.destroy();
+        this._codeScrollbars.delete(pre);
+      }
+    }
+  }
+
+  private _destroyCodeBlockScrollbars(): void {
+    for (const [, sb] of this._codeScrollbars) sb.destroy();
+    this._codeScrollbars.clear();
   }
 
   /** When a provider/model dropdown is open, size the text area so the composer
@@ -1434,11 +1498,18 @@ class Openp41geAgents extends LitElement {
     return msg?.content;
   }
 
+  /**
+   * The provider-diagnostic status text shown in the strip above the
+   * transcript. Only the unreachable/warning case is surfaced here — the
+   * streaming indicator is intentionally NOT a bar, because appearing and
+   * disappearing it shifts the transcript content around (and scrunches the
+   * composer) on every request. Streaming state is instead shown by the
+   * single "thinking…" tail indicator inside the transcript.
+   */
   private _statusText(): string | null {
     const s = this._status;
     if (!s) return null;
     if (s.providerOk === false) return "⚠ Provider unreachable — configure in ⚙ Agent.";
-    if (s.streaming) return "● streaming…";
     return null;
   }
 
@@ -1458,7 +1529,22 @@ class Openp41geAgents extends LitElement {
           overflow: hidden;
         }
         .chat-bottombar {
-          padding: 5px 12px;
+          box-sizing: border-box;
+          height: 34px;
+          display: flex;
+          align-items: center;
+          /* Bottom padding = the grid's reserved scrollbar space so the bar
+             content slides UP (staying vertically centred above it) when the
+             grid overflows horizontally, keeping it clear of the floating
+             horizontal scrollbar. --grid-bb-reserve is set by <tab-grid> on
+             the grid container and inherits into this shadow root. */
+          /* NOTE: no transition here. We empirically found that a
+             transition: padding-bottom on this shadow-DOM bar prevents the
+             value from following --grid-bb-reserve (Chrome does not re-evaluate
+             the transition when the inheriting custom property changes across
+             the shadow boundary), so the content would never shift. Dropping
+             the transition makes the slide-up apply immediately and reliably. */
+          padding: 0 12px var(--grid-bb-reserve, 0px);
           font-size: 11px;
           font-weight: 600;
           text-transform: uppercase;
@@ -1630,6 +1716,7 @@ class Openp41geAgents extends LitElement {
           border-color: #4b9fff;
         }
         .chat-message.assistant .msg-content .code-block {
+          position: relative;
           border: 1px solid var(--border-color, #2a2a2a);
           border-radius: 6px;
           background: var(--bg-tertiary, #222);
@@ -1757,22 +1844,45 @@ class Openp41geAgents extends LitElement {
         .chat-message.assistant .msg-content tbody tr:nth-child(even) td {
           background: var(--bg-tertiary, #222);
         }
-        .caret {
-          display: inline-block;
-          width: 7px;
-          height: 14px;
-          vertical-align: text-bottom;
-          background: var(--accent, #4a9eff);
-          animation: blink 1s steps(2) infinite;
-          margin-left: 2px;
+        /* A single "thinking…" tail shown at the bottom of the transcript while
+           streaming — replaces the old flashing caret that was appended to every
+           assistant response block. The label stays put while the three dots
+           pulse in sequence, so it never pushes existing content around. */
+        .chat-thinking {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          color: var(--text-muted, #888);
+          font-size: 13px;
+          line-height: 1;
+          flex-shrink: 0;
         }
-        @keyframes blink {
+        .thinking-label {
+          letter-spacing: 0.02em;
+        }
+        .thinking-dots {
+          display: inline-flex;
+          align-items: baseline;
+          gap: 1px;
+        }
+        .thinking-dots .dot {
+          display: inline-block;
+          animation: thinking-blink 1.2s infinite;
+        }
+        .thinking-dots .dot:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+        .thinking-dots .dot:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+        @keyframes thinking-blink {
           0%,
+          60%,
           100% {
-            opacity: 1;
+            opacity: 0.2;
           }
-          50% {
-            opacity: 0;
+          30% {
+            opacity: 1;
           }
         }
         .tool-calls {
@@ -2196,6 +2306,7 @@ class Openp41geAgents extends LitElement {
       <div class="chat-scroll">
         <div class="chat-messages">
           ${this._messages.map((msg) => this._renderMessage(msg))}
+          ${this._waitingForReply() ? this._renderThinking() : html``}
         </div>
       </div>
 
@@ -2389,6 +2500,33 @@ class Openp41geAgents extends LitElement {
     `;
   }
 
+  /** Whether we are waiting for the model to start producing its reply — the
+   *  only moment the "thinking…" tail is shown. Once any assistant text has
+   *  started streaming (the last assistant message has content) the indicator
+   *  disappears, so it reads as "waiting" rather than persisting alongside
+   *  the reply that is already flowing in. */
+  private _waitingForReply(): boolean {
+    if (!this._streaming) return false;
+    const last = this._messages[this._messages.length - 1];
+    // Still waiting when there is no assistant message in flight, or it exists
+    // but is empty (e.g. the model is about to emit its first token).
+    return !last || last.role !== "assistant" || !(last.content ?? "").length;
+  }
+
+  /** A single "thinking…" tail indicator rendered at the bottom of the
+   *  transcript while waiting for a reply. It is the one place that waiting
+   *  state is shown (no per-message caret), so the layout never jumps. */
+  private _renderThinking(): TemplateResult {
+    return html`
+      <div class="chat-thinking" aria-hidden="true">
+        <span class="thinking-label">thinking</span>
+        <span class="thinking-dots"
+          ><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span
+        >
+      </div>
+    `;
+  }
+
   private _renderMessage(msg: ChatMessage): TemplateResult {
     if (msg.role === "user") {
       return html`<div class="chat-message user">
@@ -2408,9 +2546,7 @@ class Openp41geAgents extends LitElement {
     return html`
       <div class="chat-message assistant">
         <div class="msg-content" @click=${this._onMsgContentClick}>
-          ${segments.map((seg) => this._renderSegment(seg))}${
-            this._streaming ? html`<span class="caret"></span>` : ""
-          }
+          ${segments.map((seg) => this._renderSegment(seg))}
         </div>
         ${
           toolCalls.length > 0

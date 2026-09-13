@@ -26,6 +26,9 @@ import "./components/openp41ge-contextmenu";
 import "./components/openp41ge-pane-picker";
 import "./components/openp41ge-worktree-tree";
 import "./components/openp41ge-sidebar";
+import "./components/openp41ge-settings-drawer-host";
+import "./components/openp41ge-agent-settings-drawer";
+import "./components/openp41ge-settings-surface";
 import "./components/focus-section";
 import "./components/openp41ge-bottom-bar-btn";
 

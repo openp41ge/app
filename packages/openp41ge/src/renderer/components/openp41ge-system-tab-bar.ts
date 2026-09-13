@@ -38,7 +38,7 @@ class Openp41geSystemTabBar extends LitElement {
           display: flex;
           align-items: center;
           height: 36px;
-          background: var(--bg-secondary, #1e1e1e);
+          background: var(--bg-surface, #161616);
           border-bottom: 1px solid var(--divider, #333);
           overflow-x: auto;
           flex-shrink: 0;
@@ -63,7 +63,7 @@ class Openp41geSystemTabBar extends LitElement {
         }
         .system-tab.active {
           color: var(--text-primary, #ccc);
-          background: var(--bg-primary, #252526);
+          background: var(--border-divider, #2d2d2d);
           border-bottom: 1px solid var(--accent, #007acc);
         }
         .system-tab-close {

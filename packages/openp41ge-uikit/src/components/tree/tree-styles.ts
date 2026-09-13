@@ -342,7 +342,7 @@ export const treeStyles = css`
     position: absolute;
     inset: 0;
     z-index: -1;
-    background: var(--cm-gutter-bg, var(--bg-gutter, #1a1a1a));
+    background: var(--cm-gutter-bg, var(--bg-gutter, #161616));
     border-right: 1px solid var(--cm-gutter-border, var(--border-divider, #2d2d2d));
   }
   .cm-match-gutter-num {
@@ -356,7 +356,7 @@ export const treeStyles = css`
   .tree-node--cm:hover .cm-match-gutter {
     background: color-mix(
       in srgb,
-      var(--cm-gutter-bg, var(--bg-gutter, #1a1a1a)) 35%,
+      var(--cm-gutter-bg, var(--bg-gutter, #161616)) 35%,
       var(--tree-hover-bg, var(--bg-hover, #2a2d2e))
     );
   }

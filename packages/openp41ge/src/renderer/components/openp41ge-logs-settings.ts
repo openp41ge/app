@@ -35,7 +35,9 @@ export class Openp41geLogsSettings extends LitElement {
           box-sizing: border-box;
           height: 100%;
           overflow: auto;
-          background: var(--bg-primary, #1e1e1e);
+          /* Use the drawer/sidebar background in the drawer; fall back to the
+           * component's own bg-primary when used as a grid tab. */
+          background: var(--settings-pane-bg, var(--bg-primary, #161616));
           color: var(--text-primary, #ccc);
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 13px;
@@ -45,7 +47,10 @@ export class Openp41geLogsSettings extends LitElement {
         .ls-pane {
           box-sizing: border-box;
           min-height: 100%;
-          padding: 28px 32px;
+          /* 28px is the pane's own padding when used as a grid tab. In the
+           * settings drawer, the host surface sets --settings-pane-padding to
+           * the agent-matching 18px so all drawers read consistently. */
+          padding: var(--settings-pane-padding, 28px 32px);
         }
         .ls-section-title {
           margin: 0 0 14px;

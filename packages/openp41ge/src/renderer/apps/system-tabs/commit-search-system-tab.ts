@@ -432,22 +432,22 @@ export class CommitSearchSystemTabController implements SystemTabController {
     const footer = document.createElement("div");
     Object.assign(footer.style, {
       flexShrink: "0",
-      height: "24px",
+      height: "34px",
       display: "flex",
       alignItems: "center",
       padding: "0 8px",
       borderTop: "1px solid var(--divider,#333)",
       fontSize: "12px",
       color: "var(--text-secondary,#999)",
-      background: "var(--bg-secondary,#252526)",
+      background: "var(--bg-secondary, #161616)",
       gap: "6px",
     });
-    // Spacer + this tab's own settings button, with the gear on the OUTSIDE
-    // edge (right for a right sidebar, left for a left sidebar).
+    // This tab's own settings button, with the gear on the INSIDE edge (facing
+    // the grid) — right for a left sidebar, left for a right one.
     appendSettingsButton(
       footer,
       this._side,
-      "openp41ge:open-git-settings",
+      "openp41ge:open-git-settings-drawer",
       "git-settings",
       "History",
       "History settings",

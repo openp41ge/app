@@ -1372,7 +1372,7 @@ export class Openp41geWindowManager extends LitElement {
           box-sizing: border-box;
           -webkit-app-region: drag;
           user-select: none;
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
           border-bottom: 1px solid var(--divider, #333);
         }
         .wm-winbtns {
@@ -1427,7 +1427,7 @@ export class Openp41geWindowManager extends LitElement {
           height: 44px;
           padding: 0 14px;
           box-sizing: border-box;
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
           border-bottom: 1px solid var(--divider, #333);
         }
         .wm-view-title {
@@ -1555,8 +1555,8 @@ export class Openp41geWindowManager extends LitElement {
           /* No horizontal padding so rows + separators span the full window width;
              the rows keep their own content inset. The list starts below the
              view header, and the bottom padding clears the overlaying bottom bar
-             (44px) + scroll space. */
-          padding: 0 0 64px;
+             (88px) + scroll space. */
+          padding: 0 0 108px;
           box-sizing: border-box;
         }
         /* Invisible mask over the workspace list while a drawer is open, so a
@@ -1689,7 +1689,7 @@ export class Openp41geWindowManager extends LitElement {
         .ws-thumb-chrome {
           height: 12px;
           flex-shrink: 0;
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
           border-bottom: 1px solid var(--divider, #333);
           display: flex;
           align-items: center;
@@ -1738,7 +1738,7 @@ export class Openp41geWindowManager extends LitElement {
         .ws-win-side {
           width: 18px;
           flex-shrink: 0;
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
           border-radius: 3px;
           display: flex;
           flex-direction: column;
@@ -1922,7 +1922,7 @@ export class Openp41geWindowManager extends LitElement {
           display: flex;
           flex-direction: column;
           min-width: 0;
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
           border-left: 1px solid var(--divider, #444);
           transition: width 0.2s ease;
           animation: dw-slide 0.18s ease;
@@ -2052,7 +2052,7 @@ export class Openp41geWindowManager extends LitElement {
           margin: 0;
           padding: 4px;
           list-style: none;
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
           border: 1px solid var(--divider, #333);
           border-radius: 6px;
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -2122,7 +2122,7 @@ export class Openp41geWindowManager extends LitElement {
           gap: 6px;
           justify-content: flex-end;
           flex-shrink: 0;
-          height: 44px;
+          height: 88px;
           padding: 0 14px;
           border-top: 1px solid var(--divider, #333);
         }
@@ -2140,10 +2140,10 @@ export class Openp41geWindowManager extends LitElement {
           gap: 6px;
           justify-content: flex-end;
           flex-shrink: 0;
-          height: 44px;
+          height: 88px;
           padding: 0 14px;
           border-top: 1px solid var(--divider, #333);
-          background: var(--bg-secondary, #252526);
+          background: var(--bg-secondary, #161616);
         }
         .dw-add {
           border: none;

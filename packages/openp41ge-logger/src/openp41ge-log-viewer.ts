@@ -786,7 +786,7 @@ export class Openp41geLogViewer extends LitElement {
           display: flex;
           align-items: center;
           gap: 4px;
-          height: 24px;
+          height: 34px;
           padding: 0 8px;
           box-sizing: border-box;
           background: var(--bg-primary, #1e1e1e);

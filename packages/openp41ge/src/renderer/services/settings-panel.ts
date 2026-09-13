@@ -10,7 +10,9 @@ export function createSettingsPanel(description: string): HTMLElement {
   const root = document.createElement("div");
   root.dataset.settingsPanel = "true";
   Object.assign(root.style, {
-    padding: "16px 14px",
+    // Use the drawer surface's --settings-pane-padding (18px) when hosted in a
+    // drawer; fall back to the panel's own 16px 14px when used as a grid tab.
+    padding: "var(--settings-pane-padding, 16px 14px)",
     display: "flex",
     flexDirection: "column",
     gap: "8px",
@@ -58,7 +60,7 @@ export function createSettingsTabShell(label: string, content: HTMLElement): HTM
     height: "100%",
     minHeight: "0",
     boxSizing: "border-box",
-    background: "var(--bg-primary,#1e1e1e)",
+    background: "var(--bg-primary, #161616)",
   });
 
   const topBar = document.createElement("div");
@@ -70,7 +72,7 @@ export function createSettingsTabShell(label: string, content: HTMLElement): HTM
     height: "43px",
     padding: "0 14px",
     borderBottom: "1px solid var(--divider,#333)",
-    background: "var(--bg-secondary,#252526)",
+    background: "var(--bg-secondary, #161616)",
     boxSizing: "border-box",
   });
 
@@ -98,9 +100,9 @@ export function createSettingsTabShell(label: string, content: HTMLElement): HTM
   bottomBar.dataset.bottomBar = "true";
   Object.assign(bottomBar.style, {
     flexShrink: "0",
-    height: "24px",
+    height: "34px",
     borderTop: "1px solid var(--divider,#333)",
-    background: "var(--bg-secondary,#252526)",
+    background: "var(--bg-secondary, #161616)",
     boxSizing: "border-box",
   });
 

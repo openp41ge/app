@@ -61,6 +61,31 @@ describe("syntax-highlight", () => {
     expect(detectLanguageCandidates("")).toEqual(["text"]);
   });
 
+  it("detects Python even when it shares `import` with JS/TS", () => {
+    // `import`/`from … import` used to be caught by the JS detector and mislabeled
+    // the snippet as JavaScript/TypeScript.
+    expect(detectLanguage("import os\nprint(os.getcwd())")).toBe("python");
+    expect(detectLanguage("from pathlib import Path\nprint(Path('.').resolve())")).toBe("python");
+    expect(detectLanguage("import sys\nfor arg in sys.argv:\n    print(arg)")).toBe("python");
+    expect(detectLanguage("for i in range(10):\n    print(i)")).toBe("python");
+    expect(detectLanguage("class Foo:\n    def __init__(self):\n        self.x = 1\n")).toBe("python");
+    expect(detectLanguage("print('hello world')")).toBe("python");
+  });
+
+  it("still detects genuine JavaScript and ES module imports as JS", () => {
+    expect(detectLanguage("const x = 1;\nconsole.log(x)")).toBe("javascript");
+    // ESM import has `from`, so it must not fall into the Python detector.
+    expect(detectLanguageCandidates("import { foo } from './foo'\nfoo()")).toEqual([
+      "javascript",
+      "typescript",
+    ]);
+    expect(detectLanguageCandidates("import x from './x'\nx()")).toEqual([
+      "javascript",
+      "typescript",
+    ]);
+    expect(detectLanguage("#!/bin/bash\necho hi")).toBe("bash");
+  });
+
   it("returns a human label for language ids", () => {
     expect(langLabel("typescript")).toBe("TypeScript");
     expect(langLabel("python")).toBe("Python");

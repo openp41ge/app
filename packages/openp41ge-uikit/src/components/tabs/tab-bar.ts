@@ -339,7 +339,7 @@ export class TabBar extends LitElement {
       <div class="tab-bar-wrapper" style="position:relative;flex:1;min-width:0;">
         <div
           class="tab-bar-container"
-          style="display:flex;align-items:center;height:35px;border-bottom:1px solid var(--border-divider, #2d2d2d);background:#181818;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;"
+          style="display:flex;align-items:center;height:35px;border-bottom:1px solid var(--border-divider, #2d2d2d);background:var(--bg-surface, #161616);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;"
         >
           <style>
             .tab-bar-container::-webkit-scrollbar {
@@ -363,19 +363,17 @@ export class TabBar extends LitElement {
             }
             .tab-bar-fade-left {
               left: 0;
-              background: linear-gradient(to right, var(--tab-bar-bg, #181818), transparent);
+              background: linear-gradient(to right, var(--tab-bar-bg, #161616), transparent);
             }
             .tab-bar-fade-right {
               right: 0;
-              background: linear-gradient(to left, var(--tab-bar-bg, #181818), transparent);
+              background: linear-gradient(to left, var(--tab-bar-bg, #161616), transparent);
             }
           </style>
           ${this.tabIds.map((id) => {
             const tab = this.tabs[id];
             const isActive = id === this.activeTabId;
-            const aBg = this.focused
-              ? "background:var(--border-divider,#2d2d2d);color:#eee;"
-              : "background:rgba(255,255,255,0.06);color:#ccc;";
+            const aBg = "background:var(--border-divider,#2d2d2d);color:#eee;";
             const iBg = "color:#888;";
             const isEphemeral = tab?.ephemeral ?? false;
             // Use local override if set, otherwise fall back to workspace state

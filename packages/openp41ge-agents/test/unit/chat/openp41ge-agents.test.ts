@@ -131,6 +131,48 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot!.querySelector(".code-block")!.classList.contains("wrap")).toBe(true);
   });
 
+  it("attaches horizontal overlay scrollbars to code blocks, but only while unwrapped", async () => {
+    // jsdom ships no ResizeObserver, and the component skips attaching without
+    // one. Stub it so the sync logic runs and we can assert the lifecycle.
+    const RealRO = globalThis.ResizeObserver as unknown;
+    // @ts-expect-error jsdom provides no ResizeObserver; install a no-op stub.
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      constructor(_cb: unknown) {}
+    };
+
+    try {
+      const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+      document.body.appendChild(el);
+      el.addMessage(
+        "assistant",
+        "```js\nconst x = 1;\n```\n```python\nprint('a')\n```",
+      );
+      await el.updateComplete;
+
+      const codeBlocks = el.shadowRoot!.querySelectorAll<HTMLElement>(".code-block");
+      expect(codeBlocks.length).toBe(2);
+
+      const scrollbars = (el as unknown as { _codeScrollbars: Map<HTMLElement, unknown> })
+        ._codeScrollbars;
+      expect(scrollbars.size).toBe(2);
+
+      // Toggle wrap ON for the first block → its scrollbar is destroyed.
+      el.shadowRoot!.querySelectorAll<HTMLElement>(".code-wrap")[0].click();
+      await el.updateComplete;
+      expect(scrollbars.size).toBe(1);
+
+      // Toggle wrap back OFF → a scrollbar is re-attached.
+      el.shadowRoot!.querySelectorAll<HTMLElement>(".code-wrap")[0].click();
+      await el.updateComplete;
+      expect(scrollbars.size).toBe(2);
+    } finally {
+      globalThis.ResizeObserver = RealRO as typeof ResizeObserver;
+    }
+  });
+
   it("clearMessages removes all messages and shows empty state", () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
@@ -1129,6 +1171,39 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
     expect((el as unknown as { _caretRaw: number })._caretRaw).toBe(1);
     expect((el as unknown as { _selAnchor: number })._selAnchor).toBe(6);
+  });
+
+  it("shows the thinking… tail while waiting for a reply and hides it once content streams", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // In-flight request, but no assistant text yet — still "waiting".
+    el.setProviderStatus({ streaming: true, providerOk: true });
+    el.addMessage("user", "hi");
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".chat-thinking")).not.toBeNull();
+
+    // First streamed token arrives — the indicator disappears.
+    el.appendDelta("Hello");
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".chat-thinking")).toBeNull();
+
+    // Streaming ends entirely — no indicator.
+    el.setProviderStatus({ streaming: false, providerOk: true });
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".chat-thinking")).toBeNull();
+  });
+
+  it("does not show the thinking… tail when an assistant reply is already complete", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.addMessage("assistant", "done");
+    el.setProviderStatus({ streaming: false, providerOk: true });
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".chat-thinking")).toBeNull();
   });
 
   it("setProviderStatus shows a status strip when unreachable", async () => {

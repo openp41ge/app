@@ -17,7 +17,7 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { state, property } from "lit/decorators.js";
-import { tooltipController } from "openp41ge-uikit";
+import { tooltipController, OverlayScrollbar } from "openp41ge-uikit";
 import { toastService } from "./openp41ge-toast";
 import { repoTreeRenderer } from "../services/repo-tree-renderer";
 import { plusIconThick, searchIcon, settingsIcon } from "../icons";
@@ -161,6 +161,7 @@ class Openp41geWorktreeTree extends LitElement {
 
   private _drawerEl: HTMLElement | null = null;
   private _treeEl: HTMLElement | null = null;
+  private _overlayScrollbar: OverlayScrollbar | null = null;
   private _scrollResizeObserver: ResizeObserver | null = null;
   private _scrollResizeObserved = false;
   /** Explorer row currently selected by click or keyboard (VS Code-style). */
@@ -310,30 +311,9 @@ class Openp41geWorktreeTree extends LitElement {
       openp41ge-worktree-tree { outline: none; box-shadow: -6px 0 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 100%; }
       .wt-tree-scroll { outline: none; }
       .wt-tree-scroll * { outline: none; }
-      /* Native scrollbar hidden; custom overlay scrollbar implemented via JS. */
-      .wt-tree-scroll { scrollbar-width: none; -ms-overflow-style: none; }
-      .wt-tree-scroll::-webkit-scrollbar { width: 0; height: 0; }
-      /* Custom overlay scrollbar track — always visible when scrollable */
-      .wt-tree-scroll-wrapper .wt-scrollbar-track {
-        position: absolute; right: 0; top: 0; width: 8px; height: 100%;
-        pointer-events: auto; z-index: 10;
-        background: transparent;
-        opacity: 0;
-        transition: opacity 0.2s ease;
-      }
-      .wt-tree-scroll-wrapper:hover .wt-scrollbar-track {
-        opacity: 1;
-      }
-      .wt-tree-scroll-wrapper .wt-scrollbar-track:hover {
-        background: rgba(0,0,0,0.08);
-      }
-      .wt-tree-scroll-wrapper .wt-scrollbar-thumb {
-        position: absolute; right: 0; width: 6px;
-        background: rgba(255,255,255,0.2);
-      }
-      .wt-tree-scroll-wrapper .wt-scrollbar-thumb:hover {
-        background: rgba(255,255,255,0.35);
-      }
+      /* Use the shared native scrollbar (styled globally by
+         installGlobalScrollbarStyles) so the explorer matches every other
+         scrollable panel — and it tracks the sidebar during rubber-banding. */
       /* VS Code-style keyboard/click selection for file/folder rows AND
          repo/worktree headers. Two-class specificity keeps it above the row
          :hover highlight. The arrow cursor stays blue (background + outline).
@@ -350,9 +330,8 @@ class Openp41geWorktreeTree extends LitElement {
       .wt-row-header.wt-row-selected {
         background: color-mix(in srgb, var(--border-divider, #2d2d2d) 60%, transparent);
       }
-      /* Rows already have padding-right:8px in their inline styles, so
-         the overlay scrollbar sits in the padded area — content text/buttons
-         are never hidden underneath it. Row backgrounds fill the full width
+      /* Rows already have padding-right so the native scrollbar never
+         overlaps content text/buttons. Row backgrounds fill the full width
          (edge to edge) because .wt-tree-scroll-content has no padding. */
       /* When the tree fills the drawer, hide the last child's bottom border
          so it cannot double up with the bottom bar's top border. */
@@ -555,6 +534,11 @@ class Openp41geWorktreeTree extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener("resize", this._onWindowResize);
+    if (this._overlayScrollbar) {
+      // Destroy the custom overlay scrollbar + hide timer / observers.
+      this._overlayScrollbar.destroy();
+      this._overlayScrollbar = null;
+    }
     if (this._searchTimer) {
       clearTimeout(this._searchTimer);
       this._searchTimer = null;
@@ -612,6 +596,18 @@ class Openp41geWorktreeTree extends LitElement {
     >
       ${unsafeHTML(settingsIcon(14))}
     </button>`;
+  }
+
+  /**
+   * Which side of the grid this tree is docked to (from the hosting sidebar).
+   * The bottom-bar action icons are aligned to the sidebar's INSIDE edge (the
+   * edge facing the grid): right for a left sidebar, left for a right one.
+   */
+  private get _sidebarSide(): "left" | "right" {
+    const sb = this.closest?.("openp41ge-sidebar") as
+      | { side?: "left" | "right" }
+      | null;
+    return sb?.side === "right" ? "right" : "left";
   }
 
   // ── Explorer search / filter ────────────────────────────────────────────
@@ -1222,18 +1218,20 @@ class Openp41geWorktreeTree extends LitElement {
             <!-- wt-tree-scroll-content -->
           </div>
           <!-- wt-tree-scroll -->
-          <div class="wt-scrollbar-track" @mousedown=${this._onScrollbarTrackMousedown}>
-            <div class="wt-scrollbar-thumb" @mousedown=${this._onScrollbarThumbMousedown}></div>
-          </div>
         </div>
         <!-- wt-tree-scroll-wrapper -->
         <div
           class="sb-bottom-bar"
-          style="border-top:1px solid var(--divider,#333);height:24px;flex-shrink:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary,#252526);"
+          style="border-top:1px solid var(--divider,#333);height:34px;flex-shrink:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary, #161616);"
         >
-          ${this._renderSettingsButton()}
-          <span style="flex:1"></span>
-          ${this._renderToolButtons()}
+          ${
+            this._sidebarSide === "left"
+              ? // Inside edge = right → spacer first, then the icon group reading
+                // toward the inside edge (settings innermost, search outward).
+                html`<span style="flex:1"></span>${this._renderToolButtons()}${this._renderSettingsButton()}`
+              : // Inside edge = left → settings innermost, then search, then spacer.
+                html`${this._renderSettingsButton()}${this._renderToolButtons()}<span style="flex:1"></span>`
+          }
         </div>
       </div>
     `;
@@ -1348,14 +1346,32 @@ class Openp41geWorktreeTree extends LitElement {
       updateDrawerVisibility();
     }
 
-    // Sync custom overlay scrollbar thumb position and bind scroll listener.
-    // Use requestAnimationFrame so the browser has performed layout after
-    // Lit's DOM update — otherwise scrollHeight may still reflect old
-    // content and the scrollbar won't be hidden when content shrinks.
+    // Sync the shared native scrollbar state and bind the scroll listener.
+    // requestAnimationFrame lets the browser perform layout after Lit's DOM
+    // update so the `.full` border toggle reflects the real content height.
     requestAnimationFrame(() => this._syncScrollbar());
     if (this._treeEl) {
       this._treeEl.removeEventListener("scroll", this._boundScroll);
       this._treeEl.addEventListener("scroll", this._boundScroll, { passive: true });
+    }
+
+    // Use the SAME overlay scrollbar as every other panel (floating overlay that
+    // hides the native bar and fades out after the cursor leaves) so the explorer
+    // matches them and its scrollbar does not linger after the mouse leaves.
+    if (this._treeEl && !this._overlayScrollbar) {
+      const wrapper = this.querySelector(".wt-tree-scroll-wrapper") as HTMLElement | null;
+      if (wrapper) {
+        this._overlayScrollbar = OverlayScrollbar.attach(this._treeEl, {
+          axis: "vertical",
+          container: wrapper,
+          autoHide: true,
+          autoHideDelay: 600,
+          // Keep the thumb the same width as its track (the track strip is drawn
+          // at the hover size, so match it so they are visually flush).
+          size: 10,
+          hoverSize: 10,
+        });
+      }
     }
 
     // Trigger initial data load once. The _hasLoadedOnce guard prevents
@@ -1367,13 +1383,12 @@ class Openp41geWorktreeTree extends LitElement {
       this._loadRepos();
     }
 
-    // Keep the custom scrollbar in sync with content height. Tree rows are
-    // rendered by the child <openp41ge-repo-tree-item>, which re-renders
+    // Keep the `.full` border toggle in sync with content height. Tree rows
+    // are rendered by the child <openp41ge-repo-tree-item>, which re-renders
     // independently of this component — so _syncScrollbar() (normally only
     // re-run on our own updated()/scroll) is never re-triggered by child
     // content growth/shrink. Observing the scroll content's box size closes
-    // that gap: the track appears as soon as the list overflows and
-    // disappears the moment it fits again.
+    // that gap so the last row's border is dropped/restored correctly.
     if (typeof ResizeObserver !== "undefined") {
       const contentEl = this.querySelector(".wt-tree-scroll-content") as HTMLElement | null;
       if (contentEl && !this._scrollResizeObserved) {
@@ -1410,58 +1425,6 @@ class Openp41geWorktreeTree extends LitElement {
     this._tooltipTargets = [...live];
   }
 
-  private _onScrollbarTrackMousedown = (e: MouseEvent): void => {
-    const track = e.currentTarget as HTMLElement;
-    const thumb = track.querySelector(".wt-scrollbar-thumb") as HTMLElement;
-    if (!thumb || !this._treeEl) return;
-
-    const trackRect = track.getBoundingClientRect();
-    const clickY = e.clientY - trackRect.top;
-    const thumbHeight = thumb.offsetHeight;
-    const trackHeight = trackRect.height - thumbHeight;
-
-    if (trackHeight <= 0) return;
-
-    const scrollRatio = clickY / trackHeight;
-    const maxScroll = this._treeEl.scrollHeight - this._treeEl.clientHeight;
-    this._treeEl.scrollTop = Math.round(scrollRatio * maxScroll);
-  };
-
-  private _onScrollbarThumbMousedown = (e: MouseEvent): void => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!this._treeEl) return;
-    const thumb = e.currentTarget as HTMLElement;
-    const track = thumb.parentElement as HTMLElement;
-    if (!track) return;
-
-    const startY = e.clientY;
-    const startScrollTop = this._treeEl.scrollTop;
-    const trackRect = track.getBoundingClientRect();
-    const thumbHeight = thumb.offsetHeight;
-    const maxScroll = this._treeEl.scrollHeight - this._treeEl.clientHeight;
-
-    const onMove = (ev: MouseEvent) => {
-      const dy = ev.clientY - startY;
-      const trackHeight = trackRect.height - thumbHeight;
-      if (trackHeight <= 0) return;
-      const ratio = dy / trackHeight;
-      this._treeEl!.scrollTop = Math.max(
-        0,
-        Math.min(maxScroll, startScrollTop + ratio * maxScroll),
-      );
-    };
-
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  };
-
   private _boundScroll = (): void => {
     this._syncScrollbar();
   };
@@ -1474,36 +1437,9 @@ class Openp41geWorktreeTree extends LitElement {
     // it does not stack with the bottom bar's top border into a single 2px
     // line. Mirrors the Workspaces overlay list (_syncLeftFill + the
     // `.wm-left-scroll.full` rule). CSS-only: no component state, no re-render.
+    // The native scrollbar is styled/handled globally, so no thumb syncing is
+    // needed here.
     el.classList.toggle("full", el.scrollHeight >= el.clientHeight - 1);
-
-    // Track and thumb are outside .wt-tree-scroll (sibling, not child) to avoid
-    // overflow clipping. Query from the wrapper parent instead.
-    const wrapper = this.querySelector(".wt-tree-scroll-wrapper");
-    const track = wrapper?.querySelector(".wt-scrollbar-track") as HTMLElement;
-    const thumb = wrapper?.querySelector(".wt-scrollbar-thumb") as HTMLElement;
-    if (!track || !thumb) return;
-
-    const { scrollHeight, clientHeight, scrollTop } = el;
-
-    if (scrollHeight <= clientHeight || clientHeight <= 0) {
-      track.style.display = "none";
-      return;
-    }
-    track.style.display = "";
-
-    // Track rendered height from getBoundingClientRect
-    const trackH = track.getBoundingClientRect().height;
-    if (trackH <= 0) return;
-
-    // Thumb proportional to visible / total content
-    const visiblePct = clientHeight / scrollHeight;
-    const thumbH = Math.max(20, visiblePct * trackH);
-    thumb.style.height = thumbH + "px";
-
-    // Thumb position mirrors scroll progress (0→1)
-    const maxScroll = scrollHeight - clientHeight;
-    const pct = maxScroll > 0 ? scrollTop / maxScroll : 0;
-    thumb.style.top = pct * (trackH - thumbH) + "px";
   }
 
   // ── Focus ─────────────────────────────────────────────────────────────
@@ -1731,13 +1667,19 @@ class Openp41geWorktreeTree extends LitElement {
     }
   };
 
-  /** Explorer tab's settings button — opens the file-editor settings grid tab. */
+  /** Explorer tab's settings button — opens the editor settings in the new
+   * "negative drawer" (over the grid). The old grid-tab event string
+   * (openp41ge:open-explorer-settings) is left intact for an easy revert. */
   private _onSettingsClick = () => {
     document.dispatchEvent(
-      new CustomEvent("openp41ge:open-explorer-settings", {
+      new CustomEvent("openp41ge:open-explorer-settings-drawer", {
         bubbles: true,
         composed: true,
-        detail: { appType: "file-editor-settings", title: "Editor" },
+        detail: {
+          appType: "file-editor-settings",
+          title: "Explorer",
+          side: this._sidebarSide,
+        },
       }),
     );
   };

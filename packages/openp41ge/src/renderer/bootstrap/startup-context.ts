@@ -34,6 +34,7 @@ import { CommitOpenHandler } from "../services/commit-open-handler";
 import { AgentsOpenHandler } from "../services/agents-open-handler";
 import { LogOpenHandler } from "../services/log-open-handler";
 import { SettingsOpenHandler } from "../services/settings-open-handler";
+import { SettingsDrawerOpenHandler } from "../services/settings-drawer-open-handler";
 import { ContextMenuBuilder } from "../services/context-menu-builder";
 import { QuoteController } from "../services/quote-controller";
 import { FileDropHandler } from "../services/file-drop-handler";
@@ -60,6 +61,7 @@ export class StartupContext {
   readonly agentsOpenHandler: AgentsOpenHandler;
   readonly logOpenHandler: LogOpenHandler;
   readonly settingsOpenHandler: SettingsOpenHandler;
+  readonly settingsDrawerOpenHandler: SettingsDrawerOpenHandler;
   readonly contextMenuBuilder: IContextMenuBuilder;
   readonly quoteController: IQuoteController;
   readonly fileDropHandler: IFileDropHandler;
@@ -120,6 +122,7 @@ export class StartupContext {
     this.agentsOpenHandler = new AgentsOpenHandler();
     this.logOpenHandler = new LogOpenHandler();
     this.settingsOpenHandler = new SettingsOpenHandler();
+    this.settingsDrawerOpenHandler = new SettingsDrawerOpenHandler();
     this.contextMenuBuilder = new ContextMenuBuilder();
     this.quoteController = new QuoteController();
     this.fileDropHandler = new FileDropHandler();
