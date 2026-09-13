@@ -20,6 +20,7 @@ import { ref, createRef } from "lit/directives/ref.js";
 import type { ConfigService } from "../services/config-service";
 import type { PropertyValues } from "lit";
 import { showConfirmModal } from "../components/openp41ge-confirm-modal";
+import { workspaceFileService } from "../services/workspace-file-service";
 import {
   PROVIDER_PRESETS,
   CUSTOM_PRESET_ID,
@@ -155,6 +156,18 @@ export class Openp41geAgentSettings extends LitElement {
   @state() private _defaultOpen = false;
   @state() private _listScrollTop = 0;
 
+  /** Available agent tools registered by the backend (plugin-style). */
+  @state() private _availableTools: Array<{ name: string; description: string }> = [];
+  /** Names of the agent tools enabled for this workspace. */
+  @state() private _enabledTools = new Set<string>();
+  @state() private _toolsLoading = true;
+  /** Whether a workspace file is open (tools are per-workspace). */
+  @state() private _hasWorkspace = false;
+
+  /** Last observed workspace file path, so we only reload tools on file change. */
+  private _lastWorkspacePath: string | null = null;
+  private _workspaceUnsub: (() => void) | null = null;
+
   /** Fixed row height of the default-provider virtual list. */
   private static readonly ROW_H = 44;
   /** Scrollable viewport height of the default-provider list. */
@@ -177,6 +190,9 @@ export class Openp41geAgentSettings extends LitElement {
     super.connectedCallback();
     this.addEventListener("keydown", this._onKeydown);
     document.addEventListener("pointerdown", this._onDocPointerDown);
+    this._workspaceUnsub = workspaceFileService.onChange(() => this._syncWorkspace());
+    this._lastWorkspacePath = workspaceFileService.openFilePath;
+    this._hasWorkspace = workspaceFileService.openFilePath != null;
     void this._load();
   }
 
@@ -184,6 +200,8 @@ export class Openp41geAgentSettings extends LitElement {
     super.disconnectedCallback();
     this.removeEventListener("keydown", this._onKeydown);
     document.removeEventListener("pointerdown", this._onDocPointerDown);
+    this._workspaceUnsub?.();
+    this._workspaceUnsub = null;
   }
 
   protected updated(_changedProperties: PropertyValues): void {
@@ -205,6 +223,62 @@ export class Openp41geAgentSettings extends LitElement {
       this._config = this._defaultConfig();
     }
     this._loading = false;
+    await this._loadTools();
+  }
+
+  /** Load the registered tool set and the workspace's enabled subset. */
+  private async _loadTools(): Promise<void> {
+    let tools: Array<{ name: string; description: string }> = [];
+    try {
+      tools = (await window.openp41ge?.chat?.listTools?.()) ?? [];
+    } catch {
+      tools = [];
+    }
+    this._availableTools = tools;
+    this._syncEnabledFromWorkspace();
+    this._toolsLoading = false;
+  }
+
+  /**
+   * Sync the enabled-tools set from the open workspace. Defaults to "all
+   * registered tools" when the workspace has no explicit config. Only re-reads
+   * when the workspace file path changes (other save events must not clobber
+   * an in-progress toggle).
+   */
+  private _syncWorkspace(): void {
+    const path = workspaceFileService.openFilePath;
+    const changed = path !== this._lastWorkspacePath;
+    this._lastWorkspacePath = path;
+    this._hasWorkspace = path != null;
+    if (changed) {
+      this._syncEnabledFromWorkspace();
+    }
+    this.requestUpdate();
+  }
+
+  private _syncEnabledFromWorkspace(): void {
+    const saved = workspaceFileService.openData?.agentTools?.enabled;
+    const registered = new Set(this._availableTools.map((t) => t.name));
+    if (saved?.length) {
+      // Keep only tools that are still registered, so de-registered plugins
+      // don't linger in the persisted set.
+      this._enabledTools = new Set(saved.filter((n) => registered.has(n)));
+    } else {
+      this._enabledTools = registered;
+    }
+  }
+
+  /** Toggle a tool in the workspace's enabled set and persist it. */
+  private async _toggleAgentTool(name: string): Promise<void> {
+    const next = new Set(this._enabledTools);
+    if (next.has(name)) {
+      next.delete(name);
+    } else {
+      next.add(name);
+    }
+    this._enabledTools = next;
+    this.requestUpdate();
+    await workspaceFileService.setEnabledAgentTools([...next]);
   }
 
   private _defaultConfig(): AgentConfig {
@@ -439,9 +513,10 @@ export class Openp41geAgentSettings extends LitElement {
   private _openAdd(): void {
     const config = this._config;
     if (!config) return;
-    // Seed a blank (Custom) provider. It is persisted immediately so the
-    // drawer edits a real entry; if the user closes it with no data it is
-    // auto-deleted (see _maybeDeleteEmptyProvider).
+    // Seed a blank (Custom) provider in-memory only. It is NOT persisted until
+    // the user enters a real endpoint/model (via _syncProviderFromDraft); if
+    // they close it with no data it is discarded (see _maybeDeleteEmptyProvider),
+    // so we never write empty fake providers to config.
     const draft: ProviderDraft = { baseUrl: "", model: "" };
     const id = nextProviderId(Object.keys(config.providers), CUSTOM_PRESET_ID);
     const providers = { ...config.providers, [id]: this._providerFromDraft(draft) };
@@ -449,7 +524,6 @@ export class Openp41geAgentSettings extends LitElement {
     if (!providerId) providerId = id;
     const next = { ...config, providerId, providers };
     this._config = next;
-    void this._persist(next);
     this._testResult = null;
     this._showTestResponse = false;
     this._drawers = [
@@ -1095,6 +1169,74 @@ export class Openp41geAgentSettings extends LitElement {
           padding: 10px;
           color: var(--text-secondary, #999);
         }
+
+        /* Agent tools list (per-workspace enablement). */
+        .ags-tools {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .ags-tool-card {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid var(--divider, #2f3031);
+          border-radius: 8px;
+          background: var(--bg-secondary, #1e1e1e);
+          color: inherit;
+          font: inherit;
+          text-align: left;
+          cursor: pointer;
+          transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+        }
+        .ags-tool-card:hover {
+          border-color: var(--accent, #569cd6);
+        }
+        .ags-tool-card[aria-pressed="true"] {
+          border-color: var(--accent, #569cd6);
+          background: color-mix(in srgb, var(--accent, #569cd6) 12%, var(--bg-secondary, #1e1e1e));
+          box-shadow: inset 0 0 0 1px var(--accent, #569cd6);
+        }
+        .ags-tool-check {
+          flex-shrink: 0;
+          width: 18px;
+          height: 18px;
+          border-radius: 5px;
+          border: 1px solid var(--divider, #2f3031);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 700;
+          color: #fff;
+          background: var(--bg-secondary, #1e1e1e);
+        }
+        .ags-tool-card[aria-pressed="true"] .ags-tool-check {
+          background: var(--accent, #569cd6);
+          border-color: var(--accent, #569cd6);
+        }
+        .ags-tool-body {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .ags-tool-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-primary, #e0e0e0);
+        }
+        .ags-tool-desc {
+          font-size: 12px;
+          color: var(--text-secondary, #999);
+          line-height: 1.4;
+        }
         .ags-default-card {
           position: relative;
         }
@@ -1720,6 +1862,8 @@ export class Openp41geAgentSettings extends LitElement {
                       `
                 }
               </div>
+
+              ${this._renderTools()}
             </div>
           </div>
 
@@ -1738,6 +1882,60 @@ export class Openp41geAgentSettings extends LitElement {
           ${this._drawers.map((d, i) => this._renderDrawer(d, i))}
           ${this._closingDrawers.map((c) => this._renderClosingDrawer(c))}
         </div>
+      </div>
+    `;
+  }
+
+  /** Render the per-workspace agent Tools card. */
+  private _renderTools(): TemplateResult {
+    const tools = this._availableTools;
+    const toolsBody: TemplateResult = this._toolsLoading
+      ? html`<p class="ags-card-help">Loading…</p>`
+      : !this._hasWorkspace
+        ? html`
+            <p class="ags-card-help">
+              Agent tools are enabled per workspace. Open a workspace first to choose
+              which tools its agents may use.
+            </p>
+          `
+        : tools.length === 0
+          ? html`<p class="ags-card-help">No agent tools are registered.</p>`
+          : html`
+              <div class="ags-tools" role="group" aria-label="Available agent tools">
+                ${tools.map(
+                  (tool) => html`
+                    <button
+                      type="button"
+                      class="ags-tool-card"
+                      aria-pressed=${this._enabledTools.has(tool.name)}
+                      @click=${() => void this._toggleAgentTool(tool.name)}
+                    >
+                      <span class="ags-tool-check" aria-hidden="true">${
+                        this._enabledTools.has(tool.name) ? "✓" : nothing
+                      }</span>
+                      <span class="ags-tool-body">
+                        <span class="ags-tool-name">${tool.name}</span>
+                        ${tool.description
+                          ? html`<span class="ags-tool-desc">${tool.description}</span>`
+                          : nothing}
+                      </span>
+                    </button>
+                  `,
+                )}
+              </div>
+              <p class="ags-card-help">
+                Enabled tools are passed to agents when they run in this workspace. Tools
+                you disable here are withheld, even if a chat's composer still lists them.
+              </p>
+            `;
+
+    return html`
+      <p class="ags-section-title">Tools</p>
+      <div class="ags-card ags-input-card ags-card-gap">
+        <label class="ags-card-question">
+          Which tools should agents be able to use in this workspace?
+        </label>
+        ${toolsBody}
       </div>
     `;
   }

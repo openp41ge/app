@@ -209,9 +209,14 @@ export class AgentRuntime {
       let currentAssistant: ChatMessage | null = null;
 
       const toolDefs = this._tools.definitions();
-      const tools = enabledTools?.length
-        ? toolDefs.filter((t) => enabledTools.includes(t.name))
-        : toolDefs;
+      // `enabledTools` is optional: when omitted/undefined, every registered
+      // tool is available (the pre-settings default). When provided — even as
+      // an empty list — it is authoritative, so a workspace that disables all
+      // of its tools yields `[]` and no tool runs.
+      const tools =
+        enabledTools !== undefined
+          ? toolDefs.filter((t) => enabledTools.includes(t.name))
+          : toolDefs;
       for await (const delta of provider.streamChat({
         messages: requestMessages,
         tools,

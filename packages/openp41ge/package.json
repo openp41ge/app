@@ -30,7 +30,11 @@
     "openp41ge-scrollbar": "workspace:*",
     "openp41ge-filesystem": "workspace:*",
     "zod": "^3.24.0",
-    "openp41ge-agents": "workspace:*"
+    "openp41ge-agents": "workspace:*",
+    "openp41ge-agents-tool-types": "workspace:*",
+    "openp41ge-agents-tool-read-file": "workspace:*",
+    "openp41ge-agents-tool-search-files": "workspace:*",
+    "openp41ge-agents-tool-run-command": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

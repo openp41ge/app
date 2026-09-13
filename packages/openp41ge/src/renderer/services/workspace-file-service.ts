@@ -288,6 +288,31 @@ export class WorkspaceFileService {
     this._emitChanged();
   }
 
+  // ── Agent tools ──────────────────────────────────────
+
+  /**
+   * Set which agent tools are enabled for the open workspace and persist.
+   * Returns false when no workspace file is open.
+   *
+   * Does not emit `workspace-file-changed`: this is a config-only change and
+   * emitting would trigger the repo-materialisation side effect in the
+   * workspace-changed listener on every toggle. Consumers read the updated
+   * `agentTools` directly from `openData`.
+   */
+  async setEnabledAgentTools(enabled: string[]): Promise<boolean> {
+    if (!this.openData) return false;
+    this.openData.agentTools = { enabled: [...enabled] };
+    return this.save();
+  }
+
+  /**
+   * Names of the agent tools enabled for the open workspace, or undefined
+   * when no workspace file is open / no explicit set has been saved.
+   */
+  getEnabledAgentTools(): string[] | undefined {
+    return this.openData?.agentTools?.enabled;
+  }
+
   // ── Materialize repos (clone on disk) ────────────────────────────
 
   /**

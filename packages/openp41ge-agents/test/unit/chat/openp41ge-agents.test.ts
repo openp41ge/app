@@ -146,10 +146,7 @@ describe("Openp41geAgents (custom element)", () => {
     try {
       const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
       document.body.appendChild(el);
-      el.addMessage(
-        "assistant",
-        "```js\nconst x = 1;\n```\n```python\nprint('a')\n```",
-      );
+      el.addMessage("assistant", "```js\nconst x = 1;\n```\n```python\nprint('a')\n```");
       await el.updateComplete;
 
       const codeBlocks = el.shadowRoot!.querySelectorAll<HTMLElement>(".code-block");
@@ -538,12 +535,13 @@ describe("Openp41geAgents (custom element)", () => {
     expect(sendBtn.disabled).toBe(true);
     expect(sendBtn.getAttribute("title")).toBe("Type a message to send");
 
-    // Activate: the tooltip reverts to the send action label.
+    // Activate: the styled tooltip provides the label, so the native-title
+    // fallback is cleared (having both would double the tooltip).
     (inputEl as { value: string }).value = "hello";
     inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     await el.updateComplete;
     expect(sendBtn.disabled).toBe(false);
-    expect(sendBtn.getAttribute("title")).toBe("Send message");
+    expect(sendBtn.getAttribute("title")).toBeNull();
 
     // Clearing the draft deactivates it again.
     (inputEl as { value: string }).value = "";
@@ -596,9 +594,11 @@ describe("Openp41geAgents (custom element)", () => {
     expect(modelItems).toHaveLength(2);
     expect(modelItems[0].textContent).toContain("vicuna-13b");
 
-    const toolsBtn = el.shadowRoot!.querySelector(
-      ".composer-tool[title='Active tools']",
-    ) as HTMLElement;
+    // The tools toggle is the only `.composer-tool` that carries an SVG icon
+    // (the add-content button is a text glyph), so select it via that.
+    const toolsBtn = el
+      .shadowRoot!.querySelector(".composer-tool svg")
+      ?.closest("button") as HTMLElement;
     // The tools button shows no floating count badge.
     expect(toolsBtn.querySelector(".tool-badge")).toBeNull();
   });
@@ -784,9 +784,10 @@ describe("Openp41geAgents (custom element)", () => {
     });
     await el.updateComplete;
 
-    const toolsBtn = el.shadowRoot!.querySelector(
-      ".composer-tool[title='Active tools']",
-    ) as HTMLButtonElement;
+    // The tools toggle is the only `.composer-tool` that carries an SVG icon.
+    const toolsBtn = el
+      .shadowRoot!.querySelector(".composer-tool svg")
+      ?.closest("button") as HTMLButtonElement;
     toolsBtn.click();
     await el.updateComplete;
 

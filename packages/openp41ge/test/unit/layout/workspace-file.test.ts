@@ -88,6 +88,14 @@ describe("migrateWorkspaceFileData", () => {
     expect(migrateWorkspaceFileData("nope").repos).toEqual([]);
   });
 
+  it("preserves a per-workspace agentTools config through migration", () => {
+    const file = migrateWorkspaceFileData({
+      ...V1_MANIFEST,
+      agentTools: { enabled: ["read_file", "search_files"] },
+    });
+    expect(file.agentTools).toEqual({ enabled: ["read_file", "search_files"] });
+  });
+
   it("strips a retired Search system tab and its sidebar references", () => {
     const file = migrateWorkspaceFileData({
       ...V1_MANIFEST,
@@ -143,6 +151,12 @@ describe("workspaceToFileData / fileDataToWorkspace round-trip", () => {
     expect(rebuilt.editorTabs["tab-1"]).toBeDefined();
     expect(rebuilt.systemTabs["explorer"]).toBeDefined();
     expect(rebuilt.scopedFolders).toEqual(["/w"]);
+  });
+
+  it("keeps a per-workspace agentTools config when merging the session", () => {
+    const manifest = { ...V1_MANIFEST, agentTools: { enabled: ["read_file"] } };
+    const file = workspaceToFileData(sampleWorkspace(), manifest);
+    expect(file.agentTools).toEqual({ enabled: ["read_file"] });
   });
 
   it("does not mutate the source workspace when extracting the session", () => {

@@ -30,6 +30,10 @@ export default defineConfig({
       "@openp41ge-terminal": path.resolve(__dirname, "../openp41ge-terminal/src"),
       "@openp41ge-agents": path.resolve(__dirname, "../openp41ge-agents/src"),
       "openp41ge-agents": path.resolve(__dirname, "../openp41ge-agents/src"),
+      "openp41ge-uikit/tooltip": path.resolve(
+        __dirname,
+        "../openp41ge-uikit/src/components/tooltip",
+      ),
       "openp41ge-uikit": path.resolve(__dirname, "../openp41ge-uikit/src"),
       "openp41ge-syntax-highlighting": path.resolve(
         __dirname,

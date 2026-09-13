@@ -636,6 +636,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     pingProvider: (providerId) => ipcRenderer.invoke("chat:pingProvider", providerId),
     listModels: (opts) => ipcRenderer.invoke("chat:listModels", opts),
     getAgentConfig: () => ipcRenderer.invoke("chat:getAgentConfig"),
+    listTools: () => ipcRenderer.invoke("chat:listTools"),
 
     /** Subscribe to chat list/state changes. Returns an unsubscribe function. */
     onChanged: (callback) => {

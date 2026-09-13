@@ -18,6 +18,7 @@ import { LitElement, html, type TemplateResult } from "lit";
 import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
+import { tooltipContent, tooltipController } from "openp41ge-uikit/tooltip";
 import type { Chat, ChatMessage, ChatRuntimeStatus, ToolCall } from "../types";
 import { renderMarkdownSegments, type MarkdownSegment, type CodeBlockSegment } from "./markdown.js";
 import {
@@ -923,12 +924,24 @@ class Openp41geAgents extends LitElement {
   }
 
   private _updateComposerState(): void {
-    const sendBtn = this.renderRoot.querySelector<HTMLButtonElement>(".composer-send");
+    // Scope to the send button (not the abort button, which shares the
+    // `.composer-send` class but is always interactive during streaming).
+    const sendBtn = this.renderRoot.querySelector<HTMLButtonElement>(".composer-send:not(.abort)");
     if (sendBtn) {
       sendBtn.disabled = this._sendDisabled;
-      // Explain the disabled state via a native tooltip (Chrome shows `title`
-      // even on a disabled button, and the composer's other controls use title).
-      sendBtn.title = this._sendDisabled ? "Type a message to send" : "Send message";
+      // Refresh the styled tooltip content so it tracks the disabled state.
+      tooltipController.attach(sendBtn, {
+        type: "simple",
+        text: this._sendDisabled ? "Type a message to send" : "Send message",
+      });
+      // A button's `disabled` attribute suppresses mouse events, so the custom
+      // tooltip can't fire while it is inert. Keep a native `title` fallback for
+      // that hint only — cleared once enabled so the two never double up.
+      if (this._sendDisabled) {
+        sendBtn.title = "Type a message to send";
+      } else {
+        sendBtn.removeAttribute("title");
+      }
     }
     const el = this._contentEl;
     if (el) {
@@ -2411,21 +2424,21 @@ class Openp41geAgents extends LitElement {
         <div class="composer-toolbar">
           <button
             class="composer-tool"
-            title="Add files or content"
+            ${tooltipContent({ type: "simple", text: "Add files or content" })}
             @click=${() => this._onAddContent()}
           >
             ＋
           </button>
           <button
             class="composer-select"
-            title="Provider"
+            ${tooltipContent({ type: "simple", text: "Provider" })}
             @click=${() => this._toggleMenu("provider")}
           >
             <span class="composer-select-label">${this._currentProviderLabel()}</span>
           </button>
           <button
             class="composer-select composer-model-select"
-            title="Model"
+            ${tooltipContent({ type: "simple", text: "Model" })}
             @click=${() => this._toggleMenu("model")}
           >
             <span class="composer-select-label">${this._currentModelLabel()}</span>
@@ -2434,7 +2447,7 @@ class Openp41geAgents extends LitElement {
             this._thinkingOptions().length > 0
               ? html`<button
                   class="composer-select composer-thinking-select"
-                  title="Thinking level"
+                  ${tooltipContent({ type: "simple", text: "Thinking level" })}
                   @click=${() => this._toggleMenu("thinking")}
                 >
                   <span class="composer-select-label">${this._currentThinkingLabel()}</span>
@@ -2443,7 +2456,7 @@ class Openp41geAgents extends LitElement {
           }
           <button
             class="composer-tool ${this._menuOpen === "tools" ? "active" : ""}"
-            title="Active tools"
+            ${tooltipContent({ type: "simple", text: "Active tools" })}
             @click=${() => this._toggleMenu("tools")}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
@@ -2455,7 +2468,11 @@ class Openp41geAgents extends LitElement {
           <span class="composer-spacer"></span>
           ${
             this._streaming
-              ? html`<button class="composer-send abort" title="Stop" @click=${() => this._abort()}>
+              ? html`<button
+                  class="composer-send abort"
+                  ${tooltipContent({ type: "simple", text: "Stop" })}
+                  @click=${() => this._abort()}
+                >
                   <svg viewBox="0 0 24 24">
                     <rect
                       x="6"
@@ -2470,7 +2487,7 @@ class Openp41geAgents extends LitElement {
                 </button>`
               : html`<button
                   class="composer-send"
-                  title="Send message"
+                  ${tooltipContent({ type: "simple", text: "Send message" })}
                   ?disabled=${this._sendDisabled}
                   @click=${() => this._sendMessage()}
                 >
@@ -2576,7 +2593,7 @@ class Openp41geAgents extends LitElement {
           <button
             type="button"
             class="code-wrap ${wrapped ? "active" : ""}"
-            title="Toggle line wrap"
+            ${tooltipContent({ type: "simple", text: "Toggle line wrap" })}
             @click=${(e: Event) => {
               e.stopPropagation();
               this._toggleWrap(key);
@@ -2587,7 +2604,7 @@ class Openp41geAgents extends LitElement {
           <button
             type="button"
             class="code-lang ${menuOpen ? "active" : ""}"
-            title="Change language"
+            ${tooltipContent({ type: "simple", text: "Change language" })}
             @click=${(e: Event) => {
               e.stopPropagation();
               this._toggleLangMenu(key);

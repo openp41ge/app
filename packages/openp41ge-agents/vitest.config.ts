@@ -19,6 +19,12 @@ export default defineConfig({
     alias: {
       "@openp41ge-agents": path.resolve(__dirname, "./src"),
       "@openp41ge": path.resolve(__dirname, "../openp41ge/src"),
+      // Resolve the narrow tooltip subpath to uikit's self-contained source so
+      // unit tests don't depend on uikit's prebuilt dist chunk.
+      "openp41ge-uikit/tooltip": path.resolve(
+        __dirname,
+        "../openp41ge-uikit/src/components/tooltip",
+      ),
     },
   },
 });

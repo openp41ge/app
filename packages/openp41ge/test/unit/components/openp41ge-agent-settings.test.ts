@@ -158,14 +158,14 @@ describe("openp41ge-agent-settings", () => {
     expect(el.shadowRoot.activeElement).toBe(baseInput);
   });
 
-  test("adding a provider creates it immediately and persists edits live", async () => {
+  test("adding a provider only persists it once it has real data", async () => {
     const el = await mount(AGENT({}, ""));
+    const setsBefore = el.configService.sets.length;
     q(el, ".ags-add-row").click();
     await tick();
-    // Opening add creates a blank (Custom) entry right away.
-    let last = el.configService.sets[el.configService.sets.length - 1];
-    expect(Object.keys(last.value.providers)).toEqual(["custom"]);
-    expect(last.value.providerId).toBe("custom");
+    // A blank (Custom) provider is created in-memory but NOT persisted yet.
+    expect(el.configService.sets).toHaveLength(setsBefore);
+    expect(Object.keys(el._config.providers)).toEqual(["custom"]);
     // Pick the OpenAI preset; the fields persist without a Save click.
     q(el, ".drawer .ags-default-trigger").click();
     await tick();
@@ -174,7 +174,7 @@ describe("openp41ge-agent-settings", () => {
     );
     openaiRow.click();
     await tick();
-    last = el.configService.sets[el.configService.sets.length - 1];
+    const last = el.configService.sets[el.configService.sets.length - 1];
     expect(last.value.providers.custom.name).toBe("OpenAI");
     expect(last.value.providers.custom.baseUrl).toBe("https://api.openai.com/v1");
     expect(last.value.providers.custom.model).toBe("gpt-4o");
@@ -201,11 +201,12 @@ describe("openp41ge-agent-settings", () => {
 
   test("an added provider with no data is auto-deleted when the drawer closes", async () => {
     const el = await mount(AGENT({}, ""));
+    const setsBefore = el.configService.sets.length;
     q(el, ".ags-add-row").click();
     await tick();
-    expect(
-      Object.keys(el.configService.sets[el.configService.sets.length - 1].value.providers),
-    ).toHaveLength(1);
+    // The blank provider is in-memory but not persisted (no fake config entry).
+    expect(Object.keys(el._config.providers)).toHaveLength(1);
+    expect(el.configService.sets).toHaveLength(setsBefore);
     // Close with the top-bar ✕ without entering any data.
     q(el, ".drawer .dw-close").click();
     await tick();

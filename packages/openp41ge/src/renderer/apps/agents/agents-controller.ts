@@ -21,6 +21,7 @@ import type { ChatDeltaPayload, ChatStatusPayload, ChatToolPayload } from "openp
 import { IpcChatStoreModel, type ChatStoreModel } from "../../models/chat-store-model";
 import { IpcChatRuntimeModel, type ChatRuntimeModel } from "../../models/chat-runtime-model";
 import { createLogger } from "openp41ge-logger";
+import { workspaceFileService } from "../../services/workspace-file-service";
 
 const log = createLogger("openp41ge", "AgentsController");
 
@@ -223,8 +224,16 @@ export class AgentsController extends BaseController implements TabController {
       } catch {
         availableTools = [];
       }
-      if (!availableTools.length) availableTools = [...DEFAULT_TOOLS];
-      // Preserve any user selection; otherwise default to the whole set.
+      const saved = workspaceFileService.getEnabledAgentTools();
+      if (!availableTools.length && !saved) availableTools = [...DEFAULT_TOOLS];
+      // The workspace defines which tools this chat may use — hide the disabled
+      // ones from the composer. When the workspace has no explicit config (or no
+      // open workspace), every registered tool is available, matching the
+      // pre-settings behaviour.
+      if (saved) {
+        availableTools = availableTools.filter((t) => saved.includes(t.name));
+      }
+      // Preserve any user selection; otherwise default to the enabled subset.
       if (this._activeTools.length) {
         this._activeTools = this._activeTools.filter((n) =>
           availableTools.some((t) => t.name === n),
@@ -249,6 +258,17 @@ export class AgentsController extends BaseController implements TabController {
     if (tools) this._activeTools = tools;
   };
 
+  /**
+   * The set of tools this chat may use. The workspace's per-workspace enabled
+   * set acts as a capability gate, so disabling a tool in the Agents settings
+   * takes effect even for an already-open chat that still lists it.
+   */
+  private _effectiveEnabledTools(): string[] {
+    const saved = workspaceFileService.getEnabledAgentTools();
+    if (!saved) return this._activeTools;
+    return this._activeTools.filter((n) => saved.includes(n));
+  }
+
   private _onSend = (e: Event): void => {
     const detail = (e as CustomEvent<{ text?: string; thinkingLevel?: string }>).detail;
     const text = detail?.text;
@@ -259,7 +279,7 @@ export class AgentsController extends BaseController implements TabController {
       this.chatId,
       text,
       this._cwd,
-      this._activeTools,
+      this._effectiveEnabledTools(),
       detail?.thinkingLevel,
     );
   };

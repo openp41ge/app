@@ -59,6 +59,21 @@ export interface WorkspaceFileData {
   };
   /** One entry per open window (session). */
   windows?: Window[];
+
+  // ── v2: per-workspace agent configuration ──────────────────────────
+  /**
+   * Per-workspace agent tool enablement. Agent tools are registered
+   * plugin-style, so this lists which of the currently registered tools are
+   * enabled for this workspace. Omitted/undefined means "all registered tools
+   * are enabled" (the default).
+   */
+  agentTools?: AgentToolsConfig;
+}
+
+/** Per-workspace agent tool enablement (stored in the workspace file). */
+export interface AgentToolsConfig {
+  /** Names of the agent tools enabled for this workspace. */
+  enabled: string[];
 }
 
 // ─── Rect / Bounds ─────────────────────────────────────────────────────────

@@ -16,6 +16,10 @@
       "types": "./dist/file-editor/index.d.ts",
       "import": "./dist/file-editor/index.js"
     },
+    "./tooltip": {
+      "types": "./dist/components/tooltip/index.d.ts",
+      "import": "./dist/tooltip.js"
+    },
     "./styles.css": "./dist/styles.css"
   },
   "main": "dist/index.js",

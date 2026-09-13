@@ -29,6 +29,13 @@ export default defineConfig({
         find: "openp41ge-filesystem",
         replacement: path.resolve(__dirname, "../openp41ge-filesystem/src"),
       },
+      {
+        // Must precede the `openp41ge-uikit` prefix alias so the agents package's
+        // narrow tooltip import resolves to the self-contained tooltip source
+        // instead of a bogus `.../src/tooltip` path (or uikit's prebuilt dist).
+        find: "openp41ge-uikit/tooltip",
+        replacement: path.resolve(__dirname, "../openp41ge-uikit/src/components/tooltip"),
+      },
       { find: "openp41ge-uikit", replacement: path.resolve(__dirname, "../openp41ge-uikit/src") },
       {
         find: "openp41ge-uikit/theme",

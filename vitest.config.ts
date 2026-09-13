@@ -121,6 +121,13 @@ export default defineConfig({
       // Source aliases so renderer code importing the uikit package and its
       // subpaths resolves to source (the dist only ships declaration files
       // for some subpaths such as file-editor).
+      // Must precede the `openp41ge-uikit` prefix alias so the agents package's
+      // narrow `openp41ge-uikit/tooltip` import resolves to the self-contained
+      // tooltip source instead of a bogus `.../src/tooltip` path.
+      "openp41ge-uikit/tooltip": path.resolve(
+        __dirname,
+        "./packages/openp41ge-uikit/src/components/tooltip",
+      ),
       "openp41ge-uikit": path.resolve(__dirname, "./packages/openp41ge-uikit/src"),
       "openp41ge-uikit/theme": path.resolve(__dirname, "./packages/openp41ge-uikit/src/theme"),
     },

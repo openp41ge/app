@@ -125,6 +125,36 @@ describe("AgentRuntime", () => {
     expect(capturedArgs).toEqual({ path: "/a/b.ts" });
   });
 
+  it("withholds every tool when an empty enabledTools set is passed", async () => {
+    const fakeTool: AgentTool = {
+      name: "read_file",
+      description: "read",
+      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+      execute: async () => ({ content: "x" }),
+    };
+    ctx.tools.register(fakeTool);
+
+    let capturedTools: unknown;
+    const provider: ChatProvider = {
+      id: "fake",
+      label: "Fake",
+      ping: async () => true,
+      async *streamChat(req: ChatStreamRequest): AsyncIterable<ProviderDelta> {
+        capturedTools = req.tools;
+        yield { type: "text", text: "done" };
+      },
+    };
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await ctx.runtime.send(chat.id, "win-a", "hello", undefined, []);
+
+    // The provider received no tools, so no tool-call loop can occur.
+    expect(capturedTools).toEqual([]);
+    const stored = ctx.store.get(chat.id)!;
+    expect(stored.messages.filter((m) => m.role === "tool")).toHaveLength(0);
+  });
+
   it("respects the max-turns guard for a chat that keeps calling tools", async () => {
     const loopTool: AgentTool = {
       name: "run_command",

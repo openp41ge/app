@@ -151,6 +151,18 @@ importers:
       openp41ge-agents:
         specifier: workspace:*
         version: link:../openp41ge-agents
+      openp41ge-agents-tool-read-file:
+        specifier: workspace:*
+        version: link:../openp41ge-agents-tool-read-file
+      openp41ge-agents-tool-run-command:
+        specifier: workspace:*
+        version: link:../openp41ge-agents-tool-run-command
+      openp41ge-agents-tool-search-files:
+        specifier: workspace:*
+        version: link:../openp41ge-agents-tool-search-files
+      openp41ge-agents-tool-types:
+        specifier: workspace:*
+        version: link:../openp41ge-agents-tool-types
       openp41ge-constants:
         specifier: workspace:*
         version: link:../openp41ge-constants
@@ -203,6 +215,57 @@ importers:
       openp41ge-scrollbar:
         specifier: workspace:*
         version: link:../openp41ge-scrollbar
+      openp41ge-uikit:
+        specifier: workspace:*
+        version: link:../openp41ge-uikit
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/openp41ge-agents-tool-read-file:
+    dependencies:
+      openp41ge-agents-tool-types:
+        specifier: workspace:*
+        version: link:../openp41ge-agents-tool-types
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/openp41ge-agents-tool-run-command:
+    dependencies:
+      openp41ge-agents-tool-types:
+        specifier: workspace:*
+        version: link:../openp41ge-agents-tool-types
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/openp41ge-agents-tool-search-files:
+    dependencies:
+      openp41ge-agents-tool-types:
+        specifier: workspace:*
+        version: link:../openp41ge-agents-tool-types
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/openp41ge-agents-tool-types:
     devDependencies:
       typescript:
         specifier: ^7.0.2

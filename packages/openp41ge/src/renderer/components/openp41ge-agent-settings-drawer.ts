@@ -22,6 +22,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import type { Openp41geSettingsDrawerHost } from "./openp41ge-settings-drawer-host";
 import type { ConfigService } from "../services/config-service";
+import { workspaceFileService } from "../services/workspace-file-service";
 import {
   PROVIDER_PRESETS,
   CUSTOM_PRESET_ID,
@@ -233,6 +234,72 @@ const AGDS_CSS = `
     display: flex;
     justify-content: flex-end;
   }
+  .agds-tools {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .agds-tool-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--divider, #2f3031);
+    border-radius: 8px;
+    background: var(--bg-secondary, #1e1e1e);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+  }
+  .agds-tool-card:hover {
+    border-color: var(--accent, #569cd6);
+  }
+  .agds-tool-card[aria-pressed="true"] {
+    border-color: var(--accent, #569cd6);
+    background: color-mix(in srgb, var(--accent, #569cd6) 12%, var(--bg-secondary, #1e1e1e));
+    box-shadow: inset 0 0 0 1px var(--accent, #569cd6);
+  }
+  .agds-tool-check {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 1px solid var(--divider, #2f3031);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--bg-secondary, #1e1e1e);
+  }
+  .agds-tool-card[aria-pressed="true"] .agds-tool-check {
+    background: var(--accent, #569cd6);
+    border-color: var(--accent, #569cd6);
+  }
+  .agds-tool-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .agds-tool-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #e0e0e0);
+  }
+  .agds-tool-desc {
+    font-size: 12px;
+    color: var(--text-secondary, #999);
+    line-height: 1.4;
+  }
 `;
 
 function providerDraftFromConfig(p: ProviderConfig): ProviderDraft {
@@ -279,6 +346,14 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   @state() private _config: AgentConfig | null = null;
   @state() private _loading = true;
 
+  /** Available agent tools registered by the backend (plugin-style). */
+  @state() private _availableTools: Array<{ name: string; description: string }> = [];
+  /** Names of the agent tools enabled for this workspace. */
+  @state() private _enabledTools = new Set<string>();
+  @state() private _toolsLoading = true;
+  /** Whether a workspace file is open (tools are per-workspace). */
+  @state() private _hasWorkspace = false;
+
   /** Provider drafts keyed by provider layer id. */
   private _providerDrafts = new Map<string, ProviderDraft>();
   /** Provider layer id → config provider key being edited (null = adding). */
@@ -289,6 +364,9 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   private _modelCtx = new Map<string, ModelCtx>();
 
   private _nextId = 0;
+  /** Last observed workspace file path, so we only reload tools on file change. */
+  private _lastWorkspacePath: string | null = null;
+  private _workspaceUnsub: (() => void) | null = null;
 
   get title(): string {
     return "Agents";
@@ -296,7 +374,16 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    this._workspaceUnsub = workspaceFileService.onChange(() => this._syncWorkspace());
+    this._lastWorkspacePath = workspaceFileService.openFilePath;
+    this._hasWorkspace = workspaceFileService.openFilePath != null;
     void this._load();
+  }
+
+  disconnectedCallback(): void {
+    this._workspaceUnsub?.();
+    this._workspaceUnsub = null;
+    super.disconnectedCallback();
   }
 
   private async _load(): Promise<void> {
@@ -309,8 +396,51 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
       this._config = this._defaultConfig();
     }
     this._loading = false;
+    await this._loadTools();
     this.host?.refresh();
     this.requestUpdate();
+  }
+
+  /** Load the registered tool set and the workspace's enabled subset. */
+  private async _loadTools(): Promise<void> {
+    let tools: Array<{ name: string; description: string }> = [];
+    try {
+      tools = (await window.openp41ge?.chat?.listTools?.()) ?? [];
+    } catch {
+      tools = [];
+    }
+    this._availableTools = tools;
+    this._syncEnabledFromWorkspace();
+    this._toolsLoading = false;
+  }
+
+  /**
+   * Sync the enabled-tools set from the open workspace. Defaults to "all
+   * registered tools" when the workspace has no explicit config. Only re-reads
+   * when the workspace file path changes (other save events must not clobber
+   * an in-progress toggle).
+   */
+  private _syncWorkspace(): void {
+    const path = workspaceFileService.openFilePath;
+    const changed = path !== this._lastWorkspacePath;
+    this._lastWorkspacePath = path;
+    this._hasWorkspace = path != null;
+    if (changed) {
+      this._syncEnabledFromWorkspace();
+    }
+    this.requestUpdate();
+  }
+
+  private _syncEnabledFromWorkspace(): void {
+    const saved = workspaceFileService.openData?.agentTools?.enabled;
+    const registered = new Set(this._availableTools.map((t) => t.name));
+    if (saved?.length) {
+      // Keep only tools that are still registered, so de-registered plugins
+      // don't linger in the persisted set.
+      this._enabledTools = new Set(saved.filter((n) => registered.has(n)));
+    } else {
+      this._enabledTools = registered;
+    }
   }
 
   private _defaultConfig(): AgentConfig {
@@ -379,12 +509,13 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     const config = this._config;
     if (!config) return;
     const id = nextProviderId(Object.keys(config.providers), CUSTOM_PRESET_ID);
-    const preset = customPreset();
     const provider: ProviderConfig = { baseUrl: "", model: "" };
     const providers = { ...config.providers, [id]: provider };
     const next = { ...config, providerId: config.providerId || id, providers };
+    // Keep the blank provider in-memory only — it is NOT persisted until the
+    // user enters a real endpoint/model (via _syncProvider). Closing it empty
+    // discards it, so we never write fake empty providers to config.
     this._config = next;
-    void this._persist(next);
 
     const layerId = this._genId();
     this._providerDrafts.set(layerId, providerDraftFromConfig(provider));
@@ -545,6 +676,20 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     void this._syncProvider(layerId);
   }
 
+  /** Toggle a tool in the workspace's enabled set and persist it. */
+  private async _toggleAgentTool(name: string): Promise<void> {
+    const next = new Set(this._enabledTools);
+    if (next.has(name)) {
+      next.delete(name);
+    } else {
+      next.add(name);
+    }
+    this._enabledTools = next;
+    this.requestUpdate();
+    this.host?.refresh();
+    await workspaceFileService.setEnabledAgentTools([...next]);
+  }
+
   // ── Rendering ──────────────────────────────────────────────────────────
 
   render(): TemplateResult {
@@ -611,6 +756,71 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
                 `
           }
         </div>
+
+        ${this._renderTools()}
+      </div>
+    `;
+  }
+
+  /** Render the per-workspace agent Tools section. */
+  private _renderTools(): TemplateResult {
+    if (this._toolsLoading) {
+      return html`
+        <p class="agds-section-title" style="margin-top:18px;">Tools</p>
+        <div class="agds-card">
+          <label class="agds-card-question">Which tools should agents be able to use in this workspace?</label>
+          <p class="agds-card-help">Loading…</p>
+        </div>
+      `;
+    }
+
+    const tools = this._availableTools;
+    let body: TemplateResult;
+    if (!this._hasWorkspace) {
+      body = html`
+        <p class="agds-card-help">
+          Agent tools are enabled per workspace. Open a workspace first to choose
+          which tools its agents may use.
+        </p>
+      `;
+    } else if (tools.length === 0) {
+      body = html`<p class="agds-card-help">No agent tools are registered.</p>`;
+    } else {
+      body = html`
+        <div class="agds-tools" role="group" aria-label="Available agent tools">
+          ${tools.map(
+            (tool) => html`
+              <button
+                type="button"
+                class="agds-tool-card"
+                aria-pressed=${this._enabledTools.has(tool.name)}
+                @click=${() => void this._toggleAgentTool(tool.name)}
+              >
+                <span class="agds-tool-check" aria-hidden="true">${
+                  this._enabledTools.has(tool.name) ? "✓" : nothing
+                }</span>
+                <span class="agds-tool-body">
+                  <span class="agds-tool-name">${tool.name}</span>
+                  ${tool.description
+                    ? html`<span class="agds-tool-desc">${tool.description}</span>`
+                    : nothing}
+                </span>
+              </button>
+            `,
+          )}
+        </div>
+        <p class="agds-card-help">
+          Enabled tools are passed to agents when they run in this workspace. Tools
+          you disable here are withheld, even if a chat's composer still lists them.
+        </p>
+      `;
+    }
+
+    return html`
+      <p class="agds-section-title" style="margin-top:18px;">Tools</p>
+      <div class="agds-card">
+        <label class="agds-card-question">Which tools should agents be able to use in this workspace?</label>
+        ${body}
       </div>
     `;
   }

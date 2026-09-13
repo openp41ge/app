@@ -8,6 +8,7 @@ export default defineConfig({
         index: path.resolve(__dirname, "src/index.ts"),
         theme: path.resolve(__dirname, "src/theme/index.ts"),
         "file-editor": path.resolve(__dirname, "src/file-editor/index.ts"),
+        tooltip: path.resolve(__dirname, "src/components/tooltip/index.ts"),
       },
       formats: ["es"],
       fileName: (format, entryName) => `${entryName}.js`,
@@ -20,6 +21,12 @@ export default defineConfig({
     rollupOptions: {
       external: [
         /^openp41ge-/,
+        // Keep a single lit instance across the app — consumers provide it
+        // (the tooltip subsystem is lit-only). The main app and uikit demos all
+        // alias this package to source, so this only affects the built dist
+        // chunks (incl. the standalone `tooltip` entry used by openp41ge-agents).
+        /^lit$/,
+        /^lit\//,
       ],
     },
   },
