@@ -110,8 +110,9 @@ export class Openp41geLogViewer extends LitElement {
   /** Guards the measure→re-render loop so a pathology can't spin the renderer. */
   private _measurePasses = 0;
 
-  // In-log find bar (Cmd/Ctrl+F or the bottom-bar search icon). Scoped to
-  // today's logs — including entries not yet loaded into the virtual window.
+  // In-log find bar (Cmd/Ctrl+F or the bottom-bar search icon). Spans today's
+  // logs plus any day the user explicitly confirmed via the day-boundary row —
+  // including entries not yet loaded into the virtual window.
   @state() private _searchOpen = false;
   @state() private _searchQuery = "";
   @state() private _searchRegex = false;
@@ -123,8 +124,9 @@ export class Openp41geLogViewer extends LitElement {
   private _activeSegment: SearchSegment | null = null;
   private _activeRange: TextRange | null = null;
   private _searchRangeMap = new Map<string, Record<SearchSegment, TextRange[]>>();
-  /** Once today's logs have been fully drained, search is a pure in-memory op. */
-  private _todayDrained = false;
+  /** Once the confirmed-day window has been fully drained, search is a pure
+   * in-memory op (today + any explicitly-confirmed older days). */
+  private _searchDrained = false;
   private _searchLoading = false;
   private _searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -269,7 +271,7 @@ export class Openp41geLogViewer extends LitElement {
     this._activeSegment = null;
     this._activeRange = null;
     this._searchRangeMap = new Map<string, Record<SearchSegment, TextRange[]>>();
-    this._todayDrained = false;
+    this._searchDrained = false;
     this._searchLoading = false;
     if (this._searchDebounce) {
       clearTimeout(this._searchDebounce);
@@ -346,6 +348,14 @@ export class Openp41geLogViewer extends LitElement {
       if (newList) {
         newList.scrollTop = oldScrollTop + (newList.scrollHeight - oldScrollHeight);
       }
+      // A day-boundary click crossed into an explicitly-confirmed older day:
+      // that day is now part of the searchable window. Mark it undrained (so the
+      // next search re-drains the rest of that day) and re-run the search so
+      // matches span the newly-confirmed entries too.
+      if (target !== undefined) {
+        this._searchDrained = false;
+        if (this._searchOpen) this._scheduleSearch();
+      }
     } catch {
       // ignore — the next scroll will retry.
     } finally {
@@ -376,12 +386,6 @@ export class Openp41geLogViewer extends LitElement {
   }
 
   // ═══ In-log find (Cmd/Ctrl+F) ─────────────────────────────────────────
-
-  private _todayStartMs(): number {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  }
 
   private _searchSegments(entry: LogViewEntry): Array<{ segment: SearchSegment; text: string }> {
     return [
@@ -472,13 +476,14 @@ export class Openp41geLogViewer extends LitElement {
     }, 150);
   }
 
-  /** Drain today's logs (or the in-memory bus) fully so search covers entries
-   * the user hasn't scrolled to yet. Stops at the day boundary — it never
-   * auto-crosses into the previous day. Pages are accumulated and applied in a
-   * single `_entries` assignment so the drain does not re-render (and scroll-
-   * anchor) once per page — that repetition is what made typing "scroll". */
-  private async _drainToday(): Promise<void> {
-    if (this._todayDrained || this._searchLoading || !this._pageReader) return;
+  /** Drain the confirmed-day window (today + any explicitly-confirmed older
+   * days) fully so search covers entries the user hasn't scrolled to yet. Stops
+   * at the next day boundary — it never auto-crosses into an unconfirmed
+   * previous day. Pages are accumulated and applied in a single `_entries`
+   * assignment so the drain does not re-render (and scroll-anchor) once per
+   * page — that repetition is what made typing "scroll". */
+  private async _drainSearchWindow(): Promise<void> {
+    if (this._searchDrained || this._searchLoading || !this._pageReader) return;
     this._searchLoading = true;
     // Hold the page lock so the scroll handler's auto-load doesn't race us.
     this._loadingOlder = true;
@@ -503,7 +508,7 @@ export class Openp41geLogViewer extends LitElement {
         nextDayCursor = page.nextDayCursor ?? null;
         nextDayLabel = page.nextDayLabel ?? "";
       }
-      this._todayDrained = true;
+      this._searchDrained = true;
       // Apply the whole drain in one state change (one render), not per page.
       this._entries = [...collected, ...this._entries];
       this._cursor = cursor;
@@ -528,12 +533,12 @@ export class Openp41geLogViewer extends LitElement {
 
   private async _refreshSearch(): Promise<void> {
     if (!this._searchOpen) return;
-    // Only drain today's file once a query is typed. Opening the bar with an
-    // empty query must not prepend all of today's entries — that reflows the
-    // virtual list and (via the scroll-preserve delta) yanks a top-scrolled
-    // view down to the bottom the moment Cmd/Ctrl+F is pressed.
+    // Only drain the confirmed-day window once a query is typed. Opening the
+    // bar with an empty query must not prepend all of today's entries — that
+    // reflows the virtual list and (via the scroll-preserve delta) yanks a
+    // top-scrolled view down to the bottom the moment Cmd/Ctrl+F is pressed.
     if (this._searchQuery.trim()) {
-      await this._drainToday();
+      await this._drainSearchWindow();
       if (!this._searchOpen) return;
     }
     this._computeSearchMatches();
@@ -549,14 +554,12 @@ export class Openp41geLogViewer extends LitElement {
     this._activeSegment = null;
     this._activeRange = null;
     if (!this._searchOpen || !q) return;
-    const todayStart = this._todayStartMs();
     const opts = {
       regex: this._searchRegex,
       caseSensitive: this._searchCase,
       wholeWord: this._searchWholeWord,
     };
     for (const entry of this._visible) {
-      if (entry.timestamp < todayStart) continue;
       const ranges: Record<SearchSegment, TextRange[]> = {
         level: [],
         time: [],

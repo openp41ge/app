@@ -101,3 +101,15 @@ to avoid interfering with `_loadOlder`'s own scroll-preserve delta.
 - [x] `nx run openp41ge-logger:test` passes; logger + platform typecheck/lint clean.
 - [ ] Live-verify: open a log viewer, search today, click "Load yesterday's logs",
       confirm the count now includes yesterday matches.
+
+## Status
+
+Implemented (2026-09-06); unit-level verification complete, live check pending:
+- Dropped the `todayStart` filter and `_todayStartMs()`; search now matches every
+  loaded entry regardless of day.
+- Renamed `_drainToday`/`_todayDrained` → `_drainSearchWindow`/`_searchDrained`.
+- `_loadOlder(target)` (the day-boundary click) resets `_searchDrained` and, when
+  the find bar is open, schedules a debounced `_scheduleSearch()` so the just-
+  confirmed day is re-drained and included in the matches.
+- Verified: `openp41ge-logger:test` → 156 passed; `nx run-many -t typecheck` → 17
+  projects passed; `oxlint` clean on the touched files.

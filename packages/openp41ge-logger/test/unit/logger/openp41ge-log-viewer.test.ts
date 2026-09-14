@@ -726,7 +726,7 @@ describe("in-log search", () => {
     await destroyViewer(el);
   });
 
-  it("only searches today's logs — older entries are not matched", async () => {
+  it("searches every loaded entry, including older days", async () => {
     const oldTs = Date.now() - 2 * 24 * 60 * 60 * 1000;
     const el = mountReader({
       latest: {
@@ -743,7 +743,42 @@ describe("in-log search", () => {
 
     const msgs = (el as any)._searchMatches.map((m: any) => m.entry.message);
     expect(msgs).toContain("today foo");
-    expect(msgs).not.toContain("old foo");
+    expect(msgs).toContain("old foo");
+    await destroyViewer(el);
+  });
+
+  it("clicking the day-boundary row makes the loaded day searchable", async () => {
+    const yesterdayTs = Date.now() - 24 * 60 * 60 * 1000;
+    const el = mountReader({
+      latest: {
+        entries: [mk("today foo")],
+        hasOlder: false,
+        cursor: null,
+        nextDayCursor: { fileIndex: 1, lineCount: 0 },
+        nextDayLabel: "Load yesterday's logs",
+      },
+      older: { entries: [mk("yesterday foo", yesterdayTs)], hasOlder: false, cursor: null },
+    });
+    await flush(el);
+
+    // Search today before confirming the boundary: today matches, yesterday does not.
+    (el as any)._searchOpen = true;
+    (el as any)._searchQuery = "foo";
+    await (el as any)._refreshSearch();
+    let msgs = (el as any)._searchMatches.map((m: any) => m.entry.message);
+    expect(msgs).toContain("today foo");
+    expect(msgs).not.toContain("yesterday foo");
+
+    // Confirm the boundary: the loaded day becomes part of the searchable surface.
+    (el as any).querySelector(".day-boundary").click();
+    await flush(el);
+    // The click marks the window undrained and schedules a debounced refresh.
+    await new Promise((r) => setTimeout(r, 200));
+    await flush(el);
+
+    msgs = (el as any)._searchMatches.map((m: any) => m.entry.message);
+    expect(msgs).toContain("today foo");
+    expect(msgs).toContain("yesterday foo");
     await destroyViewer(el);
   });
 
@@ -906,7 +941,7 @@ describe("in-log search", () => {
       older: { entries: [], hasOlder: false, cursor: null },
     });
     await flush(el);
-    expect((el as any)._todayDrained).toBe(false);
+    expect((el as any)._searchDrained).toBe(false);
     // Open via Cmd/Ctrl+F (the query is still empty). Draining here would
     // prepend all of today's entries and (via the scroll-preserve delta)
     // yank a top-scrolled view down to the bottom the moment the bar opens.
@@ -916,7 +951,7 @@ describe("in-log search", () => {
     );
     await flush(el);
     expect((el as any)._searchOpen).toBe(true);
-    expect((el as any)._todayDrained).toBe(false);
+    expect((el as any)._searchDrained).toBe(false);
     await destroyViewer(el);
   });
 
