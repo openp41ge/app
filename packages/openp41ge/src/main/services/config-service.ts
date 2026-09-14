@@ -128,19 +128,24 @@ export class ConfigService {
         const raw = fs.readFileSync(this._configPath, "utf-8");
         const parsed = JSON.parse(raw) as Partial<UserConfig>;
         this._config = deepMerge({ ...DEFAULT_CONFIG }, parsed);
+        log.info("config-loaded", { source: "file", path: this._configPath });
       } else {
         this._writeAtomic(this._config);
+        log.info("config-initialized", { source: "defaults", path: this._configPath });
       }
 
       this._watch();
     } catch (err) {
-      log.error("init error:", err);
+      // Recoverable — falls back to defaults. warn (not error) so it doesn't
+      // forward to the renderer's blocking error overlay.
+      log.warn("init error:", err);
       this._config = { ...DEFAULT_CONFIG };
     }
   }
 
   /** Get the entire config or a specific key (dot-separated). */
   get(key?: string): unknown {
+    log.debug("config-get", { key: key ?? "(all)" });
     if (!key) return this._config;
     return this._resolveKey(key);
   }
@@ -152,6 +157,7 @@ export class ConfigService {
 
   /** Set a config key (dot-separated) and persist to disk. */
   set(key: string, value: unknown): void {
+    log.debug("config-set", { key, value });
     const keys = key.split(".");
     let obj: Record<string, unknown> = this._config as unknown as Record<string, unknown>;
     for (let i = 0; i < keys.length - 1; i++) {
@@ -206,7 +212,7 @@ export class ConfigService {
       fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), "utf-8");
       fs.renameSync(tmpPath, this._configPath);
     } catch (err) {
-      log.error("write error:", err);
+      log.warn("write error:", err);
     }
   }
 
@@ -228,7 +234,7 @@ export class ConfigService {
         }
       });
     } catch (err) {
-      log.error("watch error:", err);
+      log.warn("watch error:", err);
     }
   }
 
@@ -237,7 +243,7 @@ export class ConfigService {
       try {
         fn(this._config);
       } catch (err) {
-        log.error("listener error:", err);
+        log.warn("listener error:", err);
       }
     }
   }

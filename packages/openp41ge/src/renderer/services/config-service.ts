@@ -70,7 +70,7 @@ export class ConfigService {
       this._loaded = true;
       log.info("config loaded");
     } catch (err) {
-      log.error("failed to load config:", err);
+      log.warn("failed to load config:", err);
       this._loaded = false;
     }
   }
@@ -129,7 +129,7 @@ export class ConfigService {
         }),
       );
     } catch (err) {
-      log.error(`failed to set config key "${key}":`, err);
+      log.warn(`failed to set config key "${key}":`, err);
     }
   }
 
@@ -174,7 +174,7 @@ export class ConfigService {
       try {
         fn(this._config);
       } catch (err) {
-        log.error("change listener error:", err);
+        log.warn("change listener error:", err);
       }
     }
   }
@@ -186,7 +186,7 @@ export class ConfigService {
         try {
           fn(value);
         } catch (err) {
-          log.error("key change listener error:", err);
+          log.warn("key change listener error:", err);
         }
       }
     }

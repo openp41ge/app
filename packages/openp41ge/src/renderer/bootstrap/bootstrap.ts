@@ -61,7 +61,7 @@ export class RendererBootstrap {
         log.info("PRELOAD BRIDGE window.openp41ge is available");
       }
     } catch (e) {
-      log.error("PRELOAD BRIDGE check error:", e);
+      log.warn("PRELOAD BRIDGE check error:", e);
     }
 
     // ── Phase 1: Fire all IPC calls immediately (no await) ────────
@@ -70,7 +70,9 @@ export class RendererBootstrap {
       this.context.initialStatePromise =
         window.openp41ge?.workspace?.getState() ?? Promise.resolve(null);
     } catch (e) {
-      log.error("Failed to get initial state:", e);
+      // Non-fatal: we fall back to an empty state and keep booting. warn (not
+      // error) so it doesn't trip the blocking error overlay.
+      log.warn("Failed to get initial state:", e);
       this.context.initialStatePromise = Promise.resolve("") as Promise<string>;
     }
     this.context.configService.load(); // idempotent — starts loading once

@@ -8,8 +8,11 @@
 import { app, BrowserWindow, dialog, screen } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createLogger } from "openp41ge-logger";
 import type { TabNameGenerator } from "../src/main/index.js";
 import type { OperationDispatcher } from "../src/main/index.js";
+
+const log = createLogger("openp41ge", "window-manager");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -203,10 +206,18 @@ export function createOpenp41geWindow(
   openp41geWindows.set(openp41geWinId, win);
   openp41geWindowMeta.set(openp41geWinId, windowMeta);
 
+  log.info("window-create", {
+    windowId: openp41geWinId,
+    type: windowMeta.windowType,
+    workspacePath: windowMeta.workspacePath,
+    isDev,
+  });
+
   // Tell any open Window Manager to refresh its "open windows" column.
   notifyOpenWindowsChanged();
 
   win.webContents.on("did-finish-load", () => {
+    log.info("window-loaded", { windowId: openp41geWinId, type: windowMeta.windowType });
     if (_dispatcher) {
       win.webContents.send("openp41ge:init", {
         windowId: openp41geWinId,
@@ -218,8 +229,16 @@ export function createOpenp41geWindow(
     }
   });
 
+  win.webContents.on("did-fail-load", (_e, code, desc) => {
+    log.warn("window-load-failed", { windowId: openp41geWinId, code, desc });
+  });
+
   win.on("closed", () => {
     const meta = openp41geWindowMeta.get(openp41geWinId);
+    log.info("window-close", {
+      windowId: openp41geWinId,
+      type: meta?.windowType ?? "unknown",
+    });
     openp41geWindows.delete(openp41geWinId);
     openp41geWindowMeta.delete(openp41geWinId);
     // Tell any open Window Manager to drop the closed window immediately.

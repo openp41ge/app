@@ -93,6 +93,40 @@ export class EventRouter {
 
     const totalDuration = performance.now() - startTime;
 
+    // Mirror the dispatch into the global log bus (DEBUG routing detail; the
+    // full record lives in the event-log-buffer). Structured payloads so it is
+    // queryable in the Logs sidebar / on-disk file. When no edge matched, the
+    // candidate edges are logged so "click does nothing" is traceable.
+    if (matchedEdge) {
+      log.debug("route", {
+        eventType,
+        edgeId: matchedEdge.id,
+        from: matchedEdge.from,
+        when: matchedEdge.when ?? null,
+        to: matchedEdge.to,
+        handlerCount: matchedEdge.to.length,
+        totalDurationMs: Math.round(totalDuration * 100) / 100,
+      });
+    } else {
+      log.debug("route-no-match", {
+        eventType,
+        candidateEdges: edges.map((e) => ({ id: e.id, from: e.from, when: e.when ?? null })),
+      });
+    }
+    for (const r of handlerResults) {
+      if (r.error) {
+        // A handler throwing is recoverable (it is caught and recorded), so
+        // WARN not ERROR — the renderer ERROR path pops the blocking overlay.
+        log.warn("handler-error", {
+          eventType,
+          handlerId: r.handlerId,
+          error: r.error,
+          durationMs: Math.round(r.duration * 100) / 100,
+          edgeId: matchedEdge?.id ?? null,
+        });
+      }
+    }
+
     // Notify AppState observers after batch update
     this._state.notify();
 

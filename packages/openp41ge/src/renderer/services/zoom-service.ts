@@ -24,7 +24,7 @@ export class ZoomService implements IZoomService {
       try {
         fn(this._zoom);
       } catch (err) {
-        log.error("listener error:", err);
+        log.warn("listener error:", err);
       }
     }
   }

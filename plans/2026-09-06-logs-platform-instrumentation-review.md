@@ -112,18 +112,32 @@ renderer issues; reserve `log.error` deliberately.
 
 ## Completion Criteria
 
-- [ ] Grid log tab reads via `LogFilePageReader` (file-backed, main + renderer + history); stale
-      comment removed.
-- [ ] P0 seams (`event-router`, `workspace-state-manager`, `dom-bridge`) emit structured logs.
-- [ ] P1 drag + handlers + TabController lifecycle instrumented.
+- [x] Grid log tab reads via `LogFilePageReader` (file-backed, main + renderer + history); stale
+      comment removed. — `log-viewer-controller.ts` already uses `new LogFilePageReader()`.
+- [x] P0 seams (`event-router`, `workspace-state-manager`, `dom-bridge`) emit structured logs.
+- [x] P1 drag + handlers + TabController lifecycle instrumented.
 - [x] Dead `debug-log-panel` removed; `isDebugSeed` relocated to `services/log-debug.ts` — done in
       `2026-09-06-settings-grid-tabs.md` (Decision 4), which also sends the Debug toggle decision.
-- [ ] Renderer ERROR usage audited to avoid spurious blocking error-overlay triggers.
-- [ ] Quality skill passes; tests updated.
+- [x] Renderer ERROR usage audited to avoid spurious blocking error-overlay triggers.
+- [x] Quality skill passes; tests updated.
 
 ## Status
 
 - **Log row wrap fix (2026-09-06)** — implemented in `openp41ge-logger/src/openp41ge-log-viewer.ts`
   (`.log-entry` flex → block; meta tags `inline-block`; message `inline` + `pre-wrap`), captured as
-  item 9 in `2026-09-06-settings-grid-tabs.md`. This plan's remaining P0/P1/P2 logging additions and
-  the `LogFilePageReader` rewire are **recommendations only** — not yet implemented.
+  item 9 in `2026-09-06-settings-grid-tabs.md`.
+- **P0/P1/P2 logging additions (2026-09-06)** — implemented:
+  - P0: `event-router.ts` (route / route-no-match / handler-error), `workspace-state-manager.ts`
+    (`workspace-state`), `dom-bridge.ts` (`dom-event`).
+  - P1: `init-drag-system.ts` `drag-start` (INFO) + `cross-window-drop-*` (WARN); `handlers/*.ts`
+    (`trace` wrapper logging handler id + payload); TabController lifecycle logged centrally in
+    `tab-mount-manager.ts` (controller-mount / restore / unmount / visible).
+  - P2: `error-capture-service.ts` (`log.error` on uncaught errors / rejections, with a
+    `_suppressConsoleCapture` guard so they aren't double-added to the overlay);
+    `config-service.ts` (main: config-loaded / initialized + `config:get`/`config:set` DEBUG; renderer
+    - main recoverable errors downgraded to `log.warn`); `window-manager.ts` (window-create / loaded /
+      load-failed / close).
+- **Renderer ERROR audit (2026-09-06)** — recoverable renderer `log.error` calls switched to
+  `log.warn` (renderer `config-service`, `workspace-state-manager` listener, `zoom-service` listener,
+  `file-editor-controller` mount, `bootstrap` preload-bridge + initial-state). Fatal structural
+  failures (root not found, element type mismatch, bootstrap failed) keep `log.error` deliberately.

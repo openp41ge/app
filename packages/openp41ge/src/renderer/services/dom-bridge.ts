@@ -1,4 +1,7 @@
+import { createLogger } from "openp41ge-logger";
 import type { EventRouter } from "./event-router";
+
+const log = createLogger("openp41ge", "dom-bridge");
 
 /**
  * DOM Bridge — intercepts browser-native DOM events and routes them
@@ -31,6 +34,10 @@ export class DOMBridge {
         const target = e.target as HTMLElement;
         const eventType = this._determineMousedownEvent(target, e.clientX);
         if (eventType) {
+          // DEBUG: the DOM→router observation, including the tag that was
+          // clicked. Events that match no edge are logged by the router as
+          // "route-no-match", so the pair traces the full path.
+          log.debug("dom-event", { eventType, x: e.clientX, y: e.clientY, tag: target.tagName });
           this._router.emit(eventType, { x: e.clientX, y: e.clientY, target: target.tagName });
         }
       },
@@ -39,10 +46,12 @@ export class DOMBridge {
 
     // Window focus/blur
     window.addEventListener("focus", () => {
+      log.debug("dom-event", { eventType: "window-focus" });
       this._router.emit("window-focus", {});
     });
 
     window.addEventListener("blur", () => {
+      log.debug("dom-event", { eventType: "window-blur" });
       this._router.emit("window-blur", {});
     });
   }

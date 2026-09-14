@@ -167,7 +167,10 @@ export class FileEditorController extends BaseController implements FileViewerCo
       // config (e.g. the Git sidebar's current query).
       this._applyConfiguredHighlight();
     } catch (err) {
-      log.error("Failed to mount file:", err);
+      // A file that fails to load (too large, unreadable) is recoverable — the
+      // editor shows an inline message. log.warn so it doesn't trip the
+      // blocking error overlay (console.error does) and freeze the whole app.
+      log.warn("Failed to mount file:", err);
     }
   }
 

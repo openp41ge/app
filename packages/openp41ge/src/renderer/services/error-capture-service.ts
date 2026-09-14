@@ -16,8 +16,10 @@
 
 const STORAGE_KEY = "openp41ge:captured-errors";
 
-
+import { createLogger } from "openp41ge-logger";
 import { MAX_ERRORS } from "openp41ge-constants";
+
+const log = createLogger("openp41ge", "error-capture");
 
 interface CapturedError {
   message: string;
@@ -30,6 +32,14 @@ interface CapturedError {
 let errors: CapturedError[] = [];
 let overlayEl: HTMLElement | null = null;
 let isInstalled = false;
+
+/**
+ * True while this service is emitting a `log.error` (which the console
+ * transport replays to console.error and would hence re-trigger the overlay
+ * intercept below). Guards the double-count of an uncaught error — the
+ * onerror / rejection handler adds it explicitly once.
+ */
+let _suppressConsoleCapture = false;
 
 function addError(err: CapturedError): void {
   errors = [err, ...errors].slice(0, MAX_ERRORS);
@@ -184,6 +194,20 @@ export function installErrorCapture(): void {
     // arrive through window.onerror as uncaught "exceptions" — skip them so
     // they never block the overlay, matching the console.error filter below.
     if (!isBenignRendererDiagnostic(msg)) {
+      // Land the error in the log bus + file. The console transport replays
+      // ERROR to console.error, which our own interceptor would otherwise add
+      // to the overlay AGAIN (type "console") — suppress it during the emit so
+      // a single uncaught error is only shown once.
+      _suppressConsoleCapture = true;
+      try {
+        log.error("uncaught-error", {
+          message: msg,
+          source: source || "",
+          stack: error?.stack || "",
+        });
+      } finally {
+        _suppressConsoleCapture = false;
+      }
       addError({
         message: msg,
         source: source || "",
@@ -204,6 +228,17 @@ export function installErrorCapture(): void {
   const origOnrejection = window.onunhandledrejection;
   window.onunhandledrejection = ((event: PromiseRejectionEvent) => {
     const reason = event.reason;
+    // Land the rejection in the log bus + file (suppress the replay into the
+    // overlay intercept so it isn't double-counted as a console error).
+    _suppressConsoleCapture = true;
+    try {
+      log.error("unhandled-rejection", {
+        message: reason?.message || String(reason),
+        stack: reason?.stack || "",
+      });
+    } finally {
+      _suppressConsoleCapture = false;
+    }
     addError({
       message: reason?.message || String(reason),
       source: "",
@@ -226,6 +261,12 @@ export function installErrorCapture(): void {
     const msg = args.map((a: unknown) => (typeof a === "object" ? String(a) : String(a))).join(" ");
     // Skip benign browser-internal warnings that are not real app errors
     if (isBenignRendererDiagnostic(msg)) {
+      origConsoleError.apply(console, args);
+      return;
+    }
+    // Suppress the re-entry from this service's own log.error emit so a single
+    // uncaught error isn't added to the overlay twice (see _suppressConsoleCapture).
+    if (_suppressConsoleCapture) {
       origConsoleError.apply(console, args);
       return;
     }

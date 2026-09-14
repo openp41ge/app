@@ -537,9 +537,7 @@ function onChatMouseDown(e: MouseEvent): void {
   // drag should begin.
   const row = e
     .composedPath()
-    .find(
-      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-chat-id"),
-    );
+    .find((el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-chat-id"));
   if (!row) return;
 
   // New gesture — clear any unconsumed suppression flag from a previous drag.
@@ -869,9 +867,7 @@ export function initDragSystem(): () => void {
     _suppressChatRowClick = false;
     const hasChatRow = e
       .composedPath()
-      .some(
-        (el) => el instanceof HTMLElement && el.hasAttribute("data-chat-id"),
-      );
+      .some((el) => el instanceof HTMLElement && el.hasAttribute("data-chat-id"));
     if (hasChatRow) {
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -1086,6 +1082,16 @@ export function initDragSystem(): () => void {
       if (!_dragActivated) {
         _dragActivated = true;
         _localDragActive = true;
+        log.info("drag-start", {
+          sourceType: _currentSource?.type ?? "unknown",
+          label:
+            _pendingDragStart?.label ??
+            _pendingSidebarDragStart?.label ??
+            _pendingFileDragStart?.label ??
+            _pendingGitEntryDragStart?.label ??
+            _pendingLogStreamDragStart?.label ??
+            _pendingChatDragStart?.label,
+        });
         _localFileDragActive = !!_pendingFileDragStart;
         // Drag engaged (threshold met) — suppress the trailing click-on-the-row so
         // releasing back over the explorer can't open the file as if it were a click.
@@ -1566,10 +1572,16 @@ async function _handleCrossWindowDrop(
 ): Promise<void> {
   try {
     const active = await window.openp41ge.drag.getActive();
-    if (!active) return;
+    if (!active) {
+      log.warn("cross-window-drop-ignored", { reason: "no-active-drag", x: clientX, y: clientY });
+      return;
+    }
 
     const target = openp41geTargetResolver(clientX, clientY);
-    if (!target) return;
+    if (!target) {
+      log.warn("cross-window-drop-no-target", { x: clientX, y: clientY });
+      return;
+    }
 
     const data = active.dragData;
     const sourceWinId = active.sourceWinId;
@@ -1921,8 +1933,11 @@ async function _handleCrossWindowDrop(
       window.openp41ge.drag.endSession();
       return;
     }
-  } catch {
+  } catch (err) {
     // Cross-window drop failed
+    log.warn("cross-window-drop-failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 

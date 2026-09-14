@@ -15,10 +15,13 @@
  * elements like _viewportEl are never created.
  */
 
+import { createLogger } from "openp41ge-logger";
 import { getAppTypeRegistration } from "../apps/app-registry";
 import type { TabController } from "../controllers/types";
 import type { Workspace, Tab } from "../../layout/types";
 import type { TabGrid } from "../openp41ge-tabs-adapter";
+
+const log = createLogger("openp41ge", "tab-mount-manager");
 
 interface MountEntry {
   controller: TabController;
@@ -57,8 +60,7 @@ export class TabMountManager {
       const tabContents = document.querySelectorAll("tab-content");
       await Promise.all(
         Array.from(tabContents).map(
-          (tc) =>
-            (tc as unknown as { updateComplete: Promise<void> }).updateComplete,
+          (tc) => (tc as unknown as { updateComplete: Promise<void> }).updateComplete,
         ),
       );
     }
@@ -71,7 +73,8 @@ export class TabMountManager {
 
       for (const tabId of placement.tabIds) {
         allCurrentTabIds.add(tabId);
-        const tab = workspace.editorTabs[tabId as keyof typeof workspace.editorTabs] as Tab | undefined;
+        const tab = workspace.editorTabs[tabId as keyof typeof workspace.editorTabs] as
+          Tab | undefined;
         if (!tab) continue;
 
         const entry = this._getOrCreateEntry(tab, workspace, grid, tabId);
@@ -130,6 +133,7 @@ export class TabMountManager {
     }
 
     entry.container.style.display = "";
+    log.debug("controller-visible", { tabId, appType: entry.controller.appType });
     entry.controller.setVisible(true);
   }
 
@@ -138,6 +142,11 @@ export class TabMountManager {
    */
   destroy(): void {
     for (const [, entry] of this._mounts) {
+      log.debug("controller-unmount", {
+        tabId: entry.controller.tabId,
+        appType: entry.controller.appType,
+        reason: "destroy",
+      });
       entry.controller.unmount();
       entry.container.remove();
     }
@@ -194,6 +203,7 @@ export class TabMountManager {
     // Restore saved state if available
     if (tab.config && typeof tab.config === "object") {
       const config = tab.config as Record<string, unknown>;
+      log.debug("controller-restore", { tabId: tab.id, appType: tab.appType });
       controller.restore({ ...config });
     }
 
@@ -225,6 +235,7 @@ export class TabMountManager {
 
     // NOW mount the controller — Lit lifecycle will fire for any elements
     // created inside mount() since the container is in the DOM.
+    log.debug("controller-mount", { tabId: tab.id, appType: tab.appType });
     controller.mount(container);
 
     const entry: MountEntry = { controller, container };
@@ -235,6 +246,11 @@ export class TabMountManager {
   private _removeOrphans(currentTabIds: Set<string>): void {
     for (const [tabId, entry] of this._mounts) {
       if (!currentTabIds.has(tabId)) {
+        log.debug("controller-unmount", {
+          tabId,
+          appType: entry.controller.appType,
+          reason: "orphan",
+        });
         entry.controller.unmount();
         entry.container.remove();
         this._mounts.delete(tabId);

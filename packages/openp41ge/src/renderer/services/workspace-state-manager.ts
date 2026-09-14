@@ -21,6 +21,19 @@ export class WorkspaceStateManager implements IWorkspaceStateManager {
   private readonly _listeners = new Set<(ws: Workspace) => void>();
 
   setState(ws: Workspace): void {
+    // DEBUG mutation summary: window/tab/grid shape, so workspace operations
+    // (open/close/split/move) land in the log bus even though this manager is
+    // only handed the resulting state (the operation itself lives upstream).
+    log.debug("workspace-state", {
+      windows: ws.windows.map((w) => ({
+        id: w.id,
+        cols: w.grid.cols,
+        rows: w.grid.rows,
+        placements: w.grid.placements.length,
+        tabs: w.grid.placements.reduce((n, p) => n + p.tabIds.length, 0),
+      })),
+    });
+
     this._workspace = ws;
 
     // Recompute layouts
@@ -37,7 +50,7 @@ export class WorkspaceStateManager implements IWorkspaceStateManager {
       try {
         fn(ws);
       } catch (err) {
-        log.error("listener error:", err);
+        log.warn("listener error:", err);
       }
     }
   }
