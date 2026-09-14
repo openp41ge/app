@@ -104,7 +104,7 @@ export class LogsSystemTabController implements SystemTabController {
       display: "flex",
       alignItems: "center",
       gap: "6px",
-      padding: "0 8px",
+      padding: this._side === "left" ? "0 0 0 8px" : "0 8px 0 0",
       borderTop: "1px solid var(--divider,#333)",
       fontSize: "12px",
       color: "var(--text-secondary,#999)",
@@ -118,6 +118,7 @@ export class LogsSystemTabController implements SystemTabController {
       "logs-settings",
       "Logs",
       "Log settings",
+      this._side,
     );
 
     view.append(list, footer);

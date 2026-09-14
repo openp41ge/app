@@ -41,6 +41,9 @@ import { installGlobalScrollbarStyles } from "openp41ge-uikit";
 // ─── Theme CSS variables (bundled by Vite) ────────────────────────────────
 import "../styles/themes.css";
 
+// ─── Shared action-button styles (sidebar bottom-bar buttons, etc.) ──────
+import "../styles/action-buttons.css";
+
 // ─── Bootstrap imports ───────────────────────────────────────────────────
 import {
   RendererBootstrap,

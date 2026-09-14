@@ -308,7 +308,13 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab-scroll::-webkit-scrollbar {
             display: none;
           }
-          .sidebar-tab-close:hover {
+          /* Background (inactive) tabs: hover matches the activated tab's grey. */
+          .sidebar-tab .sidebar-tab-close:hover {
+            background: var(--border-divider, #2d2d2d);
+            color: #fff;
+          }
+          /* Activated tab: hover uses a brightened grey. */
+          .sidebar-tab.active .sidebar-tab-close:hover {
             background: var(--bg-hover-strong, #444);
             color: #fff;
           }
@@ -345,7 +351,7 @@ class Openp41geSidebar extends LitElement {
               ? html`
                   <div
                     class="sidebar-tab-scroll flex items-stretch overflow-x-auto"
-                    style="scrollbar-width:none;-ms-overflow-style:none;margin-right:29px;"
+                    style="scrollbar-width:none;-ms-overflow-style:none;margin-right:34px;"
                     @scroll=${this._onTabBarScroll}
                   >
                     ${this.systemTabs.map((tab, idx) => {
@@ -356,13 +362,13 @@ class Openp41geSidebar extends LitElement {
                       // tab's extent is visible on both sidebars. Border on the last
                       // tab is dropped only while overflowing (offscreen/at the fade).
                       if (!isLast || !this._hasOverflow) sideBorder += " border-r";
-                      const tabStyle = `width:120px;height:34px;font-size:13px;${
+                      const tabStyle = `width:120px;height:34px;padding-left:10px;font-size:13px;${
                         isActive
                           ? "background:var(--border-divider, #2d2d2d);color:var(--text-primary, #ccc)"
                           : "color:var(--text-secondary, #999)"
                       }`;
                       return html` <div
-                        class="sidebar-tab flex items-center gap-2.5 px-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
+                        class="sidebar-tab ${isActive ? 'active' : ''} flex items-center gap-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
                         data-sidebar-tab-id=${tab.id}
                         data-sidebar-side=${this.side}
                         data-tab-title=${tab.title}
@@ -373,7 +379,7 @@ class Openp41geSidebar extends LitElement {
                         <span class="truncate flex-1">${tab.title}</span>
                         <span
                           class="sidebar-tab-close flex items-center justify-center"
-                          style="width:20px;height:20px;border-radius:4px;font-size:13px;line-height:1"
+                          style="width:34px;height:34px;border-radius:0;font-size:13px;line-height:1"
                           @click=${(e: Event) => this._onTabClose(e, tab.id)}
                           >✕</span
                         >
@@ -389,12 +395,12 @@ class Openp41geSidebar extends LitElement {
           ></div>
           <div
             class="absolute top-0 w-4 h-full pointer-events-none"
-            style="right:29px;opacity:${this._showRightShadow ? 1 : 0};transition:opacity .12s ease;background:linear-gradient(to left, rgba(0,0,0,0.35), transparent)"
+            style="right:34px;opacity:${this._showRightShadow ? 1 : 0};transition:opacity .12s ease;background:linear-gradient(to left, rgba(0,0,0,0.35), transparent)"
           ></div>
           <!-- + button: open inline menu of registered sidebar tabs -->
           <div
             class="sidebar-tab-add absolute top-0 flex items-center justify-center cursor-pointer select-none transition-colors duration-75"
-            style="height:18px;width:18px;top:8px;right:7px;color:var(--text-secondary,#999);z-index:2;border-radius:3px;"
+            style="height:34px;width:34px;top:0;right:0;color:var(--text-secondary,#999);z-index:2;border-radius:0;"
             ${tooltipContent({ type: "simple", text: "Open sidebar tab" })}
             @click=${this._onAddTabClick}
             @mouseenter=${(e: MouseEvent) => {

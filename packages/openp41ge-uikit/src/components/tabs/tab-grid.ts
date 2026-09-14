@@ -888,14 +888,16 @@ export class TabGrid extends LitElement {
    * ~15px of layout height at the bottom, which shrinks every grid cell and
    * pushes each tab's bottom/status bar upward.  Hiding it and replacing it
    * with the shared overlay scrollbar lets the bar float OVER the bottom of
-   * the grid (over the per-tab status bars) instead of consuming space, and it
-   * auto-hides when the cursor leaves.
+   * the grid (over the per-tab status bars) instead of consuming space. It
+   * stays visible whenever the grid overflows horizontally — the bottom-bar
+   * content is nudged up (see the grid-hover-reserve rules) so it never sits
+   * underneath the bar.
    */
   /**
    * Recompute whether the grid content overflows horizontally. When it does,
-   * the floating horizontal scrollbar is shown and — on hover — the grid
-   * content moves up/shrinks slightly to reserve space for it (so it no
-   * longer covers the per-tab bottom bars).
+   * the floating horizontal scrollbar is shown and the grid content moves up
+   * slightly to reserve space for it (so it no longer covers the per-tab
+   * bottom bars).
    */
   private _updateGridHScrollState(): void {
     const target = this.querySelector<HTMLElement>(".grid-container");
@@ -943,8 +945,11 @@ export class TabGrid extends LitElement {
       // rather than inside the scrolling content where it would move sideways.
       container: this,
       inset: { left: "0", right: "0", bottom: "0" },
-      autoHide: true,
-      autoHideDelay: 600,
+      // Keep the bar visible whenever the grid overflows horizontally. The
+      // bottom-bar content is already nudged up (see the grid-hover-reserve
+      // rules), so the bar never covers it and there is no reason to fade it
+      // out after the cursor leaves — it stays put the whole time.
+      autoHide: false,
       size: 9,
       hoverSize: 10,
       zIndex: 1001,
@@ -1009,6 +1014,24 @@ export class TabGrid extends LitElement {
           box-sizing: border-box;
           transition: padding-bottom 0.18s ease;
           padding-bottom: 10px !important;
+        }
+        /* Keep bottom-bar action buttons (icon / text) FULL height when the
+           bar reserves space for the floating scrollbar. The bar's bottom
+           padding would otherwise shrink any height:100% button (because
+           border-box padding eats into the content box), so we pin the button
+           to the bar's full 34px and top-align it — it stays exactly where it
+           was — while its own bottom padding shifts the icon/text up so it
+           clears the scrollbar. Only the icon moves up, never the button. */
+        .grid-container.grid-hover-reserve fe-status-bar .sbb-row .p41ge-icon-btn,
+        .grid-container.grid-hover-reserve [data-bottom-bar] .p41ge-icon-btn,
+        .grid-container.grid-hover-reserve [data-bottom-bar] .level-btn,
+        .grid-container.grid-hover-reserve .bottom-bar .p41ge-icon-btn,
+        .grid-container.grid-hover-reserve .bottom-bar .level-btn {
+          min-height: 34px;
+          align-self: flex-start;
+          transition: padding-bottom 0.18s ease;
+          padding-bottom: 10px !important;
+          box-sizing: border-box;
         }
       </style>
       <div class="grid-container" style=${gridStyle} >

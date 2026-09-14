@@ -281,15 +281,16 @@ export class TabBar extends LitElement {
              italicize their title). Always render it upright. */
           font-style: normal;
           /* Neutralize the inherited 34px line-height (from the tab) that
-             pushes the glyph low in its 16px button; a tight line box lets
-             flex center the ✕ in the box. */
+             pushes the glyph low; a tight line box lets flex center the ✕. */
           line-height: 1;
           color: #666;
           cursor: pointer;
-          width: 20px;
-          height: 20px;
+          /* Full-height, square close button: spans the tab's 34px height and
+             is as wide as it is tall. */
+          width: 34px;
+          height: 34px;
           flex-shrink: 0;
-          border-radius: 4px;
+          border-radius: 0;
           transition:
             background 0.15s,
             color 0.15s;
@@ -301,7 +302,13 @@ export class TabBar extends LitElement {
              lift just the glyph (the button itself stays put). */
           transform: translateY(-1px);
         }
-        .tab-close:hover {
+        /* Background (inactive) tabs: hover matches the activated tab's grey. */
+        .tab-btn .tab-close:hover {
+          background: var(--border-divider, #2d2d2d);
+          color: #fff;
+        }
+        /* Activated tab: hover uses a brightened grey. */
+        .tab-btn.active .tab-close:hover {
           background: var(--bg-hover-strong, #444);
           color: #fff;
         }
@@ -383,7 +390,7 @@ export class TabBar extends LitElement {
                 : tab?.ephemeralPinned ?? false;
             const hasIcon = !!tab?.icon;
             const tabStyle = [
-              `display:inline-flex;align-items:center;flex-shrink:0;min-width:${hasIcon ? 'calc(var(--tab-min-width,120px) + 24px)' : 'var(--tab-min-width,120px)'};max-width:75%;height:34px;padding:0 8px;border-right:1px solid #333;cursor:pointer;font-size:12px;line-height:34px;user-select:none;white-space:nowrap;`,
+              `display:inline-flex;align-items:center;flex-shrink:0;min-width:${hasIcon ? 'calc(var(--tab-min-width,120px) + 24px)' : 'var(--tab-min-width,120px)'};max-width:75%;height:34px;padding:0 0 0 8px;border-right:1px solid #333;cursor:pointer;font-size:12px;line-height:34px;user-select:none;white-space:nowrap;`,
               `font-style:${!isEphemeral && !tab?.pinned ? 'italic' : 'normal'};`,
               isActive && this.focused && isEphemeral
                 ? isEphemeralPinned
@@ -394,7 +401,7 @@ export class TabBar extends LitElement {
             return html`
               <div
                 role="tab"
-                class="tab-btn"
+                class="tab-btn ${isActive ? 'active' : ''}"
                 data-tab-id=${id}
                 style=${tabStyle}
                 @mouseenter=${(e: MouseEvent) => this._startTextScroll(e.currentTarget as HTMLElement)}

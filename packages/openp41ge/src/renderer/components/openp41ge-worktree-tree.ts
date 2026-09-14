@@ -164,6 +164,8 @@ class Openp41geWorktreeTree extends LitElement {
   private _overlayScrollbar: OverlayScrollbar | null = null;
   private _scrollResizeObserver: ResizeObserver | null = null;
   private _scrollResizeObserved = false;
+  private _sbObserver: MutationObserver | null = null;
+  private _sbObserved = false;
   /** Explorer row currently selected by click or keyboard (VS Code-style). */
   private _focusedRowEl: HTMLElement | null = null;
 
@@ -308,7 +310,7 @@ class Openp41geWorktreeTree extends LitElement {
     const s = document.createElement("style");
     s.id = "wt-scrollbar-style";
     s.textContent = `
-      openp41ge-worktree-tree { outline: none; box-shadow: -6px 0 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 100%; }
+      openp41ge-worktree-tree { outline: none; box-shadow: -6px 0 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 100%; --wt-sb-offset: 0px; }
       .wt-tree-scroll { outline: none; }
       .wt-tree-scroll * { outline: none; }
       /* Use the shared native scrollbar (styled globally by
@@ -338,6 +340,11 @@ class Openp41geWorktreeTree extends LitElement {
       .wt-tree-scroll.full .wt-tree-scroll-content > :last-child { border-bottom: 0; }
       #wt-addrepo-row:focus-within,
       #wt-addwt-row:focus-within { outline: 2px solid #4a9eff; outline-offset: -2px; }
+      /* Reserve the overlay-scrollbar width only while the scrollbar is visible
+         so the confirm/cancel buttons stay clear of it. --wt-sb-offset is 0px
+         when hidden and the track width when visible (set by the tree). */
+      #wt-addrepo-row,
+      #wt-addwt-row { padding-right: var(--wt-sb-offset, 0px); }
       /* The add-repo/add-worktree inputs must never paint their own focus ring —
          only the row's :focus-within outline is allowed. */
       #wt-addrepo-input:focus, #wt-addrepo-input:focus-visible,
@@ -358,50 +365,9 @@ class Openp41geWorktreeTree extends LitElement {
       }
       .explorer-result-file:hover { background: rgba(255,255,255,0.06); }
       .explorer-result-match:hover { background: rgba(255,255,255,0.04); }
-      /* Tool buttons in the bottom bar. Only one tool is active at a time;
-         grey when off, white when on or hovered — no button background. */
-      .wt-tool-btn {
-        width: 18px;
-        height: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        border: none;
-        background: transparent;
-        color: var(--text-secondary, #999);
-        cursor: pointer;
-      }
-      .wt-tool-btn:hover {
-        color: var(--text-primary, #fff);
-      }
-      .wt-tool-btn.wt-tool-active {
-        color: var(--text-primary, #fff);
-      }
-      /* Settings gear button in the bottom bar — grey off, white on hover or
-         while its settings grid tab is open. */
-      .wt-settings-btn {
-        width: 18px;
-        height: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        border: none;
-        border-radius: 3px;
-        background: transparent;
-        color: var(--text-secondary, #999);
-        cursor: pointer;
-      }
-      .wt-settings-btn:hover {
-        color: var(--text-primary, #ccc);
-      }
-      .wt-settings-btn.wt-settings-active {
-        color: var(--text-primary, #ccc);
-      }
-      .wt-settings-btn.wt-settings-active:hover {
-        color: var(--text-primary, #ccc);
-      }
+      /* Tool + settings buttons in the bottom bar. Their full-height, square
+         sizing, hover background and adjacent separators come from the shared
+         .p41ge-icon-btn class (styles/action-buttons.css). */
     `;
     document.head.appendChild(s);
   }
@@ -566,6 +532,11 @@ class Openp41geWorktreeTree extends LitElement {
       this._scrollResizeObserver = null;
       this._scrollResizeObserved = false;
     }
+    if (this._sbObserver) {
+      this._sbObserver.disconnect();
+      this._sbObserver = null;
+      this._sbObserved = false;
+    }
 
     document.removeEventListener("project:changed", this._onProjectChanged);
     this.removeEventListener("explorer-reorder-repos", this._onExplorerReorder);
@@ -591,10 +562,10 @@ class Openp41geWorktreeTree extends LitElement {
       data-tip="Explorer Settings"
       aria-label="Explorer Settings"
       aria-pressed=${active}
-      class="wt-settings-btn${active ? " wt-settings-active" : ""}"
+      class="p41ge-icon-btn wt-settings-btn${active ? " wt-settings-active" : ""}"
       @click=${this._onSettingsClick}
     >
-      ${unsafeHTML(settingsIcon(14))}
+      ${unsafeHTML(settingsIcon(18))}
     </button>`;
   }
 
@@ -938,7 +909,7 @@ class Openp41geWorktreeTree extends LitElement {
   /** Tool icons shown in the bottom bar. Only one tool is active at a time;
    * the search tool reveals the search bar at the top of the explorer. */
   private _renderToolButtons(): TemplateResult {
-    return html` ${this._renderToolButton("search", searchIcon(14), "Search files")} `;
+    return html` ${this._renderToolButton("search", searchIcon(18), "Search files")} `;
   }
 
   private _renderToolButton(tool: "search", icon: string, title: string): TemplateResult {
@@ -950,7 +921,8 @@ class Openp41geWorktreeTree extends LitElement {
         aria-label=${title}
         aria-pressed=${active}
         data-explorer-tool=${tool}
-        class="wt-tool-btn${active ? " wt-tool-active" : ""}"
+        data-cap-side=${this._sidebarSide}
+        class="p41ge-icon-btn wt-tool-btn${active ? " wt-tool-active" : ""}"
         @click=${() => this._toggleTool(tool)}
       >
         ${unsafeHTML(icon)}
@@ -1127,7 +1099,7 @@ class Openp41geWorktreeTree extends LitElement {
                 return _showingAddRepo
                   ? html`<div
                       id="wt-addrepo-row"
-                      class="flex items-center h-[30px] pl-3 pr-2 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100"
+                      class="flex items-center h-[30px] pl-3 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100"
                     >
                       <span class="hidden">${unsafeHTML(plusIconThick(16))}</span
                       ><input
@@ -1150,52 +1122,37 @@ class Openp41geWorktreeTree extends LitElement {
                             if (_showingAddRepo) this._cancelAddRepo();
                           }, 150);
                         }}
-                      /><span
+                      /><button
+                        type="button"
                         id="wt-addrepo-confirm"
-                        class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 ml-1 text-secondary"
+                        class="p41ge-icon-btn"
+                        data-cap-side="left"
                         @click=${() => this._confirmAddRepo()}
-                        @mouseenter=${(e: MouseEvent) => {
-                          (e.currentTarget as HTMLElement).classList.add("bg-hover");
-                        }}
-                        @mouseleave=${(e: MouseEvent) => {
-                          (e.currentTarget as HTMLElement).classList.remove("bg-hover");
-                        }}
                         title="Confirm"
                         ><svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 -960 960 960"
+                          width="16"
+                          height="16"
+                          fill="currentColor"
                         >
-                          <polyline points="4,8 7,11 12,4" /></svg></span
-                      ><span
+                          <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" /></svg
+                      ></button
+                      ><button
+                        type="button"
                         id="wt-addrepo-cancel"
-                        class="w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-secondary"
+                        class="p41ge-icon-btn"
                         @click=${() => this._cancelAddRepo()}
-                        @mouseenter=${(e: MouseEvent) => {
-                          (e.currentTarget as HTMLElement).classList.add("bg-hover");
-                        }}
-                        @mouseleave=${(e: MouseEvent) => {
-                          (e.currentTarget as HTMLElement).classList.remove("bg-hover");
-                        }}
                         title="Cancel"
                         ><svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 -960 960 960"
+                          width="16"
+                          height="16"
+                          fill="currentColor"
                         >
-                          <line x1="4" y1="4" x2="12" y2="12" />
-                          <line x1="12" y1="4" x2="4" y2="12" /></svg
-                      ></span>
+                          <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" /></svg
+                      ></button>
                     </div>`
                   : html`<div
                       class="flex items-center h-[30px] pl-3 pr-2 cursor-pointer select-none text-sm text-muted border-b border-divider transition-[color,background] duration-100"
@@ -1222,7 +1179,7 @@ class Openp41geWorktreeTree extends LitElement {
         <!-- wt-tree-scroll-wrapper -->
         <div
           class="sb-bottom-bar"
-          style="border-top:1px solid var(--divider,#333);height:34px;flex-shrink:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary, #161616);"
+          style="border-top:1px solid var(--divider,#333);height:34px;flex-shrink:0;display:flex;align-items:center;padding:${this._sidebarSide === "left" ? "0 0 0 8px" : "0 8px 0 0"};font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary, #161616);"
         >
           ${
             this._sidebarSide === "left"
@@ -1374,6 +1331,8 @@ class Openp41geWorktreeTree extends LitElement {
       }
     }
 
+    this._initScrollbarOffset();
+
     // Trigger initial data load once. The _hasLoadedOnce guard prevents
     // re-entry on subsequent Lit update cycles — without it _loadRepos()
     // calls _renderTree() which calls requestUpdate(), causing an
@@ -1440,6 +1399,30 @@ class Openp41geWorktreeTree extends LitElement {
     // The native scrollbar is styled/handled globally, so no thumb syncing is
     // needed here.
     el.classList.toggle("full", el.scrollHeight >= el.clientHeight - 1);
+  }
+
+  /**
+   * Track whether the overlay scrollbar is currently visible so the button
+   * group can shift left by the scrollbar width (only while it is visible).
+   * The OverlayScrollbar draws a floating .os-track that never takes layout
+   * space, so when it appears it would otherwise cover the confirm/cancel
+   * buttons at the right edge. We mirror its visibility (the os-hidden class
+   * plus display: none when the list is not scrollable) onto --wt-sb-offset.
+   */
+  private _initScrollbarOffset(): void {
+    if (this._sbObserved) return;
+    const wrapper = this.querySelector<HTMLElement>(".wt-tree-scroll-wrapper");
+    const track = wrapper?.querySelector<HTMLElement>(".os-track--v");
+    if (!track) return;
+    this._sbObserved = true;
+    const apply = () => {
+      const visible = track.style.display !== "none" && !track.classList.contains("os-hidden");
+      const width = visible ? parseFloat(getComputedStyle(track).width) : 0;
+      this.style.setProperty("--wt-sb-offset", `${Number.isFinite(width) ? width : 0}px`);
+    };
+    apply();
+    this._sbObserver = new MutationObserver(apply);
+    this._sbObserver.observe(track, { attributes: true, attributeFilter: ["class", "style"] });
   }
 
   // ── Focus ─────────────────────────────────────────────────────────────

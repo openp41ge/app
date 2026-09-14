@@ -16,11 +16,12 @@
 import { LitElement, html, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { tooltipContent } from "../tooltip";
 
 // Compact inline glyphs for the find toggles — kept as text so they read
 // clearly at 11px (same intent as the Git sidebar's regex/match-case icons).
 const ICON_FIND =
-  '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="5" cy="5" r="3.2"></circle><path d="M8 8l2.6 2.6"></path></svg>';
+  '<svg width="16" height="16" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="5" cy="5" r="3.2"></circle><path d="M8 8l2.6 2.6"></path></svg>';
 const ICON_REGEX =
   '<svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><text x="0.5" y="11" font-size="11" font-family="Consolas,monospace" font-weight="600">.*</text></svg>';
 const ICON_CASE =
@@ -283,7 +284,7 @@ class FeStatusBar extends LitElement {
             this._emptyMessage !== null
               ? html`<span style="color:#666;font-size:11px;">${this._emptyMessage}</span>`
               : html`
-                  <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                  <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:100%;">
                     <span
                       class="sbb-size"
                       style="color:${this._isDirty ? "#e2b714" : "#777"};font-size:11px;display:flex;align-items:center;font-style:normal;"
@@ -293,11 +294,13 @@ class FeStatusBar extends LitElement {
                        the field lives in the full-width find bar above. -->
                     <button
                       type="button"
-                      class="fe-find-entry"
+                      class="p41ge-icon-btn fe-find-entry${this._findOpen ? " is-active" : ""}"
+                      data-cap-side="both"
                       data-testid="fe-find-entry"
-                      title="Find (⌘F)"
+                      aria-label="Find in file (⌘F when focused)"
+                      ${tooltipContent({ type: "simple", text: "Find in file (⌘F when focused)" })}
+                      style="-webkit-app-region:no-drag;"
                       @click=${this._onEntryClick}
-                      style="flex-shrink:0;width:16px;height:16px;display:grid;place-items:center;padding:0;cursor:pointer;background:transparent;border:1px solid transparent;border-radius:3px;color:${this._findOpen ? "#4a9eff" : "var(--fe-secondary-color,#888)"};"
                     >
                       ${unsafeHTML(ICON_FIND)}
                     </button>
@@ -311,25 +314,17 @@ class FeStatusBar extends LitElement {
                         >`
                       : ""
                   }
-                  <div style="display:flex;align-items:stretch;height:24px;">
+                  <div style="display:flex;align-items:stretch;height:100%;">
                     ${
                       this._hasFormatter
                         ? html`
                             <div
-                              class="sbb-format-btn"
-                              style="flex-shrink:0;min-width:28px;height:24px;display:grid;place-items:center;padding:0 8px;background:transparent;color:#666;cursor:pointer;opacity:0.5;border:none;box-sizing:border-box;user-select:none;-webkit-app-region:no-drag;"
-                              title="Format document"
+                              class="p41ge-icon-btn sbb-format-btn"
+                              data-cap-side="left"
+                              aria-label="Format document"
+                              ${tooltipContent({ type: "simple", text: "Format document" })}
+                              style="-webkit-app-region:no-drag;"
                               @click=${() => this._formatterHandler?.()}
-                              @mouseenter=${(e: MouseEvent) => {
-                                const el = e.currentTarget as HTMLElement;
-                                el.style.color = "#4a9eff";
-                                el.style.opacity = "1";
-                              }}
-                              @mouseleave=${(e: MouseEvent) => {
-                                const el = e.currentTarget as HTMLElement;
-                                el.style.color = "#666";
-                                el.style.opacity = "0.5";
-                              }}
                             >
                               <svg
                                 width="16"
@@ -349,21 +344,11 @@ class FeStatusBar extends LitElement {
                     ${this._buttons.map(
                       (btn) => html`
                         <div
-                          class="sbb-custom-btn"
+                          class="p41ge-icon-btn sbb-custom-btn"
                           data-btn-id=${btn.id}
-                          style="flex-shrink:0;min-width:28px;height:24px;display:${this._isVisible(btn) ? "grid" : "none"};place-items:center;padding:0 8px;background:transparent;color:#666;cursor:pointer;opacity:0.5;border:none;box-sizing:border-box;user-select:none;-webkit-app-region:no-drag;"
+                          style="-webkit-app-region:no-drag;display:${this._isVisible(btn) ? "inline-flex" : "none"};"
                           title=${btn.title ?? ""}
                           @click=${() => btn.onClick()}
-                          @mouseenter=${(e: MouseEvent) => {
-                            const el = e.currentTarget as HTMLElement;
-                            el.style.color = "#4a9eff";
-                            el.style.opacity = "1";
-                          }}
-                          @mouseleave=${(e: MouseEvent) => {
-                            const el = e.currentTarget as HTMLElement;
-                            el.style.color = "#666";
-                            el.style.opacity = "0.5";
-                          }}
                         >
                           ${unsafeHTML(btn.icon)}
                         </div>
@@ -371,9 +356,10 @@ class FeStatusBar extends LitElement {
                     )}
                     <!-- Word wrap toggle -->
                     <div
-                      class="sbb-wrap-btn"
-                      style="flex-shrink:0;min-width:28px;height:24px;display:grid;place-items:center;padding:0 8px;background:transparent;color:${this._wordWrapOn ? "#4a9eff" : "#666"};cursor:pointer;opacity:${this._wordWrapOn ? "1" : "0.5"};border:none;box-sizing:border-box;user-select:none;-webkit-app-region:no-drag;"
-                      title="Toggle word wrap"
+                      class="p41ge-icon-btn sbb-wrap-btn${this._wordWrapOn ? " is-active" : ""}"
+                      aria-label="Toggle line wrap"
+                      ${tooltipContent({ type: "simple", text: "Toggle line wrap" })}
+                      style="-webkit-app-region:no-drag;"
                       @click=${() => {
                         const newState = !this._wordWrapOn;
                         this._wordWrapOn = newState;

@@ -20,47 +20,28 @@ export function createSettingsButton(
   title: string,
   tooltip: string = "Settings",
   side?: Side,
+  capSide?: Side,
 ): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.setAttribute("aria-label", tooltip);
   btn.dataset.tip = tooltip;
-  btn.innerHTML = settingsIcon(14);
-  Object.assign(btn.style, {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "18px",
-    width: "18px",
-    padding: "0",
-    border: "none",
-    borderRadius: "3px",
-    background: "transparent",
-    color: "var(--text-secondary,#999)",
-    cursor: "pointer",
-    flexShrink: "0",
-  });
+  btn.innerHTML = settingsIcon(18);
+  btn.className = "p41ge-icon-btn";
+  // Standalone settings button with no neighbouring action icon gets a cap
+  // separator on its outer (non-grid-facing) edge.
+  if (capSide) btn.dataset.capSide = capSide;
 
-  const state = { active: false, hover: false };
-  const applyColor = () => {
-    btn.style.color = state.active || state.hover
-      ? "var(--text-primary,#ccc)"
-      : "var(--text-secondary,#999)";
+  const state = { active: false };
+  const applyState = () => {
+    btn.classList.toggle("is-active", state.active);
   };
 
-  btn.addEventListener("mouseenter", () => {
-    state.hover = true;
-    applyColor();
-  });
-  btn.addEventListener("mouseleave", () => {
-    state.hover = false;
-    applyColor();
-  });
-
-  // Keep the icon lit (white) while its own settings grid tab is open.
+  // Keep the icon lit (white) + hover background while its own settings grid
+  // tab is open. (Hover styling itself is handled by the p41ge-icon-btn class.)
   subscribeSettingsTabState(appType, (open) => {
     state.active = open;
-    applyColor();
+    applyState();
   });
 
   btn.addEventListener("click", () => {
@@ -122,7 +103,8 @@ export function appendSettingsButton(
   appType: string,
   title: string,
   tooltip: string = "Settings",
+  capSide?: Side,
 ): void {
-  const btn = createSettingsButton(openEvent, appType, title, tooltip, side);
+  const btn = createSettingsButton(openEvent, appType, title, tooltip, side, capSide);
   layoutFooterIcons(footer, side, [btn]);
 }

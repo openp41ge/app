@@ -17,6 +17,7 @@ export type IconName =
   | "doc"
   | "chevron-right"
   | "chevron-down"
+  | "chevron-up"
   | "grid"
   | "play"
   | "terminal"
@@ -79,6 +80,8 @@ export const iconRegistry: IconRegistry = {
   "chevron-right": (size) => icon("0 0 16 16", [`<polyline points="6,4 10,8 6,12"/>`], size),
 
   "chevron-down": (size) => icon("0 0 16 16", [`<polyline points="4,6 8,10 12,6"/>`], size),
+
+  "chevron-up": (size) => icon("0 0 16 16", [`<polyline points="4,10 8,6 12,10"/>`], size),
 
   grid: (size) =>
     icon(

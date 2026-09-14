@@ -635,6 +635,102 @@ export class Openp41geRepoTreeItem extends LitElement {
     `;
   }
 
+  /**
+   * The "+ add worktree" row shown at the bottom of a repo's expanded content.
+   *
+   * Mirrors the sidebar's "+ add repository" row: a muted, hoverable row with a
+   * plus icon. Clicking it reveals the inline branch-name input (with
+   * Confirm/Cancel), replacing the row in place.
+   */
+  private _renderAddWorktreeRow(): TemplateResult {
+    if (!this._showingAddWorktree) {
+      return html`
+        <div
+          class="add-worktree-row flex items-center h-[26px] pl-7 pr-3 cursor-pointer select-none text-sm text-muted border-b border-[#232323] transition-[color,background] duration-100"
+          @click=${() => this._showAddWorktreeInline()}
+        >
+          <span class="w-[10px] flex items-center justify-center shrink-0"
+            ><span class="-translate-x-px inline-flex"
+              >${unsafeHTML(plusIconThick(11))}</span
+            ></span
+          ><span class="ml-1 text-muted flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+            >add worktree</span
+          >
+        </div>
+      `;
+    }
+    return html`
+      <div
+        id="wt-addwt-row"
+        class="flex items-center h-[26px] pl-7 text-sm border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
+      >
+        <input
+          id="wt-addwt-input"
+          type="text"
+          placeholder="enter branch name"
+          class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-sm pl-[14px] pr-1 outline-none font-inherit"
+          .value=${this._addWorktreeName}
+          @input=${(e: InputEvent) => {
+            this._addWorktreeName = (e.target as HTMLInputElement).value;
+          }}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              this._confirmAddWorktree();
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              this._cancelAddWorktree();
+            }
+          }}
+          @blur=${(_e: FocusEvent) => {
+            setTimeout(() => {
+              if (this._showingAddWorktree) {
+                this._cancelAddWorktree();
+              }
+            }, 150);
+          }}
+        />
+        <button
+          type="button"
+          class="p41ge-icon-btn"
+          data-cap-side="left"
+          title="Confirm"
+          ?disabled=${this._isDuplicateWorktreeName}
+          @click=${() => this._confirmAddWorktree()}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 -960 960 960"
+            width="16"
+            height="16"
+            fill="currentColor"
+          >
+            <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="p41ge-icon-btn"
+          title="Cancel"
+          @click=${() => this._cancelAddWorktree()}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 -960 960 960"
+            width="16"
+            height="16"
+            fill="currentColor"
+          >
+            <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" />
+          </svg>
+        </button>
+      </div>
+    `;
+  }
+
   // ─── Uikit tree integration ──────────────────────────────────────
 
   /** Build TreeNode[] for all files under a worktree branch. */
@@ -968,6 +1064,9 @@ export class Openp41geRepoTreeItem extends LitElement {
         .wt-row-header:hover {
           background-color: var(--bg-hover, #2a2d2e);
         }
+        .add-worktree-row:hover {
+          background-color: var(--bg-hover, #2a2d2e);
+        }
         .wt-row-btn svg {
           transition: color 0.1s;
         }
@@ -976,6 +1075,10 @@ export class Openp41geRepoTreeItem extends LitElement {
         }
         #wt-addwt-row.duplicate-name:focus-within {
           outline-color: #e81123 !important;
+        }
+        #wt-addwt-row .p41ge-icon-btn:disabled {
+          opacity: 0.4;
+          pointer-events: none;
         }
       </style>
       <div class="select-none">
@@ -1014,16 +1117,6 @@ export class Openp41geRepoTreeItem extends LitElement {
             >
             ${this._repoWarn()}
             ${html`
-              <!-- + button (add worktree) -->
-              <span
-                class="repo-header-btn w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-colors duration-100"
-                title="Add worktree"
-                @click=${(e: MouseEvent) => {
-                  e.stopPropagation();
-                  this._showAddWorktreeInline();
-                }}
-                >${unsafeHTML(plusIconThick(14))}</span
-              >
               <!-- Refresh button -->
               <span
                 class="repo-header-btn w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-colors duration-100"
@@ -1063,81 +1156,8 @@ export class Openp41geRepoTreeItem extends LitElement {
                       )
                     : ""
                 }
+                ${this._expanded ? this._renderAddWorktreeRow() : ""}
               `
-            : nothing
-        }
-        ${
-          this._showingAddWorktree
-            ? html` <div
-                id="wt-addwt-row"
-                class="flex items-center h-[26px] px-2 pl-7 pr-3 text-sm gap-1 border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
-              >
-                <input
-                  id="wt-addwt-input"
-                  type="text"
-                  placeholder="enter branch name"
-                  class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-sm pl-[14px] outline-none font-inherit"
-                  .value=${this._addWorktreeName}
-                  @input=${(e: InputEvent) => {
-                    this._addWorktreeName = (e.target as HTMLInputElement).value;
-                  }}
-                  @keydown=${(e: KeyboardEvent) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      this._confirmAddWorktree();
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      this._cancelAddWorktree();
-                    }
-                  }}
-                  @blur=${(_e: FocusEvent) => {
-                    setTimeout(() => {
-                      if (this._showingAddWorktree) {
-                        this._cancelAddWorktree();
-                      }
-                    }, 150);
-                  }}
-                />
-                <span
-                  class="wt-row-btn w-[22px] h-[22px] flex items-center justify-center rounded shrink-0 text-secondary transition-colors duration-100 ${this._isDuplicateWorktreeName ? "pointer-events-none opacity-40" : "cursor-pointer"}"
-                  @click=${() => this._confirmAddWorktree()}
-                  title="Confirm"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="4,8 7,11 12,4" />
-                  </svg>
-                </span>
-                <span
-                  class="wt-row-btn w-[22px] h-[22px] flex items-center justify-center cursor-pointer rounded shrink-0 text-secondary transition-colors duration-100"
-                  @click=${() => this._cancelAddWorktree()}
-                  title="Cancel"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <line x1="4" y1="4" x2="12" y2="12" />
-                    <line x1="12" y1="4" x2="4" y2="12" />
-                  </svg>
-                </span>
-              </div>`
             : nothing
         }
       </div>

@@ -9,6 +9,7 @@ class FakeFeStatusBar extends HTMLElement {
       <div style="position:relative;display:flex;flex-direction:column;flex-shrink:0;">
         <div class="sbb-row" style="position:relative;display:flex;flex-shrink:0;align-items:center;height:48px;background:#1e1e1e;border-top:1px solid #2a2a2a;padding:0 0 0 8px;gap:8px;font-size:11px;color:#888;">
           <span style="color:#777;">Foo.ts</span>
+          <div class="p41ge-icon-btn" style="height:100%;"><svg></svg></div>
         </div>
       </div>`;
   }
@@ -86,6 +87,38 @@ describe("grid hover-reserve", () => {
     grid.dispatchEvent(new Event("pointerenter"));
     expect((grid as any)._gridHasHScroll).toBe(true);
     expect(gc.classList.contains("grid-hover-reserve")).toBe(true);
+  });
+
+  it("keeps bottom-bar action buttons FULL height while the bar reserves space", async () => {
+    const grid = makeGrid();
+    await grid.updateComplete;
+    const controllers = grid.querySelectorAll(".tab-content-controller");
+    for (const c of controllers) {
+      const fe = document.createElement("fe-status-bar");
+      (c as HTMLElement).style.display = "flex";
+      c.appendChild(fe);
+    }
+    const gc = grid.querySelector(".grid-container") as HTMLElement;
+    Object.defineProperty(gc, "scrollWidth", { configurable: true, get: () => 900 });
+    Object.defineProperty(gc, "clientWidth", { configurable: true, get: () => 400 });
+
+    const btn = grid.querySelector(".sbb-row .p41ge-icon-btn") as HTMLElement;
+    // Without overflow the reserve class is absent, so the button keeps its
+    // natural height (no artificial min-height / bottom padding).
+    expect(btn).toBeTruthy();
+    expect(grid.querySelector(".grid-container")!.classList.contains("grid-hover-reserve")).toBe(false);
+    let cs = getComputedStyle(btn);
+    expect(cs.minHeight).toBe("auto");
+    expect(cs.paddingBottom).toBe("0");
+
+    // With overflow the reserve applies: the button is pinned full height and
+    // only its icon/text is nudged up (bottom padding), never shrunk.
+    (grid as any)._updateGridHScrollState();
+    grid.dispatchEvent(new Event("pointerenter"));
+    expect(gc.classList.contains("grid-hover-reserve")).toBe(true);
+    cs = getComputedStyle(btn);
+    expect(cs.minHeight).toBe("34px");
+    expect(cs.paddingBottom).toBe("10px");
   });
 
   it("does not apply the class when not overflowing", async () => {

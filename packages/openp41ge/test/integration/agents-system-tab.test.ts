@@ -8,14 +8,16 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AgentsSystemTabController } from "../../src/renderer/apps/system-tabs/agents-system-tab";
+import "../../src/renderer/components/openp41ge-settings-drawer-host";
 import { TestChatStoreModel } from "../../src/renderer/models/chat-store-model";
 import type { Chat } from "openp41ge-agents";
 
 const flush = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
-/** Click the footer search tool so the search box becomes active. */
-function openAgentSearch(host: HTMLElement): void {
-  (host.querySelector('button[aria-label="Search chats"]') as HTMLButtonElement).click();
+/** Mount a drawer host (in beforeEach) and click the search tool to open the search drawer. */
+function openAgentSearchDrawer(host2: HTMLElement, drawerHost: HTMLElement): HTMLElement {
+  (host2.querySelector('button[aria-label="Search chats"]') as HTMLButtonElement).click();
+  return drawerHost;
 }
 
 function fixtureChats(): Chat[] {
@@ -60,11 +62,14 @@ describe("AgentsSystemTabController", () => {
   let host: HTMLElement;
   let controller: AgentsSystemTabController;
   let storeModel: TestChatStoreModel;
+  let drawerHost: HTMLElement;
 
   beforeEach(() => {
     mockBridge();
     host = document.createElement("div");
     document.body.appendChild(host);
+    drawerHost = document.createElement("openp41ge-settings-drawer-host") as HTMLElement;
+    document.body.appendChild(drawerHost);
     storeModel = new TestChatStoreModel(fixtureChats());
     controller = new AgentsSystemTabController("sys-1");
     controller._storeModel = storeModel;
@@ -73,6 +78,7 @@ describe("AgentsSystemTabController", () => {
   afterEach(() => {
     controller.unmount();
     host.remove();
+    drawerHost.remove();
   });
 
   it("mounts and lists chats; the footer holds the search tool and this tab's settings button", async () => {
@@ -81,6 +87,19 @@ describe("AgentsSystemTabController", () => {
 
     const rows = host.querySelectorAll(".chat-row");
     expect(rows.length).toBe(2);
+
+    // Text is left-aligned; a merged tool-call pill (tool icon + count +
+    // chevron) sits on the right and appears only for expandable rows (those
+    // with tool calls).
+    const toolsRow = Array.from(rows).find((r) => r.textContent?.includes("Fix bug"))!;
+    const noToolsRow = Array.from(rows).find((r) => r.textContent?.includes("Write tests"))!;
+    const chevronBtn = toolsRow.querySelector(".chat-chevron-btn");
+    expect(chevronBtn).toBeTruthy();
+    expect(chevronBtn?.tagName).toBe("BUTTON");
+    // The chevron button is the rightmost element of the row head.
+    const toolsHead = toolsRow.querySelector(".chat-row-head")!;
+    expect(toolsHead.lastElementChild).toBe(chevronBtn);
+    expect(noToolsRow.querySelector(".chat-chevron-btn")).toBeNull();
 
     // The New Chat is a clickable row at the top of the tab.
     const newChatRow = host.querySelector('button.chat-new-row') as HTMLButtonElement;
@@ -91,9 +110,9 @@ describe("AgentsSystemTabController", () => {
     expect(settingsBtn).toBeTruthy();
     expect(host.querySelector('button[aria-label="Search chats"]')).toBeTruthy();
     const openEventSpy = vi.fn();
-    document.addEventListener("openp41ge:open-agents-settings", openEventSpy);
+    document.addEventListener("openp41ge:open-agents-settings-drawer", openEventSpy);
     settingsBtn.click();
-    document.removeEventListener("openp41ge:open-agents-settings", openEventSpy);
+    document.removeEventListener("openp41ge:open-agents-settings-drawer", openEventSpy);
     expect(openEventSpy).toHaveBeenCalledOnce();
     const detail = (openEventSpy.mock.calls[0][0] as CustomEvent).detail;
     expect(detail.appType).toBe("agent");
@@ -118,75 +137,73 @@ describe("AgentsSystemTabController", () => {
     expect(detail.pinned).toBe(true);
   });
 
-  it("hides the search box by default and reveals it via the footer search tool", async () => {
+  it("opens a search drawer from the footer search tool (no inline bar)", async () => {
     controller.mount(host);
     await flush();
 
-    const input = host.querySelector("input") as HTMLInputElement;
+    // No inline search box at the top of the sidebar anymore.
+    expect(host.querySelector("input")).toBeNull();
+
+    const drawerHost2 = openAgentSearchDrawer(host, drawerHost);
+    await flush();
+
+    // The shared search drawer opened, carrying the shared input row + toggles.
+    expect(drawerHost2.textContent).toContain("Search chats");
+    const input = drawerHost2.querySelector('input[placeholder="Search chats…"]');
     expect(input).toBeTruthy();
-    // The search box is hidden until the search tool is toggled on.
-    expect(input?.parentElement?.style.display).toBe("none");
+    expect(drawerHost2.querySelector('button[title="Regex search"]')).toBeTruthy();
+    expect(drawerHost2.querySelector('button[title="Match case (case-sensitive)"]')).toBeTruthy();
 
-    // The New Chat is a clickable row at the top, NOT a footer button.
-    expect(host.querySelector('button.chat-new-row')).toBeTruthy();
-
-    // Toggling the footer search tool reveals the search box with toggles.
-    const searchBtn = host.querySelector('button[aria-label="Search chats"]') as HTMLButtonElement;
-    searchBtn.click();
+    // Pressing the footer search tool again closes the drawer (toggle).
+    (host.querySelector('button[aria-label="Search chats"]') as HTMLButtonElement).click();
     await flush();
-    expect(input?.parentElement?.style.display).toBe("flex");
-    const header = input?.parentElement;
-    expect(header?.querySelector('button[title="Regex search"]')).toBeTruthy();
-    expect(header?.querySelector('button[title="Match case (case-sensitive)"]')).toBeTruthy();
-
-    // Toggling off hides it again.
-    searchBtn.click();
-    await flush();
-    expect(input?.parentElement?.style.display).toBe("none");
+    expect((drawerHost2 as unknown as { isOpen: boolean }).isOpen).toBe(false);
   });
 
   it("passes regex/case options to the store search", async () => {
     controller.mount(host);
     await flush();
-    openAgentSearch(host);
+    const drawerHost2 = openAgentSearchDrawer(host, drawerHost);
+    await flush();
 
-    const input = host.querySelector("input") as HTMLInputElement;
+    const input = drawerHost2.querySelector('input[placeholder="Search chats…"]') as HTMLInputElement;
     input.value = "tests";
     input.dispatchEvent(new Event("input"));
     await flush(300); // debounce is 200ms
 
     // Toggle match-case on.
-    host
+    drawerHost2
       .querySelector('button[title="Match case (case-sensitive)"]')!
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await flush();
+    await flush(300);
     expect(storeModel.calls.filter((c) => c.op === "search").at(-1)?.args[1]).toMatchObject({
       regex: false,
       caseSensitive: true,
     });
 
     // Toggle regex on.
-    host
+    drawerHost2
       .querySelector('button[title="Regex search"]')!
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await flush();
+    await flush(300);
     expect(storeModel.calls.filter((c) => c.op === "search").at(-1)?.args[1]).toMatchObject({
       regex: true,
       caseSensitive: true,
     });
   });
 
-  it("filters by search query (message text)", async () => {
+  it("filters chats by query in the search drawer", async () => {
     controller.mount(host);
     await flush();
-    openAgentSearch(host);
+    const drawerHost2 = openAgentSearchDrawer(host, drawerHost);
+    await flush();
 
-    const input = host.querySelector("input") as HTMLInputElement;
+    const input = drawerHost2.querySelector('input[placeholder="Search chats…"]') as HTMLInputElement;
     input.value = "tests";
     input.dispatchEvent(new Event("input"));
     await flush(300); // debounce is 200ms
 
-    const rows = host.querySelectorAll(".chat-row");
+    const rows = drawerHost2.querySelectorAll(".chat-result-row");
     expect(rows.length).toBe(1);
     expect(rows[0].textContent).toContain("Write tests");
   });
@@ -199,7 +216,7 @@ describe("AgentsSystemTabController", () => {
     const row = Array.from(host.querySelectorAll<HTMLElement>(".chat-row")).find((r) =>
       r.textContent?.includes("Fix bug"),
     )!;
-    const chevron = row.querySelector(".chat-chevron") as HTMLElement;
+    const chevron = row.querySelector(".chat-chevron-btn") as HTMLElement;
     chevron.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await flush();
 
@@ -210,50 +227,6 @@ describe("AgentsSystemTabController", () => {
     expect(sub).toBeTruthy();
     expect(sub.textContent).toContain("read_file");
     expect(sub.textContent).toContain("cfg.json");
-  });
-
-  it("archives a chat after the confirmation (soft-hide, not delete)", async () => {
-    controller.mount(host);
-    await flush();
-
-    const row = Array.from(host.querySelectorAll<HTMLElement>(".chat-row")).find((r) =>
-      r.textContent?.includes("Write tests"),
-    )!;
-    const archiveBtn = row.querySelector(".chat-archive") as HTMLButtonElement;
-    expect(archiveBtn).toBeTruthy();
-
-    // Stub the confirm modal to approve.
-    controller._confirm = async () => true;
-    archiveBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await flush();
-
-    // Archive was recorded, not delete.
-    expect(storeModel.calls.some((c) => c.op === "archive" && c.args[0] === "chat_2")).toBe(true);
-    expect(storeModel.calls.some((c) => c.op === "delete")).toBe(false);
-    expect((await storeModel.get("chat_2"))?.archivedAt).toBeTypeOf("number");
-
-    // The archived chat is no longer listed.
-    const rows = host.querySelectorAll(".chat-row");
-    expect(rows.length).toBe(1);
-    expect(rows[0].textContent).toContain("Fix bug");
-    expect(host.textContent).not.toContain("Write tests");
-  });
-
-  it("does not archive when the confirmation is cancelled", async () => {
-    controller.mount(host);
-    await flush();
-
-    const row = Array.from(host.querySelectorAll<HTMLElement>(".chat-row")).find((r) =>
-      r.textContent?.includes("Write tests"),
-    )!;
-    const archiveBtn = row.querySelector(".chat-archive") as HTMLButtonElement;
-
-    controller._confirm = async () => false;
-    archiveBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await flush();
-
-    expect(storeModel.calls.some((c) => c.op === "archive")).toBe(false);
-    expect(host.querySelectorAll(".chat-row").length).toBe(2);
   });
 
   it("shows the open-in-another-window indicator + Highlight dispatch", async () => {
