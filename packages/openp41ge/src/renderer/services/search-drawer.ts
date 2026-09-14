@@ -10,10 +10,13 @@
  * needs (options, query semantics, result rendering).
  *
  * Shared look (rendered identically for every tab):
- *   - a flush, borderless full-width query input, focus on open;
- *   - shared regex + match-case toggles (every tab gets these by default);
- *   - an optional per-tab options row (e.g. Git's depth-limit / search-into
- *     toggles) appended by the provider via `buildOptions`, so the common
+ *   - a settings-drawer-style card holding a question label with a flush,
+ *     borderless full-width query input beneath it (focus on open);
+ *   - shared regex + match-case toggles on the card's content row (every tab
+ *     gets these by default);
+ *   - an optional per-tab options slot below the query card and/or a bottom
+ *     bar at the foot of the drawer (e.g. Git's depth-limit / search-into
+ *     toggles), supplied by the provider via `buildOptions`, so the common
  *     controls read the same everywhere while each tab layers its own.
  *
  * Per-tab customization is expressed through the `SearchDrawerProvider`
@@ -32,6 +35,19 @@ export interface SearchDrawerOptions {
 }
 
 /**
+ * Containers the surface hands to a provider's `buildOptions`, so it can place
+ * controls in the right zone:
+ *  - `options`: directly below the shared query card (e.g. filter fields that
+ *    an option toggle reveals).
+ *  - `footer`: a bottom bar docked to the foot of the drawer (e.g. tool
+ *    toggles), meant to read like the sidebar bottom bar.
+ */
+export interface SearchDrawerBuildContext {
+  options: HTMLElement;
+  footer: HTMLElement;
+}
+
+/**
  * A tab's search behaviour — the per-tab part of the search drawer.
  */
 export interface SearchDrawerProvider {
@@ -41,14 +57,21 @@ export interface SearchDrawerProvider {
   readonly title: string;
   /** Query input placeholder (e.g. "Search chats…"). */
   readonly placeholder: string;
+  /** Optional question label shown at the top of the query card (e.g. "What
+   *  would you like to search for?"). Rendered like a settings-card question. */
+  readonly question?: string;
 
   /**
-   * Append this tab's own option controls into `container`. Called once on
-   * open. Return an optional cleanup function (run on close). `onOptionsChanged`
+   * Append this tab's own option controls into `boxes` (a shared `options` slot
+   * below the query card and a `footer` bottom bar). Called once on open.
+   * Return an optional cleanup function (run on close). `onOptionsChanged`
    * should be invoked whenever an option that affects the query changes, so the
    * surface re-runs the active search.
    */
-  buildOptions?(container: HTMLElement, onOptionsChanged: () => void): (() => void) | void;
+  buildOptions?(
+    boxes: SearchDrawerBuildContext,
+    onOptionsChanged: () => void,
+  ): (() => void) | void;
 
   /**
    * Run a search for `query` ("" clears) and render into the `results` element.
@@ -97,14 +120,47 @@ function buildSearchSurface(provider: SearchDrawerProvider): Openp41geSearchSurf
   let regex = false;
   let caseSensitive = false;
 
-  // ── Query row: flush input + shared regex / match-case toggles ─────────
+  // ── Card zone: settings-style cards for the query + per-tab options ─────
+  const cardZone = document.createElement("div");
+  Object.assign(cardZone.style, {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: "14px",
+    padding: "14px 14px 0",
+    boxSizing: "border-box",
+    flexShrink: "0",
+  });
+
+  // Query card: a settings-drawer-style card with an optional question label
+  // above a flush, borderless full-width query input (plus shared regex /
+  // match-case toggles) on the card's content row.
+  const searchCard = document.createElement("div");
+  Object.assign(searchCard.style, {
+    boxSizing: "border-box",
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.05)",
+  });
+  if (provider.question) {
+    const question = document.createElement("label");
+    question.textContent = provider.question;
+    Object.assign(question.style, {
+      display: "block",
+      margin: "0 0 14px",
+      fontWeight: "500",
+      fontSize: "13px",
+      color: "var(--text-primary,#e0e0e0)",
+    });
+    searchCard.appendChild(question);
+  }
+
   const inputRow = document.createElement("div");
   Object.assign(inputRow.style, {
     display: "flex",
     alignItems: "center",
-    gap: "4px",
-    padding: "8px 10px",
-    flexShrink: "0",
+    gap: "6px",
   });
 
   const input = document.createElement("input");
@@ -115,26 +171,30 @@ function buildSearchSurface(provider: SearchDrawerProvider): Openp41geSearchSurf
     flex: "1",
     minWidth: "0",
     boxSizing: "border-box",
-    height: "26px",
-    padding: "0",
-    fontSize: "12px",
+    height: "28px",
+    // No left padding: text aligns flush with the card's left content edge.
+    padding: "0 8px 0 0",
+    fontSize: "13px",
     color: "var(--text-primary,#ccc)",
     background: "transparent",
     border: "none",
     outline: "none",
+    fontFamily: "inherit",
   });
 
   const makeToggle = (icon: string, title: string): HTMLButtonElement => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.title = title;
+    btn.setAttribute("aria-pressed", "false");
     btn.innerHTML = icon;
     Object.assign(btn.style, {
+      boxSizing: "border-box",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      width: "18px",
-      height: "18px",
+      width: "26px",
+      height: "26px",
       padding: "0",
       cursor: "pointer",
       background: "transparent",
@@ -143,45 +203,88 @@ function buildSearchSurface(provider: SearchDrawerProvider): Openp41geSearchSurf
       color: "var(--text-secondary,#888)",
       flexShrink: "0",
     });
+    // Rounded hover highlight, matching the app's hoverable icon buttons. The
+    // background is never cleared while the toggle is active (aria-pressed), so
+    // an enabled regex / match-case toggle keeps its active background. Uses the
+    // lighter --bg-active (instead of --bg-hover) so the small buttons are easy
+    // to see against the card.
+    btn.addEventListener("mouseenter", () => {
+      if (btn.getAttribute("aria-pressed") !== "true") {
+        btn.style.background = "var(--bg-active,#37373d)";
+      }
+    });
+    btn.addEventListener("mouseleave", () => {
+      if (btn.getAttribute("aria-pressed") !== "true") {
+        btn.style.background = "transparent";
+      }
+    });
     return btn;
+  };
+
+  const setToggleActive = (btn: HTMLButtonElement, active: boolean): void => {
+    btn.setAttribute("aria-pressed", String(active));
+    btn.style.color = active ? "#e3e3e3" : "var(--text-secondary,#888)";
+    btn.style.background = active ? "var(--bg-active,#37373d)" : "transparent";
   };
 
   const regexToggle = makeToggle(REGEX_ICON, "Regex search");
   regexToggle.addEventListener("click", () => {
     regex = !regex;
-    regexToggle.style.color = regex ? "#e3e3e3" : "var(--text-secondary,#888)";
+    setToggleActive(regexToggle, regex);
     if (input.value.trim()) schedule();
   });
   const caseToggle = makeToggle(CASE_ON_ICON, "Match case (case-sensitive)");
   caseToggle.addEventListener("click", () => {
     caseSensitive = !caseSensitive;
-    caseToggle.style.color = caseSensitive ? "#e3e3e3" : "var(--text-secondary,#888)";
+    setToggleActive(caseToggle, caseSensitive);
     if (input.value.trim()) schedule();
   });
 
   inputRow.appendChild(input);
   inputRow.appendChild(regexToggle);
   inputRow.appendChild(caseToggle);
-  surface.appendChild(inputRow);
+  searchCard.appendChild(inputRow);
+  cardZone.appendChild(searchCard);
 
-  // ── Per-tab options row (provider-owned) ───────────────────────────────
+  // ── Per-tab option card + footer bar (provider-owned) ───────────────────
+  // The provider appends its own option card (filter fields) to `optionsRow`
+  // below the query card, and/or a bottom bar (tool toggles) to `footerRow`
+  // docked to the foot of the drawer. Each is only added to the surface if the
+  // provider actually fills it, so unused zones render no empty rows.
   let optionsCleanup: (() => void) | undefined;
   const optionsRow = document.createElement("div");
   Object.assign(optionsRow.style, {
     display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "4px",
-    padding: "0 10px 6px",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: "0",
+    padding: "0",
     flexShrink: "0",
   });
-  const cleanup = provider.buildOptions?.(optionsRow, () => {
-    if (input.value.trim()) schedule();
+  const footerRow = document.createElement("div");
+  Object.assign(footerRow.style, {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: "0",
+    padding: "0",
+    flexShrink: "0",
   });
+  const cleanup = provider.buildOptions?.(
+    { options: optionsRow, footer: footerRow },
+    () => {
+      if (input.value.trim()) schedule();
+    },
+  );
   if (typeof cleanup === "function") optionsCleanup = cleanup;
-  if (optionsRow.childElementCount > 0) surface.appendChild(optionsRow);
+  if (optionsRow.childElementCount > 0) cardZone.appendChild(optionsRow);
+  surface.appendChild(cardZone);
 
   // ── Results container ──────────────────────────────────────────────────
+  // The top border is only shown once there is something to separate (some
+  // tabs, e.g. Explorer, render results in the main panel, so the drawer's own
+  // results container stays empty and must not draw an orphaned line under the
+  // query card). A child-list observer keeps the border in sync with content.
   const results = document.createElement("div");
   Object.assign(results.style, {
     flex: "1",
@@ -190,9 +293,19 @@ function buildSearchSurface(provider: SearchDrawerProvider): Openp41geSearchSurf
     overflowX: "hidden",
     display: "flex",
     flexDirection: "column",
-    borderTop: "1px solid var(--border-divider,#2a2a2a)",
+    borderTop: "none",
   });
+  const setResultsBorder = (): void => {
+    results.style.borderTop =
+      results.childElementCount > 0 ? "1px solid var(--border-divider,#2a2a2a)" : "none";
+  };
+  const resultsObserver = new MutationObserver(setResultsBorder);
+  resultsObserver.observe(results, { childList: true });
+  setResultsBorder();
   surface.appendChild(results);
+
+  // Footer bar: provider tool toggles docked to the foot of the drawer.
+  if (footerRow.childElementCount > 0) surface.appendChild(footerRow);
 
   // ── Search execution (debounced) ───────────────────────────────────────
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -246,6 +359,7 @@ function buildSearchSurface(provider: SearchDrawerProvider): Openp41geSearchSurf
     token += 1;
     optionsCleanup?.();
     optionsCleanup = undefined;
+    resultsObserver.disconnect();
   };
   surface.addEventListener("disconnected", teardown);
 

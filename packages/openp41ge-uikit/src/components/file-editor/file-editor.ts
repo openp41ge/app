@@ -797,7 +797,7 @@ export class FileEditorElement extends LitElement {
       }
       /* Status bar theme support */
       fe-status-bar {
-        --sbb-bg: var(--fe-gutter-bg);
+        --sbb-bg: var(--bg-secondary);
         --sbb-color: ${c.default};
       }
       /* Search-match highlights (built-in find + external highlight sources) —

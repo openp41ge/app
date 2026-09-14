@@ -1,12 +1,14 @@
 /**
  * Integration tests for Explorer content-search + name filter.
  *
- * Pins the behaviour of the new Explorer search box:
- *   - the search bar renders at the top of the drawer
+ * Pins the behaviour of the new Explorer search drawer:
+ *   - the search control lives in the shared search drawer (opened from the
+ *     bottom-bar search tool), NOT an inline bar at the top of the panel
  *   - typing routes a debounced content search through the injected
  *     IExplorerSearchModel with the visible repo/worktree disk roots
- *   - results render as file rows with per-match sublist rows, and clicking a
- *     match row dispatches openp41ge:open-file with the matching line/column
+ *   - the RESULTS render in the Explorer panel (not in the drawer body): file
+ *     rows with per-match sublist rows, and clicking a match row dispatches
+ *     openp41ge:open-file with the matching line/column
  *   - the name filter is forwarded to each <openp41ge-repo-tree-item>
  */
 
@@ -15,6 +17,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 // Side-effect: registers the <openp41ge-worktree-tree> custom element.
 import "../../../src/renderer/components/openp41ge-worktree-tree";
 import "../../../src/renderer/components/openp41ge-repo-tree-item";
+import "../../../src/renderer/components/openp41ge-settings-drawer-host";
 import { workspaceFileService } from "../../../src/renderer/services/workspace-file-service";
 import type { IExplorerSearchModel } from "../../../src/renderer/models/explorer-search-model";
 import { TestExplorerSearchModel } from "../../../src/renderer/models/test-models";
@@ -25,11 +28,15 @@ type Tree = HTMLElement & {
   _worktreesByRepo: Map<string, Array<{ branch: string; path: string; exists: boolean }>>;
   _hasWorkspace: boolean;
   _searching: boolean;
+  _repoFilterActive: boolean;
+  _repoFilterTerms: string[];
   _contentIndexByPath: Map<string, unknown>;
   _matchDetailsByPath: Map<string, unknown>;
   updateComplete: Promise<unknown>;
   requestUpdate: () => Promise<unknown>;
 };
+
+type DrawerHost = HTMLElement & { updateComplete: Promise<unknown> };
 
 const RESULTS = [
   {
@@ -56,21 +63,43 @@ function indexEntry(r: (typeof RESULTS)[number]) {
 
 describe("ExplorerSystemTab search", () => {
   let host: HTMLElement;
+  let drawerHost: DrawerHost;
   let tree: Tree;
   let model: TestExplorerSearchModel;
 
-  /** Click the search tool icon so the search bar renders below the tools bar. */
+  /** Click the bottom-bar search tool so the shared search drawer opens. */
   async function openSearch(tree: Tree): Promise<void> {
     const btn = tree.querySelector<HTMLElement>("[data-explorer-tool='search']");
     expect(btn).not.toBeNull();
     btn?.click();
+    await drawerHost.updateComplete;
     await tree.updateComplete;
     await new Promise((r) => setTimeout(r, 0));
+  }
+
+  /** The search drawer's shared query input. */
+  function getInput(): HTMLInputElement {
+    const input = drawerHost.querySelector("input") as HTMLInputElement;
+    expect(input).not.toBeNull();
+    return input;
+  }
+
+  /** Type `value` into the drawer input and wait for the debounced search. */
+  async function typeInDrawer(value: string): Promise<void> {
+    const input = getInput();
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    await tree.updateComplete;
   }
 
   beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
+    drawerHost = document.createElement(
+      "openp41ge-settings-drawer-host",
+    ) as unknown as DrawerHost;
+    document.body.appendChild(drawerHost);
     workspaceFileService.openFilePath = "/w/test.openp41ge-workspace";
     model = new TestExplorerSearchModel();
 
@@ -87,114 +116,251 @@ describe("ExplorerSystemTab search", () => {
   afterEach(() => {
     tree.remove();
     host.remove();
+    drawerHost.remove();
     workspaceFileService.openFilePath = null;
   });
 
-  it("hides the search bar by default and reveals it via the search tool in the bottom bar", async () => {
-    // All tools are off by default — the search input is not rendered.
+  it("opens a search drawer from the bottom-bar search tool (no inline bar)", async () => {
+    // No inline search box in the Explorer panel.
     expect(tree.querySelector("input[placeholder='Filter repos and files…']")).toBeNull();
     const toolBtn = tree.querySelector("[data-explorer-tool='search']");
     expect(toolBtn).not.toBeNull();
     expect(toolBtn?.getAttribute("aria-pressed")).toBe("false");
 
-    // The tool button lives in the bottom bar, right-aligned after the flex
-    // spacer, with the settings gear kept left-aligned.
+    // The tool button lives in the bottom bar with the settings gear. For this
+    // (left-anchored) tree the icon group reads toward the inside edge, so the
+    // search tool renders to the LEFT of the settings gear.
     const bottomBar = tree.querySelector(".sb-bottom-bar");
     expect(bottomBar).not.toBeNull();
     expect(bottomBar?.contains(toolBtn as Node)).toBe(true);
     const settingsBtn = bottomBar?.querySelector("button[aria-label='Explorer Settings']");
     expect(settingsBtn).not.toBeNull();
-    const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
-    expect(settingsBtn?.compareDocumentPosition(toolBtn as Node) & FOLLOWING).toBe(FOLLOWING);
+    expect(
+      settingsBtn?.compareDocumentPosition(toolBtn as Node) & Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
 
-    // Clicking the search tool reveals the search bar at the top of the drawer.
+    // Clicking the search tool opens the shared drawer with the input + toggles.
     await openSearch(tree);
-    const input = tree.querySelector("input[placeholder='Filter repos and files…']");
-    expect(input).not.toBeNull();
+    expect(drawerHost.textContent).toContain("Search explorer");
+    expect(getInput().placeholder).toBe("Filter repos and files…");
+    expect(drawerHost.querySelector('button[title="Regex search"]')).toBeTruthy();
+    expect(drawerHost.querySelector('button[title="Match case (case-sensitive)"]')).toBeTruthy();
     expect(toolBtn?.getAttribute("aria-pressed")).toBe("true");
-    const drawer = tree.querySelector(".wt-drawer");
-    expect(drawer?.querySelector("input[placeholder='Filter repos and files…']")).toBe(input);
-    // The search bar sits above the tree content.
-    const wrapper = tree.querySelector(".wt-tree-scroll-wrapper");
-    expect(input?.compareDocumentPosition(wrapper as Node)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
 
-    // Clicking the active tool again toggles it off — the search bar hides.
+    // The options area adds an always-visible repo/worktree filter card: a
+    // question label with a single empty term input. No hint text in the body.
+    expect(drawerHost.textContent).toContain("What would you like to search for?");
+    expect(drawerHost.textContent).toContain("Which repos or worktrees should be included?");
+    expect(drawerHost.querySelector("[data-repo-filter-toggle]")).toBeNull();
+    expect(drawerHost.querySelectorAll("[data-repo-filter-input]").length).toBe(1);
+    expect(drawerHost.textContent).not.toContain("Type to filter");
+
+    // Clicking the active tool again closes the drawer.
     await openSearch(tree);
-    expect(tree.querySelector("input[placeholder='Filter repos and files…']")).toBeNull();
-    expect(toolBtn?.getAttribute("aria-pressed")).toBe("false");
+    expect((drawerHost as unknown as { isOpen: boolean }).isOpen).toBe(false);
   });
 
-  it("toggling off search unfilters the tree and clears live content results", async () => {
-    model.results = RESULTS;
+  it("enables a repo/worktree filter and narrows the repository list to matches", async () => {
+    model.results = [];
+    tree._repos = [
+      { path: "/repo", name: "test-repo", url: "https://github.com/x/test-repo" },
+      { path: "/repo2", name: "other-repo", url: "https://github.com/x/other-repo" },
+    ];
+    tree._worktreesByRepo = new Map([
+      ["test-repo", [{ branch: "main", path: "/repo/main", exists: true }]],
+      ["other-repo", [{ branch: "feature", path: "/repo2/feature", exists: true }]],
+    ]);
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+
+    // Filter card is always visible, so the term input is present up front and
+    // the filter starts inactive (empty terms match everything).
+    expect(drawerHost.querySelector("[data-repo-filter-toggle]")).toBeNull();
+    expect(tree._repoFilterActive).toBe(false);
+    const termInput = drawerHost.querySelector(
+      "[data-repo-filter-input]",
+    ) as HTMLInputElement;
+    expect(termInput).not.toBeNull();
+
+    // Typing a term keeps only the matching repo in the tree.
+    termInput.value = "test";
+    termInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    await tree.updateComplete;
+
+    const items = tree.querySelectorAll("openp41ge-repo-tree-item");
+    expect(items.length).toBe(1);
+    expect((items[0] as unknown as { repoName: string }).repoName).toBe("test-repo");
+  });
+
+  it("supports multiple repo filter strings via auto-added empty rows (OR match)", async () => {
+    model.results = [];
+    tree._repos = [
+      { path: "/repo", name: "test-repo", url: "https://github.com/x/test-repo" },
+      { path: "/repo2", name: "other-repo", url: "https://github.com/x/other-repo" },
+    ];
+    tree._worktreesByRepo = new Map([
+      ["test-repo", [{ branch: "main", path: "/repo/main", exists: true }]],
+      ["other-repo", [{ branch: "feature", path: "/repo2/feature", exists: true }]],
+    ]);
+    await openSearch(tree);
+
+    // One empty row to start (the always-present bottom row).
+    expect(drawerHost.querySelectorAll("[data-repo-filter-input]").length).toBe(1);
+
+    // Typing in the bottom row auto-appends a fresh empty row below it.
+    const first = drawerHost.querySelector(
+      "[data-repo-filter-input]",
+    ) as HTMLInputElement;
+    first.value = "test";
+    first.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await tree.updateComplete;
+    let inputs = drawerHost.querySelectorAll("[data-repo-filter-input]");
+    expect(inputs.length).toBe(2);
+    expect((inputs[0] as HTMLInputElement).value).toBe("test");
+
+    // Typing in the new empty row adds another row; either term keeps its repo.
+    const second = inputs[1] as HTMLInputElement;
+    second.value = "other";
+    second.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    await tree.updateComplete;
+
+    // Values preserved per row; trailing row is always empty.
+    inputs = drawerHost.querySelectorAll("[data-repo-filter-input]");
+    expect(inputs.length).toBe(3);
+    expect((inputs[0] as HTMLInputElement).value).toBe("test");
+    expect((inputs[1] as HTMLInputElement).value).toBe("other");
+    expect((inputs[2] as HTMLInputElement).value).toBe("");
+
+    expect(tree.querySelectorAll("openp41ge-repo-tree-item").length).toBe(2);
+  });
+
+  it("presses Return to jump focus to the trailing empty filter row", async () => {
+    model.results = [];
+    tree._repos = [
+      { path: "/repo", name: "test-repo", url: "https://github.com/x/test-repo" },
+    ];
+    tree._worktreesByRepo = new Map([
+      ["test-repo", [{ branch: "main", path: "/repo/main", exists: true }]],
+    ]);
+    await openSearch(tree);
+
+    // Type a term → a fresh empty row appears below it.
+    const first = drawerHost.querySelector(
+      "[data-repo-filter-input]",
+    ) as HTMLInputElement;
+    first.value = "test";
+    first.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await tree.updateComplete;
+    const inputs = drawerHost.querySelectorAll("[data-repo-filter-input]");
+    expect(inputs.length).toBe(2);
+
+    // Return in the filled row moves focus to the empty row below.
+    (inputs[0] as HTMLInputElement).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    await tree.updateComplete;
+    expect(document.activeElement).toBe(inputs[1]);
+
+    // Return in the trailing empty row (no row below) keeps focus there.
+    (inputs[1] as HTMLInputElement).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    await tree.updateComplete;
+    expect(document.activeElement).toBe(inputs[1]);
+  });
+
+  it("narrows content-search roots to the repo-filtered repos and worktrees", async () => {
+    model.results = [];
+    tree._repos = [
+      { path: "/repo", name: "test-repo", url: "https://github.com/x/test-repo" },
+      { path: "/repo2", name: "other-repo", url: "https://github.com/x/other-repo" },
+    ];
+    tree._worktreesByRepo = new Map([
+      ["test-repo", [{ branch: "main", path: "/repo/main", exists: true }]],
+      ["other-repo", [{ branch: "feature", path: "/repo2/feature", exists: true }]],
+    ]);
+    await openSearch(tree);
+    await typeInDrawer("alpha");
+
+    // Repo filter off → every repo/worktree is searched.
+    expect(model.calls.at(-1)?.query).toBe("alpha");
+    expect(model.calls.at(-1)?.rootPaths).toEqual([
+      "/repo",
+      "/repo/main",
+      "/repo2",
+      "/repo2/feature",
+    ]);
+
+    // Enter a repo term in the always-visible filter — the search re-runs over
+    // only the matching repo/worktree roots.
+    const termInput = drawerHost.querySelector(
+      "[data-repo-filter-input]",
+    ) as HTMLInputElement;
+    termInput.value = "test";
+    termInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     await new Promise((r) => setTimeout(r, 300));
     await tree.updateComplete;
 
-    // Content matches are present while the search tool is active.
+    expect(model.calls.at(-1)?.query).toBe("alpha");
+    expect(model.calls.at(-1)?.rootPaths).toEqual(["/repo", "/repo/main"]);
+  });
+
+  it("closing search unfilters the tree and clears live content results", async () => {
+    model.results = RESULTS;
+    await openSearch(tree);
+    await typeInDrawer("alpha");
+
+    // Content matches are present while the search drawer is open.
     expect(tree._contentIndexByPath.size).toBe(2);
     const item = tree.querySelector("openp41ge-repo-tree-item") as unknown as { filter: string };
     expect(item.filter).toBe("alpha");
 
-    // Click the active tool icon to toggle it off.
+    // Close the drawer (toggle the tool icon). Toggling off unfilters the tree.
     const toolBtn = tree.querySelector<HTMLElement>("[data-explorer-tool='search']");
     toolBtn?.click();
     await tree.updateComplete;
     await new Promise((r) => setTimeout(r, 0));
 
-    // The search bar hides, the tree unfilters, and live results are dropped.
-    expect(tree.querySelector("input")).toBeNull();
+    // The tree unfilters and live results are dropped.
+    expect((drawerHost as unknown as { isOpen: boolean }).isOpen).toBe(false);
     expect(tree._contentIndexByPath.size).toBe(0);
     expect(tree._searching).toBe(false);
     const itemAfter = tree.querySelector("openp41ge-repo-tree-item") as unknown as {
       filter: string;
     };
     expect(itemAfter.filter).toBe("");
+
+    // The drawer's input is torn down once the closing layer is removed.
+    await new Promise((r) => setTimeout(r, 250));
+    expect(drawerHost.querySelector("input")).toBeNull();
   });
 
-  it("toggling search back on restores the query and re-runs the content search", async () => {
+  it("reopening the drawer starts a fresh search (previous query is not restored)", async () => {
     model.results = RESULTS;
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
-    await tree.updateComplete;
+    await typeInDrawer("alpha");
     expect(model.calls.length).toBe(1);
 
+    // Close (toggles the search off and unfilters), then reopen — the query is
+    // NOT preserved; a fresh empty surface is built.
     const toolBtn = tree.querySelector<HTMLElement>("[data-explorer-tool='search']");
     toolBtn?.click();
     await tree.updateComplete;
     await new Promise((r) => setTimeout(r, 0));
+    expect(tree._contentIndexByPath.size).toBe(0);
+
+    await openSearch(tree);
+    // The fresh surface's initial empty run never issues a model search.
     expect(model.calls.length).toBe(1);
-
-    toolBtn?.click();
-    await tree.updateComplete;
-    await new Promise((r) => setTimeout(r, 300));
-
-    // The query text is preserved in the input and the search re-runs.
-    const inputAfter = tree.querySelector("input") as HTMLInputElement;
-    expect(inputAfter.value).toBe("alpha");
-    expect(model.calls.length).toBe(2);
-    expect(model.calls[1].query).toBe("alpha");
-    await tree.updateComplete;
-    await new Promise((r) => setTimeout(r, 20));
-    expect(tree._contentIndexByPath.size).toBe(2);
+    expect(getInput().value).toBe("");
+    expect(tree._contentIndexByPath.size).toBe(0);
   });
 
   it("routes a debounced content search over the visible repo/worktree roots", async () => {
     model.results = RESULTS;
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-
-    // Debounced by 200ms; allow time to fire.
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("alpha");
 
     expect(model.calls.length).toBe(1);
     expect(model.calls[0].query).toBe("alpha");
@@ -233,11 +399,7 @@ describe("ExplorerSystemTab search", () => {
 
     model.results = RESULTS;
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
-    await tree.updateComplete;
+    await typeInDrawer("alpha");
     // Let the repo-tree-item load the worktree + reveal the src dir.
     await new Promise((r) => setTimeout(r, 80));
     await tree.updateComplete;
@@ -327,12 +489,8 @@ describe("ExplorerSystemTab search", () => {
   it("forwards the name filter to each matching repo-tree-item", async () => {
     model.results = [];
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
     // "test" matches the repo name, so the repo item keeps rendering.
-    input.value = "test";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
-    await tree.updateComplete;
+    await typeInDrawer("test");
 
     const item = tree.querySelector("openp41ge-repo-tree-item") as unknown as {
       filter: string;
@@ -344,21 +502,22 @@ describe("ExplorerSystemTab search", () => {
     expect(item.filterRegex).toBe(false);
     expect(item.filterCase).toBe(false);
 
-    // Toggle the case option and re-type — the item carries it through.
-    const caseBtn = tree.querySelector("[data-filter-case]") as HTMLElement;
-    caseBtn.click();
+    // Toggle the case option in the drawer and re-type — the item carries it.
+    const caseBtn = drawerHost.querySelector<HTMLElement>('button[title="Match case (case-sensitive)"]');
+    expect(caseBtn).not.toBeNull();
+    caseBtn?.click();
+    await new Promise((r) => setTimeout(r, 300)); // debounce re-runs the search
     await tree.updateComplete;
-    expect((item as unknown as { filterCase: boolean }).filterCase).toBe(true);
+    const itemAfter = tree.querySelector("openp41ge-repo-tree-item") as unknown as {
+      filterCase: boolean;
+    };
+    expect(itemAfter.filterCase).toBe(true);
   });
 
   it("hides repo rows that match neither the repo nor any worktree name", async () => {
     model.results = [];
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "nomatch";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
-    await tree.updateComplete;
+    await typeInDrawer("nomatch");
 
     expect(tree.querySelector("openp41ge-repo-tree-item")).toBeNull();
     expect(tree.textContent).toContain("No matches");
@@ -368,19 +527,14 @@ describe("ExplorerSystemTab search", () => {
     model.deferStreaming = true;
     model.results = RESULTS;
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
 
     // Type "al"; the debounced search starts and stays pending.
-    input.value = "al";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("al");
     expect(model.calls.length).toBe(1);
     expect(tree._searching).toBe(true);
 
     // Type "alp"; the newer search must cancel the previous session.
-    input.value = "alp";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("alp");
     expect(model.calls.length).toBe(2);
     expect(model.cancelledStreaming).toContain("al");
     expect(tree._searching).toBe(true);
@@ -396,10 +550,7 @@ describe("ExplorerSystemTab search", () => {
   it("streams counts only and fetches match lines per file", async () => {
     model.results = RESULTS;
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("alpha");
 
     // The walk delivered index entries — counts, no match lines.
     expect(tree._contentIndexByPath.size).toBe(2);
@@ -425,10 +576,7 @@ describe("ExplorerSystemTab search", () => {
       matches: [{ lineNumber: 1, column: 1, startIndex: 0, endIndex: 5, lineText: "alpha" }],
     }));
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("alpha");
     await new Promise((r) => setTimeout(r, 20));
 
     // Every file is indexed, but only the leading window fetched its lines.
@@ -463,10 +611,7 @@ describe("ExplorerSystemTab search", () => {
       matches: [{ lineNumber: 1, column: 1, startIndex: 0, endIndex: 5, lineText: "alpha" }],
     }));
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("alpha");
     await new Promise((r) => setTimeout(r, 20));
     expect(model.fetchCalls.length).toBe(20);
 
@@ -491,31 +636,25 @@ describe("ExplorerSystemTab search", () => {
     expect(model.fetchCalls.length).toBe(22);
   });
 
-  it("cancels the running search as soon as the query changes, before the replacement is debounced", async () => {
+  it("cancels the running search as soon as the query changes, before the replacement is issued", async () => {
     // Regression: typing "d" then "r" left the "d" walk running for the whole
     // debounce window, so partial-keystroke searches piled up and the Explorer
-    // stuck on "Searching…".
+    // stuck on "Searching…". The drawer framework debounces, so the superseded
+    // walk must be cancelled the moment its replacement fires.
     model.deferStreaming = true;
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
 
-    input.value = "d";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("d");
     expect(model.calls.length).toBe(1);
 
-    // Second keystroke: the previous walk is cancelled immediately, and the
-    // replacement has not been issued yet (still inside the debounce window).
-    input.value = "dr";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    // Second keystroke: after the debounce, the previous walk is cancelled and
+    // the replacement is issued.
+    await typeInDrawer("dr");
     expect(model.cancelledStreaming).toContain("d");
-    expect(model.calls.length).toBe(1);
+    expect(model.calls.length).toBe(2);
 
     // Clearing the query also stops the walk rather than leaving it running.
-    await new Promise((r) => setTimeout(r, 300));
-    expect(model.calls.length).toBe(2);
-    input.value = "";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await typeInDrawer("");
     expect(model.cancelledStreaming).toContain("dr");
     expect(tree._searching).toBe(false);
   });
@@ -526,10 +665,7 @@ describe("ExplorerSystemTab search", () => {
     // file, which starved the main thread and blocked typing.
     model.deferStreaming = true;
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("alpha");
 
     const session = model.pendingStreaming[0];
     session.emit([indexEntry(RESULTS[0])]);
@@ -544,11 +680,8 @@ describe("ExplorerSystemTab search", () => {
   it("streams results in as they arrive and ignores chunks from a superseded search", async () => {
     model.deferStreaming = true;
     await openSearch(tree);
-    const input = tree.querySelector("input") as HTMLInputElement;
 
-    input.value = "alpha";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("alpha");
     const first = model.pendingStreaming[0];
 
     // Results appear before the walk finishes (the session is still pending).
@@ -562,9 +695,7 @@ describe("ExplorerSystemTab search", () => {
     expect(tree._contentIndexByPath.size).toBe(2);
 
     // Supersede the search; late chunks from the old walk are dropped.
-    input.value = "alphab";
-    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 300));
+    await typeInDrawer("alphab");
     expect(tree._contentIndexByPath.size).toBe(0);
     first.emit([indexEntry(RESULTS[0])]);
     await new Promise((r) => setTimeout(r, 50));

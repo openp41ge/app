@@ -38,7 +38,13 @@ import {
   type ContentSearchSession,
 } from "../models/explorer-search-model";
 import { matchesNameFilter } from "../services/explorer-filter";
-import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
+import {
+  openSearchDrawer,
+  type SearchDrawerBuildContext,
+  type SearchDrawerOptions,
+  type SearchDrawerProvider,
+} from "../services/search-drawer";
+import type { Openp41geSettingsDrawerHost } from "./openp41ge-settings-drawer-host";
 
 import { worktreePersistence } from "../services/worktree-persistence";
 import { setContextMenuActive } from "../services/drag-context";
@@ -48,8 +54,6 @@ import { GitService, IpcGitAdapter } from "openp41ge-git";
 
 // ─── Explorer search tuning ─────────────────────────────────────────────
 
-/** Idle time after the last keystroke before a content search is issued. */
-const SEARCH_DEBOUNCE_MS = 200;
 /** Fallback batching interval when requestAnimationFrame is unavailable. */
 const FLUSH_INTERVAL_MS = 16;
 /**
@@ -266,6 +270,12 @@ class Openp41geWorktreeTree extends LitElement {
   @state() private _filterQuery = "";
   @state() private _filterRegex = false;
   @state() private _filterCase = false;
+  /** Whether any repo/worktree name-filter term is non-empty (filter active). */
+  private get _repoFilterActive(): boolean {
+    return this._repoFilterTerms.some((t) => t.trim() !== "");
+  }
+  /** The repo/worktree name filter terms (one per input, empty = ignored). */
+  @state() private _repoFilterTerms: string[] = [""];
   /**
    * The explorer tool whose panel is open below the tools bar. Only one tool is
    * active at a time; clicking the active tool's icon toggles it off. `null`
@@ -284,7 +294,6 @@ class Openp41geWorktreeTree extends LitElement {
   private _searchTimer: ReturnType<typeof setTimeout> | null = null;
   private _searchToken = 0;
   private _activeSearch: ContentSearchSession | null = null;
-  private _filterInputEl: HTMLInputElement | null = null;
   /** Paths with a match-line fetch in flight, so rows don't request twice. */
   private _matchFetchesInFlight = new Set<string>();
   /**
@@ -583,82 +592,252 @@ class Openp41geWorktreeTree extends LitElement {
 
   // ── Explorer search / filter ────────────────────────────────────────────
 
-  private _onFilterInput(e: Event): void {
-    const input = e.target as HTMLInputElement;
-    this._filterQuery = input.value;
-    this._filterInputEl = input;
-    this._scheduleSearch();
+  /**
+   * Open the explorer's content search as a search drawer (over the grid). The
+   * drawer shell, shared query input and regex/match-case toggles come from the
+   * search-drawer framework; this provider drives the explorer's own search,
+   * whose RESULTS render in this Explorer panel (not in the drawer body).
+   */
+  private _openSearchDrawer(): void {
+    const host = document.querySelector("openp41ge-settings-drawer-host") as
+      | Openp41geSettingsDrawerHost
+      | null;
+    if (!host) return;
+    // Toggle-close: pressing the search icon again should unfilter the panel,
+    // not leave it stuck on the drawer's last query. The framework then closes
+    // the drawer. (The `buildOptions` teardown below also clears the panel for
+    // other close paths such as ✕ / outside-click / Escape.)
+    if (host.isOpenFor("explorer-search", this._sidebarSide)) {
+      this._clearExplorerSearch();
+    }
+    const provider: SearchDrawerProvider = {
+      appType: "explorer-search",
+      title: "Search explorer",
+      placeholder: "Filter repos and files…",
+      question: "What would you like to search for?",
+      // The repo/worktree name filter is a settings-style card that is always
+      // visible in the drawer, with one or more text inputs (an empty row is
+      // auto-appended at the bottom as you type). The regex/case toggles live
+      // in the shared query card above; this layer adds the per-tab repo name
+      // filter card below the search card.
+      buildOptions: (boxes, onOptionsChanged) => {
+        return this._buildRepoFilterOptions(boxes, onOptionsChanged);
+      },
+      search: (query, opts, results) => {
+        this._applyExplorerSearch(query, opts);
+      },
+    };
+    openSearchDrawer(host, this._sidebarSide, provider);
   }
 
-  private _toggleFilterRegex(): void {
-    this._filterRegex = !this._filterRegex;
-    this._scheduleSearch();
-  }
-
-  private _toggleFilterCase(): void {
-    this._filterCase = !this._filterCase;
-    this._scheduleSearch();
+  /** Apply a drawer-driven query/options to the explorer filter and run it. */
+  private _applyExplorerSearch(query: string, opts: SearchDrawerOptions): void {
+    this._filterQuery = query;
+    this._filterRegex = opts.regex;
+    this._filterCase = opts.caseSensitive;
+    this._activeTool = "search";
+    // The framework already debounced before calling us, so run immediately.
+    this._runSearchNow();
   }
 
   /**
-   * Toggle a tools-bar tool. Only one tool is active at a time; clicking the
-   * active tool's icon turns it off. Turning search on reveals the search bar
-   * below the tools bar (restoring the previous query + results); turning it
-   * off unfilters the tree while keeping the query text for the next time.
+   * Build the explorer's repo/worktree filter controls for the search drawer:
+   * a settings-drawer-style card (question label above a stack of term inputs)
+   * that is always visible below the search card. Typing in the bottom
+   * (always-empty) row auto-appends a fresh empty row, so no "+" button is
+   * needed; each row has a square ✕ button. Results still render in the panel.
+   * A bottom bar is also docked to the foot of the drawer (mirroring the
+   * sidebar bottom bar) with no controls — it keeps a consistent footer even
+   * though the filter card is now always visible in the body.
    */
-  private _toggleTool(tool: "search"): void {
-    const turningOn = this._activeTool !== tool;
-    this._activeTool = turningOn ? tool : null;
-    if (tool !== "search") return;
-    if (turningOn) {
-      // Re-apply the preserved query's results and focus the input.
-      if (this._filterQuery.trim()) this._scheduleSearch();
-      this._focusFilterInput();
-    } else {
-      // Search tool off — unfilter the tree and drop live results/state, but
-      // keep the query text so toggling back on restores the search.
-      if (this._searchTimer) {
-        clearTimeout(this._searchTimer);
-        this._searchTimer = null;
-      }
-      this._cancelActiveSearch();
-      this._resetSearchState();
-      this._searching = false;
-    }
-  }
+  private _buildRepoFilterOptions(
+    boxes: SearchDrawerBuildContext,
+    onOptionsChanged: () => void,
+  ): () => void {
+    const { options: filterHost, footer: bottomBarHost } = boxes;
 
-  /** Focus the search input once the search bar has rendered below the tools bar. */
-  private _focusFilterInput(): void {
-    requestAnimationFrame(() => {
-      const input = this.querySelector<HTMLInputElement>("#wt-filter-input");
-      this._filterInputEl = input ?? null;
-      input?.focus();
+    // ── Repo/worktree filter card ──────────────────────────────────────────
+    // A settings-card look (rgba white bg, 8px radius, 12/14px padding) with a
+    // question label on top and the term inputs below. Each row is an input
+    // plus a square ✕ button; the rows are inset by the card padding and
+    // separated by a faded 1px line (never after the trailing empty row).
+    const filterCard = document.createElement("div");
+    Object.assign(filterCard.style, {
+      boxSizing: "border-box",
+      width: "100%",
+      padding: "12px 14px",
+      borderRadius: "8px",
+      background: "rgba(255,255,255,0.05)",
     });
+
+    const question = document.createElement("label");
+    question.textContent = "Which repos or worktrees should be included?";
+    Object.assign(question.style, {
+      display: "block",
+      margin: "0 0 14px",
+      fontWeight: "500",
+      fontSize: "13px",
+      color: "var(--text-primary,#e0e0e0)",
+    });
+    filterCard.appendChild(question);
+
+    const renderInputs = (focusIndex?: number): void => {
+      filterCard.querySelectorAll("[data-repo-filter-row]").forEach((el) => el.remove());
+      this._repoFilterTerms.forEach((term, i) => {
+        const row = document.createElement("div");
+        row.setAttribute("data-repo-filter-row", "");
+        Object.assign(row.style, {
+          boxSizing: "border-box",
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+          // Tighter vertical padding so the multi-line card reads compact.
+          padding: "6px 0",
+          // Faded separator between rows, never after the trailing empty row.
+          borderBottom:
+            i < this._repoFilterTerms.length - 1
+              ? "1px solid color-mix(in srgb, var(--divider,#333) 40%, transparent)"
+              : "none",
+        });
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = term;
+        input.placeholder = "Match repo/worktree…";
+        input.setAttribute("data-repo-filter-input", "");
+        Object.assign(input.style, {
+          flex: "1",
+          minWidth: "0",
+          boxSizing: "border-box",
+          height: "28px",
+          // No left padding: text aligns flush with the card's left content edge.
+          padding: "0 8px 0 0",
+          fontSize: "13px",
+          color: "var(--text-primary,#ccc)",
+          background: "transparent",
+          border: "none",
+          outline: "none",
+        });
+        input.addEventListener("input", () => {
+          const next = [...this._repoFilterTerms];
+          next[i] = input.value;
+          // Typing in the bottom (always-empty) row spawns a fresh empty row.
+          if (i === next.length - 1 && next[i].trim() !== "") {
+            next.push("");
+            this._repoFilterTerms = next;
+            renderInputs(i);
+          } else {
+            this._repoFilterTerms = next;
+          }
+          onOptionsChanged();
+        });
+        input.addEventListener("keydown", (e) => {
+          // Return: when the row below is the empty row, jump to it so the
+          // user can keep typing the next repo filter term.
+          if (e.key !== "Enter") return;
+          const nextIdx = i + 1;
+          if (
+            nextIdx < this._repoFilterTerms.length &&
+            this._repoFilterTerms[nextIdx].trim() === ""
+          ) {
+            e.preventDefault();
+            filterCard.querySelectorAll<HTMLInputElement>("[data-repo-filter-input]")[
+              nextIdx
+            ]?.focus();
+          }
+        });
+        row.appendChild(input);
+
+        // ✕ to drop this term (the trailing empty row is kept as the bottom row).
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.textContent = "✕";
+        removeBtn.title = "Remove this repo filter";
+        removeBtn.setAttribute("data-repo-filter-remove", "");
+        Object.assign(removeBtn.style, {
+          boxSizing: "border-box",
+          width: "26px",
+          height: "26px",
+          padding: "0",
+          cursor: "pointer",
+          background: "transparent",
+          border: "none",
+          borderRadius: "4px",
+          color: "var(--text-secondary,#888)",
+          fontSize: "12px",
+          lineHeight: "1",
+          flexShrink: "0",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+        });
+        removeBtn.addEventListener("mouseenter", () => {
+          removeBtn.style.background = "var(--bg-hover,#2a2d2e)";
+          removeBtn.style.color = "var(--text-primary,#fff)";
+        });
+        removeBtn.addEventListener("mouseleave", () => {
+          removeBtn.style.background = "transparent";
+          removeBtn.style.color = "var(--text-secondary,#888)";
+        });
+        removeBtn.addEventListener("click", () => {
+          let next = this._repoFilterTerms.filter((_, j) => j !== i);
+          if (next.length === 0) next = [""];
+          // Always keep an empty row at the bottom.
+          if (next[next.length - 1].trim() !== "") next.push("");
+          this._repoFilterTerms = next;
+          renderInputs();
+          onOptionsChanged();
+        });
+        row.appendChild(removeBtn);
+        filterCard.appendChild(row);
+      });
+
+      if (focusIndex != null) {
+        filterCard.querySelectorAll<HTMLInputElement>("[data-repo-filter-input]")[
+          focusIndex
+        ]?.focus();
+      }
+    };
+
+    renderInputs();
+    filterHost.appendChild(filterCard);
+
+    // ── Empty bottom bar ──────────────────────────────────────────────────
+    // A full-width bar docked to the foot of the drawer. It carries no controls
+    // but matches the sidebar bottom bar (top border, bg-secondary, aligned to
+    // the sidebar's inside edge) so the drawer keeps a consistent footer.
+    const bottomBar = document.createElement("div");
+    Object.assign(bottomBar.style, {
+      boxSizing: "border-box",
+      width: "100%",
+      height: "34px",
+      display: "flex",
+      alignItems: "center",
+      borderTop: "1px solid var(--divider,#333)",
+      background: "var(--bg-secondary,#161616)",
+      padding: this._sidebarSide === "left" ? "0 0 0 8px" : "0 8px 0 0",
+    });
+    bottomBarHost.appendChild(bottomBar);
+
+    return () => {
+      // No extra listeners to remove — the nodes are dropped with the surface.
+    };
   }
 
-  private _onFilterKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      if (this._filterQuery) {
-        // First Escape clears the query; a second blurs.
-        this._filterQuery = "";
-        this._scheduleSearch();
-      } else if (this._filterInputEl) {
-        this._filterInputEl.blur();
-      }
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      // Run immediately on Enter, bypassing the debounce.
-      if (this._searchTimer) clearTimeout(this._searchTimer);
+  /** Turn search off: unfilter the tree and drop live results/state. */
+  private _clearExplorerSearch(): void {
+    if (this._searchTimer) {
+      clearTimeout(this._searchTimer);
       this._searchTimer = null;
-      const q = this._filterQuery.trim();
-      if (q) {
-        const token = ++this._searchToken;
-        this._cancelActiveSearch();
-        this._searching = true;
-        void this._runSearch(q, token);
-      }
     }
+    this._cancelActiveSearch();
+    this._filterQuery = "";
+    this._filterRegex = false;
+    this._filterCase = false;
+    this._repoFilterTerms = [""];
+    this._activeTool = null;
+    this._resetSearchState();
+    this._searching = false;
   }
 
   /**
@@ -679,9 +858,15 @@ class Openp41geWorktreeTree extends LitElement {
     }
   }
 
-  private _scheduleSearch(): void {
-    if (this._searchTimer) clearTimeout(this._searchTimer);
-    this._searchTimer = null;
+  /**
+   * Run a search now (no debounce). The search drawer debounces keystrokes, so
+   * applying a query straight through avoids a second delay.
+   */
+  private _runSearchNow(): void {
+    if (this._searchTimer) {
+      clearTimeout(this._searchTimer);
+      this._searchTimer = null;
+    }
     // Bump the token first: it invalidates callbacks from the outgoing search
     // even if its cancel hasn't taken effect in the main process yet.
     const token = ++this._searchToken;
@@ -693,19 +878,30 @@ class Openp41geWorktreeTree extends LitElement {
       return;
     }
     this._searching = true;
-    this._searchTimer = setTimeout(() => {
-      this._searchTimer = null;
-      void this._runSearch(q, token);
-    }, SEARCH_DEBOUNCE_MS);
+    void this._runSearch(q, token);
   }
 
   /** Root disk paths to content-search — everything visible in the explorer. */
+  /** Root disk paths to content-search, narrowed to the visible repos/worktrees
+   * when the repo/worktree filter is enabled, else everything in the explorer. */
   private _rootPaths(): string[] {
     const paths = new Set<string>();
     for (const repo of this._repos) {
-      if (repo.path) paths.add(repo.path);
+      if (!this._repoFilterActive) {
+        if (repo.path) paths.add(repo.path);
+        for (const wt of this._worktreesByRepo.get(repo.name) ?? []) {
+          if (wt.path) paths.add(wt.path);
+        }
+        continue;
+      }
+      const repoMatches = this._matchesRepoFilter(repo.name);
+      if (repoMatches && repo.path) paths.add(repo.path);
       const wts = this._worktreesByRepo.get(repo.name) ?? [];
-      for (const wt of wts) if (wt.path) paths.add(wt.path);
+      for (const wt of wts) {
+        if ((repoMatches || this._matchesRepoFilter(wt.branch)) && wt.path) {
+          paths.add(wt.path);
+        }
+      }
     }
     return Array.from(paths);
   }
@@ -723,7 +919,7 @@ class Openp41geWorktreeTree extends LitElement {
     }
 
     // Reset per-search accumulation. Any previous search was already cancelled
-    // by _scheduleSearch / _onFilterKeydown before this ran.
+    // by _runSearchNow before this ran.
     this._cancelActiveSearch();
     this._resetSearchState();
     this._searching = true;
@@ -864,7 +1060,39 @@ class Openp41geWorktreeTree extends LitElement {
     return matchesNameFilter(name, this._activeFilterQuery, this._filterRegex, this._filterCase);
   }
 
+  /**
+   * Whether a repo/worktree name matches the drawer's repo filter. When the
+   * filter is enabled, a name passes if it contains any of the terms
+   * (case-insensitive); an empty filter matches everything.
+   */
+  private _matchesRepoFilter(name: string): boolean {
+    const terms = this._repoFilterTerms.map((t) => t.trim()).filter(Boolean);
+    if (terms.length === 0) return true;
+    const lower = name.toLowerCase();
+    return terms.some((t) => lower.includes(t.toLowerCase()));
+  }
+
+  /** Worktrees narrowed by the repo filter (repo filter off → all of them). */
+  private _visibleWorktrees(repo: {
+    name: string;
+  }): Array<{ branch: string; path: string; exists: boolean }> {
+    const wts = this._worktreesByRepo.get(repo.name) ?? [];
+    if (!this._repoFilterActive) return wts;
+    // A repo whose NAME matches the filter shows all of its worktrees; otherwise
+    // only the worktrees whose branch matches are kept.
+    if (this._matchesRepoFilter(repo.name)) return wts;
+    return wts.filter((wt) => this._matchesRepoFilter(wt.branch));
+  }
+
   private _filteredRepos(): Array<{ path: string; name: string; url: string }> {
+    if (this._repoFilterActive) {
+      return this._repos.filter((repo) => {
+        if (this._matchesRepoFilter(repo.name)) return true;
+        const wts = this._worktreesByRepo.get(repo.name) ?? [];
+        if (wts.some((wt) => this._matchesRepoFilter(wt.branch))) return true;
+        return this._repoHasContentMatch(repo);
+      });
+    }
     const q = this._activeFilterQuery;
     if (!q) return this._repos;
     return this._repos.filter((repo) => {
@@ -906,8 +1134,8 @@ class Openp41geWorktreeTree extends LitElement {
     return this._activeFilterQuery;
   }
 
-  /** Tool icons shown in the bottom bar. Only one tool is active at a time;
-   * the search tool reveals the search bar at the top of the explorer. */
+  /** Tool icons shown in the bottom bar. The search tool opens the search
+   * drawer (controls in the drawer, matches render in this panel). */
   private _renderToolButtons(): TemplateResult {
     return html` ${this._renderToolButton("search", searchIcon(18), "Search files")} `;
   }
@@ -923,51 +1151,10 @@ class Openp41geWorktreeTree extends LitElement {
         data-explorer-tool=${tool}
         data-cap-side=${this._sidebarSide}
         class="p41ge-icon-btn wt-tool-btn${active ? " wt-tool-active" : ""}"
-        @click=${() => this._toggleTool(tool)}
+        @click=${() => this._openSearchDrawer()}
       >
         ${unsafeHTML(icon)}
       </button>
-    `;
-  }
-
-  private _renderSearchBar(): TemplateResult {
-    const regexColor = this._filterRegex ? "rgb(227,227,227)" : "var(--text-secondary,#888)";
-    const caseColor = this._filterCase ? "rgb(227,227,227)" : "var(--text-secondary,#888)";
-    return html`
-      <div style="flex-shrink:0;padding:6px 10px;border-bottom:1px solid var(--divider,#2a2a2a);">
-        <div style="display:flex;align-items:center;gap:4px;">
-          <input
-            id="wt-filter-input"
-            type="text"
-            placeholder="Filter repos and files…"
-            spellcheck="false"
-            .value=${this._filterQuery}
-            @input=${this._onFilterInput}
-            @keydown=${this._onFilterKeydown}
-            style="flex:1;min-width:0;box-sizing:border-box;height:26px;padding:0;font-size:12px;color:var(--text-primary,#ccc);background:transparent;border:none;outline:none;"
-          />
-          <button
-            type="button"
-            title="Regex filter"
-            aria-label="Regex filter"
-            data-filter-regex
-            @click=${this._toggleFilterRegex}
-            style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;cursor:pointer;background:transparent;border:1px solid transparent;border-radius:4px;color:${regexColor};"
-          >
-            ${unsafeHTML(REGEX_ICON)}
-          </button>
-          <button
-            type="button"
-            title="Match case"
-            aria-label="Match case"
-            data-filter-case
-            @click=${this._toggleFilterCase}
-            style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;cursor:pointer;background:transparent;border:1px solid transparent;border-radius:4px;color:${caseColor};"
-          >
-            ${unsafeHTML(CASE_ON_ICON)}
-          </button>
-        </div>
-      </div>
     `;
   }
 
@@ -1014,13 +1201,12 @@ class Openp41geWorktreeTree extends LitElement {
       <div
         class="wt-drawer flex flex-col overflow-hidden flex-1 min-h-0 w-full bg-gutter relative select-none"
       >
-        ${this._searchActive ? this._renderSearchBar() : nothing}
         <div class="wt-tree-scroll-wrapper flex-1 relative min-h-0">
           <div class="wt-tree-scroll absolute inset-0 overflow-y-auto overflow-x-hidden">
             <div class="wt-tree-scroll-content" data-explorer-drop-zone>
               ${this._renderSearchStatus()}
               ${this._filteredRepos().map((repo) => {
-                const worktrees = this._worktreesByRepo.get(repo.name) ?? [];
+                const worktrees = this._visibleWorktrees(repo);
                 return html`
                   <div class="flex items-stretch w-full">
                     <openp41ge-repo-tree-item
@@ -1660,7 +1846,7 @@ class Openp41geWorktreeTree extends LitElement {
         composed: true,
         detail: {
           appType: "file-editor-settings",
-          title: "Explorer",
+          title: "Explorer Settings",
           side: this._sidebarSide,
         },
       }),

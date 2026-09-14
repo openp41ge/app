@@ -46,8 +46,10 @@ interface LogMatchOccurrence {
 
 // Compact inline glyphs for the find toggles — kept as text so they read
 // clearly at 11px (same intent as the file editor's find bar).
-const ICON_FIND =
-  '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="5" cy="5" r="3.2"></circle><path d="M8 8l2.6 2.6"></path></svg>';
+// The bottom-bar search icon matches the Explorer sidebar's Material
+// magnifier+list searchIcon, so both use the same glyph.
+const ICON_SEARCH =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="18" height="18" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
 const ICON_REGEX =
   '<svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><text x="0.5" y="11" font-size="11" font-family="Consolas,monospace" font-weight="600">.*</text></svg>';
 const ICON_CASE =
@@ -785,9 +787,8 @@ export class Openp41geLogViewer extends LitElement {
         .bottom-bar {
           display: flex;
           align-items: center;
-          gap: 4px;
           height: 34px;
-          padding: 0 8px;
+          padding: 0;
           box-sizing: border-box;
           background: var(--bg-primary, #1e1e1e);
           border-top: 1px solid var(--border-divider, #2d2d2d);
@@ -796,22 +797,27 @@ export class Openp41geLogViewer extends LitElement {
           flex-shrink: 0;
         }
         .level-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          align-self: stretch;
           background: transparent;
-          border: none;
-          color: var(--text-muted, #666);
+          border: 1px solid transparent;
+          color: var(--text-secondary, #999);
           cursor: pointer;
           font-size: 12px;
           font-family: inherit;
-          padding: 0 6px;
-          height: 100%;
-          display: flex;
-          align-items: center;
+          padding: 0 10px;
+          height: auto;
+          box-sizing: border-box;
         }
         .level-btn:hover {
-          color: var(--text-primary, #d4d4d4);
+          background: rgba(255, 255, 255, 0.07);
+          color: var(--text-primary, #fff);
         }
         .level-btn.active {
-          color: var(--text-primary, #ffffff);
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-primary, #fff);
         }
         .spacer {
           flex: 1;
@@ -819,31 +825,37 @@ export class Openp41geLogViewer extends LitElement {
         .sep {
           flex-shrink: 0;
           width: 1px;
-          height: 16px;
-          margin: 0 6px;
+          align-self: stretch;
+          margin: 0;
           background: var(--border-divider, #2d2d2d);
         }
         .wrap-btn {
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 4px;
+          align-self: stretch;
+          aspect-ratio: 1 / 1;
           background: transparent;
-          border: none;
-          color: var(--text-muted, #666);
+          border: 1px solid transparent;
+          color: var(--text-secondary, #999);
           cursor: pointer;
           font-size: 12px;
           font-family: inherit;
-          padding: 0 6px;
-          height: 100%;
+          padding: 0;
+          box-sizing: border-box;
+          flex-shrink: 0;
         }
         .wrap-btn svg {
           display: block;
         }
         .wrap-btn:hover {
-          color: var(--text-primary, #d4d4d4);
+          background: rgba(255, 255, 255, 0.07);
+          color: var(--text-primary, #fff);
         }
         .wrap-btn.active {
-          color: var(--text-primary, #ffffff);
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-primary, #fff);
         }
         .day-boundary {
           display: flex;
@@ -992,22 +1004,24 @@ export class Openp41geLogViewer extends LitElement {
         }
         .find-entry-btn {
           flex-shrink: 0;
-          width: 18px;
-          height: 18px;
+          align-self: stretch;
+          aspect-ratio: 1 / 1;
           display: grid;
           place-items: center;
           padding: 0;
           cursor: pointer;
           background: transparent;
           border: 1px solid transparent;
-          border-radius: 3px;
-          color: var(--text-muted, #666);
+          color: var(--text-secondary, #999);
+          box-sizing: border-box;
         }
         .find-entry-btn:hover {
-          color: var(--text-primary, #d4d4d4);
+          background: rgba(255, 255, 255, 0.07);
+          color: var(--text-primary, #fff);
         }
         .find-entry-btn.active {
-          color: #4a9eff;
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-primary, #fff);
         }
         mark.find-match {
           background: rgba(234, 140, 0, 0.32);
@@ -1085,8 +1099,9 @@ export class Openp41geLogViewer extends LitElement {
             title="Find in logs (⌘F)"
             @click=${() => (this._searchOpen ? this._closeSearch() : this._openSearch())}
           >
-            ${unsafeHTML(ICON_FIND)}
+            ${unsafeHTML(ICON_SEARCH)}
           </button>
+          <span class="sep"></span>
           <span class="spacer"></span>
           ${LEVELS.map(
             (lvl) => html`
@@ -1105,8 +1120,8 @@ export class Openp41geLogViewer extends LitElement {
             @click=${() => this._toggleWrap()}
           >
             <svg
-              width="12"
-              height="12"
+              width="16"
+              height="16"
               viewBox="0 0 16 16"
               fill="none"
               stroke="currentColor"

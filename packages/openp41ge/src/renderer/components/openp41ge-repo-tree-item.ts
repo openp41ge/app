@@ -61,8 +61,10 @@ const MAX_RENDERED_MATCH_ROWS = 500;
  */
 const VIRTUALIZE_ROW_THRESHOLD = 150;
 
-/** Row height in px, matching the uikit tree's --tree-row-height default. */
-const TREE_ROW_HEIGHT = 26;
+/** Row height in px for the explorer file tree. Overrides the uikit tree's
+ * default (26px) via the inline --tree-row-height so every explorer row is the
+ * same height as the repo/worktree header rows (30px). */
+const TREE_ROW_HEIGHT = 30;
 
 export class Openp41geRepoTreeItem extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -562,13 +564,13 @@ export class Openp41geRepoTreeItem extends LitElement {
     const pullDoneTime = this._pullCompleted.get(wt.branch);
     const showGreen = pullDoneTime !== undefined && Date.now() - pullDoneTime < 2500;
     return html`
-      <div class="relative bg-gutter h-[26px] pointer-events-none border-b border-[#232323]">
+      <div class="relative bg-gutter h-[30px] pointer-events-none border-b border-[#232323]">
         <div
           draggable="true"
           data-worktree-row
           data-repo="${this.repoName}"
           data-branch="${wt.branch}"
-          class="pointer-events-auto flex items-center h-[26px] px-2 pl-7 pr-3 cursor-pointer text-sm text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
+          class="pointer-events-auto flex items-center h-[30px] px-2 pl-7 pr-3 cursor-pointer text-sm text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
           @click=${() => {
             const path = wt.path || `${this.repoName}/${wt.branch}`;
             this._toggleWorktreeFiles(wt.branch, path);
@@ -646,7 +648,7 @@ export class Openp41geRepoTreeItem extends LitElement {
     if (!this._showingAddWorktree) {
       return html`
         <div
-          class="add-worktree-row flex items-center h-[26px] pl-7 pr-3 cursor-pointer select-none text-sm text-muted border-b border-[#232323] transition-[color,background] duration-100"
+          class="add-worktree-row flex items-center h-[30px] pl-7 pr-3 cursor-pointer select-none text-sm text-muted border-b border-[#232323] transition-[color,background] duration-100"
           @click=${() => this._showAddWorktreeInline()}
         >
           <span class="w-[10px] flex items-center justify-center shrink-0"
@@ -662,13 +664,13 @@ export class Openp41geRepoTreeItem extends LitElement {
     return html`
       <div
         id="wt-addwt-row"
-        class="flex items-center h-[26px] pl-7 text-sm border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
+        class="flex items-center h-[30px] pl-7 text-sm border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
       >
         <input
           id="wt-addwt-input"
           type="text"
           placeholder="enter branch name"
-          class="flex-1 min-w-0 h-[22px] bg-transparent border-none rounded-none text-[#e0e0e0] text-sm pl-[14px] pr-1 outline-none font-inherit"
+          class="flex-1 min-w-0 h-6 bg-transparent border-none rounded-none text-[#e0e0e0] text-sm pl-[14px] pr-1 outline-none font-inherit"
           .value=${this._addWorktreeName}
           @input=${(e: InputEvent) => {
             this._addWorktreeName = (e.target as HTMLInputElement).value;
@@ -979,7 +981,7 @@ export class Openp41geRepoTreeItem extends LitElement {
     const virtualize = countVisibleRows(nodes) > VIRTUALIZE_ROW_THRESHOLD;
     return html`<div class="wt-expanded-wt-block border-b border-[#232323]">
       <openp41ge-tree
-        style="--tree-font-size:12px;--tree-indent:20px;${this._themeTokenVars()}"
+        style="--tree-font-size:12px;--tree-indent:20px;--tree-row-height:30px;${this._themeTokenVars()}"
         .nodes=${nodes}
         .renderIcon=${this._renderIcon}
         .onToggle=${this._makeDirToggle(branch)}

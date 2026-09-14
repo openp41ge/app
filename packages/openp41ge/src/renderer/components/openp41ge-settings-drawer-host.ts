@@ -741,7 +741,10 @@ export class Openp41geSettingsDrawerHost extends LitElement {
              single bottom border (like the tab bar) to avoid a double line. */
           height: 35px;
           box-sizing: border-box;
-          padding: 0 10px 0 14px;
+          /* No right padding: the full-height square close button sits flush at
+             the drawer's right edge. Keep the 14px leading padding on the left
+             so the title keeps its inset from the inner edge. */
+          padding: 0 0 0 14px;
           border-bottom: 1px solid var(--border-divider, #2d2d2d);
         }
         .sdw-title {
@@ -758,14 +761,16 @@ export class Openp41geSettingsDrawerHost extends LitElement {
           border: none;
           background: transparent;
           color: var(--text-secondary, #999);
-          width: 26px;
-          height: 26px;
+          /* Full height of the drawer head and square (width = height), matching
+             the shared .p41ge-icon-btn pattern used across bottom bars. */
+          height: 100%;
+          aspect-ratio: 1 / 1;
           padding: 0;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          border-radius: 6px;
+          border-radius: 0;
           font-size: 14px;
           line-height: 1;
           flex-shrink: 0;

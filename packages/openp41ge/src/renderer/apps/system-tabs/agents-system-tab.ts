@@ -275,6 +275,7 @@ export class AgentsSystemTabController implements SystemTabController {
       appType: "agents-search",
       title: "Search chats",
       placeholder: "Search chats…",
+      question: "Which chats are you looking for?",
       search: async (query, opts, results) => {
         results.replaceChildren();
         if (!query) {

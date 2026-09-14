@@ -89,7 +89,7 @@ class Openp41geBottomBar extends LitElement {
   render(): TemplateResult {
     return html`
       <div
-        class="flex shrink-0 items-center bg-bg-primary border-t border-divider px-2 gap-2 text-xs text-secondary"
+        class="flex shrink-0 items-center bg-bg-secondary border-t border-divider px-2 gap-2 text-xs text-secondary"
         style="height:34px;box-sizing:border-box"
       >
         ${

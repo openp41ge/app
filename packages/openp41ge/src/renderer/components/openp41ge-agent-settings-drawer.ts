@@ -369,7 +369,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   private _workspaceUnsub: (() => void) | null = null;
 
   get title(): string {
-    return "Agents";
+    return "Agent Settings";
   }
 
   connectedCallback(): void {

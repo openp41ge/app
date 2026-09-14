@@ -68,10 +68,6 @@ class Openp41geWindowView extends LitElement {
   /** Drawer width on the dragged side at drag start (so widening the sidebar
    * can take that space from the open drawer). */
   private _dragStartDrawerWidth = 0;
-  /** True while the sidebar is over-dragged into resistance (drawer at min). */
-  private _isOverdriven = false;
-  /** Sidebar width the drag springs back to on release when overdriven. */
-  private _overdragTarget = 0;
   /** True while the sidebar rubber-bands past its OWN max width. */
   private _isOverMax = false;
   private _overMaxTarget = 0;
@@ -159,8 +155,6 @@ class Openp41geWindowView extends LitElement {
     // sidebar can take space from the drawer (and stop at its minimum).
     const host = this._drawerHost();
     this._dragStartDrawerWidth = host ? host.drawerWidthFor(handle) : 0;
-    this._isOverdriven = false;
-    this._overdragTarget = 0;
     this._isOverMax = false;
     this._overMaxTarget = 0;
     this._isOverMin = false;
@@ -205,11 +199,11 @@ class Openp41geWindowView extends LitElement {
   /**
    * Compute the sidebar width (and matching drawer width) for a drag move.
    *
-   * Widening the sidebar takes the space from the open drawer on that side
-   * (the drawer shrinks by the same amount), so the drawer's far edge stays
-   * where it was instead of sliding into the grid. Once the drawer reaches its
-   * minimum width the sidebar stops growing — a small resistive "give" is
-   * allowed, and it springs back on release.
+   * The sidebar resizes exactly as it would with no drawer open — it is never
+   * blocked by a drawer's minimum width. While the drawer has headroom it
+   * shrinks to absorb the sidebar's growth (so the drawer's far edge stays put
+   * instead of sliding into the grid); once it reaches its minimum it clamps
+   * there and simply slides along with the sidebar.
    *
    * Returns `drawerWidth: null` when no drawer is open on that side.
    */
@@ -220,7 +214,7 @@ class Openp41geWindowView extends LitElement {
     const host = this._drawerHost();
     const open = !!host?.isDrawerOpen(handle);
     const drawerStart = this._dragStartDrawerWidth;
-    const minWidth = open ? host!.drawerMinWidth : MIN_SIDEBAR_WIDTH;
+    const minDrawer = open ? host!.drawerMinWidth : 0;
     const startWidth = handle === "left" ? this._dragStartLeftWidth : this._dragStartRightWidth;
     // Widening the sidebar is +dx for left, -dx for right.
     const desired = handle === "left" ? startWidth + dx : startWidth - dx;
@@ -228,18 +222,13 @@ class Openp41geWindowView extends LitElement {
     // 35% viewport cap (the same constraint the template's `max-width` uses),
     // so the rubber band fires at the width the sidebar actually renders to.
     const maxSidebar = this._sidebarMax();
-    // Headroom: how much the drawer can shrink (the space the sidebar can take).
-    const allowance = open ? Math.max(0, drawerStart - minWidth) : 0;
-    const maxSidebarByDrawer = startWidth + allowance;
 
     let newWidth: number;
     let drawerWidth = drawerStart;
     this._isOverMax = false;
     this._isOverMin = false;
-    this._isOverdriven = false;
     this._overMaxTarget = 0;
     this._overMinTarget = 0;
-    this._overdragTarget = 0;
 
     if (desired < MIN_SIDEBAR_WIDTH) {
       // Below its own minimum — rubber band down, spring back on release.
@@ -248,23 +237,17 @@ class Openp41geWindowView extends LitElement {
       this._overMinTarget = MIN_SIDEBAR_WIDTH;
       if (open) {
         const growth = newWidth - startWidth;
-        drawerWidth = Math.max(minWidth, Math.min(drawerStart, drawerStart - growth));
+        drawerWidth = Math.max(minDrawer, Math.min(drawerStart, drawerStart - growth));
       }
-    } else if (open && maxSidebarByDrawer < maxSidebar && desired > maxSidebarByDrawer) {
-      // Drawer is at its minimum — resist: a small give, then spring back.
-      const overdrag = desired - maxSidebarByDrawer;
-      newWidth = Math.min(maxSidebar, maxSidebarByDrawer + overdrag * this._RESISTANCE);
-      drawerWidth = minWidth;
-      this._isOverdriven = true;
-      this._overdragTarget = maxSidebarByDrawer;
     } else {
       newWidth = Math.min(maxSidebar, desired);
       if (open) {
-        // Take the sidebar's growth from the drawer (keep their sum constant),
-        // so the drawer's far edge stays put. Narrowing grows it back up to the
-        // width it had when the drag started.
+        // While the drawer has headroom, shrink it to absorb the sidebar's
+        // growth so its far edge stays put; once it reaches its minimum the
+        // drawer clamps there and slides with the sidebar rather than blocking
+        // the resize. Narrowing grows it back up to the width at drag start.
         const growth = newWidth - startWidth;
-        drawerWidth = Math.max(minWidth, Math.min(drawerStart, drawerStart - growth));
+        drawerWidth = Math.max(minDrawer, Math.min(drawerStart, drawerStart - growth));
       }
       // Above its own max — rubber band up, spring back on release.
       if (desired > maxSidebar) {
@@ -333,14 +316,6 @@ class Openp41geWindowView extends LitElement {
     // Reset cursor
     document.body.style.cursor = "";
 
-    // If the drag was over-driven into resistance, snap the sidebar back to the
-    // maximum it can be given the drawer is at its minimum.
-    if (this._isOverdriven && this._overdragTarget > 0 && handle) {
-      this._dragLeftWidth = handle === "left" ? this._overdragTarget : this._dragLeftWidth;
-      this._dragRightWidth = handle === "right" ? this._overdragTarget : this._dragRightWidth;
-      this._springWidth("left", this._dragLeftWidth);
-      this._springWidth("right", this._dragRightWidth);
-    }
     // If the sidebar rubber-banded past its own max, spring it back to the max.
     if (this._isOverMax && this._overMaxTarget > 0 && handle) {
       this._dragLeftWidth = handle === "left" ? this._overMaxTarget : this._dragLeftWidth;
@@ -364,7 +339,6 @@ class Openp41geWindowView extends LitElement {
 
     // Clear the drag indicator and overrun state.
     this.querySelector(".wv-notch-v.dragging")?.classList.remove("dragging");
-    this._isOverdriven = false;
     this._isOverMax = false;
     this._isOverMin = false;
   };
@@ -512,7 +486,12 @@ class Openp41geWindowView extends LitElement {
           flex-shrink: 0;
           cursor: col-resize;
           position: relative;
-          z-index: 30;
+          /* Above the settings drawer host (z-index:1001) so the sidebar resize
+           * bar stays fully grabbable and its hover highlight isn't clipped by
+           * an open drawer sliding out of the adjacent sidebar. The drawer
+           * covers the grid but starts at the boundary, so without this only
+           * the 3px on the sidebar side of the notch would be reachable. */
+          z-index: 1002;
           background: transparent;
           /* Asymmetric negative margins cancel the 7px width to a ZERO-width
              flex track (margin-box 7 - 3 - 4 = 0), so the sidebar border sits
