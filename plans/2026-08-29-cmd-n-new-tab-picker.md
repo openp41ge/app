@@ -1,71 +1,178 @@
 2026-08-29
 
-# Cmd+N: New Tab with Pane-Type Picker
+# Cmd+N: Quick-Create / Quick-Action Modal (Plan B)
 
 ## Goal
 
-Reassign **`Cmd+N`** from "new window" to a lightweight modal that lets the user pick a pane type and create a **new tab containing a pane of that type**. Move "New Window" to **`Cmd+Shift+N`** (currently unbound).
+Reassign **`Cmd+N`** from "new window" to a **centered modal** ("quick-create")
+that opens in the middle of the screen and lets the user **type to filter** a set
+of quick actions, including **creating a new file with the given name** (and a
+new folder), creating a **new agent chat** that auto-opens in the grid, and
+(other actions as listed). Move **"New Window"** to **`Cmd+Shift+N`** (currently
+unbound).
 
-Refreshed for the current (2026-08) architecture — the original 2025-07 plan references the removed project system and the old openp41ge/tab model. Supersedes `plans/2025-07-20-cmd-n-new-tab-picker.md`.
+This supersedes the earlier "new tab with pane-type picker" reading (Plan A).
+The chosen direction (Plan B) is a single predictable entry point rather than a
+contextual, focus-dependent shortcut, because focus detection across the
+multi-window, shadow-DOM, grid layout is fragile and hard to predict.
 
 ## Rationale / Current State
 
-- **`Cmd+N`** → `cmdNewWindow()` → new Electron window (still bound at `register-shortcuts.step.ts:29`).
-- **`Cmd+T`** → unbound; the `openp41ge:new-tab` IPC handler in `window-handlers.ts` is a **no-op** ("will be replaced with something else"). There is no working keyboard path to create a new tab today.
-- **`Cmd+Shift+N`** → free (only Meta+Shift+E/G/F/O/+ are bound).
-- **`Cmd+P`** pane picker is **orphaned** — `register-shortcuts.step.ts:79` dispatches `openp41ge:show-pane-picker` but no listener exists, and `<openp41ge-pane-picker>` is never instantiated (`isOpenp41gePanePicker` has no consumers). Cmd+P currently does nothing. *(Optional follow-up, see Scope.)*
-- Current tab model: `Window` → `grid` → `placements[]` (cells) → each cell holds `tabIds[]`. A tab is `createTab(id, appType, title, config)`; panes are grid app types from `APP_TYPES` (`src/renderer/app-types.ts`): terminal, file-explorer, markdown, table, video (file-viewer excluded).
-- Creating a tab with a pane: `addColumnTab(ws, windowId, appType, title)` (new column + tab) or `openTabInCell(ws, windowId, appType, title, …)` (tab in an existing/new cell). Both live in layout ops and are dispatched stringly through `window.openp41ge.workspace.dispatch()`.
+- **`Cmd+N`** → `cmdNewWindow()` → new Electron window (still bound at
+  `register-shortcuts.step.ts:29`).
+- **`Cmd+Shift+N`** → free (only Meta+Shift+E/H/O/+/-/_/0/S/D are bound; no
+  Meta+Shift+N).
+- **`Cmd+P`** pane picker is **orphaned** — `register-shortcuts.step.ts:79`
+  dispatches `openp41ge:show-pane-picker` but no listener exists, and
+  `<openp41ge-pane-picker>` is never instantiated. Its styling/panel pattern is
+  reusable. *(Optional follow-up, see Scope.)*
+- **No Explorer file/folder creation exists today** — the worktree/repo tree has
+  no "new file"/"new folder" command and no `file:create` IPC. The only path to a
+  new file is `saveAs()` in the file editor (Save dialog). Quick-create needs a
+  new main-process IPC to write a file / make a directory.
+- **Agents "New chat" already works** — `agents-system-tab` `_newChat()` creates
+  a chat and dispatches `openp41ge:open-chat` (`{ chatId, title, pinned: true }`)
+  → opens it pinned in the grid. Reuse this event for the modal's "New chat".
+- Reusable UI patterns: `openp41ge-pane-picker` / `openp41ge-confirm-modal`
+  overlay styling, backdrop/panel theme vars (`--bg-primary`, `--border-color`,
+  `--accent`, `--text-secondary`), `ITEM_HEIGHT` from `openp41ge-constants`.
 
 ## Approach
 
-1. **Shortcut remap** (`src/renderer/bootstrap/steps/register-shortcuts.step.ts`)
-   - `Cmd+N` handler → open the new-tab picker overlay (instead of `cmdNewWindow()`).
-   - Register `Cmd+Shift+N` (`modifiers: 12`) → `cmdNewWindow()` (New Window relocated).
+### 1. Shortcut remap (`src/renderer/bootstrap/steps/register-shortcuts.step.ts`)
 
-2. **Picker component** (`src/renderer/components/openp41ge-new-tab-picker.ts`, new; Lit, light DOM like other overlays)
-   - Lists grid pane types from `APP_TYPES.filter(t => t.id !== "file-viewer")` — filtered by typing, arrow keys + Enter to select, Escape closes, backdrop click closes, File Explorer listed first (file-pane most common).
-   - Exposes `.open()` / dispatches/receives a custom event (following `openp41ge-confirm-modal`/`openp41ge-pane-picker` patterns) so it can be opened programmatically.
-   - State lives in a module singleton so the picker survives any HMR/re-mount churn (mirroring `workspacesOverlayService` pattern).
+- `Cmd+N` handler → open the new quick-create modal (instead of
+  `cmdNewWindow()`). Always opens the modal; never a no-op.
+- Register `Cmd+Shift+N` (`modifiers: 12`) → `cmdNewWindow()` ("New Window"
+  relocated).
 
-3. **Create the tab** on selection (in the shortcut handler or via the overlay's controller)
-   - `winId = window.openp41ge.workspace.getWindowId()`
-   - Dispatch the new-tab op: `dispatch("addColumnTab", winId, appType, label)` (creates a new column + tab with one pane of the chosen type). This is the conservative, currently-working equivalent of the old "new openp41ge/tab with a pane".
-   - Close the picker.
+### 2. Quick-create modal component
 
-4. **Files changed**
-   - `src/renderer/bootstrap/steps/register-shortcuts.step.ts` — remap Cmd+N, add Cmd+Shift+N.
-   - `src/renderer/components/openp41ge-new-tab-picker.ts` — new component (or extend existing pane picker if reuse proves cleaner).
-   - `src/renderer/app.ts` — import/register the component.
-   - Optionally `src/renderer/components/openp41ge-pane-picker.ts` — only if we fix Cmd+P (see Scope).
+`src/renderer/components/openp41ge-quick-create.ts` (new; Lit, light DOM like
+other overlays). Centered panel with a **filter input** (autofocused) and a
+filterable action list; arrow keys + Enter to select, Escape closes, backdrop
+click closes.
+
+- Exposes `.open()` and can be opened programmatically (dispatches/receives a
+  custom event, following `openp41ge-confirm-modal`/`openp41ge-pane-picker`
+  patterns).
+- State lives in a module singleton so it survives HMR/re-mount churn (mirrors
+  the `workspacesOverlayService` pattern).
+
+### 3. Actions in the modal
+
+The modal lists quick actions, filtered by what the user types. Actions are
+registry-ish so new ones are additive:
+
+- **Create new file** — type a name after the action (or use the "new file"
+  action with an inline path field); creates the file via a new `file:create`
+  IPC and opens it in the grid. Target directory resolution:
+  - If an Explorer tree folder is currently selected, use that directory;
+  - Else fall back to the first workspace root;
+  - (Alternative) prompt for a full path. *(Open Question 2.)*
+- **Create new folder** — new `file:createFolder` IPC (mkdir) under the same
+  resolved directory.
+- **New agent chat** — calls the existing create-chat path and dispatches
+  `openp41ge:open-chat` (reuse `_newChat()` wiring) → opens pinned in the grid.
+- **Open pane** (optional) — fold in the orphaned pane-picker actions
+  (terminal/file-explorer/markdown/table/video) via `addColumnTab`, so the modal
+  becomes a single quick-open/quick-create entry point. *(Open Question 3.)*
+
+### 4. New main-process IPC for file/folder creation
+
+- `electron/ipc-handlers/file-handlers.ts`: add
+  - `file:create` → `{ path, content? }` — `fs.writeFile` (recursively create
+    parent dirs); returns the created path.
+  - `file:createFolder` → `{ path }` — `fs.mkdir` (recursive); returns the path.
+  - Guard against path traversal / out-of-scope writes (basic validation).
+- `electron/preload.cjs` + `src/renderer/global.d.ts`: expose `file.create` /
+  `file.createFolder`.
+
+### 5. Wire the controller
+
+- `src/renderer/components/openp41ge-quick-create.ts` holds the action list; on
+  selection it dispatches the relevant op:
+  - create file/folder → `openp41ge:create-file` / `openp41ge:create-folder`
+    events handled by the explorer/file-open layer (or call `file.create` then
+    open via `actionOpenFile`);
+  - new chat → dispatch `openp41ge:open-chat` (existing event).
+- Register the component in `src/renderer/app.ts`.
+
+## Files Changed
+
+- `src/renderer/bootstrap/steps/register-shortcuts.step.ts` — remap Cmd+N, add
+  Cmd+Shift+N.
+- `src/renderer/components/openp41ge-quick-create.ts` — **new** component + action
+  list + singleton state.
+- `src/renderer/app.ts` — import/register the component.
+- `electron/ipc-handlers/file-handlers.ts` — add `file:create` / `file:createFolder`.
+- `electron/preload.cjs` + `src/renderer/global.d.ts` — expose the new IPC.
+- `src/renderer/services/…` — resolver that maps a selected Explorer directory /
+  workspace root → creation path (could live in the component).
+- Reuse (no change): `agents-system-tab` `_newChat()` / `openp41ge:open-chat`.
+- Optional: `src/renderer/components/openp41ge-pane-picker.ts` — only if we fix
+  Cmd+P / fold panes into the modal (see Scope).
 
 ## Testing Strategy
 
-- Unit test the picker's selection→dispatch mapping (pure): given a chosen `AppTypeInfo`, the emitted dispatch args are `("addColumnTab", winId, appType, label)`.
-- Integration/unit: verify `addColumnTab` produces a window whose newest placement contains a tab of the chosen `appType` (layout op already covered in `tab-operations` tests — assert the mapping, not the op internals).
-- Manual (debug skill): Cmd+N opens picker; Escape/backdrop closes with no state change; select Terminal → new column+tab with a terminal pane; Cmd+Shift+N still opens a new window; no console errors (error overlay cleared).
+- Unit: quick-create modal renders actions; typing filters; Enter/Escape/backdrop
+  behave; selecting "New chat"/"new file" dispatches the expected event with the
+  resolved directory; never creates an empty tab/file on cancel or no-match.
+- Unit (pure): selection → dispatch mapping; directory resolution (selected
+  folder → root fallback).
+- Integration: `file:create` / `file:createFolder` IPC shapes + real temp-file
+  write/read; `addColumnTab` for pane actions if panes are folded in.
+- Manual (debug skill): Cmd+N opens modal; Escape/backdrop closes with no state
+  change; "New chat" opens a chat in the grid; "new file `foo.ts`" creates the
+  file and opens it; Cmd+Shift+N opens a new window; no console errors.
+- Quality gate: `nx run-many -t typecheck`, `nx lint`; `nx run openp41ge:test`.
 
 ## UX Considerations
 
-- **Focus**: picker input autofocuses on open (matches `openp41ge-pane-picker`); Enter selects, Escape cancels, backdrop click closes. After selection, focus returns to the app (new tab takes focus naturally).
-- **Keyboard**: no conflicts — Cmd+N / Cmd+Shift+N currently free or relocatable.
-- **Visual**: reuse the pane-picker's backdrop/panel styling + theme CSS vars (`--bg-primary`, `--border-color`, `--accent`, `--text-secondary`), `ITEM_HEIGHT` from `openp41ge-constants`.
-- **Empty state**: if no grid pane types are registered, show "No pane types" and never create an empty tab.
-- **Error state**: if dispatch fails or window context is missing, close picker silently (no empty tab).
-
-## Open Questions
-
-1. **New-tab semantics** (default in Approach): `addColumnTab` = new column + single tab of the chosen type. Alternative readings: (a) open a new tab in the *focused* cell (replace active tab), (b) restore the old empty-grid Cmd+T. Default (a-new-column) is the closest working equivalent of "new tab with a pane". *Confirm before implementing.*
+- **Focus**: modal input autofocuses on open; Enter selects the highlighted
+  action/item; type-to-filter; Escape or backdrop closes. After creation, focus
+  returns to the app (new file/chat takes focus naturally).
+- **Keyboard**: no conflicts — Cmd+N / Cmd+Shift+N are free or relocatable.
+- **Visual**: reuse the pane-picker/confirm-modal backdrop + panel styling and
+  theme CSS vars; `ITEM_HEIGHT` from `openp41ge-constants`.
+- **Empty/error states**: no registered actions → "No actions"; invalid/empty
+  create path → inline validation, never create an empty file; failed IPC →
+  silent close or toast, no orphan tab.
+- **Create-new-file UX**: when the user types into the filter and it doesn't
+  match an existing action, show a "Create new file `…`" action at the top so
+  typing a name directly creates the file (Plan B's core behaviour).
 
 ## Scope
 
-- **In**: Cmd+N → picker → new column+tab with chosen pane; Cmd+Shift+N → new window.
-- **Out (pending user call)**: reviving the orphaned `Cmd+P` pane picker — separate bug; flagging because it exists and is dead, but this plan doesn't touch it unless requested.
+- **In**: Cmd+N → quick-create modal (filter + actions: new file, new folder,
+  new chat); Cmd+Shift+N → new window; `file:create` / `file:createFolder` IPC.
+- **Out (pending user call)**: reviving the orphaned Cmd+P pane picker / folding
+  pane-opening into the modal — flagging because it's dead, but this plan only
+  touches it if requested.
+- **Out**: contextual/focus-dependent Cmd+N behaviour (Plan A) — explicitly
+  rejected for predictability; a future nicety is contextual *preselection*
+  inside the modal, but Cmd+N always opens the modal.
+
+## Open Questions
+
+1. **Create-new-file target directory** — default: use the selected Explorer tree
+   folder, else first workspace root. Alternative: prompt for a full path. Confirm.
+2. **New file naming flow** — inline path field on the action, or "type a name in
+   the filter and hit Enter" (quick-create style). Default: the latter, with
+   `new file` as an explicit action.
+3. **Fold pane-opening into the modal** (and/or fix Cmd+P)? Default: leave pane
+   opening out of this pass; reuse the pane-picker only if requested.
 
 ## Completion Criteria
 
-- [ ] Cmd+N opens the new-tab picker (no new window).
+- [ ] Cmd+N opens the quick-create modal (no new window).
 - [ ] Cmd+Shift+N opens a new window.
-- [ ] Picker lists grid pane types (File Explorer first), filters, Enter/Escape/backdrop behave, no empty tab on cancel.
-- [ ] Selecting a type creates a new column+tab whose tab has that `appType`.
-- [ ] `nx run-many -t typecheck`, `nx lint` clean; `nx run openp41ge:test` passes; runtime-verified in dev (debug skill), no console errors.
+- [ ] Modal lets the user type to filter actions; Enter/Escape/backdrop behave; no
+      empty tab/file on cancel or no-match.
+- [ ] "New file `<name>`" creates the file (via `file:create`) under the resolved
+      directory and opens it in the grid.
+- [ ] "New folder" creates a directory (via `file:createFolder`).
+- [ ] "New chat" creates a chat and opens it pinned in the grid (reuses
+      `openp41ge:open-chat`).
+- [ ] `nx run-many -t typecheck`, `nx lint` clean; `nx run openp41ge:test` passes;
+      runtime-verified in dev (debug skill), no console errors.

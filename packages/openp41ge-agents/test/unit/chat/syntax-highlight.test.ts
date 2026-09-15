@@ -68,7 +68,9 @@ describe("syntax-highlight", () => {
     expect(detectLanguage("from pathlib import Path\nprint(Path('.').resolve())")).toBe("python");
     expect(detectLanguage("import sys\nfor arg in sys.argv:\n    print(arg)")).toBe("python");
     expect(detectLanguage("for i in range(10):\n    print(i)")).toBe("python");
-    expect(detectLanguage("class Foo:\n    def __init__(self):\n        self.x = 1\n")).toBe("python");
+    expect(detectLanguage("class Foo:\n    def __init__(self):\n        self.x = 1\n")).toBe(
+      "python",
+    );
     expect(detectLanguage("print('hello world')")).toBe("python");
   });
 
