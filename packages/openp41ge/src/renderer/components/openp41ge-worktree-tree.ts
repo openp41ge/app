@@ -1137,7 +1137,7 @@ class Openp41geWorktreeTree extends LitElement {
   /** Tool icons shown in the bottom bar. The search tool opens the search
    * drawer (controls in the drawer, matches render in this panel). */
   private _renderToolButtons(): TemplateResult {
-    return html` ${this._renderToolButton("search", searchIcon(18), "Search files")} `;
+    return html` ${this._renderToolButton("search", searchIcon(20), "Search files")} `;
   }
 
   private _renderToolButton(tool: "search", icon: string, title: string): TemplateResult {

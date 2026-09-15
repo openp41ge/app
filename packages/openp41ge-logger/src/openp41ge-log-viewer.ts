@@ -49,11 +49,11 @@ interface LogMatchOccurrence {
 // The bottom-bar search icon matches the Explorer sidebar's Material
 // magnifier+list searchIcon, so both use the same glyph.
 const ICON_SEARCH =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="18" height="18" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="20" height="20" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
 // Funnel icon for the stream filter. Matches the Explorer sidebar's Material
 // filter_list glyph. Uses currentColor so it tracks the button's state.
 const ICON_FILTER =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="18" height="18" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></svg>';
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="20" height="20" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></svg>';
 // Small × for the stream pills.
 const ICON_CLOSE =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="10" height="10" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>';
@@ -216,6 +216,10 @@ export class Openp41geLogViewer extends LitElement {
     // Don't steal focus from interactive controls the user is about to operate.
     const t = e.target as HTMLElement | null;
     if (t && t.closest("button, input, textarea, select, a, [contenteditable]")) return;
+    // Keep focus inside the filter bar (input + suggest popup) while the user
+    // clicks a pill or a suggestion, otherwise focusing the list blurs the
+    // input and the popup closes on the very first option click.
+    if (t && t.closest(".filter-bar-wrap")) return;
     this._listEl?.focus();
   };
 
@@ -1134,9 +1138,10 @@ export class Openp41geLogViewer extends LitElement {
         .find-bar {
           display: flex;
           align-items: center;
-          gap: 8px;
-          height: 28px;
-          padding: 0 8px;
+          gap: 0;
+          height: 34px;
+          box-sizing: border-box;
+          padding: 0 0 0 8px;
           flex-shrink: 0;
           background: var(--bg-primary, #1e1e1e);
           border-top: 1px solid var(--border-divider, #2d2d2d);
@@ -1147,6 +1152,7 @@ export class Openp41geLogViewer extends LitElement {
           flex: 1 1 auto;
           min-width: 0;
           height: 100%;
+          margin-right: 8px;
           padding: 0;
           box-sizing: border-box;
           background: transparent;
@@ -1166,26 +1172,31 @@ export class Openp41geLogViewer extends LitElement {
         }
         .find-count {
           flex-shrink: 0;
+          margin-right: 8px;
           color: var(--text-secondary, #888);
           font-size: 11px;
         }
         .find-toggle {
           flex-shrink: 0;
-          width: 18px;
-          height: 18px;
+          align-self: stretch;
+          aspect-ratio: 1 / 1;
           display: grid;
           place-items: center;
           padding: 0;
           cursor: pointer;
           background: transparent;
           border: 1px solid transparent;
-          border-radius: 3px;
+          border-left-color: var(--border-divider, #2d2d2d);
+          border-radius: 0;
           color: var(--text-muted, #888);
+          box-sizing: border-box;
         }
         .find-toggle:hover {
+          background: rgba(255, 255, 255, 0.07);
           color: var(--text-primary, #d4d4d4);
         }
         .find-toggle.active {
+          background: rgba(255, 255, 255, 0.1);
           color: #4a9eff;
         }
         .find-entry-btn {
@@ -1217,8 +1228,9 @@ export class Openp41geLogViewer extends LitElement {
           display: flex;
           align-items: center;
           gap: 6px;
-          min-height: 28px;
+          min-height: 34px;
           padding: 3px 8px;
+          box-sizing: border-box;
           background: var(--bg-primary, #1e1e1e);
           border-top: 1px solid var(--border-divider, #2d2d2d);
           font-size: 11px;
@@ -1238,11 +1250,10 @@ export class Openp41geLogViewer extends LitElement {
           gap: 4px;
           padding: 1px 3px 1px 8px;
           background: rgba(86, 156, 214, 0.16);
-          border: 1px solid rgba(86, 156, 214, 0.38);
           border-radius: 999px;
           color: #569cd6;
           font-size: 11px;
-          line-height: 18px;
+          line-height: 20px;
           white-space: nowrap;
         }
         .filter-pill-label {
@@ -1449,6 +1460,7 @@ export class Openp41geLogViewer extends LitElement {
                                                 class="filter-suggest-item${this._isSelected(stream) ? " selected" : ""}${i === this._filterActiveIndex ? " active" : ""}"
                                                 data-stream=${stream}
                                                 data-filter-suggest-index=${i}
+                                                @pointerdown=${(e: PointerEvent) => e.preventDefault()}
                                                 @mousedown=${(e: MouseEvent) => e.preventDefault()}
                                                 @click=${() => this._toggleStream(stream)}
                                               >
@@ -1506,6 +1518,7 @@ export class Openp41geLogViewer extends LitElement {
           >
             ${unsafeHTML(ICON_SEARCH)}
           </button>
+          <span class="sep"></span>
           <button
             type="button"
             class="filter-entry-btn${this._filterOpen ? " active" : ""}"
@@ -1517,6 +1530,7 @@ export class Openp41geLogViewer extends LitElement {
           </button>
           <span class="sep"></span>
           <span class="spacer"></span>
+          <span class="sep"></span>
           ${LEVELS.map(
             (lvl) => html`
               <button

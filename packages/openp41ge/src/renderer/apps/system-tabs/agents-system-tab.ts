@@ -157,7 +157,7 @@ export class AgentsSystemTabController implements SystemTabController {
       "Agent settings",
       this._side,
     );
-    const searchBtn = this._makeFooterToolButton(searchIcon(18), "Search chats");
+    const searchBtn = this._makeFooterToolButton(searchIcon(20), "Search chats");
     searchBtn.addEventListener("click", () => this._openChatSearch());
     // Both icons sit on the INSIDE edge (facing the grid), settings first then
     // search, regardless of which side the sidebar is docked to. A flex spacer

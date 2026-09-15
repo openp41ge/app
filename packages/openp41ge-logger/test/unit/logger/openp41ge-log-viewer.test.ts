@@ -1287,6 +1287,38 @@ describe("stream filter", () => {
     await destroyViewer(el);
   });
 
+  it("clicking a suggestion does not close the popup opened via a stream name", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    // Open the filter by clicking a blue stream name (like a user would).
+    el.querySelector<HTMLElement>(".log-name")!.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
+    await update(el);
+    // Let the deferred _focusFilter run so the input is focused and the popup
+    // opens via its @focus handler.
+    await new Promise((r) => setTimeout(r, 0));
+    await update(el);
+    expect((el as any)._filterOpen).toBe(true);
+    expect((el as any)._filterSuggestOpen).toBe(true);
+    // In a real browser the host-level pointerdown listener fires here; it used
+    // to grab focus to .log-list, blurring the input and closing the popup.
+    const betaItem = [...el.querySelectorAll<HTMLElement>(".filter-suggest-item")].find(
+      (n) => n.querySelector(".filter-suggest-label")?.textContent === "beta",
+    )!;
+    betaItem.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+    await update(el);
+    // The popup must stay open (focus stays in the filter bar), and the click
+    // adds the second stream.
+    expect((el as any)._filterSuggestOpen).toBe(true);
+    betaItem.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await update(el);
+    expect((el as any)._selectedStreams).toEqual(["alpha", "beta"]);
+    expect((el as any)._filterSuggestOpen).toBe(true);
+    await destroyViewer(el);
+  });
+
   it("can be open at the same time as search, with the filter bar above search", async () => {
     const el = await createViewer();
     el.querySelector<HTMLButtonElement>("[data-testid=log-find-btn]")!.click();
