@@ -347,13 +347,14 @@ describe("file-editor inline commit-diff mode", () => {
     expect(themeStyle).toContain(".fe-hscroll-thumb");
   });
 
-  test("BEFORE and AFTER columns always share one content-derived width — a fully-deleted file leaves the AFTER column with the BEFORE column's width", async () => {
+  test("a fully-deleted file keeps BOTH number columns the same width, sized from the BEFORE content", async () => {
     const el = await mount();
-    (el as unknown as { _charWidth: number })._charWidth = 20; // widen so content beats the 48px min
+    (el as unknown as { _charWidth: number })._charWidth = 20; // widen so content beats the min
 
     // A fully-deleted file: every row removed, old numbers 1..120 (3 digits),
-    // NO new-side content at all (AFTER column would render empty). The shared
-    // width must come from the BEFORE column's content.
+    // NO new-side content at all (AFTER column would render empty). The digit
+    // width comes from the BEFORE column's content; the AFTER column matches it
+    // exactly (no extra allowance — a dot on the shared border separates them).
     const lineCount = 120;
     const text = Array.from({ length: lineCount }, (_, i) => `old deleted line ${i + 1}`).join(
       "\n",
@@ -365,9 +366,14 @@ describe("file-editor inline commit-diff mode", () => {
     }));
     await loadInlineDiff(el, text, rows);
 
-    const expected = 3 * 20 + 16; // 3 digits * charW + padding = 76
-    expect(el.querySelector(".fe-inline-left").style.width).toBe(`${expected}px`);
-    expect(el.querySelector(".fe-gutter").style.width).toBe(`${expected}px`);
+    const sharedWidth = 3 * 20 + 16; // 3 digits * charW + padding = 76
+    expect(el.querySelector(".fe-inline-left").style.width).toBe(`${sharedWidth}px`);
+    expect(el.querySelector(".fe-gutter").style.width).toBe(`${sharedWidth}px`);
+    // The two columns are flush (no gap): the AFTER column starts exactly where
+    // the BEFORE column ends.
+    expect(el.querySelector(".fe-inline-left").style.width).toBe(
+      el.querySelector(".fe-gutter").style.width,
+    );
     // The AFTER column is BLANK (no new side) yet stays as wide as the BEFORE.
     expect(middleLabels(el).every((t) => t === "")).toBe(true);
     expect(leftLabels(el)[0]).toBe("1");
@@ -386,8 +392,31 @@ describe("file-editor inline commit-diff mode", () => {
     ];
     await loadInlineDiff(el, "fresh one\nfresh two\nfresh three", rows);
 
-    const expected = 3 * 20 + 16; // 3 digits * charW + padding = 76
-    expect(el.querySelector(".fe-inline-left").style.width).toBe(`${expected}px`);
-    expect(el.querySelector(".fe-gutter").style.width).toBe(`${expected}px`);
+    const sharedWidth = 3 * 20 + 16; // 3 digits * charW + padding = 76
+    expect(el.querySelector(".fe-inline-left").style.width).toBe(`${sharedWidth}px`);
+    expect(el.querySelector(".fe-gutter").style.width).toBe(`${sharedWidth}px`);
+  });
+
+  test("a separator dot is painted on the shared border between the two columns", async () => {
+    const el = await mount();
+    (el as unknown as { _charWidth: number })._charWidth = 20;
+    await loadInlineDiff(el, TEXT, ROWS);
+
+    const dots = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-dot")];
+    // One dot per visible row (the jsdom band renders lines 1..2).
+    expect(dots.length).toBeGreaterThanOrEqual(2);
+    // The dot is a small circle centered on the column's right edge (the shared
+    // border) — it translates -50% to straddle the boundary. It needs a z-index
+    // so it paints ABOVE the AFTER gutter column (the gutter is a later sibling
+    // and would otherwise cover the dot's right half). pointer-events:none keeps
+    // it from intercepting the row's click/hover.
+    for (const dot of dots) {
+      expect(dot.style.position).toBe("absolute");
+      expect(dot.style.borderRadius).toBe("50%");
+      expect(dot.style.left).toBe("100%");
+      expect(dot.style.transform).toContain("translateX(-50%)");
+      expect(dot.style.zIndex).toBe("2");
+      expect(dot.style.pointerEvents).toBe("none");
+    }
   });
 });

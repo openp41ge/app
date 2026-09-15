@@ -340,7 +340,10 @@ export class FileEditorElement extends LitElement {
     // Two line-number columns only (BEFORE left / AFTER middle); the +/− sign
     // column is gone — the number CELLS carry the colour instead (red BEFORE
     // cell on deleted rows, green AFTER cell on added rows).
-    let gutterWidth = 48; // middle (after)
+    // The AFTER (middle/rightmost) column is sized by the file's total line
+    // count, exactly like the plain editor gutter. The BEFORE (left) column is
+    // hidden entirely when there is no diff.
+    let gutterWidth = this._computeGutterWidth(this._viewModel?.lineCount ?? 0); // middle (after)
     let leftWidth = 36;
     let rowsForColumns: InlineDiffGutterRows | null = null;
     if (this._inlineRows) {
@@ -358,14 +361,16 @@ export class FileEditorElement extends LitElement {
           maxNew = Math.max(maxNew, String(row.newLine).length);
         }
       }
-      // BOTH number columns always share ONE width, derived from whichever
-      // column has the widest content. A fully-DELETED file (all rows removed,
-      // maxNew = 0) still reserves the AFTER column using the BEFORE column's
-      // numbers — and a wholly-NEW file does the reverse (maxOld = 0). This
-      // keeps the two columns flush and their right-aligned place values on
-      // top of each other.
+      // The two number columns are sized by the number of lines on each side
+      // (the widest number that can appear there). A fully-DELETED file (all
+      // rows removed, maxNew = 0) still reserves the AFTER column using the
+      // BEFORE column's numbers — and a wholly-NEW file does the reverse
+      // (maxOld = 0). Both columns are the SAME width (the widest number), so
+      // their right-aligned place values line up; a small dot painted on the
+      // shared border between them keeps the old and new numbers visually
+      // separate (see InlineDiffGutterColumns).
       const maxDigits = Math.max(maxOld, maxNew);
-      const sharedWidth = Math.max(48, Math.ceil(maxDigits * charW) + 16);
+      const sharedWidth = Math.max(32, Math.ceil(maxDigits * charW) + 16);
       gutterWidth = sharedWidth;
       leftWidth = sharedWidth;
       rowsForColumns = {
@@ -1736,6 +1741,9 @@ export class FileEditorElement extends LitElement {
     this._lineWidthTracker.reset();
     this._lineWidthTracker.measureRange(1, model.lineCount);
     this._refreshContentWidth();
+    // Size the line-numbers gutter to the file's line count (and refresh it
+    // whenever the model is (re)loaded).
+    this._applyGutterWidth();
     this._attachVerticalScrollbar();
 
     // Do NOT focus the textarea here. Opening a file (e.g. from the Explorer)
@@ -1856,6 +1864,27 @@ export class FileEditorElement extends LitElement {
     const w = testEl.scrollWidth / 100;
     this._viewportEl.removeChild(testEl);
     return w;
+  }
+
+  /**
+   * Width of the line-numbers gutter, decided by the number of lines in the
+   * file. Line numbers are right-aligned, so the column only needs to be wide
+   * enough for the widest number plus its padding: a file with up to 99 lines
+   * needs room for 2 digits, up to 999 for 3, and so on. Because this depends
+   * on the file's line count, different files get a different gutter width.
+   */
+  private _computeGutterWidth(lineCount: number): number {
+    const charW = this._charWidth > 0 ? this._charWidth : 8;
+    const digits = Math.max(1, String(Math.max(1, lineCount)).length);
+    // digits * charWidth + 8px left gap + 8px right padding.
+    return Math.ceil(digits * charW) + 16;
+  }
+
+  /** Recompute and apply the line-numbers gutter width for the current file.
+   * No-op when an inline diff is active (setInlineDiff owns the widths there). */
+  private _applyGutterWidth(): void {
+    if (!this._viewModel || this._inlineRows) return;
+    this._lineNumbersOverlay?.setGutterWidth(this._computeGutterWidth(this._viewModel.lineCount));
   }
 
   /**
@@ -2060,9 +2089,22 @@ export class FileEditorElement extends LitElement {
         },
       };
       this._lineNumbersOverlay.setConfig(overrides);
-      // Expand line number range to cover all model lines when wrapped
+      // After a wrap toggle the number of model lines that fit the viewport
+      // changes, so the overlay's visible range must be recomputed. When
+      // wrapping is ON we expand the range so the numbers reach across the
+      // whole (wrapped) document; when OFF we re-sync to the view's current
+      // visible model range. `rebuildAll()` in non-wrapped mode does not emit
+      // `onVisibleRangeChanged` (and `onScroll` may no-op when the computed
+      // range is unchanged), so without this the overlay keeps its pre-toggle
+      // (wrapped) entry set and the lines at the bottom of the viewport render
+      // without numbers until the next scroll event.
       if (this._wordWrapEnabled && this._viewModel) {
         this._lineNumbersOverlay.setVisibleRange(1, Math.min(this._viewModel.lineCount, 500));
+      } else if (this._viewLines && this._viewModel) {
+        this._viewLines.onScroll(this._viewportEl.scrollTop, this._viewportEl.clientHeight);
+        const start = this._viewLines.startLineNumber || 1;
+        const end = this._viewLines.endLineNumber || this._viewModel.lineCount;
+        this._lineNumbersOverlay.setVisibleRange(start, end);
       }
     }
     this._updateHScroll();
@@ -2321,6 +2363,10 @@ export class FileEditorElement extends LitElement {
 
     // Update line count (this also updates scroll height)
     this._viewLines.setTotalLineCount(this._viewModel.lineCount);
+
+    // A line insert/delete can change the size of the largest line number, so
+    // re-size the line-numbers gutter to the current file's line count.
+    this._applyGutterWidth();
 
     // Pre-compute bracket depths BEFORE rendering so they're available
     // when onLineRender fires during onScroll/refresh.

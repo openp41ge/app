@@ -15,6 +15,11 @@
  * tinted green for added rows — colored cells run all the way across, no +/−
  * symbols. There is no separate sign column anymore.
  *
+ * The two number columns are the SAME width and sit flush against each other.
+ * To keep the old and new numbers visually separate, a small dot is painted on
+ * the shared border between them, vertically centered on each line — it reads
+ * as a dotted separator ("old · new") without widening the column.
+ *
  * Wheel events over these columns now scroll the editor NATIVELY: the columns
  * are inside the viewport's scroll container (one unified scroll — the same
  * spatial model as VSCode), so no wheel forwarding or transform following is
@@ -46,6 +51,11 @@ interface InlineBandEl extends HTMLDivElement {
   __st?: InlineBandCache;
 }
 
+/** The small separator dot painted on the border between the two columns. */
+interface InlineDotEl extends HTMLDivElement {
+  __top?: number;
+}
+
 /** Per-buffer-line provider of the left column's content. */
 export interface InlineDiffGutterRows {
   infoFor(lineNumber: number): InlineDiffGutterRowInfo;
@@ -55,6 +65,7 @@ export class InlineDiffGutterColumns {
   private _leftOuter: HTMLElement;
   private _leftInner: HTMLElement;
   private _entries = new Map<number, InlineBandEl>();
+  private _dots = new Map<number, InlineDotEl>();
   private _lineHeight: number;
   private _rows: InlineDiffGutterRows | null = null;
   private _onLineClick: ((lineNumber: number) => void) | null = null;
@@ -76,14 +87,17 @@ export class InlineDiffGutterColumns {
     this._leftOuter.className = "fe-inline-left";
     // Horizontal pinning is owned by the sticky .fe-gutter-group the column
     // lives in — this column itself is plain (relative) and scrolls VERTICALLY
-    // natively with the content.
+    // natively with the content. overflow:visible (not hidden) so the separator
+    // dot can straddle the column's right edge and sit on the shared border.
     this._leftOuter.style.cssText =
-      "flex-shrink:0;position:relative;overflow:hidden;display:none;" +
+      "flex-shrink:0;position:relative;overflow:visible;display:none;" +
       "background:var(--fe-bg,#161616);user-select:none;" +
       "font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
     this._leftInner = document.createElement("div");
+    // overflow:visible so the separator dot (positioned at the column's right
+    // edge) shows past the column instead of being clipped.
     this._leftInner.style.cssText =
-      "position:absolute;top:0;left:0;right:0;height:100%;overflow:hidden;";
+      "position:absolute;top:0;left:0;right:0;height:100%;overflow:visible;";
     this._leftOuter.appendChild(this._leftInner);
     contentEl.insertBefore(this._leftOuter, gutterEl);
   }
@@ -95,6 +109,22 @@ export class InlineDiffGutterColumns {
     this._leftOuter.style.width = `${leftWidth}px`;
   }
 
+  /** Small separator dot painted on the shared border between the columns. */
+  private _makeDot(): InlineDotEl {
+    const dot = document.createElement("div") as InlineDotEl;
+    dot.className = "fe-inline-left-dot";
+    // Centered horizontally on the column's right edge via left:100% + a
+    // translateX(-50%) (applied per-frame in setVisibleRange). The dot straddles
+    // the shared border, so it needs a z-index to paint ABOVE the AFTER gutter
+    // column — the gutter is a later sibling in the flex row and would otherwise
+    // cover the dot's right half. pointer-events none so it never intercepts
+    // the row's click/hover.
+    dot.style.cssText =
+      "position:absolute;width:4px;height:4px;border-radius:50%;" +
+      "background:var(--fe-secondary-color,#888);pointer-events:none;z-index:2;";
+    return dot;
+  }
+
   /**
    * Attach the content provider (rows) and show the column; null hides it
    * (normal file mode — no extra before-column).
@@ -103,6 +133,12 @@ export class InlineDiffGutterColumns {
     if (this._disposed) return;
     this._rows = rows;
     this._leftOuter.style.display = rows !== null ? "" : "none";
+    // Leaving diff mode — drop the separator dots; they only belong to the
+    // shown BEFORE column.
+    if (!rows) {
+      for (const dot of this._dots.values()) dot.remove();
+      this._dots.clear();
+    }
   }
 
   /** Rebuild the absolutely-placed labels for the visible band. When word
@@ -123,6 +159,9 @@ export class InlineDiffGutterColumns {
       if (line < start || line > end) {
         el.remove();
         this._entries.delete(line);
+        const dot = this._dots.get(line);
+        dot?.remove();
+        this._dots.delete(line);
       }
     }
 
@@ -166,6 +205,14 @@ export class InlineDiffGutterColumns {
         }
         st = { top: NaN, height: NaN, text: undefined, cls: undefined, active: undefined, hover: undefined };
         el.__st = st;
+        // The separator dot sits on the shared border of this row. Only in
+        // diff mode (no dots pile up while the column is hidden in normal
+        // file mode).
+        if (this._rows) {
+          const dot = this._makeDot();
+          this._leftInner.appendChild(dot);
+          this._dots.set(line, dot);
+        }
       }
 
       if (st!.top !== top) {
@@ -175,6 +222,20 @@ export class InlineDiffGutterColumns {
       if (st!.height !== height) {
         el.style.height = `${height}px`;
         st!.height = height;
+      }
+
+      // Position the separator dot: centered horizontally on the column's
+      // right edge (the shared border), vertically centered on the row's first
+      // segment (where both numbers sit).
+      const dot = this._dots.get(line);
+      if (dot) {
+        const dotTop = (vStart - 1) * this._lineHeight + this._lineHeight / 2 - 2;
+        if (dot.__top !== dotTop) {
+          dot.style.top = `${dotTop}px`;
+          dot.__top = dotTop;
+        }
+        dot.style.left = "100%";
+        dot.style.transform = "translateX(-50%)";
       }
 
       const info = this._rows ? this._rows.infoFor(line) : { leftLabel: "", cls: "" };
@@ -257,6 +318,8 @@ export class InlineDiffGutterColumns {
     this._disposed = true;
     for (const el of this._entries.values()) el.remove();
     this._entries.clear();
+    for (const dot of this._dots.values()) dot.remove();
+    this._dots.clear();
     this._leftOuter.remove();
   }
 }

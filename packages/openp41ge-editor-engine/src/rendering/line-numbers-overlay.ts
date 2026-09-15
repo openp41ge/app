@@ -329,12 +329,20 @@ export class LineNumbersOverlay {
 
   /**
    * Change the gutter width at runtime (e.g. an inline diff needs room for its
-   * `old new +` labels). Existing labels re-center automatically.
+   * `old new +` labels, or the plain editor sizes the column to the file's
+   * line count). The new width propagates to the inner scroll container and
+   * every existing label wrapper, so already-painted numbers reflow to the
+   * new width instead of staying at the old one until the band is next
+   * rebuilt.
    */
   setGutterWidth(width: number): void {
     if (width <= 0 || this._disposed) return;
     this._config.gutterWidth = width;
     this._gutterEl.setWidth(width);
+    this._scrollContainer.setWidth(width);
+    for (const [, entry] of this._entries) {
+      entry.wrapper.setWidth(width);
+    }
   }
 
   /**
