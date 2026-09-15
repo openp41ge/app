@@ -1004,3 +1004,333 @@ describe("in-log search", () => {
     await destroyViewer(el);
   });
 });
+
+// ── Stream filter (bottom-bar funnel) ──
+
+describe("stream filter", () => {
+  const update = (el: Openp41geLogViewer) => (el as unknown as Openp41geLogViewer).updateComplete;
+
+  it("renders a funnel filter button in the bottom bar", async () => {
+    const el = await createViewer();
+    expect(el.querySelector("[data-testid=log-filter-btn]")).toBeTruthy();
+    await destroyViewer(el);
+  });
+
+  it("hides the filter bar until opened", async () => {
+    const el = await createViewer();
+    expect(el.querySelector(".filter-bar")).toBeNull();
+    await destroyViewer(el);
+  });
+
+  it("opens the filter bar via the bottom-bar funnel button", async () => {
+    const el = await createViewer();
+    const btn = el.querySelector<HTMLButtonElement>("[data-testid=log-filter-btn]")!;
+    btn.click();
+    await update(el);
+    expect(el.querySelector(".filter-bar")).toBeTruthy();
+    expect((el as any)._filterOpen).toBe(true);
+    await destroyViewer(el);
+  });
+
+  it("renders selected streams as removable pills", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    (el as any)._addStream("alpha");
+    (el as any)._addStream("beta");
+    await update(el);
+    const pills = el.querySelectorAll(".filter-pill");
+    expect(pills).toHaveLength(2);
+    expect(el.querySelector(".filter-pill-label")!.textContent).toBe("alpha");
+    expect(el.querySelector(".filter-pill-x")).toBeTruthy();
+    await destroyViewer(el);
+  });
+
+  it("clicking a pill's × removes the stream from the filter", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    (el as any)._addStream("alpha");
+    (el as any)._addStream("beta");
+    await update(el);
+    const x = el.querySelector<HTMLButtonElement>(".filter-pill-x")!;
+    x.click();
+    await update(el);
+    expect((el as any)._selectedStreams).toEqual(["beta"]);
+    expect(el.querySelectorAll(".filter-pill")).toHaveLength(1);
+    await destroyViewer(el);
+  });
+
+  it("filter narrows the visible list to selected streams (OR, case-insensitive)", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    pushLog(LogLevel.INFO, "test", "gamma", ["g1"]);
+    const el = await createViewer();
+    (el as any)._addStream("alpha");
+    (el as any)._addStream("BETA");
+    await update(el);
+    const visible = (el as any)._visible;
+    expect(visible.map((e: any) => e.source).sort()).toEqual(["alpha", "beta"]);
+    await destroyViewer(el);
+  });
+
+  it("selecting a value filters the rendered log rows to what is selected", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    pushLog(LogLevel.INFO, "test", "gamma", ["g1"]);
+    const el = await createViewer();
+    // All three streams are rendered initially.
+    expect(entries(el)).toHaveLength(3);
+    (el as any)._addStream("alpha");
+    await update(el);
+    expect(entries(el)).toHaveLength(1);
+    expect(entries(el)[0].querySelector(".log-name")!.textContent).toBe("[alpha]");
+    // Add a second stream → both are shown.
+    (el as any)._addStream("beta");
+    await update(el);
+    expect(entries(el)).toHaveLength(2);
+    await destroyViewer(el);
+  });
+
+  it("shows nothing when the selected streams match none of the loaded entries", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    const el = await createViewer();
+    (el as any)._addStream("nope");
+    await update(el);
+    expect((el as any)._visible).toHaveLength(0);
+    expect(entries(el)).toHaveLength(0);
+    await destroyViewer(el);
+  });
+
+  it("clearing the selection restores all rendered logs", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    (el as any)._addStream("alpha");
+    await update(el);
+    expect(entries(el)).toHaveLength(1);
+    // Close the filter (resets the selection) → all streams render again.
+    (el as any)._closeFilter();
+    await update(el);
+    expect(entries(el)).toHaveLength(2);
+    await destroyViewer(el);
+  });
+
+  it("shows all streams when no streams are selected", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    await update(el);
+    expect((el as any)._visible).toHaveLength(2);
+    expect(entries(el)).toHaveLength(2);
+    await destroyViewer(el);
+  });
+
+  it("opens an auto-suggest popup instead of a native datalist", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    await update(el);
+    // The removable-pill filter no longer uses the native down-arrow datalist.
+    expect(el.querySelector("datalist")).toBeNull();
+    (el as any)._openSuggest();
+    await update(el);
+    expect(el.querySelector("[data-testid=log-filter-suggest]")).toBeTruthy();
+    await destroyViewer(el);
+  });
+
+  it("lists the available streams in the popup", async () => {
+    pushLog(LogLevel.INFO, "test", "zeta", ["z1"]);
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    (el as any)._filterSuggestOpen = true;
+    await update(el);
+    const streams = [...el.querySelectorAll(".filter-suggest-label")].map((n) => n.textContent);
+    expect(streams).toContain("zeta");
+    expect(streams).toContain("alpha");
+    await destroyViewer(el);
+  });
+
+  it("typing filters the popup list by stream name", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    await update(el);
+    const input = el.querySelector<HTMLInputElement>("[data-testid=log-filter-input]")!;
+    input.value = "al";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await update(el);
+    const streams = [...el.querySelectorAll(".filter-suggest-label")].map((n) => n.textContent);
+    expect(streams).toEqual(["alpha"]);
+    await destroyViewer(el);
+  });
+
+  it("arrow keys navigate the popup and Enter toggles the highlighted stream", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    (el as any)._openFilter();
+    await update(el);
+    const input = el.querySelector<HTMLInputElement>("[data-testid=log-filter-input]")!;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await update(el);
+    expect((el as any)._filterActiveIndex).toBe(0);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await update(el);
+    expect((el as any)._selectedStreams).toEqual(["alpha"]);
+    await destroyViewer(el);
+  });
+
+  it("Space toggles the highlighted stream in the popup", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    (el as any)._openFilter();
+    await update(el);
+    const input = el.querySelector<HTMLInputElement>("[data-testid=log-filter-input]")!;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await update(el);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    await update(el);
+    expect((el as any)._selectedStreams).toEqual(["alpha"]);
+    await destroyViewer(el);
+  });
+
+  it("clicking a popup option toggles the stream on and off", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    (el as any)._filterSuggestOpen = true;
+    await update(el);
+    el.querySelector<HTMLElement>(".filter-suggest-item")!.click();
+    await update(el);
+    expect((el as any)._selectedStreams).toEqual(["alpha"]);
+    // Clicking again removes it (toggle). Re-query: the node may be re-rendered.
+    el.querySelector<HTMLElement>(".filter-suggest-item")!.click();
+    await update(el);
+    expect((el as any)._selectedStreams).toEqual([]);
+    await destroyViewer(el);
+  });
+
+  it("the popup stays open after selecting a stream via click", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    (el as any)._filterSuggestOpen = true;
+    await update(el);
+    expect(el.querySelector("[data-testid=log-filter-suggest]")).toBeTruthy();
+    // Click the first suggestion ("alpha"): it becomes a selected pill.
+    el.querySelector<HTMLElement>(".filter-suggest-item")!.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
+    await update(el);
+    // The popup remains open so a second stream can be picked.
+    expect((el as any)._filterSuggestOpen).toBe(true);
+    expect((el as any)._selectedStreams).toEqual(["alpha"]);
+    expect(el.querySelector("[data-testid=log-filter-suggest]")).toBeTruthy();
+    await destroyViewer(el);
+  });
+
+  it("clicking the filter input reopens the suggestions even after they were closed", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    pushLog(LogLevel.INFO, "test", "beta", ["b1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    await update(el);
+    // Popup open, then closed (e.g. the input kept focus but the popup hid).
+    (el as any)._openSuggest();
+    await update(el);
+    expect(el.querySelector("[data-testid=log-filter-suggest]")).toBeTruthy();
+    (el as any)._closeSuggest();
+    await update(el);
+    expect(el.querySelector("[data-testid=log-filter-suggest]")).toBeNull();
+    // Clicking the already-focused input reopens the popup (no @focus event).
+    const input = el.querySelector<HTMLInputElement>("[data-testid=log-filter-input]")!;
+    input.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await update(el);
+    expect((el as any)._filterSuggestOpen).toBe(true);
+    expect(el.querySelector("[data-testid=log-filter-suggest]")).toBeTruthy();
+    await destroyViewer(el);
+  });
+
+  it("closes the popup when focus leaves the filter bar (clicking away)", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    (el as any)._filterSuggestOpen = true;
+    await update(el);
+    expect(el.querySelector("[data-testid=log-filter-suggest]")).toBeTruthy();
+    const input = el.querySelector<HTMLInputElement>("[data-testid=log-filter-input]")!;
+    input.dispatchEvent(
+      new FocusEvent("focusout", { bubbles: true, relatedTarget: document.body }),
+    );
+    await update(el);
+    expect((el as any)._filterSuggestOpen).toBe(false);
+    expect(el.querySelector("[data-testid=log-filter-suggest]")).toBeNull();
+    await destroyViewer(el);
+  });
+
+  it("clicking the stream name in a log row opens the filter and adds it", async () => {
+    pushLog(LogLevel.INFO, "test", "dev-tools", ["hello"]);
+    const el = await createViewer();
+    const name = el.querySelector<HTMLElement>(".log-name")!;
+    name.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await update(el);
+    expect((el as any)._filterOpen).toBe(true);
+    expect((el as any)._selectedStreams).toEqual(["dev-tools"]);
+    expect(el.querySelector(".filter-bar")).toBeTruthy();
+    await destroyViewer(el);
+  });
+
+  it("can be open at the same time as search, with the filter bar above search", async () => {
+    const el = await createViewer();
+    el.querySelector<HTMLButtonElement>("[data-testid=log-find-btn]")!.click();
+    await update(el);
+    el.querySelector<HTMLButtonElement>("[data-testid=log-filter-btn]")!.click();
+    await update(el);
+
+    const filterBar = el.querySelector(".filter-bar")!;
+    const findBar = el.querySelector(".find-bar")!;
+    expect(filterBar).toBeTruthy();
+    expect(findBar).toBeTruthy();
+    // The stream filter bar sits directly above the search bar.
+    expect(
+      filterBar.compareDocumentPosition(findBar) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await destroyViewer(el);
+  });
+
+  it("Escape closes the filter bar and clears the selection", async () => {
+    pushLog(LogLevel.INFO, "test", "alpha", ["a1"]);
+    const el = await createViewer();
+    (el as any)._filterOpen = true;
+    (el as any)._selectedStreams = ["alpha"];
+    await update(el);
+    const input = el.querySelector<HTMLInputElement>("[data-testid=log-filter-input]")!;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await update(el);
+    expect((el as any)._filterOpen).toBe(false);
+    expect((el as any)._selectedStreams).toEqual([]);
+    await destroyViewer(el);
+  });
+
+  it("a stream filter narrows active search matches", async () => {
+    pushLog(LogLevel.INFO, "test", "mod", ["foo one"]);
+    pushLog(LogLevel.INFO, "test", "other", ["foo two"]);
+    const el = await createViewer();
+    (el as any)._searchOpen = true;
+    (el as any)._searchQuery = "foo";
+    await (el as any)._refreshSearch();
+    await update(el);
+    // Filter to the "mod" stream → only its match survives.
+    (el as any)._addStream("mod");
+    const msgs = (el as any)._searchMatches.map((m: any) => m.entry.message);
+    expect(msgs).toEqual(["foo one"]);
+    await destroyViewer(el);
+  });
+});

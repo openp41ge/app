@@ -50,6 +50,13 @@ interface LogMatchOccurrence {
 // magnifier+list searchIcon, so both use the same glyph.
 const ICON_SEARCH =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="18" height="18" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
+// Funnel icon for the stream filter. Matches the Explorer sidebar's Material
+// filter_list glyph. Uses currentColor so it tracks the button's state.
+const ICON_FILTER =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="18" height="18" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></svg>';
+// Small × for the stream pills.
+const ICON_CLOSE =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="10" height="10" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>';
 const ICON_REGEX =
   '<svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><text x="0.5" y="11" font-size="11" font-family="Consolas,monospace" font-weight="600">.*</text></svg>';
 const ICON_CASE =
@@ -113,6 +120,16 @@ export class Openp41geLogViewer extends LitElement {
   // In-log find bar (Cmd/Ctrl+F or the bottom-bar search icon). Spans today's
   // logs plus any day the user explicitly confirmed via the day-boundary row —
   // including entries not yet loaded into the virtual window.
+  // Stream filter (bottom-bar funnel icon). Independent of the find bar — both
+  // can be open at once, and each narrows the visible list. Multi-select: each
+  // chosen stream `source` (the blue `[name]`, without brackets) becomes a pill,
+  // and a matching auto-suggest popup (above the bar) adds/removes more.
+  @state() private _filterOpen = false;
+  @state() private _selectedStreams: string[] = [];
+  @state() private _filterQuery = "";
+  @state() private _filterSuggestOpen = false;
+  @state() private _filterActiveIndex = 0;
+
   @state() private _searchOpen = false;
   @state() private _searchQuery = "";
   @state() private _searchRegex = false;
@@ -202,9 +219,14 @@ export class Openp41geLogViewer extends LitElement {
     this._listEl?.focus();
   };
 
-  /** The entries that pass the current level filter (all logs, datetime order). */
+  /** The entries that pass the current level + stream filter (all logs, datetime order). */
   private get _visible(): LogViewEntry[] {
-    return this._entries.filter((e) => e.level >= this._minLevel);
+    const streams = new Set(this._selectedStreams.map((s) => s.toLowerCase()));
+    return this._entries.filter((e) => {
+      if (e.level < this._minLevel) return false;
+      if (streams.size && !streams.has(e.source.toLowerCase())) return false;
+      return true;
+    });
   }
 
   /** Stable key used to cache an item's measured pixel height. */
@@ -263,6 +285,11 @@ export class Openp41geLogViewer extends LitElement {
     this._viewStart = 0;
     this._viewEnd = 0;
     this._measurePasses = 0;
+    this._filterOpen = false;
+    this._selectedStreams = [];
+    this._filterQuery = "";
+    this._filterSuggestOpen = false;
+    this._filterActiveIndex = 0;
     this._searchOpen = false;
     this._searchQuery = "";
     this._searchMatches = [];
@@ -383,6 +410,158 @@ export class Openp41geLogViewer extends LitElement {
     // Wrapping changes every row's height, so discard measured heights.
     this._heightCache = new Map<string, number>();
     this._layoutDirty = true;
+  }
+
+  // ═══ Stream filter (bottom-bar funnel) ────────────────────────────────
+
+  /** Unique stream (source) names currently loaded, sorted for the popup. */
+  private get _availableStreams(): string[] {
+    const set = new Set<string>();
+    for (const e of this._entries) set.add(e.source);
+    return [...set].sort();
+  }
+
+  /** Streams shown in the popup, narrowed by what the user has typed. */
+  private get _suggestStreams(): string[] {
+    const query = this._filterQuery.trim().toLowerCase();
+    const streams = this._availableStreams;
+    if (!query) return streams;
+    return streams.filter((s) => s.toLowerCase().includes(query));
+  }
+
+  private _isSelected(stream: string): boolean {
+    return this._selectedStreams.some((s) => s.toLowerCase() === stream.toLowerCase());
+  }
+
+  /** Open the filter bar; if a stream is given, add it to the selection. */
+  private _openFilter(source?: string): void {
+    this._filterOpen = true;
+    if (source) this._addStream(source);
+    // Focus AFTER Lit has rendered the input (openFilter only marks state).
+    setTimeout(() => this._focusFilter(), 0);
+  }
+
+  private _closeFilter(): void {
+    this._filterOpen = false;
+    this._selectedStreams = [];
+    this._filterQuery = "";
+    this._filterSuggestOpen = false;
+    this._filterActiveIndex = 0;
+    this._layoutDirty = true;
+    if (this._searchOpen) this._computeSearchMatches();
+    this.requestUpdate();
+  }
+
+  private _toggleFilter(): void {
+    if (this._filterOpen) this._closeFilter();
+    else this._openFilter();
+  }
+
+  /** Replace the selection, mark the list dirty so `_visible` is re-rendered,
+   * and recompute any active search over it. */
+  private _setSelectedStreams(streams: string[]): void {
+    this._selectedStreams = streams;
+    this._layoutDirty = true;
+    if (this._searchOpen) this._computeSearchMatches();
+    this.requestUpdate();
+  }
+
+  /** Add a stream (if absent) — used by clicking a stream name in a log row. */
+  private _addStream(stream: string): void {
+    if (this._isSelected(stream)) return;
+    this._setSelectedStreams([...this._selectedStreams, stream]);
+  }
+
+  /** Add or remove a stream — used by the popup (click / Enter / Space). */
+  private _toggleStream(stream: string): void {
+    this._setSelectedStreams(
+      this._isSelected(stream)
+        ? this._selectedStreams.filter((s) => s.toLowerCase() !== stream.toLowerCase())
+        : [...this._selectedStreams, stream],
+    );
+  }
+
+  /** Remove a stream — used by the pill's × button. */
+  private _removeStream(stream: string): void {
+    const lowered = stream.toLowerCase();
+    this._setSelectedStreams(this._selectedStreams.filter((s) => s.toLowerCase() !== lowered));
+  }
+
+  private _openSuggest(): void {
+    this._filterSuggestOpen = true;
+    this.requestUpdate();
+  }
+
+  private _closeSuggest(): void {
+    this._filterSuggestOpen = false;
+    this._filterActiveIndex = 0;
+    this.requestUpdate();
+  }
+
+  private _focusFilter(): void {
+    this.querySelector<HTMLInputElement>("[data-testid=log-filter-input]")?.focus();
+  }
+
+  private _onFilterInput = (e: InputEvent): void => {
+    this._filterQuery = (e.target as HTMLInputElement).value;
+    this._filterActiveIndex = 0;
+    this._openSuggest();
+  };
+
+  private _onFilterFocusOut = (e: FocusEvent): void => {
+    // Keep the popup open when focus moves within the filter bar (e.g. to a
+    // pill's × button); close it when focus leaves entirely (clicking away).
+    const next = e.relatedTarget as Node | null;
+    const wrap = this.querySelector<HTMLElement>(".filter-bar-wrap");
+    if (wrap && next && wrap.contains(next)) return;
+    this._closeSuggest();
+  };
+
+  private _onFilterKeyDown = (e: KeyboardEvent): void => {
+    const streams = this._suggestStreams;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!this._filterSuggestOpen) {
+        this._openSuggest();
+        this._filterActiveIndex = 0;
+      } else if (streams.length) {
+        this._filterActiveIndex = Math.min(this._filterActiveIndex + 1, streams.length - 1);
+      }
+      this.requestUpdate();
+      void this.updateComplete.then(() => this._scrollActiveSuggestIntoView());
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!this._filterSuggestOpen) {
+        this._openSuggest();
+        this._filterActiveIndex = Math.max(streams.length - 1, 0);
+      } else if (streams.length) {
+        this._filterActiveIndex = Math.max(this._filterActiveIndex - 1, 0);
+      }
+      this.requestUpdate();
+      void this.updateComplete.then(() => this._scrollActiveSuggestIntoView());
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (!this._filterSuggestOpen) {
+        this._openSuggest();
+      } else if (streams.length) {
+        const idx = Math.min(this._filterActiveIndex, streams.length - 1);
+        this._toggleStream(streams[idx]);
+      }
+    } else if (e.key === "Escape") {
+      if (this._filterSuggestOpen) {
+        this._closeSuggest();
+      } else {
+        this._closeFilter();
+        this._listEl?.focus();
+      }
+    }
+  };
+
+  private _scrollActiveSuggestIntoView(): void {
+    const el = this.querySelector<HTMLElement>(
+      `[data-filter-suggest-index="${this._filterActiveIndex}"]`,
+    );
+    el?.scrollIntoView({ block: "nearest" });
   }
 
   // ═══ In-log find (Cmd/Ctrl+F) ─────────────────────────────────────────
@@ -921,6 +1100,10 @@ export class Openp41geLogViewer extends LitElement {
           display: inline;
           color: #569cd6;
           margin-right: 4px;
+          cursor: pointer;
+        }
+        .log-name:hover {
+          text-decoration: underline;
         }
         .log-text {
           display: inline;
@@ -1026,6 +1209,141 @@ export class Openp41geLogViewer extends LitElement {
           background: rgba(255, 255, 255, 0.1);
           color: var(--text-primary, #fff);
         }
+        .filter-bar-wrap {
+          position: relative;
+          flex-shrink: 0;
+        }
+        .filter-bar {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 28px;
+          padding: 3px 8px;
+          background: var(--bg-primary, #1e1e1e);
+          border-top: 1px solid var(--border-divider, #2d2d2d);
+          font-size: 11px;
+          color: var(--text-secondary, #999);
+        }
+        .filter-pills {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 4px;
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+        .filter-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 1px 3px 1px 8px;
+          background: rgba(86, 156, 214, 0.16);
+          border: 1px solid rgba(86, 156, 214, 0.38);
+          border-radius: 999px;
+          color: #569cd6;
+          font-size: 11px;
+          line-height: 18px;
+          white-space: nowrap;
+        }
+        .filter-pill-label {
+          max-width: 180px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .filter-pill-x {
+          display: grid;
+          place-items: center;
+          width: 16px;
+          height: 16px;
+          padding: 0;
+          border: none;
+          border-radius: 50%;
+          background: transparent;
+          color: inherit;
+          cursor: pointer;
+        }
+        .filter-pill-x:hover {
+          background: rgba(255, 255, 255, 0.16);
+        }
+        .filter-input {
+          flex: 1 1 100px;
+          min-width: 60px;
+          height: 22px;
+          padding: 0;
+          box-sizing: border-box;
+          background: transparent;
+          border: none;
+          border-radius: 0;
+          color: var(--text-primary, #ccc);
+          font-size: 12px;
+          font-family: inherit;
+          outline: none;
+        }
+        .filter-input:focus,
+        .filter-input:focus-visible {
+          outline: none;
+        }
+        .filter-suggest {
+          position: absolute;
+          bottom: 100%;
+          left: 0;
+          right: 0;
+          max-height: 180px;
+          overflow-y: auto;
+          background: var(--bg-primary, #1e1e1e);
+          border: 1px solid var(--border-divider, #2d2d2d);
+          border-bottom: none;
+          box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.35);
+          z-index: 10;
+        }
+        .filter-suggest-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 4px 10px;
+          cursor: pointer;
+          font-size: 12px;
+          color: var(--text-primary, #ccc);
+        }
+        .filter-suggest-item:hover,
+        .filter-suggest-item.active {
+          background: rgba(255, 255, 255, 0.08);
+        }
+        .filter-suggest-item.selected {
+          color: #569cd6;
+        }
+        .filter-suggest-check {
+          color: #569cd6;
+          font-size: 11px;
+          line-height: 1;
+        }
+        .filter-suggest-empty {
+          padding: 6px 10px;
+          font-size: 12px;
+          color: var(--text-secondary, #999);
+        }
+        .filter-entry-btn {
+          flex-shrink: 0;
+          align-self: stretch;
+          aspect-ratio: 1 / 1;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          cursor: pointer;
+          background: transparent;
+          border: 1px solid transparent;
+          color: var(--text-secondary, #999);
+          box-sizing: border-box;
+        }
+        .filter-entry-btn:hover {
+          background: rgba(255, 255, 255, 0.07);
+          color: var(--text-primary, #fff);
+        }
+        .filter-entry-btn.active {
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-primary, #fff);
+        }
         mark.find-match {
           background: rgba(234, 140, 0, 0.32);
           color: inherit;
@@ -1063,7 +1381,13 @@ export class Openp41geLogViewer extends LitElement {
                             >${this._highlighted(item.entry, "level")}</span
                           >
                           <span class="log-time">${this._highlighted(item.entry, "time")}</span>
-                          <span class="log-name">[${this._highlighted(item.entry, "source")}]</span>
+                          <span
+                            class="log-name"
+                            role="button"
+                            title="Filter to this stream"
+                            @click=${() => this._openFilter(item.entry.source)}
+                            >[${this._highlighted(item.entry, "source")}]</span
+                          >
                           <span class="log-text">${this._highlighted(item.entry, "message")}</span>
                         </div>
                       `,
@@ -1072,26 +1396,103 @@ export class Openp41geLogViewer extends LitElement {
           ${offsetBottom > 0 ? html`<div class="vspacer" style="height:${offsetBottom}px"></div>` : ""}
         </div>
         ${
-          this._searchOpen
+          this._filterOpen || this._searchOpen
             ? html`
-                <div class="find-bar">
-                  <input
-                    class="find-input"
-                    data-testid="log-find-input"
-                    type="text"
-                    placeholder="Search today's logs"
-                    spellcheck="false"
-                    .value=${this._searchQuery}
-                    @input=${this._onFindInput}
-                    @keydown=${this._onFindKeyDown}
-                  />
-                  ${searchCount ? html`<span class="find-count">${searchCount}</span>` : ""}
-                  ${this._findToggle(ICON_PREV, "Previous match", this._searchMatches.length > 0, "log-find-prev", () => void this._nextMatch(-1))}
-                  ${this._findToggle(ICON_NEXT, "Next match", this._searchMatches.length > 0, "log-find-next", () => void this._nextMatch(1))}
-                  ${this._findToggle(ICON_REGEX, "Regex search", this._searchRegex, "log-find-regex", this._toggleRegex)}
-                  ${this._findToggle(ICON_CASE, "Match case", this._searchCase, "log-find-case", this._toggleCase)}
-                  ${this._findToggle(ICON_WORD, "Whole word", this._searchWholeWord, "log-find-whole-word", this._toggleWholeWord)}
-                </div>
+                ${
+                  this._filterOpen
+                    ? html`
+                        <div class="filter-bar-wrap" @focusout=${this._onFilterFocusOut}>
+                          <div class="filter-bar">
+                            <div class="filter-pills">
+                              ${this._selectedStreams.map(
+                                (stream) => html`
+                                  <span class="filter-pill" data-stream=${stream}>
+                                    <span class="filter-pill-label">${stream}</span>
+                                    <button
+                                      type="button"
+                                      class="filter-pill-x"
+                                      aria-label="Remove ${stream}"
+                                      @click=${(e: Event) => {
+                                        e.stopPropagation();
+                                        this._removeStream(stream);
+                                        this._focusFilter();
+                                      }}
+                                    >
+                                      ${unsafeHTML(ICON_CLOSE)}
+                                    </button>
+                                  </span>
+                                `,
+                              )}
+                              <input
+                                class="filter-input"
+                                data-testid="log-filter-input"
+                                type="text"
+                                placeholder="Filter by stream"
+                                spellcheck="false"
+                                .value=${this._filterQuery}
+                                @input=${this._onFilterInput}
+                                @keydown=${this._onFilterKeyDown}
+                                @focus=${this._openSuggest}
+                                @click=${this._openSuggest}
+                              />
+                            </div>
+                          </div>
+                          ${
+                            this._filterSuggestOpen
+                              ? html`
+                                  <div class="filter-suggest" data-testid="log-filter-suggest">
+                                    ${
+                                      this._suggestStreams.length
+                                        ? this._suggestStreams.map(
+                                            (stream, i) => html`
+                                              <div
+                                                class="filter-suggest-item${this._isSelected(stream) ? " selected" : ""}${i === this._filterActiveIndex ? " active" : ""}"
+                                                data-stream=${stream}
+                                                data-filter-suggest-index=${i}
+                                                @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                                                @click=${() => this._toggleStream(stream)}
+                                              >
+                                                <span class="filter-suggest-label">${stream}</span>
+                                                ${this._isSelected(stream) ? html`<span class="filter-suggest-check">✓</span>` : ""}
+                                              </div>
+                                            `,
+                                          )
+                                        : html`<div class="filter-suggest-empty">
+                                            No streams found
+                                          </div>`
+                                    }
+                                  </div>
+                                `
+                              : ""
+                          }
+                        </div>
+                      `
+                    : ""
+                }
+                ${
+                  this._searchOpen
+                    ? html`
+                        <div class="find-bar">
+                          <input
+                            class="find-input"
+                            data-testid="log-find-input"
+                            type="text"
+                            placeholder="Search today's logs"
+                            spellcheck="false"
+                            .value=${this._searchQuery}
+                            @input=${this._onFindInput}
+                            @keydown=${this._onFindKeyDown}
+                          />
+                          ${searchCount ? html`<span class="find-count">${searchCount}</span>` : ""}
+                          ${this._findToggle(ICON_PREV, "Previous match", this._searchMatches.length > 0, "log-find-prev", () => void this._nextMatch(-1))}
+                          ${this._findToggle(ICON_NEXT, "Next match", this._searchMatches.length > 0, "log-find-next", () => void this._nextMatch(1))}
+                          ${this._findToggle(ICON_REGEX, "Regex search", this._searchRegex, "log-find-regex", this._toggleRegex)}
+                          ${this._findToggle(ICON_CASE, "Match case", this._searchCase, "log-find-case", this._toggleCase)}
+                          ${this._findToggle(ICON_WORD, "Whole word", this._searchWholeWord, "log-find-whole-word", this._toggleWholeWord)}
+                        </div>
+                      `
+                    : ""
+                }
               `
             : ""
         }
@@ -1100,9 +1501,19 @@ export class Openp41geLogViewer extends LitElement {
             type="button"
             class="find-entry-btn${this._searchOpen ? " active" : ""}"
             title="Find in logs (⌘F)"
+            data-testid="log-find-btn"
             @click=${() => (this._searchOpen ? this._closeSearch() : this._openSearch())}
           >
             ${unsafeHTML(ICON_SEARCH)}
+          </button>
+          <button
+            type="button"
+            class="filter-entry-btn${this._filterOpen ? " active" : ""}"
+            title="Filter by stream"
+            data-testid="log-filter-btn"
+            @click=${() => this._toggleFilter()}
+          >
+            ${unsafeHTML(ICON_FILTER)}
           </button>
           <span class="sep"></span>
           <span class="spacer"></span>
