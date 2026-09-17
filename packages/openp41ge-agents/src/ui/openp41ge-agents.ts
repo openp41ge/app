@@ -14,7 +14,7 @@
  *   - `chat:add-content` — user clicked the “+ / add content” button.
  */
 
-import { LitElement, html, type TemplateResult } from "lit";
+import { LitElement, html, type TemplateResult, type PropertyValues } from "lit";
 import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
@@ -111,6 +111,26 @@ function formatTokens(n?: number): string {
   return `${n}`;
 }
 
+// The bottom-bar find icon matches the Explorer sidebar's magnifier+list glyph
+// (same as the log viewer) so in-tab search looks consistent app-wide.
+const ICON_FIND =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
+const ICON_CHAT_PREV =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5v-5M2.2 4.8l2.8-2.8 2.8 2.8"/></svg>';
+const ICON_CHAT_NEXT =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5v5M2.2 5.2l2.8 2.8 2.8-2.8"/></svg>';
+const ICON_CHAT_CLOSE =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="12" height="12" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>';
+
+/** A single find-in-chat occurrence: the message it lives in plus the char
+ *  offsets within that message's flattened text (re-mapped to the current
+ *  text nodes at mark time, since highlighting splits them). */
+interface ChatHit {
+  msg: HTMLElement;
+  start: number;
+  end: number;
+}
+
 class Openp41geAgents extends LitElement {
   @state() private _messages: ChatMessage[] = [];
   @state() private _streaming = false;
@@ -119,6 +139,11 @@ class Openp41geAgents extends LitElement {
   @state() private _usage: TokenUsage | null = null;
   /** Live generation rate (tok/s) while a response is streaming. */
   @state() private _liveTps: number | null = null;
+  /** In-chat find (bottom-bar magnifier, like the log viewer). */
+  @state() private _searchOpen = false;
+  @state() private _searchQuery = "";
+  @state() private _searchHits: ChatHit[] = [];
+  @state() private _searchIndex = 0;
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
 
@@ -349,6 +374,158 @@ class Openp41geAgents extends LitElement {
     return html`<svg class="bb-arrow${down ? " down" : ""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11 20V7.825l-5.6 5.6L4 12l8-8l8 8l-1.4 1.425l-5.6-5.6V20z"/></svg>`;
   }
 
+  // ─── In-chat find ──────────────────────────────────────────────────
+
+  private _toggleSearch(): void {
+    this._searchOpen ? this._closeSearch() : this._openSearch();
+  }
+
+  private _openSearch(): void {
+    this._searchOpen = true;
+    if (this._searchQuery) this._computeAndMark(true);
+    // Focus after Lit renders the find input.
+    setTimeout(() => this._focusFindInput(), 0);
+  }
+
+  private _closeSearch(): void {
+    this._searchOpen = false;
+    this._searchQuery = "";
+    this._searchHits = [];
+    this._searchIndex = 0;
+    this._clearMarks();
+  }
+
+  private _onFindInput = (e: InputEvent): void => {
+    this._searchQuery = (e.target as HTMLInputElement).value;
+    this._computeAndMark(true);
+  };
+
+  private _onFindKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      this._nextMatch(e.shiftKey ? -1 : 1);
+    } else if (e.key === "Escape") {
+      this._closeSearch();
+      this._focusMessageList();
+    }
+  };
+
+  /** Cmd/Ctrl+F opens the in-chat find bar (like the log viewer's scoped find). */
+  private _onHostKeyDown = (e: KeyboardEvent): void => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "F")) {
+      e.preventDefault();
+      this._openSearch();
+    }
+  };
+
+  private _nextMatch(dir: 1 | -1): void {
+    if (this._searchHits.length === 0) return;
+    this._searchIndex =
+      (this._searchIndex + dir + this._searchHits.length) % this._searchHits.length;
+    this._markActive();
+    this._scrollToHit(this._searchHits[this._searchIndex]);
+  }
+
+  /** Recompute the occurrences over the current DOM and highlight them all. */
+  private _computeAndMark(scrollActive: boolean): void {
+    this._clearMarks();
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    const q = this._searchQuery.trim();
+    const hits: ChatHit[] = [];
+    if (this._searchOpen && list && q.length > 1) {
+      const needle = q.toLowerCase();
+      for (const msg of list.querySelectorAll<HTMLElement>(".chat-message")) {
+        const flat = this._flatText(msg);
+        if (!flat) continue;
+        const lower = flat.toLowerCase();
+        let i = 0;
+        for (;;) {
+          const at = lower.indexOf(needle, i);
+          if (at === -1) break;
+          hits.push({ msg, start: at, end: at + needle.length });
+          i = at + needle.length;
+        }
+      }
+    }
+    this._searchHits = hits;
+    if (this._searchIndex >= hits.length) this._searchIndex = Math.max(0, hits.length - 1);
+    this._markActive();
+    if (scrollActive && hits.length > 0) this._scrollToHit(hits[this._searchIndex]);
+  }
+
+  /** The message's flattened text, from its current text nodes in order. */
+  private _flatText(msg: HTMLElement): string {
+    let out = "";
+    const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) out += (walker.currentNode as Text).data;
+    return out;
+  }
+
+  /** Map a [start,end) offset range in a message to its current text nodes. */
+  private _mapMsgRanges(
+    msg: HTMLElement,
+    start: number,
+    end: number,
+  ): { node: Text; start: number; end: number }[] {
+    const out: { node: Text; start: number; end: number }[] = [];
+    const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
+    let off = 0;
+    while (walker.nextNode()) {
+      const t = walker.currentNode as Text;
+      const a = Math.max(start, off);
+      const b = Math.min(end, off + t.data.length);
+      if (a < b) out.push({ node: t, start: a - off, end: b - off });
+      off += t.data.length;
+    }
+    return out;
+  }
+
+  /** Highlight every hit; flag the active one. */
+  private _markActive(): void {
+    this._clearMarks();
+    this._searchHits.forEach((h, idx) => {
+      const ranges = this._mapMsgRanges(h.msg, h.start, h.end);
+      for (const r of ranges) {
+        const range = document.createRange();
+        try {
+          range.setStart(r.node, r.start);
+          range.setEnd(r.node, r.end);
+          const mark = document.createElement("mark");
+          mark.className = idx === this._searchIndex ? "chat-hit chat-hit-active" : "chat-hit";
+          range.surroundContents(mark);
+        } catch {
+          /* best-effort highlight; the find bar still counts/navigates. */
+        }
+      }
+    });
+  }
+
+  /** Remove every mark we injected (kept on a distinct class to avoid clobbering
+   *  any other <mark> the content might legitimately contain). */
+  private _clearMarks(): void {
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    if (!list) return;
+    for (const mark of [...list.querySelectorAll("mark.chat-hit")]) {
+      mark.replaceWith(...mark.childNodes);
+    }
+  }
+
+  private _scrollToHit(hit: ChatHit): void {
+    if (typeof hit.msg.scrollIntoView === "function") {
+      hit.msg.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+    }
+  }
+
+  private _focusFindInput(): void {
+    const input = this.renderRoot.querySelector<HTMLInputElement>(".chat-findbar input");
+    input?.focus();
+    input?.select();
+  }
+
+  private _focusMessageList(): void {
+    this.renderRoot.querySelector<HTMLElement>(".chat-messages")?.focus();
+  }
+
   // ─── Back-compat API ────────────────────────────────────────────────
 
   addMessage(role: "user" | "assistant", content: string): void {
@@ -370,6 +547,7 @@ class Openp41geAgents extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.addEventListener("keydown", this._onHostKeyDown);
     if (!this._docListenerAttached) {
       document.addEventListener("pointerdown", this._onDocPointerDown);
       this._docListenerAttached = true;
@@ -378,6 +556,7 @@ class Openp41geAgents extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.removeEventListener("keydown", this._onHostKeyDown);
     if (this._docListenerAttached) {
       document.removeEventListener("pointerdown", this._onDocPointerDown);
       this._docListenerAttached = false;
@@ -1547,7 +1726,7 @@ class Openp41geAgents extends LitElement {
     this._scrollToBottom();
   }
 
-  protected updated(): void {
+  protected updated(changed: PropertyValues): void {
     // Any re-render (e.g. a streaming delta, or a toggle) clears the imperative
     // composer content; repopulate it so typed text and caret survive re-renders.
     this._renderComposerContent();
@@ -1556,6 +1735,13 @@ class Openp41geAgents extends LitElement {
     this._syncComposerInputWidth();
     this._syncProviderMenuHeight();
     this._syncCodeBlockScrollbars();
+    // Re-run the in-chat find against the fresh DOM only when the messages
+    // themselves changed (a streaming/render pass wipes the injected <mark>s).
+    // Gating on `_messages` (not the search state) avoids looping, since the
+    // recompute itself updates _searchHits and re-renders.
+    if (this._searchOpen && this._searchQuery && changed.has("_messages")) {
+      this._computeAndMark(false);
+    }
   }
 
   /**
@@ -1732,6 +1918,28 @@ class Openp41geAgents extends LitElement {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+        .bb-find {
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          padding: 0;
+          border: none;
+          border-radius: 4px;
+          background: transparent;
+          color: var(--text-muted, #888);
+          cursor: pointer;
+          transition: background-color 0.1s, color 0.1s;
+        }
+        .bb-find:hover {
+          background: var(--bg-hover, #2a2d2e);
+          color: var(--text-primary, #d4d4d4);
+        }
+        .bb-find.active {
+          color: var(--text-primary, #d4d4d4);
+        }
         .bb-tps {
           flex-shrink: 0;
           margin-left: 8px;
@@ -1739,6 +1947,73 @@ class Openp41geAgents extends LitElement {
           letter-spacing: normal;
           font-weight: 500;
           color: var(--text-muted, #888);
+        }
+        .chat-findbar {
+          box-sizing: border-box;
+          display: flex;
+          align-items: center;
+          height: 34px;
+          padding: 0 12px;
+          flex-shrink: 0;
+          gap: 0;
+          background: var(--bg-primary, #1e1e1e);
+          border-bottom: 1px solid var(--border-color, #2a2a2a);
+          font-size: 11px;
+          color: var(--text-secondary, #999);
+        }
+        .chat-findbar .find-input {
+          flex: 1 1 auto;
+          min-width: 0;
+          height: 100%;
+          margin-right: 8px;
+          padding: 0;
+          box-sizing: border-box;
+          background: transparent;
+          border: none;
+          border-radius: 0;
+          color: var(--text-primary, #ccc);
+          font-size: 12px;
+          font-family: inherit;
+          outline: none;
+        }
+        .chat-findbar .find-input:focus,
+        .chat-findbar .find-input:focus-visible {
+          outline: none;
+        }
+        .chat-findbar .find-count {
+          flex-shrink: 0;
+          margin-right: 8px;
+          color: var(--text-secondary, #888);
+          font-size: 11px;
+        }
+        .chat-findbar .find-toggle {
+          flex-shrink: 0;
+          align-self: stretch;
+          width: 26px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          cursor: pointer;
+          background: transparent;
+          border: none;
+          color: var(--text-muted, #888);
+        }
+        .chat-findbar .find-toggle:hover {
+          background: rgba(255, 255, 255, 0.07);
+          color: var(--text-primary, #d4d4d4);
+        }
+        .chat-findbar .find-toggle:disabled {
+          opacity: 0.4;
+          cursor: default;
+        }
+        mark.chat-hit {
+          background: rgba(255, 200, 0, 0.28);
+          color: inherit;
+          border-radius: 2px;
+          padding: 0 1px;
+        }
+        mark.chat-hit-active {
+          background: rgba(255, 165, 0, 0.55);
         }
         .bb-arrow {
           width: 1.15em;
@@ -2588,6 +2863,52 @@ class Openp41geAgents extends LitElement {
 
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
+      ${
+        this._searchOpen
+          ? html`<div class="chat-findbar">
+              <input
+                class="find-input"
+                type="text"
+                placeholder="Find in chat"
+                spellcheck="false"
+                .value=${this._searchQuery}
+                @input=${this._onFindInput}
+                @keydown=${this._onFindKeyDown}
+              />
+              ${
+                this._searchHits.length > 0
+                  ? html`<span class="find-count"
+                      >${this._searchIndex + 1}/${this._searchHits.length}</span
+                    >`
+                  : html``
+              }
+              <button
+                type="button"
+                class="find-toggle"
+                title="Previous match"
+                ?disabled=${this._searchHits.length === 0}
+                @click=${() => this._nextMatch(-1)}
+                >${unsafeHTML(ICON_CHAT_PREV)}</button
+              >
+              <button
+                type="button"
+                class="find-toggle"
+                title="Next match"
+                ?disabled=${this._searchHits.length === 0}
+                @click=${() => this._nextMatch(1)}
+                >${unsafeHTML(ICON_CHAT_NEXT)}</button
+              >
+              <button
+                type="button"
+                class="find-toggle"
+                title="Close search (Esc)"
+                @click=${() => this._closeSearch()}
+                >${unsafeHTML(ICON_CHAT_CLOSE)}</button
+              >
+            </div>`
+          : html``
+      }
+
       <div class="chat-scroll">
         <div class="chat-messages">
           ${this._messages.map((msg) => this._renderMessage(msg))}
@@ -2790,9 +3111,13 @@ class Openp41geAgents extends LitElement {
         ></textarea>
       </div>
 
-      <div class="chat-bottombar"><span class="bb-left">${
-        this._title || "Agent chat"
-      }</span>${
+      <div class="chat-bottombar"><button
+        type="button"
+        class="bb-find${this._searchOpen ? " active" : ""}"
+        title="Find in chat (⌘F)"
+        @click=${() => this._toggleSearch()}
+        >${unsafeHTML(ICON_FIND)}</button
+      >${
         this._streaming && this._liveTps != null
           ? html`<span class="bb-tps" part="tps">~${this._fmtRate(
               this._liveTps,

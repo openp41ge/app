@@ -26,8 +26,11 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
 
     const bar = el.shadowRoot!.querySelector(".chat-bottombar") as HTMLElement;
-    // Before any usage: falls back to the chat title.
-    expect(bar.textContent!.trim()).toBe("Agent chat");
+    // The chat title is no longer shown in the bottom bar; it is replaced by a
+    // find-in-chat button (left-aligned).
+    expect(bar.querySelector(".bb-left")).toBeNull();
+    expect(bar.querySelector(".bb-find")).toBeTruthy();
+    expect(bar.textContent!.trim()).toBe("");
 
     el.setUsage({ promptTokens: 1_200, completionTokens: 34, totalTokens: 1_234 });
     await el.updateComplete;
@@ -102,6 +105,49 @@ describe("Openp41geAgents (custom element)", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0].role).toBe("user");
     expect(messages[0].content).toBe("Hello, world!");
+  });
+
+  it("opens the find bar and searches across the transcript", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+
+    el.addMessage("user", "hello world");
+    el.addMessage("assistant", "a world of code");
+    await el.updateComplete;
+
+    const bar = el.shadowRoot!.querySelector(".chat-bottombar") as HTMLElement;
+    const btn = bar.querySelector(".bb-find") as HTMLButtonElement;
+    btn.click();
+    await el.updateComplete;
+
+    const input = el.shadowRoot!.querySelector(".chat-findbar input") as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    input.value = "world";
+    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+
+    // Two occurrences across the two messages, highlighted as <mark>s.
+    const hits = el.shadowRoot!.querySelectorAll("mark.chat-hit");
+    expect(hits.length).toBe(2);
+    const count = el.shadowRoot!.querySelector(".chat-findbar .find-count") as HTMLElement;
+    expect(count.textContent!.trim()).toBe("1/2");
+
+    // Navigating moves the active highlight to the second hit.
+    const next = el.shadowRoot!.querySelectorAll(".chat-findbar .find-toggle")[1] as HTMLButtonElement;
+    next.click();
+    await el.updateComplete;
+    const active = el.shadowRoot!.querySelector("mark.chat-hit-active");
+    expect(active).toBeTruthy();
+    expect(
+      el.shadowRoot!.querySelector(".chat-findbar .find-count")!.textContent!.trim(),
+    ).toBe("2/2");
+
+    // Closing removes the marks and the bar.
+    (el.shadowRoot!.querySelectorAll(".chat-findbar .find-toggle")[2] as HTMLButtonElement).click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".chat-findbar")).toBeNull();
+    expect(el.shadowRoot!.querySelectorAll("mark.chat-hit").length).toBe(0);
   });
 
   it("renders a user message as a bubble in the DOM", async () => {
