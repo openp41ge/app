@@ -2382,7 +2382,7 @@ class Openp41geAgents extends LitElement {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 2px 12px 0;
+          padding: 0 8px;
           font-size: 11.5px;
           font-weight: 500;
           color: var(--text-secondary, #9a9a9a);
@@ -2691,11 +2691,6 @@ class Openp41geAgents extends LitElement {
               </div>`
             : ""
         }
-        ${
-          this._usage
-            ? html`<div class="composer-tokenrow">${this._formatUsage(this._usage)}</div>`
-            : html``
-        }
         <div class="composer-toolbar">
           <button
             class="composer-tool"
@@ -2741,6 +2736,11 @@ class Openp41geAgents extends LitElement {
             </svg>
           </button>
           <span class="composer-spacer"></span>
+          ${
+            this._usage
+              ? html`<div class="composer-tokenrow">${this._formatUsage(this._usage)}</div>`
+              : html``
+          }
           ${
             this._streaming
               ? html`<button
