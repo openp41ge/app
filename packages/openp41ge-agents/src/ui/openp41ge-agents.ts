@@ -2023,10 +2023,10 @@ class Openp41geAgents extends LitElement {
           background: rgba(255, 165, 0, 0.55);
         }
         .bb-arrow {
-          width: 1.15em;
-          height: 1.16em;
+          width: 1.4em;
+          height: 1.4em;
           display: inline-block;
-          vertical-align: -0.11em;
+          vertical-align: -0.18em;
           margin-left: 2px;
           margin-right: 1px;
           fill: currentColor;
@@ -2662,7 +2662,7 @@ class Openp41geAgents extends LitElement {
           align-items: center;
           gap: 2px;
           padding: 0 8px;
-          font-size: 11.5px;
+          font-size: 13px;
           font-weight: 500;
           color: var(--text-secondary, #9a9a9a);
           white-space: nowrap;
