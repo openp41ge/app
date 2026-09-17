@@ -160,8 +160,7 @@ describe("AgentRuntime", () => {
     await ctx.runtime.send(chat.id, "win-a", "go");
 
     // Live rate forwarded: 150 tokens / 246ms  =>  609.8 tok/s.
-    const liveCalls = ctx.hooks.sendToWindow.mock.calls.filter(([, e]) => e === "chat:liveRate");
-    expect(liveCalls).toHaveLength(1);
+    const liveCalls = ctx.hooks.sendToWindow.mock.calls.filter(([, e]) => e === "chat:live-rate");
     expect(liveCalls).toHaveLength(1);
     expect(liveCalls[0][2].chatId).toBe(chat.id);
     expect(liveCalls[0][2].tps).toBeCloseTo(609.8, 1);

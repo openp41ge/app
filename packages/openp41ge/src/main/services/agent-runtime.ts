@@ -305,7 +305,7 @@ export class AgentRuntime {
             // a live average gen rate, but never persist it as the completion's
             // authoritative usage.
             if (delta.elapsedMs && delta.elapsedMs > 0 && delta.usage.completionTokens > 0) {
-              this._hooks.sendToWindow(winId, "chat:liveRate", {
+              this._hooks.sendToWindow(winId, "chat:live-rate", {
                 chatId,
                 tps: delta.usage.completionTokens / (delta.elapsedMs / 1000),
               });
