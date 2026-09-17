@@ -134,6 +134,32 @@ describe("AgentRuntime", () => {
   });
 
 
+  it("streams reasoning text onto the assistant message and forwards it", async () => {
+    const provider = makeFakeProvider([
+      [
+        { type: "reasoning", text: "Let me think" },
+        { type: "reasoning", text: " about this" },
+        { type: "text", text: "Answer" },
+        {
+          type: "usage",
+          usage: { promptTokens: 5, completionTokens: 3, totalTokens: 8 },
+          elapsedMs: 100,
+        },
+      ],
+    ]);
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await ctx.runtime.send(chat.id, "win-a", "go");
+
+    const msg = ctx.store.get(chat.id)!.messages.find((m) => m.role === "assistant")!;
+    expect(msg.content).toBe("Answer");
+    expect(msg.reasoning).toBe("Let me think about this");
+
+    const reasoningCalls = ctx.hooks.sendToWindow.mock.calls.filter(([, e]) => e === "chat:reasoning");
+    expect(reasoningCalls.map((c) => c[2].delta)).toEqual(["Let me think", " about this"]);
+  });
+
   it("forwards a live generation rate but never persists it as the final usage", async () => {
     const provider = makeFakeProvider([
       [

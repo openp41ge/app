@@ -197,9 +197,9 @@ export class VllmChatProvider implements ChatProvider {
             continue;
           }
           for (const d of this._emitChunk(chunk, toolAccumulators)) {
-            if (d.type === "text" || d.type === "tool_call") {
+            if (d.type === "text" || d.type === "reasoning" || d.type === "tool_call") {
               streamedTokens++;
-              // Always stream the content first.
+              // Always stream the content (text or reasoning) first.
               yield d;
               // Throttled live progress: surface an approximate average rate
               // (completion tokens so far / elapsed since the request started)
@@ -255,7 +255,11 @@ export class VllmChatProvider implements ChatProvider {
   ): Generator<ProviderDelta> {
     const c = chunk as {
       choices?: Array<{
-        delta?: { content?: string | null; tool_calls?: Array<Record<string, unknown>> };
+        delta?: {
+          content?: string | null;
+          reasoning?: string | null;
+          tool_calls?: Array<Record<string, unknown>>;
+        };
       }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
     };
@@ -282,6 +286,10 @@ export class VllmChatProvider implements ChatProvider {
 
     if (typeof delta.content === "string" && delta.content.length > 0) {
       yield { type: "text", text: delta.content };
+    }
+
+    if (typeof delta.reasoning === "string" && delta.reasoning.length > 0) {
+      yield { type: "reasoning", text: delta.reasoning };
     }
 
     if (Array.isArray(delta.tool_calls)) {

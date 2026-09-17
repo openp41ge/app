@@ -20,6 +20,7 @@ import { registerOpenp41geAgents } from "openp41ge-agents";
 import type {
   ChatDeltaPayload,
   ChatLiveRatePayload,
+  ChatReasoningPayload,
   ChatStatusPayload,
   ChatToolPayload,
   ChatUsagePayload,
@@ -150,6 +151,10 @@ export class AgentsController extends BaseController implements TabController {
       this._runtimeModel.onLiveRate((payload: ChatLiveRatePayload) => {
         if (payload.chatId !== chatId || !this._component) return;
         this._component.setStreamRate(payload.tps);
+      }),
+      this._runtimeModel.onReasoning((payload: ChatReasoningPayload) => {
+        if (payload.chatId !== chatId || !this._component) return;
+        this._component.appendReasoning(payload.delta);
       }),
       this._storeModel.onChanged(() => {
         if (!this._component) return;

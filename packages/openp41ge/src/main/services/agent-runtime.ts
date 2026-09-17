@@ -288,7 +288,16 @@ export class AgentRuntime {
         thinking: thinkingLevel,
       })) {
         if (signal.aborted) break;
-        if (delta.type === "text" && delta.text) {
+        if (delta.type === "reasoning" && delta.text) {
+          // Reasoning/thinking text streamed ahead of the final answer. Persist
+          // it on the assistant message and forward it so the chat pane can
+          // render the thinking block.
+          if (!currentAssistant) currentAssistant = this._beginAssistant(chatId);
+          this._store.updateMessage(chatId, currentAssistant.id, (m) => {
+            m.reasoning = (m.reasoning ?? "") + delta.text;
+          });
+          this._hooks.sendToWindow(winId, "chat:reasoning", { chatId, delta: delta.text });
+        } else if (delta.type === "text" && delta.text) {
           if (!currentAssistant) currentAssistant = this._beginAssistant(chatId);
           this._store.updateMessage(chatId, currentAssistant.id, (m) => {
             m.content = (m.content ?? "") + delta.text;

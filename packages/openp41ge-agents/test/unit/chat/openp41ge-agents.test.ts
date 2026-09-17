@@ -425,6 +425,25 @@ describe("Openp41geAgents (custom element)", () => {
     expect(messages[0].content).toBe("Hello world");
   });
 
+  it("appendReasoning stores reasoning and renders a collapsible Reasoning block", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.appendReasoning("Let me think");
+    el.appendReasoning(" about this");
+    await el.updateComplete;
+
+    const messages = el.messages as Array<{ role: string; content?: string; reasoning?: string }>;
+    expect(messages).toHaveLength(1);
+    expect(messages[0].role).toBe("assistant");
+    expect(messages[0].reasoning).toBe("Let me think about this");
+
+    const reasoning = el.renderRoot.querySelector(".msg-reasoning");
+    expect(reasoning).not.toBeNull();
+    expect(reasoning!.querySelector(".msg-reasoning-body")!.textContent).toBe("Let me think about this");
+  });
+
   it("setToolCallState adds a running tool call then transitions to done", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);

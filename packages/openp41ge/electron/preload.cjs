@@ -693,6 +693,12 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.on("chat:live-rate", handler);
       return () => ipcRenderer.removeListener("chat:live-rate", handler);
     },
+    /** Subscribe to streamed reasoning/thinking text. */
+    onReasoning: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("chat:reasoning", handler);
+      return () => ipcRenderer.removeListener("chat:reasoning", handler);
+    },
     /** Subscribe to open-once state broadcasts. */
     onOpenState: (callback) => {
       const handler = (_event, data) => callback(JSON.parse(data));

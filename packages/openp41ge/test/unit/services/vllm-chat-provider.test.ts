@@ -125,6 +125,43 @@ describe("VllmChatProvider.streamChat", () => {
     });
   });
 
+  it("yields reasoning deltas and counts them toward the live rate", async () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"role":"assistant","reasoning":"Let me think"}}]}',
+      "",
+      'data: {"choices":[{"delta":{"reasoning":" about this"}}]}',
+      "",
+      'data: {"choices":[{"delta":{"content":"Answer"}}]}',
+      "",
+      'data: {"choices":[{"delta":{}}],"usage":{"prompt_tokens":5,"completion_tokens":4,"total_tokens":9}}',
+      "",
+      "data: [DONE]",
+      "",
+    ].join("\n");
+
+    let clock = 1_000;
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => (clock += 300));
+    try {
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(sseResponse(sse));
+      const provider = new VllmChatProvider(config);
+      const deltas = await collect(provider.streamChat({ messages: [] }));
+
+      expect(deltas.filter((d) => d.type === "reasoning").map((d) => (d as { text: string }).text)).toEqual([
+        "Let me think",
+        " about this",
+      ]);
+      expect(deltas.filter((d) => d.type === "text")[0]).toEqual({ type: "text", text: "Answer" });
+
+      // Live usage reflects both reasoning and content tokens (3 streamed tokens),
+      // not just visible content.
+      const live = deltas.filter((d) => d.type === "usage" && (d as { live?: boolean }).live);
+      const lastLive = live[live.length - 1] as { usage: { completionTokens: number }; live?: boolean };
+      expect(lastLive.usage.completionTokens).toBe(3);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("emits throttled live usage deltas while content streams", async () => {
     const sse = [
       'data: {"choices":[{"delta":{"role":"assistant","content":"A"}}]}',

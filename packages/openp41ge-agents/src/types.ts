@@ -53,6 +53,11 @@ export interface ChatMessage {
   /** Only present on assistant messages that called tools. */
   toolCalls?: ToolCall[];
   /**
+   * The model's reasoning/thinking text, streamed before the final answer.
+   * Present on assistant messages from reasoning models.
+   */
+  reasoning?: string;
+  /**
    * Ordered interleaving of text and tool calls for assistant messages, so the
    * UI can render tool calls inline at the position they occurred rather than
    * grouping all text above all tool calls. Absent on legacy messages.
@@ -116,6 +121,12 @@ export interface ChatRuntimeStatus {
 
 /** Broadcast payload for `chat:delta` (streamed assistant text). */
 export interface ChatDeltaPayload {
+  chatId: string;
+  delta: string;
+}
+
+/** Broadcast payload for `chat:reasoning` (streamed reasoning text). */
+export interface ChatReasoningPayload {
   chatId: string;
   delta: string;
 }

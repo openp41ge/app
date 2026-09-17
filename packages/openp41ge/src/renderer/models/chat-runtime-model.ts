@@ -11,6 +11,7 @@
 import type {
   ChatDeltaPayload,
   ChatLiveRatePayload,
+  ChatReasoningPayload,
   ChatStatusPayload,
   ChatToolPayload,
   ChatUsagePayload,
@@ -31,6 +32,7 @@ export interface ChatRuntimeModel {
   onStatus(cb: (payload: ChatStatusPayload) => void): () => void;
   onUsage(cb: (payload: ChatUsagePayload) => void): () => void;
   onLiveRate(cb: (payload: ChatLiveRatePayload) => void): () => void;
+  onReasoning(cb: (payload: ChatReasoningPayload) => void): () => void;
 }
 
 // ─── Production: IPC-backed ───────────────────────────────────────────────
@@ -63,6 +65,9 @@ export class IpcChatRuntimeModel implements ChatRuntimeModel {
   onLiveRate(cb: (payload: ChatLiveRatePayload) => void): () => void {
     return window.openp41ge.chat.onLiveRate(cb);
   }
+  onReasoning(cb: (payload: ChatReasoningPayload) => void): () => void {
+    return window.openp41ge.chat.onReasoning(cb);
+  }
 }
 
 // ─── Test: in-memory fixture runtime ──────────────────────────────────────
@@ -87,6 +92,7 @@ export class TestChatRuntimeModel implements ChatRuntimeModel {
   private readonly _status = new Set<(p: ChatStatusPayload) => void>();
   private readonly _usage = new Set<(p: ChatUsagePayload) => void>();
   private readonly _liveRate = new Set<(p: ChatLiveRatePayload) => void>();
+  private readonly _reasoning = new Set<(p: ChatReasoningPayload) => void>();
 
   send(id: string, text: string, cwd?: string): Promise<void> {
     this.calls.push({ op: "send", args: [id, text, cwd] });
@@ -135,6 +141,10 @@ export class TestChatRuntimeModel implements ChatRuntimeModel {
     this._liveRate.add(cb);
     return () => this._liveRate.delete(cb);
   }
+  onReasoning(cb: (p: ChatReasoningPayload) => void): () => void {
+    this._reasoning.add(cb);
+    return () => this._reasoning.delete(cb);
+  }
 
   /** Emit externally (used to simulate a streamed delta arriving). */
   emitDelta(id: string, delta: string): void {
@@ -148,5 +158,8 @@ export class TestChatRuntimeModel implements ChatRuntimeModel {
   }
   emitLiveRate(id: string, tps: number): void {
     for (const cb of this._liveRate) cb({ chatId: id, tps });
+  }
+  emitReasoning(id: string, delta: string): void {
+    for (const cb of this._reasoning) cb({ chatId: id, delta });
   }
 }

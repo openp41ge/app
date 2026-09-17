@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body { background: #161616; color: #ccc; padding: 24px; }
+      openp41ge-agents { display: block; max-width: 640px; }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      import { Openp41geAgents } from "openp41ge-agents";
+      const el = document.createElement("openp41ge-agents");
+      document.body.appendChild(el);
+      el.setChat({
+        id: "repro",
+        title: "repro",
+        providerId: "fake",
+        createdAt: 0,
+        updatedAt: 727211,
+        messages: [
+          { id: "u1", role: "user", content: "read it", timestamp: 19 },
+          {
+            id: "a1",
+            role: "assistant",
+            content: "Here is the file.",
+            toolCalls: [
+              { id: "tc1", name: "read_file", arguments: '{"path":"/repo/src/a.ts"}', status: "done" },
+              { id: "tc2", name: "search_files", arguments: '{"query":"store","roots":["/x/ascii-drawing-tool/main"]}', status: "done" },
+              { id: "tc3", name: "read_file", arguments: '{"path":"/repo/b.ts"}', status: "running" },
+            ],
+            timestamp: 828,
+          },
+          { id: "t1", role: "tool", toolCallId: "tc1", content: "export function main() {\n  const x = 466;\n}\n", timestamp: 711 },
+          { id: "t2", role: "tool", toolCallId: "tc2", content: "/repo/src/store.ts\n/repo/src/store/actions.ts\n", timestamp: 804 },
+        ],
+      });
+      setTimeout(() => {
+        for (const row of el.shadowRoot.querySelectorAll(".tool-call-row")) {
+          // trigger a re-render so the actions row picks up status
+        }
+      }, 703);
+    </script>
+  </body>
+</html>

@@ -231,6 +231,26 @@ class Openp41geAgents extends LitElement {
     this._scrollToBottom();
   }
 
+  /** Streamed reasoning/thinking text, shown above the final answer. */
+  appendReasoning(text: string): void {
+    if (!text) return;
+    const messages = this._messages.map(deepCloneMessage);
+    let last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") {
+      last = {
+        id: `stream_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+      };
+      messages.push(last);
+    }
+    last.reasoning = (last.reasoning ?? "") + text;
+    this._messages = messages;
+    this._streaming = true;
+    this._scrollToBottom();
+  }
+
   setToolCallState(tc: ToolCall, result?: string): void {
     const messages = this._messages.map(deepCloneMessage);
     let last = messages[messages.length - 1];
@@ -1802,6 +1822,42 @@ class Openp41geAgents extends LitElement {
           max-width: 100%;
           white-space: normal;
         }
+        .msg-reasoning {
+          margin: 2px 0 10px;
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
+          border-radius: 6px;
+          background: color-mix(in srgb, var(--panel-bg, #1b1e24) 55%, transparent);
+        }
+        .msg-reasoning summary {
+          cursor: pointer;
+          padding: 6px 10px;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--muted-color, #8b93a1);
+          user-select: none;
+          list-style: none;
+        }
+        .msg-reasoning summary::-webkit-details-marker {
+          display: none;
+        }
+        .msg-reasoning summary::before {
+          content: "▸";
+          display: inline-block;
+          margin-right: 6px;
+          transition: transform 0.15s ease;
+        }
+        .msg-reasoning[open] summary::before {
+          transform: rotate(90deg);
+        }
+        .msg-reasoning .msg-reasoning-body {
+          padding: 0 10px 10px;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          font-size: 13px;
+          color: color-mix(in srgb, var(--muted-color, #8b93a1) 80%, #fff);
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
         .chat-message.assistant .msg-content {
           white-space: normal;
         }
@@ -2762,6 +2818,16 @@ class Openp41geAgents extends LitElement {
     `;
   }
 
+  /** Collapsible reasoning/thinking block above an assistant answer. It is
+   *  auto-expanded for the in-flight message so the user sees it stream. */
+  private _renderReasoning(reasoning: string | undefined, live: boolean): TemplateResult {
+    if (!reasoning) return html``;
+    return html`<details class="msg-reasoning" ?open=${live}>
+      <summary>Reasoning</summary>
+      <div class="msg-reasoning-body">${reasoning}</div>
+    </details>`;
+  }
+
   private _renderMessage(msg: ChatMessage): TemplateResult {
     if (msg.role === "user") {
       return html`<div class="chat-message user">
@@ -2783,6 +2849,7 @@ class Openp41geAgents extends LitElement {
     if (msg.segments && msg.segments.length > 0) {
       return html`
         <div class="chat-message assistant">
+          ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1])}
           ${msg.segments.map((seg) => {
             if (seg.type === "tool") return this._renderToolCall(seg.toolCall!);
             const parts = seg.text
@@ -2801,6 +2868,7 @@ class Openp41geAgents extends LitElement {
       : [];
     return html`
       <div class="chat-message assistant">
+        ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1])}
         <div class="msg-content" @click=${this._onMsgContentClick}>
           ${segments.map((seg) => this._renderSegment(seg))}
         </div>

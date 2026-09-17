@@ -7,6 +7,7 @@ import type {
   ChatToolPayload,
   ChatStatusPayload,
   ChatLiveRatePayload,
+  ChatReasoningPayload,
   ToolCall,
   ChatRuntimeStatus,
 } from "openp41ge-agents";
@@ -335,6 +336,7 @@ declare global {
         onStatus: (callback: (payload: ChatStatusPayload) => void) => () => void;
         onUsage: (callback: (payload: ChatUsagePayload) => void) => () => void;
         onLiveRate: (callback: (payload: ChatLiveRatePayload) => void) => () => void;
+        onReasoning: (callback: (payload: ChatReasoningPayload) => void) => () => void;
         onOpenState: (callback: (payload: Record<string, string>) => void) => () => void;
         onHighlight: (callback: (payload: { chatId: string }) => void) => () => void;
       };

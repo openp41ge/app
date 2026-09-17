@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body { margin: 0; background: #121212; }
+      #host { width: 100vw; height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="host"></div>
+    <script type="module">
+      import { ToolResultController } from "./apps/tool-result/tool-result-controller.ts";
+
+      const src = [
+        "// A small TS sample",
+        "export function main(): number {",
+        "  const answer: number = 42;",
+        "  const msg: string = 'hello';",
+        "  return answer + msg.length;",
+        "}",
+        "",
+        "@decorator class Foo extends Bar {}",
+      ].join("\n");
+
+      window.__pendingToolResult = {
+        toolName: "read_file",
+        argsString: JSON.stringify({ path: "/repo/src/sample.ts" }),
+        result: src,
+        hint: "read_file · sample.ts",
+      };
+
+      const host = document.getElementById("host");
+      const controller = new ToolResultController("repro-tool", "tool-result");
+      controller.mount(host);
+
+      window.__repro = { controller, host };
+    </script>
+  </body>
+</html>
