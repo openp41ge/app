@@ -311,8 +311,8 @@ class Openp41geAgents extends LitElement {
         class="bb-stat"
         ${tooltipContent({
           type: "detail",
-          title: "Prompt tokens",
-          subtitle: `Tokens sent to the model: the system prompt, connected worktree context, and your messages. · ${u.promptTokens.toLocaleString("en-US")} tokens`,
+          title: "Tokens uploaded",
+          subtitle: `Amount sent to the model (system prompt, connected worktree context, and your messages). ${u.promptTokens.toLocaleString("en-US")} tokens uploaded.`,
         })}
         >${this._fmtTok(u.promptTokens)}${this._arrow(false)}</span>
       <span class="bb-sep">·</span>
@@ -320,19 +320,10 @@ class Openp41geAgents extends LitElement {
         class="bb-stat"
         ${tooltipContent({
           type: "detail",
-          title: "Completion tokens",
-          subtitle: `Tokens the model generated in this response. · ${u.completionTokens.toLocaleString("en-US")} tokens`,
+          title: "Tokens downloaded",
+          subtitle: `Amount the model generated in this response. ${u.completionTokens.toLocaleString("en-US")} tokens downloaded.`,
         })}
         >${this._fmtTok(u.completionTokens)}${this._arrow(true)}</span>
-      <span class="bb-sep">·</span>
-      <span
-        class="bb-stat"
-        ${tooltipContent({
-          type: "detail",
-          title: "Total tokens",
-          subtitle: `Prompt plus completion tokens combined for this response. · ${u.totalTokens.toLocaleString("en-US")} tokens`,
-        })}
-        >${this._fmtTok(u.totalTokens)}</span>
     `;
   }
 
@@ -2386,6 +2377,20 @@ class Openp41geAgents extends LitElement {
           padding: 2px 6px 6px;
           background: transparent;
         }
+        .composer-tokenrow {
+          box-sizing: border-box;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px 6px;
+          font-size: 11.5px;
+          font-weight: 500;
+          color: var(--text-secondary, #9a9a9a);
+          white-space: nowrap;
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+
         .composer-select {
           flex: 0 0 auto;
           display: inline-flex;
@@ -2765,6 +2770,11 @@ class Openp41geAgents extends LitElement {
                 </button>`
           }
         </div>
+        ${
+          this._usage
+            ? html`<div class="composer-tokenrow">${this._formatUsage(this._usage)}</div>`
+            : html``
+        }
         <textarea
           class="chat-input composer-input"
           rows="1"
@@ -2778,9 +2788,7 @@ class Openp41geAgents extends LitElement {
       </div>
 
       <div class="chat-bottombar"><span class="bb-left">${
-        this._usage
-          ? html`<span class="bb-usage" part="usage">${this._formatUsage(this._usage)}</span>`
-          : html`${this._title || "Agent chat"}`
+        this._title || "Agent chat"
       }</span>${
         this._streaming && this._liveTps != null
           ? html`<span class="bb-tps" part="tps">~${this._fmtRate(

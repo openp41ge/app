@@ -31,12 +31,12 @@ describe("Openp41geAgents (custom element)", () => {
 
     el.setUsage({ promptTokens: 1_200, completionTokens: 34, totalTokens: 1_234 });
     await el.updateComplete;
-    const usage = bar.querySelector(".bb-usage") as HTMLElement;
+    const usage = el.shadowRoot!.querySelector(".composer-tokenrow") as HTMLElement;
     expect(usage).toBeTruthy();
     // Compact 1K formatting + direction arrows (down = rotated up icon).
-    // Three separate stat elements, each carrying its own tooltip.
+    // Two separate stat elements, each carrying its own tooltip.
     const stats = usage.querySelectorAll(".bb-stat");
-    expect(stats).toHaveLength(3);
+    expect(stats).toHaveLength(2);
     // Each stat is hovered/annotated via the shared tooltipContent directive.
     expect(stats[0].textContent).toContain("1.2K");
     expect(stats[1].textContent).toContain("34");
@@ -74,7 +74,7 @@ describe("Openp41geAgents (custom element)", () => {
 
     el.setUsage({ promptTokens: 1_500_000, completionTokens: 2_300, totalTokens: 1_502_300 });
     await el.updateComplete;
-    const usage = el.shadowRoot!.querySelector(".bb-usage") as HTMLElement;
+    const usage = el.shadowRoot!.querySelector(".composer-tokenrow") as HTMLElement;
     expect(usage.textContent).toContain("1.5M");
     expect(usage.textContent).toContain("2.3K");
     expect(usage.textContent).not.toContain("total");
