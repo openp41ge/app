@@ -133,6 +133,48 @@ describe("AgentRuntime", () => {
     expect(usageCalls[0][2].usage.tokensPerSecond).toBeCloseTo(1580.1, 1);
   });
 
+
+  it("forwards a live generation rate but never persists it as the final usage", async () => {
+    const provider = makeFakeProvider([
+      [
+        { type: "text", text: "A" },
+        {
+          type: "usage",
+          // A throttled live progress delta with the real elapsed time.
+          usage: { promptTokens: 0, completionTokens: 150, totalTokens: 150 },
+          elapsedMs: 246,
+          live: true,
+        },
+        { type: "text", text: "B" },
+        {
+          type: "usage",
+          // The authoritative final usage chunk (not live).
+          usage: { promptTokens: 99, completionTokens: 201, totalTokens: 300 },
+          elapsedMs: 200,
+        },
+      ],
+    ]);
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await ctx.runtime.send(chat.id, "win-a", "go");
+
+    // Live rate forwarded: 150 tokens / 246ms  =>  609.8 tok/s.
+    const liveCalls = ctx.hooks.sendToWindow.mock.calls.filter(([, e]) => e === "chat:liveRate");
+    expect(liveCalls).toHaveLength(1);
+    expect(liveCalls).toHaveLength(1);
+    expect(liveCalls[0][2].chatId).toBe(chat.id);
+    expect(liveCalls[0][2].tps).toBeCloseTo(609.8, 1);
+
+    // Only the final, authoritative usage is persisted and forwarded.
+    const usageCalls = ctx.hooks.sendToWindow.mock.calls.filter(([, e]) => e === "chat:usage");
+    expect(usageCalls).toHaveLength(1);
+    expect(usageCalls[0][2].usage.completionTokens).toBe(201);
+    const stored = ctx.store.get(chat.id)!.messages.find((m) => m.role === "assistant")?.usage;
+    expect(stored?.completionTokens).toBe(201);
+  });
+
+
   it("executes tool calls and loops back to the provider until text-only", async () => {
     let capturedArgs: Record<string, unknown> | undefined;
     const fakeTool: AgentTool = {

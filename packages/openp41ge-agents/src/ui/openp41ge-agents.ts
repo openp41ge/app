@@ -117,6 +117,8 @@ class Openp41geAgents extends LitElement {
   @state() private _status: ChatRuntimeStatus | null = null;
   @state() private _title = "";
   @state() private _usage: TokenUsage | null = null;
+  /** Live generation rate (tok/s) while a response is streaming. */
+  @state() private _liveTps: number | null = null;
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
 
@@ -199,6 +201,7 @@ class Openp41geAgents extends LitElement {
     this._title = chat.title;
     this._messages = chat.messages.map(deepCloneMessage);
     this._streaming = false;
+    this._liveTps = null;
     this._providerId = chat.providerId;
     this._modelId = "";
     this._toolResults = {};
@@ -254,6 +257,7 @@ class Openp41geAgents extends LitElement {
   setProviderStatus(status: ChatRuntimeStatus): void {
     this._status = status;
     this._streaming = status.streaming;
+    if (!status.streaming) this._liveTps = null;
   }
 
   /** Set the chat title (e.g. when auto-titled from the first user message). */
@@ -264,6 +268,11 @@ class Openp41geAgents extends LitElement {
   /** Set the latest token usage reported for a completion. */
   setUsage(usage: TokenUsage): void {
     this._usage = usage;
+  }
+
+  /** Set the live generation rate shown only while the response streams. */
+  setStreamRate(tps: number | null): void {
+    this._liveTps = tps;
   }
 
   /** The usage of the most recent assistant message that carries one. */
@@ -2717,9 +2726,9 @@ class Openp41geAgents extends LitElement {
           ? html`<span class="bb-usage" part="usage">${this._formatUsage(this._usage)}</span>`
           : html`${this._title || "Agent chat"}`
       }</span>${
-        this._usage?.tokensPerSecond != null
+        this._streaming && this._liveTps != null
           ? html`<span class="bb-tps" part="tps">~${this._fmtRate(
-              this._usage.tokensPerSecond,
+              this._liveTps,
             )} tok/s</span>`
           : html``
       }</div>

@@ -164,11 +164,15 @@ export class VllmChatProvider implements ChatProvider {
     const toolAccumulators = new Map<number, ToolAccumulator>();
     let buffer = "";
     let done = false;
-    // Timestamp of the first streamed content delta, so we can approximate the
-    // generation throughput (completion tokens / elapsed) once usage arrives.
-    let firstContentAt: number | null = null;
+    // Wall-clock start of the request, used to derive a live (average)
+    // tokens-per-second readout while the response streams.
+    let streamStartAt: number | null = null;
+    let streamedTokens = 0;
+    let lastLiveAt = 0;
 
     try {
+      streamStartAt = Date.now();
+      lastLiveAt = streamStartAt;
       while (!done) {
         const { value, done: readerDone } = await reader.read();
         if (readerDone) break;
@@ -193,14 +197,33 @@ export class VllmChatProvider implements ChatProvider {
             continue;
           }
           for (const d of this._emitChunk(chunk, toolAccumulators)) {
-            if (firstContentAt === null && (d.type === "text" || d.type === "tool_call")) {
-              firstContentAt = Date.now();
-            }
-            if (d.type === "usage") {
+            if (d.type === "text" || d.type === "tool_call") {
+              streamedTokens++;
+              // Always stream the content first.
+              yield d;
+              // Throttled live progress: surface an approximate average rate
+              // (completion tokens so far / elapsed since the request started)
+              // while the response is still streaming.
+              if (streamStartAt !== null && Date.now() - lastLiveAt >= 250) {
+                lastLiveAt = Date.now();
+                yield {
+                  type: "usage",
+                  usage: {
+                    promptTokens: 0,
+                    completionTokens: streamedTokens,
+                    totalTokens: streamedTokens,
+                  },
+                  elapsedMs: Date.now() - streamStartAt,
+                  live: true,
+                };
+              }
+            } else if (d.type === "usage") {
+              // The provider's final usage chunk carries the authoritative
+              // counts; report the overall request elapsed time alongside it.
               yield {
                 type: "usage",
                 usage: d.usage,
-                elapsedMs: firstContentAt === null ? 0 : Date.now() - firstContentAt,
+                elapsedMs: streamStartAt === null ? 0 : Date.now() - streamStartAt,
               };
             } else {
               yield d;

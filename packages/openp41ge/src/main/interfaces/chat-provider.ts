@@ -36,7 +36,7 @@ export interface TokenUsage {
 export type ProviderDelta =
   | { type: "text"; text: string }
   | { type: "tool_call"; id: string; name: string; arguments: string }
-  | { type: "usage"; usage: TokenUsage; elapsedMs?: number };
+  | { type: "usage"; usage: TokenUsage; elapsedMs?: number; live?: boolean };
 
 /** Input to a streamChat call. */
 export interface ChatStreamRequest {

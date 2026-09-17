@@ -140,6 +140,12 @@ export interface ChatUsagePayload {
   usage: TokenUsage;
 }
 
+/** Broadcast payload for `chat:liveRate` (live gen rate during streaming). */
+export interface ChatLiveRatePayload {
+  chatId: string;
+  tps: number;
+}
+
 /**
  * A short, human-readable preview of a chat's latest activity.
  * Used by the sidebar rows and ChatSummary.lastMessagePreview.

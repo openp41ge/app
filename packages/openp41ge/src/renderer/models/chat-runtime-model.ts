@@ -8,7 +8,13 @@
 
 /* eslint-disable max-classes-per-file */
 
-import type { ChatDeltaPayload, ChatStatusPayload, ChatToolPayload, ChatUsagePayload } from "openp41ge-agents";
+import type {
+  ChatDeltaPayload,
+  ChatLiveRatePayload,
+  ChatStatusPayload,
+  ChatToolPayload,
+  ChatUsagePayload,
+} from "openp41ge-agents";
 
 /** Narrow send/abort + subscribe contract for the agent runtime. */
 export interface ChatRuntimeModel {
@@ -24,6 +30,7 @@ export interface ChatRuntimeModel {
   onTool(cb: (payload: ChatToolPayload) => void): () => void;
   onStatus(cb: (payload: ChatStatusPayload) => void): () => void;
   onUsage(cb: (payload: ChatUsagePayload) => void): () => void;
+  onLiveRate(cb: (payload: ChatLiveRatePayload) => void): () => void;
 }
 
 // ─── Production: IPC-backed ───────────────────────────────────────────────
@@ -53,6 +60,9 @@ export class IpcChatRuntimeModel implements ChatRuntimeModel {
   onUsage(cb: (payload: ChatUsagePayload) => void): () => void {
     return window.openp41ge.chat.onUsage(cb);
   }
+  onLiveRate(cb: (payload: ChatLiveRatePayload) => void): () => void {
+    return window.openp41ge.chat.onLiveRate(cb);
+  }
 }
 
 // ─── Test: in-memory fixture runtime ──────────────────────────────────────
@@ -76,6 +86,7 @@ export class TestChatRuntimeModel implements ChatRuntimeModel {
   private readonly _tool = new Set<(p: ChatToolPayload) => void>();
   private readonly _status = new Set<(p: ChatStatusPayload) => void>();
   private readonly _usage = new Set<(p: ChatUsagePayload) => void>();
+  private readonly _liveRate = new Set<(p: ChatLiveRatePayload) => void>();
 
   send(id: string, text: string, cwd?: string): Promise<void> {
     this.calls.push({ op: "send", args: [id, text, cwd] });
@@ -120,6 +131,10 @@ export class TestChatRuntimeModel implements ChatRuntimeModel {
     this._usage.add(cb);
     return () => this._usage.delete(cb);
   }
+  onLiveRate(cb: (p: ChatLiveRatePayload) => void): () => void {
+    this._liveRate.add(cb);
+    return () => this._liveRate.delete(cb);
+  }
 
   /** Emit externally (used to simulate a streamed delta arriving). */
   emitDelta(id: string, delta: string): void {
@@ -130,5 +145,8 @@ export class TestChatRuntimeModel implements ChatRuntimeModel {
   }
   emitUsage(id: string, usage: ChatUsagePayload["usage"]): void {
     for (const cb of this._usage) cb({ chatId: id, usage });
+  }
+  emitLiveRate(id: string, tps: number): void {
+    for (const cb of this._liveRate) cb({ chatId: id, tps });
   }
 }

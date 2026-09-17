@@ -17,7 +17,14 @@ import { BaseController } from "../../controllers/base-controller";
 import type { TabController } from "../../controllers/types";
 import type { Openp41geAgents } from "openp41ge-agents";
 import { registerOpenp41geAgents } from "openp41ge-agents";
-import type { ChatDeltaPayload, ChatStatusPayload, ChatToolPayload, ChatUsagePayload, ToolCall } from "openp41ge-agents";
+import type {
+  ChatDeltaPayload,
+  ChatLiveRatePayload,
+  ChatStatusPayload,
+  ChatToolPayload,
+  ChatUsagePayload,
+  ToolCall,
+} from "openp41ge-agents";
 import { IpcChatStoreModel, type ChatStoreModel } from "../../models/chat-store-model";
 import { IpcChatRuntimeModel, type ChatRuntimeModel } from "../../models/chat-runtime-model";
 import { createLogger } from "openp41ge-logger";
@@ -139,6 +146,10 @@ export class AgentsController extends BaseController implements TabController {
       this._runtimeModel.onUsage((payload: ChatUsagePayload) => {
         if (payload.chatId !== chatId || !this._component) return;
         this._component.setUsage(payload.usage);
+      }),
+      this._runtimeModel.onLiveRate((payload: ChatLiveRatePayload) => {
+        if (payload.chatId !== chatId || !this._component) return;
+        this._component.setStreamRate(payload.tps);
       }),
       this._storeModel.onChanged(() => {
         if (!this._component) return;

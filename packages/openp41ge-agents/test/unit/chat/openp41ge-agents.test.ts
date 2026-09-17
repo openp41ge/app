@@ -48,13 +48,23 @@ describe("Openp41geAgents (custom element)", () => {
     expect(usage.textContent).not.toContain("total");
     expect(usage.textContent).not.toContain("1,200");
 
-    // A token rate (once known) is right-aligned with a leading tilde.
+    // The live generation rate is right-aligned with a leading tilde and only
+    // visible while the response is streaming; hidden otherwise.
     expect(bar.querySelector(".bb-tps")).toBeNull();
-    el.setUsage({ promptTokens: 101, completionTokens: 509, totalTokens: 430, tokensPerSecond: 152.3 });
+
+    el.setProviderStatus({ streaming: true, providerOk: true });
+    el.setStreamRate(11.6);
     await el.updateComplete;
-    const tps = bar.querySelector(".bb-tps") as HTMLElement;
+    let tps = bar.querySelector(".bb-tps") as HTMLElement | null;
     expect(tps).toBeTruthy();
-    expect(tps.textContent!.replace(/\s+/g, " ").trim()).toBe("~152.3 tok/s");
+    expect(tps!.textContent!.replace(/\s+/g, " ").trim()).toBe("~11.6 tok/s");
+
+    // Once streaming stops, the live readout disappears again.
+    el.setProviderStatus({ streaming: false, providerOk: true });
+    el.setStreamRate(11.6);
+    await el.updateComplete;
+    tps = bar.querySelector(".bb-tps") as HTMLElement | null;
+    expect(tps).toBeNull();
   });
 
   it("shortens large token counts to K/M", async () => {

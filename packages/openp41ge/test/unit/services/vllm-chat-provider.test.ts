@@ -120,9 +120,45 @@ describe("VllmChatProvider.streamChat", () => {
     expect(deltas[1]).toEqual({
       type: "usage",
       usage: { promptTokens: 120, completionTokens: 34, totalTokens: 154 },
-      // Elapsed time measured from the first content delta to the usage chunk.
+      // Elapsed time measured from the start of the request to the usage chunk.
       elapsedMs: expect.any(Number),
     });
+  });
+
+  it("emits throttled live usage deltas while content streams", async () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"role":"assistant","content":"A"}}]}',
+      "",
+      'data: {"choices":[{"delta":{"content":"B"}}]}',
+      "",
+      'data: {"choices":[{"delta":{"content":"C"}}]}',
+      "",
+      'data: {"choices":[{"delta":{}}],"usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8}}',
+      "",
+      "data: [DONE]",
+      "",
+    ].join("\n");
+
+    // Simulate >250ms elapsing between content tokens so the throttled live
+    // progress delta fires, but keep each call cheaper for the test.
+    let clock = 1_000;
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => (clock += 300));
+    try {
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(sseResponse(sse));
+      const provider = new VllmChatProvider(config);
+      const deltas = await collect(provider.streamChat({ messages: [] }));
+
+      const live = deltas.filter((d) => d.type === "usage" && (d as { live?: boolean }).live);
+      expect(live.length).toBeGreaterThan(0);
+      expect(live[0]).toMatchObject({ type: "usage", live: true });
+
+      // The authoritative final usage chunk is always last and not "live".
+      const last = deltas[deltas.length - 1];
+      expect(last).toMatchObject({ type: "usage", usage: { promptTokens: 5, completionTokens: 3, totalTokens: 8 } });
+      expect((last as { live?: boolean }).live).toBeFalsy();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("requests stream_options.include_usage so vLLM reports usage", async () => {

@@ -15,6 +15,7 @@ export type {
   ChatSearchResult,
   ChatStatusPayload,
   ChatUsagePayload,
+  ChatLiveRatePayload,
   ChatSummary,
   ChatToolPayload,
   MessageSegment,

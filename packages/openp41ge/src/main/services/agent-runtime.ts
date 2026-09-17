@@ -300,6 +300,18 @@ export class AgentRuntime {
           if (!currentAssistant) currentAssistant = this._beginAssistant(chatId);
           this._upsertToolCall(chatId, winId, currentAssistant.id, delta);
         } else if (delta.type === "usage") {
+          if (delta.live) {
+            // A throttled progress delta while the response is streaming: report
+            // a live average gen rate, but never persist it as the completion's
+            // authoritative usage.
+            if (delta.elapsedMs && delta.elapsedMs > 0 && delta.usage.completionTokens > 0) {
+              this._hooks.sendToWindow(winId, "chat:liveRate", {
+                chatId,
+                tps: delta.usage.completionTokens / (delta.elapsedMs / 1000),
+              });
+            }
+            continue;
+          }
           // The provider's final chunk carries the token usage for THIS
           // completion. Persist it on the streaming assistant message and
           // forward it to the window so the chat's bottom bar can show it.

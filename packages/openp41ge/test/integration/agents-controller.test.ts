@@ -153,6 +153,26 @@ describe("AgentsController", () => {
     expect(el._usage).toEqual({ promptTokens: 120, completionTokens: 34, totalTokens: 154 });
   });
 
+  it("forwards the live generation rate to the component while streaming", async () => {
+    (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";
+    controller.mount(host);
+    await flush();
+
+    const el = host.querySelector("openp41ge-agents") as HTMLElement & {
+      _liveTps?: unknown;
+    };
+    runtimeModel.emitLiveRate("chat_1", 29.3);
+    await flush();
+    expect(el._liveTps).toBe(29.3);
+
+    // Live rate for another chat is ignored (per-chat subscription).
+    runtimeModel.emitLiveRate("chat_2", 251.7);
+    await flush();
+    expect(el._liveTps).toBe(29.3);
+  });
+
+
+
   it("populates the composer provider/model selector from the agent config", async () => {
     (window as unknown as Record<string, unknown>).openp41ge = {
       ...(window as unknown as Record<string, unknown>).openp41ge,
