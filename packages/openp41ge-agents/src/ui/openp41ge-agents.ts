@@ -312,7 +312,7 @@ class Openp41geAgents extends LitElement {
         ${tooltipContent({
           type: "detail",
           title: "Prompt tokens",
-          subtitle: "Tokens sent to the model: the system prompt, connected worktree context, and your messages.",
+          subtitle: `Tokens sent to the model: the system prompt, connected worktree context, and your messages. · ${u.promptTokens.toLocaleString("en-US")} tokens`,
         })}
         >${this._fmtTok(u.promptTokens)}${this._arrow(false)}</span>
       <span class="bb-sep">·</span>
@@ -321,7 +321,7 @@ class Openp41geAgents extends LitElement {
         ${tooltipContent({
           type: "detail",
           title: "Completion tokens",
-          subtitle: "Tokens the model generated in this response.",
+          subtitle: `Tokens the model generated in this response. · ${u.completionTokens.toLocaleString("en-US")} tokens`,
         })}
         >${this._fmtTok(u.completionTokens)}${this._arrow(true)}</span>
       <span class="bb-sep">·</span>
@@ -330,7 +330,7 @@ class Openp41geAgents extends LitElement {
         ${tooltipContent({
           type: "detail",
           title: "Total tokens",
-          subtitle: "Prompt plus completion tokens combined for this response.",
+          subtitle: `Prompt plus completion tokens combined for this response. · ${u.totalTokens.toLocaleString("en-US")} tokens`,
         })}
         >${this._fmtTok(u.totalTokens)}</span>
     `;
