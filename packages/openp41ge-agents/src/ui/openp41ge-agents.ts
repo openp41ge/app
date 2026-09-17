@@ -1751,10 +1751,10 @@ class Openp41geAgents extends LitElement {
           color: var(--text-muted, #888);
         }
         .bb-arrow {
-          width: 0.85em;
-          height: 0.85em;
+          width: 1.15em;
+          height: 1.16em;
           display: inline-block;
-          vertical-align: -0.1em;
+          vertical-align: -0.11em;
           margin-left: 2px;
           margin-right: 1px;
           fill: currentColor;
