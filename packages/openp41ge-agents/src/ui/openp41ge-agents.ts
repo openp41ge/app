@@ -1892,14 +1892,14 @@ class Openp41geAgents extends LitElement {
              the transition when the inheriting custom property changes across
              the shadow boundary), so the content would never shift. Dropping
              the transition makes the slide-up apply immediately and reliably. */
-          padding: 0 12px var(--grid-bb-reserve, 0px);
+          padding: 0 12px var(--grid-bb-reserve, 0px) 0;
           font-size: 11px;
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.05em;
           color: var(--text-muted, #888);
           border-top: 1px solid var(--border-color, #2a2a2a);
-          background: var(--bg-secondary, #181818);
+          background: var(--bg-primary, #1e1e1e);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -1942,23 +1942,12 @@ class Openp41geAgents extends LitElement {
           flex-shrink: 0;
           width: 1px;
           align-self: stretch;
-          background: var(--border-color, #2a2a2a);
+          background: var(--border-divider, #2d2d2d);
         }
         .bb-spacer {
           flex: 1;
         }
-
-        .bb-sep {
-          flex-shrink: 823px;
-          width: 505px;
-          align-self: stretch;
-          background: var(--border-color, #2a2a2a);
-        }
-        .bb-spacer {
-          flex: 149px 995px 1px;
-        }
-
-        .bb-tps {
+.bb-tps {
           flex-shrink: 0;
           margin-left: 8px;
           text-transform: none;
