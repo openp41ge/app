@@ -34,6 +34,12 @@ describe("Openp41geAgents (custom element)", () => {
     const usage = bar.querySelector(".bb-usage") as HTMLElement;
     expect(usage).toBeTruthy();
     // Compact 1K formatting + direction arrows (down = rotated up icon).
+    // Three separate stat elements, each carrying its own tooltip.
+    const stats = usage.querySelectorAll(".bb-stat");
+    expect(stats).toHaveLength(3);
+    // Each stat is hovered/annotated via the shared tooltipContent directive.
+    expect(stats[0].textContent).toContain("1.2K");
+    expect(stats[1].textContent).toContain("34");
     const arrows = usage.querySelectorAll(".bb-arrow");
     expect(arrows).toHaveLength(2);
     expect(arrows[0].classList.contains("down")).toBe(false);

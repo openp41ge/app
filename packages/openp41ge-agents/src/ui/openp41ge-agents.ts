@@ -277,9 +277,34 @@ class Openp41geAgents extends LitElement {
 
   /** Short human-readable token usage line for the bottom bar. */
   private _formatUsage(u: TokenUsage): TemplateResult {
-    return html`${this._fmtTok(u.promptTokens)}${this._arrow(false)} · ${this._fmtTok(
-      u.completionTokens,
-    )}${this._arrow(true)} · ${this._fmtTok(u.totalTokens)}`;
+    return html`
+      <span
+        class="bb-stat"
+        ${tooltipContent({
+          type: "detail",
+          title: "Prompt tokens",
+          subtitle: "Tokens sent to the model: the system prompt, connected worktree context, and your messages.",
+        })}
+        >${this._fmtTok(u.promptTokens)}${this._arrow(false)}</span>
+      <span class="bb-sep">·</span>
+      <span
+        class="bb-stat"
+        ${tooltipContent({
+          type: "detail",
+          title: "Completion tokens",
+          subtitle: "Tokens the model generated in this response.",
+        })}
+        >${this._fmtTok(u.completionTokens)}${this._arrow(true)}</span>
+      <span class="bb-sep">·</span>
+      <span
+        class="bb-stat"
+        ${tooltipContent({
+          type: "detail",
+          title: "Total tokens",
+          subtitle: "Prompt plus completion tokens combined for this response.",
+        })}
+        >${this._fmtTok(u.totalTokens)}</span>
+    `;
   }
 
   /** Compact 1K/1M token formatting. */
@@ -1686,6 +1711,17 @@ class Openp41geAgents extends LitElement {
         }
         .bb-arrow.down {
           transform: rotate(180deg);
+        }
+        .bb-stat {
+          cursor: help;
+          color: var(--text-secondary, #9a9a9a);
+        }
+        .bb-stat:hover {
+          color: var(--text-primary, #ddd);
+        }
+        .bb-sep {
+          color: var(--text-muted, #888);
+          padding: 0 3px;
         }
         .chat-status {
           padding: 4px 12px;
