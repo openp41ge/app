@@ -1881,7 +1881,6 @@ class Openp41geAgents extends LitElement {
           height: 34px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
           /* Bottom padding = the grid's reserved scrollbar space so the bar
              content slides UP (staying vertically centred above it) when the
              grid overflows horizontally, keeping it clear of the floating
@@ -1920,14 +1919,12 @@ class Openp41geAgents extends LitElement {
         }
         .bb-find {
           flex: 0 0 auto;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 22px;
-          height: 22px;
+          align-self: stretch;
+          aspect-ratio: 1 / 1;
+          display: grid;
+          place-items: center;
           padding: 0;
           border: none;
-          border-radius: 4px;
           background: transparent;
           color: var(--text-muted, #888);
           cursor: pointer;
@@ -1938,8 +1935,29 @@ class Openp41geAgents extends LitElement {
           color: var(--text-primary, #d4d4d4);
         }
         .bb-find.active {
+          background: var(--bg-active, #37373d);
           color: var(--text-primary, #d4d4d4);
         }
+        .bb-sep {
+          flex-shrink: 0;
+          width: 1px;
+          align-self: stretch;
+          background: var(--border-color, #2a2a2a);
+        }
+        .bb-spacer {
+          flex: 1;
+        }
+
+        .bb-sep {
+          flex-shrink: 823px;
+          width: 505px;
+          align-self: stretch;
+          background: var(--border-color, #2a2a2a);
+        }
+        .bb-spacer {
+          flex: 149px 995px 1px;
+        }
+
         .bb-tps {
           flex-shrink: 0;
           margin-left: 8px;
@@ -3117,7 +3135,7 @@ class Openp41geAgents extends LitElement {
         title="Find in chat (⌘F)"
         @click=${() => this._toggleSearch()}
         >${unsafeHTML(ICON_FIND)}</button
-      >${
+      ><span class="bb-sep"></span><span class="bb-spacer"></span>${
         this._streaming && this._liveTps != null
           ? html`<span class="bb-tps" part="tps">~${this._fmtRate(
               this._liveTps,
