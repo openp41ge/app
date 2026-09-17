@@ -315,7 +315,6 @@ class Openp41geAgents extends LitElement {
           subtitle: `Amount sent to the model (system prompt, connected worktree context, and your messages). ${u.promptTokens.toLocaleString("en-US")} tokens uploaded.`,
         })}
         >${this._fmtTok(u.promptTokens)}${this._arrow(false)}</span>
-      <span class="bb-sep">·</span>
       <span
         class="bb-stat"
         ${tooltipContent({
@@ -1761,10 +1760,6 @@ class Openp41geAgents extends LitElement {
         .bb-stat:hover {
           color: var(--text-primary, #ddd);
         }
-        .bb-sep {
-          color: var(--text-muted, #888);
-          padding: 0 3px;
-        }
         .chat-status {
           padding: 4px 12px;
           font-size: 11px;
@@ -2383,7 +2378,7 @@ class Openp41geAgents extends LitElement {
           box-sizing: border-box;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 2px;
           padding: 0 8px;
           font-size: 11.5px;
           font-weight: 500;
