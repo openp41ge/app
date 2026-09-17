@@ -230,6 +230,13 @@ export class ChatStoreService {
         const tc = m.toolCalls?.find((t) => t.id === toolCallId);
         if (tc) {
           fn(tc);
+          if (m.segments) {
+            m.segments = m.segments.map((s) =>
+              s.type === "tool" && s.toolCall?.id === toolCallId
+                ? { ...s, toolCall: { ...s.toolCall, status: tc.status, ...(tc.error ? { error: tc.error } : {}) } }
+                : s,
+            );
+          }
           return;
         }
       }

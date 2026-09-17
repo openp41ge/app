@@ -332,6 +332,7 @@ declare global {
         onDelta: (callback: (payload: ChatDeltaPayload) => void) => () => void;
         onTool: (callback: (payload: ChatToolPayload) => void) => () => void;
         onStatus: (callback: (payload: ChatStatusPayload) => void) => () => void;
+        onUsage: (callback: (payload: ChatUsagePayload) => void) => () => void;
         onOpenState: (callback: (payload: Record<string, string>) => void) => () => void;
         onHighlight: (callback: (payload: { chatId: string }) => void) => () => void;
       };

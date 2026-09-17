@@ -20,6 +20,20 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot).toBeTruthy();
   });
 
+  it("shows token usage in the bottom bar once set", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const bar = el.shadowRoot!.querySelector(".chat-bottombar") as HTMLElement;
+    // Before any usage: falls back to the chat title.
+    expect(bar.textContent!.trim()).toBe("Agent chat");
+
+    el.setUsage({ promptTokens: 1_200, completionTokens: 34, totalTokens: 1_234 });
+    await el.updateComplete;
+    expect(bar.querySelector(".bb-usage")?.textContent).toBe("1,200 in · 34 out · 1,234 total");
+  });
+
   it("shows no empty-state placeholder when there are no messages", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
@@ -324,6 +338,10 @@ describe("Openp41geAgents (custom element)", () => {
           role: "assistant",
           content: "hello",
           toolCalls: [{ id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "done" }],
+          segments: [
+            { type: "tool", toolCall: { id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "done" } },
+            { type: "text", text: "hello" },
+          ],
           timestamp: 2,
         },
       ],
@@ -336,6 +354,15 @@ describe("Openp41geAgents (custom element)", () => {
     const toolRow = shadow.querySelector(".tool-call-row") as HTMLElement;
     expect(toolRow.textContent).toContain("read_file");
     expect(toolRow.textContent).toContain("/a");
+
+    // Tool calls render inline, interleaved with the response text per `segments`:
+    // the tool row comes before the streamed content (no grouped `.tool-calls` container).
+    const assistant = shadow.querySelector(".chat-message.assistant")!;
+    expect(assistant.querySelector(".tool-calls")).toBeNull();
+    const msgContent = assistant.querySelector(".msg-content")!;
+    expect(
+      toolRow.compareDocumentPosition(msgContent) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("appendDelta creates and grows the assistant message", async () => {
@@ -375,6 +402,117 @@ describe("Openp41geAgents (custom element)", () => {
     });
     const done = (el.messages as Array<{ toolCalls?: Array<{ status: string }> }>)[0].toolCalls![0];
     expect(done.status).toBe("done");
+  });
+
+  it("emits chat:tool-open with the tool result when a done card is clicked", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const opened = new Promise<CustomEvent>((resolve) => {
+      el.addEventListener("chat:tool-open", (e) => resolve(e as CustomEvent), { once: true });
+    });
+
+    el.setToolCallState(
+      { id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "done" },
+      "file contents",
+    );
+    await el.updateComplete;
+
+    const row = el.shadowRoot!.querySelector(".tool-call-row")! as HTMLElement;
+    // The card body is NOT clickable — a right-aligned action row appears.
+    const actions = el.shadowRoot!.querySelector(".tool-call-actions")!;
+    expect(actions).not.toBeNull();
+    // No inline result panel — the result lives in the opened tab.
+    expect(el.shadowRoot!.querySelector(".tool-call-result")).toBeNull();
+
+    const openBtn = el.shadowRoot!.querySelector(".tool-call-btn.primary")! as HTMLElement;
+    // The buttons are icon-only, below the card (not inside it).
+    expect(openBtn.querySelector("svg")).not.toBeNull();
+    const copyBtn = el.shadowRoot!.querySelector(".tool-call-btn:not(.primary)")! as HTMLElement;
+    expect(copyBtn.querySelector("svg")).not.toBeNull();
+    // The actions row is a sibling of the card, rendered below it.
+    expect(actions.parentElement?.querySelector(".tool-call-row")).not.toBeNull();
+    expect(actions.closest(".tool-call-row")).toBeNull();
+    openBtn.click();
+    const detail = ((await opened) as CustomEvent<{ toolCall?: { id: string }; result?: string }>)
+      .detail!;
+    expect(detail.toolCall?.id).toBe("tc1");
+    expect(detail.result).toBe("file contents");
+  });
+
+  it("does not open a running (no-result) card", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    let opened = false;
+    el.addEventListener("chat:tool-open", () => {
+      opened = true;
+    });
+
+    el.setToolCallState({ id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "running" });
+    await el.updateComplete;
+
+    // No action row while the tool is still running (no result yet).
+    expect(el.shadowRoot!.querySelector(".tool-call-actions")).toBeNull();
+    const row = el.shadowRoot!.querySelector(".tool-call-row")! as HTMLElement;
+    row.click();
+    expect(opened).toBe(false);
+  });
+
+  it("shows a friendly second line for read_file and search_files", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setToolCallState(
+      { id: "tc1", name: "read_file", arguments: '{"path":"/repo/src/a.ts"}', status: "running" },
+    );
+    el.setToolCallState({
+      id: "tc2",
+      name: "search_files",
+      arguments: '{"query":"store","roots":["/x/ascii-drawing-tool/main","/x/tw050x.net/dev"]}',
+      status: "running",
+    });
+    await el.updateComplete;
+
+    const rows = el.shadowRoot!.querySelectorAll(".tool-call-row");
+    expect(rows[0].querySelector(".tool-call-args")?.textContent).toBe("/repo/src/a.ts");
+    expect(rows[1].querySelector(".tool-call-args")?.textContent).toBe(
+      "“store” · ascii-drawing-tool/main, tw050x.net/dev",
+    );
+  });
+
+  it("renders tool calls inline, interleaved with streamed text in order", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.appendDelta("Let me check. ");
+    el.setToolCallState({
+      id: "tc1",
+      name: "read_file",
+      arguments: '{"path":"/a"}',
+      status: "done",
+    });
+    el.appendDelta("It says hello.");
+    await el.updateComplete;
+
+    // Segment order is preserved: text → tool call → text.
+    const segments = (el.messages as Array<{ segments?: Array<{ type: string }> }>)[0].segments;
+    expect(segments?.map((s) => s.type)).toEqual(["text", "tool", "text"]);
+
+    const assistant = el.shadowRoot!.querySelector(".chat-message.assistant")!;
+    const contents = assistant.querySelectorAll(".msg-content");
+    const toolRow = assistant.querySelector(".tool-call-row")!;
+    expect(contents).toHaveLength(2);
+    expect(
+      contents[0].compareDocumentPosition(toolRow) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      toolRow.compareDocumentPosition(contents[1]) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("dispatches chat:send with the typed text", async () => {

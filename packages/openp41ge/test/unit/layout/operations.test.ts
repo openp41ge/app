@@ -1047,3 +1047,63 @@ describe("moveSystemTabToSidebar", () => {
     expect(ws.windows[0].sidebar?.activeRightTab).toBeTruthy();
   });
 });
+
+// ─── openTabInNextCell ────────────────────────────────────────────────────
+
+describe("openTabInNextCell", () => {
+  test("opens in the existing cell to the right, without adding a column", () => {
+    let ws = makeWs();
+    const winId = makeWsId();
+    ws = ops.resizeGrid(ws, winId, 1, 2);
+    const t2 = types.createTab("t2", "file-viewer", "Second");
+    ws = ops.addTabToCell(ws, winId, t2, 0, 1);
+
+    const result = ops.openTabInNextCell(ws, winId, "p1", "tool-result", "read_file · a.ts", '{}', false);
+    const win = result.windows.find((w) => w.id === winId)!;
+    const grid = win.grid;
+
+    // No new column was inserted — the tool result joined the existing col 1.
+    expect(grid.cols).toBe(2);
+    const cell = grid.placements.find((p) => p.position.col === 1)!;
+    expect(cell.tabIds).toContain("t2");
+    const openedTabs = Object.values(result.editorTabs).filter(
+      (t: any) => t.appType === "tool-result",
+    );
+    expect(openedTabs.length).toBe(1);
+    // t2 is a regular tab (not a preview), so the unpinned tool result is added
+    // alongside it in the same cell.
+    expect(cell.tabIds.length).toBe(2);
+  });
+
+  test("creates a new column when the source is the rightmost cell", () => {
+    let ws = makeWs();
+    const winId = makeWsId();
+
+    const result = ops.openTabInNextCell(ws, winId, "p1", "tool-result", "read_file · a.ts", '{}', false);
+    const win = result.windows.find((w) => w.id === winId)!;
+    const grid = win.grid;
+
+    expect(grid.cols).toBe(2);
+    // The source (chat) STAYS in the first column — the new column is inserted
+    // AFTER it, so the first cell is not left empty with both tabs in the second.
+    const first = grid.placements.find((p) => p.position.row === 0 && p.position.col === 0);
+    expect(first?.tabIds).toContain("p1");
+    expect(first?.tabIds).toHaveLength(1);
+    const next = grid.placements.find((p) => p.position.row === 0 && p.position.col === 1);
+    expect(next).toBeDefined();
+    const openedTabs = Object.values(result.editorTabs).filter(
+      (t: any) => t.appType === "tool-result",
+    );
+    expect(openedTabs.length).toBe(1);
+    expect(result.editorTabs[openedTabs[0].id].isPreview).toBe(true);
+    expect(next?.tabIds).toContain(openedTabs[0].id);
+    expect(next?.tabIds).not.toContain("p1");
+  });
+
+  test("is a no-op when the source tab is missing", () => {
+    const ws = makeWs();
+    const winId = makeWsId();
+    const result = ops.openTabInNextCell(ws, winId, "nope", "tool-result", "t", '{}', false);
+    expect(result).toBe(ws);
+  });
+});

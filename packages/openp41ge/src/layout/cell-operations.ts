@@ -89,6 +89,88 @@ export function pinTabInCell(
 }
 
 /**
+ * Open a tab in the cell immediately to the RIGHT of the cell that holds
+ * `sourceTabId`, creating a new column (a "next cell") when the source is
+ * already the rightmost occupied cell.
+ *
+ * Used by the agents chat: clicking a tool-call card opens the tool's result
+ * in the adjacent cell rather than inline. The target row is row 0 (the app's
+ * column-based split model), so a source in a lower row still opens in the
+ * rightmost column.
+ *
+ * @param pinned - false → the tab opens as an unpinned preview (fills or
+ *   replaces the cell's preview slot); true → a regular pinned tab.
+ */
+export function openTabInNextCell(
+  workspace: Workspace,
+  windowId: string,
+  sourceTabId: string,
+  appType: string,
+  title: string,
+  filePath?: string,
+  pinned: boolean = false,
+  config?: Record<string, unknown>,
+): Workspace {
+  const win = workspace.windows.find((w) => w.id === windowId);
+  if (!win) return workspace;
+
+  const source = win.grid.placements.find((p) => p.tabIds.includes(sourceTabId as TabId));
+  if (!source) return workspace;
+
+  const col = source.position.col;
+  const targetCol = col + 1;
+
+  let result = workspace;
+  // If there's no column to the right yet, insert one AFTER the source so the
+  // source stays put and the result opens beside it. `insertGridColumn(col)`
+  // would instead insert at the SOURCE's index and shift the source into the
+  // new column — leaving the first cell empty with both tabs in the second.
+  if (targetCol >= win.grid.cols) {
+    result = insertEmptyColumnAfter(result, windowId, col);
+  }
+
+  return openTabInCell(result, windowId, appType, title, filePath, targetCol, pinned, config);
+}
+
+/**
+ * Insert a new EMPTY column immediately to the right of `col`, splitting that
+ * column's width, WITHOUT shifting the source column (the source stays at
+ * `col`, the new empty column lands at `col + 1`). Mirrors the divider math in
+ * `splitFileOpen` so the new cell gets a real midpoint divider even when there
+ * are no existing column dividers.
+ */
+function insertEmptyColumnAfter(
+  workspace: Workspace,
+  windowId: string,
+  col: number,
+): Workspace {
+  const newCol = col + 1;
+  return mapGridInWindow(workspace, windowId, (grid) => {
+    const shifted = grid.placements.map((p) => {
+      if (p.position.row !== 0) return p;
+      if (p.position.col >= newCol) {
+        return { ...p, position: { ...p.position, col: p.position.col + 1 } };
+      }
+      return p;
+    });
+
+    const oldColDividers = grid.dividers?.columns ?? [];
+    const leftBound = oldColDividers[col - 1] ?? 0;
+    const rightBound = oldColDividers[col] ?? 1;
+    const midDivider = (leftBound + rightBound) / 2;
+    const newColDividers = [...oldColDividers];
+    newColDividers.splice(newCol, 0, midDivider);
+
+    return {
+      ...grid,
+      cols: grid.cols + 1,
+      placements: shifted,
+      dividers: { columns: newColDividers, rows: grid.dividers?.rows ?? [] },
+    };
+  });
+}
+
+/**
  * Toggle the ephemeral pin state on an ephemeral tab.
  * When pinned, the ephemeral tab survives defocus (won't auto-close).
  * When unpinned, it closes on defocus.

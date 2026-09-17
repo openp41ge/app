@@ -237,4 +237,30 @@ describe("ChatStoreService", () => {
     // Tool result "model" must not match by itself.
     expect(store.search("model")).toEqual([]);
   });
+
+  it("updateToolCall propagates status/error into the matching inline segment", () => {
+    const c = store.create();
+    store.appendMessage(c.id, {
+      id: "a1",
+      role: "assistant",
+      content: "",
+      toolCalls: [
+        { id: "tc1", name: "read_file", arguments: "", status: "running" },
+      ],
+      segments: [
+        {
+          type: "tool",
+          toolCall: { id: "tc1", name: "read_file", arguments: "", status: "running" },
+        },
+      ],
+    });
+    store.updateToolCall(c.id, "tc1", (tc) => {
+      tc.status = "error";
+      tc.error = "boom";
+    });
+    const msg = store.get(c.id)!.messages[0];
+    const seg = msg.segments!.find((s) => s.type === "tool")!;
+    expect(seg.toolCall!.status).toBe("error");
+    expect(seg.toolCall!.error).toBe("boom");
+  });
 });

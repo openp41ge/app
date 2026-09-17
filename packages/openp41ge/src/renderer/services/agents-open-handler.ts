@@ -90,6 +90,114 @@ export class AgentsOpenHandler {
     );
   }
 
+  /**
+   * Open a tool call's result in an unpinned tab in the cell immediately to
+   * the right of the chat that issued it, creating that cell if the chat is
+   * already the rightmost one.
+   *
+   * Fired by the agents chat when a completed tool-call card is clicked (the
+   * card no longer expands inline). The tab is a `tool-result` viewer holding
+   * the snapshotted result text.
+   */
+  handleOpenToolResult(e: CustomEvent): void {
+    const detail = (e.detail ?? {}) as {
+      chatTabId?: string;
+      toolCallId?: string;
+      name?: string;
+      arguments?: string;
+      result?: string;
+    };
+    const chatTabId = detail.chatTabId;
+    if (!chatTabId) return;
+
+    const myWindowId = window.openp41ge.workspace.getWindowId();
+    if (!myWindowId) {
+      log.warn("open-tool-result skipped — no window context");
+      return;
+    }
+
+    const title = this._titleForTool(detail.name, detail.arguments);
+    const config = JSON.stringify({
+      toolName: detail.name ?? "tool",
+      argsString: detail.arguments ?? "",
+      result: detail.result ?? "",
+      hint: title,
+    });
+
+    // `search_files` produces a LIST of matching paths — route it to the
+    // dedicated search-results pane (not the file editor). Everything else
+    // (read_file and file-content tools) opens the read-only tool-result
+    // viewer over the snapshotted content.
+    const appType = detail.name === "search_files" ? "search-results" : "tool-result";
+
+    // Set the pending context so the controller mount picks it up, then
+    // open an UNPINNED (preview) tab in the next cell.
+    (window as unknown as Record<string, unknown>).__pendingToolResult = {
+      toolName: detail.name ?? "tool",
+      argsString: detail.arguments ?? "",
+      result: detail.result ?? "",
+      hint: title,
+    };
+    log.info("open tool result", title, "next-cell", appType);
+    this._commandBus!.dispatch(
+      "openTabInNextCell",
+      myWindowId,
+      chatTabId,
+      appType,
+      title,
+      config,
+      false, // unpinned
+    );
+  }
+
+  /**
+   * Open a file selected from a search-results pane in the editor, in the
+   * cell immediately to the right of the results pane (creating that cell if
+   * it is the rightmost one).
+   */
+  handleOpenSearchResultFile(e: CustomEvent): void {
+    const detail = (e.detail ?? {}) as { sourceTabId?: string; path?: string };
+    const sourceTabId = detail.sourceTabId;
+    const filePath = detail.path;
+    if (!sourceTabId || !filePath) return;
+
+    const myWindowId = window.openp41ge.workspace.getWindowId();
+    if (!myWindowId) {
+      log.warn("open-search-result-file skipped — no window context");
+      return;
+    }
+    const name = filePath.split("/").filter(Boolean).pop() || filePath;
+    log.info("open search result file", filePath, "next-cell");
+    this._commandBus!.dispatch(
+      "openTabInNextCell",
+      myWindowId,
+      sourceTabId,
+      "file-viewer",
+      name,
+      filePath,
+      false, // unpinned preview
+    );
+  }
+
+  /** Friendly tab title for a tool result, e.g. `read_file · src/a.ts`. */
+  private _titleForTool(name: string | undefined, argumentsStr?: string): string {
+    const label = name || "tool";
+    let args: Record<string, unknown> = {};
+    try {
+      args = argumentsStr ? JSON.parse(argumentsStr) : {};
+    } catch {
+      args = {};
+    }
+    const path = typeof args.path === "string" ? args.path : undefined;
+    const query = typeof args.query === "string" ? args.query : undefined;
+    if (path) {
+      const short = path.split("/").filter(Boolean).pop() || path;
+      return `${label} · ${short}`;
+    }
+    if (query) return `${label} · "${query}"`;
+    return label;
+  }
+
   private _getLastActiveCellCol(): number {
     const myWindowId = window.openp41ge.workspace.getWindowId();
     if (!myWindowId) return 0;

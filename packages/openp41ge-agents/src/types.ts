@@ -24,6 +24,22 @@ export interface ToolCall {
   error?: string;
 }
 
+/** An ordered slice of an assistant message: streamed text or a tool call. */
+export interface MessageSegment {
+  type: "text" | "tool";
+  /** Present when type === "text". */
+  text?: string;
+  /** Present when type === "tool". */
+  toolCall?: ToolCall;
+}
+
+/** Token usage reported by the provider for a single completion. */
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 /** A single message in a chat transcript. */
 export interface ChatMessage {
   id: string;
@@ -31,8 +47,16 @@ export interface ChatMessage {
   content?: string;
   /** Only present on assistant messages that called tools. */
   toolCalls?: ToolCall[];
+  /**
+   * Ordered interleaving of text and tool calls for assistant messages, so the
+   * UI can render tool calls inline at the position they occurred rather than
+   * grouping all text above all tool calls. Absent on legacy messages.
+   */
+  segments?: MessageSegment[];
   /** For role === "tool": the id of the tool call this result answers. */
   toolCallId?: string;
+  /** Token usage for the completion that produced this assistant message. */
+  usage?: TokenUsage;
   timestamp: number;
 }
 
@@ -95,12 +119,20 @@ export interface ChatDeltaPayload {
 export interface ChatToolPayload {
   chatId: string;
   toolCall: ToolCall;
+  /** Final result (or error) content once the tool has completed. */
+  result?: string;
 }
 
 /** Broadcast payload for `chat:status` (streaming/provider connection). */
 export interface ChatStatusPayload {
   chatId: string;
   status: ChatRuntimeStatus;
+}
+
+/** Broadcast payload for `chat:usage` (token usage from a completion). */
+export interface ChatUsagePayload {
+  chatId: string;
+  usage: TokenUsage;
 }
 
 /**

@@ -46,6 +46,16 @@ export class RegisterEventListenersStep implements IStartupStep {
       context.agentsOpenHandler.handleOpenChat(e);
     }) as EventListener);
 
+    // Tool-result open events (agent chat tool-call cards)
+    document.addEventListener("openp41ge:open-tool-result", ((e: CustomEvent) => {
+      context.agentsOpenHandler.handleOpenToolResult(e);
+    }) as EventListener);
+
+    // Search-result file open events (agent search_files result rows)
+    document.addEventListener("openp41ge:open-search-result-file", ((e: CustomEvent) => {
+      context.agentsOpenHandler.handleOpenSearchResultFile(e);
+    }) as EventListener);
+
     // Log-system open events (Logs sidebar rows)
     document.addEventListener("openp41ge:open-log-system", ((e: CustomEvent) => {
       context.logOpenHandler.handleOpenLogSystem(e);

@@ -84,6 +84,30 @@ describe("AgentRuntime", () => {
     expect(ctx.hooks.broadcast).toHaveBeenCalledWith("chat:changed", {});
   });
 
+  it("persists token usage on the assistant message and forwards a chat:usage event", async () => {
+    const provider = makeFakeProvider([
+      [
+        { type: "text", text: "Done" },
+        { type: "usage", usage: { promptTokens: 120, completionTokens: 34, totalTokens: 154 } },
+      ],
+    ]);
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await ctx.runtime.send(chat.id, "win-a", "go");
+
+    const stored = ctx.store.get(chat.id)!;
+    const assistant = stored.messages.find((m) => m.role === "assistant");
+    expect(assistant?.usage).toEqual({ promptTokens: 120, completionTokens: 34, totalTokens: 154 });
+
+    const usageCalls = ctx.hooks.sendToWindow.mock.calls.filter(([, e]) => e === "chat:usage");
+    expect(usageCalls).toHaveLength(1);
+    expect(usageCalls[0][2]).toEqual({
+      chatId: chat.id,
+      usage: { promptTokens: 120, completionTokens: 34, totalTokens: 154 },
+    });
+  });
+
   it("executes tool calls and loops back to the provider until text-only", async () => {
     let capturedArgs: Record<string, unknown> | undefined;
     const fakeTool: AgentTool = {
@@ -123,6 +147,42 @@ describe("AgentRuntime", () => {
     expect(stored.messages[3].content).toBe("Done reading.");
     // The tool received the parsed arguments.
     expect(capturedArgs).toEqual({ path: "/a/b.ts" });
+  });
+
+  it("records ordered segments interleaving text and tool calls within a turn", async () => {
+    const fakeTool: AgentTool = {
+      name: "read_file",
+      description: "read",
+      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+      execute: async () => ({ content: "file contents" }),
+    };
+    ctx.tools.register(fakeTool);
+
+    const provider = makeFakeProvider([
+      [
+        { type: "text", text: "Let me read. " },
+        { type: "tool_call", id: "call_1", name: "read_file", arguments: '{"path":"/a"}' },
+        { type: "text", text: " Found it." },
+      ],
+      [{ type: "text", text: "done" }],
+    ]);
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await ctx.runtime.send(chat.id, "win-a", "go");
+
+    const stored = ctx.store.get(chat.id)!;
+    const assistant = stored.messages.find(
+      (m) => m.role === "assistant" && m.segments && m.segments.length > 0,
+    );
+    expect(assistant).toBeDefined();
+    expect(assistant!.content).toBe("Let me read.  Found it.");
+    expect(assistant!.segments!.map((s) => s.type)).toEqual(["text", "tool", "text"]);
+    const toolSeg = assistant!.segments![1];
+    expect(toolSeg.type).toBe("tool");
+    expect(toolSeg.toolCall!.id).toBe("call_1");
+    // Status propagates into the inline segment after execution.
+    expect(toolSeg.toolCall!.status).toBe("done");
   });
 
   it("withholds every tool when an empty enabledTools set is passed", async () => {
@@ -250,7 +310,41 @@ describe("AgentRuntime", () => {
     const chat = ctx.store.create({ providerId: "fake" });
     await scopedRuntime.send(chat.id, "win-a", "hi");
 
-    expect(systemContent).toContain("[github.com/org/repo] branch main: /worktrees/main");
+    expect(systemContent).toContain("- github.com/org/repo");
+    expect(systemContent).toContain("    - branch main: /worktrees/main");
+    expect(systemContent).toContain("Connected repositories");
+    expect(systemContent).toContain("do not repeat the same file across sibling worktrees");
     expect(systemContent).toContain("scoped");
+  });
+
+  it("groups multiple worktrees of a repo under a single repo heading", async () => {
+    let systemContent: string | undefined;
+    const provider: ChatProvider = {
+      id: "fake",
+      label: "Fake",
+      ping: async () => true,
+      async *streamChat(req: ChatStreamRequest): AsyncIterable<ProviderDelta> {
+        systemContent = req.messages[0]?.content;
+        yield { type: "text", text: "done" };
+      },
+    };
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const scopedRuntime = new AgentRuntime(ctx.store, ctx.providers, ctx.tools, ctx.hooks, {
+      getProviderConfig: () => ({ baseUrl: "http://x", model: "m", temperature: 0.2 }),
+      getConnectedWorktrees: async () => [
+        { repo: "github.com/org/repo", branch: "main", path: "/worktrees/main" },
+        { repo: "github.com/org/repo", branch: "feature", path: "/worktrees/feature" },
+        { repo: "github.com/org/other", branch: "main", path: "/worktrees/other-main" },
+      ],
+    });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await scopedRuntime.send(chat.id, "win-a", "hi");
+
+    // One repo heading per unique repo, with its worktrees listed under it.
+    expect(systemContent!.match(/- github\.com\/org\/repo\n/g)?.length).toBe(1);
+    expect(systemContent).toContain("    - branch feature: /worktrees/feature");
+    expect(systemContent).toContain("- github.com/org/other\n    - branch main: /worktrees/other-main");
   });
 });

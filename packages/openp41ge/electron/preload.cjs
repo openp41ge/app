@@ -681,6 +681,12 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.on("chat:status", handler);
       return () => ipcRenderer.removeListener("chat:status", handler);
     },
+    /** Subscribe to token usage reported for a completion. */
+    onUsage: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("chat:usage", handler);
+      return () => ipcRenderer.removeListener("chat:usage", handler);
+    },
     /** Subscribe to open-once state broadcasts. */
     onOpenState: (callback) => {
       const handler = (_event, data) => callback(JSON.parse(data));

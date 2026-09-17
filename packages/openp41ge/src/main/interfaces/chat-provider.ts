@@ -23,10 +23,18 @@ export interface ChatProviderConfig {
   models?: { id: string }[];
 }
 
+/** Token usage reported by a provider completion. */
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 /** Streamed delta from a provider. */
 export type ProviderDelta =
   | { type: "text"; text: string }
-  | { type: "tool_call"; id: string; name: string; arguments: string };
+  | { type: "tool_call"; id: string; name: string; arguments: string }
+  | { type: "usage"; usage: TokenUsage };
 
 /** Input to a streamChat call. */
 export interface ChatStreamRequest {

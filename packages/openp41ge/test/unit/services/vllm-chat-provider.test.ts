@@ -108,4 +108,35 @@ describe("VllmChatProvider.streamChat", () => {
       arguments: '{"path":"/a/b.ts"}',
     });
   });
+
+  it("surfaces the usage-only final chunk as a usage delta", async () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"role":"assistant","content":"Hi"}}]}',
+      "",
+      'data: {"choices":[{"delta":{}}],"usage":{"prompt_tokens":120,"completion_tokens":34,"total_tokens":154}}',
+      "",
+      "data: [DONE]",
+      "",
+    ].join("\n");
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(sseResponse(sse));
+
+    const provider = new VllmChatProvider(config);
+    const deltas = await collect(provider.streamChat({ messages: [] }));
+
+    expect(deltas[0]).toEqual({ type: "text", text: "Hi" });
+    expect(deltas[1]).toEqual({
+      type: "usage",
+      usage: { promptTokens: 120, completionTokens: 34, totalTokens: 154 },
+    });
+  });
+
+  it("requests stream_options.include_usage so vLLM reports usage", async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(sseResponse("data: [DONE]\n\n"));
+    const provider = new VllmChatProvider(config);
+    await collect(provider.streamChat({ messages: [] }));
+
+    const called = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(called[1].body);
+    expect(body.stream_options).toEqual({ include_usage: true });
+  });
 });

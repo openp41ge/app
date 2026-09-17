@@ -87,6 +87,38 @@ describe("AgentsController", () => {
     expect(runtimeModel.calls.some((c) => c.op === "send" && c.args[0] === "chat_1")).toBe(true);
   });
 
+  it("forwards a chat:tool-open event to the window-level tool-result event", async () => {
+    (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";
+    controller.mount(host);
+    await flush();
+
+    let detail: Record<string, unknown> | null = null;
+    const handler = (e: CustomEvent) => {
+      detail = e.detail as Record<string, unknown>;
+    };
+    document.addEventListener("openp41ge:open-tool-result", handler as EventListener);
+    try {
+      const el = host.querySelector("openp41ge-agents") as HTMLElement;
+      el.dispatchEvent(
+        new CustomEvent("chat:tool-open", {
+          detail: {
+            toolCall: { id: "tc1", name: "read_file", arguments: '{"path":"/a"}' },
+            result: "file contents",
+          },
+          bubbles: true,
+        }),
+      );
+      await flush();
+
+      expect(detail).not.toBeNull();
+      expect((detail as { chatTabId?: string }).chatTabId).toBe("ctab-1");
+      expect((detail as { name?: string }).name).toBe("read_file");
+      expect((detail as { result?: string }).result).toBe("file contents");
+    } finally {
+      document.removeEventListener("openp41ge:open-tool-result", handler as EventListener);
+    }
+  });
+
   it("appends streamed deltas to the component", async () => {
     (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";
     controller.mount(host);
@@ -101,6 +133,24 @@ describe("AgentsController", () => {
     const last = el.messages![el.messages!.length - 1];
     expect(last.role).toBe("assistant");
     expect(last.content).toContain("Assembling");
+  });
+
+  it("forwards token usage to the component's bottom bar", async () => {
+    (window as unknown as Record<string, unknown>).__pendingChatId = "chat_1";
+    controller.mount(host);
+    await flush();
+
+    const el = host.querySelector("openp41ge-agents") as HTMLElement & {
+      _usage?: unknown;
+    };
+    runtimeModel.emitUsage("chat_1", { promptTokens: 120, completionTokens: 34, totalTokens: 154 });
+    await flush();
+    expect(el._usage).toEqual({ promptTokens: 120, completionTokens: 34, totalTokens: 154 });
+
+    // Usage for another chat is ignored (per-chat subscription).
+    runtimeModel.emitUsage("chat_2", { promptTokens: 1, completionTokens: 1, totalTokens: 2 });
+    await flush();
+    expect(el._usage).toEqual({ promptTokens: 120, completionTokens: 34, totalTokens: 154 });
   });
 
   it("populates the composer provider/model selector from the agent config", async () => {

@@ -116,6 +116,9 @@ export class VllmChatProvider implements ChatProvider {
       model: this._config.model,
       messages: toOpenAIMessages(req.messages),
       stream: true,
+      // Request a final SSE chunk carrying `usage` so we can surface token
+      // counts in the chat UI. vLLM does NOT include usage by default.
+      stream_options: { include_usage: true },
     };
     if (this._config.temperature !== undefined) body.temperature = this._config.temperature;
     if (this._config.maxTokens !== undefined) body.max_tokens = this._config.maxTokens;
@@ -215,7 +218,24 @@ export class VllmChatProvider implements ChatProvider {
       choices?: Array<{
         delta?: { content?: string | null; tool_calls?: Array<Record<string, unknown>> };
       }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
     };
+
+    // The final chunk with `stream_options.include_usage` carries `usage` and
+    // NO choices — surface it and stop. (Without this, the `if (!choice)`
+    // below silently discards the only place the token counts arrive.)
+    if (c.usage && typeof c.usage === "object") {
+      yield {
+        type: "usage",
+        usage: {
+          promptTokens: c.usage.prompt_tokens ?? 0,
+          completionTokens: c.usage.completion_tokens ?? 0,
+          totalTokens: c.usage.total_tokens ?? 0,
+        },
+      };
+      return;
+    }
+
     const choice = c.choices?.[0];
     if (!choice) return;
     const delta = choice.delta;

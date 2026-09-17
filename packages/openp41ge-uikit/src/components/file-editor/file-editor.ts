@@ -2815,7 +2815,16 @@ export class FileEditorElement extends LitElement {
 
     const leftOffset = 8;
     const cw = this._charWidth > 0 ? this._charWidth : 8;
-    const relativeX = clickX - leftOffset + this._viewportEl.scrollLeft;
+    // clickX is measured from the VIEWPORT's left edge, which includes the
+    // pinned line-number gutter (one or two columns) that sits to the LEFT of
+    // the text region. The caret / selection / find layers all use TEXT-REGION
+    // coordinates (origin = just after the gutter), so the click coordinate
+    // must be shifted in by the pinned gutter width before column mapping.
+    // Omitting it shifts every click right by the gutter width — which grows
+    // with the number of digits (larger files) and doubles for diff views
+    // (a BEFORE + AFTER column).
+    const pinnedGutter = this._gutterGroupEl ? this._gutterGroupEl.offsetWidth : 0;
+    const relativeX = clickX - pinnedGutter - leftOffset + this._viewportEl.scrollLeft;
     const viewCol = Math.max(0, Math.round(relativeX / cw)) + 1;
 
     if (this._wordWrapEnabled && this._viewModel.coordinatesConverter) {

@@ -14,8 +14,11 @@ export type {
   ChatSearchOptions,
   ChatSearchResult,
   ChatStatusPayload,
+  ChatUsagePayload,
   ChatSummary,
   ChatToolPayload,
+  MessageSegment,
+  TokenUsage,
   ToolCall,
   ToolCallStatus,
 } from "./types";

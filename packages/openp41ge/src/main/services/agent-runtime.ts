@@ -17,7 +17,12 @@
  */
 
 import { createLogger } from "openp41ge-logger";
-import type { ChatMessage, ChatRuntimeStatus } from "openp41ge-agents";
+import type {
+  ChatMessage,
+  ChatRuntimeStatus,
+  MessageSegment,
+  ToolCallStatus,
+} from "openp41ge-agents";
 import type { AgentRuntimeHooks } from "./agent-runtime-hooks.js";
 import type {
   ChatProvider,
@@ -66,8 +71,25 @@ function buildSystemPrompt(connected: ConnectedWorktree[] | undefined): string {
   if (connected.length === 0) {
     return `${DEFAULT_SYSTEM_PROMPT}\n\nNo connected worktrees. The file tools (read_file, search_files) are scoped and cannot access anything.`;
   }
-  const lines = connected.map((w) => `- [${w.repo}] branch ${w.branch}: ${w.path}`);
-  return `${DEFAULT_SYSTEM_PROMPT}\n\nConnected worktrees you may read and search (file tools are scoped to these):\n${lines.join("\n")}`;
+
+  // Group worktrees by repo so the model understands a repo may have several
+  // branch checkouts — the same repository at different branches, not distinct
+  // targets. Grouping prevents the model from treating every worktree as a
+  // separate repo and re-reading shared files across sibling worktrees.
+  const byRepo = new Map<string, ConnectedWorktree[]>();
+  for (const w of connected) {
+    const list = byRepo.get(w.repo);
+    if (list) list.push(w);
+    else byRepo.set(w.repo, [w]);
+  }
+
+  const blocks: string[] = [];
+  for (const [repo, worktrees] of byRepo) {
+    const wtLines = worktrees.map((w) => `    - branch ${w.branch}: ${w.path}`).join("\n");
+    blocks.push(`- ${repo}\n${wtLines}`);
+  }
+
+  return `${DEFAULT_SYSTEM_PROMPT}\n\nConnected repositories you may read and search (file tools are scoped to their worktrees):\n\n${blocks.join("\n")}\n\nEach repository has one or more worktree checkouts (one per branch) — they are the same repository at different branches. To read or search a repository, use any one of its worktree paths; do not repeat the same file across sibling worktrees.`;
 }
 
 /** A tool call accumulated from streamed deltas, awaiting execution. */
@@ -270,12 +292,23 @@ export class AgentRuntime {
           if (!currentAssistant) currentAssistant = this._beginAssistant(chatId);
           this._store.updateMessage(chatId, currentAssistant.id, (m) => {
             m.content = (m.content ?? "") + delta.text;
+            m.segments = appendTextSegment(m.segments, delta.text);
           });
           this._hooks.sendToWindow(winId, "chat:delta", { chatId, delta: delta.text });
         } else if (delta.type === "tool_call") {
           toolCalls = this._mergeTool(toolCalls, delta);
           if (!currentAssistant) currentAssistant = this._beginAssistant(chatId);
           this._upsertToolCall(chatId, winId, currentAssistant.id, delta);
+        } else if (delta.type === "usage") {
+          // The provider's final chunk carries the token usage for THIS
+          // completion. Persist it on the streaming assistant message and
+          // forward it to the window so the chat's bottom bar can show it.
+          if (currentAssistant) {
+            this._store.updateMessage(chatId, currentAssistant.id, (m) => {
+              m.usage = delta.usage;
+            });
+          }
+          this._hooks.sendToWindow(winId, "chat:usage", { chatId, usage: delta.usage });
         }
       }
 
@@ -307,7 +340,11 @@ export class AgentRuntime {
           .flatMap((m) => m.toolCalls ?? [])
           .find((t) => t.id === tc.id);
         if (updatedTool)
-          this._hooks.sendToWindow(winId, "chat:tool", { chatId, toolCall: updatedTool });
+          this._hooks.sendToWindow(winId, "chat:tool", {
+            chatId,
+            toolCall: updatedTool,
+            result: result.error ? result.error : result.content,
+          });
       }
 
       if (signal.aborted) return;
@@ -320,9 +357,15 @@ export class AgentRuntime {
       id: this._id("msg"),
       role: "assistant",
       content: "",
+      segments: [],
       timestamp: Date.now(),
     };
-    this._store.appendMessage(chatId, { id: assistant.id, role: "assistant", content: "" });
+    this._store.appendMessage(chatId, {
+      id: assistant.id,
+      role: "assistant",
+      content: "",
+      segments: [],
+    });
     return assistant;
   }
 
@@ -356,6 +399,7 @@ export class AgentRuntime {
           { id: delta.id, name: delta.name, arguments: delta.arguments, status: "running" },
         ];
       }
+      m.segments = upsertToolSegment(m.segments, delta);
     });
     const chat = this._store.get(chatId);
     const tool = chat?.messages.flatMap((m) => m.toolCalls ?? []).find((t) => t.id === delta.id);
@@ -384,4 +428,53 @@ function parseArgs(raw: string): Record<string, unknown> {
     // not JSON — fall through
   }
   return { command: trimmed };
+}
+
+/** Append a text chunk to the ordered segment list, merging into a trailing text segment. */
+function appendTextSegment(
+  segments: MessageSegment[] | undefined,
+  text: string,
+): MessageSegment[] {
+  const segs = segments ?? [];
+  const last = segs[segs.length - 1];
+  if (last && last.type === "text") {
+    return [...segs.slice(0, -1), { type: "text", text: (last.text ?? "") + text }];
+  }
+  return [...segs, { type: "text", text }];
+}
+
+/** Insert or update a tool-call segment at its recorded position in the ordered list. */
+function upsertToolSegment(
+  segments: MessageSegment[] | undefined,
+  tool: { id: string; name?: string; arguments?: string; status?: ToolCallStatus },
+): MessageSegment[] {
+  const segs = segments ?? [];
+  const idx = segs.findIndex((s) => s.type === "tool" && s.toolCall?.id === tool.id);
+  if (idx >= 0) {
+    return segs.map((s, i) => {
+      if (i !== idx) return s;
+      const existing = s.toolCall!;
+      return {
+        ...s,
+        toolCall: {
+          ...existing,
+          name: tool.name ?? existing.name,
+          arguments: tool.arguments ?? existing.arguments,
+          status: tool.status ?? existing.status,
+        },
+      };
+    });
+  }
+  return [
+    ...segs,
+    {
+      type: "tool",
+      toolCall: {
+        id: tool.id,
+        name: tool.name ?? "",
+        arguments: tool.arguments ?? "",
+        status: tool.status ?? "running",
+      },
+    },
+  ];
 }

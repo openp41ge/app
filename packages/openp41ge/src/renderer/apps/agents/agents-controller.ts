@@ -17,7 +17,7 @@ import { BaseController } from "../../controllers/base-controller";
 import type { TabController } from "../../controllers/types";
 import type { Openp41geAgents } from "openp41ge-agents";
 import { registerOpenp41geAgents } from "openp41ge-agents";
-import type { ChatDeltaPayload, ChatStatusPayload, ChatToolPayload } from "openp41ge-agents";
+import type { ChatDeltaPayload, ChatStatusPayload, ChatToolPayload, ChatUsagePayload, ToolCall } from "openp41ge-agents";
 import { IpcChatStoreModel, type ChatStoreModel } from "../../models/chat-store-model";
 import { IpcChatRuntimeModel, type ChatRuntimeModel } from "../../models/chat-runtime-model";
 import { createLogger } from "openp41ge-logger";
@@ -73,10 +73,12 @@ export class AgentsController extends BaseController implements TabController {
     el.addEventListener("chat:send", this._onSend as EventListener);
     el.addEventListener("chat:abort", this._onAbort as EventListener);
     el.addEventListener("chat:tools-change", this._onToolsChange as EventListener);
+    el.addEventListener("chat:tool-open", this._onToolOpen as EventListener);
     this._boundHandlers.push(
       { type: "chat:send", handler: this._onSend as EventListener },
       { type: "chat:abort", handler: this._onAbort as EventListener },
       { type: "chat:tools-change", handler: this._onToolsChange as EventListener },
+      { type: "chat:tool-open", handler: this._onToolOpen as EventListener },
     );
 
     // Open the chat (opened-once bookkeeping) and fetch its transcript.
@@ -128,11 +130,15 @@ export class AgentsController extends BaseController implements TabController {
       }),
       this._runtimeModel.onTool((payload: ChatToolPayload) => {
         if (payload.chatId !== chatId || !this._component) return;
-        this._component.setToolCallState(payload.toolCall);
+        this._component.setToolCallState(payload.toolCall, payload.result);
       }),
       this._runtimeModel.onStatus((payload: ChatStatusPayload) => {
         if (payload.chatId !== chatId || !this._component) return;
         this._component.setProviderStatus(payload.status);
+      }),
+      this._runtimeModel.onUsage((payload: ChatUsagePayload) => {
+        if (payload.chatId !== chatId || !this._component) return;
+        this._component.setUsage(payload.usage);
       }),
       this._storeModel.onChanged(() => {
         if (!this._component) return;
@@ -285,6 +291,28 @@ export class AgentsController extends BaseController implements TabController {
 
   private _onAbort = (): void => {
     void this._runtimeModel.abort(this.chatId);
+  };
+
+  /**
+   * A completed tool-call card was clicked — forward it to the window-level
+   * tool-result open handler, which opens the result in an unpinned tab in the
+   * cell to the right of THIS chat tab.
+   */
+  private _onToolOpen = (e: Event): void => {
+    const detail = (e as CustomEvent<{ toolCall?: ToolCall; result?: string }>).detail;
+    const tc = detail?.toolCall;
+    if (!tc) return;
+    document.dispatchEvent(
+      new CustomEvent("openp41ge:open-tool-result", {
+        detail: {
+          chatTabId: this.tabId,
+          toolCallId: tc.id,
+          name: tc.name,
+          arguments: tc.arguments,
+          result: detail.result,
+        },
+      }),
+    );
   };
 
   private async _closeIfRemoved(): Promise<void> {

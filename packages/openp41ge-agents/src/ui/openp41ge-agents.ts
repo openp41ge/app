@@ -19,7 +19,7 @@ import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
 import { tooltipContent, tooltipController } from "openp41ge-uikit/tooltip";
-import type { Chat, ChatMessage, ChatRuntimeStatus, ToolCall } from "../types";
+import type { Chat, ChatMessage, ChatRuntimeStatus, MessageSegment, TokenUsage, ToolCall } from "../types";
 import { renderMarkdownSegments, type MarkdownSegment, type CodeBlockSegment } from "./markdown.js";
 import {
   highlight,
@@ -32,7 +32,38 @@ function deepCloneMessage(m: ChatMessage): ChatMessage {
   return {
     ...m,
     toolCalls: m.toolCalls?.map((t) => ({ ...t })),
+    segments: m.segments?.map((s) =>
+      s.type === "tool" ? { ...s, toolCall: { ...s.toolCall! } } : { ...s },
+    ),
   };
+}
+
+/** Append a text chunk to the ordered segment list, merging into a trailing text segment. */
+function appendTextSegment(
+  segments: MessageSegment[] | undefined,
+  text: string,
+): MessageSegment[] {
+  const segs = segments ?? [];
+  const last = segs[segs.length - 1];
+  if (last && last.type === "text") {
+    return [...segs.slice(0, -1), { type: "text", text: (last.text ?? "") + text }];
+  }
+  return [...segs, { type: "text", text }];
+}
+
+/** Insert or update a tool-call segment at its recorded position in the ordered list. */
+function upsertToolSegment(
+  segments: MessageSegment[] | undefined,
+  tool: ToolCall,
+): MessageSegment[] {
+  const segs = segments ?? [];
+  const idx = segs.findIndex((s) => s.type === "tool" && s.toolCall?.id === tool.id);
+  if (idx >= 0) {
+    return segs.map((s, i) =>
+      i === idx ? { ...s, toolCall: { ...tool } } : s,
+    );
+  }
+  return [...segs, { type: "tool", toolCall: { ...tool } }];
 }
 
 /** A selectable provider shown in the composer's config row. */
@@ -85,8 +116,12 @@ class Openp41geAgents extends LitElement {
   @state() private _streaming = false;
   @state() private _status: ChatRuntimeStatus | null = null;
   @state() private _title = "";
+  @state() private _usage: TokenUsage | null = null;
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
+
+  /** Tool results received live, keyed by tool-call id (for opening in a tab). */
+  @state() private _toolResults: Record<string, string> = {};
 
   /** Per code-block line-wrap toggle, keyed by `${msgId}::${index}`. */
   @state() private _codeWrap: Record<string, boolean> = {};
@@ -166,6 +201,10 @@ class Openp41geAgents extends LitElement {
     this._streaming = false;
     this._providerId = chat.providerId;
     this._modelId = "";
+    this._toolResults = {};
+    // Restore the last reported token usage so the bottom bar shows it even
+    // after the tab is reopened.
+    this._usage = this._lastAssistantUsage(chat.messages);
     this._scrollToBottom();
   }
 
@@ -183,12 +222,13 @@ class Openp41geAgents extends LitElement {
       messages.push(last);
     }
     last.content = (last.content ?? "") + text;
+    last.segments = appendTextSegment(last.segments, text);
     this._messages = messages;
     this._streaming = true;
     this._scrollToBottom();
   }
 
-  setToolCallState(tc: ToolCall): void {
+  setToolCallState(tc: ToolCall, result?: string): void {
     const messages = this._messages.map(deepCloneMessage);
     let last = messages[messages.length - 1];
     if (!last || last.role !== "assistant") {
@@ -205,7 +245,9 @@ class Openp41geAgents extends LitElement {
     if (idx >= 0) calls[idx] = { ...tc };
     else calls.push({ ...tc });
     last.toolCalls = calls;
+    last.segments = upsertToolSegment(last.segments, tc);
     this._messages = messages;
+    if (result !== undefined) this._toolResults = { ...this._toolResults, [tc.id]: result };
     this._scrollToBottom();
   }
 
@@ -217,6 +259,29 @@ class Openp41geAgents extends LitElement {
   /** Set the chat title (e.g. when auto-titled from the first user message). */
   setTitle(title: string): void {
     this._title = title;
+  }
+
+  /** Set the latest token usage reported for a completion. */
+  setUsage(usage: TokenUsage): void {
+    this._usage = usage;
+  }
+
+  /** The usage of the most recent assistant message that carries one. */
+  private _lastAssistantUsage(messages: ChatMessage[]): TokenUsage | null {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const u = messages[i]?.usage;
+      if (u) return u;
+    }
+    return null;
+  }
+
+  /** Short human-readable token usage line for the bottom bar. */
+  private _formatUsage(u: TokenUsage): string {
+    return `${this._fmtTok(u.promptTokens)} in · ${this._fmtTok(u.completionTokens)} out · ${this._fmtTok(u.totalTokens)} total`;
+  }
+
+  private _fmtTok(n: number): string {
+    return n.toLocaleString("en-US");
   }
 
   // ─── Back-compat API ────────────────────────────────────────────────
@@ -1507,8 +1572,27 @@ class Openp41geAgents extends LitElement {
   // ─── Rendering ──────────────────────────────────────────────────────
 
   private _toolResultFor(tc: ToolCall): string | undefined {
+    const live = this._toolResults[tc.id];
+    if (live !== undefined) return live;
     const msg = this._messages.find((m) => m.role === "tool" && m.toolCallId === tc.id);
     return msg?.content;
+  }
+
+  /**
+   * Open a completed tool-call card's result in a tab in the next cell,
+   * instead of expanding an inline accordion. Only fires for cards that have
+   * a result available (the tool has finished).
+   */
+  private _openToolResult(tc: ToolCall): void {
+    const result = this._toolResultFor(tc);
+    if (result === undefined) return;
+    this.dispatchEvent(
+      new CustomEvent("chat:tool-open", {
+        bubbles: true,
+        composed: true,
+        detail: { toolCall: tc, result },
+      }),
+    );
   }
 
   /**
@@ -1569,6 +1653,12 @@ class Openp41geAgents extends LitElement {
           overflow: hidden;
           text-overflow: ellipsis;
           flex-shrink: 0;
+        }
+        .bb-usage {
+          text-transform: none;
+          letter-spacing: normal;
+          font-weight: 500;
+          color: var(--text-secondary, #9a9a9a);
         }
         .chat-status {
           padding: 4px 12px;
@@ -1908,8 +1998,8 @@ class Openp41geAgents extends LitElement {
         }
         .tool-call-row {
           display: flex;
-          align-items: center;
-          gap: 6px;
+          flex-direction: column;
+          gap: 2px;
           font-family: var(--font-mono, "JetBrains Mono", monospace);
           font-size: 11.5px;
           background: var(--bg-tertiary, #1c1c1c);
@@ -1917,16 +2007,55 @@ class Openp41geAgents extends LitElement {
           border-radius: 4px;
           padding: 4px 8px;
         }
+        .tool-call-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 6px;
+          margin-top: 6px;
+        }
+        .tool-call-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 20px;
+          height: 20px;
+          padding: 0;
+          color: var(--text-secondary, #999);
+          background: var(--bg-active, #2d2d2d);
+          border: 1px solid var(--border-color, #3a3a3a);
+          border-radius: 4px;
+          cursor: pointer;
+          opacity: 0.9;
+        }
+        .tool-call-btn:hover {
+          opacity: 1;
+          color: var(--text-primary, #d4d4d4);
+        }
+        .tool-call-btn.primary {
+          color: var(--text-primary, #d4d4d4);
+        }
+        .tool-call-btn svg {
+          width: 11px;
+          height: 11px;
+        }
+        .chat-message.assistant > .tool-call-wrap {
+          margin: 5px 0;
+        }
         .tool-call-name {
           font-weight: 600;
           color: var(--text-secondary, #ccc);
-          flex-shrink: 0;
-        }
-        .tool-call-args {
-          color: var(--text-muted, #999);
+          flex: 1 1 auto;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+        .tool-call-args {
+          color: var(--text-muted, #999);
+          font-size: 11px;
+          white-space: pre-wrap;
+          word-break: break-word;
+          line-height: 1.35;
         }
         .tool-status {
           flex-shrink: 0;
@@ -1941,20 +2070,6 @@ class Openp41geAgents extends LitElement {
         }
         .tool-status.error {
           color: #f44336;
-        }
-        .tool-result {
-          margin-top: 2px;
-          margin-left: 10px;
-          font-family: var(--font-mono, "JetBrains Mono", monospace);
-          font-size: 11px;
-          color: var(--text-muted, #888);
-          background: var(--bg-tertiary, #191919);
-          border-left: 2px solid var(--border-color, #333);
-          padding: 3px 6px;
-          white-space: pre-wrap;
-          word-break: break-word;
-          max-height: 120px;
-          overflow-y: auto;
         }
         .composer {
           flex-shrink: 0;
@@ -2513,7 +2628,11 @@ class Openp41geAgents extends LitElement {
         ></textarea>
       </div>
 
-      <div class="chat-bottombar">${this._title || "Agent chat"}</div>
+      <div class="chat-bottombar">${
+        this._usage
+          ? html`<span class="bb-usage" part="usage">${this._formatUsage(this._usage)}</span>`
+          : html`${this._title || "Agent chat"}`
+      }</div>
     `;
   }
 
@@ -2551,12 +2670,33 @@ class Openp41geAgents extends LitElement {
       </div>`;
     }
     if (msg.role === "tool") {
-      // Standalone tool-result message (rare): render as a mono result block.
-      return html`<div class="tool-result">${msg.content}</div>`;
+      // Tool results are surfaced by the tool-call card (which opens them in a
+      // tab in the next cell), so the standalone result message is not rendered
+      // here — only the card represents it. Keep the message in `_messages` so
+      // the card can look up the result.
+      return html``;
     }
     // assistant
     const toolCalls = msg.toolCalls ?? [];
     const overrides = this._codeLangForMessage(msg.id);
+    // New messages carry an ordered segment list (text/tool interleaved) so tool
+    // calls render inline at the position they occurred in the response.
+    if (msg.segments && msg.segments.length > 0) {
+      return html`
+        <div class="chat-message assistant">
+          ${msg.segments.map((seg) => {
+            if (seg.type === "tool") return this._renderToolCall(seg.toolCall!);
+            const parts = seg.text
+              ? renderMarkdownSegments(seg.text, { codeLanguages: overrides, msgId: msg.id })
+              : [];
+            return html`<div class="msg-content" @click=${this._onMsgContentClick}>
+              ${parts.map((s) => this._renderSegment(s))}
+            </div>`;
+          })}
+        </div>
+      `;
+    }
+    // Legacy messages (no segment order recorded): content then grouped tool calls.
     const segments = msg.content
       ? renderMarkdownSegments(msg.content, { codeLanguages: overrides, msgId: msg.id })
       : [];
@@ -2695,16 +2835,103 @@ class Openp41geAgents extends LitElement {
   private _renderToolCall(tc: ToolCall): TemplateResult {
     const status = tc.status ?? "running";
     const result = this._toolResultFor(tc);
+    const openable = status !== "running" && result !== undefined;
     return html`
-      <div class="tool-call-row" data-tool-call-id=${tc.id}>
-        <span class="tool-call-name">${tc.name}</span>
-        <span class="tool-call-args">${this._argsText(tc.arguments)}</span>
-        <span class="tool-status ${status}">
-          ${status === "running" ? "…" : status === "done" ? "✓" : "✗"}
-        </span>
+      <div class="tool-call-wrap" data-tool-call-id=${tc.id}>
+        <div class="tool-call-row">
+          <div class="tool-call-header">
+            <span class="tool-call-name">${tc.name}</span>
+            <span class="tool-status ${status}">
+              ${status === "running" ? "…" : status === "done" ? "✓" : "✗"}
+            </span>
+          </div>
+          <div class="tool-call-args">${this._toolArgsSummary(tc)}</div>
+        </div>
+        ${
+          openable
+            ? html`<div class="tool-call-actions">
+                <button
+                  type="button"
+                  class="tool-call-btn"
+                  title="Copy result"
+                  aria-label="Copy result"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    void this._copyToolResult(tc);
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
+                <button
+                  type="button"
+                  class="tool-call-btn primary"
+                  title="Open result in a new tab"
+                  aria-label="Open result in a new tab"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._openToolResult(tc);
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                </button>
+              </div>`
+            : ""
+        }
       </div>
-      ${status !== "running" && result ? html`<div class="tool-result">${result}</div>` : ""}
     `;
+  }
+
+  /** Copy a completed tool-call card's result to the clipboard. */
+  private async _copyToolResult(tc: ToolCall): Promise<void> {
+    const result = this._toolResultFor(tc);
+    if (result === undefined) return;
+    try {
+      await navigator.clipboard.writeText(result);
+    } catch {
+      // Clipboard may be unavailable (e.g. no permission); fail silently.
+    }
+  }
+
+  /** Human-friendly second line for a tool call (path / query + worktrees). */
+  private _toolArgsSummary(tc: ToolCall): string {
+    const args = this._parseArgs(tc.arguments);
+    if (tc.name === "read_file") {
+      const p = args.path;
+      if (typeof p === "string" && p.trim()) return p.trim();
+    }
+    if (tc.name === "search_files") {
+      const q = typeof args.query === "string" ? args.query : "";
+      const roots = Array.isArray(args.roots)
+        ? (args.roots as unknown[]).filter((r): r is string => typeof r === "string")
+        : [];
+      const scope = roots.length
+        ? roots.map((r) => this._worktreeLabel(r)).join(", ")
+        : "all worktrees";
+      return q.trim() ? `“${q.trim()}” · ${scope}` : scope;
+    }
+    return this._argsText(tc.arguments);
+  }
+
+  private _parseArgs(args: ToolCall["arguments"]): Record<string, unknown> {
+    if (typeof args === "string") {
+      try {
+        const parsed = JSON.parse(args);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        // not JSON
+      }
+      return {};
+    }
+    return args ?? {};
+  }
+
+  /** Compact repo/branch label for a worktree root path. */
+  private _worktreeLabel(p: string): string {
+    const segs = p.split("/").filter(Boolean);
+    if (segs.length >= 2) return `${segs[segs.length - 2]}/${segs[segs.length - 1]}`;
+    return p;
   }
 
   private _argsText(args: ToolCall["arguments"]): string {

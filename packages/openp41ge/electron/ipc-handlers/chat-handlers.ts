@@ -2,8 +2,8 @@
  * Chat IPC handlers — the chat store + agent runtime surface.
  *
  * Handles the renderer → main chat API and broadcasts main → renderer events:
- *   chat:changed, chat:delta, chat:tool, chat:status, chat:open-state,
- *   chat:highlight.
+ *   chat:changed, chat:delta, chat:tool, chat:status, chat:usage,
+ *   chat:open-state, chat:highlight.
  *
  * "Opened once": main keeps `openChats` (chatId -> winId). A chat may be open
  * in at most one window; opening it in another window is refused (the renderer

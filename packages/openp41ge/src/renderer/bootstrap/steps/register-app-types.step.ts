@@ -21,6 +21,8 @@ import { gitRepositoryAppRegistration } from "../../apps/git-repository/index";
 import { gitCommitSearchAppRegistration } from "../../apps/git-commit-search/index";
 import { commitFileDiffAppRegistration } from "../../apps/commit-file-diff/index";
 import { agentsAppRegistration } from "../../apps/agents/index";
+import { toolResultAppRegistration } from "../../apps/tool-result/index";
+import { searchResultsAppRegistration } from "../../apps/search-results/index";
 import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
 import { explorerPlugin } from "../../apps/system-tabs/explorer-plugin";
 import { gitPlugin } from "../../apps/system-tabs/git-plugin";
@@ -41,6 +43,8 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(gitCommitSearchAppRegistration);
     registerAppType(commitFileDiffAppRegistration);
     registerAppType(agentsAppRegistration);
+    registerAppType(toolResultAppRegistration);
+    registerAppType(searchResultsAppRegistration);
 
     // Register system tab types for sidebars
     for (const reg of allSystemTabRegistrations) {
