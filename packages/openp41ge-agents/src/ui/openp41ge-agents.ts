@@ -1851,7 +1851,7 @@ class Openp41geAgents extends LitElement {
           transform: rotate(90deg);
         }
         .msg-reasoning .msg-reasoning-body {
-          padding: 0 10px 10px;
+          padding: 10px 14px 12px;
           white-space: pre-wrap;
           word-wrap: break-word;
           font-size: 13px;
