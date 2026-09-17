@@ -2374,7 +2374,7 @@ class Openp41geAgents extends LitElement {
           display: flex;
           align-items: center;
           gap: 4px;
-          padding: 2px 6px 6px;
+          padding: 2px 6px 4.25px;
           background: transparent;
         }
         .composer-tokenrow {
@@ -2382,7 +2382,7 @@ class Openp41geAgents extends LitElement {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 1px 12px 6px;
+          padding: 0px 12px 6px;
           font-size: 11.5px;
           font-weight: 500;
           color: var(--text-secondary, #9a9a9a);
@@ -2457,27 +2457,23 @@ class Openp41geAgents extends LitElement {
           fill: currentColor;
           stroke: none;
         }
-        .composer-spacer {
-          flex: 1 1 auto;
-        }
         .composer-send {
-          flex: 0 0 auto;
-          align-self: flex-end;
+          position: absolute;
+          right: 28px;
+          bottom: 10px;
+          z-index: 5;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 20px;
-          height: 20px;
+          width: 28px;
+          height: 28px;
           padding: 0;
           border: none;
-          border-radius: 6px;
+          border-radius: 8px;
           background: transparent;
           color: var(--text-secondary, #999);
           cursor: pointer;
-          transition:
-            opacity 0.1s,
-            background-color 0.1s,
-            color 0.1s;
+          transition: opacity 0.1s, background-color 0.1s, color 0.1s;
           user-select: none;
         }
         .composer-send:not(:disabled) {
@@ -2734,42 +2730,7 @@ class Openp41geAgents extends LitElement {
               />
             </svg>
           </button>
-          <span class="composer-spacer"></span>
-          ${
-            this._streaming
-              ? html`<button
-                  class="composer-send abort"
-                  ${tooltipContent({ type: "simple", text: "Stop" })}
-                  @click=${() => this._abort()}
-                >
-                  <svg viewBox="0 0 24 24">
-                    <rect
-                      x="6"
-                      y="6"
-                      width="12"
-                      height="12"
-                      rx="1"
-                      fill="currentColor"
-                      stroke="none"
-                    />
-                  </svg>
-                </button>`
-              : html`<button
-                  class="composer-send"
-                  ${tooltipContent({ type: "simple", text: "Send message" })}
-                  ?disabled=${this._sendDisabled}
-                  @click=${() => this._sendMessage()}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 -960 960 960"
-                    fill="currentColor"
-                  >
-                    <path d="m256-240-56-56 384-384H240v-80h480v480h-80v-344L256-240Z" />
-                  </svg>
-                </button>`
-          }
-        </div>
+          </div>
         ${
           this._usage
             ? html`<div class="composer-tokenrow">${this._formatUsage(this._usage)}</div>`
@@ -2785,6 +2746,40 @@ class Openp41geAgents extends LitElement {
           @focus=${() => this._onComposerFocus(true)}
           @blur=${() => this._onComposerFocus(false)}
         ></textarea>
+        ${
+          this._streaming
+            ? html`<button
+                class="composer-send abort"
+                ${tooltipContent({ type: "simple", text: "Stop" })}
+                @click=${() => this._abort()}
+              >
+                <svg viewBox="0 0 24 24">
+                  <rect
+                    x="6"
+                    y="6"
+                    width="12"
+                    height="12"
+                    rx="1"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                </svg>
+              </button>`
+            : html`<button
+                class="composer-send"
+                ${tooltipContent({ type: "simple", text: "Send message" })}
+                ?disabled=${this._sendDisabled}
+                @click=${() => this._sendMessage()}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 -960 960 960"
+                  fill="currentColor"
+                >
+                  <path d="m256-240-56-56 384-384H240v-80h480v480h-80v-344L256-240Z" />
+                </svg>
+              </button>`
+        }
       </div>
 
       <div class="chat-bottombar"><span class="bb-left">${
