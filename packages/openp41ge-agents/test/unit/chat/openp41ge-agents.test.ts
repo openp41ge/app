@@ -39,7 +39,7 @@ describe("Openp41geAgents (custom element)", () => {
     expect(arrows[0].classList.contains("down")).toBe(false);
     expect(arrows[1].classList.contains("down")).toBe(true);
     expect(usage.textContent).toContain("K");
-    expect(usage.textContent).toContain("total");
+    expect(usage.textContent).not.toContain("total");
     expect(usage.textContent).not.toContain("1,200");
   });
 
@@ -53,7 +53,7 @@ describe("Openp41geAgents (custom element)", () => {
     const usage = el.shadowRoot!.querySelector(".bb-usage") as HTMLElement;
     expect(usage.textContent).toContain("1.5M");
     expect(usage.textContent).toContain("2.3K");
-    expect(usage.textContent).toContain("total");
+    expect(usage.textContent).not.toContain("total");
   });
 
   it("shows no empty-state placeholder when there are no messages", async () => {

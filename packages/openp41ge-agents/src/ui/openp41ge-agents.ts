@@ -277,9 +277,9 @@ class Openp41geAgents extends LitElement {
 
   /** Short human-readable token usage line for the bottom bar. */
   private _formatUsage(u: TokenUsage): TemplateResult {
-    return html`${this._arrow(false)}${this._fmtTok(u.promptTokens)} · ${this._arrow(true)}${this._fmtTok(
+    return html`${this._fmtTok(u.promptTokens)}${this._arrow(false)} · ${this._fmtTok(
       u.completionTokens,
-    )} · ${this._fmtTok(u.totalTokens)} total`;
+    )}${this._arrow(true)} · ${this._fmtTok(u.totalTokens)}`;
   }
 
   /** Compact 1K/1M token formatting. */
@@ -1680,7 +1680,8 @@ class Openp41geAgents extends LitElement {
           height: 0.85em;
           display: inline-block;
           vertical-align: -0.1em;
-          margin-right: 2px;
+          margin-left: 2px;
+          margin-right: 1px;
           fill: currentColor;
         }
         .bb-arrow.down {
