@@ -28,13 +28,15 @@ export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /** Local approximation of generation throughput (completion tokens / sec). */
+  tokensPerSecond?: number;
 }
 
 /** Streamed delta from a provider. */
 export type ProviderDelta =
   | { type: "text"; text: string }
   | { type: "tool_call"; id: string; name: string; arguments: string }
-  | { type: "usage"; usage: TokenUsage };
+  | { type: "usage"; usage: TokenUsage; elapsedMs?: number };
 
 /** Input to a streamChat call. */
 export interface ChatStreamRequest {

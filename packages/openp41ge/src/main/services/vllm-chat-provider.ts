@@ -164,6 +164,9 @@ export class VllmChatProvider implements ChatProvider {
     const toolAccumulators = new Map<number, ToolAccumulator>();
     let buffer = "";
     let done = false;
+    // Timestamp of the first streamed content delta, so we can approximate the
+    // generation throughput (completion tokens / elapsed) once usage arrives.
+    let firstContentAt: number | null = null;
 
     try {
       while (!done) {
@@ -189,7 +192,20 @@ export class VllmChatProvider implements ChatProvider {
           } catch {
             continue;
           }
-          yield* this._emitChunk(chunk, toolAccumulators);
+          for (const d of this._emitChunk(chunk, toolAccumulators)) {
+            if (firstContentAt === null && (d.type === "text" || d.type === "tool_call")) {
+              firstContentAt = Date.now();
+            }
+            if (d.type === "usage") {
+              yield {
+                type: "usage",
+                usage: d.usage,
+                elapsedMs: firstContentAt === null ? 0 : Date.now() - firstContentAt,
+              };
+            } else {
+              yield d;
+            }
+          }
         }
       }
     } catch (err) {

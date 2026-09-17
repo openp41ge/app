@@ -47,6 +47,14 @@ describe("Openp41geAgents (custom element)", () => {
     expect(usage.textContent).toContain("K");
     expect(usage.textContent).not.toContain("total");
     expect(usage.textContent).not.toContain("1,200");
+
+    // A token rate (once known) is right-aligned with a leading tilde.
+    expect(bar.querySelector(".bb-tps")).toBeNull();
+    el.setUsage({ promptTokens: 101, completionTokens: 509, totalTokens: 430, tokensPerSecond: 152.3 });
+    await el.updateComplete;
+    const tps = bar.querySelector(".bb-tps") as HTMLElement;
+    expect(tps).toBeTruthy();
+    expect(tps.textContent!.replace(/\s+/g, " ").trim()).toBe("~152.3 tok/s");
   });
 
   it("shortens large token counts to K/M", async () => {

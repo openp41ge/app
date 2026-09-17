@@ -303,12 +303,18 @@ export class AgentRuntime {
           // The provider's final chunk carries the token usage for THIS
           // completion. Persist it on the streaming assistant message and
           // forward it to the window so the chat's bottom bar can show it.
+          // Derive an approximate generation throughput from the streamed
+          // elapsed time (completion tokens / seconds).
+          const usage = delta.usage;
+          if (delta.elapsedMs && delta.elapsedMs > 0 && usage.completionTokens > 0) {
+            usage.tokensPerSecond = usage.completionTokens / (delta.elapsedMs / 1000);
+          }
           if (currentAssistant) {
             this._store.updateMessage(chatId, currentAssistant.id, (m) => {
-              m.usage = delta.usage;
+              m.usage = usage;
             });
           }
-          this._hooks.sendToWindow(winId, "chat:usage", { chatId, usage: delta.usage });
+          this._hooks.sendToWindow(winId, "chat:usage", { chatId, usage });
         }
       }
 

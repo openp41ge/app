@@ -38,6 +38,11 @@ export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /**
+   * Local approximation of generation throughput (completion tokens per
+   * second), measured by timing the stream. Undefined when unknown.
+   */
+  tokensPerSecond?: number;
 }
 
 /** A single message in a chat transcript. */

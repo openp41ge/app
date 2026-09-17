@@ -319,6 +319,12 @@ class Openp41geAgents extends LitElement {
     return s;
   }
 
+  /** Format a tokens/sec rate: one decimal (trimmed), compact K/M above 1K. */
+  private _fmtRate(tps: number): string {
+    if (tps >= 1000) return this._fmtTok(Math.round(tps));
+    return String(Number(tps.toFixed(1)));
+  }
+
   /** Small direction arrow: up by default, rotated 180° for down. */
   private _arrow(down: boolean): TemplateResult {
     return html`<svg class="bb-arrow${down ? " down" : ""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11 20V7.825l-5.6 5.6L4 12l8-8l8 8l-1.4 1.425l-5.6-5.6V20z"/></svg>`;
@@ -1670,6 +1676,7 @@ class Openp41geAgents extends LitElement {
           height: 34px;
           display: flex;
           align-items: center;
+          justify-content: space-between;
           /* Bottom padding = the grid's reserved scrollbar space so the bar
              content slides UP (staying vertically centred above it) when the
              grid overflows horizontally, keeping it clear of the floating
@@ -1699,6 +1706,20 @@ class Openp41geAgents extends LitElement {
           letter-spacing: normal;
           font-weight: 500;
           color: var(--text-secondary, #9a9a9a);
+        }
+        .bb-left {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .bb-tps {
+          flex-shrink: 0;
+          margin-left: 8px;
+          text-transform: none;
+          letter-spacing: normal;
+          font-weight: 500;
+          color: var(--text-muted, #888);
         }
         .bb-arrow {
           width: 0.85em;
@@ -2691,10 +2712,16 @@ class Openp41geAgents extends LitElement {
         ></textarea>
       </div>
 
-      <div class="chat-bottombar">${
+      <div class="chat-bottombar"><span class="bb-left">${
         this._usage
           ? html`<span class="bb-usage" part="usage">${this._formatUsage(this._usage)}</span>`
           : html`${this._title || "Agent chat"}`
+      }</span>${
+        this._usage?.tokensPerSecond != null
+          ? html`<span class="bb-tps" part="tps">~${this._fmtRate(
+              this._usage.tokensPerSecond,
+            )} tok/s</span>`
+          : html``
       }</div>
     `;
   }

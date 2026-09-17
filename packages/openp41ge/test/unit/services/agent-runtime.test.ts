@@ -106,6 +106,31 @@ describe("AgentRuntime", () => {
       chatId: chat.id,
       usage: { promptTokens: 120, completionTokens: 34, totalTokens: 154 },
     });
+
+  });
+
+  it("derives and forwards an approximate tokens-per-second rate when usage is timed", async () => {
+    // 523 completion tokens over 331ms => 1580.1 tokens/sec.
+    const provider = makeFakeProvider([
+      [
+        { type: "text", text: "Done" },
+        {
+          type: "usage",
+          usage: { promptTokens: 420, completionTokens: 523, totalTokens: 943 },
+          elapsedMs: 331,
+        },
+      ],
+    ]);
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await ctx.runtime.send(chat.id, "win-a", "go");
+
+    const usage = ctx.store.get(chat.id)!.messages.find((m) => m.role === "assistant")?.usage;
+    expect(usage?.tokensPerSecond).toBeCloseTo(1580.1, 1);
+
+    const usageCalls = ctx.hooks.sendToWindow.mock.calls.filter(([, e]) => e === "chat:usage");
+    expect(usageCalls[0][2].usage.tokensPerSecond).toBeCloseTo(1580.1, 1);
   });
 
   it("executes tool calls and loops back to the provider until text-only", async () => {

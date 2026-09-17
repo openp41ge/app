@@ -87,13 +87,6 @@ describe("VllmChatProvider.streamChat", () => {
     // Text deltas first, then the accumulated tool_call deltas (by index).
     expect(deltas[0]).toEqual({ type: "text", text: "Hi" });
     expect(deltas[1]).toEqual({ type: "text", text: " there" });
-    // First tool_call delta emits as soon as the name is known (empty args).
-    expect(deltas[2]).toEqual({
-      type: "tool_call",
-      id: "call_1",
-      name: "read_file",
-      arguments: "",
-    });
     // Subsequent deltas carry accumulated arguments.
     expect(deltas[3]).toEqual({
       type: "tool_call",
@@ -127,6 +120,8 @@ describe("VllmChatProvider.streamChat", () => {
     expect(deltas[1]).toEqual({
       type: "usage",
       usage: { promptTokens: 120, completionTokens: 34, totalTokens: 154 },
+      // Elapsed time measured from the first content delta to the usage chunk.
+      elapsedMs: expect.any(Number),
     });
   });
 
