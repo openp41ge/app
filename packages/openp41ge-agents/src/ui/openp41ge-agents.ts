@@ -2737,12 +2737,12 @@ class Openp41geAgents extends LitElement {
               />
             </svg>
           </button>
-          <span class="composer-spacer"></span>
           ${
             this._usage
               ? html`<div class="composer-tokenrow">${this._formatUsage(this._usage)}</div>`
               : html``
           }
+          <span class="composer-spacer"></span>
           ${
             this._streaming
               ? html`<button
