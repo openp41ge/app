@@ -1749,9 +1749,10 @@ class Openp41geAgents extends LitElement {
           margin-left: 2px;
           margin-right: 1px;
           fill: currentColor;
+          transform: rotate(45deg);
         }
         .bb-arrow.down {
-          transform: rotate(180deg);
+          transform: rotate(135deg);
         }
         .bb-stat {
           cursor: help;
@@ -2376,6 +2377,7 @@ class Openp41geAgents extends LitElement {
           gap: 4px;
           padding: 1px 6px 5px;
           background: transparent;
+          container-type: inline-size;
         }
         .composer-tokenrow {
           box-sizing: border-box;
@@ -2389,6 +2391,11 @@ class Openp41geAgents extends LitElement {
           white-space: nowrap;
           overflow: hidden;
           flex-shrink: 0;
+        }
+        @container (max-width: 380px) {
+          .composer-tokenrow {
+            display: none;
+          }
         }
 
         .composer-select {
@@ -2462,7 +2469,7 @@ class Openp41geAgents extends LitElement {
         }
         .composer-send {
           flex: 0 0 auto;
-          align-self: flex-end;
+          align-self: center;
           display: inline-flex;
           align-items: center;
           justify-content: center;
