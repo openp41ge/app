@@ -2382,7 +2382,7 @@ class Openp41geAgents extends LitElement {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 12px 6px;
+          padding: 1px 12px 6px;
           font-size: 11.5px;
           font-weight: 500;
           color: var(--text-secondary, #9a9a9a);
