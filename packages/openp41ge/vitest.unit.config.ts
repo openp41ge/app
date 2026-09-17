@@ -38,6 +38,18 @@ export default defineConfig({
       "openp41ge-tabs": path.resolve(__dirname, "../openp41ge-tabs/src"),
       "openp41ge-editor-engine": path.resolve(__dirname, "../openp41ge-editor-engine/src"),
       "openp41ge-uikit/theme": path.resolve(__dirname, "../openp41ge-uikit/src/theme/index.ts"),
+      "openp41ge-agents-tool-read-file": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-read-file/src/index.ts",
+      ),
+      "openp41ge-agents-tool-search-files": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-search-files/src/index.ts",
+      ),
+      "openp41ge-agents-tool-types": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-types/src/index.ts",
+      ),
     },
   },
 });

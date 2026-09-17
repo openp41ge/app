@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 // Side-effect: registers the <openp41ge-worktree-tree> custom element so
 // document.createElement returns the real component class in jsdom.
 import "../../../src/renderer/components/openp41ge-worktree-tree";
+import "../../../src/renderer/components/openp41ge-repo-tree-item";
 import { TestRepoService } from "../../../src/renderer/models/test-models";
 import { ExplorerSystemTabController } from "../../../src/renderer/apps/system-tabs/explorer-system-tab";
 import { workspaceFileService } from "../../../src/renderer/services/workspace-file-service";
@@ -221,9 +222,11 @@ describe("ExplorerSystemTabController", () => {
     sr.appendChild(node);
     el.appendChild(fileTree);
 
-    // Header rows are navigable again alongside file rows.
+    // Header rows are navigable again alongside file rows and the
+    // add-worktree/add-repository rows.
     expect(tree._navigableRows().map((r) => r.className).sort()).toEqual([
       "tree-node",
+      "wt-add-row flex items-center h-[30px] pr-2 cursor-pointer select-none text-sm text-muted gap-[2px] transition-[color,background] duration-100",
       "wt-row-header",
       "wt-row-header",
     ]);
@@ -251,5 +254,230 @@ describe("ExplorerSystemTabController", () => {
     // The grey/blue split: the stationary header is wt-row-selected (grey), and a
     // focused header paints wt-row-focused (blue) — CSS colors, asserted on the
     // class pair rather than computed styles (jsdom doesn't resolve them).
+  });
+
+  it("arrows reach the add-worktree and add-repository rows; Enter begins the inline edit", async () => {
+    // The repo-tree-item renders in light DOM (createRenderRoot → this), so the
+    // panel's _navigableRows walker recurses into it to reach its add-worktree row.
+    const tree = document.createElement("openp41ge-worktree-tree") as unknown as {
+      _navigableRows(): HTMLElement[];
+      _setFocusedRow(el: HTMLElement | null): void;
+      _focusedRowEl: HTMLElement | null;
+      updateComplete: Promise<unknown>;
+    };
+    const item = document.createElement("openp41ge-repo-tree-item") as unknown as {
+      repoName: string;
+      worktrees: unknown[];
+      _expanded: boolean;
+      _showingAddWorktree: boolean;
+      updateComplete: Promise<unknown>;
+    };
+    item.repoName = "org/repo";
+    item.worktrees = [];
+    host.appendChild(tree);
+    tree.appendChild(item as never);
+    // Expand the repo so it renders its per-repo add-worktree row (set after
+    // mount, matching the pattern in the explorer unit tests).
+    item._expanded = true;
+    await tree.updateComplete;
+    await item.updateComplete;
+
+    const rows = tree._navigableRows();
+    const addWt = rows.find((r) => r.classList.contains("add-worktree-row"));
+    const addRepo = rows.find(
+      (r) => r.classList.contains("wt-add-row") && !r.classList.contains("add-worktree-row"),
+    );
+    expect(addWt).toBeDefined();
+    expect(addRepo).toBeDefined();
+
+    // Arrow-focus the add-worktree row: the cursor is painted inline (blue).
+    tree._setFocusedRow(addWt!);
+    expect(addWt!.style.background).toContain("74, 158, 255");
+    expect(addWt!.style.boxShadow).toContain("inset");
+    expect(tree._focusedRowEl).toBe(addWt);
+
+    // Enter activates the row and begins the inline branch-name input.
+    tree.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    await item.updateComplete;
+    expect(item._showingAddWorktree).toBe(true);
+    expect(item.querySelector("#wt-addwt-input")).not.toBeNull();
+  });
+
+  it.each([
+    ["add-worktree", "#wt-addwt-input", "add-worktree-row"],
+    ["add-repository", "#wt-addrepo-input", "add-repo-label"],
+  ])(
+    "Escape from the %s inline input restores the arrow cursor and panel focus",
+    async (_label, inputSelector, rowMarker) => {
+      const tree = document.createElement("openp41ge-worktree-tree") as unknown as {
+        _navigableRows(): HTMLElement[];
+        _setFocusedRow(el: HTMLElement | null): void;
+        _focusedRowEl: HTMLElement | null;
+        _findAddRepoRow(): HTMLElement | null;
+        _navFocusVisible: boolean;
+        updateComplete: Promise<unknown>;
+      };
+      const item = document.createElement("openp41ge-repo-tree-item") as unknown as {
+        repoName: string;
+        worktrees: unknown[];
+        _expanded: boolean;
+        _showingAddWorktree: boolean;
+        updateComplete: Promise<unknown>;
+      };
+      item.repoName = "org/repo";
+      item.worktrees = [];
+      host.appendChild(tree);
+      tree.appendChild(item as never);
+      item._expanded = true;
+      await tree.updateComplete;
+      await item.updateComplete;
+
+      const rows = tree._navigableRows();
+      const isAddRepo = rowMarker === "add-repo-label";
+      const addRow = isAddRepo
+        ? rows.find((r) => r.classList.contains("wt-add-row") && !r.classList.contains("add-worktree-row"))!
+        : rows.find((r) => r.classList.contains("add-worktree-row"))!;
+      expect(addRow).toBeDefined();
+
+      // Arrow-focus the add row, then Enter to begin its inline input.
+      tree._navFocusVisible = true;
+      tree._setFocusedRow(addRow);
+      expect(tree._focusedRowEl).toBe(addRow);
+      tree.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+      );
+      await tree.updateComplete;
+      await item.updateComplete;
+      const input = tree.querySelector<HTMLInputElement>(inputSelector);
+      expect(input).not.toBeNull();
+
+      // Escape dismisses the input and must restore the arrow cursor on the
+      // (now idle) add row so ArrowUp/Down continues from where it was.
+      input!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true }),
+      );
+      await new Promise((r) => setTimeout(r, 30));
+      await tree.updateComplete;
+      await item.updateComplete;
+
+      const idle = isAddRepo
+        ? tree._findAddRepoRow()
+        : item.querySelector<HTMLElement>("[class*='add-worktree-row']");
+      expect(tree._focusedRowEl).toBe(idle);
+      expect(idle!.style.background).toContain("74, 158, 255");
+      // The panel must own DOM focus so the next arrow reaches _onKeyDown.
+      expect(document.activeElement).toBe(tree);
+    },
+  );
+
+  it("clears the arrow cursor when a create row enters edit mode and restores it on Escape", async () => {
+    // Regression guard for two bugs in create-row keyboard navigation:
+    //  1. Entering the inline input (arrow + Enter) must NOT leave the blue
+    //     arrow cursor framing the text being typed.
+    //  2. Escape must hand the arrow cursor back to the create row so the user
+    //     can keep arrowing (previously the cursor was lost entirely).
+    const tree = document.createElement("openp41ge-worktree-tree") as unknown as {
+      _setFocusedRow(el: HTMLElement | null): void;
+      _focusedRowEl: HTMLElement | null;
+      _selectedRowEl: HTMLElement | null;
+      _navFocusVisible: boolean;
+      updateComplete: Promise<unknown>;
+    };
+    host.appendChild(tree);
+    const fileTree = document.createElement("openp41ge-tree");
+    const sr = fileTree.attachShadow({ mode: "open" });
+    sr.innerHTML =
+      '<div class="tree-node" data-node-id="new:main::/root::folder">+ add folder</div>';
+    const createRow = sr.querySelector('[data-node-id="new:main::/root::folder"]') as HTMLElement;
+    tree.appendChild(fileTree);
+    await (tree as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
+
+    // Arrow-focus the create row → blue cursor painted (inline, like a node).
+    tree._navFocusVisible = true;
+    tree._setFocusedRow(createRow);
+    expect(createRow.style.background).toContain("74, 158, 255");
+    expect(createRow.style.boxShadow).toContain("inset");
+    expect(tree._focusedRowEl).toBe(createRow);
+
+    // Enter: the repo item dispatches create-row-edit(editing=true). The panel
+    // must drop its cursor/selection for this row so the input isn't framed.
+    tree.dispatchEvent(
+      new CustomEvent("create-row-edit", {
+        bubbles: true,
+        composed: true,
+        detail: { nodeId: createRow.dataset.nodeId, editing: true },
+      }),
+    );
+    expect(tree._focusedRowEl).toBeNull();
+    expect(tree._selectedRowEl).toBeNull();
+    expect(createRow.style.background).toBe("");
+    expect(createRow.style.boxShadow).toBe("");
+
+    // Escape: create-row-edit(editing=false) restores the cursor. The restore
+    // is deferred via setTimeout so the inline input is re-rendered out first
+    // (a synchronous paint would be wiped by _paintRow's input guard).
+    tree.dispatchEvent(
+      new CustomEvent("create-row-edit", {
+        bubbles: true,
+        composed: true,
+        detail: { nodeId: createRow.dataset.nodeId, editing: false },
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(tree._focusedRowEl).toBe(createRow);
+    expect(createRow.style.background).toContain("74, 158, 255");
+    expect(createRow.style.boxShadow).toContain("inset");
+    // The panel must re-grab DOM focus (it has tabindex=-1) so the next
+    // ArrowUp/Down is caught by _onKeyDown instead of scrolling the page.
+    expect(document.activeElement).toBe(tree);
+  });
+
+  it("never paints the grey stationary bar on add rows (even if they were selected)", async () => {
+    // Add rows ("+ new file/folder", add worktree, add repository) are actions,
+    // not files — only the blue arrow cursor may appear. The grey "selected"
+    // bar must not linger on them after the cursor moves away, while a plain
+    // file/folder row keeps its grey bar (VS Code active-file selection).
+    const tree = document.createElement("openp41ge-worktree-tree") as unknown as {
+      _setFocusedRow(el: HTMLElement | null): void;
+      _focusedRowEl: HTMLElement | null;
+      _selectedRowEl: HTMLElement | null;
+      _navFocusVisible: boolean;
+      updateComplete: Promise<unknown>;
+    };
+    host.appendChild(tree);
+    const fileTree = document.createElement("openp41ge-tree");
+    const sr = fileTree.attachShadow({ mode: "open" });
+    sr.innerHTML =
+      '<div class="tree-node" data-node-id="/repo/a.ts">a.ts</div>' +
+      '<div class="tree-node" data-node-id="new:main::/root::file">+ add file</div>';
+    const normal = sr.querySelector('[data-node-id="/repo/a.ts"]') as HTMLElement;
+    const createRow = sr.querySelector('[data-node-id="new:main::/root::file"]') as HTMLElement;
+    tree.appendChild(fileTree);
+    await (tree as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
+
+    // Click the normal row (adopts it as the selected/active row).
+    normal.dispatchEvent(
+      new CustomEvent("tree-node-click", {
+        bubbles: true,
+        composed: true,
+        detail: { nodeId: "/repo/a.ts", meta: {} },
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 80));
+    expect(tree._selectedRowEl).toBe(normal);
+
+    // Arrow-focus the create row: blue cursor only (no grey). The clicked
+    // normal row is now selected-but-not-focused → grey bar persists.
+    tree._navFocusVisible = true;
+    tree._setFocusedRow(createRow);
+    expect(createRow.style.background).toContain("74, 158, 255");
+    expect(normal.style.background).toContain("color-mix");
+
+    // Arrow away from the create row: it must NOT be painted grey.
+    tree._setFocusedRow(normal);
+    expect(createRow.style.background).toBe("");
+    expect(createRow.style.boxShadow).toBe("");
+    expect(normal.style.background).not.toBe("");
+    expect(tree._selectedRowEl).toBe(normal);
   });
 });

@@ -176,7 +176,6 @@ export class AgentsController extends BaseController implements TabController {
     const DEFAULT_TOOLS: Array<{ name: string; description: string }> = [
       { name: "read_file", description: "Read the contents of a text file." },
       { name: "search_files", description: "Search for files matching a substring." },
-      { name: "run_command", description: "Run a shell command in the working directory." },
     ];
     try {
       const cfg = await window.openp41ge.chat.getAgentConfig();

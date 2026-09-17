@@ -31,7 +31,17 @@ export default defineConfig({
         __dirname,
         "../openp41ge-uikit/src/components/tooltip",
       ),
+      "openp41ge-uikit/file-editor": path.resolve(
+        __dirname,
+        "../openp41ge-uikit/src/file-editor",
+      ),
+      "openp41ge-uikit/git-repository": path.resolve(
+        __dirname,
+        "../openp41ge-uikit/src/git-repository",
+      ),
       "openp41ge-uikit": path.resolve(__dirname, "../openp41ge-uikit/src"),
+      "openp41ge-scrollbar": path.resolve(__dirname, "../openp41ge-scrollbar/src"),
+      "openp41ge-filesystem": path.resolve(__dirname, "../openp41ge-filesystem/src"),
       "openp41ge-syntax-highlighting": path.resolve(
         __dirname,
         "../openp41ge-syntax-highlighting/src",
@@ -39,6 +49,18 @@ export default defineConfig({
       "openp41ge-tabs": path.resolve(__dirname, "../openp41ge-tabs/src"),
       "openp41ge-editor-engine": path.resolve(__dirname, "../openp41ge-editor-engine/src"),
       "openp41ge-uikit/theme": path.resolve(__dirname, "../openp41ge-uikit/src/theme"),
+      "openp41ge-agents-tool-read-file": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-read-file/src/index.ts",
+      ),
+      "openp41ge-agents-tool-search-files": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-search-files/src/index.ts",
+      ),
+      "openp41ge-agents-tool-types": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-types/src/index.ts",
+      ),
     },
   },
 });

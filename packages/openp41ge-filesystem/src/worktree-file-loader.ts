@@ -8,12 +8,17 @@
  * re-expanding shows content immediately. Background refreshes update the cache
  * while showing a spinner indicator on the row.
  *
+ * Supports a configurable `prefetchDepth`: when > 0, each directory read asks the
+ * main process for a `DirSnapshot` that also lists the contents of subdirectories
+ * down to that depth. Those nested listings are stored in the same `dirContents`
+ * cache, so expanding the next level is a cache hit instead of a round trip.
+ *
  * Also tracks untracked files per branch (loaded alongside worktree files).
  * Git paths are relative to repo root; FileEntry.path values are absolute,
  * so we store the worktree root and relativize when comparing.
  */
 
-import type { FileEntry, WorktreeData } from "./types";
+import type { FileEntry, WorktreeData, DirSnapshot } from "./types";
 
 interface BranchUntrackedInfo {
   /** Root path of the worktree (e.g. /Users/foo/repo). */
@@ -45,6 +50,12 @@ export class WorktreeFileLoader {
   readonly refreshingDirs = new Set<string>();
 
   /**
+   * How many levels of subdirectory listings to prefetch per read.
+   * 0 disables prefetching (each level loads on demand).
+   */
+  prefetchDepth = 0;
+
+  /**
    * Expand a worktree. If cached data exists, returns immediately and triggers
    * a background refresh. Otherwise loads fresh with a loading state.
    * Returns true if data is available (cached or just loaded).
@@ -65,8 +76,7 @@ export class WorktreeFileLoader {
     this.loadingWorktreeFiles.add(branch);
     onUpdate?.();
     try {
-      const entries = await window.openp41ge.file.readdir(path);
-      this.worktreeFiles.set(branch, entries);
+      await this._readDirTree(path, true, branch);
     } catch {
       this.worktreeFiles.set(branch, []);
     }
@@ -99,8 +109,7 @@ export class WorktreeFileLoader {
     this.refreshingWorktreeFiles.add(branch);
     onUpdate?.();
     try {
-      const entries = await window.openp41ge.file.readdir(path);
-      this.worktreeFiles.set(branch, entries);
+      await this._readDirTree(path, true, branch);
     } catch {
       // Keep stale data on error
     }
@@ -161,8 +170,7 @@ export class WorktreeFileLoader {
     this.loadingDirs.add(dirPath);
     onUpdate?.();
     try {
-      const entries = await window.openp41ge.file.readdir(dirPath);
-      this.dirContents.set(dirPath, entries);
+      await this._readDirTree(dirPath, false);
     } catch {
       this.dirContents.set(dirPath, []);
     }
@@ -183,13 +191,54 @@ export class WorktreeFileLoader {
     this.refreshingDirs.add(dirPath);
     onUpdate?.();
     try {
-      const entries = await window.openp41ge.file.readdir(dirPath);
-      this.dirContents.set(dirPath, entries);
+      await this._readDirTree(dirPath, false);
     } catch {
       // Keep stale data on error
     }
     this.refreshingDirs.delete(dirPath);
     onUpdate?.();
+  }
+
+  /**
+   * Read a directory (and, when `prefetchDepth > 0`, its subdirectory listings
+   * down to that depth) and store the results in the relevant cache.
+   *
+   * `isWorktreeRoot` routes the node's own entries to `worktreeFiles[branch]`
+   * (for the worktree root) or to `dirContents[path]` (for a subdirectory).
+   * Every nested snapshot is stored in `dirContents` regardless.
+   */
+  private async _readDirTree(
+    rootPath: string,
+    isWorktreeRoot: boolean,
+    branch?: string,
+  ): Promise<void> {
+    if (this.prefetchDepth > 0 && typeof window.openp41ge.file.readTree === "function") {
+      // Prefetch the nested listings. If the main process is a build that
+      // predates the `file:readTree` channel (or the read otherwise fails),
+      // fall back to a flat readdir so the worktree never ends up empty.
+      try {
+        const snapshot = await window.openp41ge.file.readTree(rootPath, this.prefetchDepth);
+        this._applySnapshot(snapshot, isWorktreeRoot, branch);
+        return;
+      } catch {
+        // Fall through to the flat readdir below.
+      }
+    }
+    const entries = await window.openp41ge.file.readdir(rootPath);
+    if (isWorktreeRoot && branch) this.worktreeFiles.set(branch, entries);
+    else this.dirContents.set(rootPath, entries);
+  }
+
+  /** Flatten a `DirSnapshot` into the per-path caches. */
+  private _applySnapshot(snapshot: DirSnapshot, isWorktreeRoot: boolean, branch?: string): void {
+    if (isWorktreeRoot && branch) {
+      this.worktreeFiles.set(branch, snapshot.entries);
+    } else {
+      this.dirContents.set(snapshot.path, snapshot.entries);
+    }
+    for (const child of snapshot.children) {
+      this._applySnapshot(child, false);
+    }
   }
 
   /**
@@ -223,6 +272,14 @@ export class WorktreeFileLoader {
   }
 
   /**
+   * Whether the given directory is cached (either from a direct read or as a
+   * prefetched subdirectory of a deeper read).
+   */
+  hasDir(dirPath: string): boolean {
+    return this.dirContents.has(dirPath);
+  }
+
+  /**
    * Load restored files for all expanded worktrees and directories.
    * Idempotent — no-ops once files are already cached.
    */
@@ -248,8 +305,7 @@ export class WorktreeFileLoader {
       this.loadingWorktreeFiles.add(path);
       onUpdate?.();
       try {
-        const entries = await window.openp41ge.file.readdir(path);
-        this.worktreeFiles.set(wt.branch, entries);
+        await this._readDirTree(path, true, wt.branch);
       } catch {
         this.worktreeFiles.set(wt.branch, []);
       }
@@ -282,8 +338,7 @@ export class WorktreeFileLoader {
         this.loadingDirs.add(dirPath);
         onUpdate?.();
         try {
-          const entries = await window.openp41ge.file.readdir(dirPath);
-          this.dirContents.set(dirPath, entries);
+          await this._readDirTree(dirPath, false);
         } catch {
           this.dirContents.set(dirPath, []);
         }
@@ -298,21 +353,21 @@ export class WorktreeFileLoader {
     this._untrackedInfo.delete(branch);
     this.loadingWorktreeFiles.delete(branch);
     this.refreshingWorktreeFiles.delete(branch);
-    const branchPrefix = `${branch}/`;
-    for (const [dirPath] of this.dirContents) {
-      if (dirPath.includes(branchPrefix)) {
-        this.dirContents.delete(dirPath);
-        this.loadingDirs.delete(dirPath);
-        this.refreshingDirs.delete(dirPath);
-      }
-    }
   }
 
+  /**
+   * Clear the cached entries for a directory and everything nested below it
+   * (including prefetched subdirectory listings).
+   */
   clearDirContents(branch: string, dirPath: string): void {
+    this._deleteDirTree(dirPath);
+  }
+
+  private _deleteDirTree(dirPath: string): void {
     this.dirContents.delete(dirPath);
     this.loadingDirs.delete(dirPath);
     this.refreshingDirs.delete(dirPath);
-    const prefix = `${dirPath}/`;
+    const prefix = dirPath.endsWith("/") ? dirPath : dirPath + "/";
     for (const [key] of this.dirContents) {
       if (key.startsWith(prefix)) {
         this.dirContents.delete(key);
@@ -320,5 +375,13 @@ export class WorktreeFileLoader {
         this.refreshingDirs.delete(key);
       }
     }
+  }
+
+  /**
+   * Clear every cached directory under a worktree root (used by worktree/subtree
+   * refreshes and by external-change invalidation).
+   */
+  clearWorktreeDirs(worktreeRoot: string): void {
+    this._deleteDirTree(worktreeRoot);
   }
 }

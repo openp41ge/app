@@ -5,6 +5,6 @@
  * untracked file tracking, and expanded-state persistence.
  */
 
-export type { FileEntry, WorktreeData } from "./types";
+export type { FileEntry, WorktreeData, DirSnapshot } from "./types";
 export { WorktreeFileLoader } from "./worktree-file-loader";
 export { DirPersistenceService } from "./dir-persistence-service";

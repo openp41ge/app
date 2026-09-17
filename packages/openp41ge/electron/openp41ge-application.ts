@@ -29,10 +29,12 @@ import {
   registerBuiltinTools,
   AgentRuntime,
   type ChatProviderConfig,
+  type ConnectedWorktree,
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
 import { ConfigService } from "../src/main/services/config-service.js";
 import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-arg.js";
+import { ReposWatcher } from "./repos-watcher.js";
 
 // ─── Window manager ──────────────────────────────────────────────────────
 import {
@@ -91,6 +93,8 @@ export class Openp41geApplication {
   private chatTools!: ToolRegistry;
   private agentRuntime!: AgentRuntime;
   private openp41geDir!: string;
+  /** Watches the repositories dir so the Explorer auto-updates on external changes. */
+  private reposWatcher!: ReposWatcher;
 
   /** Repos live in their own subdirectory of the app data dir. */
   private get reposDir(): string {
@@ -129,6 +133,9 @@ export class Openp41geApplication {
     this._createInitialWindow();
     this._setupMenu();
     this._registerAppEvents();
+    // Watch the repositories dir once the app is up, so the explorer reflects
+    // external file changes (deletes/creates outside the app).
+    this.reposWatcher.start();
   }
 
   // ── Step 1: Error handlers ────────────────────────────────────────────
@@ -230,6 +237,9 @@ export class Openp41geApplication {
     this.workspaceService = new WorkspaceService(this.gitService, this.fileSystem, reposDir);
     this.workspaceSessionStore = new FileWorkspaceSessionStore();
     this.logStore = new LogFileStore(this.openp41geDir);
+    this.reposWatcher = new ReposWatcher(reposDir, (changedPath) => {
+      this._broadcastTreeChanged(changedPath);
+    });
 
     // ── Chat / agent ──────────────────────────────────────────────────
     this.chatStore = new ChatStoreService(this.openp41geDir);
@@ -242,6 +252,18 @@ export class Openp41geApplication {
     });
     this.chatTools = new ToolRegistry();
     registerBuiltinTools(this.chatTools);
+  }
+
+  /** Broadcast a filesystem change under the repositories dir to every window. */
+  private _broadcastTreeChanged(changedPath: string): void {
+    const payload = { path: changedPath };
+    for (const [, bw] of openp41geWindows) {
+      try {
+        bw.webContents.send("file:tree-changed", payload);
+      } catch {
+        // window might be closing
+      }
+    }
   }
 
   // ── Step 5: Wire cross-service dependencies ───────────────────────────
@@ -300,6 +322,26 @@ export class Openp41geApplication {
           const cfg = this.configService.get(`agent.providers.${providerId}`);
           if (!cfg) return null;
           return cfg as ChatProviderConfig;
+        },
+        // Agent file tools may only touch worktrees that are visible in the
+        // explorer (materialized worktrees of the repos under the store). The
+        // bare repo dirs and any other path are out of scope. The structured
+        // list also feeds the system prompt so the model knows its scope and
+        // can target a specific worktree or a group of them.
+        getConnectedWorktrees: async (): Promise<ConnectedWorktree[]> => {
+          try {
+            const repos = await this.gitService.listRepos();
+            const out: ConnectedWorktree[] = [];
+            for (const repo of repos) {
+              const worktrees = await this.gitService.listWorktrees(repo.name);
+              for (const wt of worktrees) {
+                if (wt.exists) out.push({ repo: repo.name, branch: wt.branch, path: wt.path });
+              }
+            }
+            return out;
+          } catch {
+            return [];
+          }
         },
       },
     );
@@ -624,6 +666,7 @@ export class Openp41geApplication {
     app.on("before-quit", () => {
       setAppQuitting(true);
       this.dispatcher.persist();
+      this.reposWatcher.stop();
     });
 
     app.on("window-all-closed", () => {

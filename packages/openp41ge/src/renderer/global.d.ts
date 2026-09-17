@@ -220,6 +220,10 @@ declare global {
 
       file: {
         readdir: (dirPath: string) => Promise<FileEntry[]>;
+        /** Read a directory and its subdirectory listings down to `depth`. */
+        readTree: (dirPath: string, depth: number) => Promise<DirSnapshot>;
+        /** Subscribe to filesystem changes under the repositories dir. Returns unsubscribe. */
+        onTreeChanged: (callback: (data: { path: string }) => void) => () => void;
         stat: (filePath: string) => Promise<FileEntry | null>;
         readRange: (filePath: string, offset: number, length: number) => Promise<{ data: string; totalSize: number }>;
         readChunked: (filePath: string) => {
@@ -258,6 +262,7 @@ declare global {
         listRecent: (rootPaths: string[]) => Promise<{ path: string; name: string; dir: string }[]>;
         gitBranch: (dirPath: string) => Promise<string | null>;
         writeFile: (filePath: string, content: string) => Promise<{ success: boolean }>;
+        mkdir: (dirPath: string) => Promise<{ success: boolean; path: string }>;
       };
 
       /** Persistent log bus → main process (files under ~/.openp41ge/logs). */
@@ -349,6 +354,13 @@ declare global {
     isDirectory: boolean;
     size: number;
     modifiedAt: number;
+  }
+
+  /** A directory listing expanded to a fixed depth (see \`file:readTree\`). */
+  interface DirSnapshot {
+    path: string;
+    entries: FileEntry[];
+    children: DirSnapshot[];
   }
 
   interface FileSearchResult {

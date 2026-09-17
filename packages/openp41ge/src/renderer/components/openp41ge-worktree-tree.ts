@@ -20,7 +20,16 @@ import { state, property } from "lit/decorators.js";
 import { tooltipController, OverlayScrollbar } from "openp41ge-uikit";
 import { toastService } from "./openp41ge-toast";
 import { repoTreeRenderer } from "../services/repo-tree-renderer";
-import { plusIconThick, searchIcon, settingsIcon } from "../icons";
+import {
+  plusIconThick,
+  searchIcon,
+  settingsIcon,
+  checkIcon,
+  closeIcon,
+  repoIcon,
+  refreshIcon,
+  collapseAllIcon,
+} from "../icons";
 import { showConfirmModal } from "./openp41ge-confirm-modal";
 import "./openp41ge-repo-tree-item";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
@@ -63,6 +72,20 @@ const FLUSH_INTERVAL_MS = 16;
  * eagerly; beyond this the rows stay collapsed behind their count badge.
  */
 const AUTO_EXPAND_MATCH_FILES = 20;
+
+// ─── Explorer indentation setting ────────────────────────────────────────
+
+/** Config key for the Explorer indentation unit (px per tree level). */
+const EXPLORER_INDENT_KEY = "explorer.indentSize";
+/** Default indent unit (px). */
+const DEFAULT_EXPLORER_INDENT = 16;
+
+// ─── Explorer prefetch-depth setting ─────────────────────────────────────
+
+/** Config key for how many levels of directory contents the Explorer prefetches. */
+const EXPLORER_PREFETCH_KEY = "explorer.prefetchDepth";
+/** Default prefetch depth (levels of subdirectory listings per expand). */
+const DEFAULT_EXPLORER_PREFETCH = 2;
 
 // ─── Module-level state (survives DOM teardown) ─────────────────────────
 
@@ -185,6 +208,10 @@ class Openp41geWorktreeTree extends LitElement {
   @property() worksetId = "";
   private _prevWorksetId = "";
   @state() private _editMode = false;
+  /** Explorer indentation unit in px per level (from explorer settings). */
+  @state() private _indentSize = DEFAULT_EXPLORER_INDENT;
+  /** Explorer prefetch depth (levels of directory contents fetched per expand). */
+  @state() private _prefetchDepth = DEFAULT_EXPLORER_PREFETCH;
   private _selectedPath = "";
   private _worktreesByRepo: Map<string, Array<{ branch: string; path: string; exists: boolean }>> =
     new Map();
@@ -260,6 +287,10 @@ class Openp41geWorktreeTree extends LitElement {
   /** Whether the file-editor settings grid tab is open (keeps the gear lit). */
   @state() private _settingsOpen = false;
   private _settingsUnsub: (() => void) | null = null;
+  private _indentUnsub: (() => void) | null = null;
+  private _prefetchUnsub: (() => void) | null = null;
+  /** Watches the repositories dir for external changes (feeds the refresh). */
+  private _treeChangedUnsub: (() => void) | null = null;
   /** Footer buttons that received a custom tooltip — detached on teardown. */
   private _tooltipTargets: Element[] = [];
   @state() private _repos: Array<{ path: string; name: string; url: string }> = [];
@@ -347,15 +378,21 @@ class Openp41geWorktreeTree extends LitElement {
       /* When the tree fills the drawer, hide the last child's bottom border
          so it cannot double up with the bottom bar's top border. */
       .wt-tree-scroll.full .wt-tree-scroll-content > :last-child { border-bottom: 0; }
-      #wt-addrepo-row:focus-within,
-      #wt-addwt-row:focus-within { outline: 2px solid #4a9eff; outline-offset: -2px; }
+      /* The add-repo/add-worktree rows no longer paint a blue focus ring while
+         the inline input is active; the input itself owns the connection to
+         typing. */
       /* Reserve the overlay-scrollbar width only while the scrollbar is visible
          so the confirm/cancel buttons stay clear of it. --wt-sb-offset is 0px
          when hidden and the track width when visible (set by the tree). */
       #wt-addrepo-row,
-      #wt-addwt-row { padding-right: var(--wt-sb-offset, 0px); }
-      /* The add-repo/add-worktree inputs must never paint their own focus ring —
-         only the row's :focus-within outline is allowed. */
+      #wt-addwt-row {
+        padding-right: var(--wt-sb-offset, 0px);
+        /* Animate the confirm/cancel buttons sliding clear of the scrollbar
+           (no jump) while keeping the hover/colour transitions smooth. */
+        transition: padding-right 150ms ease, background 100ms, color 100ms;
+      }
+      /* The add-repo/add-worktree inputs must never paint their own focus ring
+         — no ring is shown on these rows while the inline input is active. */
       #wt-addrepo-input:focus, #wt-addrepo-input:focus-visible,
       #wt-addwt-input:focus, #wt-addwt-input:focus-visible,
       #ws-add-input:focus, #ws-add-input:focus-visible {
@@ -364,7 +401,7 @@ class Openp41geWorktreeTree extends LitElement {
       }
       #wt-addwt-input::placeholder,
       #wt-addrepo-input::placeholder,
-      #ws-add-input::placeholder { font-style:italic; }
+      #ws-add-input::placeholder { color: var(--text-secondary, #999); }
       @keyframes wt-spin { to { transform: rotate(360deg); } }
       @keyframes pull-indeterminate { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
       .wt-spinner {
@@ -455,6 +492,8 @@ class Openp41geWorktreeTree extends LitElement {
     document.addEventListener("focusin", this._onDocFocusIn, true);
     this.addEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.addEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
+    this.addEventListener("folder-contextmenu", this._onFolderContextMenu as EventListener);
+    this.addEventListener("repo-structure-changed", this._onRepoStructureChanged as EventListener);
     // Uikit <openp41ge-tree> nodes stop propagation of the DOM click event,
     // so the panel's bubble-phase _onPanelClick never sees file/folder rows.
     // Adopt selection from the composed tree-node-* events instead, so a
@@ -463,6 +502,12 @@ class Openp41geWorktreeTree extends LitElement {
     this.addEventListener("tree-node-click", this._onTreeNodeActivated as EventListener);
     this.addEventListener("tree-node-dblclick", this._onTreeNodeActivated as EventListener);
     this.addEventListener("tree-node-toggle", this._onTreeNodeActivated as EventListener);
+    // "+ add folder/file" rows notify us when they enter/leave inline-edit mode
+    // so we can drop the arrow cursor while typing and restore it on Escape.
+    this.addEventListener("create-row-edit", this._onCreateRowEdit as EventListener);
+    // A repo item's add-worktree inline input dismissed via Escape asks us to
+    // grab DOM focus so arrow navigation keeps working instead of scrolling.
+    this.addEventListener("explorer-panel-focus", this._onExplorerPanelFocus as EventListener);
 
     // Reload when the project is switched (e.g. via project picker)
     document.addEventListener("project:changed", this._onProjectChanged);
@@ -478,12 +523,31 @@ class Openp41geWorktreeTree extends LitElement {
     // (worksetId is often "" when the tree is first created).
     this._syncExplorerState();
 
-    // Keep the settings gear lit while the file-editor settings grid tab is
+    // Keep the settings gear lit while the explorer settings grid tab is
     // open (subscribe fires once immediately with the current state).
-    this._settingsUnsub = subscribeSettingsTabState("file-editor-settings", (open) => {
+    this._settingsUnsub = subscribeSettingsTabState("explorer-settings", (open) => {
       if (open === this._settingsOpen) return;
       this._settingsOpen = open;
       this.requestUpdate();
+    });
+
+    // Read the configurable Explorer indentation unit and stay live as it is
+    // changed in the explorer settings.
+    this._refreshIndentSize();
+    this._indentUnsub = appServices.configService.onKeyChange(EXPLORER_INDENT_KEY, () => {
+      this._refreshIndentSize();
+    });
+
+    // Watcher: external filesystem changes invalidate + refresh the subtree.
+    this._treeChangedUnsub =
+      window.openp41ge?.file?.onTreeChanged?.(({ path }) => {
+        this._handleExternalChange(path);
+      }) ?? null;
+
+    // Read the configurable Explorer prefetch depth and stay live as it changes.
+    this._refreshPrefetchDepth();
+    this._prefetchUnsub = appServices.configService.onKeyChange(EXPLORER_PREFETCH_KEY, () => {
+      this._refreshPrefetchDepth();
     });
 
     // Workspace gate: show a disabled hint until a workspace is selected. When
@@ -533,6 +597,18 @@ class Openp41geWorktreeTree extends LitElement {
       this._settingsUnsub();
       this._settingsUnsub = null;
     }
+    if (this._indentUnsub) {
+      this._indentUnsub();
+      this._indentUnsub = null;
+    }
+    if (this._prefetchUnsub) {
+      this._prefetchUnsub();
+      this._prefetchUnsub = null;
+    }
+    if (this._treeChangedUnsub) {
+      this._treeChangedUnsub();
+      this._treeChangedUnsub = null;
+    }
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
 
@@ -556,12 +632,49 @@ class Openp41geWorktreeTree extends LitElement {
     document.removeEventListener("focusin", this._onDocFocusIn, true);
     this.removeEventListener("worktree-contextmenu", this._onWorktreeContextMenu as EventListener);
     this.removeEventListener("repo-contextmenu", this._onRepoContextMenu as EventListener);
+    this.removeEventListener("folder-contextmenu", this._onFolderContextMenu as EventListener);
+    this.removeEventListener(
+      "repo-structure-changed",
+      this._onRepoStructureChanged as EventListener,
+    );
     this.removeEventListener("tree-node-click", this._onTreeNodeActivated as EventListener);
     this.removeEventListener("tree-node-dblclick", this._onTreeNodeActivated as EventListener);
     this.removeEventListener("tree-node-toggle", this._onTreeNodeActivated as EventListener);
   }
 
   // ═══ Lit template ═══════════════════════════════════════════════════
+
+  /** The tree-wide refresh button, shown on the LEFT of the bottom bar. */
+  private _renderRefreshButton(): TemplateResult {
+    return html` <button
+      type="button"
+      data-tip="Refresh explorer"
+      aria-label="Refresh explorer"
+      class="p41ge-icon-btn wt-refresh-btn"
+      style=${this._sidebarSide === "left" ? "padding-left:8px" : ""}
+      @click=${this._onTreeRefresh}
+    >
+      ${unsafeHTML(refreshIcon(18))}
+    </button>`;
+  }
+
+  /** The tree-wide collapse-all button, next to refresh (far LEFT of the bar). */
+  private _renderCollapseAllButton(): TemplateResult {
+    return html` <button
+      type="button"
+      data-tip="Collapse all"
+      aria-label="Collapse all rows"
+      class="p41ge-icon-btn wt-collapse-btn"
+      @click=${this._onCollapseAll}
+    >
+      ${unsafeHTML(collapseAllIcon(18))}
+    </button>`;
+  }
+
+  /** Vertical separator drawn on the RIGHT of the collapse-all button. */
+  private _renderBottomSep(): TemplateResult {
+    return html`<span class="sb-bottom-sep" aria-hidden="true"></span>`;
+  }
 
   /** The Explorer settings gear button, shown in the bottom bar. */
   private _renderSettingsButton(): TemplateResult {
@@ -584,9 +697,7 @@ class Openp41geWorktreeTree extends LitElement {
    * edge facing the grid): right for a left sidebar, left for a right one.
    */
   private get _sidebarSide(): "left" | "right" {
-    const sb = this.closest?.("openp41ge-sidebar") as
-      | { side?: "left" | "right" }
-      | null;
+    const sb = this.closest?.("openp41ge-sidebar") as { side?: "left" | "right" } | null;
     return sb?.side === "right" ? "right" : "left";
   }
 
@@ -599,9 +710,9 @@ class Openp41geWorktreeTree extends LitElement {
    * whose RESULTS render in this Explorer panel (not in the drawer body).
    */
   private _openSearchDrawer(): void {
-    const host = document.querySelector("openp41ge-settings-drawer-host") as
-      | Openp41geSettingsDrawerHost
-      | null;
+    const host = document.querySelector(
+      "openp41ge-settings-drawer-host",
+    ) as Openp41geSettingsDrawerHost | null;
     if (!host) return;
     // Toggle-close: pressing the search icon again should unfilter the panel,
     // not leave it stuck on the drawer's last query. The framework then closes
@@ -741,9 +852,9 @@ class Openp41geWorktreeTree extends LitElement {
             this._repoFilterTerms[nextIdx].trim() === ""
           ) {
             e.preventDefault();
-            filterCard.querySelectorAll<HTMLInputElement>("[data-repo-filter-input]")[
-              nextIdx
-            ]?.focus();
+            filterCard
+              .querySelectorAll<HTMLInputElement>("[data-repo-filter-input]")
+              [nextIdx]?.focus();
           }
         });
         row.appendChild(input);
@@ -793,9 +904,9 @@ class Openp41geWorktreeTree extends LitElement {
       });
 
       if (focusIndex != null) {
-        filterCard.querySelectorAll<HTMLInputElement>("[data-repo-filter-input]")[
-          focusIndex
-        ]?.focus();
+        filterCard
+          .querySelectorAll<HTMLInputElement>("[data-repo-filter-input]")
+          [focusIndex]?.focus();
       }
     };
 
@@ -1224,6 +1335,8 @@ class Openp41geWorktreeTree extends LitElement {
                       @content-match-toggle=${this._onToggleMatchFile}
                       @content-match-prefetch=${this._onPrefetchMatches}
                       .editMode=${this._editMode}
+                      .indentSize=${this._indentSize}
+                      .prefetchDepth=${this._prefetchDepth}
                       @repo-toggle-expand=${(e: CustomEvent) => {
                         const { repoName: rn, expanded } = e.detail;
                         if (expanded) _expandedRepos.add(rn);
@@ -1285,14 +1398,20 @@ class Openp41geWorktreeTree extends LitElement {
                 return _showingAddRepo
                   ? html`<div
                       id="wt-addrepo-row"
-                      class="flex items-center h-[30px] pl-3 text-sm border-b border-divider outline-2 outline-[#2a6fd1] outline-offset-[-2px] transition-[background] duration-100"
+                      class="flex items-center h-[30px] text-sm gap-[2px] transition-[background] duration-100"
+                      style="padding-left:8px"
                     >
-                      <span class="hidden">${unsafeHTML(plusIconThick(16))}</span
+                      <span class="w-4 h-[30px] flex items-center justify-center shrink-0"
+                        ><span class="inline-flex text-muted"
+                          >${unsafeHTML(plusIconThick(11))}</span
+                        ></span
+                      ><span class="w-4 h-[30px] flex items-center justify-center shrink-0"
+                        >${unsafeHTML(repoIcon(14))}</span
                       ><input
                         id="wt-addrepo-input"
                         type="text"
                         placeholder="git clone URL"
-                        class="flex-1 min-w-0 h-6 bg-transparent border-none rounded-none text-[#e0e0e0] text-xs px-1.5 outline-none font-inherit ml-2"
+                        class="flex-1 min-w-0 h-6 bg-transparent border-none rounded-none text-primary text-sm px-1 outline-none font-inherit"
                         @keydown=${(e: KeyboardEvent) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
@@ -1300,7 +1419,7 @@ class Openp41geWorktreeTree extends LitElement {
                           }
                           if (e.key === "Escape") {
                             e.preventDefault();
-                            this._cancelAddRepo();
+                            this._cancelAddRepo(true);
                           }
                         }}
                         @blur=${(_e: FocusEvent) => {
@@ -1315,33 +1434,21 @@ class Openp41geWorktreeTree extends LitElement {
                         data-cap-side="left"
                         @click=${() => this._confirmAddRepo()}
                         title="Confirm"
-                        ><svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 -960 960 960"
-                          width="16"
-                          height="16"
-                          fill="currentColor"
-                        >
-                          <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" /></svg
-                      ></button
+                      >
+                        ${unsafeHTML(checkIcon(14))}</button
                       ><button
                         type="button"
                         id="wt-addrepo-cancel"
                         class="p41ge-icon-btn"
                         @click=${() => this._cancelAddRepo()}
                         title="Cancel"
-                        ><svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 -960 960 960"
-                          width="16"
-                          height="16"
-                          fill="currentColor"
-                        >
-                          <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" /></svg
-                      ></button>
+                      >
+                        ${unsafeHTML(closeIcon(14))}
+                      </button>
                     </div>`
                   : html`<div
-                      class="flex items-center h-[30px] pl-3 pr-2 cursor-pointer select-none text-sm text-muted border-b border-divider transition-[color,background] duration-100"
+                      class="wt-add-row flex items-center h-[30px] pr-2 cursor-pointer select-none text-sm text-muted gap-[2px] transition-[color,background] duration-100"
+                      style="padding-left:8px"
                       @click=${() => this._showAddRepoInline()}
                       @mouseenter=${(e: MouseEvent) => {
                         (e.currentTarget as HTMLElement).classList.add("bg-hover");
@@ -1350,11 +1457,11 @@ class Openp41geWorktreeTree extends LitElement {
                         (e.currentTarget as HTMLElement).classList.remove("bg-hover");
                       }}
                     >
-                      <span class="w-[10px] h-[30px] flex items-center justify-center shrink-0"
-                        ><span class="-translate-x-px inline-flex"
-                          >${unsafeHTML(plusIconThick(11))}</span
-                        ></span
-                      ><span class="add-repo-label ml-1 text-muted flex-1">add repository</span>
+                      <span class="w-4 h-[30px] flex items-center justify-center shrink-0"
+                        >${unsafeHTML(plusIconThick(11))}</span
+                      ><span class="w-4 h-[30px] flex items-center justify-center shrink-0"
+                        >${unsafeHTML(repoIcon(14))}</span
+                      ><span class="add-repo-label pl-1 text-muted flex-1">add repository</span>
                     </div>`;
               })()}
             </div>
@@ -1365,15 +1472,20 @@ class Openp41geWorktreeTree extends LitElement {
         <!-- wt-tree-scroll-wrapper -->
         <div
           class="sb-bottom-bar"
-          style="border-top:1px solid var(--divider,#333);height:34px;flex-shrink:0;display:flex;align-items:center;padding:${this._sidebarSide === "left" ? "0 0 0 8px" : "0 8px 0 0"};font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary, #161616);"
+          style="border-top:1px solid var(--divider,#333);height:34px;flex-shrink:0;display:flex;align-items:center;padding:${this._sidebarSide === "left" ? "0" : "0 8px 0 0"};font-size:12px;color:var(--text-secondary,#999);background:var(--bg-secondary, #161616);"
         >
           ${
             this._sidebarSide === "left"
-              ? // Inside edge = right → spacer first, then the icon group reading
-                // toward the inside edge (settings innermost, search outward).
-                html`<span style="flex:1"></span>${this._renderToolButtons()}${this._renderSettingsButton()}`
-              : // Inside edge = left → settings innermost, then search, then spacer.
-                html`${this._renderSettingsButton()}${this._renderToolButtons()}<span style="flex:1"></span>`
+              ? // Refresh + collapse are docked at the far LEFT of the bar; the
+                // search/settings group stays toward the inside (right) edge.
+                html`${this._renderRefreshButton()}${this._renderCollapseAllButton()}${this._renderBottomSep()}
+                  <span style="flex:1"></span
+                  >${this._renderToolButtons()}${this._renderSettingsButton()}`
+              : // Inside edge = left → refresh + collapse at the far left, then
+                // separator, then settings, then search, then spacer.
+                html`${this._renderRefreshButton()}${this._renderCollapseAllButton()}${this._renderBottomSep()}${this._renderSettingsButton()}${this._renderToolButtons()}<span
+                    style="flex:1"
+                  ></span>`
           }
         </div>
       </div>
@@ -1692,8 +1804,14 @@ class Openp41geWorktreeTree extends LitElement {
           if (root2) walk(root2);
         } else if (el.classList.contains("tree-node")) {
           if (el !== cursor && el.style.boxShadow) el.style.boxShadow = "";
-        } else if (el.classList.contains("wt-row-header")) {
-          if (el !== cursor) el.classList.remove("wt-row-focused");
+        } else if (el.classList.contains("wt-row-header") || el.classList.contains("wt-add-row")) {
+          if (el !== cursor) {
+            el.classList.remove("wt-row-focused");
+            if (el.classList.contains("wt-add-row")) {
+              el.style.boxShadow = "";
+              el.style.background = "";
+            }
+          }
         } else {
           walk(el);
         }
@@ -1827,8 +1945,9 @@ class Openp41geWorktreeTree extends LitElement {
         const el = rows[idx];
         if (this._isExpandable(el)) {
           this._fireToggle(el);
-        } else if (el.classList.contains("tree-node")) {
-          // Activate a file leaf — same as a left-click (opens preview).
+        } else if (el.classList.contains("tree-node") || el.classList.contains("wt-add-row")) {
+          // Activate a file leaf or an add-worktree/add-repository row — the
+          // same as a left-click (opens preview / begins the inline edit).
           el.click();
         }
         break;
@@ -1836,7 +1955,30 @@ class Openp41geWorktreeTree extends LitElement {
     }
   };
 
-  /** Explorer tab's settings button — opens the editor settings in the new
+  /** Re-read the Explorer indentation unit from config, expose it as a CSS
+   *  variable, and re-render the tree so every row re-indents. */
+  private _refreshIndentSize(): void {
+    const raw = appServices.configService.get(EXPLORER_INDENT_KEY);
+    const v =
+      typeof raw === "number" && Number.isFinite(raw) ? Math.round(raw) : DEFAULT_EXPLORER_INDENT;
+    if (v !== this._indentSize) {
+      this._indentSize = Math.max(1, v);
+      this.style.setProperty("--explorer-indent", String(this._indentSize));
+    }
+  }
+
+  /** Re-read the Explorer prefetch depth from config and re-render so each
+   *  repo-tree-item forwards it to its WorktreeFileLoader. */
+  private _refreshPrefetchDepth(): void {
+    const raw = appServices.configService.get(EXPLORER_PREFETCH_KEY);
+    const v =
+      typeof raw === "number" && Number.isFinite(raw) ? Math.round(raw) : DEFAULT_EXPLORER_PREFETCH;
+    if (v !== this._prefetchDepth) {
+      this._prefetchDepth = Math.max(0, v);
+    }
+  }
+
+  /** Explorer tab's settings button — opens the explorer settings in the new
    * "negative drawer" (over the grid). The old grid-tab event string
    * (openp41ge:open-explorer-settings) is left intact for an easy revert. */
   private _onSettingsClick = () => {
@@ -1845,7 +1987,7 @@ class Openp41geWorktreeTree extends LitElement {
         bubbles: true,
         composed: true,
         detail: {
-          appType: "file-editor-settings",
+          appType: "explorer-settings",
           title: "Explorer Settings",
           side: this._sidebarSide,
         },
@@ -1894,6 +2036,11 @@ class Openp41geWorktreeTree extends LitElement {
     const detail = e.detail as { nodeId?: string } | undefined;
     const nodeId = detail?.nodeId;
     if (typeof nodeId !== "string" || !nodeId) return;
+    // "add file"/"add folder" rows switch to an inline input the moment they
+    // are activated (click or Enter); don't adopt them as the selected/focused
+    // cursor (that would flash a blue highlight that has to be cleared to
+    // type). Idle create rows remain arrow-navigable via _onKeyDown.
+    if (nodeId.startsWith("new:")) return;
     const el = this._findTreeNodeByNodeId(nodeId);
     if (el) {
       this._navFocusVisible = true;
@@ -1907,6 +2054,102 @@ class Openp41geWorktreeTree extends LitElement {
         this._repaintSelection();
       }
     }, 60);
+  };
+
+  private _onExplorerPanelFocus = (e: CustomEvent): void => {
+    this._grabPanelFocus();
+    // The event is dispatched by an <openp41ge-repo-tree-item> whose
+    // "add worktree" inline input was dismissed via Escape. Restore the
+    // arrow cursor on that (now idle) row so keyboard navigation continues
+    // from where it was interrupted. Note: the idle row may not be rendered
+    // yet (the inline input is still being swapped out), so we pass a finder
+    // that is polled rather than checking eligibility here.
+    const owner = e.target as HTMLElement | null;
+    if (owner)
+      this._restoreAddRowCursor(() => owner.querySelector<HTMLElement>(".add-worktree-row"));
+  };
+
+  /**
+   * Give the Explorer panel DOM focus so _onKeyDown owns ArrowUp/Down again
+   * (the panel has tabindex=-1). Called when an inline input is dismissed via
+   * Escape — otherwise focus falls back to <body> when the input is removed and
+   * the next arrow key scrolls instead of moving the cursor.
+   */
+  private _grabPanelFocus(): void {
+    if (document.activeElement !== this) this.focus();
+    // The focused inline input is about to be re-rendered out; a deferred focus
+    // guarantees the panel retains focus once that removal has settled.
+    setTimeout(() => {
+      if (document.activeElement !== this) this.focus();
+    }, 0);
+  }
+
+  /**
+   * Re-focus the arrow cursor on an idle "add" row (add worktree / add
+   * repository) after its inline input is dismissed via Escape. `find` is
+   * polled (bounded retry) because the idle row is re-created by lit on the
+   * next render — the cursor can only be repainted once the row is connected
+   * (`_repaintSelection` ignores disconnected rows).
+   */
+  private _restoreAddRowCursor(find: () => HTMLElement | null): void {
+    const restore = (attempt: number) => {
+      const row = find();
+      if (!row || !row.isConnected) {
+        if (attempt < 8) setTimeout(() => restore(attempt + 1), 0);
+        return;
+      }
+      this._navFocusVisible = true;
+      this._setFocusedRow(row);
+    };
+    setTimeout(() => restore(0), 0);
+  }
+
+  /**
+   * Resolve the idle "add repository" row (the panel-level .wt-add-row that
+   * hosts an .add-repo-label), distinct from the per-repo "add worktree" rows.
+   */
+  private _findAddRepoRow(): HTMLElement | null {
+    const rows = Array.from(this.querySelectorAll<HTMLElement>(".wt-add-row"));
+    return rows.find((r) => r.querySelector(".add-repo-label")) ?? null;
+  }
+
+  /**
+   * A "+ add folder"/"+ add file" row entered or left inline-edit mode.
+   *  - editing=true  → drop the arrow cursor/selection for that row so the
+   *    inline input is never framed by a highlight.
+   *  - editing=false (Escape) → restore the arrow cursor on the create row so
+   *    keyboard navigation continues from where it was interrupted.
+   */
+  private _onCreateRowEdit = (e: CustomEvent): void => {
+    const detail = e.detail as { nodeId?: string; editing?: boolean } | undefined;
+    const nodeId = detail?.nodeId;
+    if (typeof nodeId !== "string" || !nodeId) return;
+    const matchesFocus = this._focusedRowEl?.dataset?.nodeId === nodeId;
+    const matchesSel = this._selectedRowEl?.dataset?.nodeId === nodeId;
+    if (detail?.editing) {
+      if (matchesFocus) this._focusedRowEl = null;
+      if (matchesSel) this._selectedRowEl = null;
+      this._repaintSelection();
+      return;
+    }
+    // Restoring the cursor: re-focus the (now idle) create row so the user can
+    // keep arrowing. Defer with setTimeout (not requestAnimationFrame, which is
+    // throttled when the tab is backgrounded) until the inline input has been
+    // re-rendered out — _paintRow treats a row still holding its input as
+    // "clear this cursor", so painting before the input is removed wipes it.
+    this._grabPanelFocus();
+    const restore = (attempt: number) => {
+      const el = this._findTreeNodeByNodeId(nodeId);
+      if (!el || !el.isConnected) return;
+      // Still mid-render (input not yet removed): retry on the next tick.
+      if (el.querySelector(".tree-new-entry-input") && attempt < 8) {
+        setTimeout(() => restore(attempt + 1), 0);
+        return;
+      }
+      this._navFocusVisible = true;
+      this._setFocusedRow(el);
+    };
+    setTimeout(() => restore(0), 0);
   };
 
   /**
@@ -1949,7 +2192,11 @@ class Openp41geWorktreeTree extends LitElement {
           const root2 = (el as unknown as HTMLElement & { shadowRoot?: ShadowRoot | null })
             .shadowRoot;
           if (root2) walk(root2);
-        } else if (el.classList.contains("wt-row-header") || el.classList.contains("tree-node")) {
+        } else if (
+          el.classList.contains("wt-row-header") ||
+          el.classList.contains("tree-node") ||
+          el.classList.contains("wt-add-row")
+        ) {
           out.push(el);
         } else {
           // Recurse into containers, <openp41ge-repo-tree-item>, nested wrappers.
@@ -1979,7 +2226,7 @@ class Openp41geWorktreeTree extends LitElement {
         } else if (el.classList.contains("tree-node")) {
           el.style.boxShadow = "";
           el.style.background = "";
-        } else if (el.classList.contains("wt-row-header")) {
+        } else if (el.classList.contains("wt-row-header") || el.classList.contains("wt-add-row")) {
           el.classList.remove("wt-row-focused");
           el.classList.remove("wt-row-selected");
           el.style.boxShadow = "";
@@ -2037,15 +2284,56 @@ class Openp41geWorktreeTree extends LitElement {
     this._enforceSingleBorder();
   }
 
+  /** True for the Explorer's "+ add folder"/"+ add file" create rows and the
+   *  "add worktree"/"add repository" rows. These are actions, not files —
+   *  they must never show the stationary grey selection bar. */
+  private _isAddRow(el: HTMLElement): boolean {
+    if (el.classList.contains("wt-add-row")) return true;
+    return (el.getAttribute("data-node-id") || "").startsWith("new:");
+  }
+
   /** Paint fade-only (focused=false) or fade + outline (focused=true) on el. */
   private _paintRow(el: HTMLElement, focused: boolean): void {
+    // "add file"/"add folder" rows are still arrow-navigable, but once their
+    // inline input is enabled they must not be painted as a selected/focused
+    // cursor (the highlight would sit behind the text being typed).
+    if (
+      (el.getAttribute("data-node-id") || "").startsWith("new:") &&
+      el.querySelector(".tree-new-entry-input")
+    ) {
+      el.style.background = "";
+      el.style.boxShadow = "";
+      return;
+    }
+    // Add rows are actions, never files/folders: only the focused arrow cursor
+    // may appear — the grey stationary "selected" bar is suppressed entirely.
+    if (!focused && this._isAddRow(el)) {
+      el.classList.remove("wt-row-focused");
+      el.classList.remove("wt-row-selected");
+      el.style.background = "";
+      el.style.boxShadow = "";
+      return;
+    }
     if (!el.classList.contains("tree-node")) {
       // Header rows (repo/worktree) use CSS classes — wt-row-focused is the
       // blue cursor, wt-row-selected is the grey stationary row.
       el.classList.remove(focused ? "wt-row-selected" : "wt-row-focused");
       el.classList.add(focused ? "wt-row-focused" : "wt-row-selected");
-      el.style.boxShadow = "";
-      el.style.background = "";
+      // The add-worktree / add-repository rows live in a nested shadow root
+      // (openp41ge-repo-tree-item) that the panel's CSS cannot reach, so the
+      // wt-row-focused/wt-row-selected class is not enough — paint them with
+      // the same inline cursor styles as the tree nodes.
+      if (el.classList.contains("wt-add-row")) {
+        el.classList.remove("wt-row-focused");
+        el.classList.remove("wt-row-selected");
+        el.style.background = focused
+          ? "rgba(74,158,255,0.18)"
+          : "color-mix(in srgb, var(--border-divider, #2d2d2d) 60%, transparent)";
+        el.style.boxShadow = focused ? "inset 0 0 0 1px var(--tree-focus, #4a9eff)" : "";
+      } else {
+        el.style.boxShadow = "";
+        el.style.background = "";
+      }
       return;
     }
     // closest() does not cross the shadow boundary — resolve the owning
@@ -2440,12 +2728,20 @@ class Openp41geWorktreeTree extends LitElement {
     this._showRepoContextMenu(repoName, x, y);
   };
 
-  private _onWorktreeRefresh = (_e: CustomEvent): void => {
+  /** Tree-wide refresh — reloads every repo/worktree directory listing. */
+  private _onTreeRefresh = (): void => {
     this._loadRepos();
   };
 
-  private _onRepoRefresh = (_e: CustomEvent): void => {
-    this._loadRepos();
+  /** Collapse every repo header, worktree, and directory row. */
+  private _onCollapseAll = (): void => {
+    _expandedRepos.clear();
+    _expandedWorktrees.clear();
+    _expandedDirs.clear();
+    savePersistedState();
+    for (const item of this.querySelectorAll("openp41ge-repo-tree-item")) {
+      (item as unknown as { collapseAll?: () => void }).collapseAll?.();
+    }
   };
 
   private async _showWorktreeContextMenu(
@@ -2454,106 +2750,145 @@ class Openp41geWorktreeTree extends LitElement {
     _x: number,
     _y: number,
   ): Promise<void> {
-    const worktrees = this._worktreesByRepo.get(repoName) ?? [];
-    const items: Array<{ label: string; id: string }> = [];
-
-    if (worktrees.some((w) => w.branch === branch && w.exists)) {
-      items.push({ label: "Open in terminal", id: "terminal" });
-      items.push({ label: "Pull", id: "pull" });
-    }
+    const items: Array<{ label: string; id: string }> = [{ label: "Refresh", id: "refresh" }];
 
     setContextMenuActive(true);
     const id = await window.openp41ge.showContextMenu(items);
     setTimeout(() => setContextMenuActive(false), 0);
     if (!id) return;
 
-    switch (id) {
-      case "terminal": {
-        const winId = window.openp41ge.workspace.getWindowId();
-        if (winId) {
-          window.openp41ge.workspace.dispatch("addColumnTab", winId, "terminal");
-        }
-        break;
-      }
-      case "pull": {
-        // Find the repo-tree-item that owns this worktree
-        const repoItems = document.querySelectorAll("openp41ge-repo-tree-item");
-        let targetItem:
-          | (Element & {
-              repoName?: string;
-              startPullAnimation?: (repoName: string) => void;
-              completePullAnimation?: (branch: string) => void;
-              _fileLoader?: {
-                isWorktreeLoaded: (branch: string) => boolean;
-                clearWorktreeFiles: (branch: string) => void;
-              };
-            })
-          | null = null;
-        for (const item of repoItems) {
-          const ri = item as Element & {
-            repoName?: string;
-            startPullAnimation?: (repoName: string) => void;
-            completePullAnimation?: (branch: string) => void;
-            _fileLoader?: {
-              isWorktreeLoaded: (branch: string) => boolean;
-              clearWorktreeFiles: (branch: string) => void;
-            };
-          };
-          if (ri.repoName === repoName && ri.startPullAnimation) {
-            // Found the right repo — start animation on every visible worktree row
-            targetItem = ri;
-            break;
-          }
-        }
-
-        if (targetItem) {
-          targetItem.startPullAnimation?.(branch);
-        }
-
-        try {
-          await window.openp41ge.workspaceController.pullBranch(repoName, branch);
-          const path = worktrees.find((w) => w.branch === branch)?.path;
-          if (path && targetItem) {
-            const fileLoader = targetItem._fileLoader;
-            if (fileLoader?.isWorktreeLoaded(branch)) {
-              fileLoader.clearWorktreeFiles(branch);
-              targetItem.completePullAnimation?.(branch);
-            } else {
-              targetItem.completePullAnimation?.(branch);
-            }
-          }
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error("Pull failed:", err);
-          // Still clear the animation state on failure
-          if (targetItem) {
-            targetItem.completePullAnimation?.(branch);
-          }
-        }
-        break;
-      }
+    if (id === "refresh") {
+      const item = this._findRepoItem(repoName);
+      item?.refreshWorktree?.(branch);
     }
   }
 
   private async _showRepoContextMenu(repoName: string, _x: number, _y: number): Promise<void> {
-    const items: Array<{ label: string; id: string }> = [];
-
-    items.push({ label: "Show git info", id: "git-info" });
-    items.push({ label: "Add worktree", id: "add-worktree" });
+    const items: Array<{ label: string; id: string }> = [{ label: "Refresh", id: "refresh" }];
 
     setContextMenuActive(true);
     const id = await window.openp41ge.showContextMenu(items);
     setTimeout(() => setContextMenuActive(false), 0);
     if (!id) return;
 
-    switch (id) {
-      case "git-info":
-        this._openGitTab(repoName);
-        break;
-      case "add-worktree":
-        this._showAddWorktreeDialog(repoName);
-        break;
+    if (id === "refresh") {
+      await this._reloadRepo(repoName);
     }
+  }
+
+  // ── Folder context menu (subtree refresh) ─────────────────────────────
+
+  private _onFolderContextMenu = (e: CustomEvent): void => {
+    const { repoName, branch, path, x, y } = e.detail as {
+      repoName: string;
+      branch: string;
+      path: string;
+      x: number;
+      y: number;
+    };
+    this._showFolderContextMenu(repoName, branch, path, x, y);
+  };
+
+  /** Folder/subfolder right-click → refresh just that subtree. */
+  private async _showFolderContextMenu(
+    repoName: string,
+    branch: string,
+    path: string,
+    _x: number,
+    _y: number,
+  ): Promise<void> {
+    const items: Array<{ label: string; id: string }> = [{ label: "Refresh", id: "refresh" }];
+
+    setContextMenuActive(true);
+    const id = await window.openp41ge.showContextMenu(items);
+    setTimeout(() => setContextMenuActive(false), 0);
+    if (!id) return;
+
+    if (id === "refresh") {
+      const item = this._findRepoItem(repoName);
+      item?.refreshDir?.(branch, path);
+    }
+  }
+
+  // ── External filesystem change (watcher) ──────────────────────────────
+
+  private _onRepoStructureChanged = (e: CustomEvent): void => {
+    const { repoName } = e.detail as { repoName?: string };
+    if (!repoName) return;
+    void this._reloadRepo(repoName);
+  };
+
+  /** A filesystem change was reported by the main-process watcher — forward it
+   *  to each repo item so it can invalidate + refresh the affected subtree. */
+  private _handleExternalChange(changedPath: string): void {
+    if (!changedPath) return;
+    for (const item of this.querySelectorAll("openp41ge-repo-tree-item")) {
+      (item as unknown as { handleExternalChange?: (p: string) => boolean }).handleExternalChange?.(
+        changedPath,
+      );
+    }
+  }
+
+  /** Find the repo-tree-item for a repo, if mounted. */
+  private _findRepoItem(repoName: string):
+    | (Element & {
+        refreshWorktree?: (branch: string) => void;
+        refreshDir?: (branch: string, dirPath: string) => void;
+        refreshRepo?: () => void;
+      })
+    | null {
+    for (const item of this.querySelectorAll("openp41ge-repo-tree-item")) {
+      const ri = item as Element & { repoName?: string };
+      if (ri.repoName === repoName) return ri;
+    }
+    return null;
+  }
+
+  /**
+   * Reload a single repo's worktree list (and refresh its file caches) without
+   * reloading the whole tree. Used by the repo right-click “Refresh” and by
+   * external worktree-folder changes.
+   */
+  private async _reloadRepo(repoName: string): Promise<void> {
+    const worktrees = await this._fetchWorktreesForRepo(repoName);
+    if (!worktrees) return;
+    this._worktreesByRepo = new Map(this._worktreesByRepo);
+    this._worktreesByRepo.set(repoName, worktrees);
+    // Re-render so each repo item receives the updated worktree list.
+    this._repos = [...this._repos];
+    this.requestUpdate();
+    // Clear + reload the file caches of this repo's worktrees.
+    void this._findRepoItem(repoName)?.refreshRepo?.();
+  }
+
+  /**
+   * Resolve the on-disk worktree list for a repo (mirrors `_loadRepos`'s logic
+   * for a single repo), or null when the repo isn't in the open workspace.
+   */
+  private async _fetchWorktreesForRepo(
+    repoName: string,
+  ): Promise<Array<{ branch: string; path: string; exists: boolean }> | null> {
+    const wsRepo = workspaceFileService.openData?.repos?.find(
+      (r) => deriveRepoName(r.url) === repoName,
+    );
+    if (!wsRepo) return null;
+    const declared = wsRepo.worktrees ?? [];
+    let disk: Array<{ branch: string; path: string; exists: boolean }> = [];
+    try {
+      const repo = await this._repoService.getRepo(repoName);
+      disk = ((await repo?.listWorktrees?.()) ?? []).map((wt) => ({
+        branch: wt.branch,
+        path: wt.path,
+        exists: wt.exists,
+      }));
+    } catch {
+      disk = [];
+    }
+    const existing = new Map(disk.filter((w) => w.exists).map((w) => [w.branch, w]));
+    return declared.map((branch) => {
+      const d = existing.get(branch);
+      return { branch, path: d?.path ?? "", exists: d !== undefined };
+    });
   }
 
   // ── Add worktree dialog ───────────────────────────────────────────────
@@ -2599,10 +2934,19 @@ class Openp41geWorktreeTree extends LitElement {
     this._renderAddRepoInput();
   }
 
-  private _cancelAddRepo(): void {
+  private _cancelAddRepo(restoreFocus = false): void {
     _showingAddRepo = false;
     this._cloneUrl = "";
     this.requestUpdate();
+    // Escape should hand DOM focus back to the panel so the next ArrowUp/Down
+    // is caught by _onKeyDown instead of scrolling the explorer. Focus must
+    // survive the hourglass input being swapped out (blur/confirm don't).
+    if (restoreFocus) {
+      this._grabPanelFocus();
+      // Also restore the arrow cursor on the idle "add repository" row so
+      // keyboard navigation continues from where the inline input interrupted.
+      this._restoreAddRowCursor(() => this._findAddRepoRow());
+    }
   }
 
   private async _confirmAddRepo(): Promise<void> {

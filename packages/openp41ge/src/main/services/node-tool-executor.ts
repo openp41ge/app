@@ -8,14 +8,17 @@
 
 import { register as registerReadFile } from "openp41ge-agents-tool-read-file";
 import { register as registerSearchFiles } from "openp41ge-agents-tool-search-files";
-import { register as registerRunCommand } from "openp41ge-agents-tool-run-command";
 import type { AgentTool, AgentToolRegistry } from "openp41ge-agents-tool-types";
 
-/** Register the built-in v1 tool set into a registry. */
+/**
+ * Register the built-in v1 tool set into a registry.
+ *
+ * `run_command` is intentionally NOT registered here: shell-style command
+ * execution is disabled. Re-add `registerRunCommand` to re-enable it.
+ */
 export function registerBuiltinTools(registry: AgentToolRegistry): void {
   registerReadFile(registry);
   registerSearchFiles(registry);
-  registerRunCommand(registry);
 }
 
 export type { AgentTool, AgentToolRegistry };

@@ -1,5 +1,5 @@
 /**
- * Register all app types (terminal, file-viewer, git, video, log-viewer)
+ * Register all app types (blank, file-viewer, git, video, log-viewer)
  * so the grid can create controllers for new panes.
  *
  * Each app type is a registration record with a factory function that
@@ -13,7 +13,7 @@ import { createLogger } from "openp41ge-logger";
 const log = createLogger("openp41ge", "register-app-types");
 
 import { registerAppType, registerSystemTabType } from "../../apps/app-registry";
-import { terminalAppRegistration } from "../../apps/terminal/index";
+import { blankAppRegistration } from "../../apps/blank/index";
 import { videoAppRegistration } from "../../apps/video/index";
 import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
 import { logViewerAppRegistration } from "../../apps/log-viewer/index";
@@ -33,7 +33,7 @@ export class RegisterAppTypesStep implements IStartupStep {
   readonly name = "register-app-types";
 
   async run(context: StartupContext): Promise<void> {
-    registerAppType(terminalAppRegistration);
+    registerAppType(blankAppRegistration);
     registerAppType(videoAppRegistration);
     registerAppType(fileViewerAppRegistration);
     registerAppType(logViewerAppRegistration);

@@ -11,7 +11,7 @@
  * 4. A duplicate branch name cannot be submitted (Enter or Confirm) and does
  *    NOT collapse the repo row — the input stays open for the user to fix it.
  * 5. Confirm/Cancel are full-height square `.p41ge-icon-btn` buttons using the
- *    Material check/cross icons.
+ *    shared check/cross icons (checkIcon/closeIcon).
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -186,11 +186,12 @@ describe("Explorer per-repo add-worktree row", () => {
     // The confirm button carries the leading cap separator (input | check).
     expect(confirm!.getAttribute("data-cap-side")).toBe("left");
 
-    // The check and cross Material icon paths.
-    const svgs = item.querySelectorAll("#wt-addwt-row button svg");
-    expect(svgs.length).toBe(2);
-    const paths = Array.from(svgs).map((s) => s.querySelector("path")?.getAttribute("d") ?? "");
-    expect(paths[0]).toContain("M382-240");
-    expect(paths[1]).toContain("m256-200-56-56");
+    // The shared check/cross icons (stroke-based) in the confirm/cancel buttons.
+    const confirmSvg = item.querySelector("#wt-addwt-row button[title='Confirm'] svg");
+    const cancelSvg = item.querySelector("#wt-addwt-row button[title='Cancel'] svg");
+    const checkPath = confirmSvg?.querySelector("path")?.getAttribute("d") ?? "";
+    const cancelLineCount = cancelSvg?.querySelectorAll("line").length ?? 0;
+    expect(checkPath).toContain("M3 8.5L6.5 12L13 4.5");
+    expect(cancelLineCount).toBe(2);
   });
 });

@@ -106,4 +106,9 @@ export class DirPersistenceService {
   get hasPendingRestore(): boolean {
     return this._persistedDirPaths !== null && this._persistedDirPaths.length > 0;
   }
+
+  /** Forget any directory paths pending restore (used when collapsing all). */
+  resetPendingRestore(): void {
+    this._persistedDirPaths = null;
+  }
 }

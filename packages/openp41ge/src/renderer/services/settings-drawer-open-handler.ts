@@ -20,6 +20,7 @@ import { createLogger } from "openp41ge-logger";
 import { Openp41geSettingsDrawerHost } from "../components/openp41ge-settings-drawer-host";
 import { Openp41geAgentSettingsDrawer } from "../components/openp41ge-agent-settings-drawer";
 import { Openp41geSettingsSurface } from "../components/openp41ge-settings-surface";
+import "../components/openp41ge-explorer-settings";
 import { createSettingsPanel } from "./settings-panel";
 
 const log = createLogger("openp41ge", "settings-drawer-open-handler");
@@ -72,8 +73,19 @@ export class SettingsDrawerOpenHandler {
       case "file-editor-settings": {
         host.openSurface(
           singleSettingsSurface(
-            detail.title ?? "Explorer",
+            detail.title ?? "Editor",
             document.createElement("openp41ge-file-editor-settings"),
+            appType,
+          ),
+          side,
+        );
+        break;
+      }
+      case "explorer-settings": {
+        host.openSurface(
+          singleSettingsSurface(
+            detail.title ?? "Explorer",
+            document.createElement("openp41ge-explorer-settings"),
             appType,
           ),
           side,

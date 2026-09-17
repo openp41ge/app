@@ -432,6 +432,22 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** List entries in a directory. Returns FileEntry[]. */
     readdir: (dirPath) => ipcRenderer.invoke("file:readdir", dirPath),
 
+    /**
+     * List a directory and its subdirectory listings down to `depth` levels.
+     * Returns a DirSnapshot so the next levels can be opened without a round trip.
+     */
+    readTree: (dirPath, depth) => ipcRenderer.invoke("file:readTree", dirPath, depth),
+
+    /**
+     * Subscribe to filesystem changes under the repositories dir reported by
+     * the main process watcher. Returns unsubscribe. Payload: { path }.
+     */
+    onTreeChanged: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on("file:tree-changed", handler);
+      return () => ipcRenderer.removeListener("file:tree-changed", handler);
+    },
+
     /** Stat a file or directory. Returns FileEntry | null. */
     stat: (filePath) => ipcRenderer.invoke("file:stat", filePath),
 
@@ -468,6 +484,9 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
     /** Write content to a file. Returns { success: boolean }. */
     writeFile: (filePath, content) => ipcRenderer.invoke("file:writeFile", filePath, content),
+
+    /** Create a directory (recursively). Returns { success: boolean, path }. */
+    mkdir: (dirPath) => ipcRenderer.invoke("file:mkdir", dirPath),
 
     /** Search for files matching a query within the given root paths. */
     search: (query, rootPaths) => ipcRenderer.invoke("file:search", query, rootPaths),

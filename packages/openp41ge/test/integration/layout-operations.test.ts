@@ -428,13 +428,13 @@ describe("Layout operations — integration", () => {
       expect(p2?.position.col).toBe(1);
     });
 
-    it("defaults appType to terminal when addColumnTab has no type", () => {
+    it("defaults appType to blank when addColumnTab has no type", () => {
       const ws = types.createWorkspace("ws-col-default");
       const winId = ws.windows[0].id;
 
       const result = ops.addColumnTab(ws, winId);
       const tabId = result.windows[0].grid.placements[0].tabIds[0];
-      expect(result.editorTabs[tabId].appType).toBe("terminal");
+      expect(result.editorTabs[tabId].appType).toBe("blank");
     });
   });
 });

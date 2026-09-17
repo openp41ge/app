@@ -467,8 +467,8 @@ export function addColumnTab(
       if (filePath) config.filePath = filePath;
       const tab = makeTab(
         tabId,
-        appType ?? "terminal",
-        title || (appType?.replace("-", " ") ?? "Terminal"),
+        appType ?? "blank",
+        title || (appType?.replace("-", " ") ?? "Blank"),
         config,
       );
       result = registerTab(result, tab);
@@ -504,8 +504,8 @@ export function addColumnTabAt(
   if (filePath) config.filePath = filePath;
   const tab = makeTab(
     tabId,
-    appType ?? "terminal",
-    title || (appType?.replace("-", " ") ?? "Terminal"),
+    appType ?? "blank",
+    title || (appType?.replace("-", " ") ?? "Blank"),
     config,
     false,
   );

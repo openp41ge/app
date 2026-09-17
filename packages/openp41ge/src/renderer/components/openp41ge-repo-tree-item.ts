@@ -15,7 +15,10 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { plusIconThick, refreshIcon } from "../icons";
+import { ref, createRef } from "lit/directives/ref.js";
+import { plusIconThick, checkIcon, closeIcon, worktreeIcon, repoIcon } from "../icons";
+import { hasExactFileIcon } from "../icons/material-icons";
+import { toastService } from "./openp41ge-toast";
 import { classifyWorktree, worstOf, worktreeStatusLabel } from "../services/worktree-status";
 import { matchesNameFilter } from "../services/explorer-filter";
 import {
@@ -95,6 +98,17 @@ export class Openp41geRepoTreeItem extends LitElement {
   @property({ type: Boolean })
   editMode = false;
 
+  /** Explorer indentation unit in px per level (from explorer settings).
+   *  Every row's left padding is a multiple of this fixed value. */
+  @property({ type: Number })
+  indentSize = 16;
+
+  /** How many levels of directory contents the loader prefetches per expand
+   *  (from explorer settings). Passed through to WorktreeFileLoader. Defaults
+   *  to 0 so a bare item (as in unit tests) keeps the on-demand readdir path. */
+  @property({ type: Number })
+  prefetchDepth = 0;
+
   /** Matching files keyed by disk path — counts only, no match lines. */
   @property({ attribute: false })
   contentIndex: Map<string, ContentMatchIndexEntry> = new Map();
@@ -121,6 +135,23 @@ export class Openp41geRepoTreeItem extends LitElement {
   @state() private _expanded = false;
   @state() private _showingAddWorktree = false;
   @state() private _addWorktreeName = "";
+
+  /** The explorer create row currently in inline-edit mode (null = none). */
+  @state() private _newEntry: {
+    branch: string;
+    parentPath: string;
+    kind: "folder" | "file";
+    /** Stable row id, so the tree can keep (and restore) the right row. */
+    id: string;
+  } | null = null;
+
+  /** Value being typed in the inline new-folder/new-file input. Reactive so
+   *  the row's icon can switch to the detected file-type as you type; the
+   *  input's `.value` stays synced with this so the caret is preserved. */
+  @state() private _newEntryName = "";
+
+  /** Ref to the inline create-row input, used to focus it after render. */
+  private _newEntryInputRef = createRef<HTMLInputElement>();
 
   /** True when the add-worktree input value matches an existing worktree name. */
   private get _isDuplicateWorktreeName(): boolean {
@@ -174,6 +205,7 @@ export class Openp41geRepoTreeItem extends LitElement {
   }
 
   updated(changedProperties: Map<string | number | symbol, unknown>): void {
+    this._fileLoader.prefetchDepth = this.prefetchDepth;
     this._loadSync();
     if (changedProperties.has("worktrees")) {
       queueMicrotask(() => this._loadRestoredFiles());
@@ -300,7 +332,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         label: m.lineText,
         showChevron: false,
         draggable: false,
-        reduceIndent: 16,
+        reduceIndent: this.indentSize,
         meta: {
           branch,
           filePath,
@@ -480,6 +512,34 @@ export class Openp41geRepoTreeItem extends LitElement {
     this.requestUpdate();
   }
 
+  /** Collapse this repo's header and every expanded worktree/directory.
+   * Called by the Explorer's bottom-bar "collapse all" button. */
+  collapseAll(): void {
+    if (this._expanded) {
+      this._expanded = false;
+      this.dispatchEvent(
+        new CustomEvent("repo-toggle-expand", {
+          bubbles: true,
+          detail: { repoName: this.repoName, expanded: false },
+        }),
+      );
+    }
+    for (const branch of Array.from(this._expandedWorktrees)) {
+      this._fileLoader.collapseWorktreeFiles(branch);
+      this._expandedDirs.delete(branch);
+      this.dispatchEvent(
+        new CustomEvent("worktree-files-toggle", {
+          bubbles: true,
+          detail: { repoName: this.repoName, branch, expanded: false },
+        }),
+      );
+    }
+    this._expandedWorktrees.clear();
+    this._expandedDirs.clear();
+    this._persistence.resetPendingRestore();
+    this.requestUpdate();
+  }
+
   private async _toggleWorktreeFiles(branch: string, path: string): Promise<void> {
     if (this._expandedWorktrees.has(branch)) {
       // Collapse — keep cached data for instant re-expand
@@ -564,13 +624,14 @@ export class Openp41geRepoTreeItem extends LitElement {
     const pullDoneTime = this._pullCompleted.get(wt.branch);
     const showGreen = pullDoneTime !== undefined && Date.now() - pullDoneTime < 2500;
     return html`
-      <div class="relative bg-gutter h-[30px] pointer-events-none border-b border-[#232323]">
+      <div class="relative bg-gutter h-[30px] pointer-events-none">
         <div
           draggable="true"
           data-worktree-row
           data-repo="${this.repoName}"
           data-branch="${wt.branch}"
-          class="pointer-events-auto flex items-center h-[30px] px-2 pl-7 pr-3 cursor-pointer text-sm text-[#b0b0b0] gap-1 overflow-hidden transition-colors duration-100 wt-row-header"
+          class="pointer-events-auto flex items-center h-[30px] pr-3 cursor-pointer text-sm text-[#b0b0b0] gap-[2px] overflow-hidden transition-colors duration-100 wt-row-header"
+          style="padding-left:${8 + this.indentSize}px"
           @click=${() => {
             const path = wt.path || `${this.repoName}/${wt.branch}`;
             this._toggleWorktreeFiles(wt.branch, path);
@@ -602,13 +663,18 @@ export class Openp41geRepoTreeItem extends LitElement {
                   ></div>`
                 : ""
           }
-          <span class="text-muted w-[10px] flex items-center justify-center"
+          <span class="text-muted w-4 flex items-center justify-center shrink-0"
             ><openp41ge-icon
               name=${isExpanded ? "chevron-down" : "chevron-right"}
-              size="10"
+              size="12"
             ></openp41ge-icon
           ></span>
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">${wt.branch}</span>
+          <span class="w-4 flex items-center justify-center shrink-0"
+            >${unsafeHTML(worktreeIcon(14))}</span
+          >
+          <span class="pl-1 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+            >${wt.branch}</span
+          >
           ${this._wtWarn(wt)}
           ${
             this._fileLoader.isRefreshingWorktree(wt.branch) ||
@@ -616,21 +682,7 @@ export class Openp41geRepoTreeItem extends LitElement {
               ? html`<div
                   class="wt-spinner w-[14px] h-[14px] shrink-0 border-2 border-[#444] border-t-accent-hover rounded-full animate-[wt-spin_0.8s_linear_infinite]"
                 ></div>`
-              : html` <!-- Refresh button -->
-                  <span
-                    class="wt-row-btn w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-colors duration-100"
-                    title="Refresh"
-                    @click=${(e: MouseEvent) => {
-                      e.stopPropagation();
-                      this.dispatchEvent(
-                        new CustomEvent("worktree-refresh", {
-                          bubbles: true,
-                          detail: { repoName: this.repoName, branch: wt.branch },
-                        }),
-                      );
-                    }}
-                    >${unsafeHTML(refreshIcon(14))}</span
-                  >`
+              : nothing
           }
         </div>
       </div>
@@ -648,14 +700,15 @@ export class Openp41geRepoTreeItem extends LitElement {
     if (!this._showingAddWorktree) {
       return html`
         <div
-          class="add-worktree-row flex items-center h-[30px] pl-7 pr-3 cursor-pointer select-none text-sm text-muted border-b border-[#232323] transition-[color,background] duration-100"
+          class="add-worktree-row wt-add-row flex items-center h-[30px] pr-3 cursor-pointer select-none text-sm text-muted gap-[2px] transition-[color,background] duration-100"
+          style="padding-left:${8 + this.indentSize}px"
           @click=${() => this._showAddWorktreeInline()}
         >
-          <span class="w-[10px] flex items-center justify-center shrink-0"
-            ><span class="-translate-x-px inline-flex"
-              >${unsafeHTML(plusIconThick(11))}</span
-            ></span
-          ><span class="ml-1 text-muted flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+          <span class="w-4 flex items-center justify-center shrink-0"
+            >${unsafeHTML(plusIconThick(11))}</span
+          ><span class="w-4 flex items-center justify-center shrink-0"
+            >${unsafeHTML(worktreeIcon(14))}</span
+          ><span class="pl-1 text-muted flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
             >add worktree</span
           >
         </div>
@@ -664,13 +717,18 @@ export class Openp41geRepoTreeItem extends LitElement {
     return html`
       <div
         id="wt-addwt-row"
-        class="flex items-center h-[30px] pl-7 text-sm border-b border-[#232323] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
+        class="flex items-center h-[30px] text-sm gap-[2px] transition-colors duration-100 ${this._isDuplicateWorktreeName ? "duplicate-name" : ""}"
+        style="padding-left:${8 + this.indentSize}px"
       >
-        <input
+        <span class="w-4 flex items-center justify-center shrink-0"
+          ><span class="inline-flex text-muted">${unsafeHTML(plusIconThick(11))}</span></span
+        ><span class="w-4 flex items-center justify-center shrink-0"
+          >${unsafeHTML(worktreeIcon(14))}</span
+        ><input
           id="wt-addwt-input"
           type="text"
           placeholder="enter branch name"
-          class="flex-1 min-w-0 h-6 bg-transparent border-none rounded-none text-[#e0e0e0] text-sm pl-[14px] pr-1 outline-none font-inherit"
+          class="flex-1 min-w-0 h-6 bg-transparent border-none rounded-none text-primary text-sm px-1 outline-none font-inherit"
           .value=${this._addWorktreeName}
           @input=${(e: InputEvent) => {
             this._addWorktreeName = (e.target as HTMLInputElement).value;
@@ -684,7 +742,7 @@ export class Openp41geRepoTreeItem extends LitElement {
             if (e.key === "Escape") {
               e.preventDefault();
               e.stopPropagation();
-              this._cancelAddWorktree();
+              this._cancelAddWorktree(true);
             }
           }}
           @blur=${(_e: FocusEvent) => {
@@ -703,15 +761,7 @@ export class Openp41geRepoTreeItem extends LitElement {
           ?disabled=${this._isDuplicateWorktreeName}
           @click=${() => this._confirmAddWorktree()}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 -960 960 960"
-            width="16"
-            height="16"
-            fill="currentColor"
-          >
-            <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />
-          </svg>
+          ${unsafeHTML(checkIcon(14))}
         </button>
         <button
           type="button"
@@ -719,15 +769,7 @@ export class Openp41geRepoTreeItem extends LitElement {
           title="Cancel"
           @click=${() => this._cancelAddWorktree()}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 -960 960 960"
-            width="16"
-            height="16"
-            fill="currentColor"
-          >
-            <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" />
-          </svg>
+          ${unsafeHTML(closeIcon(14))}
         </button>
       </div>
     `;
@@ -735,52 +777,64 @@ export class Openp41geRepoTreeItem extends LitElement {
 
   // ─── Uikit tree integration ──────────────────────────────────────
 
-  /** Build TreeNode[] for all files under a worktree branch. */
+  /** Build TreeNode[] for all files under a worktree branch or subdirectory.
+   *
+   *  When not filtering, each list is appended with two “create” rows —
+   *  `+ add folder` at the bottom of the folder group (directories list first,
+   *  then files) and `+ add file` at the bottom of the file group. This holds
+   *  at the worktree root and every expanded folder, and an empty folder (or
+   *  worktree) still shows both rows so the user can start adding content. */
   private _buildFileTreeNodes(branch: string, parentPath?: string): TreeNode[] {
     const entries = this._fileLoader.getEntries(branch, parentPath);
-    if (entries.length === 0) return [];
     const expandedDirs = this._expandedDirs.get(branch) ?? new Set();
     const filterActive = this._isFilterActive;
-    return entries
-      .filter((entry) => {
-        if (!filterActive) return true;
-        if (this._matchesFilter(entry.name)) return true;
+    const nodes: TreeNode[] = [];
+
+    for (const entry of entries) {
+      if (filterActive) {
         // Surface a directory when a content match lives somewhere under it,
         // and a file when it has its own content matches — even when the name
         // doesn't match the filter.
-        if (entry.isDirectory) return this._dirContainsMatch(entry.path);
-        return this.contentIndex.has(entry.path);
-      })
-      .map((entry) => {
-        const isUntracked = this._fileLoader.isUntracked(branch, entry.path);
-        if (entry.isDirectory) {
-          // While filtering, auto-expand directories whose name matches or
-          // that contain a content match, so matching descendants are visible.
-          const isExpanded = filterActive
-            ? this._matchesFilter(entry.name) || this._dirContainsMatch(entry.path)
-            : expandedDirs.has(entry.path);
-          const isLoading = this._fileLoader.isLoadingDir(entry.path);
-          const dirBadge = filterActive ? this._dirMatchBadge(entry.path) : undefined;
-          return {
-            id: entry.path,
-            label: entry.name,
-            icon: "folder-closed",
-            expanded: isExpanded,
-            expandable: true,
-            status: isUntracked ? ("untracked" as const) : undefined,
-            badge: dirBadge,
-            children:
-              isExpanded && this._fileLoader.dirContents.has(entry.path)
-                ? this._buildFileTreeNodes(branch, entry.path)
-                : undefined,
-            meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
-          };
+        if (this._matchesFilter(entry.name)) {
+          // keep
+        } else if (entry.isDirectory && this._dirContainsMatch(entry.path)) {
+          // keep
+        } else if (!entry.isDirectory && this.contentIndex.has(entry.path)) {
+          // keep
+        } else {
+          continue;
         }
+      }
+
+      const isUntracked = this._fileLoader.isUntracked(branch, entry.path);
+      if (entry.isDirectory) {
+        // While filtering, auto-expand directories whose name matches or
+        // that contain a content match, so matching descendants are visible.
+        const isExpanded = filterActive
+          ? this._matchesFilter(entry.name) || this._dirContainsMatch(entry.path)
+          : expandedDirs.has(entry.path);
+        const isLoading = this._fileLoader.isLoadingDir(entry.path);
+        const dirBadge = filterActive ? this._dirMatchBadge(entry.path) : undefined;
+        nodes.push({
+          id: entry.path,
+          label: entry.name,
+          icon: "folder-closed",
+          expanded: isExpanded,
+          expandable: true,
+          status: isUntracked ? ("untracked" as const) : undefined,
+          badge: dirBadge,
+          children:
+            isExpanded && this._fileLoader.dirContents.has(entry.path)
+              ? this._buildFileTreeNodes(branch, entry.path)
+              : undefined,
+          meta: { branch, filePath: entry.path, isDirectory: true, isLoading },
+        });
+      } else {
         const hasMatches = filterActive && this.contentIndex.has(entry.path);
         const matchChildren = hasMatches ? this._contentMatchNodes(branch, entry.path) : undefined;
         const fileBadge = filterActive ? this._fileMatchBadge(entry.path) : undefined;
         const matchesExpanded = hasMatches && this.expandedMatchFiles.has(entry.path);
-        return {
+        nodes.push({
           id: entry.path,
           label: entry.name,
           icon: entry.name,
@@ -794,13 +848,436 @@ export class Openp41geRepoTreeItem extends LitElement {
           badge: fileBadge,
           status: isUntracked ? ("untracked" as const) : undefined,
           meta: { branch, filePath: entry.path, hasMatches },
-        };
-      });
+        });
+      }
+    }
+
+    // Create rows are only relevant while browsing — never while filtering.
+    if (!filterActive) {
+      const currentDir = parentPath ?? this._worktreeRootPath(branch);
+      const firstFileIdx = nodes.findIndex((n) => !n.meta?.isDirectory);
+      const newFolderNode = this._newEntryNode(branch, currentDir, "folder");
+      const newFileNode = this._newEntryNode(branch, currentDir, "file");
+      // Folders always sit ABOVE files in the list, so the "+ New Folder" row
+      // anchors at the bottom of the folder group (the position just before the
+      // first file) — it stays above the files even when a folder has no
+      // subdirectories. "+ New File" always sits at the very bottom.
+      if (firstFileIdx < 0) {
+        // No files (only folders, or empty): both create rows go at the bottom.
+        nodes.push(newFolderNode, newFileNode);
+      } else {
+        nodes.splice(firstFileIdx, 0, newFolderNode);
+        nodes.push(newFileNode);
+      }
+    }
+
+    return nodes;
+  }
+
+  /** Absolute path of a worktree's root directory (used as the create target
+   *  for the top-level create rows). Matches `_renderWorktree`'s fallback. */
+  private _worktreeRootPath(branch: string): string {
+    const wt = this.worktrees.find((w) => w.branch === branch);
+    return wt?.path || `${this.repoName}/${branch}`;
+  }
+
+  /** Stable id for a folder/file create row at a given directory. */
+  private _newEntryId(branch: string, parentPath: string, kind: "folder" | "file"): string {
+    return `new:${branch}::${parentPath}::${kind}`;
+  }
+
+  /** Build the `+ add folder` / `+ add file` row for a directory.
+   *
+   *  It's a leaf row whose label becomes an inline text input while it is the
+   *  active create target; otherwise the label is “New Folder” / “New File”
+   *  (with a plus icon) and clicking it enters edit mode. */
+  private _newEntryNode(branch: string, parentPath: string, kind: "folder" | "file"): TreeNode {
+    const id = this._newEntryId(branch, parentPath, kind);
+    const editing = this._newEntry?.id === id;
+    return {
+      id,
+      label: kind === "folder" ? "add folder" : "add file",
+      // Uniform [action icon][description icon] layout: the action cell holds
+      // the + glyph (rotated to a red cross on a duplicate name) and the
+      // description cell holds the folder/file-type icon.
+      icon: this._newEntryDescIcon(kind, editing),
+      actionIcon: this._newEntryActionIcon(kind, editing),
+      draggable: false,
+      showChevron: false,
+      // The muted grey only applies to the idle row; while editing, the label
+      // becomes the inline input and must render at full opacity.
+      muted: !editing,
+      meta: { branch, parentPath, newEntry: kind, isDirectory: kind === "folder" },
+      renderLabel: editing ? () => this._renderNewEntryInput(branch, parentPath, kind) : undefined,
+    };
+  }
+
+  /** The create row's ACTION icon (rendered in the dedicated action cell): +
+   *  for both kinds, rotated into a red cross when the typed name duplicates
+   *  an existing entry. */
+  private _newEntryActionIcon(kind: "folder" | "file", editing: boolean): string {
+    if (editing && this._isDuplicateNewEntry) return "new-duplicate";
+    return kind === "folder" ? "new-folder" : "new-file";
+  }
+
+  /** The create row's DESCRIPTION icon (rendered in the dedicated icon cell):
+   *  folders use the default folder icon, files use the unknown/default file
+   *  icon, switching to a detected file-type icon (e.g. "app.ts" → TS) once
+   *  an exact match is typed. */
+  private _newEntryDescIcon(kind: "folder" | "file", editing: boolean): string {
+    if (kind === "folder") return "folder-closed";
+    const name = this._newEntryName.trim();
+    if (editing && name && hasExactFileIcon(name)) return name;
+    return "file";
+  }
+
+  /** True when the current create name already exists (case-insensitive) as a
+   *  file or folder in the target directory — creation is blocked to avoid
+   *  overwriting or re-creating an existing entry. */
+  private get _isDuplicateNewEntry(): boolean {
+    if (!this._newEntry) return false;
+    const name = this._newEntryName.trim();
+    if (!name) return false;
+    return this._nameExistsInDir(this._newEntry.branch, this._newEntry.parentPath, name);
+  }
+
+  /** True when `name` already exists as a file or folder in `parentPath`.
+   *  Root entries live in the worktree cache; sub-directory entries come from
+   *  the per-dir cache, so route by whether the parent is the worktree root. */
+  private _nameExistsInDir(branch: string, parentPath: string, name: string): boolean {
+    const lower = name.toLowerCase();
+    const entries =
+      parentPath === this._worktreeRootPath(branch)
+        ? this._fileLoader.getEntries(branch)
+        : this._fileLoader.getEntries(branch, parentPath);
+    return entries.some((e) => e.name.toLowerCase() === lower);
+  }
+
+  /** The inline input label for the active create row. */
+  private _renderNewEntryInput(
+    branch: string,
+    parentPath: string,
+    kind: "folder" | "file",
+  ): TemplateResult {
+    const duplicate = this._isDuplicateNewEntry;
+    return html`
+      <div class="tree-new-entry-row${duplicate ? " duplicate" : ""}">
+        <input
+          class="tree-new-entry-input"
+          placeholder=${kind === "folder" ? "folder name" : "file name"}
+          .value=${this._newEntryName}
+          ${ref(this._newEntryInputRef)}
+          @click=${(e: MouseEvent) => e.stopPropagation()}
+          @input=${(e: InputEvent) => {
+            this._newEntryName = (e.target as HTMLInputElement).value;
+          }}
+          @keydown=${(e: KeyboardEvent) => {
+            e.stopPropagation();
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void this._confirmNewEntry(branch, parentPath, kind);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              // Explicit cancel should hand the arrow cursor back to this row
+              // so the user can keep arrowing (blur/confirm do not).
+              this._cancelNewEntry(true);
+            }
+          }}
+          @blur=${() => this._cancelNewEntry()}
+        />
+        <button
+          type="button"
+          class="tree-new-entry-btn tree-new-entry-confirm"
+          title="Confirm"
+          ?disabled=${duplicate}
+          @mousedown=${(e: MouseEvent) => e.preventDefault()}
+          @click=${(e: MouseEvent) => {
+            e.stopPropagation();
+            void this._confirmNewEntry(branch, parentPath, kind);
+          }}
+        >
+          ${unsafeHTML(checkIcon(14))}
+        </button>
+        <button
+          type="button"
+          class="tree-new-entry-btn tree-new-entry-cancel"
+          title="Cancel"
+          @mousedown=${(e: MouseEvent) => e.preventDefault()}
+          @click=${(e: MouseEvent) => {
+            e.stopPropagation();
+            this._cancelNewEntry();
+          }}
+        >
+          ${unsafeHTML(closeIcon(14))}
+        </button>
+      </div>
+    `;
+  }
+
+  /** Enter inline-edit mode for a create row (called on row click). */
+  private _beginNewEntry(branch: string, parentPath: string, kind: "folder" | "file"): void {
+    this._newEntryName = "";
+    this._newEntry = { branch, parentPath, kind, id: this._newEntryId(branch, parentPath, kind) };
+    // If the row is already the arrow cursor (arrowed to + Enter), drop its
+    // highlight immediately so the inline input isn't framed by a selection.
+    this._clearCreateRowHighlight();
+    // Tell the Explorer panel to drop its cursor/selection for this row while
+    // editing, so a stray re-paint can never frame the input behind a cursor.
+    this._notifyCreateRowEdit(this._newEntry.id, true);
+    this.requestUpdate();
+    // Focus after the tree (re)mounts the input row; a double RAF covers Lit's
+    // nested <openp41ge-tree> child update cycle.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => this._newEntryInputRef.value?.focus());
+    });
+  }
+
+  /** Notify the owning Explorer panel (openp41ge-worktree-tree) that a create
+   *  row entered (editing=true) or left (editing=false) inline-edit mode, so it
+   *  can manage the arrow cursor that would otherwise frame the input. */
+  private _notifyCreateRowEdit(nodeId: string, editing: boolean): void {
+    this.dispatchEvent(
+      new CustomEvent("create-row-edit", {
+        bubbles: true,
+        composed: true,
+        detail: { nodeId, editing },
+      }),
+    );
+  }
+
+  /** Remove the arrow-cursor highlight (inline background/box-shadow) from the
+   *  create row about to be edited, so the input isn't visually selected. */
+  private _clearCreateRowHighlight(): void {
+    const id = this._newEntry?.id;
+    if (!id) return;
+    // The create-row id is `new:<branch>::<path>::<kind>` — only `\` and `"`
+    // need escaping inside a quoted attribute selector (CSS.escape is absent
+    // in the jsdom test environment).
+    const sel = `[data-node-id="${id.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"]`;
+    const trees = this.renderRoot.querySelectorAll("openp41ge-tree");
+    for (const t of trees) {
+      const row = (t as unknown as { shadowRoot?: ShadowRoot | null }).shadowRoot?.querySelector(
+        sel,
+      );
+      if (row instanceof HTMLElement) {
+        row.style.background = "";
+        row.style.boxShadow = "";
+        return;
+      }
+    }
+  }
+
+  private _cancelNewEntry(restoreFocus = false): void {
+    if (!this._newEntry) return;
+    const id = this._newEntry.id;
+    this._newEntry = null;
+    this._newEntryName = "";
+    this.requestUpdate();
+    // Escape from the inline input should restore the arrow cursor on the
+    // create row so keyboard navigation continues from where it was.
+    if (restoreFocus) this._notifyCreateRowEdit(id, false);
+  }
+
+  /** Create the file/folder, refresh the directory listing, and (for files)
+   *  open the new file in the editor. */
+  private async _confirmNewEntry(
+    branch: string,
+    parentPath: string,
+    kind: "folder" | "file",
+  ): Promise<void> {
+    const name = this._newEntryName.trim();
+    this._cancelNewEntry();
+    if (!name) return;
+
+    // Block creating an entry whose name already exists in the target dir.
+    if (this._nameExistsInDir(branch, parentPath, name)) {
+      toastService.show(`"${name}" already exists in this folder`, "error", 4000);
+      return;
+    }
+
+    const base = parentPath.endsWith("/") ? parentPath : parentPath + "/";
+    const target = base + name;
+    try {
+      if (kind === "folder") {
+        const res = await window.openp41ge.file.mkdir(target);
+        if (!res.success) throw new Error(`Could not create folder "${name}"`);
+        toastService.show(`Folder "${name}" created`, "success");
+      } else {
+        const res = await window.openp41ge.file.writeFile(target, "");
+        if (!res.success) throw new Error(`Could not create file "${name}"`);
+        toastService.show(`File "${name}" created`, "success");
+        // Open the newly created file so the user can start editing it.
+        document.dispatchEvent(
+          new CustomEvent("openp41ge:open-file", { detail: { path: target, name, pinned: false } }),
+        );
+      }
+      await this._refreshDirAfterCreate(branch, parentPath);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toastService.show(msg, "error", 5000);
+    }
+  }
+
+  /** Re-read the directory that just gained a file/folder so the create row
+   *  reflects the new entry (root uses the worktree cache, subs use dir cache). */
+  private async _refreshDirAfterCreate(branch: string, parentPath: string): Promise<void> {
+    const onUpdate = () => {
+      if (this.isConnected) this.requestUpdate();
+    };
+    const root = this._worktreeRootPath(branch);
+    if (parentPath === root) {
+      this._fileLoader.worktreeFiles.delete(branch);
+      await this._fileLoader.expandWorktreeFiles(branch, root, this.repoName, onUpdate);
+    } else {
+      this._fileLoader.dirContents.delete(parentPath);
+      await this._fileLoader.expandDir(branch, parentPath, onUpdate);
+    }
+  }
+
+  // ── Subtree refresh (right-click) ─────────────────────────────────────
+
+  /** Re-read a folder subtree: clears its cache and reloads the visible dirs.
+   *  Used by the folder context menu's “Refresh” action so a change can be
+   *  pulled in without refreshing the whole worktree. */
+  async refreshDir(branch: string, dirPath: string): Promise<void> {
+    const onUpdate = () => {
+      if (this.isConnected) this.requestUpdate();
+    };
+    this._fileLoader.clearDirContents(branch, dirPath);
+    // Reload the target dir, then each of its currently-expanded descendants so
+    // the whole visible subtree is fresh (prefetching repopulates the rest).
+    await this._fileLoader.expandDir(branch, dirPath, onUpdate);
+    const dirs = this._expandedDirs.get(branch);
+    if (dirs) {
+      const prefix = dirPath.endsWith("/") ? dirPath : dirPath + "/";
+      for (const d of [...dirs].filter((p) => p.startsWith(prefix)).sort()) {
+        await this._fileLoader.expandDir(branch, d, onUpdate);
+      }
+    }
+    this.requestUpdate();
+  }
+
+  /** Re-read a single worktree's file tree (files + folders). The worktree's
+   *  existence/branch list is owned by the panel refresh; this only reloads
+   *  the cached directory listings. */
+  async refreshWorktree(branch: string): Promise<void> {
+    const onUpdate = () => {
+      if (this.isConnected) this.requestUpdate();
+    };
+    const root = this._worktreeRootPath(branch);
+    this._fileLoader.clearWorktreeFiles(branch);
+    this._fileLoader.clearWorktreeDirs(root);
+    if (this._expandedWorktrees.has(branch)) {
+      await this._fileLoader.expandWorktreeFiles(branch, root, this.repoName, onUpdate);
+    }
+    await this._refreshExpandedDirs(branch, onUpdate);
+    this.requestUpdate();
+  }
+
+  /** Re-read every cached directory of this repo (all worktrees). Used by the
+   *  repo context menu's “Refresh” and by external-change invalidation. */
+  async refreshRepo(): Promise<void> {
+    const onUpdate = () => {
+      if (this.isConnected) this.requestUpdate();
+    };
+    for (const wt of this.worktrees) {
+      const root = this._worktreeRootPath(wt.branch);
+      this._fileLoader.clearWorktreeFiles(wt.branch);
+      this._fileLoader.clearWorktreeDirs(root);
+      if (this._expandedWorktrees.has(wt.branch)) {
+        await this._fileLoader.expandWorktreeFiles(wt.branch, root, this.repoName, onUpdate);
+      }
+      await this._refreshExpandedDirs(wt.branch, onUpdate);
+    }
+    this.requestUpdate();
+  }
+
+  /** Reload the currently-expanded directories of one worktree. */
+  private async _refreshExpandedDirs(branch: string, onUpdate: () => void): Promise<void> {
+    const dirs = this._expandedDirs.get(branch);
+    if (!dirs) return;
+    for (const d of [...dirs].sort()) {
+      await this._fileLoader.expandDir(branch, d, onUpdate);
+    }
+  }
+
+  /**
+   * Handle a filesystem change reported by the main-process watcher.
+   *
+   * Refreshes the cached directory listing(s) that would show the change. A
+   * change to `changedPath` alters the listing of its parent directory, and —
+   * when the path itself is a cached directory — its own listing too. If the
+   * change is at a worktree root (a whole worktree folder created/deleted), a
+   * `repo-structure-changed` event is emitted so the panel reloads the repo's
+   * worktree list.
+   *
+   * Returns true when the path is inside this item's repo (handled).
+   */
+  handleExternalChange(changedPath: string): boolean {
+    const changed = changedPath.replace(/\/+$/, "");
+    let touched = false;
+    for (const wt of this.worktrees) {
+      const root = this._worktreeRootPath(wt.branch);
+      if (changed === root) {
+        // Whole worktree folder created/deleted — panel reloads the repo.
+        this.dispatchEvent(
+          new CustomEvent("repo-structure-changed", {
+            bubbles: true,
+            detail: { repoName: this.repoName },
+          }),
+        );
+        touched = true;
+        continue;
+      }
+      if (!changed.startsWith(root + "/")) continue;
+      touched = true;
+      this._refreshPathsForChange(wt.branch, root, changed);
+    }
+    return touched;
+  }
+
+  /** Refresh the cached listings affected by a change at `changed` (inside `root`). */
+  private _refreshPathsForChange(branch: string, root: string, changed: string): void {
+    const onUpdate = () => {
+      if (this.isConnected) this.requestUpdate();
+    };
+    const parent = changed.substring(0, changed.lastIndexOf("/")) || "/";
+    const toRefresh = new Set<string>();
+    if (parent === root && this._fileLoader.isWorktreeLoaded(branch)) {
+      toRefresh.add(root);
+    } else if (this._fileLoader.hasDir(parent)) {
+      toRefresh.add(parent);
+    }
+    // A cached directory itself changing (e.g. its mtime) — refresh its listing.
+    if (changed !== parent && this._fileLoader.hasDir(changed)) {
+      toRefresh.add(changed);
+    }
+    for (const dir of toRefresh) {
+      if (dir === root) {
+        void this._fileLoader.expandWorktreeFiles(branch, root, this.repoName, onUpdate);
+      } else {
+        void this._fileLoader.expandDir(branch, dir, onUpdate);
+      }
+    }
   }
 
   /** Icon renderer for tree nodes — renders <openp41ge-icon> for known icon names, <file-extension-svg> for files. */
   private _renderIcon: IconRenderer = (name: string, size: number) => {
-    // Icon registry names (folder-closed, git-branch, etc.)
+    // A duplicate create name: the + is rotated 45° into a red cross to flag it.
+    if (name === "new-duplicate") {
+      return html`<span
+        style="color:var(--tree-error,#e81123); display:inline-flex;
+        transform:rotate(45deg);"
+        >${unsafeHTML(plusIconThick(11))}</span
+      >`;
+    }
+    // Icon registry names (folder-closed, git-branch, new-folder/new-file, etc.)
+    if (name === "new-folder" || name === "new-file") {
+      // Plus icon marks these as “add this kind of entry” rows. Rendered at 11px
+      // to match the “+ add worktree” / “+ add repository” rows. Uses the row's
+      // own text colour (currentColor) so it matches the row text.
+      return html`<span>${unsafeHTML(plusIconThick(11))}</span>`;
+    }
     if (name.startsWith("folder") || name.startsWith("git") || name.startsWith("chevron")) {
       return html`<openp41ge-icon name=${name} size=${size}></openp41ge-icon>`;
     }
@@ -900,13 +1377,26 @@ export class Openp41geRepoTreeItem extends LitElement {
       | {
           branch?: string;
           filePath?: string;
+          newEntry?: "folder" | "file";
+          parentPath?: string;
           match?: boolean;
           line?: number;
           column?: number;
           matchIndex?: number;
         }
       | undefined;
-    if (!meta?.filePath) return;
+    if (!meta) return;
+    // A “+ add folder” / “+ add file” row — switch it to an inline input.
+    // Skip if this row is already the one being edited (clicking the input or
+    // its confirm/cancel buttons must not restart the inline edit).
+    if (meta.newEntry && meta.branch && meta.parentPath !== undefined) {
+      const id = this._newEntryId(meta.branch, meta.parentPath, meta.newEntry);
+      if (this._newEntry?.id !== id) {
+        this._beginNewEntry(meta.branch, meta.parentPath, meta.newEntry);
+      }
+      return;
+    }
+    if (!meta.filePath) return;
     const name = meta.filePath.split("/").pop() ?? meta.filePath;
     const detail: Record<string, unknown> = { path: meta.filePath, name, pinned: false };
     // A content-match row carries the line/column to jump to, plus the query
@@ -936,8 +1426,29 @@ export class Openp41geRepoTreeItem extends LitElement {
   };
 
   private _onFileContextMenu = (e: CustomEvent): void => {
-    const meta = e.detail?.meta as { branch?: string; filePath?: string } | undefined;
+    const meta = e.detail?.meta as
+      { branch?: string; filePath?: string; newEntry?: string; isDirectory?: boolean } | undefined;
     if (!meta) return;
+    // Create rows have no file path — right-clicking them shouldn't surface the
+    // worktree context menu.
+    if (meta.newEntry) return;
+    // Folder rows get their own context menu (e.g. “Refresh”) so a refresh can
+    // target just this subtree instead of the whole worktree.
+    if (meta.isDirectory && meta.branch && meta.filePath) {
+      this.dispatchEvent(
+        new CustomEvent("folder-contextmenu", {
+          bubbles: true,
+          detail: {
+            repoName: this.repoName,
+            branch: meta.branch,
+            path: meta.filePath,
+            x: e.detail.clientX,
+            y: e.detail.clientY,
+          },
+        }),
+      );
+      return;
+    }
     this.dispatchEvent(
       new CustomEvent("worktree-contextmenu", {
         bubbles: true,
@@ -979,9 +1490,9 @@ export class Openp41geRepoTreeItem extends LitElement {
   private _renderWorktreeFileTree(branch: string): TemplateResult {
     const nodes = this._buildFileTreeNodes(branch);
     const virtualize = countVisibleRows(nodes) > VIRTUALIZE_ROW_THRESHOLD;
-    return html`<div class="wt-expanded-wt-block border-b border-[#232323]">
+    return html`<div class="wt-expanded-wt-block">
       <openp41ge-tree
-        style="--tree-font-size:12px;--tree-indent:20px;--tree-row-height:30px;${this._themeTokenVars()}"
+        style="--tree-font-size:12px;--tree-indent:${this.indentSize}px;--tree-row-height:30px;${this._themeTokenVars()}"
         .nodes=${nodes}
         .renderIcon=${this._renderIcon}
         .onToggle=${this._makeDirToggle(branch)}
@@ -989,7 +1500,7 @@ export class Openp41geRepoTreeItem extends LitElement {
         .virtualize=${virtualize}
         .scrollContainer=${virtualize ? this._panelScrollContainer() : null}
         .rowHeight=${TREE_ROW_HEIGHT}
-        depth="0"
+        depth="2"
         @tree-node-click=${this._onFileClick}
         @tree-node-dblclick=${this._onFileDblClick}
         @tree-node-contextmenu=${this._onFileContextMenu}
@@ -1029,54 +1540,17 @@ export class Openp41geRepoTreeItem extends LitElement {
            uikit tree's shadow DOM; the tree reads --cm-* custom properties set
            inline on the <openp41ge-tree> element. */
 
-        /* End-of-row action buttons only appear when hovering the row: a flat
-           fill defines the tile while visible, and hovering the row fades the
-           buttons in (they are kept pointer-inert while hidden). */
-        .repo-header-btn,
-        .wt-row-btn {
-          width: 20px;
-          height: 20px;
-          box-sizing: border-box;
-          border-radius: 5px;
-          background: var(--bg-hover, #2a2d2e);
-          opacity: 0;
-          pointer-events: none;
-          transition:
-            opacity 0.05s ease,
-            color 0.1s;
-        }
-        .wt-row-header:hover .repo-header-btn,
-        .wt-row-header:hover .wt-row-btn {
-          opacity: 1;
-          pointer-events: auto;
-        }
-        .repo-header-btn:hover,
-        .wt-row-btn:hover {
-          background: var(--bg-hover-strong, #3a3d3f);
-        }
-        .repo-header-btn:hover svg {
-          color: var(--accent, #4a9eff);
-        }
-        .wt-row-btn:hover svg {
-          color: var(--accent, #4a9eff);
-        }
-        .wt-row-btn svg {
-          transition: color 0.1s;
-        }
         .wt-row-header:hover {
           background-color: var(--bg-hover, #2a2d2e);
         }
         .add-worktree-row:hover {
           background-color: var(--bg-hover, #2a2d2e);
         }
-        .wt-row-btn svg {
-          transition: color 0.1s;
-        }
         #wt-addwt-input:focus {
           outline: none !important;
         }
-        #wt-addwt-row.duplicate-name:focus-within {
-          outline-color: #e81123 !important;
+        #wt-addwt-row.duplicate-name #wt-addwt-input {
+          color: #e81123;
         }
         #wt-addwt-row .p41ge-icon-btn:disabled {
           opacity: 0.4;
@@ -1085,13 +1559,14 @@ export class Openp41geRepoTreeItem extends LitElement {
       </style>
       <div class="select-none">
         <!-- Repo header -->
-        <div class="relative bg-gutter h-[30px] border-b border-[#232323] pointer-events-none">
+        <div class="relative bg-gutter h-[30px] pointer-events-none">
           <!-- Inner wrapper: receives all pointer events -->
           <div
             draggable="true"
             data-repo-row
             data-repo="${this.repoName}"
-            class="pointer-events-auto flex items-center h-[30px] px-2 pl-3 pr-3 cursor-pointer text-sm text-[#ccc] gap-1 transition-colors duration-100 wt-row-header"
+            class="pointer-events-auto flex items-center h-[30px] pr-3 cursor-pointer text-sm text-[#ccc] gap-[2px] transition-colors duration-100 wt-row-header"
+            style="padding-left:${8}px"
             @click=${this._toggleExpand}
             @contextmenu=${(e: MouseEvent) => {
               e.preventDefault();
@@ -1108,33 +1583,19 @@ export class Openp41geRepoTreeItem extends LitElement {
               );
             }}
           >
-            <span class="text-muted w-[10px] flex items-center justify-center"
+            <span class="text-muted w-4 flex items-center justify-center shrink-0"
               ><openp41ge-icon
                 name=${this._expanded ? "chevron-down" : "chevron-right"}
-                size="10"
+                size="12"
               ></openp41ge-icon
             ></span>
-            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+            <span class="w-4 flex items-center justify-center shrink-0"
+              >${unsafeHTML(repoIcon(14))}</span
+            >
+            <span class="pl-1 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
               >${this.repoName}</span
             >
             ${this._repoWarn()}
-            ${html`
-              <!-- Refresh button -->
-              <span
-                class="repo-header-btn w-5 h-5 flex items-center justify-center rounded cursor-pointer shrink-0 text-muted transition-colors duration-100"
-                title="Refresh"
-                @click=${(e: MouseEvent) => {
-                  e.stopPropagation();
-                  this.dispatchEvent(
-                    new CustomEvent("repo-refresh", {
-                      bubbles: true,
-                      detail: { repoName: this.repoName },
-                    }),
-                  );
-                }}
-                >${unsafeHTML(refreshIcon(14))}</span
-              >
-            `}
           </div>
         </div>
 
@@ -1175,10 +1636,21 @@ export class Openp41geRepoTreeItem extends LitElement {
     });
   }
 
-  private _cancelAddWorktree(): void {
+  private _cancelAddWorktree(restoreFocus = false): void {
     this._addWorktreeName = "";
     this._showingAddWorktree = false;
     this.requestUpdate();
+    // Escape should hand DOM focus back to the Explorer panel so the next
+    // ArrowUp/Down moves the cursor instead of scrolling. The panel listens
+    // for this and grabs focus (blur/confirm don't restore).
+    if (restoreFocus) {
+      this.dispatchEvent(
+        new CustomEvent("explorer-panel-focus", {
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    }
   }
 
   private _confirmAddWorktree(): void {

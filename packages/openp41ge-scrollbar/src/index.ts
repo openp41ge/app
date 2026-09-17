@@ -360,7 +360,11 @@ export class OverlayScrollbar {
   private _mo: MutationObserver | null = null;
   private _raf = 0;
 
-  private constructor(target: HTMLElement, container: HTMLElement, options: OverlayScrollbarOptions) {
+  private constructor(
+    target: HTMLElement,
+    container: HTMLElement,
+    options: OverlayScrollbarOptions,
+  ) {
     this._target = target;
     this._container = container;
     this._axis = options.axis ?? "vertical";
@@ -449,6 +453,10 @@ export class OverlayScrollbar {
     const text = `
       [data-overlay-scrollbar]::-webkit-scrollbar { width: 0 !important; height: 0 !important; }
       .os-track { position: absolute; z-index: 20; pointer-events: auto; box-sizing: border-box;
+        /* The thumb animates with a springy easing that overshoots its target
+           position; hide the overshoot by clipping it to the track box instead
+           of letting it stick out past the end (or get cut by the container). */
+        overflow: hidden;
         opacity: 1; transition: opacity ${OVERLAY_FADE_MS}ms ease; }
       .os-track.os-hidden { opacity: 0; pointer-events: none; }
       .os-track--v { border-left: 1px solid rgba(128,128,128,0.25); }
@@ -567,9 +575,10 @@ export class OverlayScrollbar {
     const thumbLen = axis === "vertical" ? state.thumb.offsetHeight : state.thumb.offsetWidth;
     const travel = trackLen - thumbLen;
     if (travel <= 0) return;
-    const thumbPos = axis === "vertical"
-      ? state.thumb.offsetTop - state.track.offsetTop
-      : state.thumb.offsetLeft - state.track.offsetLeft;
+    const thumbPos =
+      axis === "vertical"
+        ? state.thumb.offsetTop - state.track.offsetTop
+        : state.thumb.offsetLeft - state.track.offsetLeft;
     const frac = (startPos - state.track.offsetTop - thumbPos) / travel;
     const targetScroll =
       (axis === "vertical" ? this._target.scrollHeight : this._target.scrollWidth) -

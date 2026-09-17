@@ -390,6 +390,13 @@ describe("ExplorerSystemTab search", () => {
           }
           return [];
         },
+        // The Explorer prefetches nested listings (explorer.prefetchDepth), so a
+        // directory read can come in as a DirSnapshot instead of a flat list.
+        readTree: async (dir: string) => ({
+          path: dir,
+          entries: await window.openp41ge.file.readdir(dir),
+          children: [],
+        }),
       },
       workspaceController: {
         getBranches: async () => [],

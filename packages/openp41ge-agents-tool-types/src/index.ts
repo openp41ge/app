@@ -7,8 +7,8 @@
  * interface (Liskov substitution — an error is data, not a control-flow exit).
  *
  * This package is the single source of truth for the tool interfaces so that
- * individual tool packages (read_file, search_files, run_command, …) and the
- * openp41ge host can share the same types without a circular dependency.
+ * individual tool packages (read_file, search_files, …) and the openp41ge
+ * host can share the same types without a circular dependency.
  */
 
 /** JSON Schema for a tool's parameters (subset of JSON Schema that vLLM/OpenAI accept). */
@@ -30,7 +30,15 @@ export interface ToolDefinition {
 export interface ToolExecutionContext {
   /** Working directory for relative-path resolutions / command execution. */
   cwd?: string;
-  /** Scope roots the tool is allowed to operate within (v1: informational only). */
+  /**
+   * Scope roots the tool is allowed to operate within.
+   *
+   * When `roots` is provided, the tool MUST restrict its file access to paths
+   * inside one of these roots and report an in-band `error` otherwise. An empty
+   * array (`[]`) means there is nothing in scope and the tool must deny the
+   * operation. When `roots` is `undefined` the tool has no scope restriction
+   * (legacy callers / direct tool usage).
+   */
   roots?: string[];
 }
 

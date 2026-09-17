@@ -245,15 +245,15 @@ describe("Controller lifecycle — integration", () => {
 
   describe("PlaceholderController specific", () => {
     it("creates a placeholder with the correct app type label", () => {
-      const ctrl = new PlaceholderController("t1", "terminal");
+      const ctrl = new PlaceholderController("t1", "file-explorer");
       ctrl.mount(container);
 
-      expect(container.innerHTML).toContain("Terminal");
+      expect(container.innerHTML).toContain("File Explorer");
       expect(container.innerHTML).toContain("×"); // close button
     });
 
     it("unmounts placeholder and cleans DOM", () => {
-      const ctrl = new PlaceholderController("t1", "terminal");
+      const ctrl = new PlaceholderController("t1", "file-explorer");
       ctrl.mount(container);
       ctrl.unmount();
 

@@ -116,7 +116,6 @@ describe("AgentsController", () => {
         listTools: async () => [
           { name: "read_file", description: "Read a file." },
           { name: "search_files", description: "Search files." },
-          { name: "run_command", description: "Run a command." },
         ],
       },
     };

@@ -28,7 +28,7 @@ export { VllmChatProvider } from "./services/vllm-chat-provider.js";
 export { ToolRegistry } from "./services/tool-registry.js";
 export { registerBuiltinTools } from "./services/node-tool-executor.js";
 export { AgentRuntime } from "./services/agent-runtime.js";
-export type { AgentRuntimeConfig } from "./services/agent-runtime.js";
+export type { AgentRuntimeConfig, ConnectedWorktree } from "./services/agent-runtime.js";
 export type { AgentRuntimeHooks } from "./services/agent-runtime-hooks.js";
 export type {
   ChatProvider,

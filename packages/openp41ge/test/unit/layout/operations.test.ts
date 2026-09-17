@@ -626,14 +626,14 @@ describe("addColumnTab", () => {
     expect(result.windows[0].grid.placements).toHaveLength(2);
   });
 
-  test("defaults appType to terminal", () => {
+  test("defaults appType to blank", () => {
     const ws = types.createWorkspace("ws1");
     const winId = ws.windows[0].id;
 
     const result = ops.addColumnTab(ws, winId);
 
     const tabId = result.windows[0].grid.placements[0].tabIds[0];
-    expect(result.editorTabs[tabId].appType).toBe("terminal");
+    expect(result.editorTabs[tabId].appType).toBe("blank");
   });
 });
 

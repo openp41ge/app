@@ -28,7 +28,6 @@ describe("App type registration — integration", () => {
   describe("APP_TYPES registry contains expected entries", () => {
     it("has all required app types", () => {
       const ids = APP_TYPES.map((t) => t.id).sort();
-      expect(ids).toContain("terminal");
       expect(ids).toContain("file-explorer");
       expect(ids).toContain("file-viewer");
       expect(ids).toContain("markdown");
@@ -53,11 +52,11 @@ describe("App type registration — integration", () => {
   });
 
   describe("Controller factory from app type", () => {
-    it("creates a PlaceholderController for terminal type", () => {
-      const ctrl = createControllerForAppType("terminal", "t1");
+    it("creates a PlaceholderController for file-explorer type", () => {
+      const ctrl = createControllerForAppType("file-explorer", "t1");
       expect(ctrl).toBeInstanceOf(PlaceholderController);
       expect(ctrl.tabId).toBe("t1");
-      expect(ctrl.appType).toBe("terminal");
+      expect(ctrl.appType).toBe("file-explorer");
     });
 
     it("created controller implements full TabController interface", () => {
@@ -114,7 +113,7 @@ describe("App type registration — integration", () => {
     });
 
     it("controller mounts produce container with flex layout", () => {
-      const ctrl = createControllerForAppType("terminal", "t-flex");
+      const ctrl = createControllerForAppType("file-explorer", "t-flex");
       const container = document.createElement("div");
       ctrl.mount(container);
 
@@ -132,9 +131,9 @@ describe("App type registration — integration", () => {
       expect(fv?.description).toContain("View file");
     });
 
-    it("terminal has the correct label", () => {
-      const term = APP_TYPES.find((t) => t.id === "terminal");
-      expect(term?.label).toBe("Terminal");
+    it("file-explorer has the correct label", () => {
+      const fv = APP_TYPES.find((t) => t.id === "file-explorer");
+      expect(fv?.label).toBe("File Explorer");
     });
   });
 });

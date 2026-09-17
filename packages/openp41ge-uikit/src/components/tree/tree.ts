@@ -43,7 +43,7 @@ export {
   type TreeToggleErrorEventDetail,
 } from "./types";
 
-const INDENT = 16; // pixels per depth level
+const DEFAULT_INDENT = 16; // pixels per depth level (default for --tree-indent)
 const SECTION_EXTRA = 8; // extra indent for section headers
 
 export class Openp41geTree extends LitElement {
@@ -669,6 +669,13 @@ export class Openp41geTree extends LitElement {
     return this._labelOffsetCache;
   }
 
+  /** The indentation unit added per depth level (px), read from --tree-indent. */
+  private _indentPerLevel(): number {
+    const cs = getComputedStyle(this);
+    const v = parseInt(cs.getPropertyValue("--tree-indent").trim() || "0", 10);
+    return Number.isFinite(v) && v > 0 ? v : DEFAULT_INDENT;
+  }
+
   private _resolveIcon(name: string | undefined, size: number): TemplateResult | string {
     if (!name) return "";
     if (this.renderIcon) {
@@ -682,7 +689,7 @@ export class Openp41geTree extends LitElement {
     return html` <span class="tree-chevron">
       <openp41ge-icon
         name=${expanded ? "chevron-down" : "chevron-right"}
-        size="10"
+        size="12"
       ></openp41ge-icon>
     </span>`;
   }
@@ -801,14 +808,12 @@ export class Openp41geTree extends LitElement {
     const isFocusable = this._focusableNodeId === node.id;
     const isLoading = this._loadingNodeIds.has(node.id);
 
-    // Indentation: section headers get extra left padding
-    const extraIndent = parseInt(
-      getComputedStyle(this).getPropertyValue("--tree-indent").trim() || "0",
-      10,
-    );
+    // Indentation: the indent unit per depth level is configurable via
+    // --tree-indent (a fixed px value, changed in the explorer settings).
+    const indentPerLevel = this._indentPerLevel();
     const rowIndent = isSection
-      ? depth * INDENT + SECTION_EXTRA + extraIndent
-      : depth * INDENT + extraIndent;
+      ? depth * indentPerLevel + SECTION_EXTRA
+      : depth * indentPerLevel;
     // A node may opt to be pulled back toward its parent (e.g. content-match
     // rows rendered as children of a file), reducing its effective indent.
     const appliedIndent = Math.max(0, rowIndent - (node.reduceIndent ?? 0));
@@ -827,7 +832,7 @@ export class Openp41geTree extends LitElement {
           depth,
           paddingLeft: rowIndent + contentPad,
           labelOffset,
-          indentPerLevel: INDENT,
+          indentPerLevel,
         })
       : node.label;
 
@@ -852,11 +857,15 @@ export class Openp41geTree extends LitElement {
           "has-children": hasChildren,
           "is-loading": isLoading,
           "tree-node--cm": !!node.renderLabel,
+          "tree-node--muted": !!node.muted,
           [statusClass]: !!node.status,
         })}"
         style=${styleMap({
           paddingLeft: `${appliedIndent + contentPad}px`,
-          paddingRight: "8px",
+          // Create rows (“+ add file” / “+ add folder”) are full-width rows whose
+          // confirm/cancel buttons must sit flush against the right edge, so they
+          // opt out of the standard 8px right padding.
+          paddingRight: node.id.startsWith("new:") ? "0px" : "8px",
         })}
         role="treeitem"
         tabindex=${isFocusable ? "0" : "-1"}
@@ -874,14 +883,18 @@ export class Openp41geTree extends LitElement {
         @dragover=${this._onDragOver}
         @drop=${(e: DragEvent) => this._onDrop(e, node)}
       >
-        <!-- Chevron (▶/▼) / Loading spinner -->
+        <!-- Action cell: chevron (▶/▼), custom action icon (e.g. + on create
+             rows), or a loading spinner. Always the same width, so every row's
+             action icon occupies identical space regardless of row type. -->
         <span class="tree-chevron-cell" @click=${(e: Event) => this._onChevronClick(e, node)}>
           ${
             isLoading
               ? this._renderSpinner()
-              : showChevron
-                ? this._renderChevron(expanded)
-                : nothing
+              : node.actionIcon
+                ? this._resolveIcon(node.actionIcon, 11)
+                : showChevron
+                  ? this._renderChevron(expanded)
+                  : nothing
           }
         </span>
 

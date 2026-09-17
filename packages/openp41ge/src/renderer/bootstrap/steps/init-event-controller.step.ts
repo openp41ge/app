@@ -14,6 +14,7 @@ import { createTabHandlers } from "../../handlers/tabs.handlers";
 import { createLayoutHandlers } from "../../handlers/layout.handlers";
 import { initDebugAPI } from "../../debug-api";
 import { workspaceFileService } from "../../services/workspace-file-service";
+import { clearCapturedErrors } from "../../services/error-capture-service";
 import { setEventRouter } from "../../app";
 import { emitOpenSystemTab } from "../../components/openp41ge-worktree-controller";
 
@@ -111,6 +112,11 @@ export class InitEventControllerStep implements IStartupStep {
       if (!workspaceFileService.openData || !path_) return;
       if (path_ === lastOpenedFilePath) return;
       lastOpenedFilePath = path_;
+      // A workspace is actively loaded — dismiss any stale errors captured by
+      // a previous session / hot reload (the error capture service restores
+      // them from sessionStorage on boot, which would otherwise keep the
+      // blocking overlay pinned even after the underlying cause is fixed).
+      clearCapturedErrors();
       const ws = context.workspaceState.getWorkspace();
       const winId = ws?.windows?.[0]?.id;
       if (winId) {

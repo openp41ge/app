@@ -157,9 +157,9 @@ describe("AgentRuntime", () => {
 
   it("respects the max-turns guard for a chat that keeps calling tools", async () => {
     const loopTool: AgentTool = {
-      name: "run_command",
-      description: "run",
-      parameters: { type: "object", properties: { command: { type: "string" } } },
+      name: "read_file",
+      description: "read",
+      parameters: { type: "object", properties: { path: { type: "string" } } },
       execute: async () => ({ content: "ok" }),
     };
     ctx.tools.register(loopTool);
@@ -168,8 +168,8 @@ describe("AgentRuntime", () => {
         {
           type: "tool_call",
           id: "call_loop",
-          name: "run_command",
-          arguments: '{"command":"echo"}',
+          name: "read_file",
+          arguments: '{"path":"/a"}',
         },
       ],
     ]);
@@ -184,5 +184,73 @@ describe("AgentRuntime", () => {
     // The number of assistant tool-call messages never exceeds the turn cap.
     const toolCalls = stored.messages.flatMap((m) => m.toolCalls ?? []);
     expect(toolCalls.length).toBeLessThanOrEqual(8);
+  });
+
+  it("forwards the connected-worktree roots to the tool execution context", async () => {
+    let capturedCtx: unknown;
+    const scopedTool: AgentTool = {
+      name: "read_file",
+      description: "read",
+      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+      execute: async (_args, toolCtx) => {
+        capturedCtx = toolCtx;
+        return { content: "x" };
+      },
+    };
+    ctx.tools.register(scopedTool);
+
+    const scopedRuntime = new AgentRuntime(ctx.store, ctx.providers, ctx.tools, ctx.hooks, {
+      getProviderConfig: () => ({ baseUrl: "http://x", model: "m", temperature: 0.2 }),
+      getConnectedWorktrees: async () => [
+        { repo: "github.com/org/repo", branch: "main", path: "/worktrees/main" },
+        { repo: "github.com/org/repo", branch: "feature-x", path: "/worktrees/feature-x" },
+      ],
+    });
+
+    const provider = makeFakeProvider([
+      [
+        {
+          type: "tool_call",
+          id: "call_1",
+          name: "read_file",
+          arguments: '{"path":"/worktrees/main/a.ts"}',
+        },
+      ],
+      [{ type: "text", text: "done" }],
+    ]);
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await scopedRuntime.send(chat.id, "win-a", "go");
+
+    // The tool receives every connected-worktree path as its scope roots.
+    expect(capturedCtx).toEqual({ cwd: undefined, roots: ["/worktrees/main", "/worktrees/feature-x"] });
+  });
+
+  it("tells the provider about the connected worktrees in the system prompt", async () => {
+    let systemContent: string | undefined;
+    const provider: ChatProvider = {
+      id: "fake",
+      label: "Fake",
+      ping: async () => true,
+      async *streamChat(req: ChatStreamRequest): AsyncIterable<ProviderDelta> {
+        systemContent = req.messages[0]?.content;
+        yield { type: "text", text: "done" };
+      },
+    };
+    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
+
+    const scopedRuntime = new AgentRuntime(ctx.store, ctx.providers, ctx.tools, ctx.hooks, {
+      getProviderConfig: () => ({ baseUrl: "http://x", model: "m", temperature: 0.2 }),
+      getConnectedWorktrees: async () => [
+        { repo: "github.com/org/repo", branch: "main", path: "/worktrees/main" },
+      ],
+    });
+
+    const chat = ctx.store.create({ providerId: "fake" });
+    await scopedRuntime.send(chat.id, "win-a", "hi");
+
+    expect(systemContent).toContain("[github.com/org/repo] branch main: /worktrees/main");
+    expect(systemContent).toContain("scoped");
   });
 });

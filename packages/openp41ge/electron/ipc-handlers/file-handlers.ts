@@ -255,6 +255,15 @@ function matchesForContent(
   });
 }
 
+/** How many levels of subdirectory listings a single `file:readTree` may return. */
+const MAX_READ_TREE_DEPTH = 4;
+
+/** Normalise a requested prefetch depth to an integer within [0, MAX_READ_TREE_DEPTH]. */
+function clampPrefetchDepth(depth: unknown): number {
+  const n = typeof depth === "number" && Number.isFinite(depth) ? Math.round(depth) : 0;
+  return Math.max(0, Math.min(MAX_READ_TREE_DEPTH, n));
+}
+
 export function registerFileHandlers(
   fileSystem: ElectronFileSystem,
   gitService: NodeGitService,
@@ -262,6 +271,14 @@ export function registerFileHandlers(
 ): void {
   ipcMain.handle("file:readdir", async (_event, dirPath: string) => {
     return fileSystem.readdir(dirPath);
+  });
+
+  // Read a directory down to `depth` levels of subdirectory listings so the
+  // renderer can open the next levels without a round trip. Depth is clamped
+  // to a sane ceiling to bound the IPC payload for large trees.
+  ipcMain.handle("file:readTree", async (_event, dirPath: string, depth?: number) => {
+    const d = clampPrefetchDepth(depth);
+    return fileSystem.readTree(dirPath, d);
   });
 
   ipcMain.handle("file:stat", async (_event, filePath: string) => {
@@ -284,6 +301,15 @@ export function registerFileHandlers(
 
   ipcMain.handle("file:writeFile", async (_event, filePath: string, content: string) => {
     return fileSystem.writeFile(filePath, content);
+  });
+
+  ipcMain.handle("file:mkdir", async (_event, dirPath: string) => {
+    try {
+      await fileSystem.mkdir(dirPath);
+      return { success: true, path: dirPath };
+    } catch {
+      return { success: false, path: dirPath };
+    }
   });
 
   // ── File scope/search ────────────────────────────────────────────────────

@@ -5,10 +5,11 @@
  * This file covers only the APIs used by openp41ge-filesystem services.
  */
 
-import type { FileEntry } from "./types";
+import type { FileEntry, DirSnapshot } from "./types";
 
 interface Openp41geFileAPI {
   readdir(path: string): Promise<FileEntry[]>;
+  readTree(path: string, depth: number): Promise<DirSnapshot>;
 }
 
 interface Openp41geWorkspaceControllerAPI {

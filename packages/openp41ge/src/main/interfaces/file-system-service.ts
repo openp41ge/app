@@ -5,6 +5,8 @@
  * All methods are async and throw on error (callers handle errors).
  */
 
+import type { DirSnapshot } from "openp41ge-filesystem";
+
 export interface FileEntryInfo {
   name: string;
   path: string;
@@ -21,6 +23,12 @@ export interface ChunkedReadResult {
 export interface IFileSystemService {
   /** Read a directory, returning sorted entries (directories first, then alphabetical). */
   readdir(dirPath: string): Promise<FileEntryInfo[]>;
+
+  /**
+   * Read a directory and its subdirectory listings down to `depth` levels.
+   * Returns a nested DirSnapshot for opening the next levels without a round trip.
+   */
+  readTree(dirPath: string, depth: number): Promise<DirSnapshot>;
 
   /** Stat a single file or directory path. Returns null if not found. */
   stat(filePath: string): Promise<FileEntryInfo | null>;

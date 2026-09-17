@@ -52,3 +52,22 @@
   border-left: 1px solid var(--divider, #333);
   border-right: 1px solid var(--divider, #333);
 }
+
+/* Explorer tree-wide refresh button: on a LEFT-docked bar it sits flush
+   against the bar's outer edge and takes over the bar's removed 8px left
+   padding as its own left padding (set inline via style). Switching to
+   content-box keeps the square content area (so the icon stays where it was)
+   while the padding grows the button outward, making it non-square (the icon
+   sits off-centre relative to the button tile). */
+.wt-refresh-btn {
+  box-sizing: content-box;
+}
+
+/* Vertical separator line on the right of the explorer's collapse-all button,
+   splitting the refresh/collapse group off from the rest of the bar. */
+.sb-bottom-sep {
+  width: 1px;
+  height: 100%;
+  flex-shrink: 0;
+  background: var(--divider, #333);
+}

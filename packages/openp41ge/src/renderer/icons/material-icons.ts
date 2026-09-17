@@ -208,3 +208,18 @@ export function getFileIcon(filename: string): string {
   // Final fallback: default file icon
   return getIcon("file") ?? "";
 }
+
+/**
+ * Returns true only when `filename` is an EXACT match for a known file type
+ * (a known file name, or a known extension). Used by the explorer's
+ * "+ new file" row to switch its plus glyph to the detected file-type icon
+ * while the name is being typed — no fuzzy/partial matches.
+ */
+export function hasExactFileIcon(filename: string): boolean {
+  if (!filename) return false;
+  const fileNameMatch = fileNameMap[filename];
+  if (fileNameMatch && iconMap.has(fileNameMatch)) return true;
+  const ext = filename.split(".").pop()?.toLowerCase();
+  if (ext && extensionMap[ext] && iconMap.has(extensionMap[ext])) return true;
+  return false;
+}

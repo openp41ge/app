@@ -5,6 +5,7 @@ import type {
   FileEntryInfo,
   ChunkedReadResult,
 } from "../interfaces/file-system-service.js";
+import type { DirSnapshot } from "openp41ge-filesystem";
 
 /**
  * Electron main-process file system service.
@@ -48,6 +49,28 @@ export class ElectronFileSystem implements IFileSystemService {
     });
 
     return result;
+  }
+
+  /**
+   * Read a directory and its subdirectory listings down to `depth` levels,
+   * returning a nested snapshot so the renderer can open the next levels
+   * without a round trip. Depth 0 returns just the immediate children.
+   */
+  async readTree(dirPath: string, depth: number): Promise<DirSnapshot> {
+    const resolved = path.resolve(dirPath);
+    const entries = await this.readdir(resolved);
+    const children: DirSnapshot[] = [];
+    if (depth > 0) {
+      for (const entry of entries) {
+        if (!entry.isDirectory) continue;
+        try {
+          children.push(await this.readTree(entry.path, depth - 1));
+        } catch {
+          // Unreadable subdirectory — skip it; the next level loads on demand.
+        }
+      }
+    }
+    return { path: resolved, entries, children };
   }
 
   async stat(filePath: string): Promise<FileEntryInfo | null> {

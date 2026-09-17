@@ -110,6 +110,24 @@ export function plusIconThick(size?: number): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size ?? 16}" height="${size ?? 16}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`;
 }
 
+/** Check / confirm icon */
+export function checkIcon(size?: number): string {
+  return icon(
+    "0 0 16 16",
+    [`<path d="M3 8.5L6.5 12L13 4.5"/>`],
+    size,
+  );
+}
+
+/** Close / cancel (cross) icon */
+export function closeIcon(size?: number): string {
+  return icon(
+    "0 0 16 16",
+    [`<line x1="3.5" y1="3.5" x2="12.5" y2="12.5"/>`, `<line x1="12.5" y1="3.5" x2="3.5" y2="12.5"/>`],
+    size,
+  );
+}
+
 /** Git branch icon — for worktree rows */
 export function gitBranchIcon(size?: number): string {
   return icon(
@@ -259,10 +277,48 @@ export function searchIcon(size?: number): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>`;
 }
 
+/** Git worktree icon (Material) — a branch/merge glyph for worktree rows.
+ * The descriptor icon for worktree rows and the "+ add worktree" row in the
+ * Explorer's uniform [action icon][description icon]<name> layout. */
+export function worktreeIcon(size?: number): string {
+  const s = size ?? 16;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="M543.5-63.5Q520-87 520-120q0-23 11-41t29-29v-221q-18-11-29-28.5T520-480q0-33 23.5-56.5T600-560q33 0 56.5 23.5T680-480q0 23-11 40.5T640-411v115l160-53v-62q-18-11-29-28.5T760-480q0-33 23.5-56.5T840-560q33 0 56.5 23.5T920-480q0 23-11 40.5T880-411v119l-240 80v22q18 11 29 29t11 41q0 33-23.5 56.5T600-40q-33 0-56.5-23.5ZM160-160v-560 560Zm0 0q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640H447l-80-80H160v480h280v80H160Z"/></svg>`;
+}
+
+/** Git repository icon (Material) — a repo/fork glyph for repo rows.
+ * The descriptor icon for repo rows and the "+ add repository" row in the
+ * Explorer's uniform [action icon][description icon]<name> layout. */
+export function repoIcon(size?: number): string {
+  const s = size ?? 16;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="M160-240v-480 520-40Zm0 80q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640v200h-80v-200H447l-80-80H160v480h200v80H160ZM584-56 440-200l144-144 56 57-87 87 87 87-56 57Zm192 0-56-57 87-87-87-87 56-57 144 144L776-56Z"/></svg>`;
+}
+
+/** Collapse-all icon (Material) — chevrons pointing inward/up-down, for the
+ * Explorer bottom-bar "collapse all rows" button. Uses currentColor so the
+ * button's colour controls the icon like the other bar buttons. */
+export function collapseAllIcon(size?: number): string {
+  const s = size ?? 24;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="m296-80-56-56 240-240 240 240-56 56-184-184L296-80Zm184-504L240-824l56-56 184 184 184-184 56 56-240 240Z"/></svg>`;
+}
+
 /** Settings gear icon (Material) — for sidebar bottom-bar settings buttons.
  * Uses currentColor so the button's colour controls the icon (grey off,
  * white on hover / when the settings grid tab is open). */
 export function settingsIcon(size?: number): string {
   const s = size ?? 24;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></svg>`;
+}
+
+/** Lock-open (unlocked) icon (Material) — the slider unlock toggle. Uses
+ * currentColor so the button's colour controls the icon. */
+export function lockOpenIcon(size?: number): string {
+  const s = size ?? 16;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="M240-640h360v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85h-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640Zm0 480h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM240-160v-400 400Z"/></svg>`;
+}
+
+/** Lock-closed (locked) icon (Material) — the slider lock toggle. Uses
+ * currentColor so the button's colour controls the icon. */
+export function lockClosedIcon(size?: number): string {
+  const s = size ?? 16;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="${s}" height="${s}" fill="currentColor"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></svg>`;
 }

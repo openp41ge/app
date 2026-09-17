@@ -1,4 +1,4 @@
-import { fileIcon, docIcon, terminalIcon, gridIcon, playIcon, chatIcon } from "./icons";
+import { fileIcon, docIcon, gridIcon, playIcon, chatIcon } from "./icons";
 
 /** Metadata for an available pane type. */
 export interface AppTypeInfo {
@@ -10,12 +10,6 @@ export interface AppTypeInfo {
 
 /** Registry of all app types a user can create. */
 export const APP_TYPES: AppTypeInfo[] = [
-  {
-    id: "terminal",
-    label: "Terminal",
-    icon: terminalIcon(16),
-    description: "Shell / command line",
-  },
   { id: "file-explorer", label: "File Explorer", icon: fileIcon(16), description: "Browse files" },
   { id: "markdown", label: "Markdown Notes", icon: docIcon(16), description: "Write notes" },
   { id: "table", label: "Interactive Table", icon: gridIcon(16), description: "Data table" },

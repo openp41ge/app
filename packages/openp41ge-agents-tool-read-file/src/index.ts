@@ -19,14 +19,44 @@ function resolvePath(p: string | undefined, ctx: ToolExecutionContext): string |
   return path.isAbsolute(p) ? p : path.resolve(ctx.cwd ?? process.cwd(), p);
 }
 
+/**
+ * Whether `p` lies at or under `root`. Paths are compared lexically (after
+ * resolving `.`/`..`) so `root` itself counts, but a sibling like
+ * `/root-evil` under `/root` does not.
+ */
+function isWithin(p: string, root: string): boolean {
+  const rel = path.relative(root, p);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+/**
+ * Enforce the connected-worktree scope. Returns an in-band error string when
+ * the path is not inside one of `ctx.roots`; `null` when it is allowed.
+ *
+ * - `roots` undefined → no scope restriction (legacy / direct tool usage).
+ * - `roots` empty → nothing connected → deny every read.
+ * - `roots` non-empty → path must be within a root.
+ */
+function scopeError(p: string, ctx: ToolExecutionContext): string | null {
+  if (ctx.roots === undefined) return null;
+  if (ctx.roots.length === 0) {
+    return `read_file: no connected worktrees in scope`;
+  }
+  if (!ctx.roots.some((root) => isWithin(p, root))) {
+    return `read_file: path is outside the connected worktrees ('${p}')`;
+  }
+  return null;
+}
+
 /** Clamp content length so a huge file doesn't flood the model context. */
 const MAX_READ_BYTES = 50_000;
 
 const tool: AgentTool = {
   name: "read_file",
   description:
-    "Read the contents of a text file. Provide an absolute or cwd-relative path. Optionally " +
-    "limit the size read.",
+    "Read the contents of a text file from the connected worktrees. Provide an absolute or " +
+    "cwd-relative path. Optionally limit the size read. Paths outside the connected worktrees " +
+    "(including the bare repo) are rejected.",
   parameters: {
     type: "object",
     properties: {
@@ -40,6 +70,8 @@ const tool: AgentTool = {
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext) {
     const p = resolvePath(args.path as string | undefined, ctx);
     if (!p) return { content: "read_file: missing 'path'", error: "missing 'path'" };
+    const denied = scopeError(p, ctx);
+    if (denied) return { content: "", error: denied };
     try {
       const offset = typeof args.offset === "number" ? args.offset : 0;
       const maxLength =

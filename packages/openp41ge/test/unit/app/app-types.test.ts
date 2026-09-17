@@ -11,7 +11,6 @@ import { APP_TYPES } from "@openp41ge/renderer/app-types";
 describe("APP_TYPES (unit)", () => {
   test("contains all expected app types", () => {
     const ids = APP_TYPES.map((t) => t.id);
-    expect(ids).toContain("terminal");
     expect(ids).toContain("file-explorer");
     expect(ids).toContain("markdown");
     expect(ids).toContain("table");

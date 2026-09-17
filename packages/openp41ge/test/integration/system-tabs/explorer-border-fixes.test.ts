@@ -8,11 +8,9 @@
  *    drops the last child's bottom border (same mechanism as the Workspaces
  *    overlay list).
  *
- * 2. Boundary below an open worktree's borderless file block — the expanded
- *    file tree gets exactly one bottom border on its own block (a wrapper),
- *    so whichever row follows (next worktree header, add-worktree row, next
- *    repo header, or add-repo row) renders below a single 1px line and no row
- *    ever doubles.
+ * 2. Borderless rows — the Explorer no longer draws separator lines above or
+ *    below repo/worktree/file rows. The expanded worktree's file block and
+ *    every row wrapper stay border-free.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -146,23 +144,22 @@ describe("Explorer sidebar border fixes", () => {
     await item._toggleWorktreeFiles("wt-a", "/repo/a");
     await (item as unknown as { updateComplete: Promise<unknown> }).updateComplete;
 
-    // The open block is wrapped in a single bottom-border container.
-    const wrapper = item.querySelector("div.wt-expanded-wt-block.border-b.border-\\[\\#232323\\]");
+    // The open block wrapper is fully borderless — the worktree/file area no
+    // longer draws separator lines above or below any row.
+    const wrapper = item.querySelector("div.wt-expanded-wt-block");
     expect(wrapper).not.toBeNull();
     expect(wrapper!.querySelector("openp41ge-tree")).not.toBeNull();
-    // wrapper owns the boundary: bottom border only — never a top border.
-    expect(wrapper!.className).toContain("border-b");
-    expect(wrapper!.className).not.toMatch(/border-t/);
-    // The uikit tree itself stays borderless (border lives on the wrapper).
+    // No border on the wrapper and none on the uikit tree itself.
+    expect(wrapper!.className).not.toMatch(/border/);
     expect(wrapper!.querySelector("openp41ge-tree")!.className).not.toMatch(/border/);
 
-    // The next worktree header is NOT the source of a separator (no top
-    // border anywhere — the boundary lives on the open block's bottom border).
+    // No row wrapper (worktree headers, repo header) carries any border —
+    // separators are gone from the whole Explorer tree.
     const headerRows = item.querySelectorAll(".wt-row-header");
     expect(headerRows.length).toBeGreaterThanOrEqual(2); // repo + worktree headers
     for (const row of Array.from(headerRows)) {
       const outer = row.closest("div[class]") as HTMLElement | null;
-      expect(outer?.className ?? "").not.toMatch(/border-t/);
+      expect(outer?.className ?? "").not.toMatch(/border/);
     }
 
     // Collapse → the boundary wrapper disappears again.

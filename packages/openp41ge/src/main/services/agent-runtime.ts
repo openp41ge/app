@@ -32,13 +32,42 @@ import { AGENT_MAX_TURNS } from "openp41ge-constants";
 const log = createLogger("openp41ge", "AgentRuntime");
 
 const DEFAULT_SYSTEM_PROMPT =
-  "You are a helpful coding agent inside Openp41ge. You can use tools to read files, " +
-  "search, and run commands. When you use a tool, explain briefly what you found. " +
-  "Be concise.";
+  "You are a helpful coding agent inside Openp41ge. You can use tools to read and search " +
+  "files. When you use a tool, explain briefly what you found. Be concise.";
+
+/** A worktree visible in the explorer — what the agent's file tools are scoped to. */
+export interface ConnectedWorktree {
+  /** Repo identifier as shown in the explorer (e.g. "github.com/org/repo"). */
+  repo: string;
+  /** Checked-out branch name. */
+  branch: string;
+  /** Absolute path of the worktree directory. */
+  path: string;
+}
 
 export interface AgentRuntimeConfig {
   /** Resolve the persisted config for a provider id, or null when unconfigured. */
   getProviderConfig(providerId: string): ChatProviderConfig | null;
+  /**
+   * Resolve the connected worktrees (visible in the explorer) that the agent's
+   * file tools are allowed to touch. Return an empty array when nothing is
+   * connected (tools must deny all file access). Omit to keep the previous
+   * unrestricted behaviour.
+   */
+  getConnectedWorktrees?(): Promise<ConnectedWorktree[]>;
+}
+
+/**
+ * The system prompt, with the connected-worktree scope appended so the model
+ * knows exactly which paths its file tools may read and search.
+ */
+function buildSystemPrompt(connected: ConnectedWorktree[] | undefined): string {
+  if (connected === undefined) return DEFAULT_SYSTEM_PROMPT;
+  if (connected.length === 0) {
+    return `${DEFAULT_SYSTEM_PROMPT}\n\nNo connected worktrees. The file tools (read_file, search_files) are scoped and cannot access anything.`;
+  }
+  const lines = connected.map((w) => `- [${w.repo}] branch ${w.branch}: ${w.path}`);
+  return `${DEFAULT_SYSTEM_PROMPT}\n\nConnected worktrees you may read and search (file tools are scoped to these):\n${lines.join("\n")}`;
 }
 
 /** A tool call accumulated from streamed deltas, awaiting execution. */
@@ -141,13 +170,21 @@ export class AgentRuntime {
       const ping = await provider.ping();
       this._setStatus(winId, chatId, { streaming: true, providerOk: ping });
 
-      // 3. Agent loop.
+      // 3. Resolve the connected-worktree scope for this send, then run the
+      //    agent loop. When no scope resolver is configured, `connected` stays
+      //    undefined and tools keep the previous unrestricted behaviour.
+      const connected = this._config.getConnectedWorktrees
+        ? await this._config.getConnectedWorktrees()
+        : undefined;
+
+      // 4. Agent loop.
       await this._runLoop(
         chatId,
         winId,
         provider,
         controller.signal,
         cwd,
+        connected,
         enabledTools,
         thinkingLevel,
       );
@@ -188,9 +225,14 @@ export class AgentRuntime {
     provider: ChatProvider,
     signal: AbortSignal,
     cwd?: string,
+    connected?: ConnectedWorktree[],
     enabledTools?: string[],
     thinkingLevel?: string,
   ): Promise<void> {
+    // Roots = the connected worktree paths; undefined when no scope is
+    // configured (legacy behaviour). Empty when nothing is connected (deny).
+    const roots = connected !== undefined ? connected.map((c) => c.path) : undefined;
+    const systemContent = buildSystemPrompt(connected);
     let turns = 0;
     while (!signal.aborted && turns < AGENT_MAX_TURNS) {
       turns += 1;
@@ -200,7 +242,7 @@ export class AgentRuntime {
       const system: ChatMessage = {
         id: this._id("sys"),
         role: "system",
-        content: DEFAULT_SYSTEM_PROMPT,
+        content: systemContent,
         timestamp: Date.now(),
       };
       const requestMessages: ChatMessage[] = [system, ...chat.messages];
@@ -244,7 +286,8 @@ export class AgentRuntime {
       // Execute accumulated tool calls and feed results back to the provider.
       for (const tc of toolCalls) {
         if (signal.aborted) break;
-        const result = await this._tools.execute(tc.name, parseArgs(tc.arguments), { cwd });
+        const ctx = roots !== undefined ? { cwd, roots } : { cwd };
+        const result = await this._tools.execute(tc.name, parseArgs(tc.arguments), ctx);
         const chatNow = this._store.get(chatId);
         if (!chatNow) break;
         const tool = chatNow.messages.flatMap((m) => m.toolCalls ?? []).find((t) => t.id === tc.id);

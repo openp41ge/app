@@ -167,6 +167,21 @@ export const treeStyles = css`
     font-size: var(--tree-section-font-size, 13px);
   }
 
+  /* Muted create rows (“+ add file” / “+ add folder”) dim the label text to
+     the secondary grey so they read like the sidebar's add-worktree rows. */
+  .tree-node--muted .tree-label {
+    color: var(--tree-muted, var(--text-muted, #666));
+  }
+  /* Muted create rows also dim the action icon (+ glyph) and the description
+     icon (folder/file) to the same colour as the row text, so every icon and
+     the label on the add rows share one colour. */
+  .tree-node--muted .tree-icon-cell,
+  .tree-node--muted .tree-chevron-cell {
+    color: var(--tree-muted, var(--text-muted, #666));
+  }
+  /* Create rows (“+ new file” / “+ new folder”) have no bottom border — they
+     are flat rows like the rest of the file list, not separated action rows. */
+
   /* ─── Actions (hover) ───────────────────────────────────── */
 
   .tree-actions {
@@ -279,6 +294,72 @@ export const treeStyles = css`
     pointer-events: none;
     background: var(--tree-selected-bg, rgba(74, 158, 255, 0.12));
   }
+
+  /* ─── Inline create-row input ("+ new file" / "+ new folder") ──── */
+  .tree-new-entry-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    /* Slide the confirm/cancel buttons clear of the panel's overlay scrollbar
+       when it appears, mirroring the sidebar's --wt-sb-offset. */
+    padding-right: var(--wt-sb-offset, 0px);
+    transition: padding-right 150ms ease;
+  }
+  .tree-new-entry-input {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    height: var(--tree-row-height, 26px);
+    background: transparent;
+    border: none;
+    color: var(--tree-label-fg, var(--text-primary, #d4d4d4));
+    font: inherit;
+    font-size: var(--tree-font-size, 13px);
+    padding: 0 4px;
+    outline: none;
+  }
+  /* Confirm/Cancel buttons. Matches the full-height, square, bordered look of
+     the p41ge-icon-btn class used by the "add worktree" / "add repository" rows. */
+  .tree-new-entry-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: var(--tree-muted, var(--text-secondary, #999));
+    cursor: pointer;
+    transition: color 80ms, background 80ms;
+  }
+  .tree-new-entry-btn + .tree-new-entry-btn {
+    /* No separator between the confirm/cancel buttons. */
+  }
+  /* No leading cap separator on the confirm button either. */
+  .tree-new-entry-confirm {
+    /* border-left removed */
+  }
+  .tree-new-entry-btn:hover {
+    color: var(--tree-label-fg, var(--text-primary, #fff));
+    background: var(--tree-hover-bg, var(--bg-hover, rgba(255, 255, 255, 0.06)));
+  }
+  .tree-new-entry-input::placeholder {
+    color: var(--tree-placeholder, var(--text-secondary, #999));
+  }
+  /* A create name that already exists in the directory keeps its normal text
+     color — the invalid state is flagged by the row's + icon rotating into a
+     red cross. The confirm button is dimmed/disabled so it can't be pressed. */
+  .tree-new-entry-row.duplicate .tree-new-entry-confirm {
+    color: var(--tree-muted, var(--text-secondary, #999));
+    opacity: 0.4;
+    pointer-events: none;
+  }
   .tree-node--cm:focus-visible {
     box-shadow: none;
   }
@@ -289,6 +370,22 @@ export const treeStyles = css`
     z-index: 2;
     pointer-events: none;
     box-shadow: inset 0 0 0 1px var(--tree-focus, var(--border-focus, #4a9eff));
+  }
+  /* While a create row is being edited, suppress the selection/focus overlay
+     so the inline input is never dimmed by a background or ring. */
+  .tree-node--cm:has(.tree-new-entry-input) {
+    box-shadow: none;
+  }
+  .tree-node--cm:has(.tree-new-entry-input)::after {
+    content: none;
+    display: none;
+  }
+  .tree-node--cm:has(.tree-new-entry-input).selected {
+    background: transparent;
+  }
+  .tree-node--cm:has(.tree-new-entry-input):hover,
+  .tree-node--cm:has(.tree-new-entry-input).selected:hover {
+    background: transparent;
   }
 
   /* ─── Virtualized tree — flat scroll container ─────────────── */

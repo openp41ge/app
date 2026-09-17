@@ -61,6 +61,13 @@ export interface TreeNode {
   /** Show a chevron toggle before the icon (default: true for nodes with children) */
   showChevron?: boolean;
   /**
+   * Optional action icon rendered in the chevron/action cell instead of the
+   * chevron (e.g. a "+" for create rows). When set it always occupies the
+   * action cell, keeping the row layout uniform regardless of whether the
+   * node has children.
+   */
+  actionIcon?: string;
+  /**
    * Mark as expandable even when children[] is empty (for async/lazy loading).
    * When true, clicking the node toggles it and calls onToggle (if set) instead
    * of firing tree-node-click.
@@ -71,6 +78,9 @@ export interface TreeNode {
    * can style via theme variables (e.g. --tree-status-untracked-opacity).
    */
   status?: "untracked" | "pending" | "warning" | "error" | "success";
+  /** When true, the row's label text renders in the muted/secondary grey
+   *  (e.g. for "+ new file" / "+ new folder" create rows). */
+  muted?: boolean;
   /** Optional label rendered after the main label (e.g. "(pending)") */
   badge?: string;
   /** App-specific metadata passed through events */
