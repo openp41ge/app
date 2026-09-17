@@ -31,7 +31,29 @@ describe("Openp41geAgents (custom element)", () => {
 
     el.setUsage({ promptTokens: 1_200, completionTokens: 34, totalTokens: 1_234 });
     await el.updateComplete;
-    expect(bar.querySelector(".bb-usage")?.textContent).toBe("1,200 in · 34 out · 1,234 total");
+    const usage = bar.querySelector(".bb-usage") as HTMLElement;
+    expect(usage).toBeTruthy();
+    // Compact 1K formatting + direction arrows (down = rotated up icon).
+    const arrows = usage.querySelectorAll(".bb-arrow");
+    expect(arrows).toHaveLength(2);
+    expect(arrows[0].classList.contains("down")).toBe(false);
+    expect(arrows[1].classList.contains("down")).toBe(true);
+    expect(usage.textContent).toContain("K");
+    expect(usage.textContent).toContain("total");
+    expect(usage.textContent).not.toContain("1,200");
+  });
+
+  it("shortens large token counts to K/M", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setUsage({ promptTokens: 1_500_000, completionTokens: 2_300, totalTokens: 1_502_300 });
+    await el.updateComplete;
+    const usage = el.shadowRoot!.querySelector(".bb-usage") as HTMLElement;
+    expect(usage.textContent).toContain("1.5M");
+    expect(usage.textContent).toContain("2.3K");
+    expect(usage.textContent).toContain("total");
   });
 
   it("shows no empty-state placeholder when there are no messages", async () => {

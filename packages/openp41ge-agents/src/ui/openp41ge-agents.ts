@@ -276,12 +276,27 @@ class Openp41geAgents extends LitElement {
   }
 
   /** Short human-readable token usage line for the bottom bar. */
-  private _formatUsage(u: TokenUsage): string {
-    return `${this._fmtTok(u.promptTokens)} in · ${this._fmtTok(u.completionTokens)} out · ${this._fmtTok(u.totalTokens)} total`;
+  private _formatUsage(u: TokenUsage): TemplateResult {
+    return html`${this._arrow(false)}${this._fmtTok(u.promptTokens)} · ${this._arrow(true)}${this._fmtTok(
+      u.completionTokens,
+    )} · ${this._fmtTok(u.totalTokens)} total`;
   }
 
+  /** Compact 1K/1M token formatting. */
   private _fmtTok(n: number): string {
-    return n.toLocaleString("en-US");
+    if (n >= 1_000_000) return this._trimZero(n / 1_000_000) + "M";
+    if (n >= 1_000) return this._trimZero(n / 1_000) + "K";
+    return String(n);
+  }
+
+  private _trimZero(v: number): string {
+    const s = v.toFixed(1).replace(/\.0$/, "");
+    return s;
+  }
+
+  /** Small direction arrow: up by default, rotated 180° for down. */
+  private _arrow(down: boolean): TemplateResult {
+    return html`<svg class="bb-arrow${down ? " down" : ""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11 20V7.825l-5.6 5.6L4 12l8-8l8 8l-1.4 1.425l-5.6-5.6V20z"/></svg>`;
   }
 
   // ─── Back-compat API ────────────────────────────────────────────────
@@ -1659,6 +1674,17 @@ class Openp41geAgents extends LitElement {
           letter-spacing: normal;
           font-weight: 500;
           color: var(--text-secondary, #9a9a9a);
+        }
+        .bb-arrow {
+          width: 0.85em;
+          height: 0.85em;
+          display: inline-block;
+          vertical-align: -0.1em;
+          margin-right: 2px;
+          fill: currentColor;
+        }
+        .bb-arrow.down {
+          transform: rotate(180deg);
         }
         .chat-status {
           padding: 4px 12px;
