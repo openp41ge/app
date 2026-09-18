@@ -37,7 +37,6 @@ import {
   type AgentConfig,
   type ModelConfig,
   type ProviderConfig,
-  type ProviderPreset,
 } from "../models/agent-provider-presets";
 
 /** A draft provider config (numeric fields held as text while editing). */
@@ -524,14 +523,17 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     this._pushProviderLayer(layerId, "Provider", id);
   }
 
-  private _pushProviderLayer(layerId: string, title: string, providerId: string): void {
-    this.host?.open({
-      id: layerId,
-      title,
-      closable: true,
-      styles: AGDS_CSS,
-      render: () => this._renderProviderEditor(layerId),
-    }, this.side);
+  private _pushProviderLayer(layerId: string, title: string, _providerId: string): void {
+    this.host?.open(
+      {
+        id: layerId,
+        title,
+        closable: true,
+        styles: AGDS_CSS,
+        render: () => this._renderProviderEditor(layerId),
+      },
+      this.side,
+    );
   }
 
   /** Open a model editor layer. */
@@ -557,13 +559,16 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     }
     const layerId = this._genId();
     this._modelCtx.set(layerId, { draft: modelDraft, providerLayerId, modelIndex });
-    this.host?.open({
-      id: layerId,
-      title,
-      closable: true,
-      styles: AGDS_CSS,
-      render: () => this._renderModelEditor(layerId),
-    }, this.side);
+    this.host?.open(
+      {
+        id: layerId,
+        title,
+        closable: true,
+        styles: AGDS_CSS,
+        render: () => this._renderModelEditor(layerId),
+      },
+      this.side,
+    );
   }
 
   /** Commit a model draft into its provider draft (live), then refresh. */
@@ -634,7 +639,6 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   /** Close a provider layer: commit draft + maybe delete empty new provider. */
   private _closeProviderLayer(layerId: string): void {
     const editId = this._providerEditId.get(layerId);
-    const draft = this._providerDrafts.get(layerId);
     const created = this._providerCreated.has(layerId);
     if (created && editId) {
       const p = this._config?.providers[editId];
@@ -695,7 +699,9 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   render(): TemplateResult {
     const entries = this._providerEntries();
     return html`
-      <style>${AGDS_CSS}</style>
+      <style>
+        ${AGDS_CSS}
+      </style>
 
       <div class="agds-pane">
         <p class="agds-section-title">Providers</p>
@@ -768,7 +774,9 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
       return html`
         <p class="agds-section-title" style="margin-top:18px;">Tools</p>
         <div class="agds-card">
-          <label class="agds-card-question">Which tools should agents be able to use in this workspace?</label>
+          <label class="agds-card-question"
+            >Which tools should agents be able to use in this workspace?</label
+          >
           <p class="agds-card-help">Loading…</p>
         </div>
       `;
@@ -779,8 +787,8 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     if (!this._hasWorkspace) {
       body = html`
         <p class="agds-card-help">
-          Agent tools are enabled per workspace. Open a workspace first to choose
-          which tools its agents may use.
+          Agent tools are enabled per workspace. Open a workspace first to choose which tools its
+          agents may use.
         </p>
       `;
     } else if (tools.length === 0) {
@@ -796,22 +804,24 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
                 aria-pressed=${this._enabledTools.has(tool.name)}
                 @click=${() => void this._toggleAgentTool(tool.name)}
               >
-                <span class="agds-tool-check" aria-hidden="true">${
-                  this._enabledTools.has(tool.name) ? "✓" : nothing
-                }</span>
+                <span class="agds-tool-check" aria-hidden="true"
+                  >${this._enabledTools.has(tool.name) ? "✓" : nothing}</span
+                >
                 <span class="agds-tool-body">
                   <span class="agds-tool-name">${tool.name}</span>
-                  ${tool.description
-                    ? html`<span class="agds-tool-desc">${tool.description}</span>`
-                    : nothing}
+                  ${
+                    tool.description
+                      ? html`<span class="agds-tool-desc">${tool.description}</span>`
+                      : nothing
+                  }
                 </span>
               </button>
             `,
           )}
         </div>
         <p class="agds-card-help">
-          Enabled tools are passed to agents when they run in this workspace. Tools
-          you disable here are withheld, even if a chat's composer still lists them.
+          Enabled tools are passed to agents when they run in this workspace. Tools you disable here
+          are withheld, even if a chat's composer still lists them.
         </p>
       `;
     }
@@ -819,7 +829,9 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     return html`
       <p class="agds-section-title" style="margin-top:18px;">Tools</p>
       <div class="agds-card">
-        <label class="agds-card-question">Which tools should agents be able to use in this workspace?</label>
+        <label class="agds-card-question"
+          >Which tools should agents be able to use in this workspace?</label
+        >
         ${body}
       </div>
     `;
@@ -853,9 +865,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
           >
             ${PROVIDER_PRESETS.map((p) => html`<option value=${p.id}>${p.label}</option>`)}
           </select>
-          <p class="agds-card-help">
-            Picking a preset pre-fills the endpoint and default model.
-          </p>
+          <p class="agds-card-help">Picking a preset pre-fills the endpoint and default model.</p>
         </div>
 
         <div class="agds-card agds-input-card" style="margin-top:14px;">
@@ -937,9 +947,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
             @input=${(e: Event) =>
               this._setModelDraft(layerId, { id: (e.target as HTMLInputElement).value })}
           />
-          <p class="agds-card-help">
-            The exact model id used when requesting chat completions.
-          </p>
+          <p class="agds-card-help">The exact model id used when requesting chat completions.</p>
         </div>
 
         <div class="agds-card agds-input-card" style="margin-top:14px;">
@@ -976,7 +984,10 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
           ${
             ctx.modelIndex !== null
               ? html`
-                  <button class="agds-delete" @click=${() => this._deleteModel(layerId, ctx.providerLayerId, ctx.modelIndex!)}>
+                  <button
+                    class="agds-delete"
+                    @click=${() => this._deleteModel(layerId, ctx.providerLayerId, ctx.modelIndex!)}
+                  >
                     Delete model
                   </button>
                 `

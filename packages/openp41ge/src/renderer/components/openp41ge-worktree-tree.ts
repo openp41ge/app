@@ -734,7 +734,7 @@ class Openp41geWorktreeTree extends LitElement {
       buildOptions: (boxes, onOptionsChanged) => {
         return this._buildRepoFilterOptions(boxes, onOptionsChanged);
       },
-      search: (query, opts, results) => {
+      search: (query, opts) => {
         this._applyExplorerSearch(query, opts);
       },
     };

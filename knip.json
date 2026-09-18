@@ -2,7 +2,11 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "tags": ["+@public"],
   "ignoreIssues": {
-    "package.json": ["unresolved"]
+    "package.json": ["unresolved"],
+    "packages/openp41ge/src/layout/types.ts": ["duplicates"],
+    "packages/openp41ge/src/renderer/global.d.ts": ["unresolved"],
+    "packages/openp41ge-editor-engine/src/global.d.ts": ["unresolved"],
+    "storybook/.storybook/main.ts": ["unresolved"]
   },
   "workspaces": {
     ".": {
@@ -18,7 +22,7 @@
     "packages/openp41ge": {
       "entry": ["src/main/index.ts", "electron/main.ts", "electron/preload.cjs"],
       "project": ["src/**/*.ts", "electron/**/*.{ts,cjs}"],
-      "ignoreDependencies": ["ts-node"],
+      "ignoreDependencies": ["ts-node", "@xterm/xterm", "@xterm/addon-fit"],
       "ignore": [
         "src/renderer/components/openp41ge-bottom-bar.ts",
         "src/renderer/components/sidebar-views/index.ts",
@@ -34,7 +38,18 @@
         "src/renderer/services/index.ts",
         "src/layout/index.ts",
         "src/index.ts",
-        "electron/trpc/index.ts"
+        "electron/trpc/index.ts",
+
+        // Terminal tab app: unregistered for now but kept for easy re-enable.
+        "src/renderer/apps/terminal/index.ts",
+        "src/renderer/apps/terminal/terminal-controller.ts",
+
+        // Legacy in-repo syntax highlighting, superseded by the
+        // openp41ge-syntax-highlighting package.
+        "src/renderer/controllers/syntax-highlight.ts",
+        "src/renderer/controllers/syntax-highlight/index.ts",
+        "src/renderer/controllers/syntax-highlight/registry.ts",
+        "src/renderer/controllers/syntax-highlight/tokenizers/*.ts"
       ],
       "ignoreExportsUsedInFile": {
         "interface": true,
@@ -47,6 +62,10 @@
     "packages/openp41ge-terminal": {
       "project": ["src/**/*.ts"]
     },
+    "packages/openp41ge-editor-engine": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/global.d.ts"]
+    },
     "packages/openp41ge-agents": {
       "project": ["src/**/*.ts"]
     },
@@ -56,6 +75,15 @@
         "interface": true,
         "type": true
       }
+    },
+    "storybook": {
+      "entry": [
+        ".storybook/main.ts",
+        ".storybook/extensions/event-log/preset.ts",
+        ".storybook/extensions/event-log/manager.tsx"
+      ],
+      "project": [".storybook/**/*"],
+      "ignoreDependencies": ["openp41ge-uikit"]
     },
     "demos/openp41ge-tabs-demo": {
       "ignoreDependencies": ["openp41ge-uikit"]

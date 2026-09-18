@@ -23,7 +23,6 @@
     "@xterm/xterm": "^6.0.0",
     "lit": "^3.3.3",
     "openp41ge-uikit": "workspace:*",
-    "openp41ge-piece-tree": "workspace:*",
     "openp41ge-git": "workspace:*",
     "openp41ge-logger": "workspace:*",
     "openp41ge-constants": "workspace:*",
@@ -33,8 +32,7 @@
     "openp41ge-agents": "workspace:*",
     "openp41ge-agents-tool-types": "workspace:*",
     "openp41ge-agents-tool-read-file": "workspace:*",
-    "openp41ge-agents-tool-search-files": "workspace:*",
-    "openp41ge-agents-tool-run-command": "workspace:*"
+    "openp41ge-agents-tool-search-files": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
