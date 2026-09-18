@@ -2016,8 +2016,9 @@ class Openp41geAgents extends LitElement {
         mark.chat-hit {
           background: rgba(255, 200, 0, 0.28);
           color: inherit;
+          font: inherit;
+          letter-spacing: inherit;
           border-radius: 2px;
-          padding: 0 1px;
         }
         mark.chat-hit-active {
           background: rgba(255, 165, 0, 0.55);
