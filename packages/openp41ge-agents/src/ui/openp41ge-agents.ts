@@ -2044,7 +2044,7 @@ class Openp41geAgents extends LitElement {
           padding: 2px 2px 2px 6px;
           font: inherit;
           color: var(--text-secondary, #9a9a9a);
-          cursor: pointer;
+          cursor: not-allowed;
           user-select: none;
         }
 .bb-stat:hover {
