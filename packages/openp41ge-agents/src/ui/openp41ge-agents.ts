@@ -2026,7 +2026,7 @@ class Openp41geAgents extends LitElement {
           width: 1.8em;
           height: 1.8em;
           display: inline-block;
-          vertical-align: -0.30em;
+          vertical-align: -0.55em;
           margin-left: 2px;
           margin-right: 1px;
           fill: currentColor;
