@@ -7,11 +7,6 @@
     "openp41ge-uikit": "workspace:*"
   },
   "devDependencies": {
-    "vite": "^6.0.0",
-    "@playwright/test": "^1.62.0"
-  },
-  "scripts": {
-    "test:e2e": "playwright test --config test/e2e/playwright.config.mjs",
-    "e2e": "playwright test --config test/e2e/playwright.config.mjs"
+    "vite": "^6.0.0"
   }
 }
