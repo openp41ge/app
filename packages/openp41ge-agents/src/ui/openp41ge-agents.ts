@@ -2028,7 +2028,7 @@ class Openp41geAgents extends LitElement {
           display: inline-block;
           vertical-align: -0.463em;
           margin-left: 2px;
-          margin-right: 1px;
+          margin-right: 0px;
           fill: currentColor;
           transform: rotate(45deg);
         }
@@ -2047,7 +2047,7 @@ class Openp41geAgents extends LitElement {
           cursor: pointer;
           user-select: none;
         }
-        .bb-stat:hover {
+.bb-stat:hover {
           background: var(--bg-hover, #2a2d2e);
           color: var(--text-primary, #ddd);
         }
