@@ -2879,6 +2879,14 @@ class Openp41geAgents extends LitElement {
 
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
+
+      <div class="chat-scroll">
+        <div class="chat-messages">
+          ${this._messages.map((msg) => this._renderMessage(msg))}
+          ${this._waitingForReply() ? this._renderThinking() : html``}
+        </div>
+      </div>
+
       ${
         this._searchOpen
           ? html`<div class="chat-findbar">
@@ -2925,12 +2933,6 @@ class Openp41geAgents extends LitElement {
           : html``
       }
 
-      <div class="chat-scroll">
-        <div class="chat-messages">
-          ${this._messages.map((msg) => this._renderMessage(msg))}
-          ${this._waitingForReply() ? this._renderThinking() : html``}
-        </div>
-      </div>
 
       <div class="composer ${this._menuOpen ? "menu-open" : ""}">
         <div
