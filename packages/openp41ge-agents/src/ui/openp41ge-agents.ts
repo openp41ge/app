@@ -511,8 +511,21 @@ class Openp41geAgents extends LitElement {
   }
 
   private _scrollToHit(hit: ChatHit): void {
-    if (typeof hit.msg.scrollIntoView === "function") {
-      hit.msg.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+    // If the active hit lives inside a collapsed reasoning block, expand it
+    // so the user actually sees the match (otherwise it scrolls to invisible
+    // text inside a closed <details>).
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    let activeMark: HTMLElement | null = null;
+    if (list) {
+      for (const mark of list.querySelectorAll<HTMLElement>("mark.chat-hit-active")) {
+        if (!activeMark) activeMark = mark;
+        const details = mark.closest<HTMLDetailsElement>(".msg-reasoning");
+        if (details && !details.open) details.open = true;
+      }
+    }
+    const target = activeMark ?? hit.msg;
+    if (typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
     }
   }
 
