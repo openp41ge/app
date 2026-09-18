@@ -22,6 +22,15 @@
         "command": "rm -rf dist",
         "cwd": "{projectRoot}"
       }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --config test/e2e/playwright.config.mjs",
+        "cwd": "{projectRoot}"
+      },
+      "dependsOn": ["^build"],
+      "cache": true
     }
   }
 }
