@@ -2968,22 +2968,6 @@ class Openp41geAgents extends LitElement {
               }
               <button
                 type="button"
-                class="find-toggle ${this._searchRegex ? "on" : ""}"
-                title="Regex"
-                aria-pressed=${this._searchRegex}
-                @click=${() => this._toggleSearchRegex()}
-                >${unsafeHTML(ICON_REGEX)}</button
-              >
-              <button
-                type="button"
-                class="find-toggle ${this._searchCase ? "on" : ""}"
-                title="Match case"
-                aria-pressed=${this._searchCase}
-                @click=${() => this._toggleSearchCase()}
-                >${unsafeHTML(ICON_MATCH_CASE)}</button
-              >
-              <button
-                type="button"
                 class="find-toggle"
                 title="Previous match"
                 ?disabled=${this._searchHits.length === 0}
@@ -2997,6 +2981,22 @@ class Openp41geAgents extends LitElement {
                 ?disabled=${this._searchHits.length === 0}
                 @click=${() => this._nextMatch(1)}
                 >${unsafeHTML(ICON_CHAT_NEXT)}</button
+              >
+              <button
+                type="button"
+                class="find-toggle ${this._searchRegex ? "on" : ""}"
+                title="Regex"
+                aria-pressed=${this._searchRegex}
+                @click=${() => this._toggleSearchRegex()}
+                >${unsafeHTML(ICON_REGEX)}</button
+              >
+              <button
+                type="button"
+                class="find-toggle ${this._searchCase ? "on" : ""}"
+                title="Match case"
+                aria-pressed=${this._searchCase}
+                @click=${() => this._toggleSearchCase()}
+                >${unsafeHTML(ICON_MATCH_CASE)}</button
               >
               <button
                 type="button"
