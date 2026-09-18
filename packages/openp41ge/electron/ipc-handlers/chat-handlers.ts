@@ -89,6 +89,12 @@ export function registerChatHandlers(
     store.search(query, opts),
   );
 
+  ipcMain.handle(
+    "chat:searchTranscript",
+    async (_e, id: string, query: string, opts?: ChatSearchOptions) =>
+      store.searchTranscript(id, query, opts),
+  );
+
   // ── Send / abort (agent runtime) ─────────────────────────────────────
   ipcMain.handle(
     "chat:send",

@@ -3,6 +3,7 @@ import type {
   ChatSummary,
   ChatSearchResult,
   ChatSearchOptions,
+  ChatTranscriptSearch,
   ChatDeltaPayload,
   ChatToolPayload,
   ChatStatusPayload,
@@ -312,6 +313,7 @@ declare global {
         archive: (id: string) => Promise<boolean>;
         rename: (id: string, title: string) => Promise<Chat | null>;
         search: (q: string, opts?: ChatSearchOptions) => Promise<ChatSearchResult[]>;
+        searchTranscript: (id: string, q: string, opts?: ChatSearchOptions) => Promise<ChatTranscriptSearch>;
         send: (id: string, text: string, cwd?: string, tools?: string[], thinkingLevel?: string) => Promise<void>;
         abort: (id: string) => Promise<void>;
         open: (id: string) => Promise<void>;

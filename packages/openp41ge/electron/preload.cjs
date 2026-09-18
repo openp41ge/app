@@ -646,6 +646,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     archive: (id) => ipcRenderer.invoke("chat:archive", id),
     rename: (id, title) => ipcRenderer.invoke("chat:rename", id, title),
     search: (q, opts) => ipcRenderer.invoke("chat:search", q, opts),
+    searchTranscript: (id, q, opts) => ipcRenderer.invoke("chat:searchTranscript", id, q, opts),
     send: (id, text, cwd) => ipcRenderer.invoke("chat:send", id, text, cwd),
     abort: (id) => ipcRenderer.invoke("chat:abort", id),
     open: (id) => ipcRenderer.invoke("chat:open", id),

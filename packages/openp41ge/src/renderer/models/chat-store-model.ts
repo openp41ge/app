@@ -12,7 +12,8 @@
 /* eslint-disable max-classes-per-file */
 
 import { defaultChatTitle } from "openp41ge-constants";
-import type { Chat, ChatSearchOptions, ChatSearchResult, ChatSummary } from "openp41ge-agents";
+import { searchTranscript } from "openp41ge-agents";
+import type { Chat, ChatSearchOptions, ChatSearchResult, ChatSummary, ChatTranscriptSearch } from "openp41ge-agents";
 
 /** Narrow read/write contract for the chat store. */
 export interface ChatStoreModel {
@@ -23,6 +24,7 @@ export interface ChatStoreModel {
   archive(id: string): Promise<boolean>;
   rename(id: string, title: string): Promise<Chat | null>;
   search(q: string, opts?: ChatSearchOptions): Promise<ChatSearchResult[]>;
+  searchTranscript(id: string, q: string, opts?: ChatSearchOptions): Promise<ChatTranscriptSearch>;
   open(id: string): Promise<void>;
   close(id: string): Promise<void>;
   highlight(id: string): Promise<void>;
@@ -55,6 +57,9 @@ export class IpcChatStoreModel implements ChatStoreModel {
   }
   search(q: string, opts?: ChatSearchOptions): Promise<ChatSearchResult[]> {
     return window.openp41ge.chat.search(q, opts);
+  }
+  searchTranscript(id: string, q: string, opts?: ChatSearchOptions): Promise<ChatTranscriptSearch> {
+    return window.openp41ge.chat.searchTranscript(id, q, opts);
   }
   open(id: string): Promise<void> {
     return window.openp41ge.chat.open(id);
@@ -203,6 +208,11 @@ export class TestChatStoreModel implements ChatStoreModel {
       }
     }
     return results;
+  }
+
+  async searchTranscript(id: string, q: string, opts: ChatSearchOptions = {}): Promise<ChatTranscriptSearch> {
+    this.calls.push({ op: "searchTranscript", args: [id, q, opts] });
+    return searchTranscript(this.chats.get(id), q, opts);
   }
 
   async open(id: string): Promise<void> {

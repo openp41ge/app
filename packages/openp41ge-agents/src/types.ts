@@ -111,6 +111,33 @@ export interface ChatSearchOptions {
   caseSensitive?: boolean;
 }
 
+/** One occurrence of a query within a single chat transcript message.
+ *
+ * `text` is the matched substring as it appears in the message's flattened
+ * searchable text; `order` is the 0-based occurrence index of that substring
+ * within the same message. The renderer re-locates the occurrence in its own
+ * DOM text (markdown-rendered) by searching for `text` and skipping `order`
+ * prior occurrences, so byte offsets never have to agree across processes.
+ */
+export interface ChatTranscriptHit {
+  messageId: string;
+  /** The matched substring (as it appears in the flattened searchable text). */
+  text: string;
+  /** 0-based occurrence index of `text` within the message. */
+  order: number;
+}
+
+/** Result of a Node-side in-chat search: the full ordered hit list plus the
+ *  transcript-wide running total, sent back to the client for result cycling. */
+export interface ChatTranscriptSearch {
+  query: string;
+  regex: boolean;
+  caseSensitive: boolean;
+  /** Transcript-wide number of matches (== hits.length). */
+  total: number;
+  hits: ChatTranscriptHit[];
+}
+
 /** Provider reachability / streaming status surfaced in the chat pane. */
 export interface ChatRuntimeStatus {
   streaming: boolean;

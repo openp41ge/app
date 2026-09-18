@@ -11,12 +11,16 @@ import fs from "fs";
 import path from "path";
 import { createLogger } from "openp41ge-logger";
 import { CHATS_FILENAME, defaultChatTitle } from "openp41ge-constants";
+import { searchTranscript } from "openp41ge-agents";
+
+export { searchTranscript };
 import type {
   Chat,
   ChatMessage,
   ChatSearchOptions,
   ChatSearchResult,
   ChatSummary,
+  ChatTranscriptSearch,
   ToolCall,
   ToolCallStatus,
 } from "openp41ge-agents";
@@ -266,6 +270,12 @@ export class ChatStoreService {
 
   search(query: string, opts?: ChatSearchOptions): ChatSearchResult[] {
     return searchChats(this.list(), query, opts);
+  }
+
+  /** Node-side in-chat search. Returns the ordered hit list + running total
+   *  for a single chat, so the renderer never scans the whole transcript. */
+  searchTranscript(chatId: string, query: string, opts?: ChatSearchOptions): ChatTranscriptSearch {
+    return searchTranscript(this.get(chatId) ?? undefined, query, opts);
   }
 
   // ── Open-state ("opened once") ───────────────────────────────────────

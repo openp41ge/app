@@ -125,11 +125,15 @@ describe("Openp41geAgents (custom element)", () => {
 
     input.value = "world";
     input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    // The find input is debounced (Node-side search is async), so wait for it.
+    await new Promise((r) => setTimeout(r, 200));
     await el.updateComplete;
 
-    // Two occurrences across the two messages, highlighted as <mark>s.
+    // Only the active occurrence is highlighted (one mark at a time), so huge
+    // transcripts never block the renderer; the running total is still shown.
     const hits = el.shadowRoot!.querySelectorAll("mark.chat-hit");
-    expect(hits.length).toBe(2);
+    expect(hits.length).toBe(1);
+    expect(hits[0].classList.contains("chat-hit-active")).toBe(true);
     const count = el.shadowRoot!.querySelector(".chat-findbar .find-count") as HTMLElement;
     expect(count.textContent!.trim()).toBe("1/2");
 
@@ -143,8 +147,9 @@ describe("Openp41geAgents (custom element)", () => {
       el.shadowRoot!.querySelector(".chat-findbar .find-count")!.textContent!.trim(),
     ).toBe("2/2");
 
-    // Closing removes the marks and the bar.
-    (el.shadowRoot!.querySelectorAll(".chat-findbar .find-toggle")[2] as HTMLButtonElement).click();
+    // Closing removes the marks and the bar (close is the last .find-toggle).
+    const toggles = el.shadowRoot!.querySelectorAll(".chat-findbar .find-toggle");
+    toggles[toggles.length - 1].click();
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".chat-findbar")).toBeNull();
     expect(el.shadowRoot!.querySelectorAll("mark.chat-hit").length).toBe(0);

@@ -18,6 +18,8 @@ export type {
   ChatLiveRatePayload,
   ChatReasoningPayload,
   ChatSummary,
+  ChatTranscriptHit,
+  ChatTranscriptSearch,
   ChatToolPayload,
   MessageSegment,
   TokenUsage,
@@ -25,3 +27,4 @@ export type {
   ToolCallStatus,
 } from "./types";
 export { chatLastPreview } from "./types";
+export { flattenMessageText, searchTranscript } from "./search";

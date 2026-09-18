@@ -74,6 +74,12 @@ export class AgentsController extends BaseController implements TabController {
     this._component = el;
     container.appendChild(el as unknown as HTMLElement);
 
+    // In-chat find runs on the Node side: the component asks the store model
+    // for the hit list + running total and only re-locates the active hit in
+    // its own DOM, so huge transcripts never block the renderer.
+    el.chatSearch = (chatId, query, opts) =>
+      this._storeModel.searchTranscript(chatId, query, opts);
+
     // Subscribe to streamed events for this chat.
     this._subscribe();
 

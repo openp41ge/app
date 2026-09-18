@@ -19,7 +19,7 @@ import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
 import { tooltipContent, tooltipController } from "openp41ge-uikit/tooltip";
-import type { Chat, ChatMessage, ChatRuntimeStatus, MessageSegment, TokenUsage, ToolCall } from "../types";
+import type { Chat, ChatMessage, ChatRuntimeStatus, ChatTranscriptHit, ChatTranscriptSearch, MessageSegment, TokenUsage, ToolCall } from "../types";
 import { renderMarkdownSegments, type MarkdownSegment, type CodeBlockSegment } from "./markdown.js";
 import {
   highlight,
@@ -128,14 +128,11 @@ const ICON_CHAT_NEXT =
 const ICON_CHAT_CLOSE =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="12" height="12" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>';
 
-/** A single find-in-chat occurrence: the message it lives in plus the char
- *  offsets within that message's flattened text (re-mapped to the current
- *  text nodes at mark time, since highlighting splits them). */
-interface ChatHit {
-  msg: HTMLElement;
-  start: number;
-  end: number;
-}
+/** A single find-in-chat occurrence delivered by the Node-side search: the
+ *  message it lives in, the matched substring, and the 0-based occurrence
+ *  ordinal within that message's flattened text (re-located in the current
+ *  DOM at mark time). */
+type ChatHit = ChatTranscriptHit;
 
 class Openp41geAgents extends LitElement {
   @state() private _messages: ChatMessage[] = [];
@@ -152,6 +149,20 @@ class Openp41geAgents extends LitElement {
   @state() private _searchIndex = 0;
   @state() private _searchRegex = false;
   @state() private _searchCase = false;
+  /** The current chat id, used to scope Node-side search. */
+  private _chatId = "";
+  /** Monotonic token so stale async search responses are dropped. */
+  private _searchSeq = 0;
+  /** Debounce timer for the find input (Node search is async/expensive). */
+  private _searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Node-side in-chat search seam, wired by the platform controller. When
+   *  absent the component falls back to a local DOM scan (unit tests). */
+  chatSearch?: (
+    chatId: string,
+    query: string,
+    opts?: { regex?: boolean; caseSensitive?: boolean },
+  ) => Promise<ChatTranscriptSearch | undefined | null>;
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
 
@@ -232,6 +243,7 @@ class Openp41geAgents extends LitElement {
 
   setChat(chat: Chat): void {
     this._title = chat.title;
+    this._chatId = chat.id;
     this._messages = chat.messages.map(deepCloneMessage);
     this._streaming = false;
     this._liveTps = null;
@@ -390,7 +402,7 @@ class Openp41geAgents extends LitElement {
 
   private _openSearch(): void {
     this._searchOpen = true;
-    if (this._searchQuery) this._computeAndMark(true);
+    if (this._searchQuery) this._runSearch(true);
     // Focus after Lit renders the find input.
     setTimeout(() => this._focusFindInput(), 0);
   }
@@ -400,13 +412,28 @@ class Openp41geAgents extends LitElement {
     this._searchQuery = "";
     this._searchHits = [];
     this._searchIndex = 0;
+    this._searchSeq++;
+    if (this._searchTimer) {
+      clearTimeout(this._searchTimer);
+      this._searchTimer = null;
+    }
     this._clearMarks();
   }
 
   private _onFindInput = (e: InputEvent): void => {
     this._searchQuery = (e.target as HTMLInputElement).value;
-    this._computeAndMark(true);
+    // Debounce: the Node-side search runs off-thread but we still avoid a
+    // request per keystroke for very large transcripts.
+    this._scheduleSearch(true);
   };
+
+  private _scheduleSearch(scrollActive: boolean): void {
+    if (this._searchTimer) clearTimeout(this._searchTimer);
+    this._searchTimer = setTimeout(() => {
+      this._searchTimer = null;
+      this._runSearch(scrollActive);
+    }, 160);
+  }
 
   private _onFindKeyDown = (e: KeyboardEvent): void => {
     if (e.key === "Enter") {
@@ -420,12 +447,12 @@ class Openp41geAgents extends LitElement {
 
   private _toggleSearchRegex(): void {
     this._searchRegex = !this._searchRegex;
-    if (this._searchQuery) this._computeAndMark(true);
+    if (this._searchQuery) this._runSearch(true);
   }
 
   private _toggleSearchCase(): void {
     this._searchCase = !this._searchCase;
-    if (this._searchQuery) this._computeAndMark(true);
+    if (this._searchQuery) this._runSearch(true);
   }
 
   /** Cmd/Ctrl+F opens the in-chat find bar (like the log viewer's scoped find). */
@@ -444,56 +471,83 @@ class Openp41geAgents extends LitElement {
     this._scrollToHit(this._searchHits[this._searchIndex]);
   }
 
-  /** Build a search regex, or null if the pattern is invalid (treat as no hits). */
-  private _safeRegex(q: string, caseSensitive: boolean): RegExp | null {
-    try {
-      return new RegExp(q, caseSensitive ? "g" : "gi");
-    } catch {
-      return null;
-    }
-  }
-
-  /** Recompute the occurrences over the current DOM and highlight them all. */
-  private _computeAndMark(scrollActive: boolean): void {
+  /** Run the search (Node-side via the seam, or a local DOM scan fallback)
+   *  and highlight just the active occurrence so huge transcripts don't block
+   *  the renderer with thousands of synchronous DOM mutations. */
+  private async _runSearch(scrollActive: boolean): Promise<void> {
     this._clearMarks();
-    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
     const q = this._searchQuery.trim();
-    const hits: ChatHit[] = [];
-    if (this._searchOpen && list && q.length > 1) {
-      if (this._searchRegex) {
-        const re = this._safeRegex(q, this._searchCase);
-        if (re) {
-          for (const msg of list.querySelectorAll<HTMLElement>(".chat-message")) {
-            const flat = this._flatText(msg);
-            if (!flat) continue;
-            re.lastIndex = 0;
-            let m: RegExpExecArray | null;
-            while ((m = re.exec(flat)) !== null) {
-              hits.push({ msg, start: m.index, end: m.index + m[0].length });
-              if (m[0].length === 0) re.lastIndex++;
-            }
-          }
-        }
-      } else {
-        const needle = this._searchCase ? q : q.toLowerCase();
-        for (const msg of list.querySelectorAll<HTMLElement>(".chat-message")) {
-          const flat = this._flatText(msg);
-          if (!flat) continue;
-          const hay = this._searchCase ? flat : flat.toLowerCase();
-          let idx = 0;
-          for (;;) {
-            const at = hay.indexOf(needle, idx);
-            if (at === -1) break;
-            hits.push({ msg, start: at, end: at + needle.length });
-            idx = at + needle.length;
-          }
-        }
-      }
+    const seq = ++this._searchSeq;
+    if (!this._searchOpen || q.length <= 1) {
+      this._searchHits = [];
+      this._searchIndex = 0;
+      return;
     }
+    const opts = { regex: this._searchRegex, caseSensitive: this._searchCase };
+
+    let hits: ChatHit[] = [];
+    if (this.chatSearch && this._chatId) {
+      let result: ChatTranscriptSearch | undefined | null;
+      try {
+        result = await this.chatSearch(this._chatId, q, opts);
+      } catch {
+        result = undefined;
+      }
+      if (seq !== this._searchSeq) return; // superseded by a newer search
+      const present = new Set(this._messages.map((m) => m.id));
+      hits = (result?.hits ?? []).filter((h) => present.has(h.messageId));
+    } else {
+      hits = this._computeLocalHits(q, opts);
+    }
+
     this._searchHits = hits;
     if (this._searchIndex >= hits.length) this._searchIndex = Math.max(0, hits.length - 1);
     this._markActive();
     if (scrollActive && hits.length > 0) this._scrollToHit(hits[this._searchIndex]);
+  }
+
+  /** Fallback DOM scan used when no Node seam is wired (unit tests). Mirrors
+   *  the Node-side matching so hit ordinals line up with the shared logic. */
+  private _computeLocalHits(q: string, opts: { regex?: boolean; caseSensitive?: boolean }): ChatHit[] {
+    const hits: ChatHit[] = [];
+    const ordinal = new Map<string, number>();
+    const next = (messageId: string): number => {
+      const o = ordinal.get(messageId) ?? 0;
+      ordinal.set(messageId, o + 1);
+      return o;
+    };
+    let re: RegExp | null = null;
+    if (opts.regex) {
+      try {
+        re = new RegExp(q, opts.caseSensitive ? "g" : "gi");
+      } catch {
+        return hits;
+      }
+    }
+    const needle = opts.caseSensitive ? q : q.toLowerCase();
+    for (const msg of this.renderRoot.querySelectorAll<HTMLElement>(".chat-message")) {
+      const id = msg.getAttribute("data-msg-id") ?? "";
+      const flat = this._flatText(msg);
+      if (!flat) continue;
+      if (re) {
+        re.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(flat)) !== null) {
+          hits.push({ messageId: id, text: m[0], order: next(id) });
+          if (m[0].length === 0) re.lastIndex++;
+        }
+      } else {
+        const hay = opts.caseSensitive ? flat : flat.toLowerCase();
+        let idx = 0;
+        for (;;) {
+          const at = hay.indexOf(needle, idx);
+          if (at === -1) break;
+          hits.push({ messageId: id, text: flat.slice(at, at + needle.length), order: next(id) });
+          idx = at + needle.length;
+        }
+      }
+    }
+    return hits;
   }
 
   /** The message's flattened text, from its current text nodes in order. */
@@ -523,24 +577,51 @@ class Openp41geAgents extends LitElement {
     return out;
   }
 
-  /** Highlight every hit; flag the active one. */
+  /** Find the rendered message element for a message id (avoids CSS-escaping
+   *  arbitrary ids, which ids can contain characters that break selectors). */
+  private _msgEl(messageId: string): HTMLElement | null {
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    if (!list) return null;
+    for (const el of list.querySelectorAll<HTMLElement>("[data-msg-id]")) {
+      if (el.getAttribute("data-msg-id") === messageId) return el;
+    }
+    return null;
+  }
+
+  /** Highlight only the active occurrence (one DOM span at a time, so the
+   *  renderer never mutates thousands of nodes in a single frame). */
   private _markActive(): void {
     this._clearMarks();
-    this._searchHits.forEach((h, idx) => {
-      const ranges = this._mapMsgRanges(h.msg, h.start, h.end);
-      for (const r of ranges) {
-        const range = document.createRange();
-        try {
-          range.setStart(r.node, r.start);
-          range.setEnd(r.node, r.end);
-          const mark = document.createElement("mark");
-          mark.className = idx === this._searchIndex ? "chat-hit chat-hit-active" : "chat-hit";
-          range.surroundContents(mark);
-        } catch {
-          /* best-effort highlight; the find bar still counts/navigates. */
-        }
+    const hit = this._searchHits[this._searchIndex];
+    if (!hit) return;
+    const msg = this._msgEl(hit.messageId);
+    if (!msg) return;
+    // Re-locate the `order`-th occurrence of the matched substring in the
+    // message's current DOM text (the raw offsets live on the Node side and
+    // need not agree with the markdown-rendered text).
+    const flat = this._flatText(msg);
+    let start = -1;
+    let at = 0;
+    for (let i = 0; i <= hit.order; ++i) {
+      start = flat.indexOf(hit.text, at);
+      if (start === -1) return; // occurrence not present in the rendered text
+      at = start + hit.text.length;
+    }
+    if (hit.text.length === 0) return;
+    const end = start + hit.text.length;
+    const ranges = this._mapMsgRanges(msg, start, end);
+    for (const r of ranges) {
+      const range = document.createRange();
+      try {
+        range.setStart(r.node, r.start);
+        range.setEnd(r.node, r.end);
+        const mark = document.createElement("mark");
+        mark.className = "chat-hit chat-hit-active";
+        range.surroundContents(mark);
+      } catch {
+        /* best-effort highlight; the find bar still counts/navigates. */
       }
-    });
+    }
   }
 
   /** Remove every mark we injected (kept on a distinct class to avoid clobbering
@@ -566,8 +647,9 @@ class Openp41geAgents extends LitElement {
         if (details && !details.open) details.open = true;
       }
     }
-    const target = activeMark ?? hit.msg;
-    if (typeof target.scrollIntoView === "function") {
+    const msgEl = this._msgEl(hit.messageId);
+    const target = activeMark ?? msgEl;
+    if (target && typeof target.scrollIntoView === "function") {
       target.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
     }
   }
@@ -1796,7 +1878,7 @@ class Openp41geAgents extends LitElement {
     // Gating on `_messages` (not the search state) avoids looping, since the
     // recompute itself updates _searchHits and re-renders.
     if (this._searchOpen && this._searchQuery && changed.has("_messages")) {
-      this._computeAndMark(false);
+      this._runSearch(false);
     }
   }
 
@@ -2137,6 +2219,10 @@ class Openp41geAgents extends LitElement {
         .chat-message {
           word-wrap: break-word;
           line-height: 1.4;
+          /* Virtualization: let Chromium skip layout/paint for offscreen
+             messages, keeping scrolling smooth on very large transcripts. */
+          content-visibility: auto;
+          contain-intrinsic-size: auto 120px;
         }
         /* User messages are grey bubbles: 3 medium-rounded corners with a
            smaller bottom-right, sized to their content (max 90% width). */
@@ -3260,7 +3346,7 @@ class Openp41geAgents extends LitElement {
 
   private _renderMessage(msg: ChatMessage): TemplateResult {
     if (msg.role === "user") {
-      return html`<div class="chat-message user">
+      return html`<div class="chat-message user" data-msg-id=${msg.id}>
         <div class="msg-content">${msg.content}</div>
       </div>`;
     }
@@ -3278,7 +3364,7 @@ class Openp41geAgents extends LitElement {
     // calls render inline at the position they occurred in the response.
     if (msg.segments && msg.segments.length > 0) {
       return html`
-        <div class="chat-message assistant">
+        <div class="chat-message assistant" data-msg-id=${msg.id}>
           ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1])}
           ${msg.segments.map((seg) => {
             if (seg.type === "tool") return this._renderToolCall(seg.toolCall!);
@@ -3297,7 +3383,7 @@ class Openp41geAgents extends LitElement {
       ? renderMarkdownSegments(msg.content, { codeLanguages: overrides, msgId: msg.id })
       : [];
     return html`
-      <div class="chat-message assistant">
+      <div class="chat-message assistant" data-msg-id=${msg.id}>
         ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1])}
         <div class="msg-content" @click=${this._onMsgContentClick}>
           ${segments.map((seg) => this._renderSegment(seg))}

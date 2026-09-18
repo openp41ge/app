@@ -13,6 +13,7 @@ import path from "path";
 import {
   ChatStoreService,
   searchChats,
+  searchTranscript,
   toSummary,
 } from "../../../src/main/services/chat-store-service";
 import type { Chat, ChatMessage, ToolCall } from "openp41ge-agents";
@@ -124,6 +125,46 @@ describe("searchChats", () => {
 
     // An invalid regex must not throw — it returns no matches.
     expect(searchChats([chat], "(", { regex: true })).toEqual([]);
+  });
+});
+
+describe("searchTranscript", () => {
+  it("returns ordered per-message hits with an accurate running total", () => {
+    const chat = makeChat("c1", [user("hello world"), assistant("a world of code")]);
+    const r = searchTranscript(chat, "world");
+    expect(r.total).toBe(2);
+    expect(r.hits).toEqual([
+      { messageId: "u-hell", text: "world", order: 0 },
+      { messageId: "a-0", text: "world", order: 0 },
+    ]);
+  });
+
+  it("numbers ordinals per-message and not transcript-wide", () => {
+    const chat = makeChat("c1", [
+      user("foo bar foo"),
+      user("foo"),
+      user("bar foo"),
+    ]);
+    const r = searchTranscript(chat, "foo");
+    expect(r.hits.map((h) => ({ m: h.messageId, o: h.order }))).toEqual([
+      { m: "u-foo ", o: 0 },
+      { m: "u-foo ", o: 1 },
+      { m: "u-foo", o: 0 },
+      { m: "u-bar ", o: 0 },
+    ]);
+  });
+
+  it("supports case-sensitive, regex, and rejects an invalid regex", () => {
+    const chat = makeChat("c1", [assistant("The quick brown fox")]);
+    expect(searchTranscript(chat, "the", { caseSensitive: true }).total).toBe(0);
+    expect(searchTranscript(chat, "The", { caseSensitive: true }).total).toBe(1);
+    expect(searchTranscript(chat, "q..ck", { regex: true }).total).toBe(1);
+    expect(searchTranscript(chat, "(", { regex: true }).total).toBe(0);
+  });
+
+  it("returns no hits for an empty chat or blank query", () => {
+    expect(searchTranscript(undefined, "x").total).toBe(0);
+    expect(searchTranscript(makeChat("c1", [user("hello")]), "").total).toBe(0);
   });
 });
 
