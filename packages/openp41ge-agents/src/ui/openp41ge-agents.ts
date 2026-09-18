@@ -114,7 +114,7 @@ function formatTokens(n?: number): string {
 // The bottom-bar find icon matches the Explorer sidebar's magnifier+list glyph
 // (same as the log viewer) so in-tab search looks consistent app-wide.
 const ICON_FIND =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="20" height="20" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
 const ICON_CHAT_PREV =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5v-5M2.2 4.8l2.8-2.8 2.8 2.8"/></svg>';
 const ICON_CHAT_NEXT =
@@ -1926,7 +1926,7 @@ class Openp41geAgents extends LitElement {
           padding: 0;
           border: none;
           background: transparent;
-          color: var(--text-muted, #888);
+          color: var(--text-secondary, #999);
           cursor: pointer;
           transition: background-color 0.1s, color 0.1s;
         }
