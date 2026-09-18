@@ -19,7 +19,7 @@ import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
 import { tooltipContent, tooltipController } from "openp41ge-uikit/tooltip";
-import type { Chat, ChatMessage, ChatRuntimeStatus, ChatTranscriptHit, ChatTranscriptSearch, MessageSegment, TokenUsage, ToolCall } from "../types";
+import type { Chat, ChatMessage, ChatRuntimeStatus, ChatTranscriptHit, ChatTranscriptPage, ChatTranscriptSearch, MessageSegment, TokenUsage, ToolCall } from "../types";
 import { renderMarkdownSegments, type MarkdownSegment, type CodeBlockSegment } from "./markdown.js";
 import {
   highlight,
@@ -128,6 +128,12 @@ const ICON_CHAT_NEXT =
 const ICON_CHAT_CLOSE =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="12" height="12" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>';
 
+/** Explorer-style chevron for the collapsed reasoning block (mirrors the
+ *  explorer tree's `chevronRight` — a 16×16 polyline that rotates 90° when
+ *  the block is expanded). */
+const ICON_REASONING_CHEVRON =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,4 10,8 6,12"/></svg>';
+
 /** A single find-in-chat occurrence delivered by the Node-side search: the
  *  message it lives in, the matched substring, and the 0-based occurrence
  *  ordinal within that message's flattened text (re-located in the current
@@ -147,6 +153,9 @@ class Openp41geAgents extends LitElement {
   @state() private _searchQuery = "";
   @state() private _searchHits: ChatHit[] = [];
   @state() private _searchIndex = 0;
+  /** Whole-transcript hit count reported by the Node-side search (running
+   *  total), which may exceed the number of hits loaded into the window. */
+  @state() private _searchTotal = 0;
   @state() private _searchRegex = false;
   @state() private _searchCase = false;
   /** The current chat id, used to scope Node-side search. */
@@ -163,6 +172,23 @@ class Openp41geAgents extends LitElement {
     query: string,
     opts?: { regex?: boolean; caseSensitive?: boolean },
   ) => Promise<ChatTranscriptSearch | undefined | null>;
+
+  /** Node-side transcript page loader seam, wired by the controller. Used for
+   *  paged (windowed) loading so the renderer never holds an entire long chat. */
+  loadMessages?: (
+    chatId: string,
+    offset: number,
+    count: number,
+  ) => Promise<ChatTranscriptPage | undefined | null>;
+
+  /** Known transcript-wide message count (may lag true count while streaming). */
+  @state() private _transcriptTotal = 0;
+  /** Transcript index (0-based) of `_messages[0]`. */
+  @state() private _loadedStart = 0;
+  /** Max messages kept in the renderer window. */
+  private _pageSize = 80;
+  /** Guards against overlapping `loadOlderMessages` fetches. */
+  private _loadingOlder = false;
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
 
@@ -245,6 +271,8 @@ class Openp41geAgents extends LitElement {
     this._title = chat.title;
     this._chatId = chat.id;
     this._messages = chat.messages.map(deepCloneMessage);
+    this._transcriptTotal = chat.messages.length;
+    this._loadedStart = 0;
     this._streaming = false;
     this._liveTps = null;
     this._providerId = chat.providerId;
@@ -463,10 +491,11 @@ class Openp41geAgents extends LitElement {
     }
   };
 
-  private _nextMatch(dir: 1 | -1): void {
+  private async _nextMatch(dir: 1 | -1): Promise<void> {
     if (this._searchHits.length === 0) return;
     this._searchIndex =
       (this._searchIndex + dir + this._searchHits.length) % this._searchHits.length;
+    await this._ensureHitLoaded(this._searchHits[this._searchIndex]);
     this._markActive();
     this._scrollToHit(this._searchHits[this._searchIndex]);
   }
@@ -494,14 +523,18 @@ class Openp41geAgents extends LitElement {
         result = undefined;
       }
       if (seq !== this._searchSeq) return; // superseded by a newer search
-      const present = new Set(this._messages.map((m) => m.id));
-      hits = (result?.hits ?? []).filter((h) => present.has(h.messageId));
+      // Keep every hit (the running total covers the whole transcript), but
+      // only the active one needs to be loaded into the window to highlight.
+      hits = result?.hits ?? [];
+      this._searchTotal = result?.total ?? hits.length;
     } else {
       hits = this._computeLocalHits(q, opts);
+      this._searchTotal = hits.length;
     }
 
     this._searchHits = hits;
     if (this._searchIndex >= hits.length) this._searchIndex = Math.max(0, hits.length - 1);
+    await this._ensureHitLoaded(hits[this._searchIndex]);
     this._markActive();
     if (scrollActive && hits.length > 0) this._scrollToHit(hits[this._searchIndex]);
   }
@@ -525,6 +558,7 @@ class Openp41geAgents extends LitElement {
       }
     }
     const needle = opts.caseSensitive ? q : q.toLowerCase();
+    let messageIndex = this._loadedStart;
     for (const msg of this.renderRoot.querySelectorAll<HTMLElement>(".chat-message")) {
       const id = msg.getAttribute("data-msg-id") ?? "";
       const flat = this._flatText(msg);
@@ -533,7 +567,7 @@ class Openp41geAgents extends LitElement {
         re.lastIndex = 0;
         let m: RegExpExecArray | null;
         while ((m = re.exec(flat)) !== null) {
-          hits.push({ messageId: id, text: m[0], order: next(id) });
+          hits.push({ messageId: id, text: m[0], order: next(id), messageIndex });
           if (m[0].length === 0) re.lastIndex++;
         }
       } else {
@@ -542,10 +576,11 @@ class Openp41geAgents extends LitElement {
         for (;;) {
           const at = hay.indexOf(needle, idx);
           if (at === -1) break;
-          hits.push({ messageId: id, text: flat.slice(at, at + needle.length), order: next(id) });
+          hits.push({ messageId: id, text: flat.slice(at, at + needle.length), order: next(id), messageIndex });
           idx = at + needle.length;
         }
       }
+      messageIndex++;
     }
     return hits;
   }
@@ -664,6 +699,51 @@ class Openp41geAgents extends LitElement {
     this.renderRoot.querySelector<HTMLElement>(".chat-messages")?.focus();
   }
 
+  /** Scroll near the top of the loaded window → pull in the older page.
+   *  Guarded so concurrent scroll events don't stack fetches. */
+  private _onScroll = (): void => {
+    const el = this.renderRoot.querySelector<HTMLElement>(".chat-scroll");
+    if (!el || this._loadingOlder) return;
+    const nearTop = el.scrollTop < 40;
+    if (nearTop && this._loadedStart > 0) {
+      void this.loadOlderMessages();
+    }
+  };
+
+  /** Make sure the message holding a search hit is within the loaded window so
+   *  it can be highlighted/scroll-to. Older messages are prepended (the tail
+   *  stays anchored for streaming). Returns false when it cannot be loaded. */
+  private async _ensureHitLoaded(hit: ChatHit | undefined): Promise<boolean> {
+    if (!hit) return false;
+    if (this._messages.some((m) => m.id === hit.messageId)) return true;
+    if (!this.loadMessages || !this._chatId) return false;
+    const count = this._pageSize;
+    const start = Math.max(0, hit.messageIndex - Math.floor(count / 2));
+    let page: ChatTranscriptPage | undefined | null;
+    try {
+      page = await this.loadMessages(this._chatId, start, count);
+    } catch {
+      return false;
+    }
+    if (!page || !page.messages.length) return false;
+    this._transcriptTotal = Math.max(this._transcriptTotal, page.total);
+    if (page.start < this._loadedStart || this._messages.length === 0) {
+      // Older history → prepend (tail remains the newest messages).
+      this._loadedStart = page.start;
+      this._messages = [
+        ...page.messages
+          .filter((m) => !this._messages.some((x) => x.id === m.id))
+          .map(deepCloneMessage),
+        ...this._messages,
+      ];
+    } else {
+      this._messages = page.messages.map(deepCloneMessage);
+      this._loadedStart = page.start;
+    }
+    await this.updateComplete;
+    return true;
+  }
+
   // ─── Back-compat API ────────────────────────────────────────────────
 
   addMessage(role: "user" | "assistant", content: string): void {
@@ -674,7 +754,80 @@ class Openp41geAgents extends LitElement {
 
   clearMessages(): void {
     this._messages = [];
+    this._transcriptTotal = 0;
+    this._loadedStart = 0;
     this._streaming = false;
+  }
+
+  /** Open a chat transcript in paged mode: set the header meta and seed the
+   *  window with an initial page (usually the tail) fetched from the Node side.
+   *  The window stays tail-anchored so streaming appends keep working; older
+   *  pages are pulled in on scroll-up (see `loadOlderMessages`). */
+  openTranscriptPaged(
+    meta: { id: string; title: string; providerId: string; description?: string },
+    page: ChatTranscriptPage,
+  ): void {
+    this._title = meta.title;
+    this._chatId = meta.id;
+    this._providerId = meta.providerId;
+    this._transcriptTotal = page.total;
+    this._loadedStart = page.start;
+    this._messages = page.messages.map(deepCloneMessage);
+    this._streaming = false;
+    this._liveTps = null;
+    this._toolResults = {};
+    this._usage = this._lastAssistantUsage(page.messages);
+    // Clear any find state carried over from a previously open chat.
+    this._searchOpen = false;
+    this._searchQuery = "";
+    this._searchHits = [];
+    this._searchIndex = 0;
+    this._searchTotal = 0;
+    this._scrollToBottom();
+  }
+
+  /** True when there are known older messages not yet in the window. */
+  get hasOlderMessages(): boolean {
+    return this._loadedStart > 0;
+  }
+
+  /** Transcript-wide message count (may lag the true count while streaming). */
+  get transcriptTotal(): number {
+    return this._transcriptTotal;
+  }
+
+  /** Fetch and prepend the page of messages immediately before the window, so
+   *  the user can scroll further up into history. Preserves the scroll offset
+   *  so the viewport does not jump. */
+  async loadOlderMessages(): Promise<void> {
+    if (this._loadingOlder || !this.loadMessages || !this._chatId || this._loadedStart <= 0) {
+      return;
+    }
+    this._loadingOlder = true;
+    const scroller = this.renderRoot.querySelector<HTMLElement>(".chat-scroll");
+    const prevScrollHeight = scroller?.scrollHeight ?? 0;
+    try {
+      const count = Math.min(this._pageSize, this._loadedStart);
+      const page = await this.loadMessages(this._chatId, this._loadedStart - count, count);
+      if (page && page.messages.length > 0) {
+        this._loadedStart = page.start;
+        this._transcriptTotal = Math.max(this._transcriptTotal, page.total);
+        this._messages = [
+          ...page.messages.map(deepCloneMessage),
+          ...this._messages,
+        ];
+        // Restore the scroll offset: newly prepended content sits above.
+        const el = scroller;
+        requestAnimationFrame(() => {
+          if (el) {
+            const added = el.scrollHeight - prevScrollHeight;
+            if (added > 0) el.scrollTop += added;
+          }
+        });
+      }
+    } finally {
+      this._loadingOlder = false;
+    }
   }
 
   focusInput(): void {
@@ -2058,10 +2211,10 @@ class Openp41geAgents extends LitElement {
         .bb-find {
           flex: 0 0 auto;
           align-self: stretch;
-          aspect-ratio: 1 / 1;
           display: grid;
           place-items: center;
-          padding: 0;
+          width: calc(34px + var(--grid-edge-left-pad, 0px));
+          padding: 0 0 0 var(--grid-edge-left-pad, 0px);
           border: none;
           background: transparent;
           color: var(--text-secondary, #999);
@@ -2255,6 +2408,9 @@ class Openp41geAgents extends LitElement {
         .msg-reasoning summary {
           cursor: pointer;
           padding: 6px 10px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.08em;
@@ -2265,14 +2421,23 @@ class Openp41geAgents extends LitElement {
         .msg-reasoning summary::-webkit-details-marker {
           display: none;
         }
-        .msg-reasoning summary::before {
-          content: "▸";
-          display: inline-block;
-          margin-right: 6px;
+        .msg-reasoning summary .msg-reasoning-chevron {
+          display: inline-flex;
+          align-items: center;
+          vertical-align: -0.16em;
           transition: transform 0.15s ease;
         }
-        .msg-reasoning[open] summary::before {
+        .msg-reasoning[open] summary .msg-reasoning-chevron {
           transform: rotate(90deg);
+        }
+        .msg-reasoning summary .msg-reasoning-size {
+          margin-left: auto;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: 0.04em;
+          text-transform: none;
+          opacity: 0.65;
+          white-space: nowrap;
         }
         .msg-reasoning .msg-reasoning-body {
           padding: 10px 14px 12px;
@@ -2575,15 +2740,21 @@ class Openp41geAgents extends LitElement {
           gap: 2px;
           font-family: var(--font-mono, "JetBrains Mono", monospace);
           font-size: 11.5px;
-          background: var(--bg-tertiary, #1c1c1c);
-          border: 1px solid var(--border-color, #333);
-          border-radius: 4px;
+          background: color-mix(in srgb, var(--panel-bg, #1b1e24) 55%, transparent);
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
+          border-radius: 6px;
           padding: 4px 8px;
         }
         .tool-call-actions {
           display: flex;
           align-items: center;
           justify-content: flex-end;
+          gap: 6px;
+          margin-left: auto;
+        }
+        .tool-call-footer {
+          display: flex;
+          align-items: center;
           gap: 6px;
           margin-top: 6px;
         }
@@ -2615,6 +2786,11 @@ class Openp41geAgents extends LitElement {
         .chat-message.assistant > .tool-call-wrap {
           margin: 5px 0;
         }
+        .tool-call-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
         .tool-call-name {
           font-weight: 600;
           color: var(--text-secondary, #ccc);
@@ -2630,19 +2806,33 @@ class Openp41geAgents extends LitElement {
           word-break: break-word;
           line-height: 1.35;
         }
-        .tool-status {
-          flex-shrink: 0;
-          font-weight: 700;
-          margin-left: auto;
+        .tool-call-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          padding: 2px 8px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          line-height: 1.2;
+          border: 1px solid transparent;
         }
-        .tool-status.running {
+        .tool-call-status.running {
           color: var(--accent, #4a9eff);
+          border-color: color-mix(in srgb, var(--accent, #4a9eff) 40%, transparent);
+          background: color-mix(in srgb, var(--accent, #4a9eff) 12%, transparent);
         }
-        .tool-status.done {
+        .tool-call-status.done {
           color: #4caf50;
+          border-color: color-mix(in srgb, #4caf50 35%, transparent);
+          background: color-mix(in srgb, #4caf50 12%, transparent);
         }
-        .tool-status.error {
-          color: #f44336;
+        .tool-call-status.failed {
+          color: #ef5555;
+          border-color: color-mix(in srgb, #ef5555 35%, transparent);
+          background: color-mix(in srgb, #ef5555 12%, transparent);
         }
         .composer {
           flex-shrink: 0;
@@ -3026,7 +3216,7 @@ class Openp41geAgents extends LitElement {
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
 
-      <div class="chat-scroll">
+      <div class="chat-scroll" @scroll=${this._onScroll}>
         <div class="chat-messages">
           ${this._messages.map((msg) => this._renderMessage(msg))}
           ${this._waitingForReply() ? this._renderThinking() : html``}
@@ -3048,7 +3238,7 @@ class Openp41geAgents extends LitElement {
               ${
                 this._searchHits.length > 0
                   ? html`<span class="find-count"
-                      >${this._searchIndex + 1}/${this._searchHits.length}</span
+                      >${this._searchIndex + 1}/${this._searchTotal}</span
                     >`
                   : html``
               }
@@ -3338,8 +3528,14 @@ class Openp41geAgents extends LitElement {
    *  auto-expanded for the in-flight message so the user sees it stream. */
   private _renderReasoning(reasoning: string | undefined, live: boolean): TemplateResult {
     if (!reasoning) return html``;
+    const words = reasoning.trim() ? reasoning.trim().split(/\s+/).length : 0;
+    const sizeLabel = words > 0 ? `${this._fmtTok(words)} words` : "";
     return html`<details class="msg-reasoning" ?open=${live}>
-      <summary>Reasoning</summary>
+      <summary>
+        <span class="msg-reasoning-chevron">${unsafeHTML(ICON_REASONING_CHEVRON)}</span>
+        <span class="msg-reasoning-label">Reasoning</span>
+        ${sizeLabel ? html`<span class="msg-reasoning-size">${sizeLabel}</span>` : html``}
+      </summary>
       <div class="msg-reasoning-body">${reasoning}</div>
     </details>`;
   }
@@ -3519,24 +3715,27 @@ class Openp41geAgents extends LitElement {
     const status = tc.status ?? "running";
     const result = this._toolResultFor(tc);
     const openable = status !== "running" && result !== undefined;
+    const statusLabel = status === "running"
+      ? html`loading<span class="thinking-dots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>`
+      : status === "done"
+        ? "success"
+        : "fail";
     return html`
       <div class="tool-call-wrap" data-tool-call-id=${tc.id}>
         <div class="tool-call-row">
           <div class="tool-call-header">
             <span class="tool-call-name">${tc.name}</span>
-            <span class="tool-status ${status}">
-              ${status === "running" ? "…" : status === "done" ? "✓" : "✗"}
-            </span>
           </div>
           <div class="tool-call-args">${this._toolArgsSummary(tc)}</div>
         </div>
-        ${
-          openable
+        <div class="tool-call-footer">
+          <span class="tool-call-status ${status}">${statusLabel}</span>
+          ${openable
             ? html`<div class="tool-call-actions">
                 <button
                   type="button"
                   class="tool-call-btn"
-                  title="Copy result"
+                  ${tooltipContent({ type: "simple", text: "Copy result" })}
                   aria-label="Copy result"
                   @click=${(e: Event) => {
                     e.stopPropagation();
@@ -3548,7 +3747,7 @@ class Openp41geAgents extends LitElement {
                 <button
                   type="button"
                   class="tool-call-btn primary"
-                  title="Open result in a new tab"
+                  ${tooltipContent({ type: "simple", text: "Open result in a new tab" })}
                   aria-label="Open result in a new tab"
                   @click=${(e: Event) => {
                     e.stopPropagation();
@@ -3560,6 +3759,7 @@ class Openp41geAgents extends LitElement {
               </div>`
             : ""
         }
+        </div>
       </div>
     `;
   }

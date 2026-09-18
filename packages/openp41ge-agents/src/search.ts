@@ -72,20 +72,20 @@ export function searchTranscript(
 
   const hits: ChatTranscriptHit[] = [];
   const msgOrdinal = new Map<string, number>();
-  const hitFor = (messageId: string, text: string): ChatTranscriptHit => {
+  const hitFor = (messageId: string, messageIndex: number, text: string): ChatTranscriptHit => {
     const order = msgOrdinal.get(messageId) ?? 0;
     msgOrdinal.set(messageId, order + 1);
-    return { messageId, text, order };
+    return { messageId, text, order, messageIndex };
   };
 
-  for (const msg of chat.messages) {
+  chat.messages.forEach((msg, messageIndex) => {
     const flat = flattenMessageText(msg);
-    if (!flat) continue;
+    if (!flat) return;
     if (re) {
       re.lastIndex = 0;
       let m: RegExpExecArray | null;
       while ((m = re.exec(flat)) !== null) {
-        hits.push(hitFor(msg.id, m[0]));
+        hits.push(hitFor(msg.id, messageIndex, m[0]));
         if (m[0].length === 0) re.lastIndex++;
       }
     } else {
@@ -94,10 +94,10 @@ export function searchTranscript(
       for (;;) {
         const at = hay.indexOf(needle, idx);
         if (at === -1) break;
-        hits.push(hitFor(msg.id, flat.slice(at, at + needle.length)));
+        hits.push(hitFor(msg.id, messageIndex, flat.slice(at, at + needle.length)));
         idx = at + needle.length;
       }
     }
-  }
+  });
   return { ...meta, total: hits.length, hits };
 }

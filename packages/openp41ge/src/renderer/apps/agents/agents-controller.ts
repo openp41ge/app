@@ -49,6 +49,8 @@ export class AgentsController extends BaseController implements TabController {
   private _boundHandlers: Array<{ type: string; handler: EventListener }> = [];
   /** Tools currently enabled for this chat (the composer multi-select). */
   private _activeTools: string[] = [];
+  /** Messages per transcript page when opening a large chat in paged mode. */
+  private _pageSize = 200;
 
   constructor(tabId: string, appType: string) {
     super(tabId, appType);
@@ -79,6 +81,11 @@ export class AgentsController extends BaseController implements TabController {
     // its own DOM, so huge transcripts never block the renderer.
     el.chatSearch = (chatId, query, opts) =>
       this._storeModel.searchTranscript(chatId, query, opts);
+
+    // Transcript content lives in the main process: the component loads only a
+    // page window and pulls in older pages on scroll-up / on search navigation.
+    el.loadMessages = (chatId, offset, count) =>
+      this._storeModel.getMessages(chatId, offset, count);
 
     // Subscribe to streamed events for this chat.
     this._subscribe();
@@ -178,12 +185,9 @@ export class AgentsController extends BaseController implements TabController {
 
   private async _loadChat(): Promise<void> {
     try {
-      const chat = await this._storeModel.get(this.chatId);
+      const header = await this._storeModel.getHeader(this.chatId);
       if (!this._component) return;
-      if (chat) {
-        this._component.setChat(chat);
-        void this._loadComposerContext(chat.providerId ?? "vllm");
-      } else {
+      if (!header) {
         this._component.setChat({
           id: this.chatId,
           title: "Chat not found",
@@ -192,7 +196,32 @@ export class AgentsController extends BaseController implements TabController {
           updatedAt: 0,
           messages: [],
         });
+        return;
       }
+      if (header.totalMessages <= this._pageSize) {
+        // Small conversation: send the whole transcript (one page).
+        const chat = await this._storeModel.get(this.chatId);
+        if (!this._component) return;
+        this._component.setChat(chat ?? {
+          id: header.id,
+          title: header.title,
+          providerId: header.providerId,
+          createdAt: 0,
+          updatedAt: 0,
+          messages: [],
+        });
+      } else {
+        // Large: open in paged mode — load only the tail window from Node; the
+        // component pulls older pages on scroll-up / on search navigation.
+        const offset = Math.max(0, header.totalMessages - this._pageSize);
+        const page = await this._storeModel.getMessages(this.chatId, offset, this._pageSize);
+        if (!this._component) return;
+        this._component.openTranscriptPaged(
+          { id: header.id, title: header.title, providerId: header.providerId },
+          page,
+        );
+      }
+      void this._loadComposerContext(header.providerId ?? "vllm");
     } catch (err) {
       log.warn("failed to load chat", (err as Error).message);
     }

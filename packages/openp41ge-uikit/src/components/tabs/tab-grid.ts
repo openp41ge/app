@@ -52,6 +52,13 @@ export interface GridState {
 export class TabGrid extends LitElement {
   @property({ type: String }) winId: string = "";
   @property({ type: Number }) cols: number = 1;
+  /** Whether the grid's leftmost column sits flush with the window's left
+   *  edge (no left sidebar). Bottom bars can nudge their edge-flush button
+   *  8px inward via the `--grid-edge-left-pad` custom prop. */
+  @property({ type: Boolean }) edgeLeft: boolean = false;
+  /** Whether the grid's rightmost column sits flush with the window's right
+   *  edge (no right sidebar). See `--grid-edge-right-pad`. */
+  @property({ type: Boolean }) edgeRight: boolean = false;
   @property({ type: Array }) placements: Array<{
     position: { row: number; col: number };
     tabIds: string[];
@@ -1127,7 +1134,12 @@ export class TabGrid extends LitElement {
       colIndex === this._resizeCol || colIndex === this._snapbackCol
         ? "min-width:0"
         : "min-width:200px";
-    const colStyle = `display:flex;flex-direction:column;${minW};${flex}border-right:${colIndex < this.cols - 1 ? "1px solid #333" : "none"};overflow:hidden;`;
+    // Expose whether this cell touches the window's rounded corner so a tab's
+    // bottom-bar edge button can move 8px inward. Custom props inherit across
+    // shadow boundaries, so bottom bars in shadow DOM can use them directly.
+    const leftPad = this.edgeLeft && colIndex === 0 ? "8px" : "0px";
+    const rightPad = this.edgeRight && colIndex === this.cols - 1 ? "8px" : "0px";
+    const colStyle = `display:flex;flex-direction:column;${minW};${flex}border-right:${colIndex < this.cols - 1 ? "1px solid #333" : "none"};overflow:hidden;--grid-edge-left-pad:${leftPad};--grid-edge-right-pad:${rightPad};`;
     const placement = this.placements.find((p) => p.position.col === colIndex);
     const tabIds = placement ? placement.tabIds : [];
     const activeTabId = this.activeTabIds[String(colIndex)] || tabIds[0] || "";

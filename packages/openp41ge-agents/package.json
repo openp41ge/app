@@ -5,6 +5,16 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./search": {
+      "types": "./dist/search.d.ts",
+      "default": "./dist/search.js"
+    }
+  },
   "scripts": {
     "build": "vite build && npx tsc --emitDeclarationOnly --outDir dist 2>/dev/null",
     "dev": "vite build --watch",

@@ -567,6 +567,8 @@ class Openp41geWindowView extends LitElement {
                 .placements=${placements}
                 .tabData=${tabData}
                 .activeTabIds=${activeTabIds}
+                .edgeLeft=${!(ws?.sidebar?.leftSidebarOpen ?? false)}
+                .edgeRight=${!(ws?.sidebar?.rightSidebarOpen ?? false)}
               ></tab-grid>
               <!-- Experimental "negative drawer" settings host: overlays the
                    grid from the sidebar edge instead of opening a settings tab. -->

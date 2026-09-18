@@ -362,7 +362,7 @@ class FeStatusBar extends LitElement {
                       class="p41ge-icon-btn sbb-wrap-btn${this._wordWrapOn ? " is-active" : ""}"
                       aria-label="Toggle line wrap"
                       ${tooltipContent({ type: "simple", text: "Toggle line wrap" })}
-                      style="-webkit-app-region:no-drag;"
+                      style="-webkit-app-region:no-drag;box-sizing:content-box;padding:0 var(--grid-edge-right-pad, 0px) 0 0;"
                       @click=${() => {
                         const newState = !this._wordWrapOn;
                         this._wordWrapOn = newState;

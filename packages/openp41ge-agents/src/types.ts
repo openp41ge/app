@@ -125,6 +125,30 @@ export interface ChatTranscriptHit {
   text: string;
   /** 0-based occurrence index of `text` within the message. */
   order: number;
+  /** Transcript index of the message (0-based), so the client can fetch the
+   *  page containing it if it is not currently loaded. */
+  messageIndex: number;
+}
+
+/** A page slice of a chat transcript, fetched on demand from the main process
+ *  so the renderer never has to hold an entire long conversation at once. */
+export interface ChatTranscriptPage {
+  chatId: string;
+  /** Transcript index of `messages[0]`. */
+  start: number;
+  /** Total number of messages in the chat. */
+  total: number;
+  messages: ChatMessage[];
+}
+
+/** Lightweight chat metadata (no messages) for opening a chat without pulling
+ *  the whole transcript into the renderer. */
+export interface ChatHeader {
+  id: string;
+  title: string;
+  providerId: string;
+  totalMessages: number;
+  description?: string;
 }
 
 /** Result of a Node-side in-chat search: the full ordered hit list plus the

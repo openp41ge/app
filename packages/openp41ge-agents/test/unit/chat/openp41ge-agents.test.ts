@@ -493,6 +493,7 @@ describe("Openp41geAgents (custom element)", () => {
     const reasoning = el.renderRoot.querySelector(".msg-reasoning");
     expect(reasoning).not.toBeNull();
     expect(reasoning!.querySelector(".msg-reasoning-body")!.textContent).toBe("Let me think about this");
+    expect(reasoning!.querySelector(".msg-reasoning-size")!.textContent).toBe("5 words");
   });
 
   it("setToolCallState adds a running tool call then transitions to done", async () => {
@@ -547,9 +548,14 @@ describe("Openp41geAgents (custom element)", () => {
     expect(openBtn.querySelector("svg")).not.toBeNull();
     const copyBtn = el.shadowRoot!.querySelector(".tool-call-btn:not(.primary)")! as HTMLElement;
     expect(copyBtn.querySelector("svg")).not.toBeNull();
-    // The actions row is a sibling of the card, rendered below it.
-    expect(actions.parentElement?.querySelector(".tool-call-row")).not.toBeNull();
+    // A success pill sits in the footer to the left of the action buttons.
+    const pill = el.shadowRoot!.querySelector(".tool-call-status.done")!;
+    expect(pill.textContent).toBe("success");
+    expect(actions.closest(".tool-call-footer")!.contains(pill)).toBe(true);
+    // The actions row is in a footer below the card (a sibling of the card row).
     expect(actions.closest(".tool-call-row")).toBeNull();
+    expect(actions.parentElement!.classList.contains("tool-call-footer")).toBe(true);
+    expect(actions.closest(".tool-call-wrap")!.querySelector(".tool-call-row")).not.toBeNull();
     openBtn.click();
     const detail = ((await opened) as CustomEvent<{ toolCall?: { id: string }; result?: string }>)
       .detail!;
@@ -570,8 +576,13 @@ describe("Openp41geAgents (custom element)", () => {
     el.setToolCallState({ id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "running" });
     await el.updateComplete;
 
-    // No action row while the tool is still running (no result yet).
+    // No action row while the tool is still running (no result yet), but a
+    // "loading…" pill with animated dots is shown.
     expect(el.shadowRoot!.querySelector(".tool-call-actions")).toBeNull();
+    const running = el.shadowRoot!.querySelector(".tool-call-status.running")!;
+    expect(running).not.toBeNull();
+    expect(running.textContent).toBe("loading...");
+    expect(running.querySelectorAll(".dot").length).toBe(3);
     const row = el.shadowRoot!.querySelector(".tool-call-row")! as HTMLElement;
     row.click();
     expect(opened).toBe(false);
@@ -1719,5 +1730,140 @@ describe("Openp41geAgents (custom element)", () => {
     expect(content.querySelector(".composer-caret")).toBeNull();
     expect(content.querySelector(".composer-highlight")?.textContent).toBe("world");
     expect(content.textContent).toBe("hello world");
+  });
+});
+
+describe("Openp41geAgents paged transcript", () => {
+  type Msg = { id: string; role: "user" | "assistant"; content: string; timestamp: number };
+
+  function makeMessages(total: number): Msg[] {
+    const out: Msg[] = [];
+    for (let i = 0; i < total; i++) {
+      out.push({
+        id: "m-" + i,
+        role: "assistant",
+        content: "message " + i + " needle",
+        timestamp: 1000 + i,
+      });
+    }
+    return out;
+  }
+
+  function mount() {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it("opens in paged mode and reports hasOlderMessages", async () => {
+    const el = mount();
+    await el.updateComplete;
+    el.openTranscriptPaged({ id: "c1", title: "Chat", providerId: "vllm" }, {
+      chatId: "c1",
+      start: 2,
+      total: 5,
+      messages: makeMessages(5).slice(2, 5),
+    });
+    await el.updateComplete;
+    expect(el.transcriptTotal).toBe(5);
+    expect(el.hasOlderMessages).toBe(true);
+    expect(el.shadowRoot!.querySelectorAll(".chat-message").length).toBe(3);
+  });
+
+  it("prepends the older page via the loadMessages seam", async () => {
+    const el = mount();
+    await el.updateComplete;
+    const calls: Array<[string, number, number]> = [];
+    el.loadMessages = (chatId, offset, count) => {
+      calls.push([chatId, offset, count]);
+      return Promise.resolve({
+        chatId,
+        start: offset,
+        total: 5,
+        messages: makeMessages(5).slice(offset, offset + count),
+      });
+    };
+    el.openTranscriptPaged({ id: "c1", title: "Chat", providerId: "vllm" }, {
+      chatId: "c1",
+      start: 2,
+      total: 5,
+      messages: makeMessages(5).slice(2, 5),
+    });
+    await el.updateComplete;
+
+    await el.loadOlderMessages();
+    await el.updateComplete;
+    expect(calls[0]).toEqual(["c1", 0, 2]);
+    expect(el.shadowRoot!.querySelectorAll(".chat-message").length).toBe(5);
+    expect(el.hasOlderMessages).toBe(false);
+    expect(el.transcriptTotal).toBe(5);
+  });
+
+  it("does not fetch once the window reaches the transcript start", async () => {
+    const el = mount();
+    await el.updateComplete;
+    const calls: number[] = [];
+    el.loadMessages = (_chatId, offset, count) => {
+      calls.push(offset);
+      return Promise.resolve({
+        chatId: "c1",
+        start: offset,
+        total: 5,
+        messages: makeMessages(5).slice(offset, offset + count),
+      });
+    };
+    el.openTranscriptPaged({ id: "c1", title: "Chat", providerId: "vllm" }, {
+      chatId: "c1",
+      start: 0,
+      total: 5,
+      messages: makeMessages(5),
+    });
+    await el.updateComplete;
+    await el.loadOlderMessages();
+    expect(calls.length).toBe(0);
+  });
+
+  it("navigates to a search hit by loading its page", async () => {
+    const el = mount();
+    await el.updateComplete;
+    // The hit lives at m-30, outside the seeded window (m-0..m-19).
+    el.chatSearch = () =>
+      Promise.resolve({
+        query: "needle",
+        regex: false,
+        caseSensitive: false,
+        total: 9,
+        hits: [{ messageId: "m-30", text: "needle", order: 0, messageIndex: 30 }],
+      });
+    el.loadMessages = (_chatId, offset, count) =>
+      Promise.resolve({
+        chatId: "c1",
+        start: Math.max(0, offset),
+        total: 40,
+        messages: makeMessages(40).slice(Math.max(0, offset), Math.max(0, offset) + count),
+      });
+    el.openTranscriptPaged({ id: "c1", title: "Chat", providerId: "vllm" }, {
+      chatId: "c1",
+      start: 0,
+      total: 40,
+      messages: makeMessages(20),
+    });
+    await el.updateComplete;
+
+    const btn = el.shadowRoot!.querySelector(".bb-find") as HTMLButtonElement;
+    btn.click();
+    await el.updateComplete;
+    const input = el.shadowRoot!.querySelector(".chat-findbar input") as HTMLInputElement;
+    input.value = "needle";
+    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 200));
+    await el.updateComplete;
+
+    const active = el.shadowRoot!.querySelector("mark.chat-hit-active") as HTMLElement;
+    expect(active).toBeTruthy();
+    expect(el.shadowRoot!.querySelectorAll("mark.chat-hit").length).toBe(1);
+    expect(
+      el.shadowRoot!.querySelector(".chat-findbar .find-count")!.textContent!.trim(),
+    ).toBe("1/9");
   });
 });

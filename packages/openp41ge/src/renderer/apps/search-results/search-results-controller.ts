@@ -30,6 +30,8 @@ export class SearchResultsController extends BaseController {
   private _hint = "";
   private _rows: string[] = [];
   private _bodyHost: HTMLElement | null = null;
+  private _list: HTMLElement | null = null;
+  private _wrap = false;
 
   mount(container: HTMLElement): void {
     this.container = container;
@@ -67,50 +69,69 @@ export class SearchResultsController extends BaseController {
     const shell = document.createElement("div");
     shell.style.cssText = "display:flex;flex-direction:column;width:100%;height:100%;";
 
-    // Header: the query and how many matches were found.
-    const header = document.createElement("div");
-    header.style.cssText =
-      "flex-shrink:0;padding:10px 14px;border-bottom:1px solid var(--border-color,#2a2a2a);" +
-      "display:flex;align-items:baseline;gap:8px;background:var(--bg-secondary,#1a1a1a);";
-    const q = this._query();
-    const qEl = document.createElement("span");
-    qEl.textContent = q ? `"${q}"` : "Search results";
-    qEl.style.cssText = "font-size:13px;font-weight:600;color:var(--text-primary,#d4d4d4);";
-    const countEl = document.createElement("span");
-    countEl.textContent = `${this._rows.length} file${this._rows.length === 1 ? "" : "s"}`;
-    countEl.style.cssText = "font-size:11px;color:var(--text-muted,#888);";
-    header.appendChild(qEl);
-    header.appendChild(countEl);
-    shell.appendChild(header);
+    const style = document.createElement("style");
+    style.textContent = `
+      .sr-list { flex:1; min-height:0; overflow:auto; padding:4px 0; font-family:var(--font-mono,'JetBrains Mono',monospace); font-size:12px; }
+      .sr-row {
+        display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:5px 14px;
+        background:transparent; border:none; cursor:pointer; color:var(--text-secondary,#bbb);
+        font:inherit; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      }
+      .sr-row:hover { background:var(--bg-active,#2d2d2d); color:var(--text-primary,#e4e4e4); }
+      .sr-row-icon { flex-shrink:0; font-size:12px; opacity:0.8; }
+      .sr-row-text { overflow:hidden; text-overflow:ellipsis; }
+      .sr-list.wrapped .sr-row {
+        align-items:flex-start;
+        white-space:pre-wrap;
+        word-break:break-word;
+        overflow:visible;
+        text-overflow:clip;
+      }
+      .sr-list.wrapped .sr-row-text {
+        overflow:visible;
+        text-overflow:clip;
+      }
+      .sr-bottom {
+        flex-shrink:0; display:flex; align-items:stretch; height:32px;
+        border-top:1px solid var(--border-color,#2a2a2a);
+        background:var(--bg-primary,#1e1e1e);
+      }
+      .sr-spacer { flex:1; }
+      .sr-wrap-btn {
+        display:flex; align-items:center; justify-content:center;
+        width:calc(32px + var(--grid-edge-right-pad,0px));
+        align-self:stretch;
+        background:transparent; border:none;
+        color:var(--text-secondary,#999); cursor:pointer;
+        padding:0 var(--grid-edge-right-pad,0px) 0 0;
+        box-sizing:border-box; flex-shrink:0;
+      }
+      .sr-wrap-btn:hover { background:rgba(255,255,255,0.07); color:var(--text-primary,#fff); }
+      .sr-wrap-btn.active { background:rgba(255,255,255,0.1); color:var(--text-primary,#fff); }
+      .sr-wrap-btn svg { display:block; }
+    `;
+    shell.appendChild(style);
 
     const list = document.createElement("div");
-    list.style.cssText =
-      "flex:1;min-height:0;overflow:auto;padding:4px 0;font-family:" +
-      "var(--font-mono,'JetBrains Mono',monospace);font-size:12px;";
+    list.className = "sr-list" + (this._wrap ? " wrapped" : "");
 
     for (const p of this._rows) {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "sr-row";
       row.title = p;
-      row.style.cssText =
-        "display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:5px 14px;" +
-        "background:transparent;border:none;cursor:pointer;color:var(--text-secondary,#bbb);" +
-        "font:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-      row.addEventListener("mouseenter", () => {
-        row.style.background = "var(--bg-active,#2d2d2d)";
-        row.style.color = "var(--text-primary,#e4e4e4)";
-      });
-      row.addEventListener("mouseleave", () => {
-        row.style.background = "transparent";
-        row.style.color = "var(--text-secondary,#bbb)";
-      });
+      // Flag the row as a file source so the shared custom drag pipeline
+      // (init-drag-system) picks it up: drag shows the bitmap ghost and a
+      // drop in the grid positions a file-viewer tab; a plain click still
+      // opens the preview in the next cell (drags suppress that trailing
+      // click via the pipeline's data-file-path suppression).
+      row.setAttribute("data-file-path", p);
       const icon = document.createElement("span");
+      icon.className = "sr-row-icon";
       icon.textContent = "\u{1f4c4}"; // 📄
-      icon.style.cssText = "flex-shrink:0;font-size:12px;opacity:0.8;";
       const text = document.createElement("span");
+      text.className = "sr-row-text";
       text.textContent = p;
-      text.style.cssText = "overflow:hidden;text-overflow:ellipsis;";
       row.appendChild(icon);
       row.appendChild(text);
       row.addEventListener("click", () => {
@@ -123,9 +144,33 @@ export class SearchResultsController extends BaseController {
       list.appendChild(row);
     }
 
+    this._list = list;
     this._bodyHost = list;
     shell.appendChild(list);
+
+    // Bottom bar with the line-wrap toggle (mirrors the log viewer / editor).
+    const bottom = document.createElement("div");
+    bottom.className = "sr-bottom";
+    const spacer = document.createElement("span");
+    spacer.className = "sr-spacer";
+    const wrapBtn = document.createElement("button");
+    wrapBtn.type = "button";
+    wrapBtn.className = "sr-wrap-btn" + (this._wrap ? " active" : "");
+    wrapBtn.title = "Toggle line wrapping";
+    wrapBtn.setAttribute("aria-label", "Toggle line wrapping");
+    wrapBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12"/><path d="M2 8h8"/><path d="M2 12h6"/><path d="M13 10l2 2-2 2"/><path d="M15 12h-5"/></svg>`;
+    wrapBtn.addEventListener("click", () => this._toggleWrap(wrapBtn));
+    bottom.appendChild(spacer);
+    bottom.appendChild(wrapBtn);
+    shell.appendChild(bottom);
+
     container.appendChild(shell);
+  }
+
+  private _toggleWrap(btn: HTMLButtonElement): void {
+    this._wrap = !this._wrap;
+    if (this._list) this._list.classList.toggle("wrapped", this._wrap);
+    btn.classList.toggle("active", this._wrap);
   }
 
   unmount(): void {
@@ -155,16 +200,6 @@ export class SearchResultsController extends BaseController {
     this._argsString = (state.argsString as string) || parsed?.argsString || "";
     this._result = (state.result as string) || parsed?.result || "";
     this._hint = (state.hint as string) || parsed?.hint || "";
-  }
-
-  private _query(): string {
-    let args: Record<string, unknown> = {};
-    try {
-      args = this._argsString ? JSON.parse(this._argsString) : {};
-    } catch {
-      args = {};
-    }
-    return typeof args.query === "string" ? args.query : "";
   }
 }
 

@@ -641,6 +641,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
   chat: {
     list: () => ipcRenderer.invoke("chat:list"),
     get: (id) => ipcRenderer.invoke("chat:get", id),
+    getHeader: (id) => ipcRenderer.invoke("chat:getHeader", id),
+    getMessages: (id, offset, count) => ipcRenderer.invoke("chat:getMessages", id, offset, count),
     create: (opts) => ipcRenderer.invoke("chat:create", opts),
     delete: (id) => ipcRenderer.invoke("chat:delete", id),
     archive: (id) => ipcRenderer.invoke("chat:archive", id),

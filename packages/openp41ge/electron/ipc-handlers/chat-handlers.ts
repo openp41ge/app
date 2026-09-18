@@ -61,6 +61,12 @@ export function registerChatHandlers(
 
   ipcMain.handle("chat:get", async (_e, id: string) => store.get(id));
 
+  ipcMain.handle("chat:getHeader", async (_e, id: string) => store.getHeader(id));
+
+  ipcMain.handle("chat:getMessages", async (_e, id: string, offset: number, count: number) =>
+    store.getMessages(id, offset, count),
+  );
+
   ipcMain.handle("chat:create", async (_e, opts?: { providerId?: string; title?: string }) => {
     const chat = store.create(opts ?? {});
     broadcast("chat:changed", {});

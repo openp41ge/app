@@ -134,8 +134,8 @@ describe("searchTranscript", () => {
     const r = searchTranscript(chat, "world");
     expect(r.total).toBe(2);
     expect(r.hits).toEqual([
-      { messageId: "u-hell", text: "world", order: 0 },
-      { messageId: "a-0", text: "world", order: 0 },
+      { messageId: "u-hell", text: "world", order: 0, messageIndex: 0 },
+      { messageId: "a-0", text: "world", order: 0, messageIndex: 1 },
     ]);
   });
 

@@ -1021,14 +1021,14 @@ export class Openp41geLogViewer extends LitElement {
           justify-content: center;
           gap: 4px;
           align-self: stretch;
-          aspect-ratio: 1 / 1;
+          width: calc(34px + var(--grid-edge-right-pad, 0px));
           background: transparent;
           border: 1px solid transparent;
           color: var(--text-secondary, #999);
           cursor: pointer;
           font-size: 12px;
           font-family: inherit;
-          padding: 0;
+          padding: 0 var(--grid-edge-right-pad, 0px) 0 0;
           box-sizing: border-box;
           flex-shrink: 0;
         }
@@ -1202,10 +1202,10 @@ export class Openp41geLogViewer extends LitElement {
         .find-entry-btn {
           flex-shrink: 0;
           align-self: stretch;
-          aspect-ratio: 1 / 1;
           display: grid;
           place-items: center;
-          padding: 0;
+          width: calc(34px + var(--grid-edge-left-pad, 0px));
+          padding: 0 0 0 var(--grid-edge-left-pad, 0px);
           cursor: pointer;
           background: transparent;
           border: 1px solid transparent;
@@ -1337,10 +1337,10 @@ export class Openp41geLogViewer extends LitElement {
         .filter-entry-btn {
           flex-shrink: 0;
           align-self: stretch;
-          aspect-ratio: 1 / 1;
           display: grid;
           place-items: center;
-          padding: 0;
+          width: calc(34px + var(--grid-edge-left-pad, 0px));
+          padding: 0 0 0 var(--grid-edge-left-pad, 0px);
           cursor: pointer;
           background: transparent;
           border: 1px solid transparent;

@@ -4,12 +4,14 @@
  *
  * A search result is a LIST of matching file paths, not file content — so it
  * must NOT render a `<file-editor>`. It renders the matches as read-only rows,
- * with the query + match count in the header, and clicking a row dispatches
- * `openp41ge:open-search-result-file` so the file opens in the next cell.
+ * with a bottom bar containing the line-wrap toggle, and clicking a row
+ * dispatches `openp41ge:open-search-result-file` so the file opens in the next
+ * cell.
  *
  * Covers:
  *   - rows render for each result path (and no file-editor is created),
- *   - header shows the query and the match count,
+ *   - the bottom bar has the line-wrap toggle and there is no top header,
+ *   - toggling wrap flips the `wrapped` class + active state on the button,
  *   - clicking a row dispatches the file-open event with the row's path,
  *   - empty result shows the no-matches fallback,
  *   - restore() re-parses the serialised context.
@@ -50,9 +52,29 @@ describe("SearchResultsController", () => {
     expect(host.querySelector("file-editor")).toBeNull();
     expect(host.textContent).toContain("/repo/src/store.ts");
     expect(host.textContent).toContain("/repo/src/store/actions.ts");
-    // Header query + count.
-    expect(host.textContent).toContain('"store"');
-    expect(host.textContent).toContain("3 files");
+    // No top header; a bottom bar holds the line-wrap toggle.
+    expect(host.querySelector(".sr-bottom")).not.toBeNull();
+    expect(host.querySelector(".sr-wrap-btn")).not.toBeNull();
+  });
+
+  it("bottom-bar wrap toggle flips the wrapped class and active state", () => {
+    pending({
+      toolName: "search_files",
+      argsString: JSON.stringify({ query: "store" }),
+      result: "/repo/src/a/very/long/path/that/should/wrap.ts\n/repo/src/store.ts",
+      hint: 'search_files · "store"',
+    });
+    controller.mount(host);
+    const list = host.querySelector(".sr-list")!;
+    const btn = host.querySelector(".sr-wrap-btn")! as HTMLButtonElement;
+    expect(list.classList.contains("wrapped")).toBe(false);
+    expect(btn.classList.contains("active")).toBe(false);
+    btn.click();
+    expect(list.classList.contains("wrapped")).toBe(true);
+    expect(btn.classList.contains("active")).toBe(true);
+    btn.click();
+    expect(list.classList.contains("wrapped")).toBe(false);
+    expect(btn.classList.contains("active")).toBe(false);
   });
 
   it("clicking a row dispatches open-search-result-file with that path", () => {
@@ -72,6 +94,20 @@ describe("SearchResultsController", () => {
     (rows[1] as HTMLButtonElement).click();
     expect(opened).toEqual({ sourceTabId: "search-tab-1", path: "/repo/src/b.ts" });
     document.removeEventListener("openp41ge:open-search-result-file", onOpen);
+  });
+
+  it("flags each row with data-file-path so the shared drag pipeline can drag it to the grid", () => {
+    pending({
+      toolName: "search_files",
+      argsString: JSON.stringify({ query: "store" }),
+      result: "/repo/src/a.ts\n/repo/src/b.ts",
+      hint: 'search_files · "store"',
+    });
+    controller.mount(host);
+    const rows = host.querySelectorAll(".sr-row") as NodeListOf<HTMLElement>;
+    expect(rows).toHaveLength(2);
+    expect(rows[0].getAttribute("data-file-path")).toBe("/repo/src/a.ts");
+    expect(rows[1].getAttribute("data-file-path")).toBe("/repo/src/b.ts");
   });
 
   it("empty result shows the no-matches fallback", () => {

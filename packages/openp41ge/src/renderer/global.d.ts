@@ -3,8 +3,10 @@ import type {
   ChatSummary,
   ChatSearchResult,
   ChatSearchOptions,
+  ChatTranscriptPage,
   ChatTranscriptSearch,
   ChatDeltaPayload,
+  ChatHeader,
   ChatToolPayload,
   ChatStatusPayload,
   ChatLiveRatePayload,
@@ -308,6 +310,8 @@ declare global {
       chat: {
         list: () => Promise<ChatSummary[]>;
         get: (id: string) => Promise<Chat | null>;
+        getHeader: (id: string) => Promise<ChatHeader | null>;
+        getMessages: (id: string, offset: number, count: number) => Promise<ChatTranscriptPage>;
         create: (opts?: { providerId?: string; title?: string }) => Promise<Chat>;
         delete: (id: string) => Promise<boolean>;
         archive: (id: string) => Promise<boolean>;

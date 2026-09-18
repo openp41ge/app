@@ -13,12 +13,14 @@
 
 import { defaultChatTitle } from "openp41ge-constants";
 import { searchTranscript } from "openp41ge-agents";
-import type { Chat, ChatSearchOptions, ChatSearchResult, ChatSummary, ChatTranscriptSearch } from "openp41ge-agents";
+import type { Chat, ChatHeader, ChatSearchOptions, ChatSearchResult, ChatSummary, ChatTranscriptPage, ChatTranscriptSearch } from "openp41ge-agents";
 
 /** Narrow read/write contract for the chat store. */
 export interface ChatStoreModel {
   list(): Promise<ChatSummary[]>;
   get(id: string): Promise<Chat | null>;
+  getHeader(id: string): Promise<ChatHeader | null>;
+  getMessages(id: string, offset: number, count: number): Promise<ChatTranscriptPage>;
   create(opts?: { providerId?: string; title?: string }): Promise<Chat>;
   delete(id: string): Promise<boolean>;
   archive(id: string): Promise<boolean>;
@@ -42,6 +44,12 @@ export class IpcChatStoreModel implements ChatStoreModel {
   }
   get(id: string): Promise<Chat | null> {
     return window.openp41ge.chat.get(id);
+  }
+  getHeader(id: string): Promise<ChatHeader | null> {
+    return window.openp41ge.chat.getHeader(id);
+  }
+  getMessages(id: string, offset: number, count: number): Promise<ChatTranscriptPage> {
+    return window.openp41ge.chat.getMessages(id, offset, count);
   }
   create(opts?: { providerId?: string; title?: string }): Promise<Chat> {
     return window.openp41ge.chat.create(opts);
@@ -124,6 +132,28 @@ export class TestChatStoreModel implements ChatStoreModel {
 
   async get(id: string): Promise<Chat | null> {
     return this.chats.get(id) ?? null;
+  }
+
+  async getHeader(id: string): Promise<ChatHeader | null> {
+    const chat = this.chats.get(id);
+    if (!chat) return null;
+    return {
+      id: chat.id,
+      title: chat.title,
+      providerId: chat.providerId,
+      totalMessages: chat.messages.length,
+      description: chat.description,
+    };
+  }
+
+  async getMessages(id: string, offset: number, count: number): Promise<ChatTranscriptPage> {
+    this.calls.push({ op: "getMessages", args: [id, offset, count] });
+    const chat = this.chats.get(id);
+    if (!chat) return { chatId: id, start: 0, total: 0, messages: [] };
+    const total = chat.messages.length;
+    const start = Math.max(0, Math.min(offset, total));
+    const end = Math.min(total, start + Math.max(0, count));
+    return { chatId: id, start, total, messages: chat.messages.slice(start, end) };
   }
 
   async create(opts: { providerId?: string; title?: string } = {}): Promise<Chat> {

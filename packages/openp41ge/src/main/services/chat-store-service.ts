@@ -11,7 +11,7 @@ import fs from "fs";
 import path from "path";
 import { createLogger } from "openp41ge-logger";
 import { CHATS_FILENAME, defaultChatTitle } from "openp41ge-constants";
-import { searchTranscript } from "openp41ge-agents";
+import { searchTranscript } from "openp41ge-agents/search";
 
 export { searchTranscript };
 import type {
@@ -19,7 +19,9 @@ import type {
   ChatMessage,
   ChatSearchOptions,
   ChatSearchResult,
+  ChatHeader,
   ChatSummary,
+  ChatTranscriptPage,
   ChatTranscriptSearch,
   ToolCall,
   ToolCallStatus,
@@ -163,6 +165,31 @@ export class ChatStoreService {
 
   get(id: string): Chat | null {
     return this._chats.get(id) ?? null;
+  }
+
+  /** Fetch a lightweight chat header (no messages) so a chat can be opened
+   *  without pulling the whole transcript into the renderer. */
+  getHeader(id: string): ChatHeader | null {
+    const chat = this.get(id);
+    if (!chat) return null;
+    return {
+      id: chat.id,
+      title: chat.title,
+      providerId: chat.providerId,
+      totalMessages: chat.messages.length,
+      description: chat.description,
+    };
+  }
+
+  /** Fetch a page slice of a chat transcript (by transcript index, 0-based)
+   *  so the renderer never has to hold an entire long conversation at once. */
+  getMessages(chatId: string, offset = 0, count = 100): ChatTranscriptPage {
+    const chat = this.get(chatId);
+    if (!chat) return { chatId, start: 0, total: 0, messages: [] };
+    const total = chat.messages.length;
+    const start = Math.max(0, Math.min(offset, total));
+    const end = Math.min(total, start + Math.max(0, count));
+    return { chatId, start, total, messages: chat.messages.slice(start, end) };
   }
 
   create(opts: { providerId?: string; title?: string } = {}): Chat {
