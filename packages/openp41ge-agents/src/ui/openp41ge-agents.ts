@@ -2041,7 +2041,7 @@ class Openp41geAgents extends LitElement {
           border: none;
           border-radius: 6px;
           background: transparent;
-          padding: 2px 6px;
+          padding: 2px 2px 2px 6px;
           font: inherit;
           color: var(--text-secondary, #9a9a9a);
           cursor: pointer;
