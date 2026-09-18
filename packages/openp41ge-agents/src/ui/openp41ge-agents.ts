@@ -1964,7 +1964,7 @@ class Openp41geAgents extends LitElement {
           flex-shrink: 0;
           gap: 0;
           background: var(--bg-primary, #1e1e1e);
-          border-bottom: 1px solid var(--border-color, #2a2a2a);
+          border-top: 1px solid var(--border-color, #2a2a2a);
           font-size: 11px;
           color: var(--text-secondary, #999);
         }
