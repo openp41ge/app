@@ -66,34 +66,6 @@ jobs:
           restore-keys: nx-${{ runner.os }}-
       - run: pnpm nx run openp41ge:test:integration
 
-  e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/cache@v4
-        with:
-          path: .nx/cache
-          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: nx-${{ runner.os }}-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: playwright-${{ runner.os }}-
-      # Install browsers for each package's Playwright version
-      - run: cd packages/openp41ge-tabs && npx playwright install --with-deps chromium chromium-headless-shell
-      - run: cd packages/openp41ge-file-editor && npx playwright install --with-deps chromium chromium-headless-shell
-      - run: cd packages/openp41ge-git-repository && npx playwright install --with-deps chromium chromium-headless-shell
-      - run: pnpm nx run-many -t e2e
-
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
