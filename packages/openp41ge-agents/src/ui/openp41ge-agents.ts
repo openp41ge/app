@@ -115,6 +115,12 @@ function formatTokens(n?: number): string {
 // (same as the log viewer) so in-tab search looks consistent app-wide.
 const ICON_FIND =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="20" height="20" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
+const ICON_REGEX =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="M197-199q-56-57-86.5-130T80-482q0-80 30-153t87-130l57 57q-46 45-70 103.5T160-482q0 64 24.5 122.5T254-256l-57 57Zm140.5-58.5Q320-275 320-300t17.5-42.5Q355-360 380-360t42.5 17.5Q440-325 440-300t-17.5 42.5Q405-240 380-240t-42.5-17.5ZM519-440v-71l-61 36-40-70 61-35-61-35 40-70 61 36v-71h80v71l61-36 40 70-61 35 61 35-40 70-61-36v71h-80Zm244 241-57-57q46-45 70-103.5T800-482q0-80-30-153t-87-130l57-57q56 57 86.5 130T880-482q0 80-30 153t-87 130Z"/></svg>';
+
+const ICON_MATCH_CASE =
+  '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor"><path d="m131-252 165-440h79l165 440h-76l-39-112H247l-40 112h-76Zm139-176h131l-64-182h-4l-63 182Zm395 186q-51 0-81-27.5T554-342q0-44 34.5-72.5T677-443q23 0 45 4t38 11v-12q0-29-20.5-47T685-505q-23 0-42 9.5T610-468l-47-35q24-29 54.5-43t68.5-14q69 0 103 32.5t34 97.5v178h-63v-37h-4q-14 23-38 35t-53 12Zm12-54q35 0 59.5-24t24.5-56q-14-8-33.5-12.5T689-393q-32 0-50 14t-18 37q0 20 16 33t40 13Z"/></svg>';
+
 const ICON_CHAT_PREV =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5v-5M2.2 4.8l2.8-2.8 2.8 2.8"/></svg>';
 const ICON_CHAT_NEXT =
@@ -144,6 +150,8 @@ class Openp41geAgents extends LitElement {
   @state() private _searchQuery = "";
   @state() private _searchHits: ChatHit[] = [];
   @state() private _searchIndex = 0;
+  @state() private _searchRegex = false;
+  @state() private _searchCase = false;
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
 
@@ -410,6 +418,16 @@ class Openp41geAgents extends LitElement {
     }
   };
 
+  private _toggleSearchRegex(): void {
+    this._searchRegex = !this._searchRegex;
+    if (this._searchQuery) this._computeAndMark(true);
+  }
+
+  private _toggleSearchCase(): void {
+    this._searchCase = !this._searchCase;
+    if (this._searchQuery) this._computeAndMark(true);
+  }
+
   /** Cmd/Ctrl+F opens the in-chat find bar (like the log viewer's scoped find). */
   private _onHostKeyDown = (e: KeyboardEvent): void => {
     if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "F")) {
@@ -426,6 +444,15 @@ class Openp41geAgents extends LitElement {
     this._scrollToHit(this._searchHits[this._searchIndex]);
   }
 
+  /** Build a search regex, or null if the pattern is invalid (treat as no hits). */
+  private _safeRegex(q: string, caseSensitive: boolean): RegExp | null {
+    try {
+      return new RegExp(q, caseSensitive ? "g" : "gi");
+    } catch {
+      return null;
+    }
+  }
+
   /** Recompute the occurrences over the current DOM and highlight them all. */
   private _computeAndMark(scrollActive: boolean): void {
     this._clearMarks();
@@ -433,17 +460,33 @@ class Openp41geAgents extends LitElement {
     const q = this._searchQuery.trim();
     const hits: ChatHit[] = [];
     if (this._searchOpen && list && q.length > 1) {
-      const needle = q.toLowerCase();
-      for (const msg of list.querySelectorAll<HTMLElement>(".chat-message")) {
-        const flat = this._flatText(msg);
-        if (!flat) continue;
-        const lower = flat.toLowerCase();
-        let i = 0;
-        for (;;) {
-          const at = lower.indexOf(needle, i);
-          if (at === -1) break;
-          hits.push({ msg, start: at, end: at + needle.length });
-          i = at + needle.length;
+      if (this._searchRegex) {
+        const re = this._safeRegex(q, this._searchCase);
+        if (re) {
+          for (const msg of list.querySelectorAll<HTMLElement>(".chat-message")) {
+            const flat = this._flatText(msg);
+            if (!flat) continue;
+            re.lastIndex = 0;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(flat)) !== null) {
+              hits.push({ msg, start: m.index, end: m.index + m[0].length });
+              if (m[0].length === 0) re.lastIndex++;
+            }
+          }
+        }
+      } else {
+        const needle = this._searchCase ? q : q.toLowerCase();
+        for (const msg of list.querySelectorAll<HTMLElement>(".chat-message")) {
+          const flat = this._flatText(msg);
+          if (!flat) continue;
+          const hay = this._searchCase ? flat : flat.toLowerCase();
+          let idx = 0;
+          for (;;) {
+            const at = hay.indexOf(needle, idx);
+            if (at === -1) break;
+            hits.push({ msg, start: at, end: at + needle.length });
+            idx = at + needle.length;
+          }
         }
       }
     }
@@ -1973,7 +2016,7 @@ class Openp41geAgents extends LitElement {
           display: flex;
           align-items: center;
           height: 34px;
-          padding: 0 12px;
+          padding: 0px 0px 0px 12px;
           flex-shrink: 0;
           gap: 0;
           background: var(--bg-primary, #1e1e1e);
@@ -2025,6 +2068,9 @@ class Openp41geAgents extends LitElement {
         .chat-findbar .find-toggle:disabled {
           opacity: 0.4;
           cursor: default;
+        }
+        .chat-findbar .find-toggle.on {
+          color: var(--text-primary, #ddd);
         }
         mark.chat-hit {
           background: rgba(255, 200, 0, 0.28);
@@ -2920,6 +2966,22 @@ class Openp41geAgents extends LitElement {
                     >`
                   : html``
               }
+              <button
+                type="button"
+                class="find-toggle ${this._searchRegex ? "on" : ""}"
+                title="Regex"
+                aria-pressed=${this._searchRegex}
+                @click=${() => this._toggleSearchRegex()}
+                >${unsafeHTML(ICON_REGEX)}</button
+              >
+              <button
+                type="button"
+                class="find-toggle ${this._searchCase ? "on" : ""}"
+                title="Match case"
+                aria-pressed=${this._searchCase}
+                @click=${() => this._toggleSearchCase()}
+                >${unsafeHTML(ICON_MATCH_CASE)}</button
+              >
               <button
                 type="button"
                 class="find-toggle"
