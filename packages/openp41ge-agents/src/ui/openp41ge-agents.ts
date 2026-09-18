@@ -332,22 +332,22 @@ class Openp41geAgents extends LitElement {
   /** Short human-readable token usage line for the bottom bar. */
   private _formatUsage(u: TokenUsage): TemplateResult {
     return html`
-      <span
+      <button
         class="bb-stat"
         ${tooltipContent({
           type: "detail",
           title: "Tokens uploaded",
           subtitle: `Amount sent to the model (system prompt, connected worktree context, and your messages). ${u.promptTokens.toLocaleString("en-US")} tokens uploaded.`,
         })}
-        >${this._fmtTok(u.promptTokens)}${this._arrow(false)}</span>
-      <span
+        >${this._fmtTok(u.promptTokens)}${this._arrow(false)}</button>
+      <button
         class="bb-stat"
         ${tooltipContent({
           type: "detail",
           title: "Tokens downloaded",
           subtitle: `Amount the model generated in this response. ${u.completionTokens.toLocaleString("en-US")} tokens downloaded.`,
         })}
-        >${this._fmtTok(u.completionTokens)}${this._arrow(true)}</span>
+        >${this._fmtTok(u.completionTokens)}${this._arrow(true)}</button>
     `;
   }
 
@@ -2036,10 +2036,19 @@ class Openp41geAgents extends LitElement {
           transform: rotate(135deg);
         }
         .bb-stat {
-          cursor: help;
+          display: inline-flex;
+          align-items: center;
+          border: none;
+          border-radius: 6px;
+          background: transparent;
+          padding: 2px 6px;
+          font: inherit;
           color: var(--text-secondary, #9a9a9a);
+          cursor: pointer;
+          user-select: none;
         }
         .bb-stat:hover {
+          background: var(--bg-hover, #2a2d2e);
           color: var(--text-primary, #ddd);
         }
         .chat-status {
@@ -2660,7 +2669,7 @@ class Openp41geAgents extends LitElement {
           box-sizing: border-box;
           display: flex;
           align-items: center;
-          gap: 2px;
+          gap: 4px;
           padding: 0 8px;
           font-size: 11.5px;
           font-weight: 500;
