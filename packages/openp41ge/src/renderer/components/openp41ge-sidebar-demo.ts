@@ -198,7 +198,7 @@ export class Openp41geSidebarDemo extends LitElement {
           height: 100%;
           overflow: hidden;
           background: var(--bg-secondary, #161616);
-          border-radius: 0 6px 6px 0;
+          border-radius: 6px;
         }
         .inner {
           position: absolute;
