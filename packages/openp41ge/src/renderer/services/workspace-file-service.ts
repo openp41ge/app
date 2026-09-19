@@ -63,6 +63,15 @@ export class WorkspaceFileService {
     return "No workspace";
   }
 
+  /**
+   * Absolute app-data root, from the main process. Falls back to the release
+   * folder (`~/.openp41ge` resolved by the main-process handlers) for test and
+   * browser-only contexts where the bridge field is absent.
+   */
+  private _dataDir(): string {
+    return window.openp41ge?.dataDir?.() ?? "~/.openp41ge";
+  }
+
   // ── Open (via dialog) ───────────────────────────────
 
   /**
@@ -137,7 +146,7 @@ export class WorkspaceFileService {
   // ── List all workspaces ───────────────────────────
 
   /**
-   * List all .openp41ge-workspace files from ~/.openp41ge/workspaces/.
+   * List all .openp41ge-workspace files from <dataDir>/workspaces/.
    * Returns sorted array of { filePath, data }.
    */
   async listWorkspaces(): Promise<Array<{ filePath: string; data: WorkspaceFileData }>> {
@@ -148,7 +157,7 @@ export class WorkspaceFileService {
 
   /**
    * Create a new workspace file with the given name.
-   * Writes to ~/.openp41ge/workspaces/<uuid>.openp41ge-workspace
+   * Writes to <dataDir>/workspaces/<uuid>.openp41ge-workspace
    * and sets it as the open workspace.
    */
   async createWorkspace(name: string): Promise<WorkspaceFileData | null> {
@@ -159,16 +168,16 @@ export class WorkspaceFileService {
       name,
       version: WORKSPACE_FILE_VERSION,
       createdAt: now,
-      dataDir: `~/.openp41ge/workspaces-data/${uuid}`,
+      dataDir: `${this._dataDir()}/workspaces-data/${uuid}`,
       repos: [],
       lastActivatedAt: now,
       ...emptyWorkspaceSession(),
     };
 
-    const filePath = `~/.openp41ge/workspaces/${uuid}.openp41ge-workspace`;
+    const filePath = `${this._dataDir()}/workspaces/${uuid}.openp41ge-workspace`;
 
     // Ensure data directory exists
-    await window.openp41ge.dialog.ensureDir(`~/.openp41ge/workspaces-data/${uuid}`);
+    await window.openp41ge.dialog.ensureDir(`${this._dataDir()}/workspaces-data/${uuid}`);
 
     const written = await window.openp41ge.dialog.writeWorkspaceFile(filePath, data);
     if (!written) return null;

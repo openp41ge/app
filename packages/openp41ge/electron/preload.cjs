@@ -4,6 +4,7 @@ let _windowId = null;
 let _isDev = false;
 let _windowType = "workspace";
 let _workspacePath = null;
+let _dataDir = null;
 let _initResolve = null;
 /** Promise that resolves once openp41ge:init IPC message is received. */
 const _initPromise = new Promise((resolve) => {
@@ -16,6 +17,7 @@ ipcRenderer.on("openp41ge:init", (_event, data) => {
   _isDev = !!data.isDev;
   _windowType = data.windowType ?? "workspace";
   _workspacePath = data.workspacePath ?? null;
+  _dataDir = data.dataDir ?? null;
   // Store initial workspace state for the renderer to pick up
   _initialState = data.workspace;
   if (_initResolve) {
@@ -39,6 +41,8 @@ ipcRenderer.on("native:contextMenuAction", (_event, id) => {
 contextBridge.exposeInMainWorld("openp41ge", {
   platform: process.platform,
   isDev: () => _isDev,
+  /** Absolute app-data root (~/.openp41ge or ~/.openp41ge-dev). */
+  dataDir: () => _dataDir,
 
   /** Show a native context menu. Returns the id of the clicked item, or null if dismissed. */
   showContextMenu: (items) => {
@@ -597,7 +601,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     return () => ipcRenderer.removeListener("menu:open-logs", handler);
   },
 
-  /** Persistent log bus → main process (files under ~/.openp41ge/logs). */
+  /** Persistent log bus → main process (files under <dataDir>/logs). */
   logs: {
     /** Forward a batch of captured log entries to disk. */
     append: (entries) => ipcRenderer.send("log:append", entries),
@@ -740,7 +744,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** Reveal a file/folder in the native file manager (Finder). */
     revealInFinder: (filePath) => ipcRenderer.invoke("dialog:revealInFinder", filePath),
 
-    /** List all .openp41ge-workspace files in ~/.openp41ge/workspaces/. */
+    /** List all .openp41ge-workspace files in <dataDir>/workspaces/. */
     listWorkspaces: () => ipcRenderer.invoke("dialog:listWorkspaces"),
 
     /** Delete a .openp41ge-workspace file. Optionally also remove its data dir when deleteData is true. */

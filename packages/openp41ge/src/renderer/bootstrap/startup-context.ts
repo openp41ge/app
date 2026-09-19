@@ -152,7 +152,7 @@ export class StartupContext {
     // Initialize tab drag-and-drop system
     initDragSystem();
 
-    // Forward renderer log bus to the main process (~/.openp41ge/logs).
+    // Forward renderer log bus to the main process (<dataDir>/logs).
     initRendererLogTransport();
   }
 }

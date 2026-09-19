@@ -5,7 +5,8 @@
  * On each mutation, the entire workspace is serialized and written atomically.
  * On startup, the last saved state is restored.
  *
- * Uses OPENP41GE_E2E_DIR when running under tests, otherwise ~/.openp41ge/.
+ * Uses OPENP41GE_E2E_DIR when running under tests, otherwise the resolved
+ * app-data root (~/.openp41ge release, ~/.openp41ge-dev dev).
  */
 
 import fs from "fs";

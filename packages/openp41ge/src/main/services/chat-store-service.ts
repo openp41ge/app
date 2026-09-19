@@ -1,6 +1,7 @@
 /**
  * ChatStoreService — CRUD + search + open-state for the shared chat store,
- * persisted atomically to ~/.openp41ge/chats.json.
+ * persisted atomically to `<openp41geDir>/chats.json` (the app-data root,
+ * `~/.openp41ge` for release / `~/.openp41ge-dev` for the dev build).
  *
  * Mirrors WorkspaceStateStore's write strategy. The store is the single
  * source of truth for chats across all windows. "Opened once" bookkeeping

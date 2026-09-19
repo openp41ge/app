@@ -33,6 +33,7 @@ import {
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
 import { ConfigService } from "../src/main/services/config-service.js";
+import { resolveAppDataDir } from "../src/main/services/app-data-dir.js";
 import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-arg.js";
 import { ReposWatcher } from "./repos-watcher.js";
 
@@ -198,10 +199,8 @@ export class Openp41geApplication {
   // ── Step 2: Paths and Chrome flags ────────────────────────────────────
 
   private _initPaths(): void {
-    this.openp41geDir =
-      process.env.OPENP41GE_E2E_DIR ||
-      process.env.OPENP41GE_DIR ||
-      path.join(process.env.HOME || process.env.USERPROFILE || "", ".openp41ge");
+    // Single source of truth for the app-data root (dev vs release folder).
+    this.openp41geDir = resolveAppDataDir(app.isPackaged);
   }
 
   private _initChromeFlags(): void {
@@ -216,7 +215,7 @@ export class Openp41geApplication {
   // ── Step 3: Config ────────────────────────────────────────────────────
 
   private _initConfig(): void {
-    this.configService = new ConfigService();
+    this.configService = new ConfigService(this.openp41geDir);
     this.configService.init();
   }
 
@@ -224,7 +223,7 @@ export class Openp41geApplication {
 
   private _initServices(): void {
     // Fixed app-data root — the per-project store was removed with the
-    // project system. Repos live under ~/.openp41ge/repositories.
+    // project system. Repos live under the app-data root/repositories.
     const reposDir = this.reposDir;
 
     this.dispatcher = new OperationDispatcher();
@@ -384,13 +383,13 @@ export class Openp41geApplication {
     registerWindowManagerHandlers();
     registerDragHandlers(this.dragGhost);
     registerTerminalHandlers(this.terminalManager);
-    registerWorkspaceHandlers(this.workspaceService, this.dispatcher);
+    registerWorkspaceHandlers(this.workspaceService, this.dispatcher, this.openp41geDir);
     registerGitHandlers(this.gitCommitService, this.gitService);
     registerConfigHandlers(this.configService);
     registerLogHandlers(this.logStore);
     registerChatHandlers(this.chatStore, this.agentRuntime, this.chatProviders, this.configService);
     registerLifecycleHandlers(this.lifecycle);
-    registerDialogHandlers();
+    registerDialogHandlers(this.openp41geDir);
   }
 
   private _registerContextMenuHandler(): void {

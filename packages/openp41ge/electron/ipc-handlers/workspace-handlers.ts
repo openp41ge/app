@@ -2,7 +2,7 @@
  * Workspace IPC handlers — cloning, repos, worktrees, app reset.
  *
  * The workspace store (createWorkspace, addRepo, etc.) has been removed
- * — it was superseded by the project system (~/.openp41ge/<project>/).
+ * — it was superseded by the project system.
  *
  * Git operations for the Workspaces overlay (workspaceData:*) delegate to
  * WorktreeStore — the single repositories layout shared with the Explorer
@@ -24,15 +24,6 @@ import {
 } from "../../src/main/services/worktree-store.js";
 
 /**
- * Default on-disk repositories store (~/.openp41ge/repositories), matching
- * NodeGitService.reposDir so the Workspaces overlay and Explorer share the
- * same layout (bare .git/ + sibling worktree folders).
- */
-const store: WorktreeStore = createWorktreeStore(
-  path.join(os.homedir(), ".openp41ge", "repositories"),
-);
-
-/**
  * Encode a repo URL into a filesystem-safe directory name (legacy).
  * Kept only for `workspaceData:getDir`; repo operations use the
  * repositories store (see WorktreeStore).
@@ -48,8 +39,8 @@ function encodeRepoUrl(url: string): string {
  * Legacy workspaces-data base dir (only used by workspaceData:getDir; the
  * per-repo clones here were superseded by the repositories store).
  */
-function getWorkspaceDataDir(): string {
-  return path.join(os.homedir(), ".openp41ge", "workspaces-data");
+function getWorkspaceDataDir(openp41geDir: string): string {
+  return path.join(openp41geDir, "workspaces-data");
 }
 
 /**
@@ -58,6 +49,7 @@ function getWorkspaceDataDir(): string {
  */
 async function getWorkspaceStats(
   repos: Array<{ url: string; worktrees?: string[] }>,
+  store: WorktreeStore,
 ): Promise<{ filesChanged: number; added: number; deleted: number; untracked: number }> {
   let filesChanged = 0;
   let added = 0;
@@ -96,7 +88,15 @@ async function getWorkspaceStats(
 export function registerWorkspaceHandlers(
   workspaceService: WorkspaceService,
   dispatcher?: OperationDispatcher,
+  openp41geDir?: string,
 ): void {
+  // Single on-disk repositories store, matching NodeGitService.reposDir so the
+  // Workspaces overlay and Explorer share the same layout (bare .git/ + sibling
+  // worktree folders). Defaults to the release folder when not provided.
+  const store: WorktreeStore = createWorktreeStore(
+    path.join(openp41geDir ?? path.join(os.homedir(), ".openp41ge"), "repositories"),
+  );
+
   ipcMain.handle("workspace:clone", async (event, url: string) => {
     const session = workspaceService.clone(url);
     session.onProgress((progress: { percent: number; message: string }) => {
@@ -204,7 +204,7 @@ export function registerWorkspaceHandlers(
 
   /** Get the workspace-data directory path. */
   ipcMain.handle("workspaceData:getDir", async () => {
-    return getWorkspaceDataDir();
+    return getWorkspaceDataDir(openp41geDir ?? path.join(os.homedir(), ".openp41ge"));
   });
 
   /** Aggregate working-tree change stats (edits) for a saved workspace's worktrees. */
@@ -212,7 +212,7 @@ export function registerWorkspaceHandlers(
     "workspaceData:getWorkspaceStats",
     async (_event, repos: Array<{ url: string; worktrees?: string[] }>) => {
       try {
-        return await getWorkspaceStats(repos);
+        return await getWorkspaceStats(repos, store);
       } catch {
         return { filesChanged: 0, added: 0, deleted: 0, untracked: 0 };
       }

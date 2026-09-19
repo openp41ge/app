@@ -22,6 +22,8 @@ declare global {
     openp41ge: {
       platform: string;
       isDev: () => boolean;
+      /** Absolute app-data root (~/.openp41ge or ~/.openp41ge-dev). */
+      dataDir: () => string;
       isTest: boolean;
       /** Show a native context menu. Returns the id of the clicked item, or null if dismissed. */
       showContextMenu: (items: Array<{ label: string; id: string }>) => Promise<string | null>;
@@ -178,7 +180,7 @@ declare global {
         /** Reveal a file/folder in the native file manager (Finder). */
         revealInFinder: (filePath: string) => Promise<boolean>;
 
-        /** List all .openp41ge-workspace files in ~/.openp41ge/workspaces/. */
+        /** List all .openp41ge-workspace files in <dataDir>/workspaces/. */
         listWorkspaces: () => Promise<Array<{ filePath: string; data: import("../../layout/types").WorkspaceFileData }>>;
 
         /** Delete a workspace file; optionally also remove its data dir when deleteData is true. */
@@ -270,7 +272,7 @@ declare global {
         mkdir: (dirPath: string) => Promise<{ success: boolean; path: string }>;
       };
 
-      /** Persistent log bus → main process (files under ~/.openp41ge/logs). */
+      /** Persistent log bus → main process (files under <dataDir>/logs). */
       logs: {
         /** Forward a batch of captured log entries to disk. */
         append: (entries: Array<Record<string, unknown>>) => void;

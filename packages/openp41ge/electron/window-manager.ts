@@ -11,6 +11,7 @@ import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-logger";
 import type { TabNameGenerator } from "../src/main/index.js";
 import type { OperationDispatcher } from "../src/main/index.js";
+import { resolveAppDataDir } from "../src/main/services/app-data-dir.js";
 
 const log = createLogger("openp41ge", "window-manager");
 
@@ -225,6 +226,7 @@ export function createOpenp41geWindow(
         isDev,
         windowType: windowMeta.windowType,
         workspacePath: windowMeta.workspacePath,
+        dataDir: resolveAppDataDir(app.isPackaged),
       });
     }
   });

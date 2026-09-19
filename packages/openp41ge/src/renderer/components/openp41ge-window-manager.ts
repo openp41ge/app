@@ -151,7 +151,7 @@ export class Openp41geWindowManager extends LitElement {
   updated(): void {
     this._measureListOverflow();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
-      ".wm-search-btn, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close",
+      ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close",
     );
     const live = new Set<Element>();
     if (btns) {
@@ -177,7 +177,7 @@ export class Openp41geWindowManager extends LitElement {
         this._overlayScrollbar = OverlayScrollbar.attach(body, {
           axis: "vertical",
           container: layer,
-          inset: { top: "44px" },
+          inset: { top: "0" },
           zIndex: 0,
           size: 9,
           autoHide: true,
@@ -622,6 +622,35 @@ export class Openp41geWindowManager extends LitElement {
   private _workspaceListFooter(): TemplateResult {
     return html`
       <div class="ws-list-footer">
+        <button
+          class="dw-search"
+          aria-label="Search workspaces"
+          aria-pressed=${this._searchOpen}
+          data-tip="Search workspaces"
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            if (this._searchOpen) {
+              this._exitSearch();
+            } else {
+              this._startSearch();
+            }
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+        </button>
+        <span class="wm-footer-spacer"></span>
         ${
           this._workspaceDeleteMode
             ? html`
@@ -1417,53 +1446,62 @@ export class Openp41geWindowManager extends LitElement {
           letter-spacing: 0.02em;
           color: var(--text-secondary, #999);
         }
-        /* Top-level view header — sits below the window title bar and matches the
-           drawer header (same height/title), so a slide-in drawer's head lands on
-           the same row and the headers stay aligned. */
-        .wm-view-header {
-          display: flex;
-          align-items: center;
-          flex-shrink: 0;
-          height: 44px;
-          padding: 0 14px;
-          box-sizing: border-box;
-          background: var(--bg-secondary, #161616);
-          border-bottom: 1px solid var(--divider, #333);
-        }
-        .wm-view-title {
-          font-size: 13px;
-          font-weight: 600;
-          min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          color: var(--text-primary, #ddd);
-        }
-        .wm-search-btn {
+        /* Search toggle: full-height square icon button on the far left of
+           the persistent bottom bar; toggles the search bar that slides up
+           above the footer. */
+        .dw-search {
           flex: none;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 26px;
-          height: 26px;
-          margin-left: auto;
           border: none;
           background: transparent;
           color: var(--text-secondary, #999);
+          border-radius: 0;
+          height: 100%;
+          aspect-ratio: 1 / 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           cursor: pointer;
-          border-radius: 4px;
-          transition:
-            color 0.1s ease,
-            background 0.1s ease;
+          padding: 0;
+          /* Right-side separator between the search utility and the
+             right-aligned add/delete action group. */
+          border-right: 1px solid var(--divider, #333);
+          /* Flush against the window's rounded bottom-left corner:
+             content-box keeps the icon centred in the square content
+             (like .wt-refresh-btn) while the 8px left padding grows the
+             tile outward over the bar's removed left padding, insetting
+             the icon from the corner while the hover fill touches the
+             window edge. */
+          box-sizing: content-box;
+          padding-left: 8px;
+          user-select: none;
         }
-        .wm-search-btn:hover {
+        .dw-search:hover,
+        .dw-search[aria-pressed="true"] {
+          background: var(--bg-active, #37373d);
           color: var(--text-primary, #ddd);
-          background: var(--bg-hover, #2a2d2e);
+        }
+        .wm-footer-spacer {
+          flex: 1;
+        }
+        /* Search bar: appears as a row just above the persistent bottom bar
+           (like the file-editor tabs). Toggled by the footer search button. */
+        .wm-search-bar {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 34px;
+          z-index: 1;
+          display: flex;
+          align-items: stretch;
+          height: 34px;
+          padding: 0;
+          box-sizing: border-box;
+          background: var(--bg-secondary, #161616);
+          border-top: 1px solid var(--divider, #333);
         }
         .wm-search {
           display: flex;
-          align-items: center;
-          gap: 4px;
+          align-items: stretch;
           flex: 1;
           min-width: 0;
           height: 100%;
@@ -1475,7 +1513,7 @@ export class Openp41geWindowManager extends LitElement {
           background: transparent;
           color: var(--text-primary, #ddd);
           border: none;
-          padding: 0;
+          padding: 0 10px 0 14px;
           font-size: 13px;
           outline: none;
           caret-color: var(--text-primary, #ddd);
@@ -1484,60 +1522,37 @@ export class Openp41geWindowManager extends LitElement {
           color: var(--text-secondary, #777);
           font-weight: 400;
         }
-        .wm-search-toggle {
+        /* Full-height square action buttons (regex, case, clear) separated by
+           border-left — mirrors the bottom bar's .p41ge-icon-btn look. */
+        .wm-search-toggle,
+        .wm-search-clear {
           flex: none;
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 18px;
-          height: 18px;
-          min-width: 18px;
+          height: 100%;
+          aspect-ratio: 1 / 1;
           padding: 0;
           border: none;
+          border-left: 1px solid var(--divider, #333);
+          border-radius: 0;
           background: transparent;
           color: var(--text-secondary, #999);
           cursor: pointer;
-          transition: color 0.1s ease;
+          transition:
+            color 0.1s ease,
+            background 0.1s ease;
         }
-        .wm-search-toggle:first-of-type {
-          margin-left: 8px;
-        }
-        .wm-search-toggle:hover {
+        .wm-search-toggle:hover,
+        .wm-search-clear:hover {
           color: var(--text-primary, #ddd);
+          background: var(--bg-hover, #2a2d2e);
         }
         .wm-search-toggle--on {
           color: var(--text-primary, #ddd);
         }
         .wm-search-toggle--on:hover {
           color: var(--text-primary, #ddd);
-        }
-        .wm-search-sep {
-          align-self: stretch;
-          flex: none;
-          width: 1px;
-          margin: 0 6px;
-          background: var(--divider, #333);
-        }
-        .wm-search-clear {
-          flex: none;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 24px;
-          min-width: 24px;
-          border: none;
-          border-radius: 3px;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          font-size: 13px;
-          cursor: pointer;
-          transition:
-            color 0.1s ease,
-            background 0.1s ease;
-        }
-        .wm-search-clear:hover {
-          color: var(--text-primary, #ddd);
-          background: var(--bg-hover, #2a2d2e);
         }
         .wm-drawer-layer {
           position: relative;
@@ -1547,17 +1562,21 @@ export class Openp41geWindowManager extends LitElement {
         }
         .wm-body {
           position: absolute;
-          top: 44px;
+          top: 0;
           left: 0;
           right: 0;
           bottom: 0;
           overflow-y: auto;
           /* No horizontal padding so rows + separators span the full window width;
-             the rows keep their own content inset. The list starts below the
-             view header, and the bottom padding clears the overlaying bottom bar
-             (88px) + scroll space. */
-          padding: 0 0 108px;
+             the rows keep their own content inset. The list starts at the top,
+             and the bottom padding clears the overlaying bottom bar (34px) +
+             scroll space. */
+          padding: 0 0 54px;
           box-sizing: border-box;
+        }
+        .wm-body--searching {
+          /* Footer (34px) + search bar (34px) + scroll gap. */
+          padding-bottom: 88px;
         }
         /* Invisible mask over the workspace list while a drawer is open, so a
            click on a card closes the drawer instead of opening another
@@ -1565,7 +1584,7 @@ export class Openp41geWindowManager extends LitElement {
            siblings with a higher z-index), so drawer interactions still work. */
         .wm-list-mask {
           position: absolute;
-          top: 44px;
+          top: 0;
           left: 0;
           right: 0;
           bottom: 0;
@@ -1835,7 +1854,7 @@ export class Openp41geWindowManager extends LitElement {
           cursor: pointer;
         }
         /* The inline "new workspace" row uses the standard solid separator; the
-           dashed outline doubled with the view header's bottom border. */
+           dashed outline distinguishes it from a normal workspace row. */
         .ws-row--new {
           cursor: default;
         }
@@ -1898,6 +1917,16 @@ export class Openp41geWindowManager extends LitElement {
           color: var(--text-secondary, #777);
           font-size: 13px;
           padding: 0 16px;
+          text-align: center;
+        }
+        /* The workspace-list empty state is centred both horizontally and
+           vertically within the list body. Scoped to .wm-body so drawer
+           empty states (e.g. "No repositories…") keep their top-left layout. */
+        .wm-body > .empty {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
         }
         /* ── Drawer ─────────────────────────────────────────────── */
         /* A single shared shadow element whose width tracks the widest drawer,
@@ -1969,7 +1998,7 @@ export class Openp41geWindowManager extends LitElement {
           justify-content: space-between;
           gap: 8px;
           flex-shrink: 0;
-          height: 44px;
+          height: 35px;
           padding: 0 14px;
           border-bottom: 1px solid var(--divider, #333);
         }
@@ -2119,11 +2148,10 @@ export class Openp41geWindowManager extends LitElement {
         .drawer-footer {
           display: flex;
           align-items: center;
-          gap: 6px;
           justify-content: flex-end;
           flex-shrink: 0;
-          height: 88px;
-          padding: 0 14px;
+          height: 34px;
+          padding: 0px 0px 0px 14px;
           border-top: 1px solid var(--divider, #333);
         }
         /* Persistent bottom bar of the top-level workspace list. Sits at the
@@ -2137,11 +2165,10 @@ export class Openp41geWindowManager extends LitElement {
           z-index: 0;
           display: flex;
           align-items: center;
-          gap: 6px;
           justify-content: flex-end;
           flex-shrink: 0;
-          height: 88px;
-          padding: 0 14px;
+          height: 34px;
+          padding: 0;
           border-top: 1px solid var(--divider, #333);
           background: var(--bg-secondary, #161616);
         }
@@ -2150,14 +2177,18 @@ export class Openp41geWindowManager extends LitElement {
           background: transparent;
           color: var(--text-secondary, #999);
           font-size: 20px;
-          width: 28px;
-          height: 28px;
-          border-radius: 6px;
+          border-radius: 0;
+          /* Full-height, square action button like the workspace window's
+             .p41ge-icon-btn: fills the bottom bar, square, with a cap
+             separator on the group's outer (left) edge. */
+          height: 100%;
+          aspect-ratio: 1 / 1;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
           user-select: none;
+          border-left: 1px solid var(--divider, #333);
         }
         .dw-add:hover {
           background: var(--bg-active, #37373d);
@@ -2176,28 +2207,41 @@ export class Openp41geWindowManager extends LitElement {
           border: none;
           background: transparent;
           color: var(--text-secondary, #999);
-          width: 28px;
-          height: 28px;
-          border-radius: 6px;
+          border-radius: 0;
+          /* Full-height, square action button with a separator line
+             between it and the adjacent add button. */
+          height: 100%;
+          aspect-ratio: 1 / 1;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
           padding: 0;
+          border-left: 1px solid var(--divider, #333);
         }
         .dw-delete:hover {
-          background: rgba(224, 108, 117, 0.15);
-          color: #e06c75;
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
         }
         .dw-delete svg {
           fill: currentColor;
         }
+        /* The rightmost bottom-bar button sits flush against the macOS
+           window edge. content-box keeps the icon centred in the square
+           content area (like .wt-refresh-btn) while the 8px padding grows
+           the tile outward, insetting the icon from the rounded corner. */
+        .ws-list-footer > :last-child,
+        .drawer-footer > :last-child {
+          box-sizing: content-box;
+          padding-right: 8px;
+        }
         .dw-delete-confirm {
-          background: rgba(224, 108, 117, 0.15);
-          color: #e06c75;
+          background: transparent;
+          color: var(--text-secondary, #999);
         }
         .dw-delete-confirm:hover {
-          background: rgba(224, 108, 117, 0.25);
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
         }
         .dw-delete-confirm:disabled {
           opacity: 0.4;
@@ -2321,83 +2365,10 @@ export class Openp41geWindowManager extends LitElement {
           <span class="wm-title">Workspace Manager</span>
         </div>
         <div class="wm-drawer-layer">
-          <div class="wm-view-header">
-            ${
-              this._searchOpen
-                ? html`
-                    <div class="wm-search">
-                      <input
-                        class="wm-search-input"
-                        placeholder="Search workspaces…"
-                        spellcheck="false"
-                        .value=${this._searchQuery}
-                        @input=${this._onSearchInput}
-                        @keydown=${this._onSearchKeydown}
-                      />
-                      <button
-                        class="wm-search-toggle ${this._useRegex ? "wm-search-toggle--on" : ""}"
-                        aria-label="Regex search"
-                        aria-pressed=${this._useRegex}
-                        data-tip="Regex search"
-                        @click=${() => {
-                          this._useRegex = !this._useRegex;
-                        }}
-                      >
-                        ${unsafeHTML(REGEX_ICON)}
-                      </button>
-                      <button
-                        class="wm-search-toggle ${this._caseSensitive ? "wm-search-toggle--on" : ""}"
-                        aria-label="Match case"
-                        aria-pressed=${this._caseSensitive}
-                        data-tip=${this._caseSensitive ? "Match case (on)" : "Match case (off)"}
-                        @click=${() => {
-                          this._caseSensitive = !this._caseSensitive;
-                        }}
-                      >
-                        ${unsafeHTML(CASE_ON_ICON)}
-                      </button>
-                      <span class="wm-search-sep"></span>
-                      <button
-                        class="wm-search-clear"
-                        aria-label="Clear search"
-                        data-tip="Clear search"
-                        @click=${this._exitSearch}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  `
-                : html`
-                    <span class="wm-view-title">Workspaces</span>
-                    <button
-                      class="wm-search-btn"
-                      aria-label="Search workspaces"
-                      data-tip="Search workspaces"
-                      @click=${this._startSearch}
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      >
-                        <circle cx="11" cy="11" r="7" />
-                        <path d="M21 21l-4.35-4.35" />
-                      </svg>
-                    </button>
-                  `
-            }
-          </div>
-          <div class="wm-body" @click=${this._onBackgroundClick}>
+          <div class="wm-body${this._searchOpen ? " wm-body--searching" : ''}" @click=${this._onBackgroundClick}>
             ${
               this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
-                ? html`<p class="empty">
-                    No workspaces yet. Create one from an open workspace window.
-                  </p>`
+                ? html`<p class="empty">No workspaces yet.</p>`
                 : this._searchOpen && this._workspaces.length > 0 && filtered.length === 0
                   ? html`<p class="empty">No workspaces match “${this._searchQuery}”.</p>`
                   : html`
@@ -2712,6 +2683,52 @@ export class Openp41geWindowManager extends LitElement {
             `,
           )}
         </div>
+        ${this._searchOpen
+          ? html`
+              <div class="wm-search-bar">
+                <div class="wm-search">
+                  <input
+                    class="wm-search-input"
+                    placeholder="Search workspaces…"
+                    spellcheck="false"
+                    .value=${this._searchQuery}
+                    @input=${this._onSearchInput}
+                    @keydown=${this._onSearchKeydown}
+                  />
+                  <button
+                    class="wm-search-toggle ${this._useRegex ? "wm-search-toggle--on" : ""}"
+                    aria-label="Regex search"
+                    aria-pressed=${this._useRegex}
+                    data-tip="Regex search"
+                    @click=${() => {
+                      this._useRegex = !this._useRegex;
+                    }}
+                  >
+                    ${unsafeHTML(REGEX_ICON)}
+                  </button>
+                  <button
+                    class="wm-search-toggle ${this._caseSensitive ? "wm-search-toggle--on" : ""}"
+                    aria-label="Match case"
+                    aria-pressed=${this._caseSensitive}
+                    data-tip=${this._caseSensitive ? "Match case (on)" : "Match case (off)"}
+                    @click=${() => {
+                      this._caseSensitive = !this._caseSensitive;
+                    }}
+                  >
+                    ${unsafeHTML(CASE_ON_ICON)}
+                  </button>
+                  <button
+                    class="wm-search-clear"
+                    aria-label="Clear search"
+                    data-tip="Close search"
+                    @click=${this._exitSearch}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            `
+          : nothing}
         ${this._workspaceListFooter()}
       </div>
     `;

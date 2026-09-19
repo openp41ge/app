@@ -3,7 +3,7 @@
  *
  * Subscribes to the shared openp41ge-logger bus, coalesces captured entries
  * into batches, and forwards them over `window.openp41ge.logs.append()` so they
- * land in ~/.openp41ge/logs alongside main-process entries.
+ * land in <dataDir>/logs alongside main-process entries.
  *
  * The bus already gates capture by level (DEBUG only while a debug session is
  * enabled), so this transport simply forwards whatever was captured — no extra

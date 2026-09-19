@@ -5,7 +5,7 @@
  * Used by IPC handlers in main.ts — no Electron imports, only service interfaces.
  *
  * The workspace store (FileWorkspaceStore) has been removed — it was superseded
- * by the project system (~/.openp41ge/<project>/). Git operations remain here as
+ * by the project system. Git operations remain here as
  * they delegate to NodeGitService.
  */
 

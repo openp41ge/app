@@ -1,7 +1,7 @@
 /**
  * Log viewer controller — mounts <openp41ge-log-viewer> as a pane.
  *
- * The viewer reads the **persisted** daily log files under `~/.openp41ge/logs`
+ * The viewer reads the **persisted** daily log files under `<dataDir>/logs`
  * via `LogFilePageReader` (backward paging: newest at the bottom, older pages
  * loaded as the user scrolls up). Logs therefore survive dev hot-reloads and
  * app restarts instead of being reset on every reload.

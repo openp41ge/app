@@ -1,8 +1,9 @@
 /**
- * ConfigService — reads/writes ~/.openp41ge/.config/config.json from the main process.
+ * ConfigService — reads/writes `<openp41geDir>/.config/config.json` from the main process.
  *
  * The .config directory is dot-prefixed so it doesn't appear as a project
- * in ~/.openp41ge/ (projects are direct subdirectories like ~/.openp41ge/myproject/).
+ * in the app-data root (projects are direct subdirectories like
+ * ~/.openp41ge/myproject/; the dev build uses ~/.openp41ge-dev/).
  *
  * On startup:
  * - If the file exists, it is read and parsed.
@@ -16,6 +17,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { createLogger } from "openp41ge-logger";
+import { APP_DATA_DIR_PRODUCTION } from "./app-data-dir.js";
 
 const log = createLogger("openp41ge", "ConfigService");
 
@@ -112,7 +114,9 @@ export class ConfigService {
 
   /** Allow OPENP41GE_DIR override (used in tests). */
   constructor(openp41geDir?: string) {
-    const baseDir = openp41geDir ?? path.join(os.homedir(), ".openp41ge");
+    // Callers pass the resolved app-data root. `~/.openp41ge` is only a safety
+    // default for direct construction without the resolved root.
+    const baseDir = openp41geDir ?? path.join(os.homedir(), APP_DATA_DIR_PRODUCTION);
     this._configDir = path.join(baseDir, ".config");
     this._configPath = path.join(this._configDir, "config.json");
   }

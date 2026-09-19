@@ -29,7 +29,7 @@ function readWorkspaceFile(filePath: string): WorkspaceFileData {
   return migrateWorkspaceFileData(JSON.parse(raw));
 }
 
-export function registerDialogHandlers(): void {
+export function registerDialogHandlers(openp41geDir: string): void {
   // ── Open workspace file ──────────────────────────────────────────────
 
   ipcMain.handle("dialog:openWorkspaceFile", async () => {
@@ -52,7 +52,7 @@ export function registerDialogHandlers(): void {
 
   ipcMain.handle("dialog:saveWorkspaceFile", async (_event, data: WorkspaceFileData, defaultPath?: string) => {
     const result = await dialog.showSaveDialog({
-      defaultPath: defaultPath ?? path.join(os.homedir(), ".openp41ge", "workspaces"),
+      defaultPath: defaultPath ?? path.join(openp41geDir, "workspaces"),
       filters: [{ name: "Openp41ge Workspace", extensions: [WORKSPACE_EXT] }],
     });
     if (result.canceled || !result.filePath) return null;
@@ -128,10 +128,10 @@ export function registerDialogHandlers(): void {
     }
   });
 
-  // ── List all workspace files in ~/.openp41ge/workspaces/ ───────────
+  // ── List all workspace files in the app-data workspaces dir ───────
 
   ipcMain.handle("dialog:listWorkspaces", async () => {
-    const dir = path.join(os.homedir(), ".openp41ge", "workspaces");
+    const dir = path.join(openp41geDir, "workspaces");
     try {
       if (!fs.existsSync(dir)) return [];
       const files = fs.readdirSync(dir);

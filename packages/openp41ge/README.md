@@ -18,7 +18,8 @@ and then previous days (backward paging).
 
 ### Log files
 
-- **Location:** `~/.openp41ge/logs/`
+- **Location:** `~/.openp41ge/logs/` (a dev build run via `electron .` uses
+  `~/.openp41ge-dev/logs/` instead, so it can run alongside the released app)
   - `openp41ge.log` — the live (current-day) file, safe to `tail -f`
   - `openp41ge-YYYY-MM-DD.log` — archived previous days (kept 14 days)
 - **Override:** set `OPENP41GE_DIR` (used by tests: `OPENP41GE_E2E_DIR`) to relocate.
@@ -51,7 +52,8 @@ and then previous days (backward paging).
 
 ### Agent / runtime access
 
-- **On disk:** `tail` / `read` the files under `~/.openp41ge/logs/`.
+- **On disk:** `tail` / `read` the files under `~/.openp41ge/logs/` (dev build:
+  `~/.openp41ge-dev/logs/`).
 - **In DevTools:** `window.openp41ge.logs.query({ source?, minLevel?, search?, limit? })`
   returns persisted history; `window.openp41ge.logs.getPath()` returns the logs dir;
   `window.openp41ge.logs.listFiles()` lists files.

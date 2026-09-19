@@ -15,7 +15,7 @@ export interface DebugAPI {
     clear(): void;
     /** Query the renderer's captured log bus (openp41ge-logger). */
     query(filter?: BusLogQuery): ReturnType<typeof queryLog>;
-    /** Path to the persisted logs directory (~/.openp41ge/logs). */
+    /** Path to the persisted logs directory (app-data root + /logs). */
     path(): Promise<string | null>;
   };
   graph: {
