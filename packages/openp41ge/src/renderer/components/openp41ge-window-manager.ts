@@ -2269,15 +2269,18 @@ export class Openp41geWindowManager extends LitElement {
           align-items: stretch;
           justify-content: space-between;
           height: 34px;
+          /* Break out of the pane's 14px side padding so the bar spans the full window width. */
+          margin: 0 -14px;
           background: var(--bg-secondary, #161616);
           border-top: 1px solid var(--divider, #333);
         }
         .wm-slideshow-btn {
+          box-sizing: border-box;
           display: flex;
           align-items: center;
           justify-content: center;
           height: 100%;
-          width: 46px;
+          width: 33px;
           font-size: 17px;
           line-height: 1;
           color: var(--text-secondary, #999);
@@ -2285,6 +2288,8 @@ export class Openp41geWindowManager extends LitElement {
           border: none;
           cursor: pointer;
         }
+        .wm-slideshow-btn:first-child { border-right: 1px solid var(--divider, #333); }
+        .wm-slideshow-btn:last-child { border-left: 1px solid var(--divider, #333); }
         .wm-slideshow-btn:hover:not(:disabled) {
           color: var(--text-primary, #eee);
           background: var(--bg-active, #26262d);
@@ -2317,6 +2322,7 @@ export class Openp41geWindowManager extends LitElement {
           gap: 12px;
           width: 100%;
           margin-top: 18px;
+          margin-bottom: 12px;
           padding: 12px 16px;
           font-size: 13px;
           font-family: inherit;
