@@ -65,8 +65,10 @@ sidebar. Drag the bar at a sidebar's inner edge to resize it.
 :::sidebar-move-demo
 :::
 
-**Moving the system tabs** — drag a system tab over to the opposite sidebar,
-and it leaves the sidebar it was in and appears on the other side.
+**Moving the system tabs** — each sidebar has its tab at the top. Dragging
+that tab over to the opposite sidebar drops it there, and the sidebar's
+content moves with it: it leaves the sidebar it was in and appears on the
+other side.
 :::
 
 :::workspace-window

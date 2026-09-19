@@ -2,12 +2,12 @@
  * <openp41ge-sidebar-move-demo> - an animated mock of a workspace window
  * showing a system tab being dragged from one sidebar to the other.
  *
- * Both sidebars stay open at the edges. A tab handle is dragged from the
- * left sidebar's tab bar across to the right sidebar's tab bar; as it
- * travels the source tab bar empties and the other side gains the cells.
- * Only one sidebar holds content at a time, alternating on a loop.
- * Under `prefers-reduced-motion` the mock freezes with the left sidebar
- * full.
+ * Each sidebar has a system tab at its top, with content cells below. The
+ * tab is dragged from the left sidebar's top across the window and dropped
+ * onto the right sidebar's top. Only once it lands does the content move:
+ * the left sidebar empties and the right sidebar fills, so just one
+ * sidebar holds content at a time. Under `prefers-reduced-motion` the
+ * mock freezes with the left sidebar holding the tab and content.
  */
 
 import { html, LitElement, type TemplateResult } from "lit";
@@ -98,17 +98,26 @@ export class Openp41geSidebarMoveDemo extends LitElement {
           flex-direction: column;
           gap: 6px;
         }
-        .side--right .side-head,
+        /* Content only moves once the tab is dropped. */
         .side--right .chip {
-          animation: fillIn 5.6s ease-in-out infinite;
+          animation: contentIn 5.6s ease-in-out infinite;
         }
 
-        .side-head {
-          width: 70%;
-          height: 7px;
-          border-radius: 3px;
-          background: var(--bg-active, #37373d);
+        .tab {
+          width: 26px;
+          height: 15px;
+          border-radius: 4px;
+          background: var(--accent, #79c0ff);
+          flex-shrink: 0;
         }
+        .side--left .tab {
+          animation: tabOut 5.6s ease-in-out infinite;
+        }
+        .side--right .tab {
+          opacity: 0;
+          animation: tabIn 5.6s ease-in-out infinite;
+        }
+
         .chip {
           width: 32px;
           height: 14px;
@@ -120,55 +129,69 @@ export class Openp41geSidebarMoveDemo extends LitElement {
           background: var(--bg-active, #37373d);
         }
         .chip--out {
-          animation: emptyOut 5.6s ease-in-out infinite;
+          animation: contentOut 5.6s ease-in-out infinite;
         }
 
-@keyframes fly {
-          0%,
+        @keyframes fly {
           8% {
-            left: 18px;
-            top: 68px;
-            opacity: 0.9;
-          }
-          55% {
-            left: 116px;
-            top: 60px;
+            left: 11px;
+            top: 12px;
             opacity: 0.9;
           }
           78% {
-            left: 172px;
-            top: 88px;
+            left: calc(100% - 45px);
+            top: 12px;
             opacity: 0.9;
           }
-          82%,
           100% {
-            left: 172px;
-            top: 88px;
+            left: calc(100% - 45px);
+            top: 12px;
             opacity: 0;
           }
         }
-        }
-        @keyframes emptyOut {
+
+        @keyframes contentOut {
           8% {
             opacity: 0.9;
           }
-          55% {
-            opacity: 0;
+          78% {
+            opacity: 0.9;
           }
           100% {
             opacity: 0;
           }
         }
 
-        @keyframes fillIn {
+        @keyframes contentIn {
           8% {
             opacity: 0;
           }
-          55% {
+          78% {
+            opacity: 0;
+          }
+          100% {
+            opacity: 0.9;
+          }
+        }
+
+        @keyframes tabOut {
+          8% {
+            opacity: 0.9;
+          }
+          78% {
+            opacity: 0;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+
+        @keyframes tabIn {
+          8% {
             opacity: 0;
           }
           78% {
-            opacity: 0.9;
+            opacity: 0;
           }
           100% {
             opacity: 0.9;
@@ -177,13 +200,18 @@ export class Openp41geSidebarMoveDemo extends LitElement {
 
         @media (prefers-reduced-motion: reduce) {
           .fly,
-          .side--right .side-head,
           .side--right .chip,
-          .chip--out {
+          .chip--out,
+          .side--left .tab,
+          .side--right .tab {
             animation: none;
           }
           .fly {
             display: none;
+          }
+          .side--right .chip,
+          .side--right .tab {
+            opacity: 0;
           }
         }
       </style>
@@ -196,13 +224,13 @@ export class Openp41geSidebarMoveDemo extends LitElement {
         </div>
         <div class="body">
           <div class="side side--left">
-            <div class="side-head"></div>
-            <div class="chip"></div>
+            <div class="tab"></div>
+            <div class="chip chip--out"></div>
             <div class="chip chip--dim chip--out"></div>
             <div class="chip chip--dim chip--out"></div>
           </div>
           <div class="side side--right">
-            <div class="side-head"></div>
+            <div class="tab"></div>
             <div class="chip"></div>
             <div class="chip chip--dim"></div>
             <div class="chip chip--dim"></div>
