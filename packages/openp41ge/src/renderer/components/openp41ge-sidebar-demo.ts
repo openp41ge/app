@@ -135,7 +135,7 @@ export class Openp41geSidebarDemo extends LitElement {
         }
         .demo {
           width: 100%;
-          height: 210px;
+          height: 178px;
           background: var(--bg, #1e1e1e);
           border: 1px solid var(--divider, #444);
           border-radius: 9px;
