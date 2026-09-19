@@ -22,6 +22,10 @@ import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import { welcomePages } from "../content/welcome";
 import { appServices } from "../app";
+
+/** Unchecked / checked icons for the "never show welcome" toggle. */
+const WELCOME_UNCHECKED_ICON = '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>';
+const WELCOME_CHECKED_ICON = '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>';
 import "./openp41ge-sidebar-demo";
 import "./openp41ge-sidebar-move-demo";
 import "./openp41ge-grid-demo";
@@ -549,11 +553,10 @@ export class Openp41geWindowManager extends LitElement {
     if (next !== this._welcomePage) this._welcomePage = next;
   }
 
-  /** Persist the "never show the welcome intro again" choice. */
-  private _onWelcomeDismissChange = (e: Event): void => {
-    const checked = (e.target as HTMLInputElement).checked;
-    this._welcomeDismissed = checked;
-    void appServices.configService.set("welcomeDismissed", checked);
+  /** Toggle + persist the "never show the welcome intro again" choice. */
+  private _onWelcomeDismissToggle = (): void => {
+    this._welcomeDismissed = !this._welcomeDismissed;
+    void appServices.configService.set("welcomeDismissed", this._welcomeDismissed);
   };
 
   private _onFocus = (): void => {
@@ -2312,21 +2315,33 @@ export class Openp41geWindowManager extends LitElement {
         .wm-welcome-dismiss {
           display: flex;
           align-items: center;
-          gap: 8px;
+          justify-content: space-between;
+          gap: 12px;
+          width: 100%;
           margin-top: 18px;
+          padding: 12px 16px;
           font-size: 13px;
+          font-family: inherit;
+          text-align: left;
           color: var(--text-secondary, #b0b0b0);
+          background: var(--bg-active, #23232a);
+          border: 1px solid var(--divider, #333);
+          /* Rounded to echo the circular icon's curve, carried further out. */
+          border-radius: 16px;
           cursor: pointer;
           user-select: none;
         }
-        .wm-welcome-dismiss:hover { color: var(--text-primary, #eee); }
-        .wm-welcome-dismiss input[type="checkbox"] {
-          width: 14px;
-          height: 14px;
-          margin: 0;
-          accent-color: var(--accent, #79c0ff);
-          cursor: pointer;
+        .wm-welcome-dismiss:hover {
+          color: var(--text-primary, #eee);
+          background: var(--bg-hover, #2a2a31);
         }
+        .wm-welcome-dismiss-label { flex: 1; }
+        .wm-welcome-dismiss-icon {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+        }
+        .wm-welcome-dismiss-icon svg { display: block; }
         /* Workspace-window explainer: the animated demo spans 80% of the
            available width, and the explanation text (and any shortcut hints)
            stacks underneath it. The demo never changes its own width; the
@@ -2854,10 +2869,17 @@ export class Openp41geWindowManager extends LitElement {
                       ${
                         this._welcomePage === 0
                           ? html`
-                              <label class="wm-welcome-dismiss">
-                                <input type="checkbox" ?checked=${this._welcomeDismissed} @change=${this._onWelcomeDismissChange} />
-                                <span>Never show the welcome message again</span>
-                              </label>
+                              <button
+                                class="wm-welcome-dismiss"
+                                role="checkbox"
+                                aria-checked=${this._welcomeDismissed}
+                                @click=${this._onWelcomeDismissToggle}
+                              >
+                                <span class="wm-welcome-dismiss-label">Never show the welcome message again</span>
+                                <span class="wm-welcome-dismiss-icon">
+                                  ${unsafeHTML(this._welcomeDismissed ? WELCOME_CHECKED_ICON : WELCOME_UNCHECKED_ICON)}
+                                </span>
+                              </button>
                             `
                           : nothing
                       }
