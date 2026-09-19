@@ -1796,8 +1796,8 @@ export class Openp41geWindowManager extends LitElement {
           /* No horizontal padding so rows + separators span the full window width;
              the rows keep their own content inset. The list starts below the
              tab bar, and the bottom padding clears the overlaying bottom bar
-             (34px) + scroll space. */
-          padding: 0 0 54px;
+             (34px) so scrolling content ends flush above it. */
+          padding: 0 0 34px;
           box-sizing: border-box;
         }
         .wm-body--searching {
