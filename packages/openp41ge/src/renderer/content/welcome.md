@@ -55,8 +55,7 @@ The workspace window has a **sidebar** holding the app's system tabs, and a
 
 **The sidebar** is the panel holding the app's system tabs — **Explorer**,
 **History**, **Agents**, **Logs**. You can access a left sidebar and a right
-sidebar. Click a system tab to pin it there, and drag the bar at a sidebar's
-inner edge to resize it.
+sidebar. Drag the bar at a sidebar's inner edge to resize it.
 
 :::shortcuts
 :::
