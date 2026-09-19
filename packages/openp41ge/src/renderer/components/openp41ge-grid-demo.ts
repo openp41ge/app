@@ -77,11 +77,12 @@ export class Openp41geGridDemo extends LitElement {
           flex-direction: column;
           gap: 6px;
         }
-        .side-head {
-          width: 70%;
-          height: 7px;
-          border-radius: 3px;
-          background: var(--bg-active, #37373d);
+        .tab {
+          width: 18px;
+          height: 9px;
+          border-radius: 4.5px;
+          background: var(--accent, #79c0ff);
+          flex-shrink: 0;
         }
         .chip {
           width: 32px;
@@ -177,7 +178,7 @@ export class Openp41geGridDemo extends LitElement {
         </div>
         <div class="body">
           <div class="side">
-            <div class="side-head"></div>
+            <div class="tab"></div>
             <div class="chip"></div>
             <div class="chip chip--dim"></div>
             <div class="chip chip--dim"></div>

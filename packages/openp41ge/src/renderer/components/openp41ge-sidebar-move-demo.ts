@@ -79,9 +79,9 @@ export class Openp41geSidebarMoveDemo extends LitElement {
         }
         .fly {
           position: absolute;
-          width: 26px;
-          height: 15px;
-          border-radius: 4px;
+          width: 18px;
+          height: 9px;
+          border-radius: 4.5px;
           background: var(--accent, #79c0ff);
           opacity: 0;
           animation: fly 5.6s ease-in-out infinite;
@@ -104,9 +104,9 @@ export class Openp41geSidebarMoveDemo extends LitElement {
         }
 
         .tab {
-          width: 26px;
-          height: 15px;
-          border-radius: 4px;
+          width: 18px;
+          height: 9px;
+          border-radius: 4.5px;
           background: var(--accent, #79c0ff);
           flex-shrink: 0;
         }

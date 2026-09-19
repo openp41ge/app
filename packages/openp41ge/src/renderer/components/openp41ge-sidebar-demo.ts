@@ -215,13 +215,12 @@ export class Openp41geSidebarDemo extends LitElement {
           gap: 8px;
           box-sizing: border-box;
         }
-        .head {
-          width: 60%;
-          max-width: 70px;
-          height: 7px;
-          border-radius: 3px;
-          background: var(--bg-active, #37373d);
-          margin-bottom: 2px;
+        .tab {
+          width: 18px;
+          height: 9px;
+          border-radius: 4.5px;
+          background: var(--accent, #79c0ff);
+          flex-shrink: 0;
         }
         .row {
           display: flex;
@@ -275,7 +274,7 @@ export class Openp41geSidebarDemo extends LitElement {
           <div class="side side--left">
             <div class="clip">
               <div class="inner">
-                <div class="head"></div>
+                <div class="tab"></div>
                 ${this._rows()}
               </div>
             </div>
@@ -284,7 +283,7 @@ export class Openp41geSidebarDemo extends LitElement {
           <div class="side side--right">
             <div class="clip">
               <div class="inner">
-                <div class="head"></div>
+                <div class="tab"></div>
                 ${this._rows()}
               </div>
             </div>
