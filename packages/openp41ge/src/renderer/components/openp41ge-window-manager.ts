@@ -2251,21 +2251,25 @@ export class Openp41geWindowManager extends LitElement {
           margin-top: 8px;
         }
         .wm-slideshow-btn {
-          width: 26px;
-          height: 26px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          padding: 4px 8px;
           font-size: 18px;
           line-height: 1;
-          color: var(--text-primary, #eee);
-          background: var(--bg-active, #37373d);
-          border: 1px solid var(--divider, #444);
-          border-radius: 5px;
+          color: var(--text-secondary, #999);
+          background: none;
+          border: none;
           cursor: pointer;
         }
-        .wm-slideshow-btn:hover:not(:disabled) { background: var(--bg-hover, #45454d); }
-        .wm-slideshow-btn:disabled { opacity: 0.4; cursor: default; }
+        .wm-slideshow-btn:hover:not(:disabled) { color: var(--text-primary, #eee); }
+        .wm-slideshow-btn:disabled { opacity: 0.35; cursor: default; }
+        .wm-slideshow-center {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+        }
         .wm-slideshow-dots {
           display: flex;
           align-items: center;
@@ -2816,18 +2820,20 @@ export class Openp41geWindowManager extends LitElement {
                       <div class="wm-markdown">${unsafeHTML(welcomePages[this._welcomePage] ?? "")}</div>
                       <div class="wm-slideshow-nav">
                         <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
-                        <div class="wm-slideshow-dots">
-                          ${welcomePages.map(
-                            (_, i) => html`
-                              <button
-                                class="wm-slideshow-dot${i === this._welcomePage ? " wm-slideshow-dot--active" : ""}"
-                                aria-label="Page ${i + 1}"
-                                @click=${() => (this._welcomePage = i)}
-                              ></button>
-                            `,
-                          )}
+                        <div class="wm-slideshow-center">
+                          <div class="wm-slideshow-dots">
+                            ${welcomePages.map(
+                              (_, i) => html`
+                                <button
+                                  class="wm-slideshow-dot${i === this._welcomePage ? " wm-slideshow-dot--active" : ""}"
+                                  aria-label="Page ${i + 1}"
+                                  @click=${() => (this._welcomePage = i)}
+                                ></button>
+                              `,
+                            )}
+                          </div>
+                          <span class="wm-slideshow-count">${this._welcomePage + 1} / ${welcomePages.length}</span>
                         </div>
-                        <span class="wm-slideshow-count">${this._welcomePage + 1} / ${welcomePages.length}</span>
                         <button class="wm-slideshow-btn" aria-label="Next page" ?disabled=${this._welcomePage === welcomePages.length - 1} @click=${() => this._welcomeNav(1)}>&#8250;</button>
                       </div>
                     </div>
