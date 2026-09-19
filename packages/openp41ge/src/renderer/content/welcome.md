@@ -62,6 +62,14 @@ sidebar. Drag the bar at a sidebar's inner edge to resize it.
 :::
 
 :::workspace-window
+:::sidebar-move-demo
+:::
+
+**Moving the sidebar** — you can move the whole sidebar to the other side of
+the grid. Drag it across, and the system tabs on it come with it.
+:::
+
+:::workspace-window
 :::grid-demo
 :::
 

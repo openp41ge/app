@@ -51,6 +51,13 @@ describe("welcome", () => {
     expect(html).toContain("<strong>The grid</strong> holds work.");
     expect(html).not.toContain("wm-window-card");
   });
+  it("renders the sidebar-move demo with its explanation beside it", () => {
+    const md =
+      ":::workspace-window\n:::sidebar-move-demo\n:::\n\n**Moving the sidebar** helps.\n:::";
+    const html = renderMarkdown(md);
+    expect(html).toContain("<openp41ge-sidebar-move-demo></openp41ge-sidebar-move-demo>");
+    expect(html).toContain("<strong>Moving the sidebar</strong> helps.");
+  });
   it("ignores unknown directives but still consumes their body", () => {
     const html = renderMarkdown(":::unknown\nignored text\n:::\n\nAfter.");
     expect(html).toContain("After.");

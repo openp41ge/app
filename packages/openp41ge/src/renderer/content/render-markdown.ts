@@ -25,8 +25,9 @@
  *   **The sidebar** …
  *   :::
  *
- * `sidebar-demo` emits `<openp41ge-sidebar-demo>`; `grid-demo` emits
- * `<openp41ge-grid-demo>`; `shortcuts` emits a keyboard-shortcut hint block.
+ * `sidebar-demo` emits `<openp41ge-sidebar-demo>`; `sidebar-move-demo` emits
+ * `<openp41ge-sidebar-move-demo>`; `grid-demo` emits
+ * `<openp41ge-grid-demo>`. `shortcuts` emits a keyboard-shortcut hint block.
  * Unknown directives are ignored.
  */
 
@@ -126,7 +127,7 @@ export function renderMarkdown(md: string): string {
           // The demo sits at half width; any other content (the explanation
           // text and any shortcut hints) stacks in a column beside it.
           const m = inner.match(
-            /^(<openp41ge-(?:sidebar|grid)-demo><\/openp41ge-(?:sidebar|grid)-demo>)\n?([\s\S]*)$/,
+            /^(<openp41ge-[a-z-]+-demo><\/openp41ge-[a-z-]+-demo>)\n?([\s\S]*)$/,
           );
           if (m) {
             out.push(
@@ -137,6 +138,8 @@ export function renderMarkdown(md: string): string {
           }
         } else if (name === "sidebar-demo") {
           out.push(`<openp41ge-sidebar-demo></openp41ge-sidebar-demo>`);
+        } else if (name === "sidebar-move-demo") {
+          out.push(`<openp41ge-sidebar-move-demo></openp41ge-sidebar-move-demo>`);
         } else if (name === "grid-demo") {
           out.push(`<openp41ge-grid-demo></openp41ge-grid-demo>`);
         } else if (name === "shortcuts") {

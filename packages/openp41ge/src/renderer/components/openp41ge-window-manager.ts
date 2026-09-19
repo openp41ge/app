@@ -22,6 +22,7 @@ import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import { welcomeHtml } from "../content/welcome";
 import "./openp41ge-sidebar-demo";
+import "./openp41ge-sidebar-move-demo";
 import "./openp41ge-grid-demo";
 
 /** Hold a skeleton this long before the drag element appears (long-press pickup). */
