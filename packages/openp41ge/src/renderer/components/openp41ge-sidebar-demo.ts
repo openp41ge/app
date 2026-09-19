@@ -197,25 +197,24 @@ export class Openp41geSidebarDemo extends LitElement {
           position: relative;
           height: 100%;
           overflow: hidden;
+          background: var(--bg-secondary, #161616);
+          border-radius: 0 6px 6px 0;
         }
         .inner {
           position: absolute;
           top: 0;
+          left: 0;
           height: 100%;
-          width: 160px;
+          width: 100%;
           padding: 9px 9px;
           display: flex;
           flex-direction: column;
           gap: 8px;
-          background: var(--bg-secondary, #161616);
-          border-radius: 5px;
           box-sizing: border-box;
-        }
-        .side--left .inner {
-          left: 0;
         }
         .head {
           width: 60%;
+          max-width: 70px;
           height: 7px;
           border-radius: 3px;
           background: var(--bg-active, #37373d);
@@ -236,6 +235,7 @@ export class Openp41geSidebarDemo extends LitElement {
         }
         .row-bar {
           flex: 1;
+          max-width: 90px;
           height: 5px;
           border-radius: 2px;
           background: var(--bg-active, #37373d);
