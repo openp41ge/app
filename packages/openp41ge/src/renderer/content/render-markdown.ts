@@ -27,7 +27,9 @@
  *
  * `sidebar-demo` emits `<openp41ge-sidebar-demo>`; `sidebar-move-demo` emits
  * `<openp41ge-sidebar-move-demo>`; `grid-demo` emits
- * `<openp41ge-grid-demo>`. `shortcuts` emits a keyboard-shortcut hint block.
+ * `<openp41ge-grid-demo>`; `window-intro-demo` emits
+ * `<openp41ge-window-intro-demo>`; `stack-demo` emits `<openp41ge-stack-demo>`.
+ * `shortcuts` emits a keyboard-shortcut hint block.
  * Unknown directives are ignored.
  */
 
@@ -136,6 +138,10 @@ export function renderMarkdown(md: string): string {
           } else {
             out.push(`<div class="wm-window-stage">${inner}</div>`);
           }
+        } else if (name === "window-intro-demo") {
+          out.push(`<openp41ge-window-intro-demo></openp41ge-window-intro-demo>`);
+        } else if (name === "stack-demo") {
+          out.push(`<openp41ge-stack-demo></openp41ge-stack-demo>`);
         } else if (name === "sidebar-demo") {
           out.push(`<openp41ge-sidebar-demo></openp41ge-sidebar-demo>`);
         } else if (name === "sidebar-move-demo") {

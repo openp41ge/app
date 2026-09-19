@@ -20,10 +20,12 @@ import { tooltipController, OverlayScrollbar } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
-import { welcomeHtml } from "../content/welcome";
+import { welcomePages } from "../content/welcome";
 import "./openp41ge-sidebar-demo";
 import "./openp41ge-sidebar-move-demo";
 import "./openp41ge-grid-demo";
+import "./openp41ge-window-intro-demo";
+import "./openp41ge-stack-demo";
 
 /** Hold a skeleton this long before the drag element appears (long-press pickup). */
 const HOLD_MS = 350;
@@ -77,6 +79,7 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _drawers: DrawerState[] = [];
   @state() private _openTabs: ManagerTabId[] = ["welcome"];
   @state() private _activeTab: ManagerTabId = "welcome";
+  @state() private _welcomePage = 0;
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
   @state() private _addingRepo = false;
@@ -504,6 +507,16 @@ export class Openp41geWindowManager extends LitElement {
 
   /** Escape cancels delete modes, closes an add card, or closes the crumb menu. */
   private _onKeydown = (e: KeyboardEvent): void => {
+    if (this._activeTab === "welcome") {
+      if (e.key === "ArrowLeft") {
+        this._welcomeNav(-1);
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        this._welcomeNav(1);
+        return;
+      }
+    }
     if (e.key !== "Escape") return;
     if (this._crumbsOpen) {
       this._crumbsOpen = false;
@@ -517,6 +530,11 @@ export class Openp41geWindowManager extends LitElement {
     else if (this._deleteMode) this._cancelDeleteMode();
     else if (this._worktreeDeleteMode) this._cancelWorktreeDeleteMode();
   };
+
+  private _welcomeNav(delta: number): void {
+    const next = Math.min(welcomePages.length - 1, Math.max(0, this._welcomePage + delta));
+    if (next !== this._welcomePage) this._welcomePage = next;
+  }
 
   private _onFocus = (): void => {
     void this._load();
@@ -2119,6 +2137,21 @@ export class Openp41geWindowManager extends LitElement {
         .wm-settings-pane {
           padding: 16px 14px;
         }
+        /* Welcome slideshow pane: a flex column so the page content scrolls
+           (in .wm-body) while the nav bar stays pinned to the bottom. */
+        .wm-welcome {
+          display: flex;
+          flex-direction: column;
+          min-height: 100%;
+          box-sizing: border-box;
+          padding: 16px 14px 0;
+        }
+        .wm-welcome .wm-markdown {
+          flex: 1;
+        }
+        .wm-welcome .wm-markdown > :last-child {
+          margin-bottom: 0;
+        }
         .wm-tab-placeholder,
         .wm-settings-placeholder {
           margin: 0;
@@ -2202,6 +2235,60 @@ export class Openp41geWindowManager extends LitElement {
         }
         .wm-markdown .wm-md-quote p {
           margin: 0;
+        }
+        /* Welcome slideshow: prev/next + page dots pinned to the bottom of the
+           pane so navigation is always visible while the page scrolls. */
+        .wm-slideshow-nav {
+          position: sticky;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          padding: 10px 14px;
+          background: var(--bg-secondary, #161616);
+          border-top: 1px solid var(--divider, #333);
+          margin-top: 8px;
+        }
+        .wm-slideshow-btn {
+          width: 26px;
+          height: 26px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          line-height: 1;
+          color: var(--text-primary, #eee);
+          background: var(--bg-active, #37373d);
+          border: 1px solid var(--divider, #444);
+          border-radius: 5px;
+          cursor: pointer;
+        }
+        .wm-slideshow-btn:hover:not(:disabled) { background: var(--bg-hover, #45454d); }
+        .wm-slideshow-btn:disabled { opacity: 0.4; cursor: default; }
+        .wm-slideshow-dots {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .wm-slideshow-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          padding: 0;
+          background: var(--bg-active, #3a3a42);
+          border: 1px solid var(--divider, #444);
+          cursor: pointer;
+        }
+        .wm-slideshow-dot--active {
+          background: var(--accent, #79c0ff);
+          border-color: var(--accent, #79c0ff);
+        }
+        .wm-slideshow-count {
+          font-size: 12px;
+          color: var(--text-secondary, #999);
+          min-width: 34px;
+          text-align: center;
         }
         /* Workspace-window explainer: the animated demo sits at half width
            beside its explanation text, both top-aligned — no card. The demo
@@ -2718,7 +2805,27 @@ export class Openp41geWindowManager extends LitElement {
           <div class="wm-body${this._searchOpen ? " wm-body--searching" : ''}" @click=${this._onBackgroundClick}>
             ${
               this._activeTab === "welcome"
-                ? html`<div class="wm-tab-pane wm-welcome"><div class="wm-markdown">${unsafeHTML(welcomeHtml)}</div></div>`
+                ? html`
+                    <div class="wm-tab-pane wm-welcome">
+                      <div class="wm-markdown">${unsafeHTML(welcomePages[this._welcomePage] ?? "")}</div>
+                      <div class="wm-slideshow-nav">
+                        <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
+                        <div class="wm-slideshow-dots">
+                          ${welcomePages.map(
+                            (_, i) => html`
+                              <button
+                                class="wm-slideshow-dot${i === this._welcomePage ? " wm-slideshow-dot--active" : ""}"
+                                aria-label="Page ${i + 1}"
+                                @click=${() => (this._welcomePage = i)}
+                              ></button>
+                            `,
+                          )}
+                        </div>
+                        <span class="wm-slideshow-count">${this._welcomePage + 1} / ${welcomePages.length}</span>
+                        <button class="wm-slideshow-btn" aria-label="Next page" ?disabled=${this._welcomePage === welcomePages.length - 1} @click=${() => this._welcomeNav(1)}>&#8250;</button>
+                      </div>
+                    </div>
+                  `
                 : this._activeTab === "releases"
                 ? html`<div class="wm-tab-pane"><p class="wm-tab-placeholder">Releases</p></div>`
                 : this._activeTab === "settings"

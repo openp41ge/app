@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderMarkdown } from "../../../src/renderer/content/render-markdown";
-import { welcomeHtml } from "../../../src/renderer/content/welcome";
+import { welcomePages } from "../../../src/renderer/content/welcome";
 
 describe("welcome", () => {
   it("renders h1/h2, bullets, numbered, bold, code", () => {
@@ -15,8 +15,9 @@ describe("welcome", () => {
     expect(html).toContain("<ol>");
     expect(html).toContain("<li>first</li>");
   });
-  it("welcomeHtml parses", () => {
-    expect(welcomeHtml).toContain("<h1>Welcome to openp41ge</h1>");
+  it("welcomePages parses, one page per slide", () => {
+    expect(welcomePages.length).toBeGreaterThanOrEqual(5);
+    expect(welcomePages[0]).toContain("<h1>Welcome to openp41ge</h1>");
   });
   it("merges wrapped source lines into one paragraph", () => {
     const html = renderMarkdown("A line that\ncontinues here\nand ends here.");
@@ -57,6 +58,14 @@ describe("welcome", () => {
     const html = renderMarkdown(md);
     expect(html).toContain("<openp41ge-sidebar-move-demo></openp41ge-sidebar-move-demo>");
     expect(html).toContain("<strong>Moving the sidebar</strong> helps.");
+  });
+  it("renders the window-intro demo", () => {
+    const html = renderMarkdown(":::window-intro-demo\n:::\n\nAfter.");
+    expect(html).toContain("<openp41ge-window-intro-demo></openp41ge-window-intro-demo>");
+  });
+  it("renders the stack demo", () => {
+    const html = renderMarkdown(":::stack-demo\n:::\n\nAfter.");
+    expect(html).toContain("<openp41ge-stack-demo></openp41ge-stack-demo>");
   });
   it("ignores unknown directives but still consumes their body", () => {
     const html = renderMarkdown(":::unknown\nignored text\n:::\n\nAfter.");
