@@ -135,23 +135,22 @@ export class Openp41geGridDemo extends LitElement {
             opacity: 0.9;
           }
           78% {
-            left: 172px;
+            left: 208px;
             top: 88px;
             opacity: 0.9;
           }
           82%,
           100% {
-            left: 172px;
+            left: 208px;
             top: 88px;
             opacity: 0;
           }
         }
         @keyframes grow {
           0%,
-          64% {
+          78% {
             flex-grow: 0;
           }
-          82%,
           100% {
             flex-grow: 1;
           }
