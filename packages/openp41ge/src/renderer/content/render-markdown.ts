@@ -26,7 +26,8 @@
  *   :::
  *
  * `sidebar-demo` emits `<openp41ge-sidebar-demo>`; `grid-demo` emits
- * `<openp41ge-grid-demo>`. Unknown directives are ignored.
+ * `<openp41ge-grid-demo>`; `shortcuts` emits a keyboard-shortcut hint block.
+ * Unknown directives are ignored.
  */
 
 function escapeHtml(s: string): string {
@@ -127,6 +128,13 @@ export function renderMarkdown(md: string): string {
           out.push(`<openp41ge-sidebar-demo></openp41ge-sidebar-demo>`);
         } else if (name === "grid-demo") {
           out.push(`<openp41ge-grid-demo></openp41ge-grid-demo>`);
+        } else if (name === "shortcuts") {
+          out.push(
+            `<div class="wm-shortcuts">` +
+              `<div class="wm-shortcut"><span class="kbd">&#8984;B</span><span>Toggle the right sidebar</span></div>` +
+              `<div class="wm-shortcut"><span class="kbd">&#8984;&#8997;B</span><span>Toggle the left sidebar</span></div>` +
+            `</div>`,
+          );
         }
         // Unknown directive names are ignored.
         i = closeIndex;

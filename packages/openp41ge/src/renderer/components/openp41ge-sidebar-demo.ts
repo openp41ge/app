@@ -145,7 +145,7 @@ export class Openp41geSidebarDemo extends LitElement {
           box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
         }
         .chrome {
-          height: 30px;
+          height: 26px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
@@ -162,11 +162,14 @@ export class Openp41geSidebarDemo extends LitElement {
           opacity: 0.55;
         }
         .cbtn {
-          width: 14px;
-          height: 14px;
+          width: 11px;
+          height: 11px;
           border-radius: 3px;
           background: var(--bg-active, #37373d);
           flex-shrink: 0;
+        }
+        .cbtn--label {
+          width: 22px;
         }
         .spacer {
           flex: 1;
@@ -251,32 +254,6 @@ export class Openp41geSidebarDemo extends LitElement {
           border-radius: 2px;
           opacity: 0;
         }
-        /* Shortcut hints under the skeleton. */
-        .shortcuts {
-          margin-top: 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          font-size: 12px;
-          color: var(--text-secondary, #b0b0b0);
-        }
-        .shortcut {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .kbd {
-          font-family: var(--font-mono, ui-monospace, monospace);
-          font-size: 11px;
-          color: var(--text-primary, #eee);
-          background: var(--bg-active, #2b2b31);
-          border: 1px solid var(--divider, #3c3c3c);
-          border-bottom-width: 2px;
-          border-radius: 4px;
-          padding: 3px 6px;
-          line-height: 1;
-          white-space: nowrap;
-        }
         @media (prefers-reduced-motion: reduce) {
           .side--left,
           .side--right {
@@ -292,7 +269,7 @@ export class Openp41geSidebarDemo extends LitElement {
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
           <span class="cbtn"></span><span class="cbtn"></span><span class="cbtn"></span>
           <span class="spacer"></span>
-          <span class="cbtn"></span><span class="cbtn"></span>
+          <span class="cbtn cbtn--label"></span><span class="cbtn"></span>
         </div>
         <div class="body">
           <div class="side side--left">
@@ -313,10 +290,6 @@ export class Openp41geSidebarDemo extends LitElement {
             </div>
           </div>
         </div>
-      </div>
-      <div class="shortcuts">
-        <div class="shortcut"><span class="kbd">&#8984;B</span><span>Toggle the right sidebar</span></div>
-        <div class="shortcut"><span class="kbd">&#8984;&#8997;B</span><span>Toggle the left sidebar</span></div>
       </div>
     `;
   }

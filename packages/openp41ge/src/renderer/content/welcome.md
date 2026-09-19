@@ -75,3 +75,6 @@ column-based, so tabs line up side by side and you can drag them around.
 - Pin the History and Agents tabs and start a session.
 
 That's the whole model — three levels, and two kinds of tab.
+
+:::shortcuts
+:::

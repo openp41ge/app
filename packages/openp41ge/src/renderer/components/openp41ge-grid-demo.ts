@@ -29,7 +29,7 @@ export class Openp41geGridDemo extends LitElement {
           box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
         }
         .chrome {
-          height: 30px;
+          height: 26px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
@@ -46,11 +46,14 @@ export class Openp41geGridDemo extends LitElement {
           opacity: 0.45;
         }
         .cbtn {
-          width: 14px;
-          height: 14px;
+          width: 11px;
+          height: 11px;
           border-radius: 3px;
           background: var(--bg-active, #37373d);
           flex-shrink: 0;
+        }
+        .cbtn--label {
+          width: 22px;
         }
         .spacer {
           flex: 1;
@@ -170,7 +173,7 @@ export class Openp41geGridDemo extends LitElement {
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
           <span class="cbtn"></span><span class="cbtn"></span><span class="cbtn"></span>
           <span class="spacer"></span>
-          <span class="cbtn"></span><span class="cbtn"></span>
+          <span class="cbtn cbtn--label"></span><span class="cbtn"></span>
         </div>
         <div class="body">
           <div class="side">

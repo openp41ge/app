@@ -2209,7 +2209,7 @@ export class Openp41geWindowManager extends LitElement {
           display: flex;
           align-items: flex-start;
           gap: 18px;
-          margin: 16px 0 26px;
+          margin: 30px 0 40px;
         }
         .wm-window-stage > * {
           flex: 1 1 50%;
@@ -2217,6 +2217,32 @@ export class Openp41geWindowManager extends LitElement {
         }
         .wm-window-stage strong {
           color: var(--text-primary, #fff);
+        }
+        /* Keyboard-shortcut hints shown at the bottom of the intro. */
+        .wm-markdown .wm-shortcuts {
+          margin: 34px 0 6px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          font-size: 12px;
+          color: var(--text-secondary, #b0b0b0);
+        }
+        .wm-markdown .wm-shortcut {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .wm-markdown .wm-shortcuts .kbd {
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: 11px;
+          color: var(--text-primary, #eee);
+          background: var(--bg-active, #2b2b31);
+          border: 1px solid var(--divider, #3c3c3c);
+          border-bottom-width: 2px;
+          border-radius: 4px;
+          padding: 3px 6px;
+          line-height: 1;
+          white-space: nowrap;
         }
         /* ── Drawer ─────────────────────────────────────────────── */
         /* A single shared shadow element whose width tracks the widest drawer,
