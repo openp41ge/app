@@ -2236,26 +2236,31 @@ export class Openp41geWindowManager extends LitElement {
         .wm-markdown .wm-md-quote p {
           margin: 0;
         }
-        /* Welcome slideshow: prev/next + page dots pinned to the bottom of the
-           pane so navigation is always visible while the page scrolls. */
+        /* Welcome slideshow: a compact controls bar pinned to the bottom of the
+           pane. One line holds the prev/next chevrons on either side of the
+           page dots; the page counter sits below it. */
         .wm-slideshow-nav {
           position: sticky;
           bottom: 0;
           display: flex;
+          flex-direction: column;
           align-items: center;
-          justify-content: center;
-          gap: 14px;
-          padding: 10px 14px;
+          gap: 5px;
+          padding: 6px 14px;
           background: var(--bg-secondary, #161616);
-          border-top: 1px solid var(--divider, #333);
           margin-top: 8px;
+        }
+        .wm-slideshow-line {
+          display: flex;
+          align-items: center;
+          gap: 10px;
         }
         .wm-slideshow-btn {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          padding: 4px 8px;
-          font-size: 18px;
+          padding: 2px 6px;
+          font-size: 17px;
           line-height: 1;
           color: var(--text-secondary, #999);
           background: none;
@@ -2264,12 +2269,6 @@ export class Openp41geWindowManager extends LitElement {
         }
         .wm-slideshow-btn:hover:not(:disabled) { color: var(--text-primary, #eee); }
         .wm-slideshow-btn:disabled { opacity: 0.35; cursor: default; }
-        .wm-slideshow-center {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px;
-        }
         .wm-slideshow-dots {
           display: flex;
           align-items: center;
@@ -2278,18 +2277,20 @@ export class Openp41geWindowManager extends LitElement {
         .wm-slideshow-dot {
           width: 10px;
           height: 10px;
-          border-radius: 50%;
+          border-radius: 999px;
           padding: 0;
           background: var(--bg-active, #3a3a42);
           border: 1px solid var(--divider, #444);
           cursor: pointer;
+          transition: width 0.25s ease;
         }
         .wm-slideshow-dot--active {
+          width: 30px;
           background: var(--accent, #79c0ff);
           border-color: var(--accent, #79c0ff);
         }
         .wm-slideshow-count {
-          font-size: 12px;
+          font-size: 11px;
           color: var(--text-secondary, #999);
           min-width: 34px;
           text-align: center;
@@ -2819,8 +2820,8 @@ export class Openp41geWindowManager extends LitElement {
                     <div class="wm-tab-pane wm-welcome">
                       <div class="wm-markdown">${unsafeHTML(welcomePages[this._welcomePage] ?? "")}</div>
                       <div class="wm-slideshow-nav">
-                        <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
-                        <div class="wm-slideshow-center">
+                        <div class="wm-slideshow-line">
+                          <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
                           <div class="wm-slideshow-dots">
                             ${welcomePages.map(
                               (_, i) => html`
@@ -2832,9 +2833,9 @@ export class Openp41geWindowManager extends LitElement {
                               `,
                             )}
                           </div>
-                          <span class="wm-slideshow-count">${this._welcomePage + 1} / ${welcomePages.length}</span>
+                          <button class="wm-slideshow-btn" aria-label="Next page" ?disabled=${this._welcomePage === welcomePages.length - 1} @click=${() => this._welcomeNav(1)}>&#8250;</button>
                         </div>
-                        <button class="wm-slideshow-btn" aria-label="Next page" ?disabled=${this._welcomePage === welcomePages.length - 1} @click=${() => this._welcomeNav(1)}>&#8250;</button>
+                        <span class="wm-slideshow-count">${this._welcomePage + 1} / ${welcomePages.length}</span>
                       </div>
                     </div>
                   `
