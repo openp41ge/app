@@ -222,6 +222,11 @@ export class Openp41geSidebarDemo extends LitElement {
           background: var(--accent, #79c0ff);
           flex-shrink: 0;
         }
+        .tabs {
+          display: flex;
+          gap: 4px;
+          flex-shrink: 0;
+        }
         .row {
           display: flex;
           align-items: center;
@@ -274,7 +279,10 @@ export class Openp41geSidebarDemo extends LitElement {
           <div class="side side--left">
             <div class="clip">
               <div class="inner">
-                <div class="tab"></div>
+                <div class="tabs">
+                  <div class="tab"></div>
+                  <div class="tab"></div>
+                </div>
                 ${this._rows()}
               </div>
             </div>
@@ -283,7 +291,11 @@ export class Openp41geSidebarDemo extends LitElement {
           <div class="side side--right">
             <div class="clip">
               <div class="inner">
-                <div class="tab"></div>
+                <div class="tabs">
+                  <div class="tab"></div>
+                  <div class="tab"></div>
+                  <div class="tab"></div>
+                </div>
                 ${this._rows()}
               </div>
             </div>

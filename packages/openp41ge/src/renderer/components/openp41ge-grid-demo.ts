@@ -153,7 +153,7 @@ export class Openp41geGridDemo extends LitElement {
           }
           82%,
           100% {
-            flex-grow: 1.3;
+            flex-grow: 1;
           }
         }
         @media (prefers-reduced-motion: reduce) {
