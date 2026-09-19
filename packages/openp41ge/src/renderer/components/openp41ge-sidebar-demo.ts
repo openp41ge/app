@@ -176,14 +176,9 @@ export class Openp41geSidebarDemo extends LitElement {
           min-height: 0;
           position: relative;
         }
-        /* The empty grid fills the body; the sidebars slide over it. */
-        .grid {
-          position: absolute;
-          inset: 8px;
-          border-radius: 6px;
-          background: var(--bg-active, #2c2c31);
-        }
-        /* Each sidebar is a clipping window over a fixed-width inner, so the
+        /* The sidebars slide over an empty body; nothing else is drawn, so
+           only the sidebar panels are visible. Each sidebar is a clipping
+           window over a fixed-width inner, so the
            width can collapse to zero (slide out) and grow back cleanly,
            without the window itself ever changing width. */
         .side {
@@ -300,7 +295,6 @@ export class Openp41geSidebarDemo extends LitElement {
           <span class="cbtn"></span><span class="cbtn"></span>
         </div>
         <div class="body">
-          <div class="grid"></div>
           <div class="side side--left">
             <div class="clip">
               <div class="inner">
