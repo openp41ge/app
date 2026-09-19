@@ -498,16 +498,28 @@ export class Openp41geApplication {
         submenu: [
           { role: "about" },
           { type: "separator" },
+          // The compact Window Manager doubles as an app-level Settings window,
+          // so Workspaces and Settings both open it with the matching tab.
+          {
+            label: "Workspaces",
+            click: () => openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "workspaces"),
+          },
+          {
+            label: "Releases",
+            click: () => openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "releases"),
+          },
+          {
+            label: "Settings…",
+            accelerator: "CmdOrCtrl+,",
+            click: () => openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "settings"),
+          },
+          { type: "separator" },
           { role: "services" },
           { type: "separator" },
           { role: "hide" },
           { role: "hideOthers" },
           { role: "unhide" },
-        ],
-      },
-      {
-        label: "File",
-        submenu: [
+          { type: "separator" },
           {
             label: "Quit",
             accelerator: "CmdOrCtrl+Q",
@@ -558,17 +570,6 @@ export class Openp41geApplication {
                   },
                 },
               ]),
-        ],
-      },
-      {
-        label: "Workspace",
-        submenu: [
-          {
-            label: "Show Workspace Manager",
-            click: () => {
-              openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined);
-            },
-          },
         ],
       },
     ];

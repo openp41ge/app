@@ -17,6 +17,9 @@ import type {
 
 export {};
 
+/** Tabs the Window Manager window can show. */
+type WindowManagerTabId = "workspaces" | "settings" | "welcome" | "releases";
+
 declare global {
   interface Window {
     openp41ge: {
@@ -45,6 +48,7 @@ declare global {
         openWorkspaceWindow: (workspacePath: string) => void;
         focusWorkspaceWindow: (workspacePath: string) => Promise<boolean>;
         onOpenWindowsChanged: (callback: () => void) => () => void;
+        onActivateTab: (callback: (tab: WindowManagerTabId) => void) => () => void;
       };
       workspace: {
         getState: () => Promise<string>;
@@ -53,6 +57,7 @@ declare global {
         getWindowId: () => string | null;
         getWindowType: () => "workspace" | "window-manager";
         getWorkspacePath: () => string | null;
+        getLaunchTab: () => WindowManagerTabId | null;
         waitForInit: () => Promise<void>;
         detachPane: (windowId: string, paneId: string, bounds?: { x: number; y: number; width: number; height: number }) => void;
         detachTab: (

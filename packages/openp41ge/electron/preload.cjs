@@ -5,6 +5,7 @@ let _isDev = false;
 let _windowType = "workspace";
 let _workspacePath = null;
 let _dataDir = null;
+let _initialTab = null;
 let _initResolve = null;
 /** Promise that resolves once openp41ge:init IPC message is received. */
 const _initPromise = new Promise((resolve) => {
@@ -18,6 +19,7 @@ ipcRenderer.on("openp41ge:init", (_event, data) => {
   _windowType = data.windowType ?? "workspace";
   _workspacePath = data.workspacePath ?? null;
   _dataDir = data.dataDir ?? null;
+  _initialTab = data.initialTab ?? null;
   // Store initial workspace state for the renderer to pick up
   _initialState = data.workspace;
   if (_initResolve) {
@@ -112,6 +114,9 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** Get the `.openp41ge-workspace` path this window is bound to (or null). */
     getWorkspacePath: () => _workspacePath,
 
+    /** Initial tab requested for a window-manager window ("workspaces" | "settings"), or null. */
+    getLaunchTab: () => _initialTab,
+
     /**
      * Wait for the openp41ge:init IPC message (which sets windowId and initial state).
      * Returns once the init message has been received.
@@ -200,6 +205,12 @@ contextBridge.exposeInMainWorld("openp41ge", {
       const handler = () => callback();
       ipcRenderer.on("window-manager:open-windows-changed", handler);
       return () => ipcRenderer.removeListener("window-manager:open-windows-changed", handler);
+    },
+    /** Fired when a tab should be activated in an already-open manager window. */
+    onActivateTab: (callback) => {
+      const handler = (_event, tab) => callback(tab);
+      ipcRenderer.on("window-manager:activate-tab", handler);
+      return () => ipcRenderer.removeListener("window-manager:activate-tab", handler);
     },
   },
 

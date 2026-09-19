@@ -27,9 +27,11 @@ function stubWindow(): void {
       openWindowSummaries: vi.fn().mockResolvedValue([]),
       onOpenWindowsChanged: vi.fn(() => () => {}),
       openWorkspaceWindow: vi.fn(),
+      onActivateTab: vi.fn(() => () => {}),
     },
     workspace: {
       getWindowId: vi.fn(() => "win-ws1-0"),
+      getLaunchTab: vi.fn(() => null),
     },
   };
 }

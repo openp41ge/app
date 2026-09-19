@@ -18,7 +18,11 @@ import { state } from "lit/decorators.js";
 import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
 import { tooltipController, OverlayScrollbar } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
+import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
+import { welcomeHtml } from "../content/welcome";
+import "./openp41ge-sidebar-demo";
+import "./openp41ge-grid-demo";
 
 /** Hold a skeleton this long before the drag element appears (long-press pickup). */
 const HOLD_MS = 350;
@@ -55,10 +59,23 @@ interface ClosingDrawer extends DrawerState {
   width: number;
 }
 
+/** Tabs available in the manager window's tab bar. */
+type ManagerTabId = "workspaces" | "settings" | "welcome" | "releases";
+
+/** Labels for each manager tab, keyed by id. */
+const MANAGER_TAB_LABELS: Record<ManagerTabId, string> = {
+  welcome: "Welcome",
+  workspaces: "Workspaces",
+  settings: "Settings",
+  releases: "Releases",
+};
+
 export class Openp41geWindowManager extends LitElement {
   @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
   @state() private _openWindows: OpenWindowSummary[] = [];
   @state() private _drawers: DrawerState[] = [];
+  @state() private _openTabs: ManagerTabId[] = ["welcome"];
+  @state() private _activeTab: ManagerTabId = "welcome";
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
   @state() private _addingRepo = false;
@@ -104,6 +121,7 @@ export class Openp41geWindowManager extends LitElement {
   private _holdTimer: number | null = null;
   private _offEndSession: (() => void) | null = null;
   private _offOpenWindowsChanged: (() => void) | null = null;
+  private _offActivateTab: (() => void) | null = null;
   /** Suppress the following row click after a drag/swipe, so the drawer doesn't pop open. */
   private _suppressClick = false;
   private _tooltipTargets: Element[] = [];
@@ -115,6 +133,10 @@ export class Openp41geWindowManager extends LitElement {
     window.addEventListener("resize", this._measureListOverflow);
     document.addEventListener("keydown", this._onKeydown);
     document.addEventListener("click", this._onDocumentClick);
+    // Welcome intro action buttons live inside the shadow DOM, so clicks are
+    // delegated at the shadow root (they're retargeted to the host by the time
+    // they reach a document listener).
+    this.shadowRoot?.addEventListener("click", this._onShadowClick);
     // Any new pointer press clears the drag-follow-up suppression. A click can
     // only follow a drag within the same gesture (no pointerdown between), so a
     // fresh press always means the previous drag's follow-up click is moot.
@@ -128,6 +150,16 @@ export class Openp41geWindowManager extends LitElement {
     this._offOpenWindowsChanged = window.openp41ge.windowManager.onOpenWindowsChanged(() => {
       void this._load();
     });
+    // A menu item may request a specific tab when the manager window is already
+    // open; activate it and bring the window to front (done in main).
+    this._offActivateTab = window.openp41ge.windowManager.onActivateTab((tab) => {
+      if (tab === "workspaces" || tab === "settings" || tab === "welcome" || tab === "releases") {
+        this._activateTab(tab);
+      }
+    });
+    // Fresh window opened for a specific tab (e.g. app menu > Settings).
+    const launchTab = window.openp41ge.workspace.getLaunchTab();
+    if (launchTab) this._activateTab(launchTab);
     void this._load();
   }
 
@@ -137,10 +169,13 @@ export class Openp41geWindowManager extends LitElement {
     window.removeEventListener("resize", this._measureListOverflow);
     document.removeEventListener("keydown", this._onKeydown);
     document.removeEventListener("click", this._onDocumentClick);
+    this.shadowRoot?.removeEventListener("click", this._onShadowClick);
     document.removeEventListener("pointerdown", this._onPointerDown);
     this._offEndSession?.();
     this._offOpenWindowsChanged?.();
     this._offOpenWindowsChanged = null;
+    this._offActivateTab?.();
+    this._offActivateTab = null;
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
     this._overlayScrollbar?.destroy();
@@ -151,7 +186,7 @@ export class Openp41geWindowManager extends LitElement {
   updated(): void {
     this._measureListOverflow();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
-      ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close",
+      ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close, .wm-tab-close, .wm-tabbar-add",
     );
     const live = new Set<Element>();
     if (btns) {
@@ -177,7 +212,7 @@ export class Openp41geWindowManager extends LitElement {
         this._overlayScrollbar = OverlayScrollbar.attach(body, {
           axis: "vertical",
           container: layer,
-          inset: { top: "0" },
+          inset: { top: "35px" },
           zIndex: 0,
           size: 9,
           autoHide: true,
@@ -209,6 +244,17 @@ export class Openp41geWindowManager extends LitElement {
     const target = e.target as HTMLElement | null;
     if (target?.closest?.(".crumbs")) return;
     this._crumbsOpen = false;
+  };
+
+  /** Welcome intro action buttons (e.g. "Open Workspaces") activate their tab. */
+  private _onShadowClick = (e: Event): void => {
+    const target = e.target as HTMLElement | null;
+    const btn = target?.closest?.("button.wm-md-button[data-tab]") as HTMLElement | null;
+    if (!btn) return;
+    const tab = btn.dataset.tab ?? "";
+    if (tab === "workspaces" || tab === "settings" || tab === "welcome" || tab === "releases") {
+      this._activateTab(tab);
+    }
   };
 
   /** Hover a workspace skeleton: pre-capture its bitmap so the drag ghost has
@@ -789,6 +835,45 @@ export class Openp41geWindowManager extends LitElement {
   }
 
   /** Expand the header into the search bar and focus the input. */
+  /** Activate a tab, opening it in the bar first if needed. */
+  private _activateTab(id: ManagerTabId): void {
+    if (!this._openTabs.includes(id)) this._openTabs = [...this._openTabs, id];
+    this._activeTab = id;
+  }
+
+  /** Close a tab; the last remaining tab cannot be closed. */
+  private _closeTab(id: ManagerTabId): void {
+    const idx = this._openTabs.indexOf(id);
+    if (idx === -1) return;
+    const next = this._openTabs.filter((t) => t !== id);
+    if (next.length === 0) return;
+    this._openTabs = next;
+    if (this._activeTab === id) {
+      this._activeTab = next[Math.max(0, idx - 1)] ?? next[0];
+    }
+  }
+
+  /** Open the inline + menu listing the available tabs, with an "O" badge on
+   *  the right marking each tab already open in the bar. */
+  private _onTabAddClick(e: Event): void {
+    const btn = e.currentTarget as HTMLElement | null;
+    const r = btn?.getBoundingClientRect();
+    const menu = document.createElement("openp41ge-contextmenu") as Openp41geContextMenuElement;
+    menu.x = Math.max(8, (r?.right ?? 160) - 160);
+    menu.y = (r?.bottom ?? 0) + 2;
+    // The Welcome tab is the landing tab and can't be opened again, so it is
+    // not offered in the + menu (only Workspaces / Settings / Releases).
+    menu.items = (Object.keys(MANAGER_TAB_LABELS) as ManagerTabId[])
+      .filter((id) => id !== "welcome")
+      .map((id) => ({
+        label: MANAGER_TAB_LABELS[id],
+        // Boxed "O" marker (mirrors the sidebar + menu) for tabs already open.
+        badge: this._openTabs.includes(id) ? "O" : undefined,
+        action: () => this._activateTab(id),
+      }));
+    document.body.appendChild(menu);
+  }
+
   private _startSearch(): void {
     this._searchOpen = true;
     void this.updateComplete.then(() => {
@@ -1440,11 +1525,109 @@ export class Openp41geWindowManager extends LitElement {
         .wm-winbtn--min {
           background: #febc2e;
         }
-        .wm-title {
-          font-size: 12px;
-          font-weight: 600;
-          letter-spacing: 0.02em;
+        /* Tab bar: persistent navigation row below the window title bar, styled
+           like the workspace window's <tab-bar>. Hosts the "Workspaces" tab
+           (active), a per-tab close button, and a trailing "+" new-tab button. */
+        .wm-tabbar {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+          height: 35px;
+          padding: 0;
+          background: var(--bg-secondary, #161616);
+          border-bottom: 1px solid var(--divider, #2d2d2d);
+          overflow-x: auto;
+          scrollbar-width: none;
+          user-select: none;
+        }
+        .wm-tabbar::-webkit-scrollbar {
+          display: none;
+        }
+        .wm-tab {
+          display: inline-flex;
+          align-items: center;
+          flex-shrink: 0;
+          min-width: var(--tab-min-width, 120px);
+          height: 34px;
+          padding: 0 0 0 10px;
+          border-right: 1px solid var(--divider, #333);
+          font-size: 13px;
+          line-height: 34px;
+          cursor: pointer;
+          white-space: nowrap;
+          user-select: none;
           color: var(--text-secondary, #999);
+        }
+        .wm-tab--active {
+          background: var(--border-divider, #2d2d2d);
+          color: var(--text-primary, #ccc);
+        }
+        .wm-tab:hover {
+          color: var(--text-primary, #ccc);
+        }
+        .wm-tab-title {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .wm-tab-close {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          margin-left: 10px;
+          width: 34px;
+          height: 34px;
+          font-size: 13px;
+          font-style: normal;
+          line-height: 1;
+          color: #666;
+          cursor: pointer;
+          border-radius: 0;
+          transition:
+            background 0.15s,
+            color 0.15s;
+        }
+        .wm-tab-close:hover {
+          background: var(--border-divider, #2d2d2d);
+          color: #fff;
+        }
+        .wm-tab--active .wm-tab-close:hover {
+          background: var(--bg-hover-strong, #444);
+          color: #fff;
+        }
+        /* Trailing "+" new-tab button, full-height square pinned to the right
+           side of the bar (margin-left:auto pushes it to the end). */
+        .wm-tabbar-add {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          width: 34px;
+          height: 34px;
+          margin: 0 0 0 auto;
+          font-size: 16px;
+          line-height: 1;
+          color: var(--text-secondary, #999);
+          cursor: pointer;
+          border-radius: 0;
+          user-select: none;
+          transition:
+            background 0.15s,
+            color 0.15s;
+        }
+        .wm-tabbar-add:hover {
+          background: var(--border-divider, #2d2d2d);
+          color: #eee;
+        }
+        .wm-tabbar-add-glyph {
+          display: block;
+          line-height: 1;
+          /* The + glyph renders low in its 34px button; lift just the glyph,
+             leaving the hover fill square in place. */
+          transform: translateY(-2px);
         }
         /* Search toggle: full-height square icon button on the far left of
            the persistent bottom bar; toggles the search bar that slides up
@@ -1562,15 +1745,17 @@ export class Openp41geWindowManager extends LitElement {
         }
         .wm-body {
           position: absolute;
-          top: 0;
+          top: 35px;
           left: 0;
           right: 0;
           bottom: 0;
           overflow-y: auto;
+          /* Match the content view surface to the bottom bar / tab bar. */
+          background: var(--bg-secondary, #161616);
           /* No horizontal padding so rows + separators span the full window width;
-             the rows keep their own content inset. The list starts at the top,
-             and the bottom padding clears the overlaying bottom bar (34px) +
-             scroll space. */
+             the rows keep their own content inset. The list starts below the
+             tab bar, and the bottom padding clears the overlaying bottom bar
+             (34px) + scroll space. */
           padding: 0 0 54px;
           box-sizing: border-box;
         }
@@ -1584,7 +1769,7 @@ export class Openp41geWindowManager extends LitElement {
            siblings with a higher z-index), so drawer interactions still work. */
         .wm-list-mask {
           position: absolute;
-          top: 0;
+          top: 35px;
           left: 0;
           right: 0;
           bottom: 0;
@@ -1928,6 +2113,111 @@ export class Openp41geWindowManager extends LitElement {
           justify-content: center;
           height: 100%;
         }
+        /* Application-level tab panes (Welcome / Releases / Settings placeholders). */
+        .wm-tab-pane,
+        .wm-settings-pane {
+          padding: 16px 14px;
+        }
+        .wm-tab-placeholder,
+        .wm-settings-placeholder {
+          margin: 0;
+          font-size: 13px;
+          color: var(--text-secondary, #999);
+        }
+        /* Welcome intro: typographic layout for the rendered markdown. */
+        .wm-markdown {
+          font-size: 14px;
+          line-height: 1.75;
+          color: var(--text-secondary, #a6a6a6);
+          max-width: 68ch;
+        }
+        .wm-markdown h1 {
+          font-size: 22px;
+          margin: 0 0 18px;
+          font-weight: 700;
+          letter-spacing: -0.02em;
+          color: var(--text-primary, #f5f5f5);
+        }
+        .wm-markdown h2 {
+          font-size: 15px;
+          margin: 28px 0 12px;
+          padding-bottom: 6px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          color: var(--text-primary, #f0f0f0);
+          border-bottom: 1px solid var(--divider, #333);
+        }
+        .wm-markdown p {
+          margin: 0 0 14px;
+        }
+        .wm-markdown ul,
+        .wm-markdown ol {
+          margin: 0 0 14px;
+          padding-left: 22px;
+        }
+        .wm-markdown li {
+          margin: 5px 0;
+        }
+        .wm-markdown strong {
+          color: var(--text-primary, #ffffff);
+          font-weight: 700;
+        }
+        .wm-markdown code {
+          background: var(--bg-active, #37373d);
+          padding: 1px 4px;
+          border-radius: 3px;
+          font-size: 12px;
+        }
+        .wm-markdown a {
+          color: var(--accent, #79c0ff);
+        }
+        .wm-markdown .wm-md-button {
+          display: inline-flex;
+          align-items: center;
+          margin: 4px 0 14px;
+          padding: 6px 14px;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-primary, #eee);
+          background: var(--bg-active, #37373d);
+          border: 1px solid var(--divider, #444);
+          border-radius: 5px;
+          cursor: pointer;
+        }
+        .wm-markdown .wm-md-button:hover {
+          background: var(--bg-hover, #45454d);
+          color: var(--text-primary, #fff);
+        }
+        /* Info notes (markdown blockquote): indented box with an accent left rule. */
+        .wm-markdown .wm-md-quote {
+          margin: 0 0 14px;
+          padding: 8px 12px;
+          font-size: 13px;
+          color: var(--text-secondary, #b0b0b0);
+          background: var(--bg-active, #23232a);
+          border-left: 3px solid var(--accent, #79c0ff);
+          border-radius: 0 4px 4px 0;
+        }
+        .wm-markdown .wm-md-quote p {
+          margin: 0;
+        }
+        /* Workspace-window explainer: the animated demo sits at half width
+           beside its explanation text, both top-aligned — no card. The demo
+           never changes its own width; the sidebars slide within it. */
+        .wm-window-stage {
+          display: flex;
+          align-items: flex-start;
+          gap: 18px;
+          margin: 16px 0 26px;
+        }
+        .wm-window-stage > * {
+          flex: 1 1 50%;
+          min-width: 0;
+        }
+        .wm-window-stage strong {
+          color: var(--text-primary, #fff);
+        }
         /* ── Drawer ─────────────────────────────────────────────── */
         /* A single shared shadow element whose width tracks the widest drawer,
            so the stack never stacks multiple shadows on top of each other. */
@@ -1999,7 +2289,7 @@ export class Openp41geWindowManager extends LitElement {
           gap: 8px;
           flex-shrink: 0;
           height: 35px;
-          padding: 0 14px;
+          padding: 0 0 0 14px;
           border-bottom: 1px solid var(--divider, #333);
         }
         .drawer-title {
@@ -2108,6 +2398,8 @@ export class Openp41geWindowManager extends LitElement {
           align-items: center;
           gap: 6px;
           flex-shrink: 0;
+          /* Stretch so the close button can be a full-height square tile. */
+          align-self: stretch;
         }
         .dw-open {
           border: none;
@@ -2124,12 +2416,14 @@ export class Openp41geWindowManager extends LitElement {
         }
         .dw-close {
           border: none;
+          border-left: 1px solid var(--divider, #333);
+          border-radius: 0;
           background: transparent;
           color: var(--text-secondary, #999);
           font-size: 16px;
-          width: 26px;
-          height: 26px;
-          border-radius: 4px;
+          /* Full-height square tile, flush against the drawer's right edge. */
+          height: 100%;
+          aspect-ratio: 1 / 1;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -2362,12 +2656,40 @@ export class Openp41geWindowManager extends LitElement {
               <span>─</span>
             </button>
           </div>
-          <span class="wm-title">Workspace Manager</span>
         </div>
         <div class="wm-drawer-layer">
+        <div class="wm-tabbar">
+          ${this._openTabs.map(
+            (id) => html`
+              <div
+                class="wm-tab ${this._activeTab === id ? "wm-tab--active" : ""}"
+                data-manager-tab=${id}
+                @click=${() => this._activateTab(id)}
+              >
+                <span class="wm-tab-title">${MANAGER_TAB_LABELS[id]}</span>
+                <span
+                  class="wm-tab-close"
+                  aria-label="Close tab"
+                  data-tip="Close tab"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._closeTab(id);
+                  }}
+                >✕</span>
+              </div>
+            `,
+          )}
+          <div class="wm-tabbar-add" aria-label="New tab" data-tip="New tab" @click=${this._onTabAddClick}><span class="wm-tabbar-add-glyph">+</span></div>
+        </div>
           <div class="wm-body${this._searchOpen ? " wm-body--searching" : ''}" @click=${this._onBackgroundClick}>
             ${
-              this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
+              this._activeTab === "welcome"
+                ? html`<div class="wm-tab-pane wm-welcome"><div class="wm-markdown">${unsafeHTML(welcomeHtml)}</div></div>`
+                : this._activeTab === "releases"
+                ? html`<div class="wm-tab-pane"><p class="wm-tab-placeholder">Releases</p></div>`
+                : this._activeTab === "settings"
+                ? html`<div class="wm-settings-pane"><p class="wm-settings-placeholder">Settings</p></div>`
+                : this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
                 ? html`<p class="empty">No workspaces yet.</p>`
                 : this._searchOpen && this._workspaces.length > 0 && filtered.length === 0
                   ? html`<p class="empty">No workspaces match “${this._searchQuery}”.</p>`

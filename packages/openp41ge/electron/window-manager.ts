@@ -46,7 +46,12 @@ export interface Openp41geWindowMeta {
   windowType: Openp41geWindowType;
   /** `.openp41ge-workspace` path the window is bound to (null for window-manager). */
   workspacePath: string | null;
+  /** Initial tab to open in a window-manager window ("workspaces" | "settings"). */
+  initialTab?: WindowManagerTab;
 }
+
+/** Tabs the compact Window Manager window can open with. */
+export type WindowManagerTab = "workspaces" | "settings" | "welcome" | "releases";
 
 /** Tracks the type/binding of every open window, keyed by window id. */
 export const openp41geWindowMeta = new Map<string, Openp41geWindowMeta>();
@@ -120,6 +125,7 @@ export function createOpenp41geWindow(
   const windowMeta: Openp41geWindowMeta = {
     windowType: meta?.windowType ?? "workspace",
     workspacePath: meta?.workspacePath ?? null,
+    initialTab: meta?.initialTab,
   };
 
   // The Window Manager is a thin utility window: cap its width to 600 so it
@@ -226,6 +232,7 @@ export function createOpenp41geWindow(
         isDev,
         windowType: windowMeta.windowType,
         workspacePath: windowMeta.workspacePath,
+        initialTab: windowMeta.initialTab,
         dataDir: resolveAppDataDir(app.isPackaged),
       });
     }
@@ -302,25 +309,33 @@ export function setOpenWorkspaceWindowHandler(fn: OpenWorkspaceWindowHandler): v
  * Create a new thin window-manager window (not bound to any workspace layout
  * Window). Returns the window id.
  */
-export function createWindowManagerWindow(sourceWindow?: BrowserWindow): string {
+export function createWindowManagerWindow(sourceWindow?: BrowserWindow, tab?: WindowManagerTab): string {
   const winId = `wm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   createOpenp41geWindow(winId, false, sourceWindow, undefined, undefined, {
     windowType: "window-manager",
     workspacePath: null,
+    initialTab: tab,
   });
   return winId;
 }
 
-/** Open (or focus) a window-manager window. */
-export function openWindowManager(sourceWindow?: BrowserWindow): void {
+/**
+ * Open (or focus) a window-manager window. When a window already exists and
+ * `tab` is given, the tab is activated in it and the window brought to front.
+ */
+export function openWindowManager(sourceWindow?: BrowserWindow, tab?: WindowManagerTab): void {
   for (const [id, bw] of openp41geWindows) {
     if (openp41geWindowMeta.get(id)?.windowType !== "window-manager") continue;
     if (bw.isDestroyed()) continue;
+    // Activate the requested tab in the already-open window.
+    if (tab) {
+      bw.webContents.send("window-manager:activate-tab", tab);
+    }
     if (bw.isMinimized()) bw.restore();
     bw.focus();
     return;
   }
-  createWindowManagerWindow(sourceWindow);
+  createWindowManagerWindow(sourceWindow, tab);
 }
 
 /** Summaries of every open window (id, kind, workspace binding). */
