@@ -106,11 +106,13 @@ export class Openp41geGridDemo extends LitElement {
           background: var(--bg-active, #2c2c31);
           border-radius: 5px;
         }
-        /* The cell created by the drop: starts empty and grows to a column. */
+        /* The cell created by the drop: starts empty and slides out under the
+           hovering chip, then turns grey once the chip is dropped. */
         .cell--new {
           flex: 0 1 0;
           background: rgba(86, 156, 214, 0.28);
-          animation: grow 5.6s ease-in-out infinite;
+          animation: grow 5.6s ease-in-out infinite,
+            settle 5.6s ease-in-out infinite;
         }
         /* The dragged chip: flies from the sidebar into the grid, then lands. */
         .fly {
@@ -129,17 +131,17 @@ export class Openp41geGridDemo extends LitElement {
             top: 68px;
             opacity: 0.9;
           }
-          55% {
-            left: 116px;
-            top: 60px;
-            opacity: 0.9;
-          }
-          78% {
+          48% {
             left: 208px;
             top: 88px;
             opacity: 0.9;
           }
-          82%,
+          76% {
+            left: 208px;
+            top: 88px;
+            opacity: 0.9;
+          }
+          80%,
           100% {
             left: 208px;
             top: 88px;
@@ -148,11 +150,24 @@ export class Openp41geGridDemo extends LitElement {
         }
         @keyframes grow {
           0%,
-          78% {
+          52% {
             flex-grow: 0;
           }
+          76%,
           100% {
             flex-grow: 1;
+          }
+        }
+
+        /* The dropped chip's cell settles into a plain grey column. */
+        @keyframes settle {
+          0%,
+          80% {
+            background: rgba(86, 156, 214, 0.28);
+          }
+          90%,
+          100% {
+            background: var(--bg-active, #2c2c31);
           }
         }
         @media (prefers-reduced-motion: reduce) {
@@ -165,6 +180,7 @@ export class Openp41geGridDemo extends LitElement {
           }
           .cell--new {
             flex: 1 1 0;
+            background: var(--bg-active, #2c2c31);
           }
         }
       </style>
