@@ -2297,7 +2297,7 @@ export class Openp41geWindowManager extends LitElement {
         .wm-window-stage {
           display: flex;
           flex-direction: column;
-          align-items: flex-start;
+          align-items: center;
           gap: 18px;
           margin: 30px 0 40px;
         }
