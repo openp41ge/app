@@ -63,6 +63,7 @@ import { registerTerminalHandlers } from "./ipc-handlers/terminal-handlers.js";
 import { registerWorkspaceHandlers } from "./ipc-handlers/workspace-handlers.js";
 import { registerGitHandlers } from "./ipc-handlers/git-handlers.js";
 import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
+import { registerWelcomeHandlers } from "./ipc-handlers/welcome-handlers.js";
 import { registerLogHandlers } from "./ipc-handlers/log-handlers.js";
 import { registerChatHandlers } from "./ipc-handlers/chat-handlers.js";
 
@@ -386,6 +387,7 @@ export class Openp41geApplication {
     registerWorkspaceHandlers(this.workspaceService, this.dispatcher, this.openp41geDir);
     registerGitHandlers(this.gitCommitService, this.gitService);
     registerConfigHandlers(this.configService);
+    registerWelcomeHandlers(this.openp41geDir);
     registerLogHandlers(this.logStore);
     registerChatHandlers(this.chatStore, this.agentRuntime, this.chatProviders, this.configService);
     registerLifecycleHandlers(this.lifecycle);

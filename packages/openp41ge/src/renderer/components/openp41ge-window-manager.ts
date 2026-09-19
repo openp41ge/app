@@ -21,7 +21,6 @@ import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import { welcomePages } from "../content/welcome";
-import { appServices } from "../app";
 
 /** Unchecked / checked icons for the "never show welcome" toggle. */
 const WELCOME_UNCHECKED_ICON = '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>';
@@ -172,9 +171,9 @@ export class Openp41geWindowManager extends LitElement {
     if (launchTab) this._activateTab(launchTab);
     void this._load();
     // If the user opted out of the welcome intro, don't land on it (or open it)
-    // on future launches. Config loads via IPC, so this settles asynchronously.
-    void appServices.configService.load().then(() => {
-      if (appServices.configService.get("welcomeDismissed") === true) {
+    // on future launches. Dismissal is a marker file in the app-data dir.
+    void window.openp41ge.welcome.isDismissed().then((dismissed) => {
+      if (dismissed) {
         this._welcomeDismissed = true;
         if (this._activeTab === "welcome") {
           this._activateTab("workspaces");
@@ -556,7 +555,7 @@ export class Openp41geWindowManager extends LitElement {
   /** Toggle + persist the "never show the welcome intro again" choice. */
   private _onWelcomeDismissToggle = (): void => {
     this._welcomeDismissed = !this._welcomeDismissed;
-    void appServices.configService.set("welcomeDismissed", this._welcomeDismissed);
+    void window.openp41ge.welcome.setDismissed(this._welcomeDismissed);
   };
 
   private _onFocus = (): void => {

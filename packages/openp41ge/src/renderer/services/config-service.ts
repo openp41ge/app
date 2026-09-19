@@ -15,8 +15,6 @@ const log = createLogger("openp41ge", "config-service");
 export interface UserConfig {
   version: number;
   appTheme: "dark" | "light";
-  /** When true, the Welcome intro is no longer shown on startup. */
-  welcomeDismissed: boolean;
   editor: {
     lineHeight: number;
     fontSize: number;

@@ -652,6 +652,11 @@ contextBridge.exposeInMainWorld("openp41ge", {
     getAll: () => ipcRenderer.invoke("config:get-all"),
   },
 
+  welcome: {
+    isDismissed: () => ipcRenderer.invoke("welcome:is-dismissed"),
+    setDismissed: (dismissed) => ipcRenderer.invoke("welcome:set-dismissed", dismissed),
+  },
+
   /** AI agent chat store + runtime bridge. */
   chat: {
     list: () => ipcRenderer.invoke("chat:list"),

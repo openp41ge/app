@@ -313,6 +313,12 @@ declare global {
         getAll: () => Promise<Record<string, any>>;
       };
 
+      /** Welcome intro dismissal — backed by a marker file in the app-data dir. */
+      welcome: {
+        isDismissed: () => Promise<boolean>;
+        setDismissed: (dismissed: boolean) => Promise<boolean>;
+      };
+
       /** AI agent chat store + runtime bridge. */
       chat: {
         list: () => Promise<ChatSummary[]>;
