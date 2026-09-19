@@ -2218,9 +2218,16 @@ export class Openp41geWindowManager extends LitElement {
         .wm-window-stage strong {
           color: var(--text-primary, #fff);
         }
-        /* Keyboard-shortcut hints shown at the bottom of the intro. */
+        /* The explanation column beside the demo: text and any shortcut hints
+           stack top-aligned next to the skeleton. */
+        .wm-window-copy {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        /* Keyboard-shortcut hints under the explanation text. */
         .wm-markdown .wm-shortcuts {
-          margin: 34px 0 6px;
+          margin: 14px 0 0;
           display: flex;
           flex-direction: column;
           gap: 10px;

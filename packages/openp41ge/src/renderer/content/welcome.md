@@ -57,6 +57,9 @@ The workspace window has a **sidebar** holding the app's system tabs, and a
 **History**, **Agents**, **Logs**. It can sit on the left, or on both sides.
 Click a system tab to pin it there, and drag the bar at a sidebar's inner
 edge to resize it.
+
+:::shortcuts
+:::
 :::
 
 :::workspace-window
@@ -75,6 +78,3 @@ column-based, so tabs line up side by side and you can drag them around.
 - Pin the History and Agents tabs and start a session.
 
 That's the whole model — three levels, and two kinds of tab.
-
-:::shortcuts
-:::

@@ -123,7 +123,18 @@ export function renderMarkdown(md: string): string {
           );
         } else if (name === "workspace-window") {
           const inner = renderMarkdown(body.join("\n"));
-          out.push(`<div class="wm-window-stage">${inner}</div>`);
+          // The demo sits at half width; any other content (the explanation
+          // text and any shortcut hints) stacks in a column beside it.
+          const m = inner.match(
+            /^(<openp41ge-(?:sidebar|grid)-demo><\/openp41ge-(?:sidebar|grid)-demo>)\n?([\s\S]*)$/,
+          );
+          if (m) {
+            out.push(
+              `<div class="wm-window-stage">${m[1]}\n<div class="wm-window-copy">${m[2]}</div></div>`,
+            );
+          } else {
+            out.push(`<div class="wm-window-stage">${inner}</div>`);
+          }
         } else if (name === "sidebar-demo") {
           out.push(`<openp41ge-sidebar-demo></openp41ge-sidebar-demo>`);
         } else if (name === "grid-demo") {
