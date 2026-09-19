@@ -2290,24 +2290,30 @@ export class Openp41geWindowManager extends LitElement {
           min-width: 34px;
           text-align: center;
         }
-        /* Workspace-window explainer: the animated demo sits at half width
-           beside its explanation text, both top-aligned — no card. The demo
-           never changes its own width; the sidebars slide within it. */
+        /* Workspace-window explainer: the animated demo spans 80% of the
+           available width, and the explanation text (and any shortcut hints)
+           stacks underneath it. The demo never changes its own width; the
+           sidebars slide within it. */
         .wm-window-stage {
           display: flex;
+          flex-direction: column;
           align-items: flex-start;
           gap: 18px;
           margin: 30px 0 40px;
         }
-        .wm-window-stage > * {
-          flex: 1 1 50%;
-          min-width: 0;
+        .wm-window-stage > :first-child {
+          width: 80%;
+          flex: none;
+        }
+        .wm-window-stage > .wm-window-copy {
+          width: 100%;
+          flex: none;
         }
         .wm-window-stage strong {
           color: var(--text-primary, #fff);
         }
-        /* The explanation column beside the demo: text and any shortcut hints
-           stack top-aligned next to the skeleton. */
+        /* The description column under the demo: text and any shortcut hints
+           stack below the skeleton. */
         .wm-window-copy {
           display: flex;
           flex-direction: column;
