@@ -2264,24 +2264,20 @@ export class Openp41geWindowManager extends LitElement {
         .wm-slideshow-nav {
           position: sticky;
           bottom: 0;
+          flex-shrink: 0;
           display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 5px;
-          padding: 6px 14px;
+          align-items: stretch;
+          justify-content: space-between;
+          height: 34px;
           background: var(--bg-secondary, #161616);
-          margin-top: 8px;
-        }
-        .wm-slideshow-line {
-          display: flex;
-          align-items: center;
-          gap: 10px;
+          border-top: 1px solid var(--divider, #333);
         }
         .wm-slideshow-btn {
-          display: inline-flex;
+          display: flex;
           align-items: center;
           justify-content: center;
-          padding: 2px 6px;
+          height: 100%;
+          width: 46px;
           font-size: 17px;
           line-height: 1;
           color: var(--text-secondary, #999);
@@ -2289,7 +2285,10 @@ export class Openp41geWindowManager extends LitElement {
           border: none;
           cursor: pointer;
         }
-        .wm-slideshow-btn:hover:not(:disabled) { color: var(--text-primary, #eee); }
+        .wm-slideshow-btn:hover:not(:disabled) {
+          color: var(--text-primary, #eee);
+          background: var(--bg-active, #26262d);
+        }
         .wm-slideshow-btn:disabled { opacity: 0.35; cursor: default; }
         .wm-slideshow-dots {
           display: flex;
@@ -2883,21 +2882,19 @@ export class Openp41geWindowManager extends LitElement {
                           : nothing
                       }
                       <div class="wm-slideshow-nav">
-                        <div class="wm-slideshow-line">
-                          <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
-                          <div class="wm-slideshow-dots">
-                            ${welcomePages.map(
-                              (_, i) => html`
-                                <button
-                                  class="wm-slideshow-dot${i === this._welcomePage ? " wm-slideshow-dot--active" : ""}"
-                                  aria-label="Page ${i + 1}"
-                                  @click=${() => (this._welcomePage = i)}
-                                ></button>
-                              `,
-                            )}
-                          </div>
-                          <button class="wm-slideshow-btn" aria-label="Next page" ?disabled=${this._welcomePage === welcomePages.length - 1} @click=${() => this._welcomeNav(1)}>&#8250;</button>
+                        <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
+                        <div class="wm-slideshow-dots">
+                          ${welcomePages.map(
+                            (_, i) => html`
+                              <button
+                                class="wm-slideshow-dot${i === this._welcomePage ? " wm-slideshow-dot--active" : ""}"
+                                aria-label="Page ${i + 1}"
+                                @click=${() => (this._welcomePage = i)}
+                              ></button>
+                            `,
+                          )}
                         </div>
+                        <button class="wm-slideshow-btn" aria-label="Next page" ?disabled=${this._welcomePage === welcomePages.length - 1} @click=${() => this._welcomeNav(1)}>&#8250;</button>
                       </div>
                     </div>
                   `
