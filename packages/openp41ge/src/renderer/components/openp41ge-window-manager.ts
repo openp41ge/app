@@ -21,6 +21,7 @@ import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import { welcomePages } from "../content/welcome";
+import { appServices } from "../app";
 import "./openp41ge-sidebar-demo";
 import "./openp41ge-sidebar-move-demo";
 import "./openp41ge-grid-demo";
@@ -80,6 +81,7 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _openTabs: ManagerTabId[] = ["welcome"];
   @state() private _activeTab: ManagerTabId = "welcome";
   @state() private _welcomePage = 0;
+  @state() private _welcomeDismissed = false;
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
   @state() private _addingRepo = false;
@@ -165,6 +167,17 @@ export class Openp41geWindowManager extends LitElement {
     const launchTab = window.openp41ge.workspace.getLaunchTab();
     if (launchTab) this._activateTab(launchTab);
     void this._load();
+    // If the user opted out of the welcome intro, don't land on it (or open it)
+    // on future launches. Config loads via IPC, so this settles asynchronously.
+    void appServices.configService.load().then(() => {
+      if (appServices.configService.get("welcomeDismissed") === true) {
+        this._welcomeDismissed = true;
+        if (this._activeTab === "welcome") {
+          this._activateTab("workspaces");
+          this._closeTab("welcome");
+        }
+      }
+    });
   }
 
   disconnectedCallback(): void {
@@ -535,6 +548,13 @@ export class Openp41geWindowManager extends LitElement {
     const next = Math.min(welcomePages.length - 1, Math.max(0, this._welcomePage + delta));
     if (next !== this._welcomePage) this._welcomePage = next;
   }
+
+  /** Persist the "never show the welcome intro again" choice. */
+  private _onWelcomeDismissChange = (e: Event): void => {
+    const checked = (e.target as HTMLInputElement).checked;
+    this._welcomeDismissed = checked;
+    void appServices.configService.set("welcomeDismissed", checked);
+  };
 
   private _onFocus = (): void => {
     void this._load();
@@ -2289,11 +2309,23 @@ export class Openp41geWindowManager extends LitElement {
           background: var(--accent, #79c0ff);
           border-color: var(--accent, #79c0ff);
         }
-        .wm-slideshow-count {
-          font-size: 11px;
-          color: var(--text-secondary, #999);
-          min-width: 34px;
-          text-align: center;
+        .wm-welcome-dismiss {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 18px;
+          font-size: 13px;
+          color: var(--text-secondary, #b0b0b0);
+          cursor: pointer;
+          user-select: none;
+        }
+        .wm-welcome-dismiss:hover { color: var(--text-primary, #eee); }
+        .wm-welcome-dismiss input[type="checkbox"] {
+          width: 14px;
+          height: 14px;
+          margin: 0;
+          accent-color: var(--accent, #79c0ff);
+          cursor: pointer;
         }
         /* Workspace-window explainer: the animated demo spans 80% of the
            available width, and the explanation text (and any shortcut hints)
@@ -2819,6 +2851,16 @@ export class Openp41geWindowManager extends LitElement {
                 ? html`
                     <div class="wm-tab-pane wm-welcome">
                       <div class="wm-markdown">${unsafeHTML(welcomePages[this._welcomePage] ?? "")}</div>
+                      ${
+                        this._welcomePage === 0
+                          ? html`
+                              <label class="wm-welcome-dismiss">
+                                <input type="checkbox" ?checked=${this._welcomeDismissed} @change=${this._onWelcomeDismissChange} />
+                                <span>Never show the welcome message again</span>
+                              </label>
+                            `
+                          : nothing
+                      }
                       <div class="wm-slideshow-nav">
                         <div class="wm-slideshow-line">
                           <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
@@ -2835,7 +2877,6 @@ export class Openp41geWindowManager extends LitElement {
                           </div>
                           <button class="wm-slideshow-btn" aria-label="Next page" ?disabled=${this._welcomePage === welcomePages.length - 1} @click=${() => this._welcomeNav(1)}>&#8250;</button>
                         </div>
-                        <span class="wm-slideshow-count">${this._welcomePage + 1} / ${welcomePages.length}</span>
                       </div>
                     </div>
                   `

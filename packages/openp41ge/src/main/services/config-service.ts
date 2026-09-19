@@ -26,6 +26,8 @@ const log = createLogger("openp41ge", "ConfigService");
 export interface UserConfig {
   version: number;
   appTheme: "dark" | "light";
+  /** When true, the Welcome intro is no longer shown on startup. */
+  welcomeDismissed: boolean;
   editor: {
     lineHeight: number;
     fontSize: number;
@@ -60,6 +62,7 @@ export const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024;
 const DEFAULT_CONFIG: UserConfig = {
   version: 1,
   appTheme: "dark",
+  welcomeDismissed: false,
   editor: {
     lineHeight: 20,
     fontSize: 14,
