@@ -85,6 +85,10 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _activeTab: ManagerTabId = "welcome";
   @state() private _welcomePage = 0;
   @state() private _welcomeDismissed = false;
+  /** Slide-transition phase for the welcome page (out-* / in-* / "" = idle). */
+  @state() private _welcomeSlide: "" | "out-left" | "out-right" | "in-left" | "in-right" = "";
+  /** Prevents overlapping navigations while a slide is playing. */
+  private _welcomeAnimLock = false;
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
   @state() private _addingRepo = false;
@@ -550,6 +554,38 @@ export class Openp41geWindowManager extends LitElement {
   private _welcomeNav(delta: number): void {
     const next = Math.min(welcomePages.length - 1, Math.max(0, this._welcomePage + delta));
     if (next !== this._welcomePage) this._welcomePage = next;
+  }
+
+  /** Navigate the welcome slideshow with a directional slide (or jump under reduced motion). */
+  private _welcomeNav(delta: number): void {
+    if (this._welcomeAnimLock) return;
+    const target = Math.min(welcomePages.length - 1, Math.max(0, this._welcomePage + delta));
+    if (target === this._welcomePage) return;
+
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) {
+      this._welcomePage = target;
+      return;
+    }
+
+    const dir = delta > 0 ? "left" : "right";
+    this._welcomeAnimLock = true;
+    this._welcomeSlide = `out-${dir}`;
+    window.setTimeout(() => {
+      this._welcomePage = target;
+      this._welcomeSlide = `in-${dir}`;
+      window.setTimeout(() => {
+        this._welcomeSlide = "";
+        this._welcomeAnimLock = false;
+      }, 260);
+    }, 260);
+  }
+
+  /** Jump directly to a page (dot click) — no slide if one is playing. */
+  private _welcomeGoto(index: number): void {
+    if (this._welcomeAnimLock) return;
+    this._welcomeSlide = "";
+    this._welcomePage = index;
   }
 
   /** Toggle + persist the "never show the welcome intro again" choice. */
@@ -2167,7 +2203,18 @@ export class Openp41geWindowManager extends LitElement {
           min-height: 100%;
           box-sizing: border-box;
           padding: 16px 14px 0;
+          /* Clip the page while it slides so the exit/enter doesn't spill sideways. */
+          overflow: hidden;
         }
+        /* Directional slide transition between welcome pages. */
+        .wm-markdown.wm-slide-out-left { animation: wm-slide-out-left 0.25s ease forwards; }
+        .wm-markdown.wm-slide-in-left  { animation: wm-slide-in-left  0.25s ease forwards; }
+        .wm-markdown.wm-slide-out-right { animation: wm-slide-out-right 0.25s ease forwards; }
+        .wm-markdown.wm-slide-in-right  { animation: wm-slide-in-right  0.25s ease forwards; }
+        @keyframes wm-slide-out-left  { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-100%); opacity: 0; } }
+        @keyframes wm-slide-in-left   { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes wm-slide-out-right { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+        @keyframes wm-slide-in-right  { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .wm-welcome .wm-markdown {
           flex: 1;
         }
@@ -2869,7 +2916,7 @@ export class Openp41geWindowManager extends LitElement {
               this._activeTab === "welcome"
                 ? html`
                     <div class="wm-tab-pane wm-welcome">
-                      <div class="wm-markdown">${unsafeHTML(welcomePages[this._welcomePage] ?? "")}</div>
+                      <div class="wm-markdown${this._welcomeSlide ? ` wm-slide-${this._welcomeSlide}` : ""}">${unsafeHTML(welcomePages[this._welcomePage] ?? "")}</div>
                       ${
                         this._welcomePage === 0
                           ? html`
@@ -2895,7 +2942,7 @@ export class Openp41geWindowManager extends LitElement {
                               <button
                                 class="wm-slideshow-dot${i === this._welcomePage ? " wm-slideshow-dot--active" : ""}"
                                 aria-label="Page ${i + 1}"
-                                @click=${() => (this._welcomePage = i)}
+                                @click=${() => this._welcomeGoto(i)}
                               ></button>
                             `,
                           )}
