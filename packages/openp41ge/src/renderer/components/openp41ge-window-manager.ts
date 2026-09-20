@@ -1827,6 +1827,9 @@ export class Openp41geWindowManager extends LitElement {
           right: 0;
           bottom: 0;
           overflow-y: auto;
+          /* Clip the horizontal page slide here (not on the pane) so the sticky
+             nav/card still anchor to this scroll container. */
+          overflow-x: hidden;
           /* Match the content view surface to the bottom bar / tab bar. */
           background: var(--bg-secondary, #161616);
           /* No horizontal padding so rows + separators span the full window width;
@@ -2203,8 +2206,6 @@ export class Openp41geWindowManager extends LitElement {
           min-height: 100%;
           box-sizing: border-box;
           padding: 16px 14px 0;
-          /* Clip the page while it slides so the exit/enter doesn't spill sideways. */
-          overflow: hidden;
         }
         /* Directional slide transition between welcome pages. */
         .wm-markdown.wm-slide-out-left { animation: wm-slide-out-left 0.25s ease forwards; }
@@ -2370,6 +2371,9 @@ export class Openp41geWindowManager extends LitElement {
           width: 100%;
           margin-top: 18px;
           margin-bottom: 12px;
+          /* Keep the toggle pinned just above the controls bar on every page. */
+          position: sticky;
+          bottom: 46px;
           padding: 12px 16px;
           font-size: 13px;
           font-family: inherit;
@@ -2917,23 +2921,17 @@ export class Openp41geWindowManager extends LitElement {
                 ? html`
                     <div class="wm-tab-pane wm-welcome">
                       <div class="wm-markdown${this._welcomeSlide ? ` wm-slide-${this._welcomeSlide}` : ""}">${unsafeHTML(welcomePages[this._welcomePage] ?? "")}</div>
-                      ${
-                        this._welcomePage === 0
-                          ? html`
-                              <button
-                                class="wm-welcome-dismiss"
-                                role="checkbox"
-                                aria-checked=${this._welcomeDismissed}
-                                @click=${this._onWelcomeDismissToggle}
-                              >
-                                <span class="wm-welcome-dismiss-label">Never show the welcome message again</span>
-                                <span class="wm-welcome-dismiss-icon">
-                                  ${unsafeHTML(this._welcomeDismissed ? WELCOME_CHECKED_ICON : WELCOME_UNCHECKED_ICON)}
-                                </span>
-                              </button>
-                            `
-                          : nothing
-                      }
+                      <button
+                        class="wm-welcome-dismiss"
+                        role="checkbox"
+                        aria-checked=${this._welcomeDismissed}
+                        @click=${this._onWelcomeDismissToggle}
+                      >
+                        <span class="wm-welcome-dismiss-label">Never show the welcome message again</span>
+                        <span class="wm-welcome-dismiss-icon">
+                          ${unsafeHTML(this._welcomeDismissed ? WELCOME_CHECKED_ICON : WELCOME_UNCHECKED_ICON)}
+                        </span>
+                      </button>
                       <div class="wm-slideshow-nav">
                         <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
                         <div class="wm-slideshow-dots">
