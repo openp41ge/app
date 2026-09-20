@@ -1843,6 +1843,10 @@ export class Openp41geWindowManager extends LitElement {
           /* Footer (34px) + search bar (34px) + scroll gap. */
           padding-bottom: 88px;
         }
+        .wm-body--welcome {
+          /* The welcome slideshow controls are its own bottom bar. */
+          padding-bottom: 0;
+        }
         /* Invisible mask over the workspace list while a drawer is open, so a
            click on a card closes the drawer instead of opening another
            workspace. Sits over .wm-body but under the drawers (which are later
@@ -2336,8 +2340,15 @@ export class Openp41geWindowManager extends LitElement {
           border: none;
           cursor: pointer;
         }
-        .wm-slideshow-btn:first-child { border-right: 1px solid var(--divider, #333); }
-        .wm-slideshow-btn:last-child { border-left: 1px solid var(--divider, #333); }
+        .wm-slideshow-btn:first-child {
+          border-right: 1px solid var(--divider, #333);
+          /* Extra internal padding on the outer edge pushes the chevron inward. */
+          padding-left: 8px;
+        }
+        .wm-slideshow-btn:last-child {
+          border-left: 1px solid var(--divider, #333);
+          padding-right: 8px;
+        }
         .wm-slideshow-btn:hover:not(:disabled) {
           color: var(--text-primary, #eee);
           background: var(--bg-active, #26262d);
@@ -2915,7 +2926,7 @@ export class Openp41geWindowManager extends LitElement {
           )}
           <div class="wm-tabbar-add" aria-label="New tab" data-tip="New tab" @click=${this._onTabAddClick}><span class="wm-tabbar-add-glyph">+</span></div>
         </div>
-          <div class="wm-body${this._searchOpen ? " wm-body--searching" : ''}" @click=${this._onBackgroundClick}>
+          <div class="wm-body${this._searchOpen ? " wm-body--searching" : ""}${this._activeTab === "welcome" ? " wm-body--welcome" : ""}" @click=${this._onBackgroundClick}>
             ${
               this._activeTab === "welcome"
                 ? html`
@@ -3269,7 +3280,7 @@ export class Openp41geWindowManager extends LitElement {
             `,
           )}
         </div>
-        ${this._searchOpen
+        ${this._searchOpen && this._activeTab !== "welcome"
           ? html`
               <div class="wm-search-bar">
                 <div class="wm-search">
@@ -3315,7 +3326,7 @@ export class Openp41geWindowManager extends LitElement {
               </div>
             `
           : nothing}
-        ${this._workspaceListFooter()}
+        ${this._activeTab !== "welcome" ? this._workspaceListFooter() : nothing}
       </div>
     `;
   }
