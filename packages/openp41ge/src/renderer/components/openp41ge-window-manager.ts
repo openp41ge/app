@@ -2379,21 +2379,20 @@ export class Openp41geWindowManager extends LitElement {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          width: 100%;
-          margin-top: 18px;
-          margin-bottom: 12px;
+          box-sizing: border-box;
+          /* Full-bleed row directly above the controls bar, sharing its style. */
+          margin: 18px -14px 0;
           /* Keep the toggle pinned just above the controls bar on every page. */
           position: sticky;
-          bottom: 46px;
-          padding: 12px 16px;
+          bottom: 34px;
+          height: 34px;
+          padding: 0 16px;
           font-size: 13px;
           font-family: inherit;
           text-align: left;
           color: var(--text-secondary, #b0b0b0);
-          background: var(--bg-active, #23232a);
-          border: 1px solid var(--divider, #333);
-          /* Rounded to echo the circular icon's curve, carried further out. */
-          border-radius: 16px;
+          background: var(--bg-secondary, #161616);
+          border-top: 1px solid var(--divider, #333);
           cursor: pointer;
           user-select: none;
         }
