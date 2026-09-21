@@ -24,6 +24,14 @@
       "project": ["src/**/*.ts", "electron/**/*.{ts,cjs}"],
       "ignoreDependencies": ["ts-node", "@xterm/xterm", "@xterm/addon-fit"],
       "ignore": [
+        // Welcome-page demo components — referenced by tag name from
+        // render-markdown.ts; kept for the animated intro demos.
+        "src/renderer/components/openp41ge-grid-demo.ts",
+        "src/renderer/components/openp41ge-sidebar-demo.ts",
+        "src/renderer/components/openp41ge-sidebar-move-demo.ts",
+        "src/renderer/components/openp41ge-stack-demo.ts",
+        "src/renderer/components/openp41ge-window-intro-demo.ts",
+        "src/renderer/components/openp41ge-workspace-tab-demo.ts",
         "src/renderer/components/openp41ge-bottom-bar.ts",
         "src/renderer/components/sidebar-views/index.ts",
         "src/renderer/interfaces/index.ts",
