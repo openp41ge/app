@@ -138,7 +138,7 @@ jobs:
       - name: Set release version
         working-directory: packages/openp41ge
         run: |
-          node -e "const f='package.json';const p=require(f);p.version=process.env.RELEASE_VERSION;require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.RELEASE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
         env:
           RELEASE_VERSION: ${{ needs.meta.outputs.version }}
 
