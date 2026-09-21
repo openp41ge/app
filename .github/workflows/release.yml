@@ -1,0 +1,210 @@
+name: Release
+
+# One release pipeline for all channels, parameterised by the version/tag.
+#
+#   alpha / beta / rc  -> run manually (workflow_dispatch), or push a tag:
+#                          v0.1.0-alpha.1   (prerelease)
+#                          v0.1.0-beta.2    (prerelease)
+#   stable             -> push a tag:   v0.1.0
+#
+# Channel is derived from the semver: `-alpha` / `-beta` / `-rc` -> prerelease.
+# Pick the exact commit to release by choosing the branch/tag or commit sha in
+# the "Run workflow" dialog (or `gh workflow run release.yml --ref <sha>`).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver, e.g. 0.1.0-alpha.1 / 0.1.0-beta.2 / 0.1.0"
+        required: true
+        type: string
+      arch:
+        description: "Target architecture"
+        required: false
+        default: universal
+        type: choice
+        options: [universal, arm64, x64]
+      draft:
+        description: "Create as a draft (publish manually after review)"
+        required: false
+        default: true
+        type: boolean
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      channel: ${{ steps.meta.outputs.channel }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - id: meta
+        name: Resolve version, tag, and channel
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::No release version provided (pass inputs.version or push a v* tag)."
+            exit 1
+          fi
+          PRERELEASE="false"
+          CHANNEL="stable"
+          case "$VERSION" in
+            *-alpha*) CHANNEL="alpha";  PRERELEASE="true" ;;
+            *-beta*)  CHANNEL="beta";   PRERELEASE="true" ;;
+            *-rc*)    CHANNEL="rc";     PRERELEASE="true" ;;
+          esac
+          {
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+            echo "channel=$CHANNEL"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+
+  build-macos:
+    needs: meta
+    runs-on: macos-14 # Apple Silicon
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      NX_NO_CLOUD: "true"
+      # electron-builder notarization (see docs: code-signing/notarization)
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Import the Developer ID Application certificate (base64 .p12) into a
+      # temporary keychain so electron-builder picks it up for signing.
+      - uses: apple-actions/import-codesign-certs@v4
+        with:
+          p12-file-base64: ${{ secrets.MAC_CSC_LINK }}
+          p12-password: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: nx-${{ runner.os }}-
+
+      - name: Set release version
+        working-directory: packages/openp41ge
+        run: |
+          node -e "const f='package.json';const p=require(f);p.version=process.env.RELEASE_VERSION;require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
+        env:
+          RELEASE_VERSION: ${{ needs.meta.outputs.version }}
+
+      - name: Build renderer + main process
+        run: pnpm nx build openp41ge
+
+      - name: Package, sign, and notarize
+        working-directory: packages/openp41ge
+        run: |
+          ARCH="${{ inputs.arch || 'universal' }}"
+          case "$ARCH" in
+            universal) FLAG="--universal" ;;
+            arm64)     FLAG="--arm64" ;;
+            x64)       FLAG="--x64" ;;
+            *) echo "::error::Unsupported arch: $ARCH"; exit 1 ;;
+          esac
+          pnpm exec electron-builder --mac "$FLAG"
+
+      - name: Verify signature + notarization
+        working-directory: packages/openp41ge
+        run: |
+          APP=$(find release -maxdepth 3 -name "*.app" -type d | head -1)
+          echo "Verifying: $APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          spctl --assess --verbose --type execute "$APP"
+          xcrun stapler validate "$APP"
+
+      - name: Generate SHA256 checksums
+        working-directory: packages/openp41ge
+        run: |
+          cd release
+          shasum -a 256 *.dmg *.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            packages/openp41ge/release/*.dmg
+            packages/openp41ge/release/*.zip
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: |
+            packages/openp41ge/release/*.dmg
+            packages/openp41ge/release/*.zip
+            packages/openp41ge/release/SHA256SUMS
+
+  release:
+    needs: build-macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-release
+          path: release-assets
+
+      - name: Create / update release
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.meta.outputs.tag }}"
+          PRERELEASE="${{ needs.meta.outputs.prerelease }}"
+
+          PREREL_FLAG=""
+          [ "$PRERELEASE" = "true" ] && PREREL_FLAG="--prerelease"
+          DRAFT_FLAG=""
+          [ "${{ inputs.draft || 'false' }}" = "true" ] && DRAFT_FLAG="--draft"
+
+          # Ship install.sh as a release asset so it can be fetched directly.
+          cp install.sh release-assets/install.sh
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists — updating."
+            gh release edit "$TAG" --title "$TAG" --generate-notes
+          else
+            echo "Creating release $TAG."
+            gh release create "$TAG" \
+              --target "${{ github.sha }}" \
+              --title "$TAG" \
+              --generate-notes \
+              $PREREL_FLAG $DRAFT_FLAG
+          fi
+
+          gh release upload "$TAG" release-assets/* --clobber

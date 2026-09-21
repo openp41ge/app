@@ -1,0 +1,42 @@
+# electron-builder config for OpenP41ge (macOS).
+# Built + signed + notarized + stapled in CI (.github/workflows/release.yml).
+#
+# Signing identity is discovered from the keychain (imported by
+# apple-actions/import-codesign-certs). Notarization credentials come from
+# the environment: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID.
+
+appId: com.openp41ge.app
+productName: OpenP41ge
+copyright: Copyright © OpenP41ge
+artifactName: ${productName}-${version}-${arch}.${ext}
+
+# Keep electron-builder output out of vite's `dist` (renderer) directory.
+directories:
+  output: release
+  buildResources: build
+
+# Only ship the built bundles + app package.json. node_modules for runtime
+# `dependencies` are auto-collected by electron-builder (pnpm workspace
+# packages are followed from the symlinked node_modules).
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+
+asar: true
+
+# Never let electron-builder push to GitHub itself — CI creates the release.
+publish: never
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  notarize: true
+
+dmg:
+  title: ${productName} ${version}

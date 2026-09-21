@@ -12,6 +12,8 @@ demo-dist/
 packages/openp41ge-git-repository/demo/
 coverage/
 playwright-report/
+.secrets/
+packages/openp41ge/release/
 .tmp-integration-test/
 *.bak
 .nx/

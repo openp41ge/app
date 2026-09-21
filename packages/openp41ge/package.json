@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "test": "vitest run",
     "clean": "bash scripts/clean.sh",
-    "notarize": "bash scripts/notarize.sh",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
     "start": "electron .",
     "start:devtools": "OPENP41GE_DEVTOOLS=1 electron ."
   },
@@ -32,7 +33,9 @@
     "openp41ge-agents": "workspace:*",
     "openp41ge-agents-tool-types": "workspace:*",
     "openp41ge-agents-tool-read-file": "workspace:*",
-    "openp41ge-agents-tool-search-files": "workspace:*"
+    "openp41ge-agents-tool-search-files": "workspace:*",
+    "openp41ge-agents-tool-edit-file": "workspace:*",
+    "openp41ge-agents-tool-write-file": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -40,6 +43,7 @@
     "electron": "^43.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^7.0.2",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "electron-builder": "^26.0.0"
   }
 }
