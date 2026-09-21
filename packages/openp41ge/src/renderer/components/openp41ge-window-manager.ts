@@ -16,20 +16,14 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
 import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
+import "openp41ge-uikit";
 import { tooltipController, OverlayScrollbar } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
+import { registerManagerTabBar } from "../services/init-drag-system";
+import { MANAGER_TAB_REORDER_EVENT } from "../services/drop-targets/manager-tab-bar-drop-target";
 import { welcomePages } from "../content/welcome";
-
-/** Unchecked / checked icons for the "never show welcome" toggle. */
-const WELCOME_UNCHECKED_ICON = '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>';
-const WELCOME_CHECKED_ICON = '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>';
-import "./openp41ge-sidebar-demo";
-import "./openp41ge-sidebar-move-demo";
-import "./openp41ge-grid-demo";
-import "./openp41ge-window-intro-demo";
-import "./openp41ge-stack-demo";
 
 /** Hold a skeleton this long before the drag element appears (long-press pickup). */
 const HOLD_MS = 350;
@@ -81,14 +75,13 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
   @state() private _openWindows: OpenWindowSummary[] = [];
   @state() private _drawers: DrawerState[] = [];
-  @state() private _openTabs: ManagerTabId[] = ["welcome"];
-  @state() private _activeTab: ManagerTabId = "welcome";
-  @state() private _welcomePage = 0;
+  /** Open tabs in the bar; the welcome intro tab is removed for now, so the
+   *  window lands on Workspaces. */
+  @state() private _openTabs: ManagerTabId[] = ["workspaces"];
+  @state() private _activeTab: ManagerTabId = "workspaces";
   @state() private _welcomeDismissed = false;
   /** Slide-transition phase for the welcome page (out-* / in-* / "" = idle). */
-  @state() private _welcomeSlide: "" | "out-left" | "out-right" | "in-left" | "in-right" = "";
   /** Prevents overlapping navigations while a slide is playing. */
-  private _welcomeAnimLock = false;
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _loaded = false;
   @state() private _addingRepo = false;
@@ -135,6 +128,12 @@ export class Openp41geWindowManager extends LitElement {
   private _offEndSession: (() => void) | null = null;
   private _offOpenWindowsChanged: (() => void) | null = null;
   private _offActivateTab: (() => void) | null = null;
+  /** Subscription for a tab moved onto this window from another manager window. */
+  private _offReceiveTab: (() => void) | null = null;
+  /** Subscription for a tab removed from this window (moved to another/new window). */
+  private _offRemoveTab: (() => void) | null = null;
+  /** Unregister the tab bar from the drag system (called on disconnect). */
+  private _unregisterManagerBar: (() => void) | null = null;
   /** Suppress the following row click after a drag/swipe, so the drawer doesn't pop open. */
   private _suppressClick = false;
   private _tooltipTargets: Element[] = [];
@@ -170,9 +169,25 @@ export class Openp41geWindowManager extends LitElement {
         this._activateTab(tab);
       }
     });
-    // Fresh window opened for a specific tab (e.g. app menu > Settings).
+    // Another manager window moved a tab onto this one; insert it at the
+    // requested index and activate it.
+    this._offReceiveTab = window.openp41ge.windowManager.onReceiveTab?.(({ tabId, index }) => {
+      if (!tabId) return;
+      this._receiveOpenTab(tabId, typeof index === "number" ? index : this._openTabs.length);
+    }) ?? null;
+    // This window's tab was moved to another (or a new) manager window.
+    this._offRemoveTab = window.openp41ge.windowManager.onRemoveTab?.(({ tabId }) => {
+      if (!tabId) return;
+      this._removeOpenTab(tabId);
+    }) ?? null;
+    // Fresh window opened for a specific tab (e.g. drag-out of a management
+    // tab, or app menu > Settings): it should open with ONLY that tab, not
+    // the default "workspaces" plus the appended launch tab.
     const launchTab = window.openp41ge.workspace.getLaunchTab();
-    if (launchTab) this._activateTab(launchTab);
+    if (launchTab) {
+      this._openTabs = [launchTab];
+      this._activeTab = launchTab;
+    }
     void this._load();
     // If the user opted out of the welcome intro, don't land on it (or open it)
     // on future launches. Dismissal is a marker file in the app-data dir.
@@ -185,6 +200,16 @@ export class Openp41geWindowManager extends LitElement {
         }
       }
     });
+  }
+
+  /** After the first render, register the tab bar with the drag system so
+   *  management tabs can be reordered / dragged. Also listens for the drop
+   *  target's reorder event on the bar. */
+  firstUpdated(): void {
+    const barEl = this.shadowRoot?.querySelector<HTMLElement>(".wm-tabbar");
+    if (!barEl) return;
+    this._unregisterManagerBar = registerManagerTabBar(barEl, this._myWindowId());
+    barEl.addEventListener(MANAGER_TAB_REORDER_EVENT, this._onManagerTabReorder);
   }
 
   disconnectedCallback(): void {
@@ -200,6 +225,12 @@ export class Openp41geWindowManager extends LitElement {
     this._offOpenWindowsChanged = null;
     this._offActivateTab?.();
     this._offActivateTab = null;
+    this._offReceiveTab?.();
+    this._offReceiveTab = null;
+    this._offRemoveTab?.();
+    this._offRemoveTab = null;
+    this._unregisterManagerBar?.();
+    this._unregisterManagerBar = null;
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
     this._overlayScrollbar?.destroy();
@@ -527,16 +558,6 @@ export class Openp41geWindowManager extends LitElement {
 
   /** Escape cancels delete modes, closes an add card, or closes the crumb menu. */
   private _onKeydown = (e: KeyboardEvent): void => {
-    if (this._activeTab === "welcome") {
-      if (e.key === "ArrowLeft") {
-        this._welcomeNav(-1);
-        return;
-      }
-      if (e.key === "ArrowRight") {
-        this._welcomeNav(1);
-        return;
-      }
-    }
     if (e.key !== "Escape") return;
     if (this._crumbsOpen) {
       this._crumbsOpen = false;
@@ -551,47 +572,11 @@ export class Openp41geWindowManager extends LitElement {
     else if (this._worktreeDeleteMode) this._cancelWorktreeDeleteMode();
   };
 
-  private _welcomeNav(delta: number): void {
-    const next = Math.min(welcomePages.length - 1, Math.max(0, this._welcomePage + delta));
-    if (next !== this._welcomePage) this._welcomePage = next;
-  }
-
-  /** Navigate the welcome slideshow with a directional slide (or jump under reduced motion). */
-  private _welcomeNav(delta: number): void {
-    if (this._welcomeAnimLock) return;
-    const target = Math.min(welcomePages.length - 1, Math.max(0, this._welcomePage + delta));
-    if (target === this._welcomePage) return;
-
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReduced) {
-      this._welcomePage = target;
-      return;
-    }
-
-    const dir = delta > 0 ? "left" : "right";
-    this._welcomeAnimLock = true;
-    this._welcomeSlide = `out-${dir}`;
-    window.setTimeout(() => {
-      this._welcomePage = target;
-      this._welcomeSlide = `in-${dir}`;
-      window.setTimeout(() => {
-        this._welcomeSlide = "";
-        this._welcomeAnimLock = false;
-      }, 260);
-    }, 260);
-  }
-
-  /** Jump directly to a page (dot click) — no slide if one is playing. */
-  private _welcomeGoto(index: number): void {
-    if (this._welcomeAnimLock) return;
-    this._welcomeSlide = "";
-    this._welcomePage = index;
-  }
-
   /** Toggle + persist the "never show the welcome intro again" choice. */
-  private _onWelcomeDismissToggle = (): void => {
-    this._welcomeDismissed = !this._welcomeDismissed;
-    void window.openp41ge.welcome.setDismissed(this._welcomeDismissed);
+  private _onWelcomeDismissToggle = (e: Event): void => {
+    const on = (e as CustomEvent<{ checked: boolean }>).detail.checked;
+    this._welcomeDismissed = on;
+    void window.openp41ge.welcome.setDismissed(on);
   };
 
   private _onFocus = (): void => {
@@ -929,6 +914,61 @@ export class Openp41geWindowManager extends LitElement {
       this._activeTab = next[Math.max(0, idx - 1)] ?? next[0];
     }
   }
+
+  /** This window's id (cached lazily). Used to register the bar for drags. */
+  private _myWindowId(): string {
+    return window.openp41ge.workspace.getWindowId() ?? "";
+  }
+
+  /** Reorder a tab to `toIndex` (after removing it from its current slot). */
+  private _reorderOpenTab(tabId: string, toIndex: number): void {
+    const idx = this._openTabs.indexOf(tabId as ManagerTabId);
+    if (idx === -1) return;
+    const next = this._openTabs.filter((t) => t !== tabId);
+    const at = Math.max(0, Math.min(toIndex, next.length));
+    next.splice(at, 0, tabId as ManagerTabId);
+    this._openTabs = next;
+  }
+
+  /** A tab was dropped onto this window's bar from another manager window. */
+  private _receiveOpenTab(tabId: string, index: number): void {
+    if (!this._openTabs.includes(tabId as ManagerTabId)) {
+      const next = [...this._openTabs];
+      const at = Math.max(0, Math.min(index, next.length));
+      next.splice(at, 0, tabId as ManagerTabId);
+      this._openTabs = next;
+    }
+    this._activeTab = tabId as ManagerTabId;
+  }
+
+  /** A tab was moved off this window to another (or a new) manager window. */
+  private _removeOpenTab(tabId: string): void {
+    const idx = this._openTabs.indexOf(tabId as ManagerTabId);
+    if (idx === -1) return;
+    const next = this._openTabs.filter((t) => t !== tabId);
+    if (next.length === 0) {
+      // Never leave a manager window without any tabs.
+      this._openTabs = ["workspaces"];
+      this._activeTab = "workspaces";
+      return;
+    }
+    this._openTabs = next;
+    if (this._activeTab === tabId) {
+      this._activeTab = next[Math.max(0, idx - 1)] ?? next[0];
+    }
+  }
+
+  /** Fired by the manager tab-bar drop target after a same-window reorder drop. */
+  private _onManagerTabReorder = (e: Event): void => {
+    const detail = (e as CustomEvent).detail as {
+      tabId: string;
+      fromIndex: number;
+      toIndex: number;
+    };
+    if (!detail?.tabId) return;
+    this._reorderOpenTab(detail.tabId, detail.toIndex);
+  };
+
 
   /** Open the inline + menu listing the available tabs, with an "O" badge on
    *  the right marking each tab already open in the bar. */
@@ -2211,18 +2251,6 @@ export class Openp41geWindowManager extends LitElement {
           box-sizing: border-box;
           padding: 16px 14px 0;
         }
-        /* Directional slide transition between welcome pages. */
-        .wm-markdown.wm-slide-out-left { animation: wm-slide-out-left 0.25s ease forwards; }
-        .wm-markdown.wm-slide-in-left  { animation: wm-slide-in-left  0.25s ease forwards; }
-        .wm-markdown.wm-slide-out-right { animation: wm-slide-out-right 0.25s ease forwards; }
-        .wm-markdown.wm-slide-in-right  { animation: wm-slide-in-right  0.25s ease forwards; }
-        @keyframes wm-slide-out-left  { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-100%); opacity: 0; } }
-        @keyframes wm-slide-in-left   { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes wm-slide-out-right { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
-        @keyframes wm-slide-in-right  { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .wm-welcome .wm-markdown {
-          flex: 1;
-        }
         .wm-welcome .wm-markdown > :last-child {
           margin-bottom: 0;
         }
@@ -2310,9 +2338,7 @@ export class Openp41geWindowManager extends LitElement {
         .wm-markdown .wm-md-quote p {
           margin: 0;
         }
-        /* Welcome slideshow: a compact controls bar pinned to the bottom of the
-           pane. One line holds the prev/next chevrons on either side of the
-           page dots; the page counter sits below it. */
+        /* Welcome footer bar pinned to the bottom of the pane. */
         .wm-slideshow-nav {
           position: sticky;
           bottom: 0;
@@ -2326,87 +2352,28 @@ export class Openp41geWindowManager extends LitElement {
           background: var(--bg-secondary, #161616);
           border-top: 1px solid var(--divider, #333);
         }
-        .wm-slideshow-btn {
-          box-sizing: border-box;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          width: 33px;
-          font-size: 17px;
-          line-height: 1;
-          color: var(--text-secondary, #999);
-          background: none;
-          border: none;
-          cursor: pointer;
-        }
-        .wm-slideshow-btn:first-child {
-          border-right: 1px solid var(--divider, #333);
-          /* Extra internal padding on the outer edge pushes the chevron inward. */
-          padding-left: 8px;
-        }
-        .wm-slideshow-btn:last-child {
-          border-left: 1px solid var(--divider, #333);
-          padding-right: 8px;
-        }
-        .wm-slideshow-btn:hover:not(:disabled) {
-          color: var(--text-primary, #eee);
-          background: var(--bg-active, #26262d);
-        }
-        .wm-slideshow-btn:disabled { opacity: 0.35; cursor: default; }
-        .wm-slideshow-dots {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .wm-slideshow-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 999px;
-          padding: 0;
-          background: var(--bg-active, #3a3a42);
-          border: 1px solid var(--divider, #444);
-          cursor: pointer;
-          transition: width 0.25s ease;
-        }
-        .wm-slideshow-dot--active {
-          width: 30px;
-          background: var(--accent, #79c0ff);
-          border-color: var(--accent, #79c0ff);
-        }
+        /* Settings-style card for the "never show the welcome message again"
+           toggle. Rendered in flow, right below the welcome content, with
+           spacing on each side so it does not touch the tab edges. */
         .wm-welcome-dismiss {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 24px;
           box-sizing: border-box;
-          /* Full-bleed row directly above the controls bar, sharing its style. */
-          margin: 18px -14px 0;
-          /* Keep the toggle pinned just above the controls bar on every page. */
-          position: sticky;
-          bottom: 34px;
-          height: 34px;
-          padding: 0 16px;
-          font-size: 13px;
+          margin: 28px 24px 56px;
+          padding: 10px 16px;
+          border-radius: 10px;
+          background: var(--bg-active, #23232a);
+          border: 1px solid var(--divider, #333);
+          color: var(--text-primary, #eee);
           font-family: inherit;
-          text-align: left;
-          color: var(--text-secondary, #b0b0b0);
-          background: var(--bg-secondary, #161616);
-          border-top: 1px solid var(--divider, #333);
-          cursor: pointer;
           user-select: none;
         }
-        .wm-welcome-dismiss:hover {
-          color: var(--text-primary, #eee);
-          background: var(--bg-hover, #2a2a31);
+        .wm-welcome-dismiss-label {
+          font-size: 13px;
+          font-weight: 500;
         }
-        .wm-welcome-dismiss-label { flex: 1; }
-        .wm-welcome-dismiss-icon {
-          display: flex;
-          align-items: center;
-          flex-shrink: 0;
-        }
-        .wm-welcome-dismiss-icon svg { display: block; }
         /* Workspace-window explainer: the animated demo spans 80% of the
            available width, and the explanation text (and any shortcut hints)
            stacks underneath it. The demo never changes its own width; the
@@ -2930,33 +2897,18 @@ export class Openp41geWindowManager extends LitElement {
               this._activeTab === "welcome"
                 ? html`
                     <div class="wm-tab-pane wm-welcome">
-                      <div class="wm-markdown${this._welcomeSlide ? ` wm-slide-${this._welcomeSlide}` : ""}">${unsafeHTML(welcomePages[this._welcomePage] ?? "")}</div>
-                      <button
-                        class="wm-welcome-dismiss"
-                        role="checkbox"
-                        aria-checked=${this._welcomeDismissed}
-                        @click=${this._onWelcomeDismissToggle}
-                      >
+                      <div class="wm-markdown">${unsafeHTML(welcomePages[0] ?? "")}</div>
+                      <div class="wm-welcome-dismiss">
                         <span class="wm-welcome-dismiss-label">Never show the welcome message again</span>
-                        <span class="wm-welcome-dismiss-icon">
-                          ${unsafeHTML(this._welcomeDismissed ? WELCOME_CHECKED_ICON : WELCOME_UNCHECKED_ICON)}
-                        </span>
-                      </button>
-                      <div class="wm-slideshow-nav">
-                        <button class="wm-slideshow-btn" aria-label="Previous page" ?disabled=${this._welcomePage === 0} @click=${() => this._welcomeNav(-1)}>&#8249;</button>
-                        <div class="wm-slideshow-dots">
-                          ${welcomePages.map(
-                            (_, i) => html`
-                              <button
-                                class="wm-slideshow-dot${i === this._welcomePage ? " wm-slideshow-dot--active" : ""}"
-                                aria-label="Page ${i + 1}"
-                                @click=${() => this._welcomeGoto(i)}
-                              ></button>
-                            `,
-                          )}
-                        </div>
-                        <button class="wm-slideshow-btn" aria-label="Next page" ?disabled=${this._welcomePage === welcomePages.length - 1} @click=${() => this._welcomeNav(1)}>&#8250;</button>
+                        <openp41ge-toggle
+                          .checked=${this._welcomeDismissed}
+                          label="Never show the welcome message again"
+                          .onLabel=${"Yes"}
+                          .offLabel=${"No"}
+                          @change=${this._onWelcomeDismissToggle}
+                        ></openp41ge-toggle>
                       </div>
+                      <div class="wm-slideshow-nav"></div>
                     </div>
                   `
                 : this._activeTab === "releases"

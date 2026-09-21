@@ -604,7 +604,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
            * covering them blocks hover/drag instead of letting the handle poke
            * through and be grabbed while a drawer overlays the grid. */
           z-index: 1001;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-family: var(--font-ui);
           font-size: 13px;
           color: var(--text-primary, #ccc);
         }
@@ -618,7 +618,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
           inset: 0;
           pointer-events: none;
           z-index: 1001;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-family: var(--font-ui);
           font-size: 13px;
           color: var(--text-primary, #ccc);
         }

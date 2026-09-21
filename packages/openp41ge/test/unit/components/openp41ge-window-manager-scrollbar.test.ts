@@ -33,6 +33,9 @@ function stubWindow(): void {
       getWindowId: vi.fn(() => "win-ws1-0"),
       getLaunchTab: vi.fn(() => null),
     },
+    welcome: {
+      isDismissed: vi.fn().mockResolvedValue(true),
+    },
   };
 }
 

@@ -22,6 +22,7 @@
 export type DragSourceData =
   | { type: "tab"; tabId: string; winId: string; worksetId: string; title?: string }
   | { type: "openp41ge-tab"; tabId: string; winId: string; worksetId: string; title?: string }
+  | { type: "manager-tab"; tabId: string; winId: string; title?: string }
   | { type: "file"; filePath: string; fileName?: string }
   | {
       type: "open-tab";

@@ -12,14 +12,14 @@ import { ToolRegistry } from "../../../src/main/services/tool-registry";
 import { registerBuiltinTools } from "../../../src/main/services/node-tool-executor";
 
 describe("registerBuiltinTools", () => {
-  it("registers only read_file and search_files (run_command disabled)", () => {
+  it("registers only read_file, search_files, edit_file, create_or_replace_file (run_command disabled)", () => {
     const registry = new ToolRegistry();
     registerBuiltinTools(registry);
     const names = registry
       .list()
       .map((t) => t.name)
       .sort();
-    expect(names).toEqual(["read_file", "search_files"]);
+    expect(names).toEqual(["create_or_replace_file", "edit_file", "read_file", "search_files"]);
   });
 
   it("each registered tool exposes the full tool contract", () => {

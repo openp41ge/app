@@ -255,13 +255,15 @@ export class DragOrchestrator implements IDragHandler {
       // Include screenX/screenY so the host can check for cross-window drops
       // before falling back to creating a new window.
       const data = s.source.getDragData();
-      if (data.type === "tab" || data.type === "openp41ge-tab") {
+      if (data.type === "tab" || data.type === "openp41ge-tab" || data.type === "manager-tab") {
         document.dispatchEvent(
           new CustomEvent(DRAG_EVENTS.DETACH, {
             detail: {
               winId: data.winId,
               tabId: data.tabId,
-              sourceWorksetId: data.worksetId,
+              // Manager tabs are window-local (not part of any workspace
+              // layout Window), so they carry no workset/source-column id.
+              sourceWorksetId: data.type === "manager-tab" ? undefined : data.worksetId,
               screenX: ev.screenX,
               screenY: ev.screenY,
               bounds: { x: ev.screenX - 50, y: ev.screenY - 50, width: 800, height: 600 },

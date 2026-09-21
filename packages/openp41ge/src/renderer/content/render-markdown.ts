@@ -142,6 +142,8 @@ export function renderMarkdown(md: string): string {
           out.push(`<openp41ge-window-intro-demo></openp41ge-window-intro-demo>`);
         } else if (name === "stack-demo") {
           out.push(`<openp41ge-stack-demo></openp41ge-stack-demo>`);
+        } else if (name === "workspace-tab-demo") {
+          out.push(`<openp41ge-workspace-tab-demo></openp41ge-workspace-tab-demo>`);
         } else if (name === "sidebar-demo") {
           out.push(`<openp41ge-sidebar-demo></openp41ge-sidebar-demo>`);
         } else if (name === "sidebar-move-demo") {

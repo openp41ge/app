@@ -309,7 +309,19 @@ class Openp41geAgents extends LitElement {
     if (!text) return;
     const messages = this._messages.map(deepCloneMessage);
     let last = messages[messages.length - 1];
-    if (!last || last.role !== "assistant") {
+    // A fresh assistant message is needed when there is no trailing assistant
+    // message, or when the last one has already produced content/tool calls —
+    // i.e. it has moved past its reasoning phase. Agent turns are sequential:
+    // reasoning for a NEW turn must render as its own block below the previous
+    // message, never merged into an old reasoning block that now sits above
+    // that content/tool call.
+    const reasoningDone =
+      !!last &&
+      last.role === "assistant" &&
+      ((last.content ?? "") !== "" ||
+        (last.toolCalls && last.toolCalls.length > 0) ||
+        (last.segments && last.segments.length > 0));
+    if (!last || last.role !== "assistant" || reasoningDone) {
       last = {
         id: `stream_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
         role: "assistant",
@@ -2372,10 +2384,12 @@ class Openp41geAgents extends LitElement {
         .chat-message {
           word-wrap: break-word;
           line-height: 1.4;
-          /* Virtualization: let Chromium skip layout/paint for offscreen
-             messages, keeping scrolling smooth on very large transcripts. */
-          content-visibility: auto;
-          contain-intrinsic-size: auto 120px;
+          /* NOTE: content-visibility/contain-intrinsic-size are intentionally
+             NOT used here. In a flex-column scroll container (.chat-messages)
+             they collapse every message and zero out scrollHeight, so the chat
+             neither renders its content nor anchors to the newest message on
+             open. The transcript is already paginated (messages load in
+             windows), which bounds the DOM size without collapsing messages. */
         }
         /* User messages are grey bubbles: 3 medium-rounded corners with a
            smaller bottom-right, sized to their content (max 90% width). */
@@ -3782,6 +3796,12 @@ class Openp41geAgents extends LitElement {
       const p = args.path;
       if (typeof p === "string" && p.trim()) return p.trim();
     }
+    // Only the target path — the full file content can be huge and is better
+    // viewed in the file editor (the card's open-in-new-tab button).
+    if (tc.name === "create_or_replace_file") {
+      const p = args.path;
+      if (typeof p === "string" && p.trim()) return p.trim();
+    }
     if (tc.name === "search_files") {
       const q = typeof args.query === "string" ? args.query : "";
       const roots = Array.isArray(args.roots)
@@ -3827,20 +3847,23 @@ class Openp41geAgents extends LitElement {
   }
 
   private _scrollToBottom(): void {
-    requestAnimationFrame(() => {
-      const el = this.renderRoot.querySelector(".chat-messages");
-      // The list scrolls normally (top-down); keep it anchored to the newest
-      // message by scrolling to the bottom. `OverlayScrollbar` observes the
-      // change and repaints the floating thumb.
-      if (el) el.scrollTop = el.scrollHeight;
-      // On the very first render the content may not be laid out yet, so the
-      // assignment above is a no-op (scrollHeight ~ clientHeight). Detect the
-      // overflow-but-unscrolled case and retry next frame.
-      if (el && el.scrollHeight - el.clientHeight > 0 && el.scrollTop === 0) {
-        requestAnimationFrame(() => {
-          el.scrollTop = el.scrollHeight;
-        });
-      }
+    // Wait for the render so the newest message is actually in the DOM, then
+    // scroll the list to its exact bottom. `scrollHeight` is an accurate
+    // measure here because content-visibility is not used (it would collapse
+    // messages and under-measure the content); reading it also forces layout.
+    // Re-anchor across a few ticks to catch content that finishes laying out
+    // asynchronously past the awaited update (e.g. code blocks / images
+    // measuring). The `OverlayScrollbar` observes the change and repaints the
+    // floating thumb.
+    void this.updateComplete.then(() => {
+      const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+      if (!list) return;
+      let remaining = 3;
+      const anchor = (): void => {
+        list.scrollTop = list.scrollHeight;
+        if (remaining-- > 0) setTimeout(anchor, 0);
+      };
+      anchor();
     });
   }
 

@@ -35,7 +35,7 @@ export class Openp41geEmptyState extends LitElement {
       box-sizing: border-box;
       overflow: hidden;
       user-select: none;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: var(--font-ui);
       color: var(--text-primary, #e0e0e0);
     }
 

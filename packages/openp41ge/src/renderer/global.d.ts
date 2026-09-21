@@ -49,6 +49,22 @@ declare global {
         focusWorkspaceWindow: (workspacePath: string) => Promise<boolean>;
         onOpenWindowsChanged: (callback: () => void) => () => void;
         onActivateTab: (callback: (tab: WindowManagerTabId) => void) => () => void;
+        /** Move a management tab from one manager window to another / reorder. */
+        moveTab: (sourceWinId: string, targetWinId: string, tabId: string, dropIndex: number) => void;
+        /** Open a new management window containing `tab` (drag-out) and remove
+         *  it from `sourceWinId`. */
+        openWithTab: (
+          sourceWinId: string,
+          tabId: string,
+          dropScreenX?: number,
+          dropScreenY?: number,
+        ) => void;
+        /** Fired on a target window when a tab moves onto it. */
+        onReceiveTab: (
+          callback: (payload: { tabId: string; index: number }) => void,
+        ) => () => void;
+        /** Fired on a source window when its tab was moved away. */
+        onRemoveTab: (callback: (payload: { tabId: string }) => void) => () => void;
       };
       workspace: {
         getState: () => Promise<string>;
@@ -92,7 +108,8 @@ declare global {
           dragData:
             | { tabId: string; winId: string; worksetId: string; type: "tab"; title?: string }
             | { type: "file"; filePath: string; fileName?: string }
-            | { type: "open-tab"; appType: string; title?: string; tabConfig?: Record<string, unknown> };
+            | { type: "open-tab"; appType: string; title?: string; tabConfig?: Record<string, unknown> }
+            | { type: "manager-tab"; tabId: string; winId: string; title?: string };
         } | null>;
         endSession: () => void;
         onEndSession: (callback: () => void) => () => void;

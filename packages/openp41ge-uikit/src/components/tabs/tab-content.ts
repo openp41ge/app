@@ -52,7 +52,7 @@ export class TabContent extends LitElement {
             style="
               font-size:13px;
               color:var(--text-muted, #666);
-              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+              font-family:var(--font-ui);
             "
           >No tabs</p>
         </div>

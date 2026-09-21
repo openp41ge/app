@@ -487,6 +487,28 @@ async function _resolveDropInWindow(
       const el = document.elementFromPoint(${clientX}, ${clientY});
       if (!el || !(el instanceof HTMLElement)) return null;
 
+      // Application Management window: its tab bar lives in a shadow root, so
+      // document.elementFromPoint sees the <openp41ge-window-manager> host, not
+      // the .wm-tabbar inside it. Query the shadow root directly.
+      const wmHost = document.querySelector('openp41ge-window-manager');
+      if (wmHost && wmHost.shadowRoot) {
+        const srEl = wmHost.shadowRoot.elementFromPoint(${clientX}, ${clientY});
+        const barEl =
+          srEl && typeof srEl.closest === 'function' ? srEl.closest('.wm-tabbar') : null;
+        if (barEl) {
+          const barRect = barEl.getBoundingClientRect();
+          const relX = ${clientX} - barRect.left;
+          const tabButtons = barEl.querySelectorAll('.wm-tab');
+          let dropIndex = tabButtons.length;
+          for (let i = 0; i < tabButtons.length; i++) {
+            const btnRect = tabButtons[i].getBoundingClientRect();
+            const btnMid = btnRect.left - barRect.left + btnRect.width / 2;
+            if (relX < btnMid) { dropIndex = i; break; }
+          }
+          return { type: 'manager-tab-bar', dropIndex };
+        }
+      }
+
       const tabBar = el.closest('tab-bar');
       if (tabBar && tabBar.dropTarget && tabBar.winId) {
         const barEl = tabBar.barElement;

@@ -1,0 +1,27 @@
+{
+  "name": "openp41ge-agents-tool-edit-file",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "openp41ge-agents-tool-types": "workspace:*",
+    "openp41ge-agents-tool-shared": "workspace:*"
+  }
+}

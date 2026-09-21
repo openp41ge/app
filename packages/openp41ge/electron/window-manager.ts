@@ -193,7 +193,7 @@ export function createOpenp41geWindow(
     // fullscreenable, so remove the native window chrome and render custom
     // close/minimize controls (no fullscreen/green button) in the renderer.
     ...(isWindowManager ? { maxWidth: 600, frame: false, fullscreenable: false } : {}),
-    title: "Openp41ge",
+    title: "OpenP41ge",
     ...(!isWindowManager ? { titleBarStyle: "hiddenInset" } : {}),
     // Match the app's dark surface so the areas exposed while the window
     // grows (native maximize animation, resize) never flash white.
@@ -307,11 +307,17 @@ export function setOpenWorkspaceWindowHandler(fn: OpenWorkspaceWindowHandler): v
 
 /**
  * Create a new thin window-manager window (not bound to any workspace layout
- * Window). Returns the window id.
+ * Window). Returns the window id. When `dropScreenX`/`dropScreenY` are given
+ * the window is opened near that point (a dragged-out tab's release point).
  */
-export function createWindowManagerWindow(sourceWindow?: BrowserWindow, tab?: WindowManagerTab): string {
+export function createWindowManagerWindow(
+  sourceWindow?: BrowserWindow,
+  tab?: WindowManagerTab,
+  dropScreenX?: number,
+  dropScreenY?: number,
+): string {
   const winId = `wm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  createOpenp41geWindow(winId, false, sourceWindow, undefined, undefined, {
+  createOpenp41geWindow(winId, false, sourceWindow, dropScreenX, dropScreenY, {
     windowType: "window-manager",
     workspacePath: null,
     initialTab: tab,
@@ -465,7 +471,7 @@ export async function promptQuit(parentWindow?: BrowserWindow): Promise<void> {
   }
   if (parentWindow) {
     const confirmed = await showConfirmViaIPC(parentWindow, {
-      title: "Quit Openp41ge?",
+      title: "Quit OpenP41ge?",
       message: "Are you sure you want to quit Openp41ge? All panes will be closed.",
       confirmLabel: "Quit",
     });

@@ -1,8 +1,8 @@
 /**
  * Shared search-bar toggle icons.
  *
- * Both the History (commit search) panel and the Workspace Manager header
- * search use these identical glyphs so the regex / match-case controls look the
+ * Both the History (commit search) panel and the Workspace Manager search
+ * bar use these identical glyphs so the regex / match-case controls look the
  * same everywhere. The case icon always keeps its "on" glyph; the on/off state
  * is conveyed purely by colour (see each consumer's toggle styling).
  */

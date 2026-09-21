@@ -496,6 +496,40 @@ describe("Openp41geAgents (custom element)", () => {
     expect(reasoning!.querySelector(".msg-reasoning-size")!.textContent).toBe("5 words");
   });
 
+  it("appendReasoning after a tool call starts a NEW assistant block, not merging into the old one", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // Turn 1: reasoning, then a tool call (the tool card renders below the
+    // reasoning block).
+    el.appendReasoning("First turn reasoning");
+    el.setToolCallState({
+      id: "tc1",
+      name: "run_command",
+      arguments: '{"command":"ls"}',
+      status: "done",
+    });
+
+    // Turn 2: new reasoning must be its own sequential block, not merged into
+    // the previous message's reasoning that now sits above the tool card.
+    el.appendReasoning("Second turn reasoning");
+    await el.updateComplete;
+
+    const messages = el.messages as Array<{ role: string; reasoning?: string; toolCalls?: unknown[] }>;
+    const assistants = messages.filter((m) => m.role === "assistant");
+    expect(assistants).toHaveLength(2);
+    expect(assistants[0].reasoning).toBe("First turn reasoning");
+    expect(assistants[0].toolCalls).toHaveLength(1);
+    expect(assistants[1].reasoning).toBe("Second turn reasoning");
+
+    // Two separate reasoning blocks render sequentially in the DOM.
+    const blocks = el.renderRoot.querySelectorAll(".msg-reasoning");
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]!.querySelector(".msg-reasoning-body")!.textContent).toBe("First turn reasoning");
+    expect(blocks[1]!.querySelector(".msg-reasoning-body")!.textContent).toBe("Second turn reasoning");
+  });
+
   it("setToolCallState adds a running tool call then transitions to done", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
@@ -602,6 +636,12 @@ describe("Openp41geAgents (custom element)", () => {
       arguments: '{"query":"store","roots":["/x/ascii-drawing-tool/main","/x/tw050x.net/dev"]}',
       status: "running",
     });
+    el.setToolCallState({
+      id: "tc3",
+      name: "create_or_replace_file",
+      arguments: '{"path":"/repo/src/app.ts","content":"...full file body...","mode":"replace"}',
+      status: "running",
+    });
     await el.updateComplete;
 
     const rows = el.shadowRoot!.querySelectorAll(".tool-call-row");
@@ -609,6 +649,9 @@ describe("Openp41geAgents (custom element)", () => {
     expect(rows[1].querySelector(".tool-call-args")?.textContent).toBe(
       "“store” · ascii-drawing-tool/main, tw050x.net/dev",
     );
+    // Only the target path, never the (potentially huge) file content.
+    expect(rows[2].querySelector(".tool-call-args")?.textContent).toBe("/repo/src/app.ts");
+    expect(rows[2].querySelector(".tool-call-args")?.textContent).not.toContain("file body");
   });
 
   it("renders tool calls inline, interleaved with streamed text in order", async () => {

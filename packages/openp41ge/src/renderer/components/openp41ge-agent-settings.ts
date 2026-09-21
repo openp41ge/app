@@ -959,7 +959,7 @@ export class Openp41geAgentSettings extends LitElement {
           box-sizing: border-box;
           height: 100%;
           color: var(--text-primary, #ccc);
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-family: var(--font-ui);
           font-size: 13px;
         }
         .ags-root {

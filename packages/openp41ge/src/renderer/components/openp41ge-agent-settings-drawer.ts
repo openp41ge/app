@@ -83,7 +83,7 @@ const AGDS_CSS = `
     height: 100%;
     box-sizing: border-box;
     color: var(--text-primary, #ccc);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-ui);
     font-size: 13px;
   }
   .agds-pane {

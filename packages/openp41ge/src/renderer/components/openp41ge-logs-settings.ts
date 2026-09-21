@@ -39,7 +39,7 @@ export class Openp41geLogsSettings extends LitElement {
            * component's own bg-primary when used as a grid tab. */
           background: var(--settings-pane-bg, var(--bg-primary, #161616));
           color: var(--text-primary, #ccc);
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-family: var(--font-ui);
           font-size: 13px;
         }
         /* Padding lives on an inner wrapper (not :host) because the app's

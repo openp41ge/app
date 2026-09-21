@@ -36,7 +36,7 @@ import { REGEX_ICON, CASE_ON_ICON } from "../git-commit-search/search-icons";
 /** 250ms input debounce — search as you type without spamming IPC per key. */
 const DEBOUNCE_MS = 250;
 
-// Search-row toggle icons (shared with the Workspace Manager header search).
+// Search-row toggle icons (shared with the Workspace Manager search bar).
 // The case icon keeps its ON glyph always; state is conveyed by colour, not by
 // swapping between ON/OFF variants.
 // Search changed CONTENT lines (git -G pickaxe). A document with a magnifier.

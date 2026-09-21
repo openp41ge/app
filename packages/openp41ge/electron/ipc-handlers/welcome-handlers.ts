@@ -14,12 +14,19 @@ import path from "path";
 /** Marker file name, resolved under the app-data root. */
 const WELCOME_DISMISSED_FILE = ".welcome-dismissed";
 
-export function registerWelcomeHandlers(openp41geDir: string): void {
+export function registerWelcomeHandlers(openp41geDir: string, isDev: boolean): void {
   const marker = path.join(openp41geDir, WELCOME_DISMISSED_FILE);
 
-  ipcMain.handle("welcome:is-dismissed", () => fs.existsSync(marker));
+  ipcMain.handle("welcome:is-dismissed", () => {
+    // The "never show again" dismissal is only honored in packaged (production)
+    // builds. Dev builds always show the welcome intro so it can't be hidden
+    // while iterating.
+    if (isDev) return false;
+    return fs.existsSync(marker);
+  });
 
   ipcMain.handle("welcome:set-dismissed", (_event, dismissed: boolean) => {
+    if (isDev) return false;
     if (dismissed) {
       fs.mkdirSync(openp41geDir, { recursive: true });
       fs.writeFileSync(marker, "", "utf8");

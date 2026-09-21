@@ -212,6 +212,34 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.on("window-manager:activate-tab", handler);
       return () => ipcRenderer.removeListener("window-manager:activate-tab", handler);
     },
+    /** Move a management tab from one manager window to another / reorder it. */
+    moveTab: (sourceWinId, targetWinId, tabId, dropIndex) => {
+      ipcRenderer.send(
+        "window-manager:move-tab",
+        JSON.stringify({ sourceWinId, targetWinId, tabId, dropIndex }),
+      );
+    },
+    /** Open a NEW management window containing `tab` (drag-out), removing it
+     *  from `sourceWinId` in the main process. */
+    openWithTab: (sourceWinId, tabId, dropScreenX, dropScreenY) => {
+      ipcRenderer.send(
+        "window-manager:open-with-tab",
+        JSON.stringify({ sourceWinId, tabId, dropScreenX, dropScreenY }),
+      );
+    },
+    /** Fired on a target manager window when another window moves a tab onto it. */
+    onReceiveTab: (callback) => {
+      const handler = (_event, payload) => callback(JSON.parse(payload));
+      ipcRenderer.on("window-manager:receive-tab", handler);
+      return () => ipcRenderer.removeListener("window-manager:receive-tab", handler);
+    },
+    /** Fired on a source manager window when its tab was moved to another
+     *  window (or to a new window) — remove it from the open-tabs bar. */
+    onRemoveTab: (callback) => {
+      const handler = (_event, payload) => callback(JSON.parse(payload));
+      ipcRenderer.on("window-manager:remove-tab", handler);
+      return () => ipcRenderer.removeListener("window-manager:remove-tab", handler);
+    },
   },
 
   drag: {

@@ -205,7 +205,7 @@ export class Openp41geApplication {
   }
 
   private _initChromeFlags(): void {
-    app.setName("openp41ge");
+    app.setName("OpenP41ge");
     app.commandLine.appendSwitch("disable-features", "FontationsFontBackend");
     app.commandLine.appendSwitch("enable-gpu-rasterization");
     if (!process.env.OPENP41GE_E2E_TEST) {
@@ -387,7 +387,10 @@ export class Openp41geApplication {
     registerWorkspaceHandlers(this.workspaceService, this.dispatcher, this.openp41geDir);
     registerGitHandlers(this.gitCommitService, this.gitService);
     registerConfigHandlers(this.configService);
-    registerWelcomeHandlers(this.openp41geDir);
+    registerWelcomeHandlers(
+      this.openp41geDir,
+      !app.isPackaged && !process.env.OPENP41GE_E2E_TEST,
+    );
     registerLogHandlers(this.logStore);
     registerChatHandlers(this.chatStore, this.agentRuntime, this.chatProviders, this.configService);
     registerLifecycleHandlers(this.lifecycle);

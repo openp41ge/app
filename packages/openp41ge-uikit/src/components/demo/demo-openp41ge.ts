@@ -139,7 +139,7 @@ export class DemoOpenp41ge extends LitElement {
     const isActive = tab.id === this.activeTab;
     return html`
       <div
-        style="display:flex;align-items:center;height:18px;padding:0 8px;border-radius:3px;background:${isActive ? "#555" : "#4a4a4a"};font-size:10px;color:#d4d4d4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;white-space:nowrap;flex-shrink:0;cursor:default;"
+        style="display:flex;align-items:center;height:18px;padding:0 8px;border-radius:3px;background:${isActive ? "#555" : "#4a4a4a"};font-size:10px;color:#d4d4d4;font-family:var(--font-ui);white-space:nowrap;flex-shrink:0;cursor:default;"
       >
         ${tab.title}
       </div>
@@ -151,7 +151,7 @@ export class DemoOpenp41ge extends LitElement {
       <div
         style="width:88px;flex-shrink:0;background:#252526;border-left:1px solid #333;display:flex;flex-direction:column;padding:0;"
       >
-        <div style="padding:6px 8px 4px;font-size:8px;color:#999;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-bottom:1px solid #333;">
+        <div style="padding:6px 8px 4px;font-size:8px;color:#999;font-weight:600;font-family:var(--font-ui);border-bottom:1px solid #333;">
           EXPLORER
         </div>
         <div style="padding:4px 8px;display:flex;flex-direction:column;gap:2px;">

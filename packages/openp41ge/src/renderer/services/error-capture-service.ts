@@ -148,7 +148,7 @@ export function installErrorCapture(): void {
     align-items:center;
     justify-content:center;
     background:rgba(120,20,20,.96);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-family:var(--font-ui);
     color:#fff;
   `;
 

@@ -8,6 +8,8 @@
 
 import { register as registerReadFile } from "openp41ge-agents-tool-read-file";
 import { register as registerSearchFiles } from "openp41ge-agents-tool-search-files";
+import { register as registerEditFile } from "openp41ge-agents-tool-edit-file";
+import { register as registerWriteFile } from "openp41ge-agents-tool-write-file";
 import type { AgentTool, AgentToolRegistry } from "openp41ge-agents-tool-types";
 
 /**
@@ -19,6 +21,8 @@ import type { AgentTool, AgentToolRegistry } from "openp41ge-agents-tool-types";
 export function registerBuiltinTools(registry: AgentToolRegistry): void {
   registerReadFile(registry);
   registerSearchFiles(registry);
+  registerEditFile(registry);
+  registerWriteFile(registry);
 }
 
 export type { AgentTool, AgentToolRegistry };

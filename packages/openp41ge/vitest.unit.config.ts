@@ -50,6 +50,18 @@ export default defineConfig({
         __dirname,
         "../openp41ge-agents-tool-types/src/index.ts",
       ),
+      "openp41ge-agents-tool-shared": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-shared/src/index.ts",
+      ),
+      "openp41ge-agents-tool-edit-file": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-edit-file/src/index.ts",
+      ),
+      "openp41ge-agents-tool-write-file": path.resolve(
+        __dirname,
+        "../openp41ge-agents-tool-write-file/src/index.ts",
+      ),
     },
   },
 });

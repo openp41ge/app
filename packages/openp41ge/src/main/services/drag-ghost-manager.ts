@@ -105,7 +105,7 @@ export function buildWorkspaceGhostHtml(
   const emojiHtml = emoji
     ? `<span style="font-size:18px;line-height:1;flex-shrink:0">${emoji}</span>`
     : "";
-  const nameHtml = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;font-size:12px;color:#d4d4d4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">${label}</span>`;
+  const nameHtml = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;font-size:12px;color:#d4d4d4;font-family:'Roboto',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${label}</span>`;
   return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:${outW}px;height:${outH}px;box-sizing:border-box;padding:8px;background:#1e1e1e;border:1px solid #3a3d3f;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.3);outline:1px solid rgba(74,158,255,0.5);outline-offset:-1px;transform-origin:${originX}px ${originY}px;animation:op41ge-lift ${LIFT_SPRING_MS}ms ${LIFT_SPRING_EASE} both;">${emojiHtml}${nameHtml}</div>`;
 }
 
@@ -234,10 +234,10 @@ export class DragGhostManager implements IDragGhostManager {
     const nameHtml = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">${escapedLabel}</span>`;
 
     const isFileGhost = !!isFile;
-    const rowHtml = `<div style="display:flex;align-items:center;gap:7px;height:${ghostH}px;min-width:160px;padding:0 9px;background:#1e1e1e;border:1px solid #3a3d3f;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,0.3);outline:1px solid rgba(74,158,255,0.5);outline-offset:-1px;font-size:12px;color:#d4d4d4;letter-spacing:0.02em;white-space:nowrap;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    const rowHtml = `<div style="display:flex;align-items:center;gap:7px;height:${ghostH}px;min-width:160px;padding:0 9px;background:#1e1e1e;border:1px solid #3a3d3f;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,0.3);outline:1px solid rgba(74,158,255,0.5);outline-offset:-1px;font-size:12px;color:#d4d4d4;letter-spacing:0.02em;white-space:nowrap;box-sizing:border-box;font-family:'Roboto',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#4a9eff" stroke-width="1.3" shape-rendering="geometricPrecision" style="flex-shrink:0"><path d="M4 1h6l3 3v10H4z"/><path d="M10 1v3h3"/></svg>
 ${nameHtml}</div>`;
-    const pillHtml = `<div style="display:flex;align-items:center;gap:6px;width:${ghostW}px;height:${ghostH}px;padding:0 14px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;outline:1px solid #4a9eff;outline-offset:-2px;font-size:12px;color:#e0e0e0;white-space:nowrap;letter-spacing:0.02em;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">${emojiHtml}${nameHtml}</div>`;
+    const pillHtml = `<div style="display:flex;align-items:center;gap:6px;width:${ghostW}px;height:${ghostH}px;padding:0 14px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;outline:1px solid #4a9eff;outline-offset:-2px;font-size:12px;color:#e0e0e0;white-space:nowrap;letter-spacing:0.02em;box-sizing:border-box;font-family:'Roboto',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${emojiHtml}${nameHtml}</div>`;
 
     // A captured bitmap of the actual dragged element is the most faithful
     // ghost: render the PNG at the exact source element size and let the window
