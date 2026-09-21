@@ -72,8 +72,33 @@ jobs:
             echo "prerelease=$PRERELEASE"
           } >> "$GITHUB_OUTPUT"
 
-  build-macos:
+  gate:
+    # Refuse to release a commit that never got a green prerequisites run
+    # (quality / test / integration / build). Guards manual dispatch on an
+    # arbitrary commit as well as tag-triggered releases.
     needs: meta
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require successful prerequisites for this commit
+        run: |
+          set -euo pipefail
+          SHA="${{ github.sha }}"
+          CONCLUSION="$(gh run list --repo "$GITHUB_REPOSITORY" \
+            --workflow prerequisites.yml --commit "$SHA" \
+            --status completed --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)"
+          echo "prerequisites for $SHA -> ${CONCLUSION:-no completed run}"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::Commit $SHA has no successful prerequisites run (found: ${CONCLUSION:-none}). Release only commits that passed quality/test/integration/build."
+            exit 1
+          fi
+
+  build-macos:
+    needs: [meta, gate]
     runs-on: macos-14 # Apple Silicon
     permissions:
       contents: read
