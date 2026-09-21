@@ -155,7 +155,7 @@ jobs:
             x64)       FLAG="--x64" ;;
             *) echo "::error::Unsupported arch: $ARCH"; exit 1 ;;
           esac
-          pnpm exec electron-builder --mac "$FLAG"
+          pnpm exec electron-builder --mac "$FLAG" --publish never
 
       - name: Verify signature + notarization
         working-directory: packages/openp41ge

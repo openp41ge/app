@@ -10,6 +10,7 @@
         "commands": [
           "vite build",
           "tsc -p tsconfig.node.json",
+          "esbuild dist-electron/electron/main.js --bundle --platform=node --format=esm --target=node20 --external:electron --outfile=dist-electron/electron/main.js --allow-overwrite",
           "cp electron/preload.cjs dist-electron/electron/preload.cjs"
         ],
         "parallel": false,

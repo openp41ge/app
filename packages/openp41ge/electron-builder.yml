@@ -15,18 +15,18 @@ directories:
   output: release
   buildResources: build
 
-# Only ship the built bundles + app package.json. node_modules for runtime
-# `dependencies` are auto-collected by electron-builder (pnpm workspace
-# packages are followed from the symlinked node_modules).
+# The renderer is bundled by Vite and the main process is bundled by esbuild
+# (a single self-contained file), so no runtime node_modules are needed.
 files:
   - dist/**
-  - dist-electron/**
+  - dist-electron/electron/main.js
+  - dist-electron/electron/preload.cjs
   - package.json
 
 asar: true
 
 # Never let electron-builder push to GitHub itself — CI creates the release.
-publish: never
+publish: null
 
 mac:
   category: public.app-category.developer-tools
