@@ -6,6 +6,7 @@ allowBuilds:
   "@google/genai": true
   "@scarf/scarf": true
   electron: true
+  electron-winstaller: false
   esbuild: true
   nx: true
   protobufjs: true
