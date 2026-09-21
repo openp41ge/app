@@ -190,7 +190,7 @@ jobs:
             packages/openp41ge/release/SHA256SUMS
 
   release:
-    needs: build-macos
+    needs: [meta, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
