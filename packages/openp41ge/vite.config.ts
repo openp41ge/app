@@ -46,6 +46,15 @@ export default defineConfig({
         replacement: path.resolve(__dirname, "../openp41ge-syntax-highlighting/src"),
       },
       { find: "openp41ge-tabs", replacement: path.resolve(__dirname, "../openp41ge-tabs/src") },
+      { find: "openp41ge-json-editor", replacement: path.resolve(__dirname, "../openp41ge-json-editor/src") },
+      {
+        find: "openp41ge-json-editor/json-editor",
+        replacement: path.resolve(__dirname, "../openp41ge-json-editor/src/json-editor.ts"),
+      },
+      {
+        find: "openp41ge-editor-gutter",
+        replacement: path.resolve(__dirname, "../openp41ge-editor-gutter/src"),
+      },
       {
         find: "openp41ge-editor-engine",
         replacement: path.resolve(__dirname, "../openp41ge-editor-engine/src"),

@@ -26,9 +26,12 @@ const log = createLogger("openp41ge", "ConfigService");
 export interface UserConfig {
   version: number;
   appTheme: "dark" | "light";
+  /** Platform-wide line height (px) — the openp41ge platform setting that all
+   *  sub-package editors (file editor, JSON editor, …) align to. */
+  lineHeight: number;
+  /** Platform-wide font size (px) — sub-package editors align to this. */
+  fontSize: number;
   editor: {
-    lineHeight: number;
-    fontSize: number;
     fontFamily: string;
     /** Max file size in bytes the editor will open (larger files show a "too large" message). */
     maxFileSize: number;
@@ -60,9 +63,9 @@ export const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024;
 const DEFAULT_CONFIG: UserConfig = {
   version: 1,
   appTheme: "dark",
+  lineHeight: 20,
+  fontSize: 14,
   editor: {
-    lineHeight: 20,
-    fontSize: 14,
     fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
     maxFileSize: DEFAULT_MAX_FILE_SIZE,
   },
@@ -132,6 +135,7 @@ export class ConfigService {
         const raw = fs.readFileSync(this._configPath, "utf-8");
         const parsed = JSON.parse(raw) as Partial<UserConfig>;
         this._config = deepMerge({ ...DEFAULT_CONFIG }, parsed);
+        this._migrateConfig(this._config);
         log.info("config-loaded", { source: "file", path: this._configPath });
       } else {
         this._writeAtomic(this._config);
@@ -231,6 +235,7 @@ export class ConfigService {
             const raw = fs.readFileSync(this._configPath, "utf-8");
             const parsed = JSON.parse(raw) as Partial<UserConfig>;
             this._config = deepMerge({ ...DEFAULT_CONFIG }, parsed);
+            this._migrateConfig(this._config);
             this._notify();
           } catch {
             // Ignore parse errors during rapid writes
@@ -239,6 +244,23 @@ export class ConfigService {
       });
     } catch (err) {
       log.warn("watch error:", err);
+    }
+  }
+
+  /** Promote legacy nested `editor.lineHeight`/`editor.fontSize` to top-level
+   *  platform settings (they are global; sub-packages align to them). Stale
+   *  nested keys are removed so future writes don't persist duplicates. */
+  private _migrateConfig(config: UserConfig): void {
+    const editor = config.editor as Record<string, unknown> | undefined;
+    if (editor && typeof editor === "object") {
+      if (typeof editor.lineHeight === "number") {
+        config.lineHeight = editor.lineHeight as number;
+        delete editor.lineHeight;
+      }
+      if (typeof editor.fontSize === "number") {
+        config.fontSize = editor.fontSize as number;
+        delete editor.fontSize;
+      }
     }
   }
 

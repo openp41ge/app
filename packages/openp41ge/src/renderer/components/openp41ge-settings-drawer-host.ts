@@ -62,12 +62,24 @@ export type DrawerSide = "left" | "right";
 export interface SettingsDrawerLayer {
   id: string;
   title: string;
+  /**
+   * Optional short status shown in the drawer head after the title (e.g.
+   * "unsaved changes" while an editor is dirty). Rendered italic.
+   */
+  status?: string;
   /** Render this layer's body. Called on every host render. */
   render: () => TemplateResult;
   /** Whether ✕ is shown. Base layers may hide it (the surface decides). */
   closable?: boolean;
   /** Whether this is the root/base layer (cannot be popped by `closeAll`). */
   isBase?: boolean;
+  /**
+   * Invoked when this layer is closed by ANY means (✕, click-to-go-back,
+   * click-away, or a programmatic close). Lets the owning surface discard
+   * uncommitted edits. The surface uses its own per-layer committed-state to
+   * decide whether to actually revert anything on close.
+   */
+  onClose?: () => void;
   /**
    * Extra CSS injected into the drawer's light-DOM scope to style its body.
    * Needed because sub-layer bodies are rendered by the host (in the host's
@@ -244,6 +256,18 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     const target = side ?? this.side;
     const other = target === "left" ? "right" : "left";
 
+    // Open much larger than the min width: default to the widest allowed
+    // (the max drawer width, clamped to the grid area). The min width
+    // (`defaultDrawerWidth`) is unchanged — it stays the floor — only the
+    // width the drawer OPENS to changes.
+    const gridWidth = this.clientWidth || 0;
+    if (gridWidth) {
+      this._drawerWidths = {
+        ...this._drawerWidths,
+        [target]: this._openWidthFor(target, gridWidth),
+      };
+    }
+
     // Only one sidebar drawer at a time: opening on one side closes the other.
     if (this._isOpen(other)) {
       this._closeStack(other);
@@ -305,6 +329,9 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     const width = Math.max(this._minWidth, this._drawerWidths[s]);
     const gridWidth = this.clientWidth || 0;
     stack.layers = stack.layers.slice(0, idx);
+    // Notify the surface for every layer being popped (deepest first) so it
+    // can discard uncommitted edits before the stack mutates further.
+    this._notifyClose(closing);
     this._finalizeClose(
       s,
       closing.map((l, i) => ({
@@ -334,6 +361,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     const width = Math.max(this._minWidth, this._drawerWidths[side]);
     const gridWidth = this.clientWidth || 0;
     stack.layers = stack.layers.slice(0, index + 1);
+    this._notifyClose(closing);
     this._finalizeClose(
       side,
       closing.map((l, k) => ({
@@ -358,9 +386,18 @@ export class Openp41geSettingsDrawerHost extends LitElement {
       layer: l,
       offset: this._layerOffset(side, i, n, width, gridWidth),
     }));
+    this._notifyClose(closing.map((c) => c.layer));
     stack.layers = [];
     stack.surface = null;
     this._finalizeClose(side, closing);
+  }
+
+  /** Invoke `onClose` for each closed layer, deepest (top) first, so a child
+   *  can discard its edits before its parent's state is torn down. */
+  private _notifyClose(closed: SettingsDrawerLayer[]): void {
+    for (let i = closed.length - 1; i >= 0; i--) {
+      closed[i].onClose?.();
+    }
   }
 
   private _finalizeClose(side: DrawerSide, closing: ClosingLayer[]): void {
@@ -405,6 +442,11 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     const room = Math.max(0, this._sideMaxWidth(side, gridWidth) - width);
     const peek = Math.min(n - 1 - index, 1) * this.stackInset;
     return Math.min(peek, room);
+  }
+
+  /** Width a drawer opens to: the widest allowed, clamped to the grid area. */
+  private _openWidthFor(side: DrawerSide, gridWidth: number): number {
+    return this._sideMaxWidth(side, gridWidth);
   }
 
   /**
@@ -748,6 +790,8 @@ export class Openp41geSettingsDrawerHost extends LitElement {
           border-bottom: 1px solid var(--border-divider, #2d2d2d);
         }
         .sdw-title {
+          flex: 1 1 auto;
+          min-width: 0;
           font-size: 11px;
           font-weight: 600;
           text-transform: uppercase;
@@ -756,6 +800,24 @@ export class Openp41geSettingsDrawerHost extends LitElement {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+        .sdw-head-right {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+          height: 100%;
+        }
+        .sdw-status {
+          margin-right: 12px;
+          font-size: 11px;
+          font-weight: 500;
+          font-style: italic;
+          text-transform: none;
+          letter-spacing: 0;
+          color: var(--accent, #569cd6);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .sdw-close {
           border: none;
@@ -907,23 +969,26 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     return html`
       <div class="sdw-head">
         <span class="sdw-title" title="${layer.title}">${layer.title}</span>
-        ${
-          layer.closable === false
-            ? nothing
-            : html`
-                <button
-                  class="sdw-close"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    this.close(layer.id, side);
-                  }}
-                  aria-label="Close"
-                  title="Close"
-                >
-                  ✕
-                </button>
-              `
-        }
+        <span class="sdw-head-right">
+          ${layer.status ? html`<span class="sdw-status">${layer.status}</span>` : nothing}
+          ${
+            layer.closable === false
+              ? nothing
+              : html`
+                  <button
+                    class="sdw-close"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this.close(layer.id, side);
+                    }}
+                    aria-label="Close"
+                    title="Close"
+                  >
+                    ✕
+                  </button>
+                `
+          }
+        </span>
       </div>
     `;
   }

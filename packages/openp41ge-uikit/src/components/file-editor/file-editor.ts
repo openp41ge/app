@@ -40,7 +40,7 @@ import { FindMatchRenderer, toFindViewSpans } from "openp41ge-editor-engine/rend
 import type { IFindViewConverter } from "openp41ge-editor-engine/rendering";
 import { FindInEditor } from "openp41ge-editor-engine/input";
 import type { FindMatch } from "openp41ge-editor-engine/input";
-import { LineNumbersOverlay } from "openp41ge-editor-engine/rendering/line-numbers-overlay";
+import { Gutter, type GutterRow } from "openp41ge-editor-gutter";
 import { CurrentLineHighlight } from "openp41ge-editor-engine/rendering/current-line-highlight";
 import { IndentationGuides } from "openp41ge-editor-engine/rendering/indentation-guides";
 import { findMatchingBracket } from "openp41ge-editor-engine/rendering/bracket-matching";
@@ -60,7 +60,7 @@ import {
 } from "openp41ge-editor-engine/themes";
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
 import { InlineDiffHighlightsRenderer, type InlineDiffRow } from "./inline-diff-highlights";
-import { InlineDiffGutterColumns, type InlineDiffGutterRows } from "./inline-diff-gutter-columns";
+import { makeFeNumberColumn, makeFeDiffBeforeColumn, type FeGutterRowData } from "./fe-gutter-columns";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
 import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
@@ -194,7 +194,7 @@ export class FileEditorElement extends LitElement {
     caseSensitive?: boolean;
     wholeWord?: boolean;
   } | null = null;
-  private _lineNumbersOverlay: LineNumbersOverlay | null = null;
+  private _gutter: Gutter | null = null;
   private _currentLineHighlight: CurrentLineHighlight | null = null;
   private _indentationGuides: IndentationGuides | null = null;
   private _clipboardHandler: ClipboardHandler | null = null;
@@ -209,7 +209,10 @@ export class FileEditorElement extends LitElement {
   private _suppressScroll: boolean = false;
 
   private _viewportEl!: HTMLElement;
-  private _gutterEl!: HTMLElement;
+  /** AFTER (normal) gutter column width, in px. */
+  private _gutterRightWidth = 48;
+  /** BEFORE (inline-diff) gutter column width, in px (0 when hidden). */
+  private _gutterLeftWidth = 0;
   /** Native-scroll flex row inside the viewport: [BEFORE] [AFTER] [text]. */
   private _scrollContentEl!: HTMLElement;
   /** Sticky-left group holding both number columns (horizontal pinning). */
@@ -291,15 +294,11 @@ export class FileEditorElement extends LitElement {
   private _inlineRows: readonly InlineDiffRow[] | null = null;
   /** Paints the red/green row bands inside the viewport. */
   private _inlineHighlights: InlineDiffHighlightsRenderer | null = null;
-  /** The extra left (old numbers) gutter column. */
-  private _inlineColumns: InlineDiffGutterColumns | null = null;
   /** Model lines covered by the current selection(s) — their NUMBER CELLs
    * (BEFORE and AFTER) get the grey active background. Includes the plain
    * cursor line (single empty selection). */
   private _selectedDiffLines: ReadonlySet<number> = new Set();
 
-  /** The model line whose number cells the pointer is over (both columns). */
-  private _hoverLine: number | null = null;
   /** Custom horizontal scrollbar confined to the CONTENT area. */
   private _hScrollTrack: HTMLElement | null = null;
   private _hScrollThumb: HTMLElement | null = null;
@@ -334,7 +333,6 @@ export class FileEditorElement extends LitElement {
     if (!this._inlineRows) {
       // Leaving diff mode: drop the active-cell highlight in both columns.
       this._selectedDiffLines = new Set();
-      this._inlineColumns?.setActiveLines(null);
     }
 
     // Two line-number columns only (BEFORE left / AFTER middle); the +/− sign
@@ -343,17 +341,39 @@ export class FileEditorElement extends LitElement {
     // The AFTER (middle/rightmost) column is sized by the file's total line
     // count, exactly like the plain editor gutter. The BEFORE (left) column is
     // hidden entirely when there is no diff.
-    let gutterWidth = this._computeGutterWidth(this._viewModel?.lineCount ?? 0); // middle (after)
-    let leftWidth = 36;
-    let rowsForColumns: InlineDiffGutterRows | null = null;
-    if (this._inlineRows) {
+    this._applyGutterWidths();
+
+    // Re-paint both number columns with the file's real numbers (left = old
+    // before, middle = new after) and their coloured cells.
+    if (this._viewLines && this._viewModel) {
+      const start = this._viewLines.startLineNumber || 1;
+      const end = this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount);
+      this._syncGutterBand(start, end);
+    }
+    this._updateInlineHighlights();
+    this._updateHScroll();
+  }
+
+  // ── Shared gutter host (openp41ge-editor-gutter) ────────────────────────
+
+  /**
+   * Size the two gutter columns for the current buffer + diff state and reflow
+   * the shared `Gutter` host. The AFTER column follows the file's line count;
+   * in a diff view BOTH columns take the widest number that can appear on
+   * either side (so their right-aligned place values line up).
+   */
+  private _applyGutterWidths(): void {
+    if (!this._viewModel) {
+      this._gutterRightWidth = 48;
+      this._gutterLeftWidth = 0;
+    } else if (this._inlineRows) {
       const charW = this._charWidth > 0 ? this._charWidth : 8;
       let maxOld = 0;
       let maxNew = 0;
       for (const row of this._inlineRows) {
         // BEFORE (left) is full except gaps where a line has no old side (an
         // addition); AFTER (middle) is full except gaps where a line has no
-        // new side (a deletion). Context (unchanged) lines appear in both.
+        // new side (a deletion).
         if (row.kind !== "added" && row.oldLine != null) {
           maxOld = Math.max(maxOld, String(row.oldLine).length);
         }
@@ -361,71 +381,71 @@ export class FileEditorElement extends LitElement {
           maxNew = Math.max(maxNew, String(row.newLine).length);
         }
       }
-      // The two number columns are sized by the number of lines on each side
-      // (the widest number that can appear there). A fully-DELETED file (all
-      // rows removed, maxNew = 0) still reserves the AFTER column using the
-      // BEFORE column's numbers — and a wholly-NEW file does the reverse
-      // (maxOld = 0). Both columns are the SAME width (the widest number), so
-      // their right-aligned place values line up; a small dot painted on the
-      // shared border between them keeps the old and new numbers visually
-      // separate (see InlineDiffGutterColumns).
-      const maxDigits = Math.max(maxOld, maxNew);
-      const sharedWidth = Math.max(32, Math.ceil(maxDigits * charW) + 16);
-      gutterWidth = sharedWidth;
-      leftWidth = sharedWidth;
-      rowsForColumns = {
-        infoFor: (line: number) => {
-          const row = this._inlineRows?.[line - 1];
-          if (!row) return { leftLabel: "", cls: "" };
-          // BEFORE (left) — the old line number. Full on context + deleted
-          // rows; a GAP where the line didn't exist before (an addition). The
-          // deleted row's cell is tinted red all the way across its column.
-          const left = row.kind !== "added" && row.oldLine != null ? String(row.oldLine) : "";
-          const cls = row.kind === "removed" ? "fe-inline-removed-cell" : "";
-          return { leftLabel: left, cls };
-        },
-      };
+      const sharedWidth = Math.max(32, Math.ceil(Math.max(maxOld, maxNew) * charW) + 16);
+      this._gutterRightWidth = sharedWidth;
+      this._gutterLeftWidth = sharedWidth;
+    } else {
+      this._gutterRightWidth = this._computeGutterWidth(this._viewModel.lineCount);
+      this._gutterLeftWidth = 0;
     }
-
-    this._lineNumbersOverlay?.setGutterWidth(gutterWidth);
-    this._inlineColumns?.setSizes(this._lineHeight, leftWidth);
-    this._inlineColumns?.setRows(rowsForColumns);
-
-    // Re-paint both number columns with the file's real numbers (left = old
-    // before, middle = new after) and their coloured cells.
-    if (this._viewLines && this._viewModel) {
-      const start = this._viewLines.startLineNumber || 1;
-      const end = this._viewLines.endLineNumber || Math.min(100, this._viewModel.lineCount);
-      this._lineNumbersOverlay?.setVisibleRange(start, end);
-      const wg = this._inlineWrapGetters();
-      this._inlineColumns?.setVisibleRange(start, end, wg.getViewLineStart, wg.getViewLineCount);
-    }
-    this._updateInlineHighlights();
-    this._updateHScroll();
+    this._gutter?.reflow();
   }
 
-  /**
-   * Create the inline-diff gutter columns if they do not already exist.
-   * Called on firstUpdated AND at the end of _initWithModel (the pipeline
-   * teardown at the start of _initWithModel disposes them, so they must come
-   * back with every rebuilt pipeline).
-   */
-  private _ensureInlineColumns(): void {
-    if (this._inlineColumns || !this._gutterEl) return;
-    // Insert the BEFORE column into the sticky group, next to the AFTER column.
-    const content = this._gutterGroupEl;
-    if (!content) return;
-    this._inlineColumns = new InlineDiffGutterColumns(
-      content,
-      this._gutterEl,
-      this._lineHeight,
-      (lineNumber: number) => {
-        this._cursorController?.selectLine(lineNumber);
-      },
-    );
-    this._inlineColumns.setSizes(this._lineHeight, 36);
-    // If decorations were already applied (restore path), repaint everything.
-    if (this._inlineRows) this.setInlineDiff(this._inlineRows);
+  /** Build the band's gutter rows (top/height account for word wrap). */
+  private _gutterRows(start: number, end: number): GutterRow[] {
+    const lh = this._lineHeight;
+    const wg = this._inlineWrapGetters();
+    const max = Math.max(1, this._viewModel?.lineCount ?? end);
+    const rows: GutterRow[] = [];
+    for (let ln = start; ln <= Math.min(end, max); ln++) {
+      const vStart = wg.getViewLineStart(ln);
+      const vCount = wg.getViewLineCount(ln);
+      rows.push({ key: ln, top: (vStart - 1) * lh, height: vCount * lh });
+    }
+    return rows;
+  }
+
+  /** Per-model-line data both gutter columns render from. */
+  private _gutterDataFor(line: number): FeGutterRowData {
+    const row = this._inlineRows ? this._inlineRows[line - 1] : undefined;
+    let afterLabel = String(line);
+    if (this._inlineRows && row) {
+      // AFTER (middle) — the new file number. Full on context + added rows; a
+      // GAP where the line has no new side (a deletion).
+      afterLabel =
+        row.kind !== "removed" && row.newLine != null ? String(row.newLine) : "";
+    }
+    const afterParts: string[] = [];
+    if (row?.kind === "added") afterParts.push("fe-inline-added-cell");
+    if (row?.kind === "removed") afterParts.push("fe-inline-removed-cell");
+    // Selected rows (cursor line or a multi-row drag selection) get the grey
+    // active-line-number background in BOTH normal and diff mode. In a diff
+    // view the number cells of every selected row light up; in normal mode
+    // the cursor line's number is highlighted (restores the old overlay's
+    // setActiveLine behaviour).
+    if (this._selectedDiffLines.has(line)) {
+      afterParts.push("active-line-number");
+    }
+    let beforeLabel = "";
+    const beforeParts: string[] = [];
+    if (this._inlineRows && row) {
+      // BEFORE (left) — the old file number. Full on context + deleted rows; a
+      // GAP where the line has no old side (an addition).
+      if (row.kind !== "added" && row.oldLine != null) beforeLabel = String(row.oldLine);
+      if (row.kind === "removed") beforeParts.push("fe-inline-removed-cell");
+      if (this._selectedDiffLines.has(line)) beforeParts.push("fe-inline-left-active");
+    }
+    return {
+      afterLabel,
+      afterCls: afterParts.join(" "),
+      beforeLabel,
+      beforeCls: beforeParts.join(" "),
+    };
+  }
+
+  /** (Re)sync the gutter's visible band with fresh data. */
+  private _syncGutterBand(start: number, end: number): void {
+    this._gutter?.setRows(this._gutterRows(start, end), (k) => this._gutterDataFor(k));
   }
 
   /** (Re)paint the red/green row bands for the visible window. */
@@ -457,31 +477,6 @@ export class FileEditorElement extends LitElement {
       wg.getViewLineStart,
       wg.getViewLineCount,
     );
-  }
-
-  // ── Line-number hover highlight ────────────────────────────────────────
-
-  /** Moused over a number cell — highlight the same row in BOTH columns. */
-  private _onGutterCellMouseOver = (e: Event): void => {
-    const cell = (e.target as HTMLElement).closest?.("[data-line]") as HTMLElement | null;
-    if (!cell) return;
-    const line = Number(cell.dataset.line);
-    if (Number.isInteger(line) && line > 0) this._setHoverLine(line);
-  };
-
-  /** Left a number cell — resolve the new row (or clear when leaving the gutter). */
-  private _onGutterCellMouseOut = (e: Event): void => {
-    const next = (e as MouseEvent).relatedTarget as HTMLElement | null;
-    const cell = next?.closest?.("[data-line]") as HTMLElement | null;
-    const line = cell ? Number(cell.dataset.line) : 0;
-    this._setHoverLine(Number.isInteger(line) && line > 0 ? line : null);
-  };
-
-  private _setHoverLine(line: number | null): void {
-    if (this._hoverLine === line) return;
-    this._hoverLine = line;
-    this._lineNumbersOverlay?.setHoverLine(line);
-    this._inlineColumns?.setHoverLine(line);
   }
 
   // ── Custom content-scoped horizontal scrollbar ─────────────────────────
@@ -748,9 +743,10 @@ export class FileEditorElement extends LitElement {
       .view-line .token-number { color: ${c.num}; }
       .view-line .token-keyword { color: ${c.kw}; }
       .view-line .token-type { color: ${c.type}; }
-      /* Editor background applied to root and gutter via --fe-bg / --fe-gutter-bg */
+      /* Editor background applied to root and gutter (line numbers blend with
+         the content area: both use --fe-bg). */
       .fe-root { background: var(--fe-bg) !important; }
-      .fe-gutter { background: var(--fe-gutter-bg) !important; }
+      .fe-gutter { background: var(--fe-bg) !important; }
       /* Scrollbar styling — match the editor background */
       .fe-viewport::-webkit-scrollbar-track {
         background: var(--fe-bg);
@@ -946,13 +942,46 @@ export class FileEditorElement extends LitElement {
       "flex-shrink:0;display:flex;flex-direction:row;align-items:stretch;position:sticky;left:0;top:0;z-index:6;";
     this._scrollContentEl.appendChild(this._gutterGroupEl);
 
-    this._gutterEl = document.createElement("div");
-    this._gutterEl.className = "fe-gutter";
-    // No `left:` offset — the group owns the horizontal pinning. LineNumbers-
-    // Overlay repositions this element to `relative` (fine inside the group).
-    this._gutterEl.style.cssText =
-      "flex-shrink:0;width:48px;position:relative;background:var(--fe-gutter-bg, #1a1a1a);overflow:hidden;user-select:none;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
-    this._gutterGroupEl.appendChild(this._gutterEl);
+    // The shared gutter host (openp41ge-editor-gutter) owns BOTH number
+    // columns (BEFORE old-numbers on the left, AFTER on the right) inside the
+    // sticky group. Its cells scroll compositor-natively with the content
+    // (the group is the flex-row gap between the pinned columns and the text;
+    // the host root is sticky-left for horizontal pinning).
+    this._gutter = new Gutter({
+      // The file editor highlights each number cell individually (not the
+      // JSON editor's unified long box), so the host's own hover box is off.
+      hoverBox: false,
+      events: {
+        onRowClick: (row) => this._cursorController?.selectLine(row.key),
+        onRowSelectRange: (_anchor, row) => {
+          // Dragging over the number cells extends the selection from the
+          // mousedown line to the current line, selecting every line in
+          // between. `selectLine` set the anchor at the mousedown line's
+          // start; `selectTo` moves the position to the target line's end,
+          // clamping to its full length. The cursor controller's
+          // selection-changed event updates _selectedDiffLines and repaints
+          // the gutter, so the whole range lights up.
+          this._cursorController?.selectTo(row.key, Number.MAX_SAFE_INTEGER);
+        },
+      },
+    });
+    const gutterRoot = this._gutter.root;
+    gutterRoot.classList.add("fe-gutter");
+    gutterRoot.style.cssText =
+      "flex-shrink:0;position:relative;overflow:hidden;user-select:none;" +
+      "font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
+    this._gutterGroupEl.appendChild(gutterRoot);
+    this._gutter.setColumns([
+      makeFeDiffBeforeColumn({
+        width: () => this._gutterLeftWidth,
+        lineHeight: () => this._lineHeight,
+        visible: () => this._inlineRows !== null,
+      }),
+      makeFeNumberColumn({
+        width: () => this._gutterRightWidth,
+        lineHeight: () => this._lineHeight,
+      }),
+    ]);
 
     this._textRegionEl = document.createElement("div");
     this._textRegionEl.className = "fe-text-region";
@@ -998,14 +1027,8 @@ export class FileEditorElement extends LitElement {
     viewportContainer.addEventListener("pointerenter", this._onContentPointerEnter);
     viewportContainer.addEventListener("pointerleave", this._onContentPointerLeave);
 
-    // Mouse-over highlight for the line-number cells (both columns highlight
-    // the hovered row together).
-    this._gutterGroupEl.addEventListener("mouseover", this._onGutterCellMouseOver);
-    this._gutterGroupEl.addEventListener("mouseout", this._onGutterCellMouseOut);
-
-    // The extra inline-diff gutter columns (left old-number + right sign). They
-    // start hidden and only appear when setInlineDiff() runs.
-    this._ensureInlineColumns();
+    // The shared gutter host's delegated mouseover/mouseout handles the
+    // row-hover highlight for BOTH columns (each cell adds its own hover class).
 
     this._updateHScroll();
 
@@ -1549,53 +1572,10 @@ export class FileEditorElement extends LitElement {
       enabled: true,
     });
 
-    // Create LineNumbersOverlay
-    this._lineNumbersOverlay = new LineNumbersOverlay(this._gutterEl, {
-      gutterWidth: 48,
-      lineHeight: this._lineHeight,
-      onLineClick: (lineNumber: number) => {
-        this._cursorController?.selectLine(lineNumber);
-      },
-      // Inline commit-diff: BEFORE (old numbers) lives in the left column;
-      // this (middle) column shows AFTER — the new file numbers — full on
-      // context + added rows and a GAP on deleted rows (they have no new side).
-      getLabelOverride: (lineNumber: number) => {
-        const row = this._inlineRows?.[lineNumber - 1];
-        if (!row) return null;
-        if (row.kind !== "removed" && row.newLine != null) {
-          return String(row.newLine);
-        }
-        return ""; // deleted rows: no after-side number
-      },
-      // The number CELL of an added row is tinted green all the way across its
-      // column; the active (cursor) row's cell gets a ring on top (removed rows
-      // carry the red cell in the BEFORE column instead). Returns space-
-      // separated classes.
-      getLabelDecoration: (lineNumber: number): string => {
-        const row = this._inlineRows?.[lineNumber - 1];
-        const parts: string[] = [];
-        if (row?.kind === "added") parts.push("fe-inline-added-cell");
-        // A deleted row keeps an empty AFTER cell (no number) but tints it red
-        // too, so the row reads as ONE continuous block of colour across the
-        // gutter instead of red-left-only.
-        if (row?.kind === "removed") parts.push("fe-inline-removed-cell");
-        if (this._inlineRows && this._selectedDiffLines.has(lineNumber)) {
-          parts.push("active-line-number");
-        }
-        return parts.join(" ");
-      },
-      wordWrapEnabled: this._wordWrapEnabled,
-      getViewLineStart: (modelLine: number) =>
-        this._viewLines?.getViewLineStart(modelLine) ?? modelLine,
-      getViewLineCount: (modelLine: number) => {
-        if (!this._viewModel) return 1;
-        const content = this._viewModel.getLineContent(modelLine);
-        const cw = this._charWidth > 0 ? this._charWidth : 8;
-        const vw = this._viewportEl?.clientWidth ?? 600;
-        const wrapCol = Math.max(10, Math.floor((vw - 16) / (cw || 8)));
-        return computeWrapSegments(content, wrapCol).length;
-      },
-    });
+    // The shared gutter host was created in firstUpdated with its two columns.
+    // Size them for the current buffer/diff state (the host keeps the same DOM
+    // across pipeline rebuilds; only the band + per-row data change here).
+    this._applyGutterWidths();
 
     // Create ScrollManager
     this._scrollManager = new ScrollManager(this._viewportEl, this._viewLines);
@@ -1630,15 +1610,8 @@ export class FileEditorElement extends LitElement {
     // lines enter/leave the window.
 
     this._viewLines.onVisibleRangeChanged = (startLine: number, endLine: number) => {
-      // Create/reposition line number elements for the new visible range
-      this._lineNumbersOverlay?.setVisibleRange(startLine, endLine);
-      const wg = this._inlineWrapGetters();
-      this._inlineColumns?.setVisibleRange(
-        startLine,
-        endLine,
-        wg.getViewLineStart,
-        wg.getViewLineCount,
-      );
+      // Re-paint the gutter band for the new visible range (both columns).
+      this._syncGutterBand(startLine, endLine);
       // Re-render selection highlights for the new visible lines (all cursors)
       this._renderSelectionHighlights(
         this._cursorController?.getAllCursors().map((c) => ({
@@ -1697,11 +1670,8 @@ export class FileEditorElement extends LitElement {
     // Render initial visible lines
     this._renderVisibleLines();
     const initialLineCount = Math.min(model.lineCount, 100);
-    this._lineNumbersOverlay.setVisibleRange(1, initialLineCount);
+    this._syncGutterBand(1, initialLineCount);
 
-    // Pipeline is rebuilt — bring the inline-diff gutter columns back (the
-    // teardown at the start of _initWithModel disposed them).
-    this._ensureInlineColumns();
 
     // Listen for model content changes (edits, undo, redo)
     model.onDidChangeContent((event: TextContentChangeEvent) => {
@@ -1884,7 +1854,9 @@ export class FileEditorElement extends LitElement {
    * No-op when an inline diff is active (setInlineDiff owns the widths there). */
   private _applyGutterWidth(): void {
     if (!this._viewModel || this._inlineRows) return;
-    this._lineNumbersOverlay?.setGutterWidth(this._computeGutterWidth(this._viewModel.lineCount));
+    this._gutterRightWidth = this._computeGutterWidth(this._viewModel.lineCount);
+    this._gutterLeftWidth = 0;
+    this._gutter?.reflow();
   }
 
   /**
@@ -2075,37 +2047,22 @@ export class FileEditorElement extends LitElement {
       this._refreshContentWidth();
       this._syncCursorView();
     }
-    // Update line numbers for word wrap positioning
-    if (this._lineNumbersOverlay) {
-      const overrides = {
-        wordWrapEnabled: this._wordWrapEnabled,
-        getViewLineStart: (modelLine: number) =>
-          this._viewLines?.getViewLineStart(modelLine) ?? modelLine,
-        getViewLineCount: (modelLine: number) => {
-          if (!this._viewModel) return 1;
-          const content = this._viewModel.getLineContent(modelLine);
-          const wc = this._computeWrapColumn();
-          return computeWrapSegments(content, wc).length;
-        },
-      };
-      this._lineNumbersOverlay.setConfig(overrides);
-      // After a wrap toggle the number of model lines that fit the viewport
-      // changes, so the overlay's visible range must be recomputed. When
-      // wrapping is ON we expand the range so the numbers reach across the
-      // whole (wrapped) document; when OFF we re-sync to the view's current
-      // visible model range. `rebuildAll()` in non-wrapped mode does not emit
-      // `onVisibleRangeChanged` (and `onScroll` may no-op when the computed
-      // range is unchanged), so without this the overlay keeps its pre-toggle
-      // (wrapped) entry set and the lines at the bottom of the viewport render
-      // without numbers until the next scroll event.
-      if (this._wordWrapEnabled && this._viewModel) {
-        this._lineNumbersOverlay.setVisibleRange(1, Math.min(this._viewModel.lineCount, 500));
-      } else if (this._viewLines && this._viewModel) {
-        this._viewLines.onScroll(this._viewportEl.scrollTop, this._viewportEl.clientHeight);
-        const start = this._viewLines.startLineNumber || 1;
-        const end = this._viewLines.endLineNumber || this._viewModel.lineCount;
-        this._lineNumbersOverlay.setVisibleRange(start, end);
-      }
+    // After a wrap toggle the number of model lines that fit the viewport
+    // changes, so the gutter band must be recomputed. When wrapping is ON we
+    // expand the range so the numbers reach across the whole (wrapped)
+    // document; when OFF we re-sync to the view's current visible model range.
+    // `rebuildAll()` in non-wrapped mode does not emit `onVisibleRangeChanged`
+    // (and `onScroll` may no-op when the computed range is unchanged), so
+    // without this the gutter keeps its pre-toggle (wrapped) entry set and the
+    // lines at the bottom of the viewport render without numbers until the
+    // next scroll event.
+    if (this._wordWrapEnabled && this._viewModel) {
+      this._syncGutterBand(1, Math.min(this._viewModel.lineCount, 500));
+    } else if (this._viewLines && this._viewModel) {
+      this._viewLines.onScroll(this._viewportEl.scrollTop, this._viewportEl.clientHeight);
+      const start = this._viewLines.startLineNumber || 1;
+      const end = this._viewLines.endLineNumber || this._viewModel.lineCount;
+      this._syncGutterBand(start, end);
     }
     this._updateHScroll();
   }
@@ -2391,7 +2348,7 @@ export class FileEditorElement extends LitElement {
     // are already handled by _onCursorChange for local edits. Calling it here
     // would place an unwanted cursor in inactive tabs sharing this model.
     if (this._viewLines.startLineNumber && this._viewLines.endLineNumber) {
-      this._lineNumbersOverlay?.setVisibleRange(
+      this._syncGutterBand(
         this._viewLines.startLineNumber,
         this._viewLines.endLineNumber,
       );
@@ -2541,10 +2498,10 @@ export class FileEditorElement extends LitElement {
       for (let l = lo; l <= hi; l++) selected.add(l);
     }
     this._selectedDiffLines = selected;
-    this._lineNumbersOverlay?.setActiveLine(pos.lineNumber);
-    // Inline diff: highlight the number cells of every selected row (cursor
-    // line on click; every line of a multi-row selection).
-    this._inlineColumns?.setActiveLines(this._inlineRows ? selected : null);
+    // Repaint the gutter band: in a diff view the selected rows' number cells
+    // get the grey active background (done inside _gutterDataFor), and the
+    // data is pulled fresh for every cell.
+    this._gutter?.refresh();
 
     // Current line highlight — based on primary cursor
     this._currentLineHighlight?.setLine(pos.lineNumber);
@@ -2896,12 +2853,12 @@ export class FileEditorElement extends LitElement {
     this._currentLineHighlight = null;
     this._inlineHighlights?.dispose();
     this._inlineHighlights = null;
-    this._inlineColumns?.dispose();
-    this._inlineColumns = null;
     this._indentationGuides?.dispose();
     this._indentationGuides = null;
-    this._lineNumbersOverlay?.dispose();
-    this._lineNumbersOverlay = null;
+    // The shared gutter host persists across pipeline rebuilds (it is created
+    // once in firstUpdated); just drop its band so stale cells don't linger
+    // while the rebuilt pipeline re-populates it.
+    this._gutter?.setRows([]);
     this._textAreaInput?.dispose();
     this._textAreaInput = null;
     this._scrollManager?.dispose();

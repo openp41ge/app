@@ -41,7 +41,8 @@
     "openp41ge-tabs": "workspace:*",
     "openp41ge-editor-engine": "workspace:*",
     "openp41ge-git": "workspace:*",
-    "openp41ge-scrollbar": "workspace:*"
+    "openp41ge-scrollbar": "workspace:*",
+    "openp41ge-editor-gutter": "workspace:*"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",

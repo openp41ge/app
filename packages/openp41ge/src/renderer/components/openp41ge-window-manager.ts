@@ -2237,10 +2237,17 @@ export class Openp41geWindowManager extends LitElement {
           justify-content: center;
           height: 100%;
         }
-        /* Application-level tab panes (Welcome / Releases / Settings placeholders). */
-        .wm-tab-pane,
-        .wm-settings-pane {
+        /* Application-level tab panes (Welcome / Releases placeholders). */
+        .wm-tab-pane {
           padding: 16px 14px;
+        }
+        /* Global Settings pane: fills the body so the JSON editor goes edge-to-edge. */
+        .wm-settings-pane {
+          height: 100%;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          box-sizing: border-box;
         }
         /* Welcome slideshow pane: a flex column so the page content scrolls
            (in .wm-body) while the nav bar stays pinned to the bottom. */
@@ -2254,8 +2261,7 @@ export class Openp41geWindowManager extends LitElement {
         .wm-welcome .wm-markdown > :last-child {
           margin-bottom: 0;
         }
-        .wm-tab-placeholder,
-        .wm-settings-placeholder {
+        .wm-tab-placeholder {
           margin: 0;
           font-size: 13px;
           color: var(--text-secondary, #999);
@@ -2914,7 +2920,7 @@ export class Openp41geWindowManager extends LitElement {
                 : this._activeTab === "releases"
                 ? html`<div class="wm-tab-pane"><p class="wm-tab-placeholder">Releases</p></div>`
                 : this._activeTab === "settings"
-                ? html`<div class="wm-settings-pane"><p class="wm-settings-placeholder">Settings</p></div>`
+                ? html`<div class="wm-settings-pane"><openp41ge-manager-settings></openp41ge-manager-settings></div>`
                 : this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
                 ? html`<p class="empty">No workspaces yet.</p>`
                 : this._searchOpen && this._workspaces.length > 0 && filtered.length === 0

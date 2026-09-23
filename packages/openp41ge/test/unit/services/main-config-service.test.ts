@@ -36,8 +36,8 @@ describe("ConfigService (main process)", () => {
     const parsed = JSON.parse(raw);
     expect(parsed.version).toBe(1);
     expect(parsed.appTheme).toBe("dark");
-    expect(parsed.editor.lineHeight).toBe(20);
-    expect(parsed.editor.fontSize).toBe(14);
+    expect(parsed.lineHeight).toBe(20);
+    expect(parsed.fontSize).toBe(14);
     expect(parsed.editor.maxFileSize).toBe(50 * 1024 * 1024);
     expect(parsed.syntaxThemes).toEqual({});
   });
@@ -51,7 +51,9 @@ describe("ConfigService (main process)", () => {
       JSON.stringify({
         version: 1,
         appTheme: "light",
-        editor: { lineHeight: 24, fontSize: 16, fontFamily: "monospace" },
+        lineHeight: 24,
+        fontSize: 16,
+        editor: { fontFamily: "monospace" },
         syntaxThemes: { ".ts": "monokai" },
       }),
       "utf-8",
@@ -60,11 +62,37 @@ describe("ConfigService (main process)", () => {
     configService.init();
 
     expect(configService.get("appTheme")).toBe("light");
-    expect(configService.get("editor.lineHeight")).toBe(24);
-    expect(configService.get("editor.fontSize")).toBe(16);
+    expect(configService.get("lineHeight")).toBe(24);
+    expect(configService.get("fontSize")).toBe(16);
     const themes = configService.get("syntaxThemes") as Record<string, string>;
     expect(themes[".ts"]).toBe("monokai");
     // Theme no longer has per-extension defaults; only what user set
+  });
+
+  test("init() promotes legacy nested editor.lineHeight/fontSize to top level", () => {
+    // Configs written before the platform settings were lifted to the top
+    // level store line-height/font-size nested under `editor`; they should be
+    // promoted and the stale nested keys removed.
+    const configDir = path.join(tmpDir, ".config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "config.json"),
+      JSON.stringify({
+        version: 1,
+        appTheme: "dark",
+        editor: { lineHeight: 30, fontSize: 12, fontFamily: "monospace", maxFileSize: 1024 },
+      }),
+      "utf-8",
+    );
+
+    configService.init();
+    expect(configService.get("lineHeight")).toBe(30);
+    expect(configService.get("fontSize")).toBe(12);
+    const editor = configService.get("editor") as Record<string, unknown>;
+    expect("lineHeight" in editor).toBe(false);
+    expect("fontSize" in editor).toBe(false);
+    expect(editor.fontFamily).toBe("monospace");
+    expect(editor.maxFileSize).toBe(1024);
   });
 
   test("init() back-fills the maxFileSize default for legacy config files", () => {
@@ -77,7 +105,9 @@ describe("ConfigService (main process)", () => {
       JSON.stringify({
         version: 1,
         appTheme: "dark",
-        editor: { lineHeight: 20, fontSize: 14, fontFamily: "monospace" },
+        lineHeight: 20,
+        fontSize: 14,
+        editor: { fontFamily: "monospace" },
       }),
       "utf-8",
     );
@@ -104,8 +134,8 @@ describe("ConfigService (main process)", () => {
     // Custom value preserved
     expect(configService.get("appTheme")).toBe("light");
     // Defaults filled in
-    expect(configService.get("editor.lineHeight")).toBe(20);
-    expect(configService.get("editor.fontSize")).toBe(14);
+    expect(configService.get("lineHeight")).toBe(20);
+    expect(configService.get("fontSize")).toBe(14);
     const themes = configService.get("syntaxThemes") as Record<string, string>;
     // syntaxThemes default is now empty — existing config is merged
     expect(themes).toEqual({});
@@ -149,11 +179,11 @@ describe("ConfigService (main process)", () => {
 
   test("set() supports nested keys", () => {
     configService.init();
-    configService.set("editor.lineHeight", 30);
-    configService.set("editor.fontSize", 18);
+    configService.set("lineHeight", 30);
+    configService.set("fontSize", 18);
 
-    expect(configService.get("editor.lineHeight")).toBe(30);
-    expect(configService.get("editor.fontSize")).toBe(18);
+    expect(configService.get("lineHeight")).toBe(30);
+    expect(configService.get("fontSize")).toBe(18);
   });
 
   test("onChange() fires when config is updated via set()", () => {

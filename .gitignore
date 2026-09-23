@@ -26,3 +26,7 @@ pi.json
 
 # Local pi agent settings (not project code)
 .pi/settings.json
+
+# Local scratch harnesses / dev scripts (not project code)
+packages/openp41ge-json-editor/_je_*.html
+packages/openp41ge-json-editor/_*.py

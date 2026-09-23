@@ -109,6 +109,12 @@ export default defineConfig({
       // declarations only), mirroring the main app's dev-mode aliasing.
       "openp41ge-tabs": path.resolve(__dirname, "./packages/openp41ge-tabs/src"),
       "openp41ge-editor-engine": path.resolve(__dirname, "./packages/openp41ge-editor-engine/src"),
+      "openp41ge-json-editor": path.resolve(__dirname, "./packages/openp41ge-json-editor/src"),
+      "openp41ge-editor-gutter": path.resolve(__dirname, "./packages/openp41ge-editor-gutter/src"),
+      "openp41ge-json-editor/json-editor": path.resolve(
+        __dirname,
+        "./packages/openp41ge-json-editor/src/json-editor.ts",
+      ),
       "openp41ge-file-editor": path.resolve(
         __dirname,
         "./packages/openp41ge-uikit/src/file-editor",

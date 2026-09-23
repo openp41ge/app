@@ -638,6 +638,33 @@ export class CursorController {
   }
 
   /**
+   * Replace all cursor states (primary + secondaries), preserving any
+   * selections — including multiple cursors at the same position.
+   *
+   * Used by hosts that maintain their own coordinate model (e.g. a folding
+   * editor whose visible buffer maps to a shared text model) to seed the
+   * controller with their caret state before delegating a movement/selection
+   * command, and by hosts restoring cursor state after the model changes.
+   */
+  setCursorStates(
+    states: Array<{ position: TextPosition; selectionAnchor: TextPosition }>,
+  ): void {
+    if (states.length === 0) return;
+    const first = states[0];
+    this._cursor = {
+      position: { ...first.position },
+      selectionAnchor: { ...first.selectionAnchor },
+      goalColumn: first.position.column,
+    };
+    this._secondaryCursors = states.slice(1).map((s) => ({
+      position: { ...s.position },
+      selectionAnchor: { ...s.selectionAnchor },
+      goalColumn: s.position.column,
+    }));
+    this._emit(states.length > 1 ? "multi-cursor" : "selection-changed");
+  }
+
+  /**
    * Move the cursor position to (lineNumber, column) without changing the
    * selection anchor. This extends or shrinks the current selection.
    * Used for mouse-driven text selection (click and drag).

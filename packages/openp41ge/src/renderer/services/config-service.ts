@@ -15,9 +15,11 @@ const log = createLogger("openp41ge", "config-service");
 export interface UserConfig {
   version: number;
   appTheme: "dark" | "light";
+  /** Platform-wide line height (px) — sub-package editors align to this. */
+  lineHeight: number;
+  /** Platform-wide font size (px) — sub-package editors align to this. */
+  fontSize: number;
   editor: {
-    lineHeight: number;
-    fontSize: number;
     fontFamily: string;
     /** Max file size in bytes the editor will open (larger files show a "too large" message). */
     maxFileSize: number;
@@ -80,7 +82,7 @@ export class ConfigService {
     return this._loaded;
   }
 
-  /** Get a specific key (dot-separated, e.g., "editor.fontSize"). */
+  /** Get a specific key (dot-separated, e.g., "editor.maxFileSize"). */
   get(key: string): unknown {
     if (!this._config) return undefined;
     const keys = key.split(".");

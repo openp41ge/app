@@ -84,3 +84,29 @@ describe("openp41ge-settings-drawer-host click-away", () => {
     expect(host.isOpen).toBe(true);
   });
 });
+
+describe("openp41ge-settings-drawer-host open width", () => {
+  it("opens at the widest allowed width (max drawer width)", async () => {
+    const host = await mountHost();
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(host.maxDrawerWidth);
+  });
+
+  it("clamps to the grid width when the grid is narrower than the max", async () => {
+    const host = await mountHost();
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 500 });
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(500);
+  });
+
+  it("never opens below the (unchanged) min width", async () => {
+    const host = await mountHost();
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 100 });
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(host.defaultDrawerWidth);
+  });
+});

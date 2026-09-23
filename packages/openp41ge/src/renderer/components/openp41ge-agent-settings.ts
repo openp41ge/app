@@ -21,6 +21,9 @@ import type { ConfigService } from "../services/config-service";
 import type { PropertyValues } from "lit";
 import { showConfirmModal } from "../components/openp41ge-confirm-modal";
 import { workspaceFileService } from "../services/workspace-file-service";
+import "openp41ge-json-editor/json-editor";
+import { cloneDeep, getAt, setAt } from "openp41ge-json-editor";
+import type { JsonPath } from "openp41ge-json-editor";
 import {
   PROVIDER_PRESETS,
   CUSTOM_PRESET_ID,
@@ -127,7 +130,17 @@ interface ModelDrawerState {
   draft: ModelDraft;
 }
 
-type DrawerState = ProviderDrawerState | ModelDrawerState;
+/** A JSON drawer: hosts a <json-editor> locked to a sub-object of the config.
+ * Edits are committed to the config live, so no draft/close commit is needed. */
+interface JsonDrawerState {
+  id: string;
+  kind: "json";
+  /** Path into `agent` config this editor is locked to. */
+  path: JsonPath;
+  title: string;
+}
+
+type DrawerState = ProviderDrawerState | ModelDrawerState | JsonDrawerState;
 
 /** A drawer that is animating out; keeps its last width so it exits in place. */
 type ClosingDrawer = DrawerState & { width: number };
@@ -145,6 +158,8 @@ export class Openp41geAgentSettings extends LitElement {
   configService: ConfigService | null = null;
 
   @state() private _config: AgentConfig | null = null;
+  /** Last persisted baseline; used to detect unsaved edits. */
+  private _savedConfig: AgentConfig | null = null;
   @state() private _loading = true;
   @state() private _drawers: DrawerState[] = [];
   @state() private _closingDrawers: ClosingDrawer[] = [];
@@ -222,6 +237,7 @@ export class Openp41geAgentSettings extends LitElement {
     } catch {
       this._config = this._defaultConfig();
     }
+    this._savedConfig = cloneDeep(this._config);
     this._loading = false;
     await this._loadTools();
   }
@@ -726,9 +742,10 @@ export class Openp41geAgentSettings extends LitElement {
   private async _commitDrawer(d: DrawerState): Promise<void> {
     if (d.kind === "model") {
       await this._commitModel(d);
-    } else {
+    } else if (d.kind === "provider") {
       await this._maybeDeleteEmptyProvider(d);
     }
+    // JSON drawers (kind === "json") edit the config live — nothing to commit.
   }
 
   private _finalizeClose(closing: ClosingDrawer[]): void {
@@ -1043,12 +1060,57 @@ export class Openp41geAgentSettings extends LitElement {
           z-index: 0;
           display: flex;
           align-items: center;
-          padding: 0 8px;
+          padding: 0 14px;
           height: 34px;
           box-sizing: border-box;
           border-top: 1px solid var(--divider, #333);
           background: var(--bg-secondary, #161616);
         }
+        .ags-bottombar-hint {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--text-secondary, #999);
+          font-size: 11px;
+          flex: 1 1 auto;
+        }
+        .ags-bottombar-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .ags-footer-btn {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          height: 26px;
+          padding: 0 12px;
+          border: none;
+          border-radius: 5px;
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-primary, #ddd);
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 12px;
+        }
+        .ags-footer-btn:hover {
+          background: rgba(255, 255, 255, 0.14);
+        }
+        .ags-footer-btn[disabled] {
+          opacity: 0.4;
+          cursor: default;
+        }
+        .ags-footer-btn--primary {
+          background: var(--accent, #569cd6);
+          color: #fff;
+        }
+        .ags-footer-btn--primary:hover {
+          background: var(--accent, #569cd6);
+          opacity: 0.9;
+        }
+
         .drawer-footer {
           display: flex;
           align-items: center;
@@ -1104,6 +1166,21 @@ export class Openp41geAgentSettings extends LitElement {
         }
         .ags-card-gap {
           margin-top: 16px;
+        }
+
+        /* The whole base pane is the JSON editor — let it fill the surface. */
+                .ags-json-pane {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          /* The whole pane is the JSON editor; drop the base card padding so
+             the editor fills the surface flush to the edges. */
+          padding: 0;
+          margin: 0;
+        }
+        .ags-json-pane > json-editor {
+          flex: 1;
+          min-height: 0;
         }
 
         /* Provider rows in the base card. */
@@ -1758,116 +1835,34 @@ export class Openp41geAgentSettings extends LitElement {
             <span class="ags-topbar-title">Agents</span>
           </div>
           <div class="ags-base">
-            <div class="ags-pane">
-              <p class="ags-section-title">Providers</p>
-              <div class="ags-card">
-                <label class="ags-card-question">
-                  Which providers should be available for agents?
-                </label>
-                ${
-                  this._loading
-                    ? html`<p class="ags-card-help">Loading…</p>`
-                    : html`
-                        <ul class="ags-provider-list">
-                          ${
-                            entries.length === 0
-                              ? html`<li class="ags-empty">No providers yet.</li>`
-                              : nothing
-                          }
-                          ${entries.map(([id, p]) => this._providerRow(id, p))}
-                          <li class="ags-provider-row ags-add-row" @click=${() => this._openAdd()}>
-                            <span class="ags-add-plus">＋</span>
-                            <span>Add another provider</span>
-                          </li>
-                        </ul>
-                        <p class="ags-card-help">
-                          Define the providers your chats can use — including local
-                          OpenAI-compatible servers. Click a provider to edit how it connects.
-                        </p>
-                      `
-                }
-              </div>
-
-              <div class="ags-card ags-input-card ags-card-gap ags-default-card">
-                ${
-                  this._loading || entries.length === 0
-                    ? html`<p class="ags-card-help">Add a provider above to set a default.</p>`
-                    : html`
-                        ${
-                          this._defaultOpen
-                            ? html`
-                                <label class="ags-card-question"
-                                  >Which provider is the default?</label
-                                >
-                                <button
-                                  class="ags-default-close"
-                                  type="button"
-                                  aria-label="Close selection"
-                                  @click=${() => this._closeDefaultList()}
-                                >
-                                  ${this._closeSvg()}
-                                </button>
-                                <div
-                                  class="ags-default-list"
-                                  ${ref(this._listEl)}
-                                  style="height:${this._listHeight(entries.length)}px"
-                                  role="listbox"
-                                  @scroll=${this._onListScroll}
-                                >
-                                  <div
-                                    class="ags-default-spacer"
-                                    style="height:${this._defaultWindow().topPad}px"
-                                  ></div>
-                                  ${entries
-                                    .slice(this._defaultWindow().start, this._defaultWindow().end)
-                                    .map(([id, p], i) =>
-                                      this._defaultListRow(
-                                        id,
-                                        p,
-                                        this._defaultWindow().start + i === entries.length - 1,
-                                      ),
-                                    )}
-                                  <div
-                                    class="ags-default-spacer"
-                                    style="height:${this._defaultWindow().bottomPad}px"
-                                  ></div>
-                                </div>
-                              `
-                            : html`
-                                <label class="ags-card-question"
-                                  >Which provider is the default?</label
-                                >
-                                <button
-                                  class="ags-default-trigger"
-                                  type="button"
-                                  aria-haspopup="listbox"
-                                  aria-expanded="false"
-                                  @click=${() => this._openDefaultList()}
-                                >
-                                  <div class="ags-default-row-info">
-                                    <span class="ags-default-row-name"
-                                      >${this._activeProviderName()}</span
-                                    >
-                                    <span class="ags-default-row-meta"
-                                      >${this._activeProviderMeta()}</span
-                                    >
-                                  </div>
-                                  ${this._chevronSvg()}
-                                </button>
-                                <p class="ags-card-help">
-                                  Agents use the default provider whenever you don't pick another.
-                                </p>
-                              `
-                        }
-                      `
-                }
-              </div>
-
-              ${this._renderTools()}
+            <div class="ags-pane ags-json-pane">
+              ${
+                this._loading
+                  ? html`<p class="ags-card-help">Loading…</p>`
+                  : html`
+                      <json-editor
+                        .value=${config}
+                        @json-editor-change=${(e: CustomEvent) => void this._onConfigJsonChange(e)}
+                        @json-editor-open=${(e: CustomEvent) => this._onConfigJsonOpen(e)}
+                      ></json-editor>
+                    `
+              }
             </div>
           </div>
 
-          <div class="ags-bottombar"></div>
+          <div class="ags-bottombar">
+            <span class="ags-bottombar-hint"
+              >${this._isDirty() ? "Unsaved changes." : "All changes saved."}</span
+            >
+            <div class="ags-bottombar-actions">
+            <button class="ags-footer-btn" type="button" ?disabled=${!this._isDirty()} @click=${() => this._resetConfig()}>
+              Reset
+            </button>
+            <button class="ags-footer-btn ags-footer-btn--primary" type="button" ?disabled=${!this._isDirty()} @click=${() => void this._saveConfig()}>
+              Save
+            </button>
+            </div>
+          </div>
 
           ${
             this._drawers.length > 0
@@ -1988,7 +1983,7 @@ export class Openp41geAgentSettings extends LitElement {
             : nothing
         }
         <div class="drawer-head">
-          <span class="drawer-title">${d.kind === "model" ? "Model" : "Provider"}</span>
+          <span class="drawer-title">${this._drawerTitle(d)}</span>
           <button
             class="dw-close"
             @click=${(e: Event) => {
@@ -2002,9 +1997,22 @@ export class Openp41geAgentSettings extends LitElement {
           </button>
         </div>
         <div class="drawer-body">
-          ${d.kind === "model" ? this._modelDetail(d) : this._providerDetail(d)}
+          ${d.kind === "model" ? this._modelDetail(d) : d.kind === "json" ? this._jsonDetail(d) : this._providerDetail(d)}
         </div>
-        <div class="drawer-footer"></div>
+        <div class="drawer-footer">
+          ${
+            d.kind === "json"
+              ? html`<div class="ags-bottombar-actions">
+<button class="ags-footer-btn" type="button" ?disabled=${!this._isDirty()} @click=${() => this._resetConfig()}>
+              Reset
+            </button>
+<button class="ags-footer-btn ags-footer-btn--primary" type="button" ?disabled=${!this._isDirty()} @click=${() => void this._saveConfig()}>
+              Save
+            </button>
+                </div>`
+              : nothing
+          }
+        </div>
       </div>
     `;
   }
@@ -2013,7 +2021,7 @@ export class Openp41geAgentSettings extends LitElement {
     return html`
       <div class="drawer drawer--closing" style="width:${c.width}%">
         <div class="drawer-head">
-          <span class="drawer-title">${c.kind === "model" ? "Model" : "Provider"}</span>
+          <span class="drawer-title">${this._drawerTitle(c)}</span>
           <button
             class="dw-close"
             @click=${(e: Event) => {
@@ -2027,7 +2035,7 @@ export class Openp41geAgentSettings extends LitElement {
           </button>
         </div>
         <div class="drawer-body">
-          ${c.kind === "model" ? this._modelDetail(c) : this._providerDetail(c)}
+          ${c.kind === "model" ? this._modelDetail(c) : c.kind === "json" ? this._jsonDetail(c) : this._providerDetail(c)}
         </div>
         <div class="drawer-footer"></div>
       </div>
@@ -2036,6 +2044,7 @@ export class Openp41geAgentSettings extends LitElement {
 
   /** The DANGEROUS section card — delete lives here as an icon action row. */
   private _dangerousCard(d: DrawerState): TemplateResult | typeof nothing {
+    if (d.kind === "json") return nothing;
     const canDelete = d.kind === "model" ? d.modelIndex !== null : d.editId !== null;
     if (!canDelete) return nothing;
     const isModel = d.kind === "model";
@@ -2468,6 +2477,95 @@ export class Openp41geAgentSettings extends LitElement {
       <div class="ags-section-title">Dangerous</div>
       ${this._dangerousCard(d)}
     `;
+  }
+
+  /** The drawer's header title (Provider / Model / the JSON sub-object key). */
+  private _drawerTitle(d: DrawerState): string {
+    if (d.kind === "json") return d.title;
+    return d.kind === "model" ? "Model" : "Provider";
+  }
+
+  /** A JSON drawer: a <json-editor> locked to a sub-object of the config. */
+  private _jsonDetail(d: JsonDrawerState): TemplateResult {
+    const value = getAt(this._config, d.path);
+    return html`
+      <json-editor
+        .value=${value}
+        @json-editor-change=${(e: CustomEvent) => void this._onJsonChange(d, e)}
+        @json-editor-open=${(e: CustomEvent) => this._onJsonOpen(d, e)}
+      ></json-editor>
+    `;
+  }
+
+  /** Row height for the JSON editors — follows the global platform
+   *  line-height setting, a little larger to give the inline edit/insert
+   *  affordances room. */
+  private _jsonRowHeight(): number {
+    const lh = this.configService?.get("lineHeight") as number | undefined;
+    return typeof lh === "number" && lh >= 14 && lh <= 100 ? lh + 4 : 24;
+  }
+
+  /** The base <json-editor> committed the whole edited config. */
+  private _onConfigJsonChange(e: CustomEvent): void {
+    const value = (e.detail as { value: AgentConfig }).value;
+    // Stage into the working draft only — nothing is persisted until Save.
+    this._config = value;
+  }
+
+  /** The base <json-editor>'s open-in-drawer button — pull a drawer out locked
+   * to the clicked sub-object. */
+  private _onConfigJsonOpen(e: CustomEvent): void {
+    this._openJsonSubDrawer((e.detail as { path: JsonPath }).path);
+  }
+
+  /** A JSON drawer's editor committed a change to its locked sub-object. */
+  private _onJsonChange(d: JsonDrawerState, e: CustomEvent): void {
+    if (!this._config) return;
+    const value = (e.detail as { value: unknown }).value;
+    const next = cloneDeep(this._config);
+    setAt(next, d.path, value);
+    // Stage into the working draft only — nothing is persisted until Save.
+    this._config = next;
+  }
+
+  /** A JSON drawer's editor opened a deeper sub-object — stack another drawer. */
+  private _onJsonOpen(d: JsonDrawerState, e: CustomEvent): void {
+    const rel = (e.detail as { path: JsonPath }).path;
+    this._openJsonSubDrawer([...d.path, ...rel]);
+  }
+
+  /** Push a new JSON drawer locked to a config path. */
+  /** True when the working draft differs from the last persisted baseline. */
+  private _isDirty(): boolean {
+    if (!this._config || !this._savedConfig) return !!this._config;
+    return JSON.stringify(this._config) !== JSON.stringify(this._savedConfig);
+  }
+
+  /** Persist the working draft (Save). */
+  private async _saveConfig(): Promise<void> {
+    if (!this._config) return;
+    await this._persist(this._config);
+    this._savedConfig = cloneDeep(this._config);
+    this.requestUpdate();
+  }
+
+  /** Discard unsaved edits and restore the last persisted config. */
+  private _resetConfig(): void {
+    if (!this._savedConfig) return;
+    this._config = cloneDeep(this._savedConfig);
+    this.requestUpdate();
+  }
+
+  private _openJsonSubDrawer(path: JsonPath): void {
+    if (!path.length) return;
+    const existing = this._drawers.find(
+      (x) => x.kind === "json" && JSON.stringify(x.path) === JSON.stringify(path),
+    );
+    if (existing) return; // don't stack a duplicate drawer for the same object
+    this._drawers = [
+      ...this._drawers,
+      { id: this._nextId(), kind: "json", path, title: String(path[path.length - 1]) },
+    ];
   }
 
   private _modelDetail(d: ModelDrawerState): TemplateResult {

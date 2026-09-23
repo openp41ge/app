@@ -20,6 +20,7 @@ const log = createLogger("openp41ge", "app");
 // ─── Component registration (side-effect imports — must be at module level) ──
 import "./components/openp41ge-windowview";
 import "./components/openp41ge-window-manager";
+import "./components/openp41ge-manager-settings";
 import "./components/openp41ge-titlebar";
 import "./components/openp41ge-topbar";
 import "./components/openp41ge-contextmenu";

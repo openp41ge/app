@@ -97,8 +97,11 @@ describe("file-editor inline commit-diff mode", () => {
     expect(el.querySelector(".fe-scroll-content").style.minHeight).toBe("100%");
 
     await loadInlineDiff(el);
-    // The BEFORE column is inserted into the group (not beside it).
-    expect(el.querySelector(".fe-inline-left").parentElement.className).toBe("fe-gutter-group");
+    // The BEFORE column lives in the shared host root (.eg-gutter), which is
+    // the group's own child — so the whole two-column gutter pins together.
+    const beforeParent = el.querySelector(".fe-inline-left").parentElement;
+    expect(beforeParent.className).toBe("eg-gutter fe-gutter");
+    expect(beforeParent.parentElement.className).toBe("fe-gutter-group");
   });
 
   test("BEFORE and AFTER columns: context in both, deleted before-only, gap rules", async () => {
@@ -171,8 +174,7 @@ describe("file-editor inline commit-diff mode", () => {
     // getLabelDecoration (via setActiveLine -> _updateAll), and the BEFORE
     // column toggles its own entries.
     el._selectedDiffLines = new Set([2]);
-    el._lineNumbersOverlay.setActiveLine(2);
-    el._inlineColumns.setActiveLines([2]);
+    el._gutter.refresh();
     let mids = [...el.querySelectorAll(".fe-gutter .line-number")];
     let lefts = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")];
     expect(mids[1].classList.contains("active-line-number")).toBe(true);
@@ -189,8 +191,7 @@ describe("file-editor inline commit-diff mode", () => {
 
     // A MULTI-ROW selection highlights every covered line in both columns.
     el._selectedDiffLines = new Set([1, 2]);
-    el._lineNumbersOverlay.setActiveLine(1);
-    el._inlineColumns.setActiveLines([1, 2]);
+    el._gutter.refresh();
     mids = [...el.querySelectorAll(".fe-gutter .line-number")];
     lefts = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")];
     expect(mids[0].classList.contains("active-line-number")).toBe(true);
@@ -200,8 +201,7 @@ describe("file-editor inline commit-diff mode", () => {
 
     // Shrinking the selection back clears the second row.
     el._selectedDiffLines = new Set([1]);
-    el._lineNumbersOverlay.setActiveLine(1);
-    el._inlineColumns.setActiveLines([1]);
+    el._gutter.refresh();
     mids = [...el.querySelectorAll(".fe-gutter .line-number")];
     lefts = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")];
     expect(mids[0].classList.contains("active-line-number")).toBe(true);
@@ -216,8 +216,7 @@ describe("file-editor inline commit-diff mode", () => {
 
     // Select the REMOVED row (line 2): its BEFORE cell keeps the red tint.
     el._selectedDiffLines = new Set([2]);
-    el._lineNumbersOverlay.setActiveLine(2);
-    el._inlineColumns.setActiveLines([2]);
+    el._gutter.refresh();
     const removedLeft = [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")][1];
     expect(getComputedStyle(removedLeft).backgroundColor).toBe("rgba(248, 81, 73, 0.24)");
     // The AFTER cell of the deleted row stays NUMBERLESS but is ALSO tinted
@@ -239,16 +238,14 @@ describe("file-editor inline commit-diff mode", () => {
       { kind: "context", oldLine: 1, newLine: 2 },
     ]);
     el._selectedDiffLines = new Set([1]);
-    el._lineNumbersOverlay.setActiveLine(1);
-    el._inlineColumns.setActiveLines([1]);
+    el._gutter.refresh();
     const addedMid = [...el.querySelectorAll(".fe-gutter .line-number")][0];
     expect(getComputedStyle(addedMid).backgroundColor).toBe("rgba(46, 160, 67, 0.24)");
 
     // A neutral (context) selected row gets the grey background, not a tint.
     await loadInlineDiff(el);
     el._selectedDiffLines = new Set([1]);
-    el._lineNumbersOverlay.setActiveLine(1);
-    el._inlineColumns.setActiveLines([1]);
+    el._gutter.refresh();
     const ctxMid = [...el.querySelectorAll(".fe-gutter .line-number")][0];
     const bg = getComputedStyle(ctxMid).backgroundColor;
     expect(bg).not.toBe("rgba(248, 81, 73, 0.24)");
@@ -368,11 +365,11 @@ describe("file-editor inline commit-diff mode", () => {
 
     const sharedWidth = 3 * 20 + 16; // 3 digits * charW + padding = 76
     expect(el.querySelector(".fe-inline-left").style.width).toBe(`${sharedWidth}px`);
-    expect(el.querySelector(".fe-gutter").style.width).toBe(`${sharedWidth}px`);
+    expect(el.querySelector(".fe-inline-after").style.width).toBe(`${sharedWidth}px`);
     // The two columns are flush (no gap): the AFTER column starts exactly where
     // the BEFORE column ends.
     expect(el.querySelector(".fe-inline-left").style.width).toBe(
-      el.querySelector(".fe-gutter").style.width,
+      el.querySelector(".fe-inline-after").style.width,
     );
     // The AFTER column is BLANK (no new side) yet stays as wide as the BEFORE.
     expect(middleLabels(el).every((t) => t === "")).toBe(true);
@@ -394,7 +391,7 @@ describe("file-editor inline commit-diff mode", () => {
 
     const sharedWidth = 3 * 20 + 16; // 3 digits * charW + padding = 76
     expect(el.querySelector(".fe-inline-left").style.width).toBe(`${sharedWidth}px`);
-    expect(el.querySelector(".fe-gutter").style.width).toBe(`${sharedWidth}px`);
+    expect(el.querySelector(".fe-inline-after").style.width).toBe(`${sharedWidth}px`);
   });
 
   test("a separator dot is painted on the shared border between the two columns", async () => {

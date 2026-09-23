@@ -1,0 +1,28 @@
+{
+  "name": "openp41ge-editor-gutter",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build && npx tsc --emitDeclarationOnly --outDir dist 2>/dev/null",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.10",
+    "jsdom": "^29.1.1"
+  }
+}

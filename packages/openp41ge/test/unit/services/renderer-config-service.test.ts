@@ -10,9 +10,9 @@ import { describe, expect, test, beforeEach, afterEach } from "vitest";
 const mockConfig = {
   version: 1,
   appTheme: "dark",
+  lineHeight: 20,
+  fontSize: 14,
   editor: {
-    lineHeight: 20,
-    fontSize: 14,
     fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
     maxFileSize: 50 * 1024 * 1024,
   },
@@ -93,7 +93,7 @@ describe("ConfigService (renderer)", () => {
     const all = configService.getAll();
     expect(all).not.toBeNull();
     expect(all!.appTheme).toBe("dark");
-    expect(all!.editor.lineHeight).toBe(20);
+    expect(all!.lineHeight).toBe(20);
   });
 
   test("get() returns the correct value for a top-level key", async () => {
@@ -103,8 +103,8 @@ describe("ConfigService (renderer)", () => {
 
   test("get() returns the correct value for a nested key", async () => {
     await configService.load();
-    expect(configService.get("editor.lineHeight")).toBe(20);
-    expect(configService.get("editor.fontSize")).toBe(14);
+    expect(configService.get("lineHeight")).toBe(20);
+    expect(configService.get("fontSize")).toBe(14);
   });
 
   test("get('editor.maxFileSize') reads the stored byte limit", async () => {
@@ -184,14 +184,14 @@ describe("ConfigService (renderer)", () => {
     let lineHeightChanged = false;
     let fontSizeChanged = false;
 
-    configService.onKeyChange("editor.lineHeight", () => {
+    configService.onKeyChange("lineHeight", () => {
       lineHeightChanged = true;
     });
-    configService.onKeyChange("editor.fontSize", () => {
+    configService.onKeyChange("fontSize", () => {
       fontSizeChanged = true;
     });
 
-    await configService.set("editor.lineHeight", 30);
+    await configService.set("lineHeight", 30);
     expect(lineHeightChanged).toBe(true);
     expect(fontSizeChanged).toBe(false);
   });

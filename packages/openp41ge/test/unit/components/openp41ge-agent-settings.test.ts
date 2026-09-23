@@ -1,13 +1,13 @@
 /**
  * Tests for <openp41ge-agent-settings>.
  *
- * Verifies the Providers card, the slide-in provider drawer, preset pickers,
- * add/edit/delete flows, and the default-provider select.
+ * The surface renders the smart <json-editor> for the whole agent config (base
+ * card), which drives the provider/model JSON sub-drawers, plus the default
+ * provider selector.
  */
 // @ts-nocheck
-import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
 import "../../../src/renderer/components/openp41ge-agent-settings";
-import { PROVIDER_PRESETS } from "../../../src/renderer/models/agent-provider-presets";
 
 /** Minimal ConfigService fake that captures set() and serves get(). */
 class FakeConfig {
@@ -42,7 +42,6 @@ const VLLM = {
   model: "Qwen2.5-Coder-7B-Instruct",
   name: "vLLM (local)",
 };
-const OPENAI = { baseUrl: "https://api.openai.com/v1", model: "gpt-4o", name: "OpenAI" };
 const AGENT = (providers = { vllm: VLLM }, providerId = "vllm") => ({ providerId, providers });
 
 async function mount(agent) {
@@ -55,568 +54,134 @@ async function mount(agent) {
 
 const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
-/** Wait for a closing drawer to be removed from the DOM. */
-const settleClose = () => tick(300);
-
-function q(el, sel) {
-  return el.shadowRoot.querySelector(sel);
-}
-function qa(el, sel) {
-  return [...el.shadowRoot.querySelectorAll(sel)];
-}
-
-describe("openp41ge-agent-settings", () => {
+describe("openp41ge-agent-settings — smart JSON view", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
   });
 
-  afterEach(() => {
-    delete (window as any).openp41ge;
-  });
-
-  test("renders the Providers card and lists the default vLLM provider", async () => {
+  test("the whole pane is the json-editor, with no card chrome", async () => {
     const el = await mount(AGENT());
-    expect(q(el, ".ags-card")).not.toBeNull();
-    expect(q(el, ".ags-card-question").textContent).toContain(
-      "Which providers should be available for agents?",
+    expect(el.shadowRoot.querySelector(".ags-json-pane > json-editor")).toBeTruthy();
+    expect(el.shadowRoot.querySelector(".ags-default-card")).toBeNull();
+    expect(el.shadowRoot.textContent).not.toContain("Tools");
+  });
+
+  test("a pinned bottom bar sits under the json editor", async () => {
+    const el = await mount(AGENT());
+    expect(el.shadowRoot.querySelector(".ags-bottombar")).toBeTruthy();
+    expect(el.shadowRoot.querySelector(".ags-bottombar").textContent).toContain("saved");
+  });
+
+  test("renders a <json-editor> bound to the whole config", async () => {
+    const el = await mount(AGENT());
+    const je = el.shadowRoot.querySelector("json-editor");
+    expect(je).toBeTruthy();
+    expect(je.editedValue).toEqual(AGENT());
+  });
+
+  test("editing the base json-editor stages but does not auto-save", async () => {
+    const el = await mount(AGENT());
+    const je = el.shadowRoot.querySelector("json-editor");
+    const next = { ...AGENT(), providers: { vllm: { ...VLLM, baseUrl: "http://x/v1" } } };
+    je.dispatchEvent(
+      new CustomEvent("json-editor-change", {
+        detail: { value: next },
+        bubbles: true,
+        composed: true,
+      }),
     );
-    const row = qa(el, ".ags-provider-row")[0];
-    expect(row.querySelector(".ags-provider-name").textContent).toBe("vLLM (local)");
-    expect(row.querySelector(".ags-provider-meta").textContent).toContain(
-      "Qwen2.5-Coder-7B-Instruct",
+    await tick();
+    // Staged in the in-memory draft only.
+    expect(el.configService.sets.length).toBe(0);
+    // Save persists the drafted config.
+    const save = el.shadowRoot.querySelector(".ags-footer-btn--primary");
+    expect(save).toBeTruthy();
+    save.click();
+    await tick();
+    expect(el.configService.sets.length).toBe(1);
+    expect(el.configService.sets[0].value.providers.vllm.baseUrl).toBe("http://x/v1");
+  });
+
+  test("opening a provider sub-object stacks a json drawer locked to it", async () => {
+    const el = await mount(AGENT());
+    const je = el.shadowRoot.querySelector("json-editor");
+    je.dispatchEvent(
+      new CustomEvent("json-editor-open", {
+        detail: { path: ["providers", "vllm"] },
+        bubbles: true,
+        composed: true,
+      }),
     );
-    // No per-row selection control; the default is chosen with the second card.
-    expect(row.querySelector(".ags-provider-radio")).toBeNull();
-    expect(q(el, ".ags-default-trigger .ags-default-row-name").textContent.trim()).toBe(
-      "vLLM (local)",
+    await tick();
+    const drawerJe = el.shadowRoot.querySelector(".drawer json-editor");
+    expect(drawerJe).toBeTruthy();
+    expect(drawerJe.editedValue).toEqual(VLLM);
+  });
+
+  test("editing within a json drawer stages but does not auto-save", async () => {
+    const el = await mount(AGENT());
+    el.shadowRoot
+      .querySelector("json-editor")
+      .dispatchEvent(
+        new CustomEvent("json-editor-open", {
+          detail: { path: ["providers", "vllm"] },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    await tick();
+    const drawerJe = el.shadowRoot.querySelector(".drawer json-editor");
+    drawerJe.dispatchEvent(
+      new CustomEvent("json-editor-change", {
+        detail: { value: { ...VLLM, model: "new-model" } },
+        bubbles: true,
+        composed: true,
+      }),
     );
+    await tick();
+    // Staged in memory only — the persisted value is unchanged.
+    expect(el.configService.vals.agent.providers.vllm.model).toBe("Qwen2.5-Coder-7B-Instruct");
+    expect(el.configService.sets.length).toBe(0);
+    // Save persists the drafted config.
+    el.shadowRoot.querySelector(".ags-footer-btn--primary").click();
+    await tick();
+    expect(el.configService.vals.agent.providers.vllm.model).toBe("new-model");
   });
 
-  test("empty provider list shows no rows and a prominent add row", async () => {
-    const el = await mount(AGENT({}, ""));
-    expect(q(el, ".ags-empty")).not.toBeNull();
-    expect(qa(el, ".ags-provider-info")).toHaveLength(0);
-    expect(q(el, ".ags-add-row").textContent).toContain("Add another provider");
-  });
-
-  test("clicking Add another provider opens a drawer with a preset selection card", async () => {
-    const el = await mount(AGENT({}, ""));
-    q(el, ".ags-add-row").click();
-    await tick();
-    expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(1);
-    // The drawer has a top bar: a fixed "Provider" title and a ✕ close button.
-    expect(q(el, ".drawer-head")).not.toBeNull();
-    expect(q(el, ".drawer-title").textContent.trim()).toBe("Provider");
-    expect(q(el, ".drawer .dw-close")).not.toBeNull();
-    // A small bottom bar (24px) is re-added, but Delete lives in the DANGEROUS
-    // section's action card, not the footer.
-    expect(q(el, ".drawer-footer")).not.toBeNull();
-    expect(q(el, ".drawer-footer .dw-delete-label")).toBeNull();
-    expect(q(el, ".drawer .ags-action-card .ags-delete-btn")).not.toBeNull();
-    expect(
-      qa(el, ".drawer .ags-section-title").some((t) => t.textContent.trim() === "Dangerous"),
-    ).toBe(true);
-    // The preset card is a closed selection trigger, not a radio grid.
-    expect(q(el, ".drawer .ags-default-trigger .ags-default-row-name").textContent.trim()).toBe(
-      "Custom",
-    );
-    // Opening it lists every preset as a selectable row.
-    q(el, ".drawer .ags-default-trigger").click();
-    await tick();
-    expect(qa(el, ".drawer .ags-default-row")).toHaveLength(PROVIDER_PRESETS.length);
-  });
-
-  test("selecting a preset pre-fills baseUrl and model", async () => {
-    const el = await mount(AGENT({}, ""));
-    q(el, ".ags-add-row").click();
-    await tick();
-    q(el, ".drawer .ags-default-trigger").click();
-    await tick();
-    const openaiRow = qa(el, ".drawer .ags-default-row").find((o) =>
-      o.querySelector(".ags-default-row-name").textContent.includes("OpenAI"),
-    );
-    openaiRow.click();
-    await tick();
-    expect(q(el, ".drawer .ags-baseurl-input").value).toBe("https://api.openai.com/v1");
-    // The default-model card shows the preset's default model.
-    expect(
-      q(
-        el,
-        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
-      ).textContent.trim(),
-    ).toBe("gpt-4o");
-  });
-
-  test("does not auto-focus the base URL input when the drawer opens", async () => {
-    const el = await mount(AGENT({ openai: OPENAI }, "openai"));
-    qa(el, ".ags-provider-row")[0].click();
-    await tick();
-    const baseInput = q(el, ".drawer .ags-baseurl-input");
-    expect(el.shadowRoot.activeElement).not.toBe(baseInput);
-    // Focusing the card by hand still works.
-    baseInput.focus();
-    expect(el.shadowRoot.activeElement).toBe(baseInput);
-  });
-
-  test("adding a provider only persists it once it has real data", async () => {
-    const el = await mount(AGENT({}, ""));
-    const setsBefore = el.configService.sets.length;
-    q(el, ".ags-add-row").click();
-    await tick();
-    // A blank (Custom) provider is created in-memory but NOT persisted yet.
-    expect(el.configService.sets).toHaveLength(setsBefore);
-    expect(Object.keys(el._config.providers)).toEqual(["custom"]);
-    // Pick the OpenAI preset; the fields persist without a Save click.
-    q(el, ".drawer .ags-default-trigger").click();
-    await tick();
-    const openaiRow = qa(el, ".drawer .ags-default-row").find((o) =>
-      o.querySelector(".ags-default-row-name").textContent.includes("OpenAI"),
-    );
-    openaiRow.click();
-    await tick();
-    const last = el.configService.sets[el.configService.sets.length - 1];
-    expect(last.value.providers.custom.name).toBe("OpenAI");
-    expect(last.value.providers.custom.baseUrl).toBe("https://api.openai.com/v1");
-    expect(last.value.providers.custom.model).toBe("gpt-4o");
-    expect(last.value.providerId).toBe("custom");
-    // The drawer stays open; the provider list behind it shows the new provider.
-    expect(qa(el, ".drawer:not(.drawer--closing)")).toHaveLength(1);
-    const names = qa(el, ".ags-provider-name").map((n) => n.textContent);
-    expect(names).toContain("OpenAI");
-  });
-
-  test("editing a field persists to config immediately (no Save button)", async () => {
-    const el = await mount(AGENT({ openai: OPENAI }, "openai"));
-    qa(el, ".ags-provider-row")[0].click();
-    await tick();
-    const setsBefore = el.configService.sets.length;
-    const baseInput = q(el, ".drawer .ags-baseurl-input");
-    baseInput.value = "https://api.openai.com/v2";
-    baseInput.dispatchEvent(new Event("input", { bubbles: true }));
-    await tick();
-    const last = el.configService.sets[el.configService.sets.length - 1];
-    expect(el.configService.sets.length).toBeGreaterThan(setsBefore);
-    expect(last.value.providers.openai.baseUrl).toBe("https://api.openai.com/v2");
-  });
-
-  test("an added provider with no data is auto-deleted when the drawer closes", async () => {
-    const el = await mount(AGENT({}, ""));
-    const setsBefore = el.configService.sets.length;
-    q(el, ".ags-add-row").click();
-    await tick();
-    // The blank provider is in-memory but not persisted (no fake config entry).
-    expect(Object.keys(el._config.providers)).toHaveLength(1);
-    expect(el.configService.sets).toHaveLength(setsBefore);
-    // Close with the top-bar ✕ without entering any data.
-    q(el, ".drawer .dw-close").click();
-    await tick();
-    await settleClose();
-    const last = el.configService.sets[el.configService.sets.length - 1];
-    expect(Object.keys(last.value.providers)).toHaveLength(0);
-    expect(qa(el, ".ags-provider-name")).toHaveLength(0);
-  });
-
-  test("an added provider with data survives closing", async () => {
-    const el = await mount(AGENT({}, ""));
-    q(el, ".ags-add-row").click();
-    await tick();
-    const baseInput = q(el, ".drawer .ags-baseurl-input");
-    baseInput.value = "http://localhost:8000/v1";
-    baseInput.dispatchEvent(new Event("input", { bubbles: true }));
-    await tick();
-    q(el, ".drawer .dw-close").click();
-    await tick();
-    await settleClose();
-    expect(
-      Object.keys(el.configService.sets[el.configService.sets.length - 1].value.providers),
-    ).toHaveLength(1);
-  });
-
-  test("editing a provider's models persists the added/detected models", async () => {
-    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }));
-    // Open the OpenAI row.
-    const row = qa(el, ".ags-provider-row")[1];
-    row.click();
-    await tick();
-    // The model drawer has its own "Model" header.
-    q(el, ".drawer .ags-add-row").click();
-    await tick();
-    expect(qa(el, ".drawer-title").pop().textContent.trim()).toBe("Model");
-    // Add a model via the model drawer.
-    const idInput = q(el, ".drawer .ags-model-id-input");
-    idInput.value = "gpt-4o-mini";
-    idInput.dispatchEvent(new Event("input", { bubbles: true }));
-    await tick();
-    // No Save button; closing the model drawer (top-bar ✕) commits it.
-    qa(el, ".drawer .dw-close").pop().click();
-    await tick();
-    await settleClose();
-    // Adding a model does NOT change the default — the preset default stays.
-    expect(
-      q(
-        el,
-        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
-      ).textContent.trim(),
-    ).toBe("gpt-4o");
-    // Provider edits persist live (no Save).
-    const lastSet = el.configService.sets[el.configService.sets.length - 1];
-    expect(lastSet.value.providers.openai.model).toBe("gpt-4o");
-    expect(lastSet.value.providers.openai.models).toEqual([{ id: "gpt-4o-mini" }]);
-  });
-
-  test("Delete removes the provider and re-points the active id", async () => {
-    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "openai"));
-    // Open the OpenAI default provider and delete it.
-    const row = qa(el, ".ags-provider-row").find((r) =>
-      r.querySelector(".ags-provider-name").textContent.includes("OpenAI"),
-    );
-    row.click();
-    await tick();
-    // Stub the confirm modal (production shows a real confirmation).
-    el._confirm = async () => true;
-    q(el, ".drawer .ags-delete-btn").click();
-    await tick();
-    await settleClose();
-
-    const lastSet = el.configService.sets[el.configService.sets.length - 1];
-    expect(lastSet.value.providers.openai).toBeUndefined();
-    expect(lastSet.value.providerId).toBe("vllm");
-  });
-
-  test("the default-provider list lists providers and persists providerId", async () => {
-    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
-    const trigger = q(el, ".ags-default-trigger");
-    expect(trigger).not.toBeNull();
-    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("vLLM (local)");
-    // The closed state shows the intro question and the footer blurb again.
-    expect(q(el, ".ags-default-card .ags-card-question").textContent).toContain(
-      "Which provider is the default",
-    );
-    expect(q(el, ".ags-default-card .ags-card-help").textContent).toContain(
-      "Agents use the default provider",
-    );
-
-    // Open the list; the card is replaced by the list (no question or blurb).
-    trigger.click();
-    await tick();
-    const rows = qa(el, ".ags-default-row");
-    expect(rows.map((o) => o.querySelector(".ags-default-row-name").textContent.trim())).toEqual([
-      "vLLM (local)",
-      "OpenAI",
-    ]);
-    expect(rows[0].classList.contains("is-active")).toBe(true);
-    // The question stays in place over the list; only the blurb is dropped.
-    expect(q(el, ".ags-default-card .ags-card-question").textContent).toContain(
-      "Which provider is the default",
-    );
-    expect(q(el, ".ags-default-card .ags-card-help")).toBeNull();
-    // The last row drops its separator line.
-    expect(rows[rows.length - 1].classList.contains("is-last")).toBe(true);
-
-    // Select OpenAI -> closes the list and persists the default.
-    rows[1].click();
-    await tick();
-    const lastSet = el.configService.sets[el.configService.sets.length - 1];
-    expect(lastSet.key).toBe("agent");
-    expect(lastSet.value.providerId).toBe("openai");
-    expect(qa(el, ".ags-default-list")).toHaveLength(0);
-    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("OpenAI");
-  });
-
-  test("closing the default list via the close button keeps the current default", async () => {
-    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
-    q(el, ".ags-default-trigger").click();
-    await tick();
-    expect(qa(el, ".ags-default-list")).toHaveLength(1);
-    q(el, ".ags-default-close").click();
-    await tick();
-    expect(qa(el, ".ags-default-list")).toHaveLength(0);
-    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("vLLM (local)");
-  });
-
-  test("clicking anywhere else closes the default list and shows the selected row", async () => {
-    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
-    q(el, ".ags-default-trigger").click();
-    await tick();
-    expect(qa(el, ".ags-default-list")).toHaveLength(1);
-
-    // Dispatch a real pointerdown on another card inside the panel.
-    const elsewhere = q(el, ".ags-card-question");
-    elsewhere.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
-    await tick();
-
-    expect(qa(el, ".ags-default-list")).toHaveLength(0);
-    expect(q(el, ".ags-default-trigger")).not.toBeNull();
-    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("vLLM (local)");
-  });
-
-  test("a pointerdown on a row inside the list does not close it before selection", async () => {
-    const el = await mount(AGENT({ vllm: VLLM, openai: OPENAI }, "vllm"));
-    q(el, ".ags-default-trigger").click();
-    await tick();
-    const rows = qa(el, ".ags-default-row");
-    const openaiRow = rows.find((r) => r.textContent.includes("OpenAI"));
-    openaiRow.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
-    await tick();
-    // The list stays open after pointerdown; the click that follows selects.
-    expect(qa(el, ".ags-default-list")).toHaveLength(1);
-    openaiRow.click();
-    await tick();
-    expect(qa(el, ".ags-default-list")).toHaveLength(0);
-    expect(q(el, ".ags-default-row-name").textContent.trim()).toBe("OpenAI");
-  });
-
-  test("the default list is virtualized — it only renders a bounded window of rows", async () => {
-    const many = {};
-    for (let i = 0; i < 50; i++) {
-      many[`p${i}`] = { baseUrl: `http://localhost:${i + 8000}/v1`, model: `m${i}` };
-    }
-    const el = await mount(AGENT(many, "p0"));
-    q(el, ".ags-default-trigger").click();
-    await tick();
-    const rows = qa(el, ".ags-default-row");
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.length).toBeLessThan(50);
-    // The currently-selected provider sits at the top of the rendered window.
-    expect(rows[0].textContent).toContain("m0");
-    // Clicking a row selects it and closes the list.
-    rows[rows.length - 1].click();
-    await tick();
-    expect(qa(el, ".ags-default-list")).toHaveLength(0);
-  });
-
-  test("detect models populates the models list and sets the default", async () => {
-    const el = await mount(AGENT({}, ""));
-    q(el, ".ags-add-row").click();
-    await tick();
-    // Select the OpenAI preset; detection is disabled for the Custom default.
-    q(el, ".drawer .ags-preset-card .ags-default-trigger").click();
-    await tick();
-    const openaiPreset = qa(el, ".drawer .ags-preset-card .ags-default-row").find((o) =>
-      o.querySelector(".ags-default-row-name")?.textContent.includes("OpenAI"),
-    );
-    openaiPreset.click();
-    await tick();
-    // Set a base URL so detection has an endpoint.
-    const baseInput = q(el, ".drawer .ags-baseurl-input");
-    baseInput.value = "https://api.openai.com/v1";
-    baseInput.dispatchEvent(new Event("input", { bubbles: true }));
-    await tick();
-    (window as any).openp41ge = {
-      chat: {
-        listModels: vi.fn(async () => ({ ok: true, models: ["gpt-4o", "gpt-4o-mini"] })),
+  test("opening a nested sub-object stacks a second json drawer", async () => {
+    const agent = {
+      providerId: "vllm",
+      providers: {
+        vllm: {
+          ...VLLM,
+          models: [{ id: "Qwen2.5-Coder", maxTokens: 2048 }],
+        },
       },
     };
-    await el._detectModels(el._drawers[0]);
+    const el = await mount(agent);
+    el.shadowRoot
+      .querySelector("json-editor")
+      .dispatchEvent(
+        new CustomEvent("json-editor-open", {
+          detail: { path: ["providers", "vllm"] },
+          bubbles: true,
+          composed: true,
+        }),
+      );
     await tick();
-    const names = qa(el, ".drawer .ags-provider-row").map(
-      (r) => r.querySelector(".ags-provider-name")?.textContent,
+    const drawerJe = el.shadowRoot.querySelector(".drawer json-editor");
+    expect(drawerJe).toBeTruthy();
+    drawerJe.dispatchEvent(
+      new CustomEvent("json-editor-open", {
+        detail: { path: ["models", 0] },
+        bubbles: true,
+        composed: true,
+      }),
     );
-    expect(names).toEqual(["gpt-4o", "gpt-4o-mini", undefined]);
-    expect(q(el, ".drawer .ags-detect-note").textContent).toContain("Detected 2 models");
-    // The default model card shows the first detected model.
-    expect(
-      q(
-        el,
-        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
-      ).textContent.trim(),
-    ).toBe("gpt-4o");
-  });
-
-  test("choosing a model from the default list sets it as the default", async () => {
-    const providers = {
-      vllm: {
-        baseUrl: "http://localhost:8000/v1",
-        model: "m1",
-        models: [{ id: "m1" }, { id: "m2" }],
-      },
-    };
-    const el = await mount(AGENT(providers, "vllm"));
-    qa(el, ".ags-provider-row")[0].click();
     await tick();
-    q(el, ".drawer .ags-default-model-card .ags-default-trigger").click();
-    await tick();
-    const rows = qa(el, ".drawer .ags-default-model-card .ags-default-row");
-    expect(rows.map((r) => r.querySelector(".ags-default-row-name").textContent.trim())).toEqual([
-      "m1",
-      "m2",
-    ]);
-    rows[1].click();
-    await tick();
-    expect(
-      q(
-        el,
-        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
-      ).textContent.trim(),
-    ).toBe("m2");
-    // The default-model change persists live (no Save).
-    const lastSet = el.configService.sets[el.configService.sets.length - 1];
-    expect(lastSet.value.providers.vllm.model).toBe("m2");
-    expect(lastSet.value.providers.vllm.models).toEqual([{ id: "m1" }, { id: "m2" }]);
-  });
-
-  test("deleting a model removes it and falls back the default", async () => {
-    const providers = {
-      vllm: {
-        baseUrl: "http://localhost:8000/v1",
-        model: "m1",
-        models: [{ id: "m1" }, { id: "m2" }],
-      },
-    };
-    const el = await mount(AGENT(providers, "vllm"));
-    qa(el, ".ags-provider-row")[0].click();
-    await tick();
-    // Open the second model's drawer (m2).
-    qa(el, ".drawer .ags-provider-row")[1].click();
-    await tick();
-    el._confirm = async () => true;
-    qa(el, ".drawer .ags-delete-btn").pop().click();
-    await tick();
-    await settleClose();
-    const names = qa(el, ".drawer .ags-provider-row").map(
-      (r) => r.querySelector(".ags-provider-name")?.textContent,
-    );
-    expect(names).toEqual(["m1", undefined]);
-    expect(
-      q(
-        el,
-        ".drawer .ags-default-model-card .ags-default-trigger .ags-default-row-name",
-      ).textContent.trim(),
-    ).toBe("m1");
-  });
-
-  test("detect models shows an inline error on a failed request", async () => {
-    const el = await mount(AGENT({}, ""));
-    q(el, ".ags-add-row").click();
-    await tick();
-    // Select the OpenAI preset; detection is disabled for the Custom default.
-    q(el, ".drawer .ags-preset-card .ags-default-trigger").click();
-    await tick();
-    const openaiPreset = qa(el, ".drawer .ags-preset-card .ags-default-row").find((o) =>
-      o.querySelector(".ags-default-row-name")?.textContent.includes("OpenAI"),
-    );
-    openaiPreset.click();
-    await tick();
-    const baseInput = q(el, ".drawer .ags-baseurl-input");
-    baseInput.value = "https://api.openai.com/v1";
-    baseInput.dispatchEvent(new Event("input", { bubbles: true }));
-    await tick();
-    (window as any).openp41ge = {
-      chat: {
-        listModels: vi.fn(async () => ({ ok: false, error: "Model list request failed (401)" })),
-      },
-    };
-    await el._detectModels(el._drawers[0]);
-    await tick();
-    expect(q(el, ".drawer .ags-detect-note--err").textContent).toContain(
-      "Model list request failed (401)",
-    );
-    expect(qa(el, ".drawer .ags-provider-row").length).toBe(1); // only the add row
-  });
-
-  test("Detect models is presented as an action row under the explanation", async () => {
-    const el = await mount(AGENT({ openai: OPENAI }, "openai"));
-    qa(el, ".ags-provider-row")[0].click();
-    await tick();
-    const row = qa(el, ".drawer .ags-action-row").find((r) =>
-      r.querySelector(".ags-action-label")?.textContent.includes("Detect the models"),
-    );
-    expect(row).toBeDefined();
-    expect(row.querySelector(".ags-action-control button").textContent).toContain("Detect models");
-    // The add-model data row is exempt from the action-row treatment.
-    expect(q(el, ".drawer .ags-add-row").classList.contains("ags-action-row")).toBe(false);
-  });
-
-  test("Detect models is disabled for the custom preset", async () => {
-    const el = await mount(AGENT({}, ""));
-    q(el, ".ags-add-row").click();
-    await tick();
-    // The add-provider drawer defaults to the Custom preset.
-    const detectRow = qa(el, ".drawer .ags-action-row").find((r) =>
-      r.querySelector(".ags-action-control button")?.textContent.includes("Detect models"),
-    );
-    const btn = detectRow.querySelector(".ags-action-control button");
-    expect(btn.disabled).toBe(true);
-    expect(detectRow.querySelector(".ags-action-label").textContent).toContain("by hand");
-    // No detection is performed for a custom endpoint.
-    (window as any).openp41ge = { chat: { listModels: vi.fn() } };
-    await el._detectModels(el._drawers[0]);
-    await tick();
-    expect((window as any).openp41ge.chat.listModels).not.toHaveBeenCalled();
-  });
-
-  test("Test Connection lives at the bottom of the base URL card and exposes View response", async () => {
-    const el = await mount(AGENT({ openai: OPENAI }, "openai"));
-    const row = qa(el, ".ags-provider-row").find((r) =>
-      r.querySelector(".ags-provider-name")?.textContent.includes("OpenAI"),
-    );
-    row.click();
-    await tick();
-    // There is no separate Actions section any more.
-    const titles = qa(el, ".drawer .ags-section-title").map((t) => t.textContent.trim());
-    expect(titles).not.toContain("Actions");
-    // The base URL card hosts the Test Connection action row.
-    const baseCard = q(el, ".drawer .ags-baseurl-input").closest(".ags-card");
-    const testRow = [...baseCard.querySelectorAll(".ags-action-row")].find((r) =>
-      r.querySelector(".ags-action-control button")?.textContent.includes("Test Connection"),
-    );
-    expect(testRow).toBeDefined();
-    // Stub a failing ping.
-    (window as any).openp41ge = {
-      chat: {
-        pingProvider: vi.fn(async () => ({ ok: false, error: "HTTP 400 Bad Request" })),
-      },
-    };
-    await el._testConnection(el._drawers[0]);
-    await tick();
-    // The button reveals the result: red "Not connected" (no status line above).
-    const connBtn = [...baseCard.querySelectorAll(".ags-action-row")]
-      .map((r) => r.querySelector(".ags-action-control button"))
-      .find((b) => b?.textContent.includes("Not connected"));
-    expect(connBtn).toBeDefined();
-    expect(connBtn.classList.contains("is-failed")).toBe(true);
-    // View response appears and toggles the raw JSON, regardless of success.
-    const viewBtn = [...baseCard.querySelectorAll(".ags-action-row")]
-      .map((r) => r.querySelector(".ags-action-control button"))
-      .find((b) => b?.textContent.includes("View response"));
-    expect(viewBtn).toBeDefined();
-    viewBtn.click();
-    await tick();
-    expect(q(el, ".drawer .ags-response").textContent).toContain("HTTP 400 Bad Request");
-    viewBtn.click();
-    await tick();
-    expect(q(el, ".drawer .ags-response")).toBeNull();
-  });
-
-  test("numeric fields are text inputs that strip non-numeric characters", async () => {
-    const el = await mount(AGENT({}, ""));
-    q(el, ".ags-add-row").click();
-    await tick();
-
-    const temp = qa(el, ".ags-card .ags-input").find((i) => i.placeholder === "0.7");
-    expect(temp.type).toBe("text");
-    temp.value = "12.3x.4";
-    temp.dispatchEvent(new Event("input", { bubbles: true }));
-    await tick();
-    expect(temp.value).toBe("12.34");
-
-    const max = qa(el, ".ags-card .ags-input").find((i) => i.placeholder === "e.g. 2048");
-    expect(max.type).toBe("text");
-    max.value = "20ab48";
-    max.dispatchEvent(new Event("input", { bubbles: true }));
-    await tick();
-    expect(max.value).toBe("2048");
-  });
-
-  test("clicking anywhere on a field card focuses its input", async () => {
-    const el = await mount(AGENT({}, ""));
-    q(el, ".ags-add-row").click();
-    await tick();
-    const card = qa(el, ".ags-input-card").find((c) => c.querySelector(".ags-input"));
-    const input = card.querySelector(".ags-input");
-    const focus = vi.spyOn(input, "focus");
-    card.click();
-    await tick();
-    expect(focus).toHaveBeenCalledTimes(1);
+    const drawers = el.shadowRoot.querySelectorAll(".drawer");
+    expect(drawers.length).toBe(2);
+    const nestedJe = el.shadowRoot.querySelectorAll(".drawer json-editor")[1];
+    expect(nestedJe.editedValue).toEqual({ id: "Qwen2.5-Coder", maxTokens: 2048 });
   });
 });

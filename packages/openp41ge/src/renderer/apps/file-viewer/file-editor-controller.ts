@@ -328,8 +328,8 @@ export class FileEditorController extends BaseController implements FileViewerCo
   /** Apply editor settings (line height, font size) from config. */
   private _applyEditorSettings(): void {
     if (!this._editor) return;
-    const lineHeight = appServices.configService.get("editor.lineHeight") as number | undefined;
-    const fontSize = appServices.configService.get("editor.fontSize") as number | undefined;
+    const lineHeight = appServices.configService.get("lineHeight") as number | undefined;
+    const fontSize = appServices.configService.get("fontSize") as number | undefined;
     if (typeof lineHeight === "number" && lineHeight >= 14 && lineHeight <= 40) {
       this._editor.setEditorLineHeight(lineHeight);
     }
@@ -412,7 +412,7 @@ export class FileEditorController extends BaseController implements FileViewerCo
       const detail = (e as CustomEvent).detail as { key?: string; value?: unknown };
       if (!detail || !detail.key) return;
       // React to editor config changes
-      if (detail.key === "editor.lineHeight" || detail.key === "editor.fontSize") {
+      if (detail.key === "lineHeight" || detail.key === "fontSize") {
         this._applyEditorSettings();
       }
     };
