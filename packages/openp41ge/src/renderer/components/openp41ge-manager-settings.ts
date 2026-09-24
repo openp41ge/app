@@ -15,6 +15,7 @@ import { LitElement, html, css, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import "openp41ge-json-editor/json-editor";
 import { cloneDeep } from "openp41ge-json-editor";
+import { GLOBAL_SETTINGS_SCHEMA } from "../models/global-settings-schema";
 
 /** The IPC config bridge exposed as `window.openp41ge.config`. */
 export interface ManagerConfigBridge {
@@ -112,10 +113,10 @@ export class Openp41geManagerSettings extends LitElement {
     this._config = cloneDeep(this._savedConfig);
   }
 
-  /** Row height for the JSON editor — follows the global platform line-height. */
+  /** Row height for the JSON editor — the global platform line-height. */
   private _jsonRowHeight(): number {
     const lh = (this._savedConfig as { lineHeight?: unknown } | null)?.lineHeight;
-    return typeof lh === "number" && lh >= 14 && lh <= 100 ? lh + 4 : 24;
+    return typeof lh === "number" && lh >= 14 && lh <= 100 ? lh : 20;
   }
 
   override render(): TemplateResult {
@@ -139,6 +140,7 @@ export class Openp41geManagerSettings extends LitElement {
                     <json-editor
                       .rowHeight=${this._jsonRowHeight()}
                       .value=${this._config}
+                      .schema=${GLOBAL_SETTINGS_SCHEMA}
                       @json-editor-change=${(e: CustomEvent) => void this._onJsonEditorChange(e)}
                     ></json-editor>
                   </div>

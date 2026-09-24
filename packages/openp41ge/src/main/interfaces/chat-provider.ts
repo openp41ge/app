@@ -13,7 +13,8 @@ import type { ToolDefinition } from "./tool.js";
 /** Provider connection config (persisted in UserConfig.agent.providers). */
 export interface ChatProviderConfig {
   baseUrl: string;
-  model: string;
+  /** The default model id used when a chat doesn't pick one explicitly. */
+  defaultModel: string;
   apiKey?: string;
   temperature?: number;
   maxTokens?: number;

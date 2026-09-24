@@ -52,9 +52,16 @@ describe("openp41ge-settings-drawer-host click-away", () => {
     await host.updateComplete;
     expect(host.isOpen).toBe(true);
 
-    // A press on the document target (a sibling of the host) within the grid rect.
-    document.dispatchEvent(
-      new MouseEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 500, clientY: 300 }),
+    // A press on the dim mask (a host child that is not a drawer) dismisses it.
+    const mask = host.querySelector(".sdw-mask");
+    expect(mask).not.toBeNull();
+    mask.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 500,
+        clientY: 300,
+      }),
     );
 
     expect(host.isOpen).toBe(false);
@@ -82,6 +89,34 @@ describe("openp41ge-settings-drawer-host click-away", () => {
     host._onDocumentPointerDown({ target: document.body, clientX: 900, clientY: 100 });
 
     expect(host.isOpen).toBe(true);
+  });
+  it("renders a dim mask while a drawer is open and removes it when closed", async () => {
+    const host = await mountHost();
+    expect(host.querySelector(".sdw-mask")).toBeNull();
+
+    host.openSurface(makeSurface(), "left");
+    await host.updateComplete;
+    expect(host.querySelector(".sdw-mask")).not.toBeNull();
+
+    host.closeAll();
+    await host.updateComplete;
+    expect(host.querySelector(".sdw-mask")).toBeNull();
+  });
+
+  it("dispatches drawer-open-changed with the open side, then null on close", async () => {
+    const host = await mountHost();
+    const sides: Array<string | null> = [];
+    host.addEventListener("drawer-open-changed", (e) => {
+      sides.push((e as CustomEvent<{ side: string | null }>).detail?.side ?? null);
+    });
+
+    host.openSurface(makeSurface(), "left");
+    await host.updateComplete;
+    expect(sides).toEqual(["left"]);
+
+    host.closeAll();
+    await host.updateComplete;
+    expect(sides).toEqual(["left", null]);
   });
 });
 

@@ -123,6 +123,27 @@ describe("json-editor structure features", () => {
     expect(danger.length).toBeGreaterThan(1);
   });
 
+  test("delete on a NESTED member removes only that member at its real depth", async () => {
+    // `model` lives at providers.vllm.model (line 5, 0-based) — not at the root.
+    const target = el.shadowRoot.querySelector('.je-row[data-line="5"] .je-del');
+    expect(target).toBeTruthy();
+    target.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.editedValue.providers.vllm.model).toBeUndefined();
+    expect(el.editedValue.providers.vllm.baseUrl).toBe("http://localhost:8000/v1");
+    expect(el.editedValue.providers.vllm.models).toBeTruthy();
+  });
+
+  test("delete on a nested array element splices that element only", async () => {
+    // The models[0] element object opens at line 7 (0-based).
+    const target = el.shadowRoot.querySelector('.je-row[data-line="7"] .je-del');
+    expect(target).toBeTruthy();
+    target.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.editedValue.providers.vllm.models).toEqual([]);
+    expect(el.editedValue.providers.vllm.model).toBe("Qwen2.5-Coder-7B-Instruct");
+  });
+
   test("a missing comma flags the offending line number red", async () => {
     const ta = input(el);
     ta.value = ta.value.replace('"providerId": "vllm",', '"providerId": "vllm"');
@@ -152,6 +173,28 @@ describe("json-editor structure features", () => {
     ta.selectionEnd = idx;
     ta.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
     expect(ta.selectionEnd - ta.selectionStart).toBe("http://localhost:8000/v1".length);
+  });
+
+  test("clicking just after a string value (end of property) does NOT select it", () => {
+    const ta = input(el);
+    // Caret sits immediately after the closing quote of the "vllm" value.
+    const open = ta.value.indexOf('"vllm"');
+    const afterQuote = open + '"vllm"'.length;
+    ta.selectionStart = afterQuote;
+    ta.selectionEnd = afterQuote;
+    ta.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    expect(ta.selectionStart).toBe(ta.selectionEnd);
+  });
+
+  test("clicking just before a string (outside it) does NOT select it", () => {
+    const ta = input(el);
+    // Caret sits on the opening quote of the "vllm" value (outside the inner
+    // text), so the token must not be selected.
+    const open = ta.value.indexOf('"vllm"');
+    ta.selectionStart = open;
+    ta.selectionEnd = open;
+    ta.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    expect(ta.selectionStart).toBe(ta.selectionEnd);
   });
 
   test("close-brace rows get no delete button", () => {
@@ -253,7 +296,9 @@ describe("json-editor structure features", () => {
     const numW = parseFloat(numCells[emptyIdx].parentElement.style.width);
     const foldW = parseFloat(foldCells[emptyIdx].parentElement.style.width);
     // Non-foldable row: overlay spans both columns.
-    numCells[emptyIdx].dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true }));
+    numCells[emptyIdx].dispatchEvent(
+      new MouseEvent("mouseover", { bubbles: true, composed: true }),
+    );
     await new Promise((r) => setTimeout(r, 20));
     const hl = el.shadowRoot.querySelector(".eg-hoverbox");
     expect(hl.style.display).not.toBe("none");
@@ -269,7 +314,9 @@ describe("json-editor structure features", () => {
     const ta = input(el);
     // Mousedown on line 2 (index 1), drag to line 5 (index 4).
     gutterRow(el, 2).dispatchEvent(new MouseEvent("mousedown", { bubbles: true, composed: true }));
-    document.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, buttons: 1, clientY: 4 * 20 + 10 }));
+    document.dispatchEvent(
+      new MouseEvent("mousemove", { bubbles: true, buttons: 1, clientY: 4 * 20 + 10 }),
+    );
     await new Promise((r) => setTimeout(r, 20));
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     const selText = ta.value.slice(ta.selectionStart, ta.selectionEnd);
@@ -305,7 +352,9 @@ describe("json-editor structure features", () => {
   test("a multi-line selection renders inner-corner notches", async () => {
     const ta = input(el);
     gutterRow(el, 2).dispatchEvent(new MouseEvent("mousedown", { bubbles: true, composed: true }));
-    document.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, buttons: 1, clientY: 4 * 20 + 10 }));
+    document.dispatchEvent(
+      new MouseEvent("mousemove", { bubbles: true, buttons: 1, clientY: 4 * 20 + 10 }),
+    );
     await new Promise((r) => setTimeout(r, 20));
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 20));
@@ -332,8 +381,24 @@ describe("json-editor structure features", () => {
     const r = el._selectables.find((x) => x.kind === "key");
     // Start a drag (button held) on the string, move beyond the threshold.
     ta.setSelectionRange(r.start, r.start);
-    ta.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, composed: true, buttons: 1, clientX: 5, clientY: 5 }));
-    ta.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, composed: true, buttons: 1, clientX: 400, clientY: 60 }));
+    ta.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        composed: true,
+        buttons: 1,
+        clientX: 5,
+        clientY: 5,
+      }),
+    );
+    ta.dispatchEvent(
+      new MouseEvent("mousemove", {
+        bubbles: true,
+        composed: true,
+        buttons: 1,
+        clientX: 400,
+        clientY: 60,
+      }),
+    );
     await new Promise((r2) => setTimeout(r2, 20));
     // The drag produces a general selection, then the user releases/click.
     ta.setSelectionRange(2, 30);
@@ -351,14 +416,38 @@ describe("json-editor structure features", () => {
     const ta = input(el);
     // Start a drag, then move the selection/extent while the button is held,
     // before releasing. The overlay should repaint on mousemove.
-    ta.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, composed: true, buttons: 1, clientX: 5, clientY: 5 }));
+    ta.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        composed: true,
+        buttons: 1,
+        clientX: 5,
+        clientY: 5,
+      }),
+    );
     ta.setSelectionRange(2, 12);
-    ta.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, composed: true, buttons: 1, clientX: 400, clientY: 12 }));
+    ta.dispatchEvent(
+      new MouseEvent("mousemove", {
+        bubbles: true,
+        composed: true,
+        buttons: 1,
+        clientX: 400,
+        clientY: 12,
+      }),
+    );
     await new Promise((r2) => setTimeout(r2, 20));
     const one = el.shadowRoot.querySelectorAll(".je-selection .je-segment").length;
     // Extend into a second line and keep dragging (button still held).
     ta.setSelectionRange(2, 30);
-    ta.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, composed: true, buttons: 1, clientX: 410, clientY: 40 }));
+    ta.dispatchEvent(
+      new MouseEvent("mousemove", {
+        bubbles: true,
+        composed: true,
+        buttons: 1,
+        clientX: 410,
+        clientY: 40,
+      }),
+    );
     await new Promise((r2) => setTimeout(r2, 20));
     const two = el.shadowRoot.querySelectorAll(".je-selection .je-segment").length;
     expect(two).toBeGreaterThan(one); // overlay repainted mid-drag, before mouseup
@@ -427,9 +516,7 @@ describe("json-editor caret style + multi-caret", () => {
     expect(caret.style.left).toBe("10px");
     expect(caret.style.top).toBe("0px");
     expect(caret.style.height).toBe("20px");
-    const styles = [...el.shadowRoot.querySelectorAll("style")]
-      .map((s) => s.textContent)
-      .join("");
+    const styles = [...el.shadowRoot.querySelectorAll("style")].map((s) => s.textContent).join("");
     expect(styles).toContain("caret-color: transparent");
   });
 
@@ -719,9 +806,7 @@ describe("json-editor enter-in-empty-pair expansion", () => {
     expect(idx).toBeGreaterThan(-1);
     const caret = idx + 1; // between [ and ]
     ta.setSelectionRange(caret, caret);
-    ta.dispatchEvent(
-      new KeyboardEvent("keydown", { bubbles: true, composed: true, key: "Enter" }),
-    );
+    ta.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, composed: true, key: "Enter" }));
     // The closing ] moves onto its own line aligned with the member line;
     // the caret sits on a freshly-indented middle line ready for a value.
     expect(ta.value).toBe('{\n  "list": [\n    \n  ]\n}');
@@ -835,8 +920,8 @@ describe("json-editor single-caret Cmd+Arrow", () => {
     const l2 = el._visibleLines[1];
     const topStart = l2.start;
     const l3 = el._visibleLines[2];
-    const anchor = topStart;            // anchor at top row start
-    const active = l3.start + 4;        // active end deeper down (forward)
+    const anchor = topStart; // anchor at top row start
+    const active = l3.start + 4; // active end deeper down (forward)
     ta.setSelectionRange(anchor, active, "forward");
     el._singleCmdArrow(ta, "ArrowLeft", true);
     // The active end collapses to the START of its own line (line 2)...
@@ -845,5 +930,433 @@ describe("json-editor single-caret Cmd+Arrow", () => {
     expect(ta.selectionDirection).toBe("forward");
     // ...while the anchor (top of the highlight block) is preserved.
     expect(ta.selectionStart).toBe(topStart);
+  });
+});
+
+describe("key auto-complete suggestions", () => {
+  const SPARSE = {
+    providerId: "vllm",
+    providers: { vllm: { baseUrl: "http://localhost:8000/v1" } },
+  };
+  const PROVIDER_SCHEMA = {
+    type: "object",
+    properties: {
+      providerId: { type: "string", description: "Active provider." },
+      providers: {
+        type: "object",
+        additionalProperties: {
+          type: "object",
+          properties: {
+            baseUrl: { type: "string", description: "Endpoint URL." },
+            model: { type: "string", description: "Default model id." },
+            models: { type: "array", description: "Available models." },
+          },
+        },
+      },
+    },
+  };
+
+  // Place the caret inside `""` on a new member line of `providers.vllm`.
+  async function mountSparse() {
+    const editor = await mount(SPARSE);
+    editor.schema = PROVIDER_SCHEMA;
+    await new Promise((r) => setTimeout(r, 20));
+    return editor;
+  }
+
+  function putCaretInEmptyKey(editor, ta) {
+    const withEmpty = ta.value.replace(
+      '"baseUrl": "http://localhost:8000/v1"',
+      '"baseUrl": "http://localhost:8000/v1",\n      ""',
+    );
+    ta.value = withEmpty;
+    const caret = withEmpty.indexOf('""') + 1;
+    ta.setSelectionRange(caret, caret);
+    ta.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  }
+
+  test("shows the not-yet-set schema keys below the caret", async () => {
+    const editor = await mountSparse();
+    putCaretInEmptyKey(editor, input(editor));
+    await new Promise((r) => setTimeout(r, 20));
+
+    const list = editor.shadowRoot.querySelector(".je-suggest");
+    expect(list).toBeTruthy();
+    const keys = [...list.querySelectorAll(".je-suggest-item")].map((n) => n.dataset.key);
+    // baseUrl is already set → excluded; model & models remain.
+    expect(keys).toEqual(["model", "models"]);
+    // The list is positioned below the caret row.
+    expect(parseFloat(list.style.top)).toBeGreaterThan(0);
+    // The side tooltip shows the highlighted (first) key's description.
+    await new Promise((r) => setTimeout(r, 20));
+    const tip = editor.shadowRoot.querySelector(".je-suggest-tip");
+    expect(tip).toBeTruthy();
+    expect(tip.textContent).toContain("Default model id.");
+  });
+
+  test("Up/Down moves the highlight, Enter accepts the key", async () => {
+    const editor = await mountSparse();
+    const ta = input(editor);
+    putCaretInEmptyKey(editor, ta);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const items = () => [...editor.shadowRoot.querySelectorAll(".je-suggest-item")];
+    expect(items()[0].classList.contains("je-suggest-item--sel")).toBe(true);
+
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(items()[1].classList.contains("je-suggest-item--sel")).toBe(true);
+
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(items()[0].classList.contains("je-suggest-item--sel")).toBe(true);
+
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    // The empty string was replaced by the accepted key and a typed default
+    // value, and the caret is parked INSIDE the value's quotes.
+    expect(ta.value).toContain('"model": ""');
+    expect(ta.value.slice(ta.selectionStart - 1, ta.selectionStart + 1)).toBe('""');
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+  });
+
+  test("accepting a number key pre-populates its literal after the colon", async () => {
+    const editor = await mount(SPARSE);
+    editor.schema = {
+      type: "object",
+      properties: {
+        providerId: { type: "string" },
+        providers: {
+          type: "object",
+          additionalProperties: {
+            type: "object",
+            properties: {
+              baseUrl: { type: "string" },
+              maxReplicas: { type: "number" },
+            },
+          },
+        },
+      },
+    };
+    await new Promise((r) => setTimeout(r, 20));
+    const ta = input(editor);
+    putCaretInEmptyKey(editor, ta);
+    await new Promise((r) => setTimeout(r, 20));
+
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ta.value).toContain('"maxReplicas": 0');
+    // Caret sits after the literal.
+    expect(ta.value.slice(ta.selectionStart - 1, ta.selectionStart)).toBe("0");
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+  });
+
+  test("Left/Right dismisses the list and the caret moves on", async () => {
+    const editor = await mountSparse();
+    const ta = input(editor);
+    putCaretInEmptyKey(editor, ta);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeTruthy();
+
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+    // The native caret move went through (ArrowRight from inside `""`).
+    expect(ta.selectionStart).toBeGreaterThan(0);
+  });
+
+  test("Escape dismisses the list without editing", async () => {
+    const editor = await mountSparse();
+    const ta = input(editor);
+    putCaretInEmptyKey(editor, ta);
+    await new Promise((r) => setTimeout(r, 20));
+    const before = ta.value;
+
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+    expect(ta.value).toBe(before);
+
+    // The keyup that follows Escape must NOT re-open the list while the caret
+    // is still on the empty quoted key.
+    ta.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+    expect(ta.value).toBe(before);
+  });
+
+  test("Escape hides the list and stops it reaching the document (drawer won't close)", async () => {
+    const editor = await mountSparse();
+    const ta = input(editor);
+    putCaretInEmptyKey(editor, ta);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeTruthy();
+
+    let docFired = false;
+    const onDoc = () => {
+      docFired = true;
+    };
+    document.addEventListener("keydown", onDoc);
+    // `composed: true` mirrors a real key event crossing the shadow boundary.
+    ta.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    document.removeEventListener("keydown", onDoc);
+
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+    expect(docFired).toBe(false);
+  });
+
+  test("the side tooltip is visible beside the list", async () => {
+    const editor = await mountSparse();
+    const ta = input(editor);
+    putCaretInEmptyKey(editor, ta);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const tip = editor.shadowRoot.querySelector(".je-suggest-tip");
+    expect(tip).toBeTruthy();
+    // The description text has no surrounding template whitespace (no first-row
+    // indent under `white-space: pre-wrap`).
+    expect(tip.textContent.trim()).toBe("Default model id.");
+    expect(tip.textContent).toBe(tip.textContent.trim());
+  });
+
+  test("no suggestions when there are no schema properties", async () => {
+    const editor = await mount(SPARSE);
+    editor.schema = { type: "object", properties: { providerId: { type: "string" } } };
+    await new Promise((r) => setTimeout(r, 20));
+    const ta = input(editor);
+    putCaretInEmptyKey(editor, ta);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+  });
+
+  test("suggests keys inside an array item object", async () => {
+    const editor = await mount({
+      providerId: "vllm",
+      providers: { vllm: { baseUrl: "http://x", models: [{ id: "a" }] } },
+    });
+    editor.schema = {
+      type: "object",
+      properties: {
+        providers: {
+          type: "object",
+          additionalProperties: {
+            type: "object",
+            properties: {
+              models: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    input: { type: "array", items: { type: "string" } },
+                    thinking: { type: "object" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    await new Promise((r) => setTimeout(r, 20));
+    const ta = input(editor);
+    // Insert an empty key line inside the model item object (after `"id"`).
+    const withEmpty = ta.value.replace('"id": "a"', '"id": "a",\n        ""');
+    ta.value = withEmpty;
+    const caret = withEmpty.indexOf('""') + 1;
+    ta.setSelectionRange(caret, caret);
+    ta.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    const list = editor.shadowRoot.querySelector(".je-suggest");
+    expect(list).toBeTruthy();
+    const keys = [...list.querySelectorAll(".je-suggest-item")].map((n) => n.dataset.key);
+    // `id` is already set → excluded; `input` and `thinking` remain.
+    expect(keys).toEqual(["input", "thinking"]);
+  });
+
+  test("offers and accepts a new-key option inside a free-form map (thinking)", async () => {
+    const editor = await mount({
+      providerId: "vllm",
+      providers: { vllm: { baseUrl: "http://x", models: [{ id: "a", thinking: {} }] } },
+    });
+    editor.schema = {
+      type: "object",
+      properties: {
+        providers: {
+          type: "object",
+          additionalProperties: {
+            type: "object",
+            properties: {
+              models: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    thinking: { type: "object", additionalProperties: { type: "string" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    await new Promise((r) => setTimeout(r, 20));
+    const ta = input(editor);
+    // Insert an empty key line inside `thinking: {}`.
+    const withEmpty = ta.value.replace('"thinking": {}', '"thinking": {\n          ""\n        }');
+    ta.value = withEmpty;
+    const caret = withEmpty.indexOf('""') + 1;
+    ta.setSelectionRange(caret, caret);
+    ta.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    const list = editor.shadowRoot.querySelector(".je-suggest");
+    expect(list).toBeTruthy();
+    const items = [...list.querySelectorAll(".je-suggest-item")];
+    expect(items.map((n) => n.dataset.key)).toEqual([""]);
+    expect(items[0].textContent.trim()).toBe("new key");
+
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    // Accepted free-form key: `"": ""` with the caret parked INSIDE the empty
+    // key quotes so the user just types the level name.
+    expect(ta.value).toContain('"": ""');
+    expect(ta.value.slice(ta.selectionStart - 1, ta.selectionStart)).toBe('"');
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+  });
+
+  test("does not show suggestions when the caret is in a filled (settled) key", async () => {
+    const editor = await mountSparse();
+    const ta = input(editor);
+    // Caret inside the already-filled `"baseUrl"` key (a settled member).
+    const caret = ta.value.indexOf('"baseUrl"') + "baseUrl".length + 1;
+    ta.setSelectionRange(caret, caret);
+    ta.dispatchEvent(new Event("select", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+  });
+
+  test("hover tooltips still appear when the JSON has a parse error", async () => {
+    const editor = await mountSparse();
+    const ta = input(editor);
+    // Break the JSON: a trailing comma after the baseUrl member (last member).
+    ta.value = ta.value.replace(
+      '"baseUrl": "http://localhost:8000/v1"',
+      '"baseUrl": "http://localhost:8000/v1",',
+    );
+    ta.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(editor._root).toBeUndefined();
+
+    const cw = editor._measureCharW() > 0 ? editor._measureCharW() : 8;
+    const idx = editor._visibleLines.findIndex((v) => v.text.includes('"baseUrl"'));
+    const col = editor._visibleLines[idx].text.indexOf('"baseUrl"');
+    editor._updateKeyTooltip(idx, 10 + col * cw + cw / 2);
+    editor._tooltipFire();
+
+    const tip = editor.shadowRoot.querySelector(".je-tooltip");
+    expect(getComputedStyle(tip).display).toBe("block");
+    expect(tip.textContent).toContain("Endpoint URL.");
+  });
+});
+
+describe("json-editor markdown tooltips", () => {
+  const MD_SCHEMA = {
+    type: "object",
+    properties: {
+      providerId: { type: "string", description: "**Active** provider." },
+      models: {
+        type: "array",
+        description: "descriptions/models.md",
+        items: {
+          type: "object",
+          properties: { id: { type: "string", description: "Model id." } },
+        },
+      },
+    },
+  };
+
+  async function mountMd() {
+    const editor = await mount({ providerId: "vllm", models: [{ id: "a" }] });
+    editor.schema = MD_SCHEMA;
+    await new Promise((r) => setTimeout(r, 20));
+    return editor;
+  }
+
+  /** Hover the given key substring and fire the tooltip immediately. */
+  async function hover(editor, substr) {
+    const ta = input(editor);
+    const cw = editor._measureCharW() > 0 ? editor._measureCharW() : 8;
+    const idx = editor._visibleLines.findIndex((v) => v.text.includes(substr));
+    const col = editor._visibleLines[idx].text.indexOf(substr);
+    editor._updateKeyTooltip(idx, 10 + col * cw + cw / 2);
+    await editor._tooltipFire();
+    return editor.shadowRoot.querySelector(".je-tooltip");
+  }
+
+  test("renders a description as Markdown with a highlighted code block", async () => {
+    const editor = await mountMd();
+    const ta = input(editor);
+    // Give providerId a Markdown description with a fenced JSON example.
+    ta.value = ta.value.replace('"providerId": "vllm"', '"providerId": "vllm",\n  "codeSample": 1');
+    editor.schema = {
+      ...MD_SCHEMA,
+      properties: {
+        ...MD_SCHEMA.properties,
+        providerId: {
+          type: "string",
+          description: 'The **active** provider.\n\n```json\n"Off": "low"\n```',
+        },
+      },
+    };
+    ta.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    const tip = await hover(editor, '"providerId"');
+    expect(getComputedStyle(tip).display).toBe("block");
+    expect(tip.innerHTML).toContain("<strong>active</strong>");
+    expect(tip.querySelector("pre.je-md-code")).toBeTruthy();
+    expect(tip.querySelector("pre.je-md-code code").innerHTML).toContain(
+      '<span class="s-var">"Off"</span>',
+    );
+  });
+
+  test("loads a Markdown file reference through resolveResource", async () => {
+    const editor = await mountMd();
+    editor.resolveResource = (ref) =>
+      `# Models\n\nLoaded \`${ref}\`.\n\n\`\`\`json\n{"id": "a"}\n\`\`\``;
+    const tip = await hover(editor, '"models"');
+    expect(getComputedStyle(tip).display).toBe("block");
+    expect(tip.querySelector("h1")?.textContent).toBe("Models");
+    expect(tip.textContent).toContain("Loaded descriptions/models.md.");
+    expect(tip.querySelector("pre.je-md-code")).toBeTruthy();
+    // The array item-structure hint is appended after the loaded content.
+    expect(tip.querySelector(".je-tooltip-hint")?.textContent).toContain("Each item:");
+  });
+
+  test("falls back to the path text when the resource can't be resolved", async () => {
+    const editor = await mountMd();
+    editor.resolveResource = () => null;
+    const tip = await hover(editor, '"models"');
+    expect(getComputedStyle(tip).display).toBe("block");
+    expect(tip.textContent).toContain("descriptions/models.md");
+  });
+
+  test("renders a plain description unchanged (no markup creep)", async () => {
+    const editor = await mountMd();
+    const tip = await hover(editor, '"providerId"');
+    expect(getComputedStyle(tip).display).toBe("block");
+    expect(tip.querySelector("strong")).toBeTruthy();
   });
 });

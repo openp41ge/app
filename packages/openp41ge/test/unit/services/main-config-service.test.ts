@@ -95,6 +95,142 @@ describe("ConfigService (main process)", () => {
     expect(editor.maxFileSize).toBe(1024);
   });
 
+  test("init() renames the provider-level `model` key to `defaultModel`", () => {
+    // Configs written before the rename stored the provider's default model
+    // under `model` (confusable with the `models` list); they should be
+    // migrated to `defaultModel` and the stale key removed.
+    const configDir = path.join(tmpDir, ".config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "config.json"),
+      JSON.stringify({
+        version: 1,
+        appTheme: "dark",
+        lineHeight: 20,
+        fontSize: 14,
+        editor: { fontFamily: "monospace", maxFileSize: 1024 },
+        agent: {
+          providerId: "vllm",
+          providers: { vllm: { baseUrl: "http://x", model: "m", apiKey: "k" } },
+        },
+      }),
+      "utf-8",
+    );
+
+    configService.init();
+    const providers = configService.get("agent.providers") as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(providers.vllm.defaultModel).toBe("m");
+    expect("model" in providers.vllm).toBe(false);
+    expect(providers.vllm.baseUrl).toBe("http://x");
+    expect(providers.vllm.apiKey).toBe("k");
+  });
+
+  test("init() persists the migrated config so the legacy `model` key never reappears", () => {
+    // The in-memory migration alone leaves the legacy `model` key in the file;
+    // reopening would read it again. The cleaned shape must be written back.
+    const configDir = path.join(tmpDir, ".config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "config.json"),
+      JSON.stringify({
+        version: 1,
+        appTheme: "dark",
+        lineHeight: 20,
+        fontSize: 14,
+        editor: { fontFamily: "monospace", maxFileSize: 1024 },
+        agent: {
+          providerId: "vllm",
+          providers: { vllm: { baseUrl: "http://x", model: "m" } },
+        },
+      }),
+      "utf-8",
+    );
+
+    configService.init();
+
+    const raw = fs.readFileSync(path.join(configDir, "config.json"), "utf-8");
+    const parsed = JSON.parse(raw) as {
+      agent: { providers: Record<string, Record<string, unknown>> };
+    };
+    expect(parsed.agent.providers.vllm.defaultModel).toBe("m");
+    expect("model" in parsed.agent.providers.vllm).toBe(false);
+  });
+
+  test("init() drops a lingering `model` key when `defaultModel` is already set", () => {
+    // A config that somehow carries BOTH keys (e.g. an earlier partial edit)
+    // must not keep the stale `model` — `defaultModel` wins and `model` is
+    // removed.
+    const configDir = path.join(tmpDir, ".config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "config.json"),
+      JSON.stringify({
+        version: 1,
+        appTheme: "dark",
+        lineHeight: 20,
+        fontSize: 14,
+        editor: { fontFamily: "monospace", maxFileSize: 1024 },
+        agent: {
+          providerId: "vllm",
+          providers: { vllm: { baseUrl: "http://x", model: "legacy", defaultModel: "cur" } },
+        },
+      }),
+      "utf-8",
+    );
+
+    configService.init();
+
+    const providers = configService.get("agent.providers") as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(providers.vllm.defaultModel).toBe("cur");
+    expect("model" in providers.vllm).toBe(false);
+
+    const parsed = JSON.parse(fs.readFileSync(path.join(configDir, "config.json"), "utf-8")) as {
+      agent: { providers: Record<string, Record<string, unknown>> };
+    };
+    expect(parsed.agent.providers.vllm.defaultModel).toBe("cur");
+    expect("model" in parsed.agent.providers.vllm).toBe(false);
+  });
+
+  test("set() strips a legacy `model` key before persisting (even after init)", () => {
+    // A save path that carries a stale `model` (e.g. `model: ""` from a config
+    // written pre-rename, alongside a `models` list) must never re-persist it.
+    configService.init();
+
+    configService.set("agent", {
+      providerId: "vllm",
+      providers: {
+        vllm: {
+          baseUrl: "http://x",
+          name: "vLLM",
+          model: "",
+          models: [{ id: "deepseek-v4-flash" }],
+        },
+      },
+    });
+
+    const providers = configService.get("agent.providers") as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect("model" in providers.vllm).toBe(false);
+    expect(providers.vllm.defaultModel).toBe("");
+    expect(providers.vllm.models).toEqual([{ id: "deepseek-v4-flash" }]);
+
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, ".config", "config.json"), "utf-8"),
+    ) as {
+      agent: { providers: Record<string, Record<string, unknown>> };
+    };
+    expect("model" in parsed.agent.providers.vllm).toBe(false);
+    expect(parsed.agent.providers.vllm.defaultModel).toBe("");
+  });
+
   test("init() back-fills the maxFileSize default for legacy config files", () => {
     // A config written before editor.maxFileSize existed must get the 50MB
     // default via deepMerge rather than a missing/undefined value.

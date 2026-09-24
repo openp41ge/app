@@ -34,7 +34,9 @@ describe("parseJson", () => {
   });
 
   test("handles numbers, booleans, null and escapes", () => {
-    expect(parseJson('{"n": -1.5e3, "t": true, "f": false, "z": null, "s": "a\\"b"}').value).toEqual({
+    expect(
+      parseJson('{"n": -1.5e3, "t": true, "f": false, "z": null, "s": "a\\"b"}').value,
+    ).toEqual({
       n: -1500,
       t: true,
       f: false,
@@ -57,10 +59,12 @@ describe("computeFoldRanges", () => {
   test("ignores brackets inside strings", () => {
     const text = '{"s": "{ not a brace }", "a": [1]}';
     const folds = computeFoldRanges(text);
-    expect(folds).toEqual([
-      { openLine: 0, closeLine: 0, kind: "object" },
-      { openLine: 0, closeLine: 0, kind: "array" },
-    ].filter((f) => f.closeLine > f.openLine));
+    expect(folds).toEqual(
+      [
+        { openLine: 0, closeLine: 0, kind: "object" },
+        { openLine: 0, closeLine: 0, kind: "array" },
+      ].filter((f) => f.closeLine > f.openLine),
+    );
     expect(folds.length).toBe(0);
   });
 });

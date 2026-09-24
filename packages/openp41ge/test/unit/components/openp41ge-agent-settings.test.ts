@@ -39,7 +39,7 @@ class FakeConfig {
 
 const VLLM = {
   baseUrl: "http://localhost:8000/v1",
-  model: "Qwen2.5-Coder-7B-Instruct",
+  defaultModel: "Qwen2.5-Coder-7B-Instruct",
   name: "vLLM (local)",
 };
 const AGENT = (providers = { vllm: VLLM }, providerId = "vllm") => ({ providerId, providers });
@@ -70,6 +70,65 @@ describe("openp41ge-agent-settings — smart JSON view", () => {
     const el = await mount(AGENT());
     expect(el.shadowRoot.querySelector(".ags-bottombar")).toBeTruthy();
     expect(el.shadowRoot.querySelector(".ags-bottombar").textContent).toContain("saved");
+  });
+
+  test("the sort button reorders object keys recursively without breaking JSON", async () => {
+    const el = await mount({
+      providers: {
+        vllm: {
+          name: "vLLM",
+          baseUrl: "http://localhost:8000/v1",
+          defaultModel: "Qwen",
+          models: [{ id: "Qwen", contextWindow: 128000 }],
+        },
+      },
+      providerId: "vllm",
+    });
+    const btn = el.shadowRoot.querySelector(".ags-footer-btn--icon");
+    expect(btn).toBeTruthy();
+    btn.click();
+    await tick();
+    expect(Object.keys(el._config)).toEqual(["providerId", "providers"]);
+    expect(Object.keys(el._config.providers.vllm)).toEqual([
+      "baseUrl",
+      "defaultModel",
+      "models",
+      "name",
+    ]);
+    expect(Object.keys(el._config.providers.vllm.models[0])).toEqual([
+      "contextWindow",
+      "id",
+    ]);
+    // Staged in-memory only — sorting is not a save.
+    expect(el.configService.sets.length).toBe(0);
+  });
+
+  test("Cmd/Ctrl+S while the JSON editor is focused saves the staged config", async () => {
+    const el = await mount(AGENT());
+    const je = el.shadowRoot.querySelector(".ags-json-pane > json-editor");
+    expect(je).toBeTruthy();
+    // Stage an unsaved edit.
+    je.dispatchEvent(
+      new CustomEvent("json-editor-change", {
+        detail: { value: { ...AGENT(), providerId: "oai" } },
+        bubbles: true,
+      }),
+    );
+    await tick();
+    expect(el.configService.sets.length).toBe(0);
+
+    // Cmd+S on the json-editor saves it (and suppresses the browser default).
+    const ev = new KeyboardEvent("keydown", {
+      key: "s",
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    je.dispatchEvent(ev);
+    await tick();
+    expect(ev.defaultPrevented).toBe(true);
+    expect(el.configService.sets.length).toBe(1);
+    expect(el.configService.vals.agent.providerId).toBe("oai");
   });
 
   test("renders a <json-editor> bound to the whole config", async () => {
@@ -133,19 +192,19 @@ describe("openp41ge-agent-settings — smart JSON view", () => {
     const drawerJe = el.shadowRoot.querySelector(".drawer json-editor");
     drawerJe.dispatchEvent(
       new CustomEvent("json-editor-change", {
-        detail: { value: { ...VLLM, model: "new-model" } },
+        detail: { value: { ...VLLM, defaultModel: "new-model" } },
         bubbles: true,
         composed: true,
       }),
     );
     await tick();
     // Staged in memory only — the persisted value is unchanged.
-    expect(el.configService.vals.agent.providers.vllm.model).toBe("Qwen2.5-Coder-7B-Instruct");
+    expect(el.configService.vals.agent.providers.vllm.defaultModel).toBe("Qwen2.5-Coder-7B-Instruct");
     expect(el.configService.sets.length).toBe(0);
     // Save persists the drafted config.
     el.shadowRoot.querySelector(".ags-footer-btn--primary").click();
     await tick();
-    expect(el.configService.vals.agent.providers.vllm.model).toBe("new-model");
+    expect(el.configService.vals.agent.providers.vllm.defaultModel).toBe("new-model");
   });
 
   test("opening a nested sub-object stacks a second json drawer", async () => {

@@ -42,13 +42,13 @@ describe("agent-provider-presets", () => {
     const draft = applyPreset(providerPreset("openai")!);
     expect(draft).toEqual({
       baseUrl: "https://api.openai.com/v1",
-      model: "gpt-4o",
+      defaultModel: "gpt-4o",
       name: "OpenAI",
     });
     // A custom preset yields blank fields.
     const custom = applyPreset(customPreset());
     expect(custom.baseUrl).toBe("");
-    expect(custom.model).toBe("");
+    expect(custom.defaultModel).toBe("");
   });
 
   it("nextProviderId de-dupes against existing ids", () => {
@@ -61,19 +61,19 @@ describe("agent-provider-presets", () => {
   });
 
   it("presetFor matches a config to its preset by endpoint, else Custom", () => {
-    expect(presetFor({ baseUrl: "https://api.openai.com/v1", model: "" }).id).toBe("openai");
+    expect(presetFor({ baseUrl: "https://api.openai.com/v1", defaultModel: "" }).id).toBe("openai");
     // Trailing slash / case are normalised.
-    expect(presetFor({ baseUrl: "HTTPS://API.OPENAI.COM/V1/", model: "" }).id).toBe("openai");
+    expect(presetFor({ baseUrl: "HTTPS://API.OPENAI.COM/V1/", defaultModel: "" }).id).toBe("openai");
     // A local/self-hosted endpoint is no longer a named preset → Custom.
-    expect(presetFor({ baseUrl: "http://localhost:8000/v1", model: "" }).id).toBe(CUSTOM_PRESET_ID);
+    expect(presetFor({ baseUrl: "http://localhost:8000/v1", defaultModel: "" }).id).toBe(CUSTOM_PRESET_ID);
     // Unrecognised endpoint → Custom.
-    expect(presetFor({ baseUrl: "https://example.com/x/v1", model: "" }).id).toBe(CUSTOM_PRESET_ID);
+    expect(presetFor({ baseUrl: "https://example.com/x/v1", defaultModel: "" }).id).toBe(CUSTOM_PRESET_ID);
     // Blank endpoint → Custom.
-    expect(presetFor({ baseUrl: "", model: "" }).id).toBe(CUSTOM_PRESET_ID);
+    expect(presetFor({ baseUrl: "", defaultModel: "" }).id).toBe(CUSTOM_PRESET_ID);
   });
 
   it("providerDisplayName prefers an explicit name", () => {
-    const config = { baseUrl: "https://api.openai.com/v1", model: "", name: "My Rig" };
+    const config = { baseUrl: "https://api.openai.com/v1", defaultModel: "", name: "My Rig" };
     expect(providerDisplayName(providerPreset("openai"), config)).toBe("My Rig");
   });
 
@@ -81,15 +81,15 @@ describe("agent-provider-presets", () => {
     expect(
       providerDisplayName(providerPreset("openai"), {
         baseUrl: "https://api.openai.com/v1",
-        model: "",
+        defaultModel: "",
       }),
     ).toBe("OpenAI");
     // Custom preset with a host → hostname.
     expect(
-      providerDisplayName(customPreset(), { baseUrl: "https://my.example.com/v1", model: "" }),
+      providerDisplayName(customPreset(), { baseUrl: "https://my.example.com/v1", defaultModel: "" }),
     ).toBe("my.example.com");
     // Custom preset with no endpoint → generic label.
-    expect(providerDisplayName(customPreset(), { baseUrl: "", model: "" })).toBe("Custom provider");
+    expect(providerDisplayName(customPreset(), { baseUrl: "", defaultModel: "" })).toBe("Custom provider");
   });
 
   it("endpointHost returns the host without the scheme/path", () => {
@@ -107,12 +107,12 @@ describe("agent-provider-presets", () => {
   });
 
   it("providerCompatible derives the wire protocol from the endpoint", () => {
-    expect(providerCompatible({ baseUrl: "https://api.openai.com/v1", model: "" })).toBe("openai");
-    expect(providerCompatible({ baseUrl: "https://api.anthropic.com/v1", model: "" })).toBe(
+    expect(providerCompatible({ baseUrl: "https://api.openai.com/v1", defaultModel: "" })).toBe("openai");
+    expect(providerCompatible({ baseUrl: "https://api.anthropic.com/v1", defaultModel: "" })).toBe(
       "anthropic",
     );
     // Unknown endpoint → OpenAI-compatible by default.
-    expect(providerCompatible({ baseUrl: "http://localhost:8000/v1", model: "" })).toBe("openai");
+    expect(providerCompatible({ baseUrl: "http://localhost:8000/v1", defaultModel: "" })).toBe("openai");
   });
 
   it("nextModelId de-dupes against existing model ids", () => {

@@ -38,7 +38,7 @@ const CONFIG = {
   lineHeight: 20,
   fontSize: 14,
   editor: { fontFamily: "mono", maxFileSize: 52428800 },
-  agent: { providerId: "vllm", providers: { vllm: { baseUrl: "http://x", model: "" } } },
+  agent: { providerId: "vllm", providers: { vllm: { baseUrl: "http://x", defaultModel: "" } } },
 };
 
 /** Only the platform-wide keys are editable in the global surface. */
@@ -125,7 +125,7 @@ describe("openp41ge-manager-settings — global platform settings JSON editor", 
   test("row height follows the global line-height", async () => {
     const el = await mount(new FakeBridge({ ...CONFIG, lineHeight: 30 }));
     const je = el.shadowRoot.querySelector("json-editor");
-    expect(je.rowHeight).toBe(34);
+    expect(je.rowHeight).toBe(30);
   });
 
   test("falls back when the config bridge is missing", async () => {

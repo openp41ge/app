@@ -22,8 +22,10 @@ import type { PropertyValues } from "lit";
 import { showConfirmModal } from "../components/openp41ge-confirm-modal";
 import { workspaceFileService } from "../services/workspace-file-service";
 import "openp41ge-json-editor/json-editor";
-import { cloneDeep, getAt, setAt } from "openp41ge-json-editor";
+import { cloneDeep, getAt, setAt, schemaAtPath, sortJsonKeys } from "openp41ge-json-editor";
 import type { JsonPath } from "openp41ge-json-editor";
+import { AGENT_SETTINGS_SCHEMA } from "../models/agent-settings-schema";
+import { resolveAgentDescription } from "../models/agent-settings-descriptions";
 import {
   PROVIDER_PRESETS,
   CUSTOM_PRESET_ID,
@@ -161,6 +163,8 @@ export class Openp41geAgentSettings extends LitElement {
   /** Last persisted baseline; used to detect unsaved edits. */
   private _savedConfig: AgentConfig | null = null;
   @state() private _loading = true;
+  /** Resolves schema description file references to bundled Markdown. */
+  private _resolveResource = (ref: string): string | null => resolveAgentDescription(ref);
   @state() private _drawers: DrawerState[] = [];
   @state() private _closingDrawers: ClosingDrawer[] = [];
   @state() private _testing = false;
@@ -300,7 +304,7 @@ export class Openp41geAgentSettings extends LitElement {
   private _defaultConfig(): AgentConfig {
     return {
       providerId: "vllm",
-      providers: { vllm: { baseUrl: "http://localhost:8000/v1", model: "" } },
+      providers: { vllm: { baseUrl: "http://localhost:8000/v1", defaultModel: "" } },
     };
   }
 
@@ -352,7 +356,7 @@ export class Openp41geAgentSettings extends LitElement {
 
   private _providerMeta(p: ProviderConfig): string {
     const parts: string[] = [];
-    if (p.model) parts.push(p.model);
+    if (p.defaultModel) parts.push(p.defaultModel);
     const host = endpointHost(p.baseUrl);
     if (host) parts.push(host);
     return parts.length ? parts.join(" · ") : "No endpoint configured";
@@ -533,7 +537,7 @@ export class Openp41geAgentSettings extends LitElement {
     // the user enters a real endpoint/model (via _syncProviderFromDraft); if
     // they close it with no data it is discarded (see _maybeDeleteEmptyProvider),
     // so we never write empty fake providers to config.
-    const draft: ProviderDraft = { baseUrl: "", model: "" };
+    const draft: ProviderDraft = { baseUrl: "", defaultModel: "" };
     const id = nextProviderId(Object.keys(config.providers), CUSTOM_PRESET_ID);
     const providers = { ...config.providers, [id]: this._providerFromDraft(draft) };
     let providerId = config.providerId;
@@ -612,7 +616,7 @@ export class Openp41geAgentSettings extends LitElement {
 
   /** Coerce a ProviderDraft into a clean ProviderConfig (numbers on save). */
   private _providerFromDraft(draft: ProviderDraft): ProviderConfig {
-    const config: ProviderConfig = { baseUrl: draft.baseUrl, model: draft.model };
+    const config: ProviderConfig = { baseUrl: draft.baseUrl, defaultModel: draft.defaultModel };
     if (draft.name !== undefined) config.name = draft.name;
     if (draft.apiKey !== undefined) config.apiKey = draft.apiKey;
     const temperature = this._numberValue(String(draft.temperature ?? ""));
@@ -804,7 +808,7 @@ export class Openp41geAgentSettings extends LitElement {
   private _isEmptyProvider(p: ProviderConfig): boolean {
     return (
       !p.baseUrl.trim() &&
-      !p.model.trim() &&
+      !p.defaultModel.trim() &&
       !(p.apiKey ?? "").trim() &&
       !p.name?.trim() &&
       (p.models ?? []).length === 0 &&
@@ -873,7 +877,7 @@ export class Openp41geAgentSettings extends LitElement {
       const oldId = models[d.modelIndex]?.id ?? null;
       models[d.modelIndex] = modelConfigFromDraft(d.draft);
       draft = { ...providerDrawer.draft, models };
-      if (draft.model === oldId) draft = { ...draft, model: id };
+      if (draft.defaultModel === oldId) draft = { ...draft, defaultModel: id };
     }
     this._updateDrawer(providerDrawer.id, { draft });
     await this._syncProviderFromDraft(providerDrawer.id);
@@ -894,8 +898,8 @@ export class Openp41geAgentSettings extends LitElement {
     const models = cur.filter((_, i) => i !== d.modelIndex);
     let draft = { ...providerDrawer.draft, models };
     // If the deleted model was the default, fall back to another model.
-    if (draft.model === cur[d.modelIndex]?.id) {
-      draft = { ...draft, model: models[0]?.id ?? "" };
+    if (draft.defaultModel === cur[d.modelIndex]?.id) {
+      draft = { ...draft, defaultModel: models[0]?.id ?? "" };
     }
     this._updateDrawer(providerDrawer.id, { draft });
     await this._syncProviderFromDraft(providerDrawer.id);
@@ -929,8 +933,13 @@ export class Openp41geAgentSettings extends LitElement {
       }
       const models = modelsFromIds(ids);
       const draft = { ...d.draft, models };
-      const model = models.some((m) => m.id === draft.model) ? draft.model : models[0].id;
-      this._updateDrawer(d.id, { draft: { ...draft, model }, defaultModelOpen: false });
+      const model = models.some((m) => m.id === draft.defaultModel)
+        ? draft.defaultModel
+        : models[0].id;
+      this._updateDrawer(d.id, {
+        draft: { ...draft, defaultModel: model },
+        defaultModelOpen: false,
+      });
       this._detectedMessage = `Detected ${ids.length} models.`;
       void this._syncProviderFromDraft(d.id);
     } catch (err) {
@@ -940,7 +949,7 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _providerCompatible(d: ProviderDrawerState): "openai" | "anthropic" {
-    return providerCompatible({ baseUrl: d.draft.baseUrl, model: d.draft.model });
+    return providerCompatible({ baseUrl: d.draft.baseUrl, defaultModel: d.draft.defaultModel });
   }
 
   private _focusModelId(): void {
@@ -1110,6 +1119,17 @@ export class Openp41geAgentSettings extends LitElement {
           background: var(--accent, #569cd6);
           opacity: 0.9;
         }
+        /* Square icon-only button (e.g. Sort keys). */
+        .ags-footer-btn--icon {
+          padding: 0;
+          width: 26px;
+          justify-content: center;
+        }
+        .ags-footer-btn--icon svg {
+          width: 14px;
+          height: 14px;
+          fill: currentColor;
+        }
 
         .drawer-footer {
           display: flex;
@@ -1169,7 +1189,7 @@ export class Openp41geAgentSettings extends LitElement {
         }
 
         /* The whole base pane is the JSON editor — let it fill the surface. */
-                .ags-json-pane {
+        .ags-json-pane {
           height: 100%;
           display: flex;
           flex-direction: column;
@@ -1269,7 +1289,10 @@ export class Openp41geAgentSettings extends LitElement {
           font: inherit;
           text-align: left;
           cursor: pointer;
-          transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+          transition:
+            border-color 0.12s ease,
+            background 0.12s ease,
+            box-shadow 0.12s ease;
         }
         .ags-tool-card:hover {
           border-color: var(--accent, #569cd6);
@@ -1842,8 +1865,11 @@ export class Openp41geAgentSettings extends LitElement {
                   : html`
                       <json-editor
                         .value=${config}
+                        .schema=${AGENT_SETTINGS_SCHEMA}
+                        .resolveResource=${this._resolveResource}
                         @json-editor-change=${(e: CustomEvent) => void this._onConfigJsonChange(e)}
                         @json-editor-open=${(e: CustomEvent) => this._onConfigJsonOpen(e)}
+                        @keydown=${(e: KeyboardEvent) => this._onEditorKeyDown(e)}
                       ></json-editor>
                     `
               }
@@ -1855,12 +1881,40 @@ export class Openp41geAgentSettings extends LitElement {
               >${this._isDirty() ? "Unsaved changes." : "All changes saved."}</span
             >
             <div class="ags-bottombar-actions">
-            <button class="ags-footer-btn" type="button" ?disabled=${!this._isDirty()} @click=${() => this._resetConfig()}>
-              Reset
-            </button>
-            <button class="ags-footer-btn ags-footer-btn--primary" type="button" ?disabled=${!this._isDirty()} @click=${() => void this._saveConfig()}>
-              Save
-            </button>
+              <button
+                class="ags-footer-btn ags-footer-btn--icon"
+                type="button"
+                title="Sort keys"
+                aria-label="Sort keys"
+                ?disabled=${!this._config}
+                @click=${() => this._sortConfig()}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="24px"
+                  viewBox="0 -960 960 960"
+                  width="24px"
+                  fill="currentColor"
+                >
+                  <path d="M120-240v-80h240v80H120Zm0-200v-80h480v80H120Zm0-200v-80h720v80H120Z" />
+                </svg>
+              </button>
+              <button
+                class="ags-footer-btn"
+                type="button"
+                ?disabled=${!this._isDirty()}
+                @click=${() => this._resetConfig()}
+              >
+                Reset
+              </button>
+              <button
+                class="ags-footer-btn ags-footer-btn--primary"
+                type="button"
+                ?disabled=${!this._isDirty()}
+                @click=${() => void this._saveConfig()}
+              >
+                Save
+              </button>
             </div>
           </div>
 
@@ -1889,8 +1943,8 @@ export class Openp41geAgentSettings extends LitElement {
       : !this._hasWorkspace
         ? html`
             <p class="ags-card-help">
-              Agent tools are enabled per workspace. Open a workspace first to choose
-              which tools its agents may use.
+              Agent tools are enabled per workspace. Open a workspace first to choose which tools
+              its agents may use.
             </p>
           `
         : tools.length === 0
@@ -1905,22 +1959,24 @@ export class Openp41geAgentSettings extends LitElement {
                       aria-pressed=${this._enabledTools.has(tool.name)}
                       @click=${() => void this._toggleAgentTool(tool.name)}
                     >
-                      <span class="ags-tool-check" aria-hidden="true">${
-                        this._enabledTools.has(tool.name) ? "✓" : nothing
-                      }</span>
+                      <span class="ags-tool-check" aria-hidden="true"
+                        >${this._enabledTools.has(tool.name) ? "✓" : nothing}</span
+                      >
                       <span class="ags-tool-body">
                         <span class="ags-tool-name">${tool.name}</span>
-                        ${tool.description
-                          ? html`<span class="ags-tool-desc">${tool.description}</span>`
-                          : nothing}
+                        ${
+                          tool.description
+                            ? html`<span class="ags-tool-desc">${tool.description}</span>`
+                            : nothing
+                        }
                       </span>
                     </button>
                   `,
                 )}
               </div>
               <p class="ags-card-help">
-                Enabled tools are passed to agents when they run in this workspace. Tools
-                you disable here are withheld, even if a chat's composer still lists them.
+                Enabled tools are passed to agents when they run in this workspace. Tools you
+                disable here are withheld, even if a chat's composer still lists them.
               </p>
             `;
 
@@ -1939,7 +1995,7 @@ export class Openp41geAgentSettings extends LitElement {
     const preset = presetFor(p);
     const name = providerDisplayName(preset, p);
     const metaParts: string[] = [];
-    if (p.model) metaParts.push(p.model);
+    if (p.defaultModel) metaParts.push(p.defaultModel);
     const host = endpointHost(p.baseUrl);
     if (host) metaParts.push(host);
     return html`
@@ -2003,12 +2059,22 @@ export class Openp41geAgentSettings extends LitElement {
           ${
             d.kind === "json"
               ? html`<div class="ags-bottombar-actions">
-<button class="ags-footer-btn" type="button" ?disabled=${!this._isDirty()} @click=${() => this._resetConfig()}>
-              Reset
-            </button>
-<button class="ags-footer-btn ags-footer-btn--primary" type="button" ?disabled=${!this._isDirty()} @click=${() => void this._saveConfig()}>
-              Save
-            </button>
+                  <button
+                    class="ags-footer-btn"
+                    type="button"
+                    ?disabled=${!this._isDirty()}
+                    @click=${() => this._resetConfig()}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    class="ags-footer-btn ags-footer-btn--primary"
+                    type="button"
+                    ?disabled=${!this._isDirty()}
+                    @click=${() => void this._saveConfig()}
+                  >
+                    Save
+                  </button>
                 </div>`
               : nothing
           }
@@ -2320,7 +2386,7 @@ export class Openp41geAgentSettings extends LitElement {
     draft: ProviderDraft,
     models: ModelConfig[],
   ): TemplateResult {
-    const current = models.find((m) => m.id === draft.model);
+    const current = models.find((m) => m.id === draft.defaultModel);
     return html`
       <div
         class="ags-card ags-input-card ags-card-gap ags-default-model-card"
@@ -2356,7 +2422,7 @@ export class Openp41geAgentSettings extends LitElement {
                 >
                   <div class="ags-default-row-info">
                     <span class="ags-default-row-name"
-                      >${current?.id ?? (draft.model.trim() ? draft.model : "Select a model")}</span
+                      >${current?.id ?? (draft.defaultModel.trim() ? draft.defaultModel : "Select a model")}</span
                     >
                   </div>
                   ${this._chevronSvg()}
@@ -2375,7 +2441,7 @@ export class Openp41geAgentSettings extends LitElement {
     m: ModelConfig,
     isLast: boolean,
   ): TemplateResult {
-    const active = d.draft.model === m.id;
+    const active = d.draft.defaultModel === m.id;
     return html`
       <div
         class="ags-default-row ${active ? "is-active" : ""} ${isLast ? "is-last" : ""}"
@@ -2491,8 +2557,11 @@ export class Openp41geAgentSettings extends LitElement {
     return html`
       <json-editor
         .value=${value}
+        .schema=${schemaAtPath(AGENT_SETTINGS_SCHEMA, d.path) ?? null}
+        .resolveResource=${this._resolveResource}
         @json-editor-change=${(e: CustomEvent) => void this._onJsonChange(d, e)}
         @json-editor-open=${(e: CustomEvent) => this._onJsonOpen(d, e)}
+        @keydown=${(e: KeyboardEvent) => this._onEditorKeyDown(e)}
       ></json-editor>
     `;
   }
@@ -2539,6 +2608,24 @@ export class Openp41geAgentSettings extends LitElement {
   private _isDirty(): boolean {
     if (!this._config || !this._savedConfig) return !!this._config;
     return JSON.stringify(this._config) !== JSON.stringify(this._savedConfig);
+  }
+
+  /** Sort every object key (recursively) in the working draft so the JSON
+   *  reads in a stable order. Arrays keep their order; only objects are
+   *  reordered, so the JSON stays valid (explicit Save still persists). */
+  private _sortConfig(): void {
+    if (!this._config) return;
+    this._config = sortJsonKeys(this._config);
+    this.requestUpdate();
+  }
+
+  /** Cmd/Ctrl+S while the JSON editor is focused saves the staged draft. */
+  private _onEditorKeyDown(e: KeyboardEvent): void {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      e.stopPropagation();
+      void this._saveConfig();
+    }
   }
 
   /** Persist the working draft (Save). */
@@ -2846,7 +2933,7 @@ export class Openp41geAgentSettings extends LitElement {
   }
 
   private _setDefaultModel(d: ProviderDrawerState, id: string): void {
-    this._setDraftField(d, { model: id });
+    this._setDraftField(d, { defaultModel: id });
     this._closeDefaultModelList(d);
   }
 }

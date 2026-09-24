@@ -77,9 +77,6 @@ export const WORKSPACE_STATE_FILENAME = "workspace-state.json";
 /** Filename used to persist the shared chat store. */
 export const CHATS_FILENAME = "chats.json";
 
-/** Maximum number of agent turns per user message (tool-call loop guard). */
-export const AGENT_MAX_TURNS = 8;
-
 /**
  * Default title for a newly-created chat: a human-friendly date + time stamp,
  * e.g. "Sep 4, 2026, 1:23 PM". Used instead of a generic "New chat".

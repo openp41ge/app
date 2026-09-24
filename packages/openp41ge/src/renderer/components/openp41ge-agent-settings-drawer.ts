@@ -42,13 +42,30 @@ import {
   type ProviderConfig,
 } from "../models/agent-provider-presets";
 import "openp41ge-json-editor/json-editor";
-import { cloneDeep, getAt, setAt } from "openp41ge-json-editor";
+import { cloneDeep, getAt, setAt, schemaAtPath, sortJsonKeys } from "openp41ge-json-editor";
 import type { JsonPath } from "openp41ge-json-editor";
+import { AGENT_SETTINGS_SCHEMA } from "../models/agent-settings-schema";
+import { resolveAgentDescription } from "../models/agent-settings-descriptions";
+
+/**
+ * In-memory draft store for the agent settings surface. The drawer keeps
+ * unsaved edits as a draft that survives closing/re-opening the drawer within
+ * a session, but is NEVER written through to persisted config (only the explicit
+ * Save does that) and vanishes on a workspace/app restart (it lives on the
+ * global only).
+ */
+const agentDraftStore = new Map<string, AgentConfig>();
+const AGENT_DRAFT_KEY = "agent";
+
+/** @internal Test hook: drop any in-session agent draft (memory only). */
+export function __resetAgentSettingsDraft(): void {
+  agentDraftStore.clear();
+}
 
 /** A draft provider config (numeric fields held as text while editing). */
 interface ProviderDraft {
   baseUrl: string;
-  model: string;
+  defaultModel: string;
   name?: string;
   apiKey?: string;
   temperature?: string;
@@ -155,10 +172,9 @@ const AGDS_CSS = `
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: flex-end;
     height: 34px;
-    padding: 0 14px;
+    padding: 0;
     box-sizing: border-box;
     border-top: 1px solid var(--divider, #333);
     background: var(--bg-surface, #161616);
@@ -166,18 +182,11 @@ const AGDS_CSS = `
   .agds-footer--action {
     justify-content: flex-end;
   }
-  .agds-footer-hint {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-secondary, #999);
-    font-size: 11px;
-  }
   .agds-footer-btn {
     flex-shrink: 0;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     height: 26px;
     padding: 0 12px;
@@ -208,6 +217,33 @@ const AGDS_CSS = `
   .agds-footer-btn[disabled] {
     opacity: 0.4;
     cursor: default;
+  }
+  /* Square icon-only button (e.g. Sort keys) in the base footer: full height,
+   * right-aligned with a left-side separator — like the drawer head buttons. */
+  .agds-footer-btn--icon {
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    border: none;
+    border-left: 1px solid var(--border-divider, #2d2d2d);
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-secondary, #999);
+  }
+  .agds-footer-btn--icon:hover {
+    background: var(--bg-active, #37373d);
+    color: var(--text-primary, #ddd);
+  }
+  .agds-footer-btn--icon[disabled]:hover {
+    background: transparent;
+    color: var(--text-secondary, #999);
+  }
+  .agds-footer-btn--icon svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
   }
 
   .agds-card-help:first-child {
@@ -526,7 +562,7 @@ const AGDS_CSS = `
 function providerDraftFromConfig(p: ProviderConfig): ProviderDraft {
   return {
     baseUrl: p.baseUrl,
-    model: p.model,
+    defaultModel: p.defaultModel,
     name: p.name,
     apiKey: p.apiKey,
     temperature: p.temperature !== undefined ? String(p.temperature) : undefined,
@@ -537,7 +573,7 @@ function providerDraftFromConfig(p: ProviderConfig): ProviderDraft {
 }
 
 function providerConfigFromDraft(d: ProviderDraft): ProviderConfig {
-  const cfg: ProviderConfig = { baseUrl: d.baseUrl, model: d.model };
+  const cfg: ProviderConfig = { baseUrl: d.baseUrl, defaultModel: d.defaultModel };
   if (d.name && d.name.trim()) cfg.name = d.name;
   if (d.apiKey) cfg.apiKey = d.apiKey;
   const temp = Number(d.temperature ?? "");
@@ -582,6 +618,8 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   /** Last persisted baseline; used to detect unsaved edits. */
   private _savedConfig: AgentConfig | null = null;
   @state() private _loading = true;
+  /** Resolves schema description file references to bundled Markdown. */
+  private _resolveResource = (ref: string): string | null => resolveAgentDescription(ref);
 
   /** Available agent tools registered by the backend (plugin-style). */
   @state() private _availableTools: Array<{ name: string; description: string }> = [];
@@ -633,15 +671,22 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   }
 
   private async _load(): Promise<void> {
+    // Read the persisted config as the SAVE baseline, independent of any draft.
+    let persisted: AgentConfig | undefined;
     try {
-      const cfg = this.configService
+      persisted = this.configService
         ? (this.configService.get("agent") as AgentConfig | undefined)
         : ((await window.openp41ge?.config?.get?.("agent")) as AgentConfig | undefined);
-      this._config = cfg ?? this._defaultConfig();
     } catch {
-      this._config = this._defaultConfig();
+      persisted = undefined;
     }
-    this._savedConfig = cloneDeep(this._config);
+    const base = persisted ?? this._defaultConfig();
+    // Restore a prior in-session draft (unsaved edits from a previous open), so
+    // closing the drawer keeps the changes visible the next time it opens — but
+    // they are still NOT persisted until Save.
+    const draft = agentDraftStore.get(AGENT_DRAFT_KEY);
+    this._config = draft ? cloneDeep(draft) : cloneDeep(base);
+    this._savedConfig = cloneDeep(base);
     this._loading = false;
     await this._loadTools();
     this.host?.refresh();
@@ -693,7 +738,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   private _defaultConfig(): AgentConfig {
     return {
       providerId: "vllm",
-      providers: { vllm: { baseUrl: "http://localhost:8000/v1", model: "" } },
+      providers: { vllm: { baseUrl: "http://localhost:8000/v1", defaultModel: "" } },
     };
   }
 
@@ -703,7 +748,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
 
   private _providerMeta(p: ProviderConfig): string {
     const parts: string[] = [];
-    if (p.model) parts.push(p.model);
+    if (p.defaultModel) parts.push(p.defaultModel);
     const host = endpointHost(p.baseUrl);
     if (host) parts.push(host);
     return parts.length ? parts.join(" · ") : "No endpoint configured";
@@ -724,6 +769,17 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     await window.openp41ge?.config?.set?.("agent", value);
   }
 
+  /** Record the current working config as the in-session draft (memory only). */
+  private _cacheDraft(): void {
+    if (!this._config) return;
+    agentDraftStore.set(AGENT_DRAFT_KEY, cloneDeep(this._config));
+  }
+
+  /** Discard any in-session draft (after Save or Reset). */
+  private _clearDraft(): void {
+    agentDraftStore.delete(AGENT_DRAFT_KEY);
+  }
+
   /** Write a provider draft through to config (live). */
   private async _syncProvider(layerId: string): Promise<void> {
     const config = this._config;
@@ -733,6 +789,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     const providers = { ...config.providers, [editId]: providerConfigFromDraft(draft) };
     const next = { ...config, providers };
     this._config = next;
+    this._cacheDraft();
     this.requestUpdate();
     this.host?.refresh();
     await this._persist(next);
@@ -756,13 +813,14 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     const config = this._config;
     if (!config) return;
     const id = nextProviderId(Object.keys(config.providers), CUSTOM_PRESET_ID);
-    const provider: ProviderConfig = { baseUrl: "", model: "" };
+    const provider: ProviderConfig = { baseUrl: "", defaultModel: "" };
     const providers = { ...config.providers, [id]: provider };
     const next = { ...config, providerId: config.providerId || id, providers };
     // Keep the blank provider in-memory only — it is NOT persisted until the
     // user enters a real endpoint/model (via _syncProvider). Closing it empty
     // discards it, so we never write fake empty providers to config.
     this._config = next;
+    this._cacheDraft();
 
     const layerId = this._genId();
     this._providerDrafts.set(layerId, providerDraftFromConfig(provider));
@@ -903,9 +961,9 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     const models = provider.models.filter((_, i) => i !== modelIndex);
     provider.models = models;
     // If the deleted model was the default, fall back.
-    if (provider.model === provider.models[modelIndex]?.id || provider.models.length === 0) {
-      if (provider.models.length > 0) provider.model = provider.models[0].id;
-      else provider.model = "";
+    if (provider.defaultModel === provider.models[modelIndex]?.id || provider.models.length === 0) {
+      if (provider.models.length > 0) provider.defaultModel = provider.models[0].id;
+      else provider.defaultModel = "";
     }
     this._modelCtx.delete(layerId);
     this._closeLayer(layerId);
@@ -934,6 +992,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     if (providerId === editId) providerId = Object.keys(providers)[0] ?? "";
     const next = { ...config, providerId, providers };
     this._config = next;
+    this._cacheDraft();
     // Only persist if this provider was already persisted; a created-but-unsaved
     // provider lives in-memory only, so removing it needs no write.
     if (!created) void this._persist(next);
@@ -978,6 +1037,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
       let providerId = config.providerId;
       if (providerId === editId) providerId = Object.keys(providers)[0] ?? "";
       this._config = { ...config, providerId, providers };
+      this._cacheDraft();
     }
     this._providerDrafts.delete(layerId);
     this._providerEditId.delete(layerId);
@@ -1004,7 +1064,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   private _isEmptyProvider(p: ProviderConfig): boolean {
     return (
       !p.baseUrl.trim() &&
-      !p.model.trim() &&
+      !p.defaultModel.trim() &&
       !(p.apiKey ?? "").trim() &&
       !p.name?.trim() &&
       (p.models ?? []).length === 0 &&
@@ -1039,6 +1099,46 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
 
   // ── Rendering ──────────────────────────────────────────────────────────
 
+  /**
+   * Head actions for the base drawer: a square Reset button (disabled until
+   * there are unsaved changes) followed by a square Save button, both shown
+   * next to ✕ (right-aligned, Reset immediately before Save). Save is
+   * highlighted blue while there are unsaved changes. Bound `this` so the host
+   * can call it as `surface.renderHeadAction()`.
+   */
+  readonly renderHeadAction = (): TemplateResult => {
+    const dirty = this._isDirty();
+    return html`
+      <button
+        class="sdw-reset"
+        type="button"
+        aria-label="Reset"
+        title="Reset"
+        ?disabled=${!dirty}
+        @click=${() => this._resetConfig()}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+          <path
+            d="M520-330v-60h160v60H520Zm60 210v-50h-60v-60h60v-50h60v160h-60Zm100-50v-60h160v60H680Zm40-110v-160h60v50h60v60h-60v50h-60Zm111-280h-83q-26-88-99-144t-169-56q-117 0-198.5 81.5T200-480q0 72 32.5 132t87.5 98v-110h80v240H160v-80h94q-62-50-98-122.5T120-480q0-75 28.5-140.5t77-114q48.5-48.5 114-77T480-840q129 0 226.5 79.5T831-560Z"
+          />
+        </svg>
+      </button>
+      <button
+        class="sdw-save ${dirty ? "sdw-save--dirty" : ""}"
+        type="button"
+        aria-label="Save"
+        title="Save"
+        @click=${() => void this._saveConfig()}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+          <path
+            d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"
+          />
+        </svg>
+      </button>
+    `;
+  };
+
   render(): TemplateResult {
     return html`
       <style>
@@ -1054,27 +1154,34 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
                   <json-editor
                     .value=${this._config}
                     .rowHeight=${this._jsonRowHeight()}
+                    .schema=${AGENT_SETTINGS_SCHEMA}
+                    .resolveResource=${this._resolveResource}
                     @json-editor-change=${(e: CustomEvent) => void this._onConfigJsonChange(e)}
                     @json-editor-open=${(e: CustomEvent) => this._onConfigJsonOpen(e)}
+                    @keydown=${(e: KeyboardEvent) => this._onEditorKeyDown(e)}
                   ></json-editor>
                 `
           }
         </div>
         <div class="agds-footer">
-          <span class="agds-footer-hint"
-            >${this._isDirty() ? "Unsaved changes." : "All changes saved."}</span
+          <button
+            class="agds-footer-btn agds-footer-btn--icon"
+            type="button"
+            title="Sort keys"
+            aria-label="Sort keys"
+            ?disabled=${!this._config}
+            @click=${() => this._sortConfig()}
           >
-          <div class="agds-footer-actions">
-            <button class="agds-footer-btn" type="button" ?disabled=${!this._isDirty()} @click=${() => this._resetConfig()}>
-              Reset
-            </button>
-            <button class="agds-footer-btn agds-footer-btn--primary" type="button" ?disabled=${!this._isDirty()} @click=${() => void this._saveConfig()}>
-              Save
-            </button>
-            <button class="agds-footer-btn" type="button" @click=${() => this.host?.closeTop(this.side)}>
-              Close
-            </button>
-          </div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              height="24px"
+              viewBox="0 -960 960 960"
+              width="24px"
+              fill="currentColor"
+            >
+              <path d="M120-240v-80h240v80H120Zm0-200v-80h480v80H120Zm0-200v-80h720v80H120Z" />
+            </svg>
+          </button>
         </div>
       </div>
     `;
@@ -1082,11 +1189,12 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
 
   // ── Smart JSON editing ────────────────────────────────────────────────
 
-  /** The whole-config editor committed an edit — persist it. */
+  /** The whole-config editor committed an edit — stage it into the draft. */
   private _onConfigJsonChange(e: CustomEvent): void {
     const value = (e.detail as { value: AgentConfig }).value;
     // Stage into the working draft only — nothing is persisted until Save.
     this._config = value;
+    this._cacheDraft();
     this.requestUpdate();
     this.host?.refresh();
   }
@@ -1102,7 +1210,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
    *  affordances room. */
   private _jsonRowHeight(): number {
     const lh = this.configService?.get("lineHeight") as number | undefined;
-    return typeof lh === "number" && lh >= 14 && lh <= 40 ? lh + 4 : 24;
+    return typeof lh === "number" && lh >= 14 && lh <= 40 ? lh : 20;
   }
 
   /** Push a JSON editor layer locked to a config path. */
@@ -1141,19 +1249,36 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
           <json-editor
             .value=${value}
             .rowHeight=${this._jsonRowHeight()}
+            .schema=${schemaAtPath(AGENT_SETTINGS_SCHEMA, path) ?? null}
+            .resolveResource=${this._resolveResource}
             @json-editor-change=${(e: CustomEvent) => void this._onJsonLayerChange(path, e)}
             @json-editor-open=${(e: CustomEvent) => this._onJsonLayerOpen(path, e)}
+            @keydown=${(e: KeyboardEvent) => this._onEditorKeyDown(e)}
           ></json-editor>
         </div>
         <div class="agds-footer agds-footer--action">
           <div class="agds-footer-actions">
-            <button class="agds-footer-btn" type="button" ?disabled=${!this._isDirty()} @click=${() => this._resetConfig()}>
+            <button
+              class="agds-footer-btn"
+              type="button"
+              ?disabled=${!this._isDirty()}
+              @click=${() => this._resetConfig()}
+            >
               Reset
             </button>
-            <button class="agds-footer-btn agds-footer-btn--primary" type="button" ?disabled=${!this._isDirty()} @click=${() => void this._saveConfig()}>
+            <button
+              class="agds-footer-btn agds-footer-btn--primary"
+              type="button"
+              ?disabled=${!this._isDirty()}
+              @click=${() => void this._saveConfig()}
+            >
               Save
             </button>
-            <button class="agds-footer-btn" type="button" @click=${() => this.host?.closeTop(this.side)}>
+            <button
+              class="agds-footer-btn"
+              type="button"
+              @click=${() => this.host?.closeTop(this.side)}
+            >
               Back
             </button>
           </div>
@@ -1170,6 +1295,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     setAt(next, path, value);
     // Stage into the working draft only — nothing is persisted until Save.
     this._config = next;
+    this._cacheDraft();
     this.requestUpdate();
     this.host?.refresh();
   }
@@ -1191,15 +1317,38 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
     if (!this._config) return;
     await this._persist(this._config);
     this._savedConfig = cloneDeep(this._config);
+    this._clearDraft();
     this.requestUpdate();
+    this.host?.refresh();
   }
 
   /** Discard unsaved edits and restore the last persisted config. */
   private _resetConfig(): void {
     if (!this._savedConfig) return;
     this._config = cloneDeep(this._savedConfig);
+    this._clearDraft();
     this.requestUpdate();
     this.host?.refresh();
+  }
+
+  /** Sort every object key (recursively) in the working draft so the JSON
+   *  reads in a stable order. Arrays keep their order, so the JSON stays
+   *  valid (explicit Save still persists). */
+  private _sortConfig(): void {
+    if (!this._config) return;
+    this._config = sortJsonKeys(this._config);
+    this._cacheDraft();
+    this.requestUpdate();
+    this.host?.refresh();
+  }
+
+  /** Cmd/Ctrl+S while the JSON editor is focused saves the staged draft. */
+  private _onEditorKeyDown(e: KeyboardEvent): void {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      e.stopPropagation();
+      void this._saveConfig();
+    }
   }
 
   private _renderTools(): TemplateResult {
@@ -1292,7 +1441,7 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
                 this._setProviderDraft(layerId, {
                   presetId,
                   baseUrl: applied.baseUrl,
-                  model: applied.model,
+                  defaultModel: applied.defaultModel,
                   name: presetId === CUSTOM_PRESET_ID ? draft.name : applied.name,
                 });
               }}
@@ -1356,7 +1505,11 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
             aria-label="Delete provider"
             @click=${() => this._deleteProvider(layerId)}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+              <path
+                d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
+              />
+            </svg>
           </button>
           <button
             class="agds-save-btn ${dirty ? "agds-save-btn--dirty" : ""}"
@@ -1364,7 +1517,11 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
             aria-label="Save provider"
             @click=${() => this._saveProvider(layerId)}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-34-35-34t-85 34q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+              <path
+                d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-34-35-34t-85 34q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"
+              />
+            </svg>
           </button>
         </div>
       </div>
@@ -1437,7 +1594,11 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
               if (idx !== undefined) this._deleteModel(layerId, ctx.providerLayerId, idx);
             }}
           >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+              <path
+                d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
+              />
+            </svg>
           </button>
           <button
             class="agds-save-btn ${dirty ? "agds-save-btn--dirty" : ""}"
@@ -1445,7 +1606,11 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
             aria-label="Save model"
             @click=${() => this._saveModel(layerId)}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-34-35-34t-85 34q-35 36-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+              <path
+                d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-34-35-34t-85 34q-35 36-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"
+              />
+            </svg>
           </button>
         </div>
       </div>

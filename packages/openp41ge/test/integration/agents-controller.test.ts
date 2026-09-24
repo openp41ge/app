@@ -180,7 +180,7 @@ describe("AgentsController", () => {
         getAgentConfig: async () => ({
           providerId: "vllm",
           providers: {
-            vllm: { baseUrl: "http://localhost:8000/v1", model: "vicuna-13b", name: "vLLM" },
+            vllm: { baseUrl: "http://localhost:8000/v1", defaultModel: "vicuna-13b", name: "vLLM" },
           },
         }),
         listTools: async () => [

@@ -44,7 +44,8 @@ export interface UserConfig {
       string,
       {
         baseUrl: string;
-        model: string;
+        /** The default model id used when a chat doesn't pick one explicitly. */
+        defaultModel: string;
         apiKey?: string;
         temperature?: number;
         maxTokens?: number;
@@ -75,7 +76,7 @@ const DEFAULT_CONFIG: UserConfig = {
     providers: {
       vllm: {
         baseUrl: "http://localhost:8000/v1",
-        model: "",
+        defaultModel: "",
       },
     },
   },
@@ -135,7 +136,12 @@ export class ConfigService {
         const raw = fs.readFileSync(this._configPath, "utf-8");
         const parsed = JSON.parse(raw) as Partial<UserConfig>;
         this._config = deepMerge({ ...DEFAULT_CONFIG }, parsed);
-        this._migrateConfig(this._config);
+        if (this._migrateConfig(this._config)) {
+          // Persist the migrated shape back to disk so legacy keys (e.g. the
+          // provider-level `model` field) are physically removed and don't
+          // reappear on the next load.
+          this._writeAtomic(this._config);
+        }
         log.info("config-loaded", { source: "file", path: this._configPath });
       } else {
         this._writeAtomic(this._config);
@@ -175,6 +181,9 @@ export class ConfigService {
       obj = obj[keys[i]] as Record<string, unknown>;
     }
     obj[keys[keys.length - 1]] = value;
+    // Strip any legacy keys (e.g. the provider-level `model`) before writing so
+    // a stale editor/renderer can never re-persist them.
+    this._migrateConfig(this._config);
     this._writeAtomic(this._config);
     this._notify();
   }
@@ -235,7 +244,9 @@ export class ConfigService {
             const raw = fs.readFileSync(this._configPath, "utf-8");
             const parsed = JSON.parse(raw) as Partial<UserConfig>;
             this._config = deepMerge({ ...DEFAULT_CONFIG }, parsed);
-            this._migrateConfig(this._config);
+            if (this._migrateConfig(this._config)) {
+              this._writeAtomic(this._config);
+            }
             this._notify();
           } catch {
             // Ignore parse errors during rapid writes
@@ -247,21 +258,46 @@ export class ConfigService {
     }
   }
 
-  /** Promote legacy nested `editor.lineHeight`/`editor.fontSize` to top-level
-   *  platform settings (they are global; sub-packages align to them). Stale
-   *  nested keys are removed so future writes don't persist duplicates. */
-  private _migrateConfig(config: UserConfig): void {
+  /** Promote stale/legacy config keys into the current shape. Returns true when
+   *  the config was changed (so the caller can persist the cleaned shape).
+   *
+   *  Renames the provider-level default model from the legacy `model` key to
+   *  `defaultModel` (so it reads as the default, distinct from the `models`
+   *  list). Any `model` key on a provider is stale now, so it is always
+   *  removed — the value is promoted to `defaultModel` only when `defaultModel`
+   *  is not already set. */
+  private _migrateConfig(config: UserConfig): boolean {
+    let changed = false;
+    const providers = config.agent?.providers;
+    if (providers && typeof providers === "object") {
+      for (const provider of Object.values(providers) as Array<Record<string, unknown>>) {
+        if (provider && typeof provider === "object" && "model" in provider) {
+          const legacy = provider.model;
+          if (
+            typeof legacy === "string" &&
+            (provider.defaultModel === undefined || provider.defaultModel === "")
+          ) {
+            provider.defaultModel = legacy;
+          }
+          delete provider.model;
+          changed = true;
+        }
+      }
+    }
     const editor = config.editor as Record<string, unknown> | undefined;
     if (editor && typeof editor === "object") {
       if (typeof editor.lineHeight === "number") {
         config.lineHeight = editor.lineHeight as number;
         delete editor.lineHeight;
+        changed = true;
       }
       if (typeof editor.fontSize === "number") {
         config.fontSize = editor.fontSize as number;
         delete editor.fontSize;
+        changed = true;
       }
     }
+    return changed;
   }
 
   private _notify(): void {

@@ -159,14 +159,30 @@ class Parser {
         if (this.i >= this.text.length) this.error("Unterminated escape", start);
         const esc = this.text[this.i];
         switch (esc) {
-          case '"': out += '"'; break;
-          case "\\": out += "\\"; break;
-          case "/": out += "/"; break;
-          case "b": out += "\b"; break;
-          case "f": out += "\f"; break;
-          case "n": out += "\n"; break;
-          case "r": out += "\r"; break;
-          case "t": out += "\t"; break;
+          case '"':
+            out += '"';
+            break;
+          case "\\":
+            out += "\\";
+            break;
+          case "/":
+            out += "/";
+            break;
+          case "b":
+            out += "\b";
+            break;
+          case "f":
+            out += "\f";
+            break;
+          case "n":
+            out += "\n";
+            break;
+          case "r":
+            out += "\r";
+            break;
+          case "t":
+            out += "\t";
+            break;
           case "u": {
             const hex = this.text.slice(this.i + 1, this.i + 5);
             if (!/^[0-9a-fA-F]{4}$/.test(hex)) this.error("Invalid unicode escape", this.i);

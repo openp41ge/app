@@ -27,10 +27,24 @@
  *  - `json-editor-change` `{ value }` when the text parses to a new value.
  */
 
-import { LitElement, html, css, type TemplateResult } from "lit";
+import { LitElement, html, css, unsafeCSS, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { live } from "lit/directives/live.js";
 import { parseJson, type JsonNode, type JsonError } from "./json-parse";
+import {
+  pathForLine,
+  schemaAtPath,
+  schemaDescriptionForPath,
+  schemaItemHint,
+} from "./json-tooltip";
+import {
+  collectKeySuggestions,
+  defaultLiteralForType,
+  ownerPathAt,
+  suggestContextAt,
+  stringAt,
+  type KeySuggestion,
+} from "./json-suggest";
 import { computeFoldRanges, findEntryAtLine, type FoldRange } from "./json-analyze";
 import {
   tokenizeJsonFull,
@@ -38,11 +52,13 @@ import {
   type JsonToken,
   type SelectableRange,
 } from "./json-tokenize";
-import { cloneDeep, summarize } from "./json-tree";
+import { cloneDeep, getAt, summarize, type JsonPath } from "./json-tree";
+import { renderMarkdown, isMarkdownFileRef, highlightCodeBlock } from "./md-render";
 import {
   Gutter,
   lineNumberColumn,
   foldColumn,
+  GUTTER_DEFAULT_CSS,
   type GutterRow,
 } from "openp41ge-editor-gutter";
 import { CursorController } from "openp41ge-editor-engine/cursor/cursor-controller";
@@ -52,10 +68,39 @@ import type { TextPosition } from "openp41ge-editor-engine/model";
 export const JSON_EDITOR_CHANGE = "json-editor-change";
 export const JSON_EDITOR_OPEN = "json-editor-open";
 
+/** Resolves a local Markdown file reference (a relative `*.md` path in a schema
+ *  `description`) to the file's Markdown text, or null when it can't be
+ *  resolved. May be async. */
+export type ResolveResource = (ref: string) => string | Promise<string | null> | null;
+
+/** The unescaped key name from a string token's source text (e.g. `"baseUrl"`
+ *  → `baseUrl`), so a hovered key token resolves to a schema path even when the
+ *  document didn't parse (no tree to walk). Returns null for non-string tokens. */
+function keyNameFromToken(value: string): string | null {
+  if (value.length < 2 || value[0] !== '"' || value[value.length - 1] !== '"') return null;
+  const inner = value.slice(1, -1);
+  let out = "";
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === "\\" && i + 1 < inner.length) {
+      const n = inner[i + 1];
+      out += n === "n" ? "\n" : n === "t" ? "\t" : n === "r" ? "\r" : n;
+      i++;
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
+
 export const GUTTER_PAD_PX = 8;
 export const DEFAULT_DIGIT_PX = 6.6;
+/** Height of one suggestion row (px) — used to position the thin side tooltip. */
+export const SUGGEST_ITEM_H = 24;
 /** Width of the dedicated fold-chevron gutter (a second column next to the line numbers). */
 export const GUTTER_FOLD_PX = 24;
+/** How long the cursor must rest on a key before the schema tooltip shows. */
+export const TOOLTIP_DELAY_MS = 350;
 
 export function gutterWidthFor(rowCount: number, digitPx: number): number {
   const digits = String(Math.max(1, rowCount)).length;
@@ -75,6 +120,14 @@ export class JsonEditorElement extends LitElement {
   @property({ attribute: false }) value: unknown = undefined;
   @property({ type: Boolean, attribute: "readonly" }) readonly = false;
   @property({ type: Number, attribute: "row-height" }) rowHeight = 20;
+  /** JSON Schema describing the document. Hovering an object key shows the
+   *  matching property's `description` (tooltip content comes from here). */
+  @property({ attribute: false }) schema: unknown = null;
+  /** Optional resolver for Markdown file references in schema descriptions
+   *  (see `isMarkdownFileRef`): given a local `*.md` path it returns the file's
+   *  Markdown text (or null when the resource can't be resolved). The host
+   *  wires this to read bundled content or the filesystem. */
+  @property({ attribute: false }) resolveResource: ResolveResource | null = null;
 
   /** Full JSON text — the source of truth that gets persisted. */
   @state() private _text = "";
@@ -114,11 +167,45 @@ export class JsonEditorElement extends LitElement {
   private _gutterVisText = "";
   private _gutterRowH = 0;
   private _gutterW = -1;
+  private _gutterFoldW = -1;
   /** Cache for the selection highlight (avoids re-measuring on hover updates). */
   private _lastSelKey: string | null = null;
   private _lastVisText = "";
   /** Cached monospace advance width for the editor font (13px). */
   private _contentCharW = 0;
+  /** Cache of the hovered line's tokenization (so mousemove stays cheap). */
+  private _ttLine = -1;
+  private _ttTokens: ReturnType<typeof tokenizeJsonFull> = [];
+  private _ttKeyStarts: Set<number> = new Set();
+  /** Schema tooltip delay state — the tooltip shows only after the cursor has
+   *  rested on a key for `TOOLTIP_DELAY_MS`, and hides immediately on leaving. */
+  private _tooltipHoverKey: string | null = null;
+  private _tooltipPending: {
+    keyId: string;
+    line: number;
+    start: number;
+    keyLen: number;
+    text: string;
+    hint: string | null;
+  } | null = null;
+  /** Monotonic id so a stale async resource load can't paint a tooltip the
+   *  cursor has since left. */
+  private _tooltipLoadSeq = 0;
+  private _tooltipShowTimer: number | null = null;
+  /** Key auto-complete state: a visible suggestions list plus the thin side
+   *  tooltip. `x`/`y` are the list's top-left in `.je-content` pixels; `tipTop`
+   *  is the side tooltip's top (follows the highlighted row). */
+  @state() private _suggest: {
+    x: number;
+    y: number;
+    tipTop: number;
+    items: KeySuggestion[];
+    selected: number;
+  } | null = null;
+  /** Visible caret offset at which the list was dismissed (see `_dismissSuggest`).
+   *  Suppresses the list from instantly re-appearing until the caret moves or
+   *  the text is edited. */
+  private _suggestSuppress: number | null = null;
   /** Extra caret positions (offsets in `_visibleText`) beyond the primary. */
   /** Extra carets, each with its own selection (anchor + active position). */
   private _carets: { anchor: number; position: number }[] = [];
@@ -140,6 +227,7 @@ export class JsonEditorElement extends LitElement {
   private _dragStartY = 0;
 
   static styles = css`
+    ${unsafeCSS(GUTTER_DEFAULT_CSS)}
     :host {
       display: block;
       box-sizing: border-box;
@@ -206,21 +294,20 @@ export class JsonEditorElement extends LitElement {
          text-primary), not the dimmer text-secondary. */
       color: var(--text-primary, #d4d4d4);
       font-size: 11px;
+      /* Colour tokens for the shared gutter default styles (GUTTER_DEFAULT_CSS). */
+      --eg-fold-color: var(--je-fold-color, #79c0ff);
     }
-    .eg-col {
-      position: relative;
-      box-sizing: border-box;
-      flex: 0 0 auto;
-    }
-    .eg-cell {
-      display: flex;
-      align-items: center;
+    /* Editor-specific gutter bits on top of GUTTER_DEFAULT_CSS: the shared
+       default provides cell layout, the fold-cell/chevron structure and the
+       unified hover box; the JSON editor only themes it and styles its
+       line-number cells. Scoped to the line-number column so the fold
+       chevron button keeps the shared centered, full-cell layout. */
+    .eg-col--line-numbers .eg-cell {
       justify-content: flex-end;
       padding: 0 8px;
-      box-sizing: border-box;
-      white-space: nowrap;
-      overflow: hidden;
       cursor: pointer;
+    }
+    .eg-cell {
       transition: background-color 120ms ease;
     }
     /* Error line numbers keep their red tint; the unified hover box merely
@@ -235,53 +322,162 @@ export class JsonEditorElement extends LitElement {
     .eg-cell.eg-cell--active {
       background: var(--je-active-line-bg, rgba(255, 255, 255, 0.12));
     }
-    /* Fold-header rows: the chevron button fills the cell and owns its hover. */
-    .eg-cell--fold {
-      justify-content: center;
-      padding: 0;
-      cursor: default;
-    }
-    .eg-fold-chevron {
-      border: none;
-      background: transparent;
-      color: var(--je-fold-color, #79c0ff);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      flex: 1 1 auto;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    .eg-chevron {
-      display: block;
-    }
-    .eg-fold-chevron:hover {
-      background: rgba(121, 192, 255, 0.18);
-      color: #a5d6ff;
-    }
-    /* Unified hover box: spans BOTH gutter columns on non-foldable rows, but
-       stays on the line-number cell only when the row has a chevron (the
-       chevron button owns its own hover). Painted by the gutter host; lets
-       pointer events pass through. Colors match the file editor's line-number
-       hover: same neutral fill + inner ring. */
-    .eg-hoverbox {
+
+    /* Schema tooltip — shown on key hover. Positioned by the editor near
+       the hovered key token; content comes from the JSON Schema property
+       "description". */
+    .je-tooltip {
       position: absolute;
-      left: 0;
-      top: 0;
-      z-index: 3;
-      background: rgba(255, 255, 255, 0.09);
+      z-index: 30;
+      max-width: 665px;
       box-sizing: border-box;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+      padding: 6px 9px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-primary, #d4d4d4);
+      background: var(--bg-secondary, #252526);
+      border: 1px solid var(--divider, #454545);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      white-space: normal;
       pointer-events: none;
+      display: none;
+    }
+    /* Rendered Markdown inside the tooltip (schema descriptions + loaded
+       resource files). Text outside recognised markers is escaped by the
+       renderer, so only these elements carry content. */
+    .je-tooltip p {
+      margin: 0 0 6px;
+    }
+    .je-tooltip p:last-child {
+      margin-bottom: 0;
+    }
+    .je-tooltip h1,
+    .je-tooltip h2,
+    .je-tooltip h3,
+    .je-tooltip h4 {
+      margin: 6px 0 4px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .je-tooltip h1 {
+      font-size: 15px;
+    }
+    .je-tooltip h2 {
+      font-size: 14px;
+    }
+    .je-tooltip h3,
+    .je-tooltip h4 {
+      font-size: 13px;
+    }
+    .je-tooltip ul,
+    .je-tooltip ol {
+      margin: 4px 0;
+      padding-left: 18px;
+    }
+    .je-tooltip li {
+      margin: 2px 0;
+    }
+    .je-tooltip blockquote {
+      margin: 6px 0;
+      padding: 2px 8px;
+      border-left: 3px solid var(--divider, #454545);
+      color: var(--text-secondary, #9d9d9d);
+    }
+    .je-tooltip hr {
+      border: 0;
+      border-top: 1px solid var(--divider, #454545);
+      margin: 8px 0;
+    }
+    .je-tooltip pre.je-md-code {
+      margin: 6px 0;
+      padding: 6px 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--divider, #454545);
+      border-radius: 4px;
+      overflow-x: auto;
+      white-space: pre;
+      font-family: var(--font-mono, monospace);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .je-tooltip pre.je-md-code code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+    .je-tooltip code {
+      background: rgba(255, 255, 255, 0.12);
+      padding: 1px 3px;
+      border-radius: 3px;
+      font-family: var(--font-mono, monospace);
+      font-size: 11px;
+    }
+    .je-tooltip a {
+      color: var(--accent, #4da3ff);
+    }
+    .je-tooltip .je-tooltip-hint {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-secondary, #9d9d9d);
     }
 
     .je-content {
       position: relative;
       flex: 1 1 auto;
       min-width: max-content;
+    }
+    /* Key auto-complete list — appears below the caret when it sits inside a
+       key-position string. Shows the schema keys not already set at that
+       object; the highlighted row is the one Up/Down will accept. */
+    .je-suggest {
+      position: absolute;
+      z-index: 40;
+      box-sizing: border-box;
+      min-width: 180px;
+      max-width: 340px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 4px;
+      background: var(--bg-secondary, #252526);
+      border: 1px solid var(--divider, #454545);
+      border-radius: 6px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      color: var(--text-primary, #d4d4d4);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .je-suggest-item {
+      height: 24px;
+      line-height: 24px;
+      padding: 0 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .je-suggest-item--sel {
+      background: var(--je-suggest-sel-bg, rgba(38, 79, 120, 0.9));
+      color: var(--je-suggest-sel-fg, #ffffff);
+    }
+    /* Thin side tooltip next to the list — same text as the key hover tooltip
+       for the highlighted suggestion. */
+    .je-suggest-tip {
+      position: absolute;
+      z-index: 41;
+      box-sizing: border-box;
+      max-width: 320px;
+      padding: 4px 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-primary, #d4d4d4);
+      background: var(--bg-secondary, #252526);
+      border: 1px solid var(--divider, #454545);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      white-space: pre-wrap;
+      pointer-events: none;
     }
     .je-lines {
       position: relative;
@@ -491,13 +687,18 @@ export class JsonEditorElement extends LitElement {
   private _onFocus = (): void => {
     this._isFocused = true;
     this._renderCarets();
+    this._syncActiveLine();
+    this._updateSuggest();
   };
 
   /** Recompute and apply the active gutter row from the textarea caret. */
   private _syncActiveLine(): void {
     const ta = this.renderRoot.querySelector(".je-input") as HTMLTextAreaElement | null;
     if (!ta) return;
-    const key = this._activeLineFor(ta);
+    // Only highlight the caret's row while the editor actually has focus.
+    // On open the textarea's value setter parks the caret at the end, which
+    // would otherwise auto-highlight the bottom line number.
+    const key = this._isFocused ? this._activeLineFor(ta) : null;
     if (key !== this._activeLine) {
       this._activeLine = key;
       this._gutter?.setActiveRow(key);
@@ -547,7 +748,10 @@ export class JsonEditorElement extends LitElement {
   private _applyRowHeight(): void {
     const lh = Math.max(1, Number(this.rowHeight) || 20);
     this.style.setProperty("--je-row-height", lh + "px");
-    this.style.setProperty("--je-gutter-w", gutterWidthFor(this._lineCount(), this._digitPx) + "px");
+    this.style.setProperty(
+      "--je-gutter-w",
+      gutterWidthFor(this._lineCount(), this._digitPx) + "px",
+    );
     this.style.setProperty("--je-fold-w", GUTTER_FOLD_PX + "px");
   }
 
@@ -641,6 +845,8 @@ export class JsonEditorElement extends LitElement {
     }
     this._visibleLines = vis;
     this._visibleText = vis.map((v) => v.text).join("\n");
+    this._ttLine = -1; // invalidate the hovered-line token cache
+    this._resetTooltipState();
 
     // Full-text offset of the start of each line, plus a visible→full offset map.
     const starts: number[] = [];
@@ -690,9 +896,9 @@ export class JsonEditorElement extends LitElement {
             <div class="je-gutter-mount"></div>
             <div class="je-content">
               <div class="je-selection"></div>
-              <div class="je-lines">
-                ${this._visibleLines.map((v) => this._renderRow(v))}
-              </div>
+              <div class="je-lines">${this._visibleLines.map((v) => this._renderRow(v))}</div>
+              <div class="je-tooltip" role="tooltip"></div>
+              ${this._renderSuggest()}
               <textarea
                 class="je-input"
                 .value=${live(this._visibleText)}
@@ -709,6 +915,7 @@ export class JsonEditorElement extends LitElement {
                   this._updateSelectionHighlight();
                   this._syncActiveLine();
                   this._renderCarets();
+                  this._updateSuggest();
                 }}
                 @mousedown=${(e: MouseEvent) => this._onMousedown(e)}
                 @mousemove=${this._onMouseMove}
@@ -732,6 +939,7 @@ export class JsonEditorElement extends LitElement {
     this._syncActiveLine();
     this._updateSelectionHighlight();
     this._renderCarets();
+    this._positionSuggestTip();
   }
 
   // ── Gutter (openp41ge-editor-gutter) ─────────────────────────────────────
@@ -753,7 +961,9 @@ export class JsonEditorElement extends LitElement {
         width: () => gutterWidthFor(this._lineCount(), this._digitPx),
       }),
       foldColumn({
-        width: GUTTER_FOLD_PX,
+        // Square collapsible buttons: the fold column is as wide as the row
+        // is tall, so the full-width chevron button is always a square.
+        width: () => Math.max(1, Math.round(Number(this.rowHeight) || 20)),
         onToggle: (line) => this._toggleFold(line),
       }),
     ]);
@@ -768,20 +978,17 @@ export class JsonEditorElement extends LitElement {
     if (!this._gutter) return;
     const rowH = Math.max(1, Number(this.rowHeight) || 20);
     const gutterW = gutterWidthFor(this._lineCount(), this._digitPx);
-    if (gutterW !== this._gutterW) {
+    const foldW = Math.max(1, Math.round(Number(this.rowHeight) || 20));
+    if (gutterW !== this._gutterW || foldW !== this._gutterFoldW) {
       this._gutterW = gutterW;
+      this._gutterFoldW = foldW;
       this._gutter.reflow();
     }
-    if (
-      this._gutterVisText !== this._visibleText ||
-      this._gutterRowH !== rowH
-    ) {
+    if (this._gutterVisText !== this._visibleText || this._gutterRowH !== rowH) {
       this._gutterVisText = this._visibleText;
       this._gutterRowH = rowH;
       this._gutter.setRows(
-        this._visibleLines.map(
-          (v, i): GutterRow => ({ key: v.line, top: i * rowH, height: rowH }),
-        ),
+        this._visibleLines.map((v, i): GutterRow => ({ key: v.line, top: i * rowH, height: rowH })),
         (key) => this._gutterData(key),
       );
       // Rebuilt rows: repaint every cell so the active/hover classes land on
@@ -1032,7 +1239,6 @@ export class JsonEditorElement extends LitElement {
     return this._contentCharW;
   }
 
-
   private _renderRow(v: VisibleLine) {
     const fold = this._foldForLine(v.line);
     const isFolded = this._folded.has(v.line);
@@ -1041,17 +1247,13 @@ export class JsonEditorElement extends LitElement {
     const showDel = !closeRow && this._hoverLine === v.line;
     const tokens = tokenizeJsonFull(v.text);
     const { keyStarts, valueStarts } = this._classifyTokens(tokens);
-    const meta = isFolded
-      ? html`<span class="je-fold-meta">${this._foldMeta(fold)}</span>`
-      : "";
+    const meta = isFolded ? html`<span class="je-fold-meta">${this._foldMeta(fold)}</span>` : "";
     // When folded, the open line's own opening brace would sit next to the
     // meta's `{ … }`/`[ … ]` label (a doubled brace). Replace the line's
     // content with just the key prefix (everything before the opening brace)
     // so the fold meta is the only opening-brace replacement visible.
     const openIdx = isFolded
-      ? tokens.findIndex(
-          (t) => t.kind === "punct" && (t.value === "{" || t.value === "["),
-        )
+      ? tokens.findIndex((t) => t.kind === "punct" && (t.value === "{" || t.value === "["))
       : -1;
     const content = tokens.map((t, i) => {
       if (isFolded && openIdx >= 0 && i >= openIdx) return "";
@@ -1064,8 +1266,22 @@ export class JsonEditorElement extends LitElement {
     });
     const del = closeRow
       ? ""
-      : html`<button class="je-del ${showDel ? "je-del--show" : ""}" title="Delete" @click=${() => this._deleteAtLine(v.line)} @mouseenter=${() => { this._hoverLine = v.line; this._setDanger(v.line); }} @mouseleave=${() => this._clearDanger()}>\u00d7</button>`;
-    return html`<div class="je-row ${danger ? "je-row--danger" : ""}" data-line="${v.line}"><div class="je-line">${content}${meta}</div><div class="je-actions">${del}</div></div>`;
+      : html`<button
+          class="je-del ${showDel ? "je-del--show" : ""}"
+          title="Delete"
+          @click=${() => this._deleteAtLine(v.line)}
+          @mouseenter=${() => {
+            this._hoverLine = v.line;
+            this._setDanger(v.line);
+          }}
+          @mouseleave=${() => this._clearDanger()}
+        >
+          ×
+        </button>`;
+    return html`<div class="je-row ${danger ? "je-row--danger" : ""}" data-line="${v.line}">
+      <div class="je-line">${content}${meta}</div>
+      <div class="je-actions">${del}</div>
+    </div>`;
   }
 
   /** Per-line token classification: which tokens are object keys / scalar
@@ -1103,6 +1319,358 @@ export class JsonEditorElement extends LitElement {
     else if (t.kind === "keyword") cls = "s-kw";
     if (braceMatch) cls += " je-brace--match";
     return html`<span class="${cls}">${t.value}</span>`;
+  }
+
+  /** Map a mouse x-offset (relative to the textarea) to a column index. */
+  private _offsetXToCol(offsetX: number): number {
+    const cw = this._measureCharW() > 0 ? this._measureCharW() : 8;
+    return Math.max(0, Math.floor((offsetX - 10) / cw));
+  }
+
+  /** Show/hide the schema tooltip based on which key the mouse is over.
+   *  Driven from the textarea's mousemove (the content spans sit beneath the
+   *  overlay and never receive pointer events), so the hovered line's key is
+   *  resolved from its column and the parsed tree's path. The tooltip is
+   *  anchored to the key's own position (its column/row), not the cursor, and
+   *  only appears after the cursor has rested on the key for a short delay.
+   */
+  private _updateKeyTooltip(idx: number, offsetX: number): void {
+    const tip = this.renderRoot.querySelector<HTMLElement>(".je-tooltip");
+    if (!tip) {
+      this._resetTooltipState();
+      return;
+    }
+    if (!this.schema) {
+      this._resetTooltipState();
+      return;
+    }
+    const v = this._visibleLines[idx];
+    if (!v) {
+      this._resetTooltipState();
+      return;
+    }
+    if (v.line !== this._ttLine) {
+      this._ttLine = v.line;
+      this._ttTokens = tokenizeJsonFull(v.text);
+      this._ttKeyStarts = this._classifyTokens(this._ttTokens).keyStarts;
+    }
+    const tokens = this._ttTokens;
+    const keyStarts = this._ttKeyStarts;
+    const col = this._offsetXToCol(offsetX);
+    const keyTok = tokens.find(
+      (t) => keyStarts.has(t.start) && col >= t.start && col < t.start + t.value.length,
+    );
+    let text: string | null = null;
+    let hint: string | null = null;
+    if (keyTok) {
+      // Resolve the key's path. Normally from the parsed tree, but fall back to
+      // a text scan when the document doesn't parse (a JSON error) so tooltips
+      // still appear over the keys of a broken document.
+      let path: JsonPath | null = null;
+      if (this._root) {
+        path = pathForLine(this._root, v.line);
+      } else {
+        const lineFullStart = this._fullLineStarts[v.line] ?? 0;
+        const owner = ownerPathAt(this._text, lineFullStart);
+        const keyName = keyNameFromToken(keyTok.value);
+        if (owner && keyName !== null) path = [...owner, keyName];
+      }
+      if (path) {
+        const schema = schemaAtPath(this.schema, path);
+        // Fall back to an ancestor description so dynamic keys (free-form map
+        // entries, arbitrary provider ids) still get a tooltip.
+        text = schemaDescriptionForPath(this.schema, path);
+        hint = schemaItemHint(schema);
+      }
+    }
+    // Identity of the key under the cursor (line + token start).
+    const keyId = keyTok && text ? `${v.line}:${keyTok.start}` : null;
+    this._tooltipHoverKey = keyId;
+
+    if (keyId && keyTok && text) {
+      // Only (re)arm when the hovered key changed; otherwise leave the running
+      // timer / already-shown tooltip alone (so moving within a key doesn't
+      // reset the delay).
+      if (this._tooltipPending?.keyId !== keyId) {
+        this._hideKeyTooltip();
+        this._clearTooltipTimer();
+        this._tooltipPending = {
+          keyId,
+          line: v.line,
+          start: keyTok.start,
+          keyLen: keyTok.value.length,
+          text,
+          hint,
+        };
+        this._tooltipShowTimer = window.setTimeout(() => this._tooltipFire(), TOOLTIP_DELAY_MS);
+      }
+    } else {
+      // Off any describable key → cancel the pending show and hide now.
+      this._resetTooltipState();
+    }
+  }
+
+  /** Clear the pending timer, hover key and any visible tooltip. */
+  private _resetTooltipState(): void {
+    this._clearTooltipTimer();
+    this._tooltipPending = null;
+    this._tooltipHoverKey = null;
+    this._hideKeyTooltip();
+  }
+
+  /** Delay elapsed: show the pending key's tooltip if the cursor is still on it.
+   *  When the description is a Markdown file reference, the resource is loaded
+   *  first (async) and re-checked against the hover state so a stale load can't
+   *  paint a tooltip the cursor has since left. */
+  private async _tooltipFire(): Promise<void> {
+    this._tooltipShowTimer = null;
+    const p = this._tooltipPending;
+    const seq = ++this._tooltipLoadSeq;
+    if (!p || this._tooltipHoverKey !== p.keyId) {
+      this._hideKeyTooltip();
+      return;
+    }
+    const v = this._visibleLines.find((x) => x.line === p.line);
+    const tip = this.renderRoot.querySelector<HTMLElement>(".je-tooltip");
+    if (!v || !tip) {
+      this._hideKeyTooltip();
+      return;
+    }
+    const idx = this._visibleLines.indexOf(v);
+
+    // Resolve the tooltip body. Most descriptions are inline Markdown; a
+    // Markdown file reference is loaded through `resolveResource`.
+    let body: string;
+    if (isMarkdownFileRef(p.text) && this.resolveResource) {
+      tip.textContent = "\u2026";
+      let content: string | null = null;
+      try {
+        content = await this.resolveResource(p.text);
+      } catch {
+        content = null;
+      }
+      // The cursor may have moved on while the resource loaded.
+      if (seq !== this._tooltipLoadSeq || this._tooltipHoverKey !== p.keyId) {
+        this._hideKeyTooltip();
+        return;
+      }
+      body = content
+        ? renderMarkdown(content)
+        : `<p>${p.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+    } else {
+      body = renderMarkdown(p.text);
+    }
+    if (p.hint) {
+      body += `<div class="je-tooltip-hint">${p.hint
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")}</div>`;
+    }
+    if (seq !== this._tooltipLoadSeq || this._tooltipHoverKey !== p.keyId) {
+      this._hideKeyTooltip();
+      return;
+    }
+    tip.innerHTML = body;
+    tip.style.display = "block";
+    // The tooltip may be wide, so it isn't pinned to the key's first column:
+    // center it on the key, then clamp it so it never falls left of the content
+    // edge and never clips past the viewport's right edge (it can sit further
+    // left or further right than the key rather than being cut off).
+    const tipW = tip.offsetWidth;
+    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const cw = this._measureCharW() > 0 ? this._measureCharW() : 8;
+    const keyW = p.keyLen * cw;
+    let left = 10 + p.start * cw + (keyW - tipW) / 2;
+    const viewport = this.renderRoot.querySelector<HTMLElement>(".je-viewport");
+    const content = this.renderRoot.querySelector<HTMLElement>(".je-content");
+    if (viewport && content) {
+      const vpRight = viewport.getBoundingClientRect().right - content.getBoundingClientRect().left;
+      const maxLeft = vpRight - tipW - 4;
+      left = Math.min(left, Math.max(0, maxLeft));
+    }
+    tip.style.left = `${Math.max(0, left)}px`;
+    tip.style.top = `${(idx + 1) * rowH + 2}px`;
+  }
+
+  private _clearTooltipTimer(): void {
+    if (this._tooltipShowTimer !== null) {
+      window.clearTimeout(this._tooltipShowTimer);
+      this._tooltipShowTimer = null;
+    }
+  }
+
+  private _hideKeyTooltip(): void {
+    const tip = this.renderRoot.querySelector<HTMLElement>(".je-tooltip");
+    if (tip) tip.style.display = "none";
+  }
+
+  // ── Key auto-complete (schema suggestions) ──────────────────────────────
+
+  /** Render the suggestions list (below the caret) and the thin side tooltip
+   *  for the highlighted row. Nothing is shown when there is no active list. */
+  private _renderSuggest(): TemplateResult | typeof nothing {
+    const s = this._suggest;
+    if (!s) return nothing;
+    const tipText = (s.items[s.selected]?.description ?? "").replace(/^\s+/, "") || null;
+    const items = s.items.map((it, i) => {
+      const sel = i === s.selected ? " je-suggest-item--sel" : "";
+      const mousedown = (e: Event) => {
+        e.preventDefault();
+        this._acceptSuggest(i);
+      };
+      const enter = () => this._selectSuggest(i);
+      // prettier-ignore
+      return html`<div class="je-suggest-item${sel}" role="option" data-key=${it.key} @mousedown=${mousedown} @mouseenter=${enter}>${it.label ?? it.key}</div>`;
+    });
+    // prettier-ignore
+    const tip = tipText
+      ? html`<div class="je-suggest-tip" role="tooltip" style="left:${s.x + 188}px; top:${s.tipTop}px">${tipText}</div>`
+      : nothing;
+    return html`
+      <div class="je-suggest" role="listbox" style="left:${s.x}px; top:${s.y}px">${items}</div>
+      ${tip}
+    `;
+  }
+
+  /** Recompute whether suggestions should show for the current caret and where
+   *  the list should sit. Called after every edit and caret move. */
+  private _updateSuggest(): void {
+    if (this.readonly || this._carets.length > 0) {
+      this._suggest = null;
+      return;
+    }
+    const ta = this._inputEl();
+    if (!ta) {
+      this._suggest = null;
+      return;
+    }
+    const pos = ta.selectionStart;
+    // If the list was just dismissed at this exact caret (e.g. via Escape),
+    // don't re-open it until the caret moves or the text changes.
+    if (this._suggestSuppress !== null && pos === this._suggestSuppress) return;
+    this._suggestSuppress = null;
+    const fullPos = this._visToFull[pos];
+    if (fullPos === undefined || fullPos === null) {
+      this._suggest = null;
+      return;
+    }
+    const ctx = suggestContextAt(this._text, fullPos);
+    if (!ctx || !this.schema) {
+      this._suggest = null;
+      return;
+    }
+    const items = collectKeySuggestions(this.schema, ctx.ownerPath, this._parsedValue, ctx.prefix);
+    if (items.length === 0) {
+      this._suggest = null;
+      return;
+    }
+    const rowIdx = this._visibleLines.findIndex(
+      (v) => pos >= v.start && pos <= v.start + v.text.length,
+    );
+    if (rowIdx < 0) {
+      this._suggest = null;
+      return;
+    }
+    const v = this._visibleLines[rowIdx];
+    const col = Math.min(pos - v.start, v.text.length);
+    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const cw = this._measureCharW() > 0 ? this._measureCharW() : 8;
+    const x = 10 + col * cw;
+    const y = (rowIdx + 1) * rowH + 2;
+    // Keep the highlight when the available set is unchanged (e.g. navigation)
+    // and reset otherwise (e.g. the prefix was edited).
+    const prev = this._suggest;
+    const sameItems =
+      prev !== null &&
+      prev.items.length === items.length &&
+      prev.items.every((p, i) => p.key === items[i].key);
+    const selected = sameItems ? Math.min(prev!.selected, items.length - 1) : 0;
+    this._suggest = {
+      x,
+      y,
+      tipTop: y + selected * SUGGEST_ITEM_H,
+      items,
+      selected,
+    };
+  }
+
+  /** Move the highlighted suggestion (clamped). */
+  private _moveSuggestSelection(delta: number): void {
+    const s = this._suggest;
+    if (!s) return;
+    const selected = Math.min(s.items.length - 1, Math.max(0, s.selected + delta));
+    if (selected === s.selected) return;
+    this._suggest = { ...s, selected, tipTop: s.y + selected * SUGGEST_ITEM_H };
+  }
+
+  /** Highlight a suggestion on hover (also swaps the side tooltip). */
+  private _selectSuggest(i: number): void {
+    const s = this._suggest;
+    if (!s || i === s.selected) return;
+    this._suggest = { ...s, selected: i, tipTop: s.y + i * SUGGEST_ITEM_H };
+  }
+
+  /** Apply the highlighted (or given) suggestion: replace the quoted token
+   *  with the key and park the caret after the closing quote. */
+  private _acceptSuggest(index?: number): void {
+    const s = this._suggest;
+    if (!s) return;
+    const item = s.items[index ?? s.selected];
+    if (!item) return;
+    const ta = this._inputEl();
+    if (!ta) return;
+    const pos = ta.selectionStart;
+    const fullPos = this._visToFull[pos];
+    if (fullPos === undefined || fullPos === null) return;
+    const str = stringAt(this._text, fullPos);
+    if (!str) return;
+    const line = this._fullLineOf(fullPos);
+    const lineFullStart = this._fullLineStarts[line];
+    const v = this._visibleLines.find((x) => x.line === line);
+    if (!v) return;
+    const visOpen = v.start + (str.open - lineFullStart);
+    const visEnd = visOpen + (str.close - str.open + 1);
+    const lit = defaultLiteralForType(item.type);
+    const ins = `"${item.key}": ${lit.value}`;
+    // A free-form "new key" suggestion has an empty key: park the caret inside
+    // the empty quotes so the user types the actual key name.
+    const caretOffset =
+      item.key === ""
+        ? visOpen + 1
+        : lit.inside
+          ? visOpen + ins.indexOf(lit.value) + 1
+          : visOpen + ins.length;
+    this._replaceRange(ta, visOpen, visEnd, ins);
+    ta.setSelectionRange(caretOffset, caretOffset);
+    this._suggest = null;
+    // Suppress re-opening at the new caret: for a regular accept the caret sits
+    // in the value (not a key), but for a free-form "new key" accept it sits
+    // inside the fresh empty key quotes, which is itself a key position.
+    this._suggestSuppress = caretOffset;
+    this._afterEdit(ta);
+  }
+
+  /** Dismiss the suggestions list and remember the caret position so it won't
+   *  instantly re-open (the caret is still on an empty quoted key). */
+  private _dismissSuggest(): void {
+    const ta = this._inputEl();
+    this._suggest = null;
+    this._suggestSuppress = ta ? ta.selectionStart : null;
+  }
+
+  /** Dismiss the suggestions list. */
+  private _hideSuggest(): void {
+    if (this._suggest) this._suggest = null;
+  }
+
+  /** Slide the thin side tooltip flush against the list's right edge (the list
+   *  width isn't known at render time, so measure it after the DOM settles). */
+  private _positionSuggestTip(): void {
+    if (!this._suggest) return;
+    const list = this.renderRoot.querySelector<HTMLElement>(".je-suggest");
+    const tip = this.renderRoot.querySelector<HTMLElement>(".je-suggest-tip");
+    if (!list || !tip) return;
+    tip.style.left = `${list.offsetLeft + list.offsetWidth + 8}px`;
   }
 
   private _foldMeta(fold: FoldRange | undefined): string {
@@ -1147,7 +1715,10 @@ export class JsonEditorElement extends LitElement {
 
   private _onBlur = (): void => {
     this._isFocused = false;
+    this._suggestSuppress = null;
+    this._hideSuggest();
     this._renderCarets();
+    this._syncActiveLine();
     const formatted = this._formatText(this._text);
     if (formatted !== null && formatted !== this._text) {
       this._folded.clear();
@@ -1165,6 +1736,7 @@ export class JsonEditorElement extends LitElement {
     this._updateBraceMatch(ta);
     this._syncActiveLine();
     this._renderCarets();
+    this._updateSuggest();
   }
 
   private _applyVisible(newVis: string): void {
@@ -1193,8 +1765,7 @@ export class JsonEditorElement extends LitElement {
       return;
     }
 
-    this._text =
-      this._text.slice(0, fullStart) + inserted + this._text.slice(fullEnd);
+    this._text = this._text.slice(0, fullStart) + inserted + this._text.slice(fullEnd);
     this._rebuild(true);
   }
 
@@ -1234,16 +1805,42 @@ export class JsonEditorElement extends LitElement {
     if (this.readonly || !this._root || this._parsedValue === undefined) return;
     const m = findEntryAtLine(this._root, fullLine);
     if (!m) return;
-    const next = cloneDeep(this._parsedValue) as Record<string, unknown> | unknown[];
-    if (m.member && typeof m.member.key === "string" && typeof next === "object" && next !== null && !Array.isArray(next)) {
-      delete next[m.member.key];
-    } else if (m.index !== undefined && Array.isArray(next)) {
-      next.splice(m.index, 1);
+    // Locate the entry's ACTUAL parent (a nested member may live deep inside
+    // the value, e.g. providers.<id>.model) so the delete removes it at the
+    // right depth rather than looking for the key at the root.
+    const path = this._pathToNode(this._root, m.parent);
+    if (path === null) return;
+    const next = cloneDeep(this._parsedValue) as unknown;
+    const container = path.length === 0 ? next : getAt(next, path);
+    if (container == null || typeof container !== "object") return;
+    if (m.member && typeof m.member.key === "string" && !Array.isArray(container)) {
+      delete (container as Record<string, unknown>)[m.member.key];
+    } else if (m.index !== undefined && Array.isArray(container)) {
+      container.splice(m.index, 1);
     }
     const text = JSON.stringify(next, null, 2) ?? String(next);
     this._folded.clear();
     this._text = text;
     this._rebuild(true);
+  }
+
+  /** Path (object keys / array indices) from the root node down to `target`, or
+   * null if `target` isn't reachable from `root`. Used to delete a member at
+   * its real nesting depth. */
+  private _pathToNode(root: JsonNode, target: JsonNode): JsonPath | null {
+    if (root === target) return [];
+    if (root.type === "object" && root.members) {
+      for (let i = 0; i < root.members.length; i++) {
+        const p = this._pathToNode(root.members[i].value, target);
+        if (p) return [root.members[i].key, ...p];
+      }
+    } else if (root.type === "array" && root.elements) {
+      for (let i = 0; i < root.elements.length; i++) {
+        const p = this._pathToNode(root.elements[i], target);
+        if (p) return [i, ...p];
+      }
+    }
+    return null;
   }
 
   private _setDanger(fullLine: number): void {
@@ -1286,12 +1883,14 @@ export class JsonEditorElement extends LitElement {
     }
     const rowH = Math.max(1, Number(this.rowHeight) || 20);
     const idx = Math.floor(e.offsetY / rowH);
-    const line =
-      idx >= 0 && idx < this._visibleLines.length ? this._visibleLines[idx].line : null;
+    const line = idx >= 0 && idx < this._visibleLines.length ? this._visibleLines[idx].line : null;
     if (line !== this._hoverLine) {
       this._hoverLine = line;
       this.requestUpdate();
     }
+    // Schema tooltips follow the mouse over key tokens (the content spans sit
+    // beneath the overlay, so this is the only place pointer position is seen).
+    this._updateKeyTooltip(idx, e.offsetX);
   };
 
   private _onMousedown = (e: MouseEvent): void => {
@@ -1327,6 +1926,7 @@ export class JsonEditorElement extends LitElement {
       this._dangerLines = new Set();
       this.requestUpdate();
     }
+    this._resetTooltipState();
   };
 
   // ── Bracket matching (caret on a bracket highlights its pair) ────────────
@@ -1382,6 +1982,37 @@ export class JsonEditorElement extends LitElement {
     if (this.readonly) return;
     const ta = e.target as HTMLTextAreaElement;
     const key = e.key;
+
+    // Key auto-complete is single-caret only: while the list is up, Up/Down
+    // move the highlight, Enter/Tab accept it, Escape dismisses, and Left/Right
+    // dismiss the list and let the native caret move proceed.
+    if (this._carets.length === 0 && this._suggest) {
+      if (key === "ArrowUp" || key === "ArrowDown") {
+        e.preventDefault();
+        e.stopPropagation();
+        this._moveSuggestSelection(key === "ArrowUp" ? -1 : 1);
+        return;
+      }
+      if (key === "Enter" || key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        this._acceptSuggest();
+        return;
+      }
+      if (key === "Escape") {
+        // Consume Escape while the list is up so it hides the list instead of
+        // bubbling to the drawer's document listener and closing the drawer.
+        e.preventDefault();
+        e.stopPropagation();
+        this._dismissSuggest();
+        return;
+      }
+      if (key === "ArrowLeft" || key === "ArrowRight") {
+        e.stopPropagation();
+        this._hideSuggest();
+        return;
+      }
+    }
 
     // Add a caret above/below the primary — works even from a single caret.
     if ((e.ctrlKey || e.metaKey) && e.altKey && (key === "ArrowUp" || key === "ArrowDown")) {
@@ -1486,6 +2117,7 @@ export class JsonEditorElement extends LitElement {
     this._updateBraceMatch(ta);
     this._syncActiveLine();
     this._renderCarets();
+    this._updateSuggest();
   };
 
   private _onClick = (e: Event): void => {
@@ -1521,7 +2153,11 @@ export class JsonEditorElement extends LitElement {
 
   private _selectableAt(pos: number): SelectableRange | null {
     for (const r of this._selectables) {
-      if (pos >= r.start - 1 && pos <= r.end + 1) return r;
+      // Only auto-select when the caret sits ON the token — strictly within the
+      // token's span, not on the whitespace/comma/end-of-line just beyond it.
+      // This keeps a click at the end of a property (to type `,`) from
+      // selecting the preceding string/value.
+      if (pos >= r.start && pos <= r.end) return r;
     }
     return null;
   }
@@ -1924,7 +2560,11 @@ export class JsonEditorElement extends LitElement {
    *  are edited ONCE, but every caret still maps to its own result position
    *  so the caret count and both carets' presence persist. */
   private _multiEdit(
-    mutate: (s: number, e: number, vis: string) => {
+    mutate: (
+      s: number,
+      e: number,
+      vis: string,
+    ) => {
       ins: string;
       delStart: number;
       delEnd: number;
@@ -2036,20 +2676,14 @@ export class JsonEditorElement extends LitElement {
     return inStr;
   }
 
-  private _replaceRange(
-    ta: HTMLTextAreaElement,
-    start: number,
-    end: number,
-    text: string,
-  ): void {
+  private _replaceRange(ta: HTMLTextAreaElement, start: number, end: number, text: string): void {
     ta.setRangeText(text, start, end, "end");
   }
 
   /** Keep the caret line in view within the scroll container. */
   private _ensureCaretVisible = (): void => {
     const ta = this.renderRoot.querySelector("textarea.je-input") as
-      | HTMLTextAreaElement
-      | undefined;
+      HTMLTextAreaElement | undefined;
     const vp = this.renderRoot.querySelector(".je-viewport") as HTMLElement | undefined;
     if (!ta || !vp) return;
     const lh = Math.max(1, Number(this.rowHeight) || 20);

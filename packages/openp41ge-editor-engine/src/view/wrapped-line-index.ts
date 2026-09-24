@@ -28,6 +28,7 @@ export interface WrappedLineInfo {
 
 export class WrappedLineIndex {
   private readonly _provider: IWrappedLineProvider;
+  private readonly _isHidden: (modelLine: number) => boolean;
   private _wrapColumn: number;
   private _totalModelLineCount = 0;
 
@@ -38,9 +39,14 @@ export class WrappedLineIndex {
   /** Number of model lines whose start has been computed into `_starts`. */
   private _built = 0;
 
-  constructor(provider: IWrappedLineProvider, wrapColumn: number) {
+  constructor(
+    provider: IWrappedLineProvider,
+    wrapColumn: number,
+    isHidden?: (modelLine: number) => boolean,
+  ) {
     this._provider = provider;
     this._wrapColumn = wrapColumn;
+    this._isHidden = isHidden ?? (() => false);
   }
 
   setTotalModelLineCount(count: number): void {
@@ -70,9 +76,10 @@ export class WrappedLineIndex {
     this._built = 0;
   }
 
-  /** Number of wrap segments a model line splits into. */
+  /** Number of wrap segments a model line splits into (0 when hidden). */
   getSegmentCount(modelLine: number): number {
     if (modelLine < 1 || modelLine > this._totalModelLineCount) return 0;
+    if (this._isHidden(modelLine)) return 0;
     let count = this._counts.get(modelLine);
     if (count === undefined) {
       count = computeWrapSegments(

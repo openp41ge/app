@@ -28,6 +28,23 @@ export function cloneDeep<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/** Recursively sort an object's keys alphabetically (arrays keep their order).
+ * Returns a new value; the input is not mutated. Primitives pass through. */
+export function sortJsonKeys<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => sortJsonKeys(v)) as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const src = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(src).sort()) {
+      out[key] = sortJsonKeys(src[key]);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 /** Read the value at a path (or undefined if the path doesn't resolve). */
 export function getAt(value: unknown, path: JsonPath): unknown {
   let cur = value;
@@ -185,4 +202,3 @@ export function summarize(value: Record<string, unknown> | unknown[]): string {
   if (counts.null) parts.push(`${counts.null} null${counts.null === 1 ? "" : "s"}`);
   return parts.join(" · ");
 }
-

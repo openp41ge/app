@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cloneDeep,
+  sortJsonKeys,
   getAt,
   setAt,
   deleteEntry,
@@ -77,7 +78,7 @@ describe("json-tree helpers", () => {
     expect(obj.x).toBe(0);
   });
 
-    it("summarizes collapsed composites by type", () => {
+  it("summarizes collapsed composites by type", () => {
     const s = summarize({ a: 1, b: "x", c: true, d: [], e: null, f: {} });
     expect(s).toContain("6 properties");
     expect(s).toContain("1 string");
@@ -87,7 +88,7 @@ describe("json-tree helpers", () => {
     expect(s).toContain("1 null");
     expect(s).toContain("1 object");
   });
-it("summarizes collapsed composite values", () => {
+  it("summarizes collapsed composite values", () => {
     expect(summarize({ baseUrl: "x", model: "y" })).toContain("2 properties");
     expect(summarize({ baseUrl: "x", model: "y" })).toContain("2 strings");
     expect(summarize([1, 28, 75])).toContain("3 items");
@@ -108,5 +109,40 @@ it("summarizes collapsed composite values", () => {
     const c = cloneDeep(v);
     c.a.b.push(3);
     expect(v.a.b).toEqual([1, 2]);
+  });
+
+  it("sorts object keys recursively and keeps array order", () => {
+    const v = {
+      providerId: "vllm",
+      providers: {
+        vllm: {
+          name: "vLLM",
+          baseUrl: "http://x",
+          defaultModel: "m",
+          models: [{ contextWindow: 128000, id: "m" }],
+        },
+      },
+    };
+    expect(sortJsonKeys(v)).toEqual({
+      providers: {
+        vllm: {
+          baseUrl: "http://x",
+          defaultModel: "m",
+          models: [{ contextWindow: 128000, id: "m" }],
+          name: "vLLM",
+        },
+      },
+      providerId: "vllm",
+    });
+  });
+
+  it("sortJsonKeys does not mutate the input and preserves primitives/null", () => {
+    const v = { z: 1, a: [3, { y: "2", x: "1" }], n: null };
+    const out = sortJsonKeys(v);
+    expect(out).toEqual({ a: [3, { x: "1", y: "2" }], n: null, z: 1 });
+    expect(Object.keys(v)).toEqual(["z", "a", "n"]);
+    expect(sortJsonKeys(42)).toBe(42);
+    expect(sortJsonKeys(null)).toBe(null);
+    expect(sortJsonKeys("s")).toBe("s");
   });
 });

@@ -27,6 +27,7 @@ import type { ITokenSegmentAdjuster } from "./token-segment-adjuster";
 import { ViewportWrapColumnCalculator } from "./wrap-column-calculator";
 import type { IWrapColumnCalculator } from "./wrap-column-calculator";
 import { WrappedLineIndex } from "./wrapped-line-index";
+import { FoldLineIndex } from "./fold-line-index";
 
 /**
  * Provider for line content and tokens, used by ViewLines when rendering.
@@ -86,6 +87,13 @@ export class ViewLines {
   private _wrappedStartViewLine: number = 0;
   private _wrappedEndViewLine: number = 0;
   private _wrappedIndex: WrappedLineIndex | null = null;
+
+  // ── Folding (non-wrapped model-space virtualization) ────────────────────
+
+  /** Model lines currently hidden by collapsed folds (1-based). */
+  private _hiddenLines: Set<number> | null = null;
+  /** Visible-line index used when any line is folded. */
+  private _foldIndex: FoldLineIndex | null = null;
 
   /**
    * Callback for rendering a line's content with its tokens.
@@ -166,6 +174,43 @@ export class ViewLines {
     this._updateScrollHeight();
   }
 
+  /**
+   * Set the set of hidden (folded) model lines. Null/empty = no folds. Hidden
+   * lines contribute zero visible lines: the scroll height, line `top`s and
+   * the visible window all ignore them.
+   */
+  setHiddenLines(hidden: Set<number> | null): void {
+    const next = hidden && hidden.size > 0 ? hidden : null;
+    const changed = this._hiddenLines !== next;
+    this._hiddenLines = next;
+    this._foldIndex = next
+      ? new FoldLineIndex({ isHidden: (m) => !!(this._hiddenLines?.has(m)) })
+      : null;
+    this._foldIndex?.setTotalModelLineCount(this._totalLineCount);
+    if (changed) {
+      this._updateScrollHeight();
+      if (this._wordWrapEnabled && this.lineContentProvider) {
+        // Fold state alters per-line segment counts (hidden = 0); drop the
+        // cached mapping so it rebuilds with the new hidden set.
+        this._wrappedIndex?.reset();
+        this._refreshWrappedWindow();
+      } else {
+        this.refresh();
+      }
+    }
+  }
+
+  /** Total number of visible lines (fold-aware; = total when no folds). */
+  getVisibleLineCount(): number {
+    if (!this._foldIndex) return this._totalLineCount;
+    return this._foldIndex.totalVisibleLineCount;
+  }
+
+  /** Whether a model line is hidden by a collapsed fold. */
+  isLineHidden(modelLine: number): boolean {
+    return !!this._hiddenLines?.has(modelLine);
+  }
+
   /** Compute the effective wrap column from the viewport width. */
   private _computeWrapColumn(): number {
     const charWidth = this._measureCharWidth();
@@ -177,8 +222,8 @@ export class ViewLines {
    * Get the total number of visible view lines (accounting for word wrap).
    */
   getViewLineCount(): number {
-    if (!this._wordWrapEnabled) return this._totalLineCount;
-    if (!this.lineContentProvider) return this._totalLineCount;
+    if (!this._wordWrapEnabled) return this.getVisibleLineCount();
+    if (!this.lineContentProvider) return this.getVisibleLineCount();
     return this.wrappedIndex().totalViewLineCount;
   }
 
@@ -187,10 +232,25 @@ export class ViewLines {
    * Returns the starting view line number (1-based) for the given model line.
    */
   getViewLineStart(modelLine: number): number {
-    if (!this._wordWrapEnabled) return modelLine;
+    if (!this._wordWrapEnabled) {
+      if (!this._foldIndex) return modelLine;
+      return this._foldIndex.getVisibleLineStart(modelLine);
+    }
     const provider = this.lineContentProvider;
     if (!provider) return modelLine;
     return this.wrappedIndex().getViewLineStart(modelLine);
+  }
+
+  /** Fold-aware visible-line index of a model line's first visible segment. */
+  private _visibleStartOf(modelLine: number): number {
+    if (!this._foldIndex) return modelLine;
+    return this._foldIndex.getVisibleLineStart(modelLine);
+  }
+
+  /** Fold-aware model line for a 1-based visible line (0 when out of range). */
+  private _modelAtVisible(visibleLine: number): number {
+    if (!this._foldIndex) return visibleLine;
+    return this._foldIndex.findModelLine(visibleLine);
   }
 
   /**
@@ -200,6 +260,7 @@ export class ViewLines {
     this._totalLineCount = count;
     // Update the wrapped mapping horizon (wraps/shifts line numbers).
     this._wrappedIndex?.setTotalModelLineCount(count);
+    this._foldIndex?.setTotalModelLineCount(count);
     // Update the scroll height of the content wrapper
     this._updateScrollHeight();
   }
@@ -320,11 +381,14 @@ export class ViewLines {
     const overRenderAbove = 1;
     const overRenderBelow = 2;
 
-    const newStartLine = Math.max(1, Math.floor(scrollTop / lineHeight) - overRenderAbove + 1);
-    const newEndLine = Math.min(
-      this._totalLineCount,
+    const totalVisible = this.getVisibleLineCount();
+    const newStartVisible = Math.max(1, Math.floor(scrollTop / lineHeight) - overRenderAbove + 1);
+    const newEndVisible = Math.min(
+      totalVisible,
       Math.ceil((scrollTop + this._viewportHeight) / lineHeight) + overRenderBelow,
     );
+    const newStartLine = this._modelAtVisible(newStartVisible);
+    const newEndLine = this._modelAtVisible(newEndVisible);
 
     if (newStartLine === this._visibleStartLine && newEndLine === this._visibleEndLine) {
       return; // No change
@@ -501,7 +565,7 @@ export class ViewLines {
       this._rebuildLines(1, this._visibleEndLine);
     } else {
       this._visibleStartLine = 1;
-      this._visibleEndLine = Math.min(100, this._totalLineCount);
+      this._visibleEndLine = this._modelAtVisible(Math.min(100, this.getVisibleLineCount()));
       this._rebuildLines(this._visibleStartLine, this._visibleEndLine);
     }
   }
@@ -523,8 +587,8 @@ export class ViewLines {
     const totalLines = this._wordWrapEnabled
       ? this.lineContentProvider
         ? this.wrappedIndex().totalViewLineCount
-        : this._totalLineCount
-      : this._totalLineCount;
+        : this.getVisibleLineCount()
+      : this.getVisibleLineCount();
     const totalHeight = totalLines * this._config.lineHeight;
     this._linesWrapper.setHeight(totalHeight);
     // The wrapper div inside a naturally-scrolling viewport creates the scroll
@@ -585,7 +649,8 @@ export class ViewLines {
     }
 
     for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
-      const top = (lineNum - 1) * lineHeight;
+      if (this.isLineHidden(lineNum)) continue;
+      const top = (this._visibleStartOf(lineNum) - 1) * lineHeight;
       const viewLine = new ViewLine(lineNum, top, lineHeight);
 
       if (this.onLineRender) {
@@ -691,6 +756,7 @@ export class ViewLines {
       this._wrappedIndex = new WrappedLineIndex(
         { getLineContent: (ln) => this.lineContentProvider?.getLineContent(ln) ?? "" },
         this._wrapColumn,
+        (m) => !!this._hiddenLines?.has(m),
       );
     }
     this._wrappedIndex.setTotalModelLineCount(this._totalLineCount);

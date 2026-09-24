@@ -23,21 +23,16 @@ import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("openp41ge", "VllmChatProvider");
 
-/** Map the composer's thinking level to the provider's reasoning_effort value.
- *  "Off" and unknown levels resolve to undefined (provider default). */
-function reasoningEffortForLevel(level?: string): string | undefined {
-  switch (level) {
-    case "Off":
-      return undefined;
-    case "Low":
-      return "low";
-    case "Medium":
-      return "medium";
-    case "High":
-      return "high";
-    default:
-      return undefined;
-  }
+/** Resolve the composer's thinking level to the provider's reasoning_effort
+ *  value. The value configured in the model's `thinking` map is passed through
+ *  verbatim — the user defines the levels the provider understands in config.
+ *  Only values that mean "off" (null, empty, "off", "none", "0") omit the
+ *  field so the model applies its default behaviour. */
+function resolveReasoningEffort(level?: string | null): string | undefined {
+  if (level === undefined || level === null) return undefined;
+  const t = level.trim();
+  if (t === "" || /^(off|none|0)$/i.test(t)) return undefined;
+  return t;
 }
 
 /** Convert our chat messages to the OpenAI chat-completions wire format. */
@@ -113,7 +108,7 @@ export class VllmChatProvider implements ChatProvider {
 
   async *streamChat(req: ChatStreamRequest): AsyncIterable<ProviderDelta> {
     const body: Record<string, unknown> = {
-      model: this._config.model,
+      model: this._config.defaultModel,
       messages: toOpenAIMessages(req.messages),
       stream: true,
       // Request a final SSE chunk carrying `usage` so we can surface token
@@ -126,10 +121,10 @@ export class VllmChatProvider implements ChatProvider {
       body.tools = toOpenAITools(req.tools);
       body.tool_choice = "auto";
     }
-    // Map the composer's thinking level to the provider's reasoning effort.
-    // "Off" (and unknown values) leave the setting absent so the model
-    // applies its default behaviour.
-    const effort = reasoningEffortForLevel(req.thinking);
+    // Pass the composer's thinking level straight through as the provider's
+    // reasoning_effort value (verbatim from config). Off/empty values leave
+    // the setting absent so the model applies its default behaviour.
+    const effort = resolveReasoningEffort(req.thinking);
     if (effort) body.reasoning_effort = effort;
 
     let res: Response;

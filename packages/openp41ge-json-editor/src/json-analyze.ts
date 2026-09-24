@@ -40,7 +40,11 @@ export function computeFoldRanges(text: string): FoldRange[] {
         const top = stack.pop();
         if (top && ((top.ch === "{" && ch === "}") || (top.ch === "[" && ch === "]"))) {
           if (line > top.line) {
-            out.push({ openLine: top.line, closeLine: line, kind: top.ch === "{" ? "object" : "array" });
+            out.push({
+              openLine: top.line,
+              closeLine: line,
+              kind: top.ch === "{" ? "object" : "array",
+            });
           }
         }
       }

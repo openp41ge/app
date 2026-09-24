@@ -30,7 +30,7 @@ export interface UserConfig {
       string,
       {
         baseUrl: string;
-        model: string;
+        defaultModel: string;
         apiKey?: string;
         temperature?: number;
         maxTokens?: number;

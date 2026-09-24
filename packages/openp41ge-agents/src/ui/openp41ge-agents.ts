@@ -19,7 +19,17 @@ import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
 import { tooltipContent, tooltipController } from "openp41ge-uikit/tooltip";
-import type { Chat, ChatMessage, ChatRuntimeStatus, ChatTranscriptHit, ChatTranscriptPage, ChatTranscriptSearch, MessageSegment, TokenUsage, ToolCall } from "../types";
+import type {
+  Chat,
+  ChatMessage,
+  ChatRuntimeStatus,
+  ChatTranscriptHit,
+  ChatTranscriptPage,
+  ChatTranscriptSearch,
+  MessageSegment,
+  TokenUsage,
+  ToolCall,
+} from "../types";
 import { renderMarkdownSegments, type MarkdownSegment, type CodeBlockSegment } from "./markdown.js";
 import {
   highlight,
@@ -39,10 +49,7 @@ function deepCloneMessage(m: ChatMessage): ChatMessage {
 }
 
 /** Append a text chunk to the ordered segment list, merging into a trailing text segment. */
-function appendTextSegment(
-  segments: MessageSegment[] | undefined,
-  text: string,
-): MessageSegment[] {
+function appendTextSegment(segments: MessageSegment[] | undefined, text: string): MessageSegment[] {
   const segs = segments ?? [];
   const last = segs[segs.length - 1];
   if (last && last.type === "text") {
@@ -59,9 +66,7 @@ function upsertToolSegment(
   const segs = segments ?? [];
   const idx = segs.findIndex((s) => s.type === "tool" && s.toolCall?.id === tool.id);
   if (idx >= 0) {
-    return segs.map((s, i) =>
-      i === idx ? { ...s, toolCall: { ...tool } } : s,
-    );
+    return segs.map((s, i) => (i === idx ? { ...s, toolCall: { ...tool } } : s));
   }
   return [...segs, { type: "tool", toolCall: { ...tool } }];
 }
@@ -71,7 +76,7 @@ interface ComposerProvider {
   id: string;
   label: string;
   /** The provider's default/current model id. */
-  model: string;
+  defaultModel: string;
   /** All models available from this provider (optional). */
   models?: ComposerModel[];
   /** The endpoint/base URL for this provider (optional). */
@@ -82,7 +87,7 @@ interface ComposerProvider {
 interface ComposerModel {
   id: string;
   /** Thinking config (key/value pairs) if the model declares one. */
-  thinking?: Record<string, string>;
+  thinking?: Record<string, string | null>;
   /** Context window size in tokens (optional). */
   contextWindow?: number;
   /** Max output tokens (optional). */
@@ -189,6 +194,18 @@ class Openp41geAgents extends LitElement {
   private _pageSize = 80;
   /** Guards against overlapping `loadOlderMessages` fetches. */
   private _loadingOlder = false;
+  /** Whether the transcript should auto-scroll to the newest message. False
+   *  once the user scrolls up to read earlier content; streaming then leaves
+   *  the viewport alone instead of yanking them back to the bottom. Re-set to
+   *  true when the user scrolls back to the bottom or sends a new message. */
+  private _pinnedToBottom = true;
+  /** Last observed `scrollTop` of the transcript, for scroll-direction detect.
+   *  Upward movement means the user is reading earlier content and we must
+   *  stop auto-following. This is safe: our own auto-follow anchor only ever
+   *  increases `scrollTop` (it scrolls down to the bottom), so it can never be
+   *  mistaken for an upward user scroll — no programmatic counter needed (the
+   *  browser coalesces scroll events, so a counter leaked and kept pinning). */
+  private _prevScrollTop = 0;
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
 
@@ -309,18 +326,14 @@ class Openp41geAgents extends LitElement {
     if (!text) return;
     const messages = this._messages.map(deepCloneMessage);
     let last = messages[messages.length - 1];
-    // A fresh assistant message is needed when there is no trailing assistant
-    // message, or when the last one has already produced content/tool calls —
-    // i.e. it has moved past its reasoning phase. Agent turns are sequential:
-    // reasoning for a NEW turn must render as its own block below the previous
-    // message, never merged into an old reasoning block that now sits above
-    // that content/tool call.
+    // A fresh assistant message is only needed when the last one completed a
+    // tool turn (it made tool calls and the next turn's reasoning must render
+    // as its own block below it). Reasoning that interleaves with content
+    // WITHIN a turn — some models stream a thought fragment between content
+    // tokens — must stay on the same message, so "has content" is NOT treated
+    // as a turn boundary.
     const reasoningDone =
-      !!last &&
-      last.role === "assistant" &&
-      ((last.content ?? "") !== "" ||
-        (last.toolCalls && last.toolCalls.length > 0) ||
-        (last.segments && last.segments.length > 0));
+      !!last && last.role === "assistant" && !!(last.toolCalls && last.toolCalls.length > 0);
     if (!last || last.role !== "assistant" || reasoningDone) {
       last = {
         id: `stream_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
@@ -399,7 +412,9 @@ class Openp41geAgents extends LitElement {
           title: "Tokens uploaded",
           subtitle: `Amount sent to the model (system prompt, connected worktree context, and your messages). ${u.promptTokens.toLocaleString("en-US")} tokens uploaded.`,
         })}
-        >${this._fmtTok(u.promptTokens)}${this._arrow(false)}</button>
+      >
+        ${this._fmtTok(u.promptTokens)}${this._arrow(false)}
+      </button>
       <button
         class="bb-stat"
         ${tooltipContent({
@@ -407,7 +422,9 @@ class Openp41geAgents extends LitElement {
           title: "Tokens downloaded",
           subtitle: `Amount the model generated in this response. ${u.completionTokens.toLocaleString("en-US")} tokens downloaded.`,
         })}
-        >${this._fmtTok(u.completionTokens)}${this._arrow(true)}</button>
+      >
+        ${this._fmtTok(u.completionTokens)}${this._arrow(true)}
+      </button>
     `;
   }
 
@@ -431,7 +448,14 @@ class Openp41geAgents extends LitElement {
 
   /** Small direction arrow: up by default, rotated 180° for down. */
   private _arrow(down: boolean): TemplateResult {
-    return html`<svg class="bb-arrow${down ? " down" : ""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11 20V7.825l-5.6 5.6L4 12l8-8l8 8l-1.4 1.425l-5.6-5.6V20z"/></svg>`;
+    return html`<svg
+      class="bb-arrow${down ? " down" : ""}"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path fill="currentColor" d="M11 20V7.825l-5.6 5.6L4 12l8-8l8 8l-1.4 1.425l-5.6-5.6V20z" />
+    </svg>`;
   }
 
   // ─── In-chat find ──────────────────────────────────────────────────
@@ -553,7 +577,10 @@ class Openp41geAgents extends LitElement {
 
   /** Fallback DOM scan used when no Node seam is wired (unit tests). Mirrors
    *  the Node-side matching so hit ordinals line up with the shared logic. */
-  private _computeLocalHits(q: string, opts: { regex?: boolean; caseSensitive?: boolean }): ChatHit[] {
+  private _computeLocalHits(
+    q: string,
+    opts: { regex?: boolean; caseSensitive?: boolean },
+  ): ChatHit[] {
     const hits: ChatHit[] = [];
     const ordinal = new Map<string, number>();
     const next = (messageId: string): number => {
@@ -588,7 +615,12 @@ class Openp41geAgents extends LitElement {
         for (;;) {
           const at = hay.indexOf(needle, idx);
           if (at === -1) break;
-          hits.push({ messageId: id, text: flat.slice(at, at + needle.length), order: next(id), messageIndex });
+          hits.push({
+            messageId: id,
+            text: flat.slice(at, at + needle.length),
+            order: next(id),
+            messageIndex,
+          });
           idx = at + needle.length;
         }
       }
@@ -711,16 +743,48 @@ class Openp41geAgents extends LitElement {
     this.renderRoot.querySelector<HTMLElement>(".chat-messages")?.focus();
   }
 
-  /** Scroll near the top of the loaded window → pull in the older page.
-   *  Guarded so concurrent scroll events don't stack fetches. */
+  /** Track whether the user is reading at the bottom (auto-follow) vs. scrolled
+   *  up (leave the viewport alone). The instant the user scrolls upward — even
+   *  a few pixels of slow scrolling — we stop auto-following, so pinning never
+   *  fights the user. Scroll near the top → pull in the older page. Guarded so
+   *  concurrent scroll events don't stack fetches. */
   private _onScroll = (): void => {
-    const el = this.renderRoot.querySelector<HTMLElement>(".chat-scroll");
-    if (!el || this._loadingOlder) return;
+    const el = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    if (!el) return;
+    // Upward movement (scrollTop decreased) means the user is navigating back
+    // to earlier content: stop auto-following, regardless of distance. Our own
+    // auto-follow anchor only scrolls DOWN to the bottom, so it can never trip
+    // this. (A separate `wheel` handler unpins synchronously as well, so the
+    // user's intent wins even before this event fires.)
+    const scrolledUp = el.scrollTop < this._prevScrollTop - 1;
+    this._prevScrollTop = el.scrollTop;
+    if (scrolledUp) {
+      this._setPinnedToBottom(false);
+    } else if (el.scrollHeight - el.scrollTop - el.clientHeight < 8) {
+      // The user (or an anchor) is back at the bottom — re-engage auto-follow.
+      this._setPinnedToBottom(true);
+    }
     const nearTop = el.scrollTop < 40;
-    if (nearTop && this._loadedStart > 0) {
+    if (nearTop && !this._loadingOlder && this._loadedStart > 0) {
       void this.loadOlderMessages();
     }
   };
+
+  /** A wheel gesture means the user is driving the scroll bar. Scrolling up
+   *  (deltaY < 0) is an immediate, synchronous signal to stop auto-following —
+   *  more reliable than waiting for the coalesced scroll event, which an
+   *  auto-anchor could overwrite before it fires. Downward scrolling is left
+   *  to `_onScroll`, which re-pins once the viewport reaches the bottom. */
+  private _onWheel = (e: WheelEvent): void => {
+    if (e.deltaY < 0) this._setPinnedToBottom(false);
+  };
+
+  /** Record the pinned-to-bottom state and mirror it onto the chat scrollbar's
+   *  pin icon (which is shown only while auto-following is engaged). */
+  private _setPinnedToBottom(value: boolean): void {
+    this._pinnedToBottom = value;
+    this._chatScrollbar?.setPinned(value);
+  }
 
   /** Make sure the message holding a search hit is within the loaded window so
    *  it can be highlighted/scroll-to. Older messages are prepended (the tail
@@ -816,7 +880,10 @@ class Openp41geAgents extends LitElement {
       return;
     }
     this._loadingOlder = true;
-    const scroller = this.renderRoot.querySelector<HTMLElement>(".chat-scroll");
+    // `.chat-messages` is the overflow container; `.chat-scroll` is only a
+    // positioning wrapper (overflow: hidden), so its scrollHeight would never
+    // grow with content and the offset restore below would be a no-op.
+    const scroller = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
     const prevScrollHeight = scroller?.scrollHeight ?? 0;
     try {
       const count = Math.min(this._pageSize, this._loadedStart);
@@ -824,10 +891,7 @@ class Openp41geAgents extends LitElement {
       if (page && page.messages.length > 0) {
         this._loadedStart = page.start;
         this._transcriptTotal = Math.max(this._transcriptTotal, page.total);
-        this._messages = [
-          ...page.messages.map(deepCloneMessage),
-          ...this._messages,
-        ];
+        this._messages = [...page.messages.map(deepCloneMessage), ...this._messages];
         // Restore the scroll offset: newly prepended content sits above.
         const el = scroller;
         requestAnimationFrame(() => {
@@ -935,6 +999,8 @@ class Openp41geAgents extends LitElement {
     this._caretRaw = 0;
     this._prevSelStart = 0;
     this._prevSelEnd = 0;
+    // A freshly-sent message always surfaces: pin to the bottom for this turn.
+    this._setPinnedToBottom(true);
     this._renderComposerContent();
     this._updateComposerState();
     this.addMessage("user", text);
@@ -945,8 +1011,11 @@ class Openp41geAgents extends LitElement {
         composed: true,
         detail: {
           text,
-          // Only send a thinking level when the model exposes thinking entries.
-          ...(this._currentThinking() ? { thinkingLevel: this._currentThinking()!.value } : {}),
+          // Only send a thinking level when the model exposes thinking entries
+          // and the selected entry has a value (null = off/disabled).
+          ...(this._currentThinking()?.value
+            ? { thinkingLevel: this._currentThinking()!.value }
+            : {}),
         },
       }),
     );
@@ -988,7 +1057,7 @@ class Openp41geAgents extends LitElement {
     // model selector always has a sensible value.
     if (!this._modelId) {
       const p = this._effectiveProviders().find((x) => x.id === this._providerId);
-      this._modelId = p?.model ?? "";
+      this._modelId = p?.defaultModel ?? "";
     }
     if (ctx.availableTools) this._availableTools = ctx.availableTools;
     if (ctx.activeTools) this._activeTools = ctx.activeTools;
@@ -1000,10 +1069,10 @@ class Openp41geAgents extends LitElement {
   private _effectiveProviders(): ComposerProvider[] {
     const providers = [...this._providers];
     if (this._providerId && !providers.some((p) => p.id === this._providerId)) {
-      providers.unshift({ id: this._providerId, label: this._providerId, model: "" });
+      providers.unshift({ id: this._providerId, label: this._providerId, defaultModel: "" });
     }
     if (providers.length === 0) {
-      return [{ id: "", label: "Default model", model: "" }];
+      return [{ id: "", label: "Default model", defaultModel: "" }];
     }
     return providers;
   }
@@ -1059,14 +1128,14 @@ class Openp41geAgents extends LitElement {
   /** The label shown on the model-selector button for the active provider. */
   private _currentModelLabel(): string {
     const p = this._effectiveProviders().find((x) => x.id === this._providerId);
-    const model = this._modelId || p?.model || "";
+    const model = this._modelId || p?.defaultModel || "";
     return model || "Default model";
   }
 
   /** The model id currently selected (falls back to the provider's default). */
   private _currentModelId(): string {
     const p = this._effectiveProviders().find((x) => x.id === this._providerId);
-    return this._modelId || p?.model || "";
+    return this._modelId || p?.defaultModel || "";
   }
 
   /** The model list actually shown for the active provider. Falls back to the
@@ -1074,7 +1143,7 @@ class Openp41geAgents extends LitElement {
   private _effectiveModels(): ComposerModel[] {
     const p = this._effectiveProviders().find((x) => x.id === this._providerId);
     if (p?.models?.length) return p.models;
-    if (p?.model) return [{ id: p.model }];
+    if (p?.defaultModel) return [{ id: p.defaultModel }];
     return [{ id: "" }];
   }
 
@@ -1111,7 +1180,7 @@ class Openp41geAgents extends LitElement {
       this._providerId = id;
       // Reset the model to the provider's configured default when switching.
       const p = this._providers.find((x) => x.id === id);
-      const defaultModel = p?.model ?? this._modelId;
+      const defaultModel = p?.defaultModel ?? this._modelId;
       this._modelId = defaultModel;
       this.dispatchEvent(
         new CustomEvent("chat:provider-change", {
@@ -1141,7 +1210,7 @@ class Openp41geAgents extends LitElement {
   }
 
   /** The thinking entry options for the active model ([] when none configured). */
-  private _thinkingOptions(): Array<{ key: string; value: string }> {
+  private _thinkingOptions(): Array<{ key: string; value: string | null }> {
     const model = this._effectiveModels().find((m) => m.id === this._currentModelId());
     const thinking = model?.thinking;
     if (!thinking) return [];
@@ -1149,7 +1218,7 @@ class Openp41geAgents extends LitElement {
   }
 
   /** The currently selected thinking entry, or null when the model has none. */
-  private _currentThinking(): { key: string; value: string } | null {
+  private _currentThinking(): { key: string; value: string | null } | null {
     const options = this._thinkingOptions();
     if (options.length === 0) return null;
     const selected =
@@ -2022,6 +2091,11 @@ class Openp41geAgents extends LitElement {
         size: 9,
         // Fade the bar out after the cursor leaves the chat for a few seconds.
         autoHide: true,
+        // Show a pin icon at the bottom of the track whenever the chat is
+        // pinned (auto-following the newest message). The host drives the
+        // pinned state via `setPinned()` as the user scrolls; the icon is
+        // decorative and hides when the bar fades out.
+        pinned: this._pinnedToBottom,
       });
     }
     // Anchor the freshly-loaded chat to the newest message (content is now
@@ -2231,7 +2305,9 @@ class Openp41geAgents extends LitElement {
           background: transparent;
           color: var(--text-secondary, #999);
           cursor: pointer;
-          transition: background-color 0.1s, color 0.1s;
+          transition:
+            background-color 0.1s,
+            color 0.1s;
         }
         .bb-find:hover {
           background: var(--bg-hover, #2a2d2e);
@@ -2250,7 +2326,7 @@ class Openp41geAgents extends LitElement {
         .bb-spacer {
           flex: 1;
         }
-.bb-tps {
+        .bb-tps {
           flex-shrink: 0;
           margin-left: 8px;
           text-transform: none;
@@ -2354,7 +2430,7 @@ class Openp41geAgents extends LitElement {
           cursor: not-allowed;
           user-select: none;
         }
-.bb-stat:hover {
+        .bb-stat:hover {
           background: var(--bg-hover, #2a2d2e);
           color: var(--text-primary, #ddd);
         }
@@ -3229,9 +3305,8 @@ class Openp41geAgents extends LitElement {
 
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
-
-      <div class="chat-scroll" @scroll=${this._onScroll}>
-        <div class="chat-messages">
+      <div class="chat-scroll">
+        <div class="chat-messages" @scroll=${this._onScroll} @wheel=${this._onWheel}>
           ${this._messages.map((msg) => this._renderMessage(msg))}
           ${this._waitingForReply() ? this._renderThinking() : html``}
         </div>
@@ -3262,43 +3337,47 @@ class Openp41geAgents extends LitElement {
                 title="Previous match"
                 ?disabled=${this._searchHits.length === 0}
                 @click=${() => this._nextMatch(-1)}
-                >${unsafeHTML(ICON_CHAT_PREV)}</button
               >
+                ${unsafeHTML(ICON_CHAT_PREV)}
+              </button>
               <button
                 type="button"
                 class="find-toggle"
                 title="Next match"
                 ?disabled=${this._searchHits.length === 0}
                 @click=${() => this._nextMatch(1)}
-                >${unsafeHTML(ICON_CHAT_NEXT)}</button
               >
+                ${unsafeHTML(ICON_CHAT_NEXT)}
+              </button>
               <button
                 type="button"
                 class="find-toggle ${this._searchRegex ? "on" : ""}"
                 title="Regex"
                 aria-pressed=${this._searchRegex}
                 @click=${() => this._toggleSearchRegex()}
-                >${unsafeHTML(ICON_REGEX)}</button
               >
+                ${unsafeHTML(ICON_REGEX)}
+              </button>
               <button
                 type="button"
                 class="find-toggle ${this._searchCase ? "on" : ""}"
                 title="Match case"
                 aria-pressed=${this._searchCase}
                 @click=${() => this._toggleSearchCase()}
-                >${unsafeHTML(ICON_MATCH_CASE)}</button
               >
+                ${unsafeHTML(ICON_MATCH_CASE)}
+              </button>
               <button
                 type="button"
                 class="find-toggle"
                 title="Close search (Esc)"
                 @click=${() => this._closeSearch()}
-                >${unsafeHTML(ICON_CHAT_CLOSE)}</button
               >
+                ${unsafeHTML(ICON_CHAT_CLOSE)}
+              </button>
             </div>`
           : html``
       }
-
 
       <div class="composer ${this._menuOpen ? "menu-open" : ""}">
         <div
@@ -3495,19 +3574,20 @@ class Openp41geAgents extends LitElement {
         ></textarea>
       </div>
 
-      <div class="chat-bottombar"><button
-        type="button"
-        class="bb-find${this._searchOpen ? " active" : ""}"
-        title="Find in chat (⌘F)"
-        @click=${() => this._toggleSearch()}
-        >${unsafeHTML(ICON_FIND)}</button
-      ><span class="bb-sep"></span><span class="bb-spacer"></span>${
-        this._streaming && this._liveTps != null
-          ? html`<span class="bb-tps" part="tps">~${this._fmtRate(
-              this._liveTps,
-            )} tok/s</span>`
-          : html``
-      }</div>
+      <div class="chat-bottombar">
+        <button
+          type="button"
+          class="bb-find${this._searchOpen ? " active" : ""}"
+          title="Find in chat (⌘F)"
+          @click=${() => this._toggleSearch()}
+        >
+          ${unsafeHTML(ICON_FIND)}</button
+        ><span class="bb-sep"></span><span class="bb-spacer"></span>${
+          this._streaming && this._liveTps != null
+            ? html`<span class="bb-tps" part="tps">~${this._fmtRate(this._liveTps)} tok/s</span>`
+            : html``
+        }
+      </div>
     `;
   }
 
@@ -3729,11 +3809,14 @@ class Openp41geAgents extends LitElement {
     const status = tc.status ?? "running";
     const result = this._toolResultFor(tc);
     const openable = status !== "running" && result !== undefined;
-    const statusLabel = status === "running"
-      ? html`loading<span class="thinking-dots"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>`
-      : status === "done"
-        ? "success"
-        : "fail";
+    const statusLabel =
+      status === "running"
+        ? html`loading<span class="thinking-dots"
+              ><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span
+            >`
+        : status === "done"
+          ? "success"
+          : "fail";
     return html`
       <div class="tool-call-wrap" data-tool-call-id=${tc.id}>
         <div class="tool-call-row">
@@ -3744,35 +3827,56 @@ class Openp41geAgents extends LitElement {
         </div>
         <div class="tool-call-footer">
           <span class="tool-call-status ${status}">${statusLabel}</span>
-          ${openable
-            ? html`<div class="tool-call-actions">
-                <button
-                  type="button"
-                  class="tool-call-btn"
-                  ${tooltipContent({ type: "simple", text: "Copy result" })}
-                  aria-label="Copy result"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    void this._copyToolResult(tc);
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                </button>
-                <button
-                  type="button"
-                  class="tool-call-btn primary"
-                  ${tooltipContent({ type: "simple", text: "Open result in a new tab" })}
-                  aria-label="Open result in a new tab"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    this._openToolResult(tc);
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-                </button>
-              </div>`
-            : ""
-        }
+          ${
+            openable
+              ? html`<div class="tool-call-actions">
+                  <button
+                    type="button"
+                    class="tool-call-btn"
+                    ${tooltipContent({ type: "simple", text: "Copy result" })}
+                    aria-label="Copy result"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      void this._copyToolResult(tc);
+                    }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="tool-call-btn primary"
+                    ${tooltipContent({ type: "simple", text: "Open result in a new tab" })}
+                    aria-label="Open result in a new tab"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this._openToolResult(tc);
+                    }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+                      />
+                    </svg>
+                  </button>
+                </div>`
+              : ""
+          }
         </div>
       </div>
     `;
@@ -3847,6 +3951,10 @@ class Openp41geAgents extends LitElement {
   }
 
   private _scrollToBottom(): void {
+    // Only auto-follow the newest message while the user is already pinned to
+    // the bottom. If they scrolled up to read earlier content, leave the
+    // viewport alone — pinning must never block navigation.
+    if (!this._pinnedToBottom) return;
     // Wait for the render so the newest message is actually in the DOM, then
     // scroll the list to its exact bottom. `scrollHeight` is an accurate
     // measure here because content-visibility is not used (it would collapse
@@ -3860,7 +3968,10 @@ class Openp41geAgents extends LitElement {
       if (!list) return;
       let remaining = 3;
       const anchor = (): void => {
+        // The user may have scrolled away between scheduling and this tick.
+        if (!this._pinnedToBottom) return;
         list.scrollTop = list.scrollHeight;
+        this._setPinnedToBottom(true);
         if (remaining-- > 0) setTimeout(anchor, 0);
       };
       anchor();

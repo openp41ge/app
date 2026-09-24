@@ -357,14 +357,23 @@ export class Gutter {
       box.style.display = "none";
       this.root.appendChild(box);
     }
-    // Find the rightmost highlightable column; the box spans all columns from
-    // the left edge through it (matching the JSON editor's unified long box).
-    let lastHighlightable = 0;
+    // Find the rightmost highlightable, VISIBLE column; the box spans all
+    // visible columns from the left edge through it (matching the JSON
+    // editor's unified long box). Hidden columns (e.g. a fold column that is
+    // collapsed away for non-code files) occupy no layout space, so they must
+    // be excluded from both the scan and the width sum.
+    let lastHighlightable = -1;
     this._columns.forEach((state, index) => {
+      if (state.column.visible?.() === false) return;
       if (this._columnHighlightable(state, row)) lastHighlightable = index;
     });
+    if (lastHighlightable < 0) {
+      if (box) box.style.display = "none";
+      return;
+    }
     let width = 0;
     for (let i = 0; i <= lastHighlightable; i++) {
+      if (this._columns[i].column.visible?.() === false) continue;
       width += this._columns[i].column.width();
     }
     box.style.display = "";

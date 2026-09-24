@@ -3,9 +3,9 @@
  * Agent settings surface.
  *
  * Pure, DOM-free functions so they are trivially unit-testable. The persisted
- * config shape (`agent.providers[].{ baseUrl, model, apiKey?, temperature?,
- * maxTokens?, name? }`) is unchanged by the runtime — `name` is a settings-only
- * display label that the chat runtime ignores.
+ * config shape (`agent.providers[].{ baseUrl, defaultModel, apiKey?,
+ * temperature?, maxTokens?, name? }`) is unchanged by the runtime — `name` is a
+ * settings-only display label that the chat runtime ignores.
  */
 
 /** A single model available from a provider (settings UI only for now). */
@@ -24,13 +24,14 @@ export interface ModelConfig {
 /** A single provider connection config (settings UI only; runtime ignores `name`). */
 export interface ProviderConfig {
   baseUrl: string;
-  model: string;
+  /** The default model id used when a chat doesn't pick one explicitly. */
+  defaultModel: string;
   apiKey?: string;
   temperature?: number;
   maxTokens?: number;
   /** Friendly display name; settings-only, ignored by the chat runtime. */
   name?: string;
-  /** All models available from this provider; `model` is the default. */
+  /** All models available from this provider; `defaultModel` is the default. */
   models?: ModelConfig[];
 }
 
@@ -48,7 +49,7 @@ export interface ProviderPreset {
   /** Wire protocol family — meaningful once the chat runtime supports more than OpenAI. */
   compatible: "openai" | "anthropic";
   baseUrl: string;
-  model: string;
+  defaultModel: string;
   /** Whether a hosted service needs an API key (local servers usually don't). */
   requiresKey: boolean;
   description?: string;
@@ -82,7 +83,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     label: "OpenAI",
     compatible: "openai",
     baseUrl: "https://api.openai.com/v1",
-    model: "gpt-4o",
+    defaultModel: "gpt-4o",
     requiresKey: true,
     description: "GPT-4o family hosted by OpenAI.",
   },
@@ -91,7 +92,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     label: "Anthropic",
     compatible: "anthropic",
     baseUrl: "https://api.anthropic.com/v1",
-    model: "claude-3-5-sonnet-20241022",
+    defaultModel: "claude-3-5-sonnet-20241022",
     requiresKey: true,
     description: "Claude models hosted by Anthropic.",
   },
@@ -100,7 +101,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     label: "Groq",
     compatible: "openai",
     baseUrl: "https://api.groq.com/openai/v1",
-    model: "llama-3.1-70b-versatile",
+    defaultModel: "llama-3.1-70b-versatile",
     requiresKey: true,
     description: "Hosted Groq inference endpoints.",
   },
@@ -109,7 +110,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     label: "Mistral",
     compatible: "openai",
     baseUrl: "https://api.mistral.ai/v1",
-    model: "mistral-large-latest",
+    defaultModel: "mistral-large-latest",
     requiresKey: true,
     description: "Hosted Mistral endpoints.",
   },
@@ -118,7 +119,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     label: "Custom",
     compatible: "openai",
     baseUrl: "",
-    model: "",
+    defaultModel: "",
     requiresKey: false,
     description: "Any OpenAI-compatible endpoint you configure by hand.",
   },
@@ -145,11 +146,11 @@ export function nextProviderId(existingIds: string[], base: string): string {
   return `${normalized}-${n}`;
 }
 
-/** Seed a draft provider config from a preset (baseUrl/model/name). */
+/** Seed a draft provider config from a preset (baseUrl/defaultModel/name). */
 export function applyPreset(preset: ProviderPreset): ProviderConfig {
   return {
     baseUrl: preset.baseUrl,
-    model: preset.model,
+    defaultModel: preset.defaultModel,
     name: preset.label,
   };
 }

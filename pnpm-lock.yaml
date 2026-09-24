@@ -181,6 +181,9 @@ importers:
       openp41ge-constants:
         specifier: workspace:*
         version: link:../openp41ge-constants
+      openp41ge-editor-gutter:
+        specifier: workspace:*
+        version: link:../openp41ge-editor-gutter
       openp41ge-filesystem:
         specifier: workspace:*
         version: link:../openp41ge-filesystem
@@ -352,6 +355,21 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/openp41ge-editor-gutter:
+    devDependencies:
+      jsdom:
+        specifier: ^29.1.1
+        version: 29.1.1(@noble/hashes@2.4.0)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.10)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/openp41ge-filesystem:
     devDependencies:
       typescript:
@@ -381,6 +399,12 @@ importers:
       lit:
         specifier: ^3.3.3
         version: 3.3.3
+      openp41ge-editor-engine:
+        specifier: workspace:*
+        version: link:../openp41ge-editor-engine
+      openp41ge-editor-gutter:
+        specifier: workspace:*
+        version: link:../openp41ge-editor-gutter
     devDependencies:
       jsdom:
         specifier: ^29.1.1
@@ -488,6 +512,9 @@ importers:
       openp41ge-editor-engine:
         specifier: workspace:*
         version: link:../openp41ge-editor-engine
+      openp41ge-editor-gutter:
+        specifier: workspace:*
+        version: link:../openp41ge-editor-gutter
       openp41ge-git:
         specifier: workspace:*
         version: link:../openp41ge-git

@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { VllmChatProvider, toOpenAIMessages } from "../../../src/main/services/vllm-chat-provider";
 import type { ChatMessage } from "openp41ge-agents";
 
-const config = { baseUrl: "http://localhost:8000/v1", model: "qwen" };
+const config = { baseUrl: "http://localhost:8000/v1", defaultModel: "qwen" };
 
 /** Build a Response whose body is a single SSE body string. */
 function sseResponse(body: string): Response {
@@ -146,16 +146,18 @@ describe("VllmChatProvider.streamChat", () => {
       const provider = new VllmChatProvider(config);
       const deltas = await collect(provider.streamChat({ messages: [] }));
 
-      expect(deltas.filter((d) => d.type === "reasoning").map((d) => (d as { text: string }).text)).toEqual([
-        "Let me think",
-        " about this",
-      ]);
+      expect(
+        deltas.filter((d) => d.type === "reasoning").map((d) => (d as { text: string }).text),
+      ).toEqual(["Let me think", " about this"]);
       expect(deltas.filter((d) => d.type === "text")[0]).toEqual({ type: "text", text: "Answer" });
 
       // Live usage reflects both reasoning and content tokens (3 streamed tokens),
       // not just visible content.
       const live = deltas.filter((d) => d.type === "usage" && (d as { live?: boolean }).live);
-      const lastLive = live[live.length - 1] as { usage: { completionTokens: number }; live?: boolean };
+      const lastLive = live[live.length - 1] as {
+        usage: { completionTokens: number };
+        live?: boolean;
+      };
       expect(lastLive.usage.completionTokens).toBe(3);
     } finally {
       spy.mockRestore();
@@ -191,7 +193,10 @@ describe("VllmChatProvider.streamChat", () => {
 
       // The authoritative final usage chunk is always last and not "live".
       const last = deltas[deltas.length - 1];
-      expect(last).toMatchObject({ type: "usage", usage: { promptTokens: 5, completionTokens: 3, totalTokens: 8 } });
+      expect(last).toMatchObject({
+        type: "usage",
+        usage: { promptTokens: 5, completionTokens: 3, totalTokens: 8 },
+      });
       expect((last as { live?: boolean }).live).toBeFalsy();
     } finally {
       spy.mockRestore();
@@ -199,12 +204,52 @@ describe("VllmChatProvider.streamChat", () => {
   });
 
   it("requests stream_options.include_usage so vLLM reports usage", async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(sseResponse("data: [DONE]\n\n"));
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      sseResponse("data: [DONE]\n\n"),
+    );
     const provider = new VllmChatProvider(config);
     await collect(provider.streamChat({ messages: [] }));
 
     const called = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(called[1].body);
     expect(body.stream_options).toEqual({ include_usage: true });
+  });
+
+  it("passes the configured thinking level through verbatim as reasoning_effort", async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      sseResponse("data: [DONE]\n\n"),
+    );
+    const provider = new VllmChatProvider(config);
+    await collect(provider.streamChat({ messages: [], thinking: "mine" }));
+
+    const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.reasoning_effort).toBe("mine");
+  });
+
+  it("omits reasoning_effort when the thinking level is off/empty/none", async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      sseResponse("data: [DONE]\n\n"),
+    );
+    const provider = new VllmChatProvider(config);
+
+    await collect(provider.streamChat({ messages: [], thinking: "off" }));
+    let body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.reasoning_effort).toBeUndefined();
+
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockClear();
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      sseResponse("data: [DONE]\n\n"),
+    );
+    await collect(provider.streamChat({ messages: [], thinking: "" }));
+    body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.reasoning_effort).toBeUndefined();
+
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockClear();
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      sseResponse("data: [DONE]\n\n"),
+    );
+    await collect(provider.streamChat({ messages: [], thinking: "none" }));
+    body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.reasoning_effort).toBeUndefined();
   });
 });

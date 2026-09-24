@@ -6,8 +6,8 @@
  *   2. build the provider request (system prompt + history + tool defs),
  *   3. stream deltas from the provider, folding text into the assistant reply
  *      and accumulating tool calls,
- *   4. execute accumulated tool calls (looping back to the provider, guarded by
- *      a max-turns bound),
+ *   4. execute accumulated tool calls (looping back to the provider until the
+ *      model stops calling tools or the request is aborted),
  *   5. persist + broadcast mutations and forward incremental deltas to the
  *      owning window.
  *
@@ -32,7 +32,6 @@ import type {
 import type { ChatStoreService } from "./chat-store-service.js";
 import type { ChatProviderRegistry } from "./chat-provider-registry.js";
 import type { ToolRegistry } from "./tool-registry.js";
-import { AGENT_MAX_TURNS } from "openp41ge-constants";
 
 const log = createLogger("openp41ge", "AgentRuntime");
 
@@ -176,7 +175,7 @@ export class AgentRuntime {
         this._hooks.broadcast("chat:changed", {});
         return;
       }
-      if (!providerConfig.model) {
+      if (!providerConfig.defaultModel) {
         this._store.appendMessage(chatId, {
           id: this._id("msg"),
           role: "assistant",
@@ -255,9 +254,7 @@ export class AgentRuntime {
     // configured (legacy behaviour). Empty when nothing is connected (deny).
     const roots = connected !== undefined ? connected.map((c) => c.path) : undefined;
     const systemContent = buildSystemPrompt(connected);
-    let turns = 0;
-    while (!signal.aborted && turns < AGENT_MAX_TURNS) {
-      turns += 1;
+    while (!signal.aborted) {
       const chat = this._store.get(chatId);
       if (!chat) return;
 
@@ -458,10 +455,7 @@ function parseArgs(raw: string): Record<string, unknown> {
 }
 
 /** Append a text chunk to the ordered segment list, merging into a trailing text segment. */
-function appendTextSegment(
-  segments: MessageSegment[] | undefined,
-  text: string,
-): MessageSegment[] {
+function appendTextSegment(segments: MessageSegment[] | undefined, text: string): MessageSegment[] {
   const segs = segments ?? [];
   const last = segs[segs.length - 1];
   if (last && last.type === "text") {

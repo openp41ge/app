@@ -42,10 +42,14 @@ export interface OverlayScrollbarOptions {
   autoHide?: boolean;
   /** Milliseconds to wait after the cursor leaves before fading out (default 2500). */
   autoHideDelay?: number;
+  /** Show a pin icon at the bottom of a vertical track that appears while the
+   *  scroll view is "pinned" to the bottom (auto-following the newest content).
+   *  The icon is purely decorative (not a button) and hides when the scrollbar
+   *  auto-hides. The host owns the pinned state, passing the initial value here
+   *  and updating it via `setPinned()`. The icon is only created when this
+   *  option is provided.  Default: false (feature off). */
+  pinned?: boolean;
 }
-
-/** A spring-like, overshooting CSS easing for the thicken/brighter animation. */
-export const SPRING_EASE = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
 const OVERLAY_DEFAULT_SIZE = 6;
 const OVERLAY_DEFAULT_HOVER_SIZE = 10;
@@ -54,6 +58,12 @@ const OVERLAY_DEFAULT_THUMB_COLOR = "rgba(255,255,255,0.22)";
 const OVERLAY_DEFAULT_THUMB_HOVER_COLOR = "rgba(255,255,255,0.42)";
 const OVERLAY_DEFAULT_AUTO_HIDE_DELAY = 2500;
 const OVERLAY_FADE_MS = 250;
+
+/** Pin icon shown at the bottom of the track while the view is pinned to the
+ *  bottom (auto-following the newest content).  User-supplied glyph. */
+const PIN_ICON =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">` +
+  `<path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></svg>`;
 
 // ─── Pure geometry (unit-testable) ─────────────────────────────────────
 
@@ -98,6 +108,7 @@ export function computeThumbPosition(
 interface AxisState {
   track: HTMLElement;
   thumb: HTMLElement;
+  pin?: HTMLElement;
 }
 
 export class OverlayScrollbar {
@@ -117,8 +128,11 @@ export class OverlayScrollbar {
   private _destroyed = false;
   private _autoHide = false;
   private _autoHideDelay = OVERLAY_DEFAULT_AUTO_HIDE_DELAY;
+  private _pinEnabled = false;
+  private _pinned = false;
   private _hideTimer = 0;
   private _pointerInside = false;
+  private _visible = true;
   private _onPointerEnter: () => void = () => {};
   private _onPointerLeave: () => void = () => {};
   private _onScroll: () => void = () => {};
@@ -144,6 +158,8 @@ export class OverlayScrollbar {
     this._styleTarget = options.styleTarget;
     this._autoHide = options.autoHide ?? false;
     this._autoHideDelay = options.autoHideDelay ?? OVERLAY_DEFAULT_AUTO_HIDE_DELAY;
+    this._pinEnabled = options.pinned !== undefined;
+    this._pinned = options.pinned ?? false;
   }
 
   static attach(target: HTMLElement, options: OverlayScrollbarOptions = {}): OverlayScrollbar {
@@ -230,8 +246,8 @@ export class OverlayScrollbar {
       .os-thumb {
         position: absolute; background: var(--os-thumb, ${OVERLAY_DEFAULT_THUMB_COLOR}); border-radius: 0;
         box-sizing: border-box; pointer-events: auto; cursor: default;
-        transition: width ${SPRING_EASE} 0.18s, height ${SPRING_EASE} 0.18s,
-                    background-color 0.15s ease, left ${SPRING_EASE} 0.18s, top ${SPRING_EASE} 0.18s;
+        transition: width 0.18s ease, height 0.18s ease,
+                    background-color 0.15s ease, left 0.18s ease, top 0.18s ease;
       }
       .os-thumb:hover, .os-thumb.dragging { background: var(--os-thumb-hover, ${OVERLAY_DEFAULT_THUMB_HOVER_COLOR}); }
       .os-track--v .os-thumb {
@@ -244,6 +260,30 @@ export class OverlayScrollbar {
         height: var(--os-size, ${this._size}px);
       }
       .os-track--h:hover .os-thumb, .os-track--h .os-thumb.dragging { height: var(--os-hover, ${this._hoverSize}px); }
+      .os-pin {
+        position: absolute;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        /* Sized to the visible track strip (the track box minus its 1px left
+           border) so the icon centres on the strip. */
+        width: calc(var(--os-hover, 10px) - 1px);
+        height: calc(var(--os-hover, 10px) - 1px);
+        box-sizing: border-box;
+        /* A dark grey — clearly darker than the translucent thumb (which
+           renders ~#4f4f4f) so the glyph stands out on the scrollbar. */
+        color: #2e2e2e;
+        pointer-events: none; /* purely decorative — not a button */
+        user-select: none;
+        transition: opacity 0.15s ease;
+      }
+      .os-pin svg {
+        /* Fill the strip box so the glyph occupies the full width. */
+        width: 100%; height: 100%;
+        flex: none;
+        display: block;
+      }
+      .os-pin.os-pin-hidden { opacity: 0; }
     `;
     const root = this._styleTarget;
     if (root instanceof ShadowRoot) {
@@ -291,6 +331,30 @@ export class OverlayScrollbar {
     track.appendChild(thumb);
     this._container.appendChild(track);
     this._axes[axis] = { track, thumb };
+
+    if (this._pinEnabled && axis === "vertical") {
+      const pin = document.createElement("span");
+      pin.className = "os-pin os-pin-hidden";
+      pin.setAttribute("aria-hidden", "true");
+      pin.setAttribute("data-os-axis", axis);
+      pin.innerHTML = PIN_ICON;
+      const ins = this._inset;
+      Object.assign(pin.style, {
+        // Keep a little breathing room above the container's bottom edge so
+        // the icon doesn't sit flush against the line. `calc(0 + 2px)` is
+        // invalid (number + length), so default `bottom` to a unit value.
+        bottom:
+          ins.bottom === undefined || ins.bottom === "0"
+            ? "2px"
+            : `calc(${ins.bottom} + 2px)`,
+        right: ins.right ?? "0",
+        zIndex: String(this._zIndex + 1),
+      });
+      // Size the square icon to the track width (matches `--os-hover`).
+      pin.style.setProperty("--os-hover", `${this._hoverSize}px`);
+      this._container.appendChild(pin);
+      this._axes[axis]!.pin = pin;
+    }
 
     thumb.addEventListener("pointerdown", (e: PointerEvent) => this._onThumbPointerDown(e, axis));
     track.addEventListener("pointerdown", (e: PointerEvent) => {
@@ -361,6 +425,14 @@ export class OverlayScrollbar {
     this._paintAxis("horizontal");
   }
 
+  /** Update whether the scroll view is pinned to the bottom (auto-following
+   *  the newest content). Shows the pin icon when true, hides it when false.
+   *  The icon also hides when the scrollbar auto-hides. */
+  setPinned(pinned: boolean): void {
+    this._pinned = pinned;
+    this._paintPin();
+  }
+
   /** Show the scrollbar and cancel any pending auto-hide. */
   private _show(): void {
     if (!this._autoHide) return;
@@ -392,10 +464,22 @@ export class OverlayScrollbar {
   }
 
   private _setVisible(visible: boolean): void {
+    this._visible = visible;
     for (const key of Object.keys(this._axes) as ScrollbarAxis[]) {
       const state = this._axes[key];
       if (state) state.track.classList.toggle("os-hidden", !visible);
     }
+    this._paintPin();
+  }
+
+  /** Repaint the pin icon: hidden when the scrollbar is faded out (auto-hide)
+   *  or when the view is not pinned to the bottom (or there is nothing to
+   *  scroll). */
+  private _paintPin(): void {
+    const state = this._axes["vertical"];
+    if (!state?.pin) return;
+    const hidden = !this._visible || !this._pinned || state.track.style.display === "none";
+    state.pin.classList.toggle("os-pin-hidden", hidden);
   }
 
   private _isDragging(): boolean {
@@ -424,6 +508,7 @@ export class OverlayScrollbar {
       if (scrollLen <= viewport) {
         thumb.style.display = "none";
         track.style.display = "none";
+        this._paintPin();
         return;
       }
       thumb.style.display = "";
@@ -432,6 +517,9 @@ export class OverlayScrollbar {
       const pos = computeThumbPosition(this._target.scrollTop, scrollLen, viewport, trackLen, len);
       thumb.style.height = `${Math.max(this._minThumbSize, len)}px`;
       thumb.style.top = `${pos}px`;
+      // The pin icon's visibility is driven by the host's pinned state (via
+      // `setPinned`) and the scrollbar's own visibility (auto-hide/scroll).
+      this._paintPin();
     } else {
       const viewport = this._target.clientWidth;
       const scrollLen = this._target.scrollWidth;
@@ -468,7 +556,10 @@ export class OverlayScrollbar {
     this._raf = 0;
     for (const key of Object.keys(this._axes) as ScrollbarAxis[]) {
       const state = this._axes[key];
-      if (state) state.track.remove();
+      if (state) {
+        state.track.remove();
+        state.pin?.remove();
+      }
     }
     this._axes = {};
     this._target.removeAttribute("data-overlay-scrollbar");

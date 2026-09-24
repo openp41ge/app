@@ -138,14 +138,16 @@ describe("Openp41geAgents (custom element)", () => {
     expect(count.textContent!.trim()).toBe("1/2");
 
     // Navigating moves the active highlight to the second hit.
-    const next = el.shadowRoot!.querySelectorAll(".chat-findbar .find-toggle")[1] as HTMLButtonElement;
+    const next = el.shadowRoot!.querySelectorAll(
+      ".chat-findbar .find-toggle",
+    )[1] as HTMLButtonElement;
     next.click();
     await el.updateComplete;
     const active = el.shadowRoot!.querySelector("mark.chat-hit-active");
     expect(active).toBeTruthy();
-    expect(
-      el.shadowRoot!.querySelector(".chat-findbar .find-count")!.textContent!.trim(),
-    ).toBe("2/2");
+    expect(el.shadowRoot!.querySelector(".chat-findbar .find-count")!.textContent!.trim()).toBe(
+      "2/2",
+    );
 
     // Closing removes the marks and the bar (close is the last .find-toggle).
     const toggles = el.shadowRoot!.querySelectorAll(".chat-findbar .find-toggle");
@@ -436,7 +438,15 @@ describe("Openp41geAgents (custom element)", () => {
           content: "hello",
           toolCalls: [{ id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "done" }],
           segments: [
-            { type: "tool", toolCall: { id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "done" } },
+            {
+              type: "tool",
+              toolCall: {
+                id: "tc1",
+                name: "read_file",
+                arguments: '{"path":"/a"}',
+                status: "done",
+              },
+            },
             { type: "text", text: "hello" },
           ],
           timestamp: 2,
@@ -476,6 +486,85 @@ describe("Openp41geAgents (custom element)", () => {
     expect(messages[0].content).toBe("Hello world");
   });
 
+  it("stops auto-scrolling the moment the user scrolls up (even slowly)", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const scroller = el.renderRoot.querySelector<HTMLElement>(".chat-messages")!;
+    // jsdom has no layout, so define real metrics on the scroller backed by a
+    // mutable value (bottom of a 2000px transcript in a 400px viewport = 1600).
+    Object.defineProperty(scroller, "scrollHeight", { value: 2000, configurable: true });
+    Object.defineProperty(scroller, "clientHeight", { value: 400, configurable: true });
+    let top = 1600;
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: () => top,
+      set: (v: number) => {
+        top = v;
+      },
+    });
+
+    // At the bottom (auto-follow engaged).
+    scroller.dispatchEvent(new Event("scroll"));
+    expect((el as unknown as { _pinnedToBottom: boolean })._pinnedToBottom).toBe(true);
+
+    // Slowly scroll up just a couple of pixels — well within the "near bottom"
+    // band. Pinning must yield immediately, or the stream re-pins us here.
+    top = 1598;
+    scroller.dispatchEvent(new Event("scroll"));
+    expect((el as unknown as { _pinnedToBottom: boolean })._pinnedToBottom).toBe(false);
+
+    // Stream new content: the viewport must NOT be yanked back to the bottom.
+    el.appendDelta("Let me check. ");
+    el.appendDelta("It says hello.");
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 25));
+    expect(scroller.scrollTop).toBe(1598);
+
+    // Scroll back to the bottom → following the stream resumes.
+    top = 1600;
+    scroller.dispatchEvent(new Event("scroll"));
+    expect((el as unknown as { _pinnedToBottom: boolean })._pinnedToBottom).toBe(true);
+    el.appendDelta(" More. ");
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 25));
+    expect(scroller.scrollTop).toBe(2000);
+  });
+
+  it("unpins on a wheel-up gesture even before any scroll movement", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const scroller = el.renderRoot.querySelector<HTMLElement>(".chat-messages")!;
+    Object.defineProperty(scroller, "scrollHeight", { value: 2000, configurable: true });
+    Object.defineProperty(scroller, "clientHeight", { value: 400, configurable: true });
+    let top = 1600;
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: () => top,
+      set: (v: number) => {
+        top = v;
+      },
+    });
+
+    // Pinned at the bottom.
+    scroller.dispatchEvent(new Event("scroll"));
+    expect((el as unknown as { _pinnedToBottom: boolean })._pinnedToBottom).toBe(true);
+
+    // A wheel-up gesture unpins immediately — the scroll event hasn't even
+    // fired yet, so an auto-anchor can't race ahead and re-pin us.
+    scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: -10 }));
+    expect((el as unknown as { _pinnedToBottom: boolean })._pinnedToBottom).toBe(false);
+
+    // Streaming must not yank us back to the bottom.
+    el.appendDelta("Keep reading. ");
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 25));
+    expect(scroller.scrollTop).toBe(1600);
+  });
+
   it("appendReasoning stores reasoning and renders a collapsible Reasoning block", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
@@ -492,8 +581,36 @@ describe("Openp41geAgents (custom element)", () => {
 
     const reasoning = el.renderRoot.querySelector(".msg-reasoning");
     expect(reasoning).not.toBeNull();
-    expect(reasoning!.querySelector(".msg-reasoning-body")!.textContent).toBe("Let me think about this");
+    expect(reasoning!.querySelector(".msg-reasoning-body")!.textContent).toBe(
+      "Let me think about this",
+    );
     expect(reasoning!.querySelector(".msg-reasoning-size")!.textContent).toBe("5 words");
+  });
+
+  it("keeps reasoning in the same message when it interleaves with content", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // A model that streams a first content token, then a reasoning fragment,
+    // then the rest of the content — all within ONE turn. These must stay on
+    // a single assistant message (reasoning block above the full answer).
+    el.appendDelta("Let");
+    el.appendReasoning(".");
+    el.appendDelta(" me confirm");
+    el.appendDelta(" the rest.");
+    await el.updateComplete;
+
+    const messages = el.messages as Array<{ role: string; content?: string; reasoning?: string }>;
+    const assistants = messages.filter((m) => m.role === "assistant");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0].content).toBe("Let me confirm the rest.");
+    expect(assistants[0].reasoning).toBe(".");
+
+    // Exactly one reasoning block (not a split "word / reasoning / rest").
+    const blocks = el.renderRoot.querySelectorAll(".msg-reasoning");
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.querySelector(".msg-reasoning-body")!.textContent).toBe(".");
   });
 
   it("appendReasoning after a tool call starts a NEW assistant block, not merging into the old one", async () => {
@@ -516,7 +633,11 @@ describe("Openp41geAgents (custom element)", () => {
     el.appendReasoning("Second turn reasoning");
     await el.updateComplete;
 
-    const messages = el.messages as Array<{ role: string; reasoning?: string; toolCalls?: unknown[] }>;
+    const messages = el.messages as Array<{
+      role: string;
+      reasoning?: string;
+      toolCalls?: unknown[];
+    }>;
     const assistants = messages.filter((m) => m.role === "assistant");
     expect(assistants).toHaveLength(2);
     expect(assistants[0].reasoning).toBe("First turn reasoning");
@@ -526,8 +647,12 @@ describe("Openp41geAgents (custom element)", () => {
     // Two separate reasoning blocks render sequentially in the DOM.
     const blocks = el.renderRoot.querySelectorAll(".msg-reasoning");
     expect(blocks).toHaveLength(2);
-    expect(blocks[0]!.querySelector(".msg-reasoning-body")!.textContent).toBe("First turn reasoning");
-    expect(blocks[1]!.querySelector(".msg-reasoning-body")!.textContent).toBe("Second turn reasoning");
+    expect(blocks[0]!.querySelector(".msg-reasoning-body")!.textContent).toBe(
+      "First turn reasoning",
+    );
+    expect(blocks[1]!.querySelector(".msg-reasoning-body")!.textContent).toBe(
+      "Second turn reasoning",
+    );
   });
 
   it("setToolCallState adds a running tool call then transitions to done", async () => {
@@ -607,7 +732,12 @@ describe("Openp41geAgents (custom element)", () => {
       opened = true;
     });
 
-    el.setToolCallState({ id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "running" });
+    el.setToolCallState({
+      id: "tc1",
+      name: "read_file",
+      arguments: '{"path":"/a"}',
+      status: "running",
+    });
     await el.updateComplete;
 
     // No action row while the tool is still running (no result yet), but a
@@ -627,9 +757,12 @@ describe("Openp41geAgents (custom element)", () => {
     document.body.appendChild(el);
     await el.updateComplete;
 
-    el.setToolCallState(
-      { id: "tc1", name: "read_file", arguments: '{"path":"/repo/src/a.ts"}', status: "running" },
-    );
+    el.setToolCallState({
+      id: "tc1",
+      name: "read_file",
+      arguments: '{"path":"/repo/src/a.ts"}',
+      status: "running",
+    });
     el.setToolCallState({
       id: "tc2",
       name: "search_files",
@@ -869,7 +1002,7 @@ describe("Openp41geAgents (custom element)", () => {
         {
           id: "vllm",
           label: "vLLM",
-          model: "vicuna-13b",
+          defaultModel: "vicuna-13b",
           baseUrl: "http://localhost:8000/v1",
           models: [{ id: "vicuna-13b" }, { id: "llama-2", contextWindow: 128000 }],
         },
@@ -918,8 +1051,8 @@ describe("Openp41geAgents (custom element)", () => {
 
     el.setComposerContext({
       providers: [
-        { id: "vllm", label: "vLLM", model: "vicuna-13b" },
-        { id: "openai", label: "OpenAI", model: "gpt-4" },
+        { id: "vllm", label: "vLLM", defaultModel: "vicuna-13b" },
+        { id: "openai", label: "OpenAI", defaultModel: "gpt-4" },
       ],
       activeProviderId: "vllm",
     });
@@ -958,7 +1091,7 @@ describe("Openp41geAgents (custom element)", () => {
     await el.updateComplete;
 
     el.setComposerContext({
-      providers: [{ id: "vllm", label: "vLLM", model: "m1" }],
+      providers: [{ id: "vllm", label: "vLLM", defaultModel: "m1" }],
       activeProviderId: "vllm",
     });
     await el.updateComplete;
@@ -988,7 +1121,7 @@ describe("Openp41geAgents (custom element)", () => {
         {
           id: "vllm",
           label: "vLLM",
-          model: "m1",
+          defaultModel: "m1",
           models: [{ id: "m1", thinking: { Light: "low", Deep: "high" }, contextWindow: 128000 }],
         },
       ],
@@ -1035,6 +1168,35 @@ describe("Openp41geAgents (custom element)", () => {
     });
   });
 
+  it("omits thinkingLevel when the selected entry's value is null (off)", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setComposerContext({
+      providers: [
+        {
+          id: "vllm",
+          label: "vLLM",
+          defaultModel: "m1",
+          models: [{ id: "m1", thinking: { Off: null, Low: "low" }, contextWindow: 128000 }],
+        },
+      ],
+      activeProviderId: "vllm",
+    });
+    await el.updateComplete;
+
+    const sendHandler = vi.fn();
+    el.addEventListener("chat:send", sendHandler as EventListener);
+    const inputEl = el.shadowRoot!.querySelector(".chat-input") as HTMLTextAreaElement;
+    (inputEl as { value: string }).value = "hi";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    (el.shadowRoot!.querySelector(".composer-send") as HTMLElement).click();
+    // The default entry ("Off", value null) must not emit a thinkingLevel.
+    expect((sendHandler.mock.calls[0][0] as CustomEvent).detail).toEqual({ text: "hi" });
+  });
+
   it("selecting a model dispatches chat:model-change and updates the model label", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
@@ -1045,7 +1207,7 @@ describe("Openp41geAgents (custom element)", () => {
         {
           id: "vllm",
           label: "vLLM",
-          model: "vicuna-13b",
+          defaultModel: "vicuna-13b",
           models: [{ id: "vicuna-13b" }, { id: "qwen-25" }],
         },
       ],
@@ -1801,12 +1963,15 @@ describe("Openp41geAgents paged transcript", () => {
   it("opens in paged mode and reports hasOlderMessages", async () => {
     const el = mount();
     await el.updateComplete;
-    el.openTranscriptPaged({ id: "c1", title: "Chat", providerId: "vllm" }, {
-      chatId: "c1",
-      start: 2,
-      total: 5,
-      messages: makeMessages(5).slice(2, 5),
-    });
+    el.openTranscriptPaged(
+      { id: "c1", title: "Chat", providerId: "vllm" },
+      {
+        chatId: "c1",
+        start: 2,
+        total: 5,
+        messages: makeMessages(5).slice(2, 5),
+      },
+    );
     await el.updateComplete;
     expect(el.transcriptTotal).toBe(5);
     expect(el.hasOlderMessages).toBe(true);
@@ -1826,12 +1991,15 @@ describe("Openp41geAgents paged transcript", () => {
         messages: makeMessages(5).slice(offset, offset + count),
       });
     };
-    el.openTranscriptPaged({ id: "c1", title: "Chat", providerId: "vllm" }, {
-      chatId: "c1",
-      start: 2,
-      total: 5,
-      messages: makeMessages(5).slice(2, 5),
-    });
+    el.openTranscriptPaged(
+      { id: "c1", title: "Chat", providerId: "vllm" },
+      {
+        chatId: "c1",
+        start: 2,
+        total: 5,
+        messages: makeMessages(5).slice(2, 5),
+      },
+    );
     await el.updateComplete;
 
     await el.loadOlderMessages();
@@ -1855,12 +2023,15 @@ describe("Openp41geAgents paged transcript", () => {
         messages: makeMessages(5).slice(offset, offset + count),
       });
     };
-    el.openTranscriptPaged({ id: "c1", title: "Chat", providerId: "vllm" }, {
-      chatId: "c1",
-      start: 0,
-      total: 5,
-      messages: makeMessages(5),
-    });
+    el.openTranscriptPaged(
+      { id: "c1", title: "Chat", providerId: "vllm" },
+      {
+        chatId: "c1",
+        start: 0,
+        total: 5,
+        messages: makeMessages(5),
+      },
+    );
     await el.updateComplete;
     await el.loadOlderMessages();
     expect(calls.length).toBe(0);
@@ -1885,12 +2056,15 @@ describe("Openp41geAgents paged transcript", () => {
         total: 40,
         messages: makeMessages(40).slice(Math.max(0, offset), Math.max(0, offset) + count),
       });
-    el.openTranscriptPaged({ id: "c1", title: "Chat", providerId: "vllm" }, {
-      chatId: "c1",
-      start: 0,
-      total: 40,
-      messages: makeMessages(20),
-    });
+    el.openTranscriptPaged(
+      { id: "c1", title: "Chat", providerId: "vllm" },
+      {
+        chatId: "c1",
+        start: 0,
+        total: 40,
+        messages: makeMessages(20),
+      },
+    );
     await el.updateComplete;
 
     const btn = el.shadowRoot!.querySelector(".bb-find") as HTMLButtonElement;
@@ -1905,8 +2079,8 @@ describe("Openp41geAgents paged transcript", () => {
     const active = el.shadowRoot!.querySelector("mark.chat-hit-active") as HTMLElement;
     expect(active).toBeTruthy();
     expect(el.shadowRoot!.querySelectorAll("mark.chat-hit").length).toBe(1);
-    expect(
-      el.shadowRoot!.querySelector(".chat-findbar .find-count")!.textContent!.trim(),
-    ).toBe("1/9");
+    expect(el.shadowRoot!.querySelector(".chat-findbar .find-count")!.textContent!.trim()).toBe(
+      "1/9",
+    );
   });
 });

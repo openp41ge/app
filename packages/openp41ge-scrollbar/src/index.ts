@@ -248,9 +248,4 @@ export class Openp41geScrollbar {
 
 export type { ScrollbarAxis } from "./overlay-scrollbar";
 export type { OverlayScrollbarOptions } from "./overlay-scrollbar";
-export {
-  OverlayScrollbar,
-  SPRING_EASE,
-  computeThumbLength,
-  computeThumbPosition,
-} from "./overlay-scrollbar";
+export { OverlayScrollbar, computeThumbLength, computeThumbPosition } from "./overlay-scrollbar";

@@ -5,6 +5,7 @@ export type {
   GutterColumn,
   GutterEvents,
 } from "./gutter";
+export { GUTTER_DEFAULT_CSS } from "./styles";
 export { lineNumberColumn, foldColumn } from "./columns";
 export type {
   LineNumberColumnOptions,

@@ -239,7 +239,7 @@ export class AgentsController extends BaseController implements TabController {
       const providers = Object.entries(cfg.providers).map(([id, p]) => {
         const pv = p as {
           name?: string;
-          model?: string;
+          defaultModel?: string;
           baseUrl?: string;
           models?: Array<{
             id: string;
@@ -251,7 +251,7 @@ export class AgentsController extends BaseController implements TabController {
         return {
           id,
           label: pv.name ?? id,
-          model: pv.model ?? "",
+          defaultModel: pv.defaultModel ?? "",
           models: (pv.models ?? []).map((m) => ({
             id: m.id,
             thinking: m.thinking,
@@ -265,7 +265,7 @@ export class AgentsController extends BaseController implements TabController {
         providers.push({
           id: activeProviderId,
           label: activeProviderId,
-          model: "",
+          defaultModel: "",
           models: [],
           baseUrl: "",
         });
@@ -300,7 +300,7 @@ export class AgentsController extends BaseController implements TabController {
       this._component?.setComposerContext({
         providers,
         activeProviderId,
-        activeModelId: active?.model ?? "",
+        activeModelId: active?.defaultModel ?? "",
         availableTools,
         activeTools: this._activeTools,
       });

@@ -26,7 +26,8 @@ export function tokenizeJsonFull(text: string): JsonToken[] {
     const c = text[i];
     if (c === " " || c === "\t" || c === "\n" || c === "\r") {
       let j = i + 1;
-      while (j < n && (text[j] === " " || text[j] === "\t" || text[j] === "\n" || text[j] === "\r")) j++;
+      while (j < n && (text[j] === " " || text[j] === "\t" || text[j] === "\n" || text[j] === "\r"))
+        j++;
       tokens.push({ kind: "ws", start: i, end: j, value: text.slice(i, j) });
       i = j;
       continue;
@@ -98,7 +99,11 @@ export function selectableRanges(tokens: JsonToken[]): SelectableRange[] {
     if (t.kind === "string") {
       const next = nonWs[idx + 1];
       const isKey = next && next.kind === "punct" && next.value === ":";
-      res.push({ kind: isKey ? "key" : "value", start: t.start + 1, end: Math.max(t.start + 1, t.end - 1) });
+      res.push({
+        kind: isKey ? "key" : "value",
+        start: t.start + 1,
+        end: Math.max(t.start + 1, t.end - 1),
+      });
     } else if (t.kind === "number" || t.kind === "keyword") {
       res.push({ kind: "value", start: t.start, end: t.end });
     }

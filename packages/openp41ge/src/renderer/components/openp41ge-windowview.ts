@@ -53,6 +53,14 @@ class Openp41geWindowView extends LitElement {
     10,
   );
 
+  /** Which sidebar has a settings drawer currently open (or null). While a
+   * drawer is open, the windowview raises that anchor sidebar above the dim
+   * mask and disables the OPPOSING sidebar's resize notch, so the drawer's own
+   * handle (which may reach the grid edge) stays grabbable instead of the
+   * opposing sidebar stealing the drag. */
+  @state()
+  private _drawerOpenSide: "left" | "right" | null = null;
+
   // ── Drag state ────────────────────────────────────────────────────────
 
   private _activeHandle: "left" | "right" | null = null;
@@ -143,6 +151,13 @@ class Openp41geWindowView extends LitElement {
   // ═══ Resize handlers ──────────────────────────────────────────────────
 
   private _onResizeStart(e: MouseEvent, handle: "left" | "right"): void {
+    // A drawer is open on the opposing side, so its far edge sits right under
+    // this notch — ignore the drag so the drawer's own resize handle (which
+    // the notch otherwise covers) stays grabbable.
+    if (this._notchDisabled(handle)) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     this._activeHandle = handle;
     this._dragStartX = e.clientX;
@@ -274,6 +289,21 @@ class Openp41geWindowView extends LitElement {
     ) as Openp41geSettingsDrawerHost | null;
   }
 
+  /** React to the drawer host broadcasting which side (if any) has a drawer
+   * open, so the windowview can raise the anchor sidebar and disable the
+   * opposing sidebar's resize notch accordingly. */
+  private _onDrawerOpenChanged = (e: Event): void => {
+    const side = (e as CustomEvent<{ side: "left" | "right" | null }>).detail?.side ?? null;
+    if (side !== this._drawerOpenSide) this._drawerOpenSide = side;
+  };
+
+  /** Whether the given sidebar's resize notch should be disabled because a
+   * drawer is open on the OPPOSING side (its own drawer edge would sit exactly
+   * under that notch, so the notch must not steal the drawer's resize drag). */
+  private _notchDisabled(side: "left" | "right"): boolean {
+    return this._drawerOpenSide !== null && this._drawerOpenSide !== side;
+  }
+
   /**
    * Write a sidebar width straight to its DOM host element. Bypasses Lit
    * re-rendering so the resize handle tracks the mouse position on every
@@ -388,7 +418,10 @@ class Openp41geWindowView extends LitElement {
    *
    * All other grid tabs (terminal, git repository, etc.) get no icon.
    */
-  private _gridTabIcon(tab: { appType: string; config?: Record<string, unknown> }): string | undefined {
+  private _gridTabIcon(tab: {
+    appType: string;
+    config?: Record<string, unknown>;
+  }): string | undefined {
     // Settings grid tabs: any appType that is a registered sidebar tab's
     // settings surface. Matched against the registry at render time so
     // extension-provided settings tabs are covered too.
@@ -520,13 +553,35 @@ class Openp41geWindowView extends LitElement {
            once the transition finishes; during the drag itself it is absent so
            the sidebar tracks the pointer without lag. */
         openp41ge-sidebar.wv-springing {
-          transition: flex-basis 0.18s ease, max-width 0.18s ease;
+          transition:
+            flex-basis 0.18s ease,
+            max-width 0.18s ease;
         }
         .wv-notch-v.left-notch::before {
           left: 1px;
         }
         .wv-notch-v.right-notch::before {
           right: 2px;
+        }
+        /* While a settings drawer is open from a sidebar, that anchor sidebar is
+         * raised above the drawer host's full-window dim mask (z-index:1001) so
+         * it stays bright and interactive instead of being greyed out by it.
+         * The other sidebar stays under the mask. */
+        openp41ge-sidebar.wv-drawer-anchor {
+          position: relative;
+          z-index: 1003;
+        }
+        /* A sidebar's resize notch whose OPPOSING sidebar has an open drawer:
+         * the drawer's far edge sits exactly under this notch when it spans the
+         * full grid width, so the notch must not intercept the pointer — let
+         * the drawer's own resize handle win the drag instead of the opposing
+         * sidebar stealing it. */
+        .wv-notch-v.wv-notch-disabled {
+          cursor: default;
+          pointer-events: none;
+        }
+        .wv-notch-v.wv-notch-disabled::before {
+          opacity: 0;
         }
       </style>
       <div class="flex flex-col w-full h-full bg-surface relative">
@@ -545,13 +600,13 @@ class Openp41geWindowView extends LitElement {
             .systemTabs=${leftSysTabs}
             .activeTabId=${win.sidebar?.activeLeftTab ?? null}
             .isOpen=${ws?.sidebar?.leftSidebarOpen ?? false}
-            class="sidebar-element ${ws?.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
+            class="sidebar-element ${ws?.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"} ${this._drawerOpenSide === "left" ? "wv-drawer-anchor" : ""}"
             style="flex: 0 1 ${this._leftWidth}px; max-width: min(${this._leftWidth}px, 35vw)"
           ></openp41ge-sidebar>
 
           <!-- Left resize notch (between left sidebar and grid) -->
           <div
-            class="wv-notch-v left-notch ${ws?.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
+            class="wv-notch-v left-notch ${ws?.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"} ${this._notchDisabled("left") ? "wv-notch-disabled" : ""}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "left")}
           ></div>
 
@@ -572,13 +627,15 @@ class Openp41geWindowView extends LitElement {
               ></tab-grid>
               <!-- Experimental "negative drawer" settings host: overlays the
                    grid from the sidebar edge instead of opening a settings tab. -->
-              <openp41ge-settings-drawer-host></openp41ge-settings-drawer-host>
+              <openp41ge-settings-drawer-host
+                @drawer-open-changed=${this._onDrawerOpenChanged}
+              ></openp41ge-settings-drawer-host>
             </div>
           </div>
 
           <!-- Right resize notch (between grid and right sidebar) -->
           <div
-            class="wv-notch-v right-notch ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
+            class="wv-notch-v right-notch ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"} ${this._notchDisabled("right") ? "wv-notch-disabled" : ""}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "right")}
           ></div>
 
@@ -590,7 +647,7 @@ class Openp41geWindowView extends LitElement {
             .systemTabs=${rightSysTabs}
             .activeTabId=${win.sidebar?.activeRightTab ?? null}
             .isOpen=${ws?.sidebar?.rightSidebarOpen ?? false}
-            class="sidebar-element ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
+            class="sidebar-element ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"} ${this._drawerOpenSide === "right" ? "wv-drawer-anchor" : ""}"
             style="flex: 0 1 ${this._rightWidth}px; max-width: min(${this._rightWidth}px, 35vw)"
           ></openp41ge-sidebar>
         </div>

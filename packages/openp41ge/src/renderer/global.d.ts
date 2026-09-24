@@ -362,7 +362,7 @@ declare global {
         }) => Promise<{ ok: boolean; models?: string[]; error?: string }>;
         getAgentConfig: () => Promise<{
           providerId: string;
-          providers: Record<string, { baseUrl: string; model: string; apiKey?: string }>;
+          providers: Record<string, { baseUrl: string; defaultModel: string; apiKey?: string }>;
         }>;
         listTools: () => Promise<Array<{ name: string; description: string }>>;
 

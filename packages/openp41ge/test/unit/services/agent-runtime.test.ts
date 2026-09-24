@@ -3,7 +3,7 @@
  *
  * Uses a fake ChatProvider (registered in a real ChatProviderRegistry), a
  * fake ToolRegistry, and a real ChatStoreService (temp dir). Verifies message
- * persistence order, tool execution + tool-result loop, max-turns guard, abort,
+ * persistence order, tool execution + tool-result loop, abort,
  * and the delta/tool/status event fan-out.
  */
 
@@ -44,7 +44,7 @@ function setup() {
   const tools = new ToolRegistry();
   const hooks = { sendToWindow: vi.fn(), broadcast: vi.fn() };
   const runtime = new AgentRuntime(store, providers, tools, hooks, {
-    getProviderConfig: () => ({ baseUrl: "http://x", model: "m", temperature: 0.2 }),
+    getProviderConfig: () => ({ baseUrl: "http://x", defaultModel: "m", temperature: 0.2 }),
   });
   return { dir, store, providers, tools, hooks, runtime };
 }
@@ -106,7 +106,6 @@ describe("AgentRuntime", () => {
       chatId: chat.id,
       usage: { promptTokens: 120, completionTokens: 34, totalTokens: 154 },
     });
-
   });
 
   it("derives and forwards an approximate tokens-per-second rate when usage is timed", async () => {
@@ -133,7 +132,6 @@ describe("AgentRuntime", () => {
     expect(usageCalls[0][2].usage.tokensPerSecond).toBeCloseTo(1580.1, 1);
   });
 
-
   it("streams reasoning text onto the assistant message and forwards it", async () => {
     const provider = makeFakeProvider([
       [
@@ -156,7 +154,9 @@ describe("AgentRuntime", () => {
     expect(msg.content).toBe("Answer");
     expect(msg.reasoning).toBe("Let me think about this");
 
-    const reasoningCalls = ctx.hooks.sendToWindow.mock.calls.filter(([, e]) => e === "chat:reasoning");
+    const reasoningCalls = ctx.hooks.sendToWindow.mock.calls.filter(
+      ([, e]) => e === "chat:reasoning",
+    );
     expect(reasoningCalls.map((c) => c[2].delta)).toEqual(["Let me think", " about this"]);
   });
 
@@ -198,7 +198,6 @@ describe("AgentRuntime", () => {
     const stored = ctx.store.get(chat.id)!.messages.find((m) => m.role === "assistant")?.usage;
     expect(stored?.completionTokens).toBe(201);
   });
-
 
   it("executes tool calls and loops back to the provider until text-only", async () => {
     let capturedArgs: Record<string, unknown> | undefined;
@@ -307,37 +306,6 @@ describe("AgentRuntime", () => {
     expect(stored.messages.filter((m) => m.role === "tool")).toHaveLength(0);
   });
 
-  it("respects the max-turns guard for a chat that keeps calling tools", async () => {
-    const loopTool: AgentTool = {
-      name: "read_file",
-      description: "read",
-      parameters: { type: "object", properties: { path: { type: "string" } } },
-      execute: async () => ({ content: "ok" }),
-    };
-    ctx.tools.register(loopTool);
-    const provider = makeFakeProvider([
-      [
-        {
-          type: "tool_call",
-          id: "call_loop",
-          name: "read_file",
-          arguments: '{"path":"/a"}',
-        },
-      ],
-    ]);
-    ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
-
-    const chat = ctx.store.create({ providerId: "fake" });
-    await ctx.runtime.send(chat.id, "win-a", "go");
-
-    const stored = ctx.store.get(chat.id)!;
-    // User + up to AGENT_MAX_TURNS loops of (assistant tool-call + tool result).
-    expect(stored.messages.length).toBeGreaterThan(2);
-    // The number of assistant tool-call messages never exceeds the turn cap.
-    const toolCalls = stored.messages.flatMap((m) => m.toolCalls ?? []);
-    expect(toolCalls.length).toBeLessThanOrEqual(8);
-  });
-
   it("forwards the connected-worktree roots to the tool execution context", async () => {
     let capturedCtx: unknown;
     const scopedTool: AgentTool = {
@@ -352,7 +320,7 @@ describe("AgentRuntime", () => {
     ctx.tools.register(scopedTool);
 
     const scopedRuntime = new AgentRuntime(ctx.store, ctx.providers, ctx.tools, ctx.hooks, {
-      getProviderConfig: () => ({ baseUrl: "http://x", model: "m", temperature: 0.2 }),
+      getProviderConfig: () => ({ baseUrl: "http://x", defaultModel: "m", temperature: 0.2 }),
       getConnectedWorktrees: async () => [
         { repo: "github.com/org/repo", branch: "main", path: "/worktrees/main" },
         { repo: "github.com/org/repo", branch: "feature-x", path: "/worktrees/feature-x" },
@@ -376,7 +344,10 @@ describe("AgentRuntime", () => {
     await scopedRuntime.send(chat.id, "win-a", "go");
 
     // The tool receives every connected-worktree path as its scope roots.
-    expect(capturedCtx).toEqual({ cwd: undefined, roots: ["/worktrees/main", "/worktrees/feature-x"] });
+    expect(capturedCtx).toEqual({
+      cwd: undefined,
+      roots: ["/worktrees/main", "/worktrees/feature-x"],
+    });
   });
 
   it("tells the provider about the connected worktrees in the system prompt", async () => {
@@ -393,7 +364,7 @@ describe("AgentRuntime", () => {
     ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
 
     const scopedRuntime = new AgentRuntime(ctx.store, ctx.providers, ctx.tools, ctx.hooks, {
-      getProviderConfig: () => ({ baseUrl: "http://x", model: "m", temperature: 0.2 }),
+      getProviderConfig: () => ({ baseUrl: "http://x", defaultModel: "m", temperature: 0.2 }),
       getConnectedWorktrees: async () => [
         { repo: "github.com/org/repo", branch: "main", path: "/worktrees/main" },
       ],
@@ -423,7 +394,7 @@ describe("AgentRuntime", () => {
     ctx.providers.register({ id: "fake", label: "Fake", create: () => provider });
 
     const scopedRuntime = new AgentRuntime(ctx.store, ctx.providers, ctx.tools, ctx.hooks, {
-      getProviderConfig: () => ({ baseUrl: "http://x", model: "m", temperature: 0.2 }),
+      getProviderConfig: () => ({ baseUrl: "http://x", defaultModel: "m", temperature: 0.2 }),
       getConnectedWorktrees: async () => [
         { repo: "github.com/org/repo", branch: "main", path: "/worktrees/main" },
         { repo: "github.com/org/repo", branch: "feature", path: "/worktrees/feature" },
@@ -437,6 +408,8 @@ describe("AgentRuntime", () => {
     // One repo heading per unique repo, with its worktrees listed under it.
     expect(systemContent!.match(/- github\.com\/org\/repo\n/g)?.length).toBe(1);
     expect(systemContent).toContain("    - branch feature: /worktrees/feature");
-    expect(systemContent).toContain("- github.com/org/other\n    - branch main: /worktrees/other-main");
+    expect(systemContent).toContain(
+      "- github.com/org/other\n    - branch main: /worktrees/other-main",
+    );
   });
 });

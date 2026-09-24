@@ -40,7 +40,13 @@ import { FindMatchRenderer, toFindViewSpans } from "openp41ge-editor-engine/rend
 import type { IFindViewConverter } from "openp41ge-editor-engine/rendering";
 import { FindInEditor } from "openp41ge-editor-engine/input";
 import type { FindMatch } from "openp41ge-editor-engine/input";
-import { Gutter, type GutterRow } from "openp41ge-editor-gutter";
+import {
+  Gutter,
+  type GutterRow,
+  foldColumn,
+  type FoldData,
+  GUTTER_DEFAULT_CSS,
+} from "openp41ge-editor-gutter";
 import { CurrentLineHighlight } from "openp41ge-editor-engine/rendering/current-line-highlight";
 import { IndentationGuides } from "openp41ge-editor-engine/rendering/indentation-guides";
 import { findMatchingBracket } from "openp41ge-editor-engine/rendering/bracket-matching";
@@ -61,6 +67,7 @@ import {
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
 import { InlineDiffHighlightsRenderer, type InlineDiffRow } from "./inline-diff-highlights";
 import { makeFeNumberColumn, makeFeDiffBeforeColumn, type FeGutterRowData } from "./fe-gutter-columns";
+import { computeFoldRegions, type FoldRegion } from "./fe-fold";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
 import { MouseHandler } from "openp41ge-editor-engine/input/mouse-handler";
@@ -213,6 +220,18 @@ export class FileEditorElement extends LitElement {
   private _gutterRightWidth = 48;
   /** BEFORE (inline-diff) gutter column width, in px (0 when hidden). */
   private _gutterLeftWidth = 0;
+
+  // ── Folding (indentation-based) state ──
+  /** Whether this file is foldable (has a recognized code grammar). */
+  private _foldEnabled = false;
+  /** All indentation-based fold regions for the current buffer. */
+  private _foldRegions: FoldRegion[] = [];
+  /** Fold-header lines currently collapsed (their bodies are hidden). */
+  private _collapsedHeaders = new Set<number>();
+  /** Model lines hidden by collapsed folds (derived, fed to ViewLines). */
+  private _hiddenLines = new Set<number>();
+  /** rAF handle for the debounced fold recompute after content edits. */
+  private _foldRecomputeFrame: number | null = null;
   /** Native-scroll flex row inside the viewport: [BEFORE] [AFTER] [text]. */
   private _scrollContentEl!: HTMLElement;
   /** Sticky-left group holding both number columns (horizontal pinning). */
@@ -391,13 +410,15 @@ export class FileEditorElement extends LitElement {
     this._gutter?.reflow();
   }
 
-  /** Build the band's gutter rows (top/height account for word wrap). */
+  /** Build the band's gutter rows (top/height account for word wrap and fold). */
   private _gutterRows(start: number, end: number): GutterRow[] {
     const lh = this._lineHeight;
     const wg = this._inlineWrapGetters();
     const max = Math.max(1, this._viewModel?.lineCount ?? end);
     const rows: GutterRow[] = [];
     for (let ln = start; ln <= Math.min(end, max); ln++) {
+      // Folded (hidden) lines don't appear in the gutter band.
+      if (this.isLineFolded(ln)) continue;
       const vStart = wg.getViewLineStart(ln);
       const vCount = wg.getViewLineCount(ln);
       rows.push({ key: ln, top: (vStart - 1) * lh, height: vCount * lh });
@@ -406,7 +427,7 @@ export class FileEditorElement extends LitElement {
   }
 
   /** Per-model-line data both gutter columns render from. */
-  private _gutterDataFor(line: number): FeGutterRowData {
+  private _gutterDataFor(line: number): FeGutterRowData & FoldData {
     const row = this._inlineRows ? this._inlineRows[line - 1] : undefined;
     let afterLabel = String(line);
     if (this._inlineRows && row) {
@@ -435,17 +456,159 @@ export class FileEditorElement extends LitElement {
       if (row.kind === "removed") beforeParts.push("fe-inline-removed-cell");
       if (this._selectedDiffLines.has(line)) beforeParts.push("fe-inline-left-active");
     }
+    // Fold-column data: a chevron on every fold header, pointing right when
+    // collapsed. Only present when this file is foldable.
+    const region = this._foldRegionAt(line);
+    const hasChevron = this._foldEnabled && !!region;
+    const folded = hasChevron && this._collapsedHeaders.has(line);
     return {
       afterLabel,
       afterCls: afterParts.join(" "),
       beforeLabel,
       beforeCls: beforeParts.join(" "),
+      hasChevron,
+      folded,
     };
   }
 
   /** (Re)sync the gutter's visible band with fresh data. */
   private _syncGutterBand(start: number, end: number): void {
     this._gutter?.setRows(this._gutterRows(start, end), (k) => this._gutterDataFor(k));
+  }
+
+  // ── Folding (indentation-based) ────────────────────────────────────────
+
+  /** Whether a model line is currently hidden by a collapsed fold. */
+  isLineFolded(line: number): boolean {
+    return this._hiddenLines.has(line);
+  }
+
+  /** The fold region whose header is at `line` (regions are sorted by start). */
+  private _foldRegionAt(line: number): FoldRegion | null {
+    if (!this._foldEnabled) return null;
+    for (const r of this._foldRegions) {
+      if (r.startLine === line) return r;
+      if (r.startLine > line) break;
+    }
+    return null;
+  }
+
+  /** Leading indentation of a model line, in visible columns (tabs expanded). */
+  private _indentOf(line: number): number {
+    if (!this._viewModel) return 0;
+    const s = this._viewModel.getLineContent(line);
+    const m = /^[ \t]*/.exec(s);
+    if (!m || !m[0]) return 0;
+    const tabSize = this._viewModel.tabSize || 4;
+    let cols = 0;
+    for (const ch of m[0]) cols += ch === "\t" ? tabSize : 1;
+    return cols;
+  }
+
+  /** (Re)compute the fold regions from the current buffer's indentation. */
+  private _computeFolds(): void {
+    const model = this._viewModel;
+    if (!model) {
+      this._foldRegions = [];
+      this._rebuildHiddenLines();
+      return;
+    }
+    this._foldRegions = computeFoldRegions({
+      lineCount: model.lineCount,
+      indentOf: (l) => this._indentOf(l),
+      isBlank: (l) => /^\s*$/.test(model.getLineContent(l)),
+    });
+    // Drop collapsed headers whose fold vanished after a content change.
+    const stillFoldable = new Set(this._foldRegions.map((r) => r.startLine));
+    for (const h of Array.from(this._collapsedHeaders)) {
+      if (!stillFoldable.has(h)) this._collapsedHeaders.delete(h);
+    }
+    this._rebuildHiddenLines();
+  }
+
+  /** Derive the hidden-line set from the currently collapsed regions. */
+  private _rebuildHiddenLines(): void {
+    const next = new Set<number>();
+    for (const r of this._foldRegions) {
+      if (this._collapsedHeaders.has(r.startLine)) {
+        for (let l = r.startLine + 1; l <= r.endLine; l++) next.add(l);
+      }
+    }
+    this._hiddenLines = next;
+  }
+
+  /** Enable folding for a code file and render the fold column + regions. */
+  private _enableFolds(): void {
+    if (this._foldEnabled) return;
+    this._foldEnabled = true;
+    this._computeFolds();
+    this._applyFolds();
+  }
+
+  /** Reset all fold state when the loaded file changes. */
+  private _teardownFolds(): void {
+    this._foldEnabled = false;
+    this._foldRegions = [];
+    this._collapsedHeaders.clear();
+    this._hiddenLines.clear();
+    if (this._foldRecomputeFrame !== null) {
+      if (typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(this._foldRecomputeFrame);
+      this._foldRecomputeFrame = null;
+    }
+    this._viewLines?.setHiddenLines(null);
+    // Hide the fold column (visibility changed) — the gutter host persists
+    // across pipeline rebuilds.
+    this._gutter?.reflow();
+  }
+
+  /** Toggle a fold header's collapsed state and re-render. */
+  private _toggleFoldAt(line: number): void {
+    if (!this._foldEnabled) return;
+    const region = this._foldRegionAt(line);
+    if (!region) return;
+    if (this._collapsedHeaders.has(line)) {
+      this._collapsedHeaders.delete(line);
+    } else {
+      this._collapsedHeaders.add(line);
+    }
+    this._rebuildHiddenLines();
+    this._applyFolds();
+  }
+
+  /** Push the current hidden-line set into the view layer and refresh. */
+  private _applyFolds(): void {
+    if (!this._viewLines || !this._viewModel) return;
+    const hidden =
+      this._foldEnabled && this._hiddenLines.size > 0 ? this._hiddenLines : null;
+    this._viewLines.setHiddenLines(hidden);
+    this._clampCursorToVisible();
+    const start = this._viewLines.startLineNumber || 1;
+    const end = this._viewLines.endLineNumber || this._viewModel.lineCount;
+    this._syncGutterBand(start, end);
+    this._renderVisibleLines();
+    // Fold-column visibility (or a width change) reflows the gutter host.
+    this._gutter?.reflow();
+  }
+
+  /** Move any caret that wound up inside a collapsed region onto its header. */
+  private _clampCursorToVisible(): void {
+    if (!this._cursorController || this._hiddenLines.size === 0) return;
+    const moved = (ln: number): number => {
+      if (!this._hiddenLines.has(ln)) return ln;
+      // Jump to the header of the region containing this hidden line.
+      for (const r of this._foldRegions) {
+        if (ln > r.startLine && ln <= r.endLine) return r.startLine;
+      }
+      return ln;
+    };
+    const states = this._cursorController.getAllCursors().map((c) => {
+      const anchor = { ...c.selectionAnchor };
+      const position = { ...c.position };
+      anchor.lineNumber = moved(anchor.lineNumber);
+      position.lineNumber = moved(position.lineNumber);
+      return { selectionAnchor: anchor, position };
+    });
+    this._cursorController.setCursorStates(states);
   }
 
   /** (Re)paint the red/green row bands for the visible window. */
@@ -597,10 +760,10 @@ export class FileEditorElement extends LitElement {
     getViewLineCount: (modelLine: number) => number;
   } {
     return {
+      // Fold-aware in both modes: `ViewLines.getViewLineStart` compacts for
+      // hidden (folded) lines, so the gutter top aligns with the content.
       getViewLineStart: (modelLine: number) =>
-        this._wordWrapEnabled
-          ? (this._viewLines?.getViewLineStart(modelLine) ?? modelLine)
-          : modelLine,
+        this._viewLines?.getViewLineStart(modelLine) ?? modelLine,
       getViewLineCount: (modelLine: number) => {
         if (!this._wordWrapEnabled || !this._viewModel) return 1;
         const content = this._viewModel.getLineContent(modelLine);
@@ -857,21 +1020,41 @@ export class FileEditorElement extends LitElement {
       .fe-gutter .line-number-wrapper.active-line-number:not(.fe-inline-added-cell):not(.fe-inline-removed-cell) {
         background: var(--fe-border-color, #2a2a2a);
       }
-      /* Mouse-over highlight for the number cells. NEUTRAL cells fill with a
-         light hover background; changed (coloured) cells keep their red/green
-         tint — the hover shows as a subtle inner ring on every cell, so BOTH
-         number cells of the hovered row clearly light up together. */
-      .fe-inline-left-label.fe-inline-left-hover:not(.fe-inline-removed-cell),
-      .fe-gutter .line-number.line-number-hover:not(.fe-inline-added-cell):not(.fe-inline-removed-cell),
-      .fe-gutter .line-number-wrapper.line-number-hover:not(.fe-inline-added-cell):not(.fe-inline-removed-cell) {
-        background: ${isLight ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.09)"};
+      /* Mouse-over highlight for the number cells. The shared gutter host
+         paints ONE unified .eg-hoverbox that stretches across every
+         highlightable column (line numbers + fold column) — matching the
+         JSON editor. It sits over the cells so coloured inline-diff cells
+         keep their tint; the neutral fill + inner ring come from the box
+         (styled by the shared GUTTER_DEFAULT_CSS, themed via the --eg-hover-*
+         tokens set on .fe-gutter). The per-cell hover classes are no longer
+         styled — the box is the single source of the hover highlight. */
+      /* (hover box styling is provided by GUTTER_DEFAULT_CSS) */
+      /* Fold/collapse gutter column (right of the line numbers). The shared
+         host gives it the generic eg-cell; the file editor supplies the
+         layout + chevron styles here (matching the JSON editor's fold column).
+         The chevron button fills its cell and owns its hover; empty fold cells
+         stay clickable (line selection) and are covered by the unified hover
+         box that spans the number + fold columns on non-foldable rows. The
+         shared GUTTER_DEFAULT_CSS provides the cell layout, chevron structure
+         and hover box; the file editor only themes the tokens (below) and
+         keeps its editor-specific column background + active-line fill. */
+      .fe-gutter {
+        /* Colour tokens consumed by GUTTER_DEFAULT_CSS. */
+        --eg-fold-color: var(--fe-fold-color, #79c0ff);
+        --eg-fold-hover-bg: rgba(121, 192, 255, 0.18);
+        --eg-fold-hover-color: #a5d6ff;
+        --eg-hover-fill: ${isLight ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.09)"};
+        --eg-hover-ring: ${isLight ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.16)"};
       }
-      .fe-inline-left-label.fe-inline-left-hover,
-      .fe-gutter .line-number-wrapper.line-number-hover {
-        box-shadow: inset 0 0 0 1px ${isLight ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.16)"};
+      .fe-gutter .eg-col--fold {
+        background: var(--fe-bg) !important;
+      }
+      .fe-gutter .eg-col--fold .eg-cell:not(.eg-cell--fold).eg-cell--active {
+        background: var(--fe-border-color, #2a2a2a);
       }
       ${scopeCSS}
       ${globalCSS}
+      ${GUTTER_DEFAULT_CSS}
     `;
     document.head.appendChild(style);
     this._themeStyleEl = style;
@@ -948,9 +1131,12 @@ export class FileEditorElement extends LitElement {
     // (the group is the flex-row gap between the pinned columns and the text;
     // the host root is sticky-left for horizontal pinning).
     this._gutter = new Gutter({
-      // The file editor highlights each number cell individually (not the
-      // JSON editor's unified long box), so the host's own hover box is off.
-      hoverBox: false,
+      // Unified hover box (like the JSON editor): the host paints a single
+      // `.eg-hoverbox` that stretches across the highlightable columns. On a
+      // foldable row the fold column is non-highlightable (the chevron owns
+      // its hover), so the box stays on the line-number column; on every
+      // other row it spans BOTH the number and fold columns.
+      hoverBox: true,
       events: {
         onRowClick: (row) => this._cursorController?.selectLine(row.key),
         onRowSelectRange: (_anchor, row) => {
@@ -967,7 +1153,10 @@ export class FileEditorElement extends LitElement {
     });
     const gutterRoot = this._gutter.root;
     gutterRoot.classList.add("fe-gutter");
+    // Keep the host's row layout (the shared Gutter needs display:flex so its
+    // columns sit side by side) alongside the file editor's pinning styles.
     gutterRoot.style.cssText =
+      "display:flex;flex-direction:row;align-items:stretch;" +
       "flex-shrink:0;position:relative;overflow:hidden;user-select:none;" +
       "font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;";
     this._gutterGroupEl.appendChild(gutterRoot);
@@ -981,6 +1170,17 @@ export class FileEditorElement extends LitElement {
         width: () => this._gutterRightWidth,
         lineHeight: () => this._lineHeight,
       }),
+      // Fold/collapse column — right of the line numbers (matches the JSON
+      // editor's [numbers, fold] order). Only shown on foldable files. The
+      // column is as wide as a row is tall so the full-width chevron button
+      // is always a square (matching the JSON editor's fold column).
+      {
+        ...foldColumn({
+          width: () => Math.max(14, Math.round(this._lineHeight)),
+          onToggle: (line) => this._toggleFoldAt(line),
+        }),
+        visible: () => this._foldEnabled,
+      },
     ]);
 
     this._textRegionEl = document.createElement("div");
@@ -1305,6 +1505,9 @@ export class FileEditorElement extends LitElement {
     tokenRegistry.getTokenizer(langId).then((tokenizer) => {
       if (!this._viewModel || !this._viewLines) return; // torn down meanwhile
       this._viewModel.setTokenizer(tokenizer);
+      // A recognized code grammar means this file is foldable (indentation
+      // folding applies). Show the fold column + regions.
+      this._enableFolds();
       if (this._paused) {
         // Hidden tab — a grammar just became ready. Apply it to the model but
         // skip the DOM rebuild (wasted on a hidden editor); mark the view stale
@@ -1372,6 +1575,9 @@ export class FileEditorElement extends LitElement {
     // Guard against double init
     if (this._viewModel && this._viewModel.model === model) return;
     this._teardownPipeline();
+    // Folding is per-file: reset the fold state so a non-code file that
+    // follows a code file doesn't keep the fold column / collapsed blocks.
+    this._teardownFolds();
 
     // Create ViewModel
     this._viewModel = new ViewModel(model, {
@@ -2423,6 +2629,26 @@ export class FileEditorElement extends LitElement {
 
     // Content changed → previously computed search matches are stale.
     this._refreshFindMatches();
+
+    // Fold regions may have shifted after an edit; recompute (keeps the hidden
+    // set current without collapsing anything the user didn't collapse).
+    this._scheduleFoldRecompute();
+  }
+
+  /** Debounced recompute + re-apply of fold regions after a content change. */
+  private _scheduleFoldRecompute(): void {
+    if (!this._foldEnabled) return;
+    if (this._foldRecomputeFrame !== null) return;
+    if (typeof requestAnimationFrame === "undefined") {
+      this._computeFolds();
+      this._applyFolds();
+      return;
+    }
+    this._foldRecomputeFrame = requestAnimationFrame(() => {
+      this._foldRecomputeFrame = null;
+      this._computeFolds();
+      this._applyFolds();
+    });
   }
 
   /**
@@ -2502,6 +2728,12 @@ export class FileEditorElement extends LitElement {
     // get the grey active background (done inside _gutterDataFor), and the
     // data is pulled fresh for every cell.
     this._gutter?.refresh();
+
+    // Highlight the caret's row across EVERY gutter column (line numbers +
+    // fold column), matching the JSON editor. The number column gets the grey
+    // from `active-line-number`; the shared fold column (and any other shared
+    // column) gets `eg-cell--active` via the host's active row, styled below.
+    this._gutter?.setActiveRow(pos.lineNumber);
 
     // Current line highlight — based on primary cursor
     this._currentLineHighlight?.setLine(pos.lineNumber);

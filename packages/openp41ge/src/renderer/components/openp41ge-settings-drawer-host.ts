@@ -74,6 +74,12 @@ export interface SettingsDrawerLayer {
   /** Whether this is the root/base layer (cannot be popped by `closeAll`). */
   isBase?: boolean;
   /**
+   * Optional action button rendered in the drawer head, just before ✕ (e.g. a
+   * surface-owned Save button). Called on every render so a dirty state can
+   * restyle it live.
+   */
+  headAction?: () => TemplateResult;
+  /**
    * Invoked when this layer is closed by ANY means (✕, click-to-go-back,
    * click-away, or a programmatic close). Lets the owning surface discard
    * uncommitted edits. The surface uses its own per-layer committed-state to
@@ -118,6 +124,12 @@ export interface SettingsDrawerSurface extends HTMLElement {
    */
   side?: DrawerSide;
   host: Openp41geSettingsDrawerHost | null;
+  /**
+   * Optional action (e.g. a Save button) the host places in the drawer head,
+   * next to ✕. Returned as a TemplateResult; re-invoked on every host render so
+   * it can reflect a live dirty state.
+   */
+  renderHeadAction?: () => TemplateResult;
 }
 
 /** Per-side state: the mounted surface plus its layer stack. */
@@ -211,6 +223,36 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     return this._isOpen(side);
   }
 
+  /** The single open side (only one drawer is open at a time), or null. */
+  private _openSide(): DrawerSide | null {
+    if (this._isOpen("left")) return "left";
+    if (this._isOpen("right")) return "right";
+    return null;
+  }
+
+  /** Last open side reported to listeners (detects transitions for the event). */
+  private _lastOpenSide: DrawerSide | null = null;
+
+  /**
+   * Broadcast when the drawer open state changes (which side is open, or
+   * none). The windowview listens so it can raise the anchor sidebar above the
+   * dim mask and disable the opposing sidebar's resize notch while a drawer is
+   * open. `detail.side` is the currently-open side or `null`.
+   */
+  protected updated(): void {
+    const openSide = this._openSide();
+    if (openSide !== this._lastOpenSide) {
+      this._lastOpenSide = openSide;
+      this.dispatchEvent(
+        new CustomEvent("drawer-open-changed", {
+          detail: { side: openSide },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    }
+  }
+
   /** The current drawer width for `side`. */
   drawerWidthFor(side: DrawerSide): number {
     return Math.max(this._minWidth, this._drawerWidths[side]);
@@ -237,9 +279,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
    */
   isOpenFor(appType: string, side?: DrawerSide): boolean {
     const sides: DrawerSide[] = side ? [side] : ["left", "right"];
-    return sides.some(
-      (s) => this._isOpen(s) && this._stacks[s].surface?.appType === appType,
-    );
+    return sides.some((s) => this._isOpen(s) && this._stacks[s].surface?.appType === appType);
   }
 
   // ── Stack control ──────────────────────────────────────────────────────
@@ -290,6 +330,8 @@ export class Openp41geSettingsDrawerHost extends LitElement {
         // The base layer gets a close button too, so every drawer head can be
         // dismissed with ✕. Closing the base closes the whole side's stack.
         closable: true,
+        // A surface may expose an in-head action (e.g. Save) placed next to ✕.
+        headAction: surface.renderHeadAction,
         render: () => surface as unknown as TemplateResult,
       },
     ];
@@ -456,10 +498,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
    * to the grid width so it never overflows the grid area.
    */
   private _sideMaxWidth(side: DrawerSide, gridWidth: number): number {
-    return Math.max(
-      this._minWidth,
-      Math.min(this.maxDrawerWidth, gridWidth),
-    );
+    return Math.max(this._minWidth, Math.min(this.maxDrawerWidth, gridWidth));
   }
 
   // ── Resize handles ──────────────────────────────────────────────────────
@@ -488,9 +527,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     const side = this._resizeSide;
     // Dragging toward the grid widens the drawer; dragging back narrows it.
     const proposed =
-      side === "right"
-        ? this._resizeStartWidth - delta
-        : this._resizeStartWidth + delta;
+      side === "right" ? this._resizeStartWidth - delta : this._resizeStartWidth + delta;
     const gridWidth = this.clientWidth || 0;
     // The drawer must never pass the grid's own edge (it would slide under the
     // opposite sidebar / off the window), so that edge is a HARD clamp with no
@@ -535,7 +572,10 @@ export class Openp41geSettingsDrawerHost extends LitElement {
       // spring return; clear it after the transition finishes.
       this._snapbackSide = side;
       window.setTimeout(() => {
-        if (this._snapbackSide === side) { this._snapbackSide = null; this.requestUpdate(); }
+        if (this._snapbackSide === side) {
+          this._snapbackSide = null;
+          this.requestUpdate();
+        }
       }, 260);
     }
     this._resizingSide = null;
@@ -573,28 +613,28 @@ export class Openp41geSettingsDrawerHost extends LitElement {
   };
 
   /**
-   * Click-away: close the open drawer when the user presses on the grid area
-   * outside it.
+   * Click-away: close the open drawer when the user presses on the dim mask
+   * (anywhere that isn't a drawer or the anchor sidebar).
    *
    * The host is a transparent full-grid overlay with `pointer-events: none`, so
-   * only the drawers block pointer events. A press on the grid that a drawer
-   * does NOT cover lands on the grid itself (a sibling of the host, not a
-   * child), so `this.contains(e.target)` is false there. We listen on document
-   * and, when the press is inside the host's bounding box (the grid area) but
-   * not on a drawer, close the whole stack. Pressing a drawer (this.contains)
-   * is left alone, and presses outside the grid (sidebars / titlebar) don't
-   * fall inside the grid area so they are ignored too — that way the sidebar
-   * settings gear that opened the drawer can still toggle it closed.
+   * only the drawers and the dark mask block pointer events. The mask
+   * (`position: fixed`) covers the whole window, so a press anywhere outside a
+   * drawer lands on it (a host child) and dismisses the drawer — including the
+   * grid, the opposing sidebar, and the titlebar. The anchor sidebar is raised
+   * above the mask (by the windowview), so a press there lands outside the host
+   * and is ignored, letting the sidebar's settings gear still toggle the drawer
+   * closed. Pressing a drawer itself is left alone.
    */
   private _onDocumentPointerDown = (e: PointerEvent): void => {
     if (!this.isOpen) return;
-    // A press on a drawer (its head, body, resize handle, or parent mask) must
-    // not dismiss the panel.
-    if (this.contains(e.target as Node)) return;
-    const rect = this.getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
+    const target = e.target as Node;
+    // Press outside the host (the raised anchor sidebar) — leave alone so its
+    // settings gear can still toggle the drawer closed.
+    if (!this.contains(target)) return;
+    // Press on a drawer (its head, body, resize handle, or parent mask) — do
+    // not dismiss it.
+    if ((target as Element).closest?.(".sdw-drawer")) return;
+    // Press on the dim mask (the rest of the app) — dismiss the drawer.
     this.closeAll();
   };
 
@@ -612,10 +652,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
    */
   private _clampSideWidth(side: DrawerSide, gridWidth: number): void {
     const max = this._sideMaxWidth(side, gridWidth);
-    const next = Math.min(
-      this._drawerWidths[side],
-      Math.max(this._minWidth, max),
-    );
+    const next = Math.min(this._drawerWidths[side], Math.max(this._minWidth, max));
     if (next !== this._drawerWidths[side]) {
       // Reassign (not mutate) so Lit reactivity fires.
       this._drawerWidths = { ...this._drawerWidths, [side]: next };
@@ -664,6 +701,21 @@ export class Openp41geSettingsDrawerHost extends LitElement {
           font-size: 13px;
           color: var(--text-primary, #ccc);
         }
+        /* Full-viewport dim mask rendered while a drawer is open. It covers the
+         * "rest of the app" (titlebar, opposing sidebar, grid content) to draw
+         * attention to the drawer location. position: fixed escapes the grid
+         * area the host lives in, so it spans the whole window; it sits above
+         * everything below the host (z-index:1001) but below the drawers
+         * (z-index 2+), so the open drawer and the raised anchor sidebar stay
+         * bright and interactive above it. Pressing the mask dismisses the
+         * drawer (see _onDocumentPointerDown). */
+        .sdw-mask {
+          position: fixed;
+          inset: 0;
+          z-index: 1;
+          background: rgba(20, 20, 22, 0.55);
+          pointer-events: auto;
+        }
         /* Each drawer occupies the grid area it covers and blocks pointer
          * events there (pointer-events:auto), so the grid underneath is only
          * inert where a drawer actually overlays it. Areas the drawer does
@@ -688,7 +740,9 @@ export class Openp41geSettingsDrawerHost extends LitElement {
              so it doesn't double up against the sidebar; which edge that is
              depends on the anchor side (see [data-side] rules below). */
           pointer-events: auto;
-          transition: left 0.2s ease, right 0.2s ease;
+          transition:
+            left 0.2s ease,
+            right 0.2s ease;
         }
         /* While a drawer is being resized we disable the width transition so
          * the drawer tracks the pointer exactly; the sdw-resize indicator
@@ -701,7 +755,10 @@ export class Openp41geSettingsDrawerHost extends LitElement {
          * here rather than on the base rule so sidebar-driven drawer resizes
          * stay immediate). */
         .sdw-drawer.sdw-snapback {
-          transition: left 0.2s ease, right 0.2s ease, width 0.2s ease;
+          transition:
+            left 0.2s ease,
+            right 0.2s ease,
+            width 0.2s ease;
         }
         .sdw-drawer[data-side="right"] {
           /* Anchored to the right sidebar, grows left: inside edge = left. */
@@ -821,6 +878,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
         }
         .sdw-close {
           border: none;
+          border-left: 1px solid var(--border-divider, #2d2d2d);
           background: transparent;
           color: var(--text-secondary, #999);
           /* Full height of the drawer head and square (width = height), matching
@@ -840,6 +898,54 @@ export class Openp41geSettingsDrawerHost extends LitElement {
         .sdw-close:hover {
           background: var(--bg-active, #37373d);
           color: var(--text-primary, #ddd);
+        }
+        /* Surface-owned head actions (e.g. Reset, Save) — square icon buttons
+         * like ✕, sitting just left of it, each separated by a divider line.
+         * Neutral grey when idle; the surface marks the save button blue
+         * (using the sdw-save--dirty class) when there are unsaved changes. */
+        .sdw-save,
+        .sdw-reset {
+          border: none;
+          border-left: 1px solid var(--border-divider, #2d2d2d);
+          background: transparent;
+          color: var(--text-secondary, #999);
+          height: 100%;
+          aspect-ratio: 1 / 1;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border-radius: 0;
+          flex-shrink: 0;
+        }
+        .sdw-save svg,
+        .sdw-reset svg {
+          width: 16px;
+          height: 16px;
+        }
+        .sdw-save:hover,
+        .sdw-reset:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .sdw-save[disabled],
+        .sdw-reset[disabled] {
+          opacity: 0.4;
+          cursor: default;
+        }
+        .sdw-save[disabled]:hover,
+        .sdw-reset[disabled]:hover {
+          background: transparent;
+          color: var(--text-secondary, #999);
+        }
+        .sdw-save--dirty,
+        .sdw-save--dirty:hover {
+          /* Dirty = accent-blue ICON (not a filled background). */
+          color: var(--accent, #569cd6);
+        }
+        .sdw-save--dirty:hover {
+          background: rgba(86, 156, 214, 0.15);
         }
         .sdw-body {
           flex: 1;
@@ -889,7 +995,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
         }
       </style>
 
-      ${this._renderStack("left")}
+      ${this.isOpen ? html`<div class="sdw-mask"></div>` : nothing} ${this._renderStack("left")}
       ${this._renderStack("right")}
     `;
   }
@@ -911,13 +1017,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     // out by a new one) instead of popping into place.
     return html`
       ${stack.layers.map((layer, i) => {
-        const offset = this._layerOffset(
-          side,
-          i,
-          n,
-          width,
-          this.clientWidth || 0,
-        );
+        const offset = this._layerOffset(side, i, n, width, this.clientWidth || 0);
         const pos = side === "left" ? `left:${offset}px` : `right:${offset}px`;
         const resizeSide = side === "left" ? "right:-2px" : "left:-2px";
         const hasChildren = i < n - 1;
@@ -927,7 +1027,13 @@ export class Openp41geSettingsDrawerHost extends LitElement {
             data-side="${side}"
             style="${pos}; width:${width}px; z-index:${i + 2}"
           >
-            ${layer.styles ? html`<style>${layer.styles}</style>` : nothing}
+            ${
+              layer.styles
+                ? html`<style>
+                    ${layer.styles}
+                  </style>`
+                : nothing
+            }
             ${this._renderHead(layer, side)}
             <div class="sdw-body">${layer.render()}</div>
             <div
@@ -948,7 +1054,6 @@ export class Openp41geSettingsDrawerHost extends LitElement {
           </div>
         `;
       })}
-
       ${stack.closing.map((c) => {
         return html`
           <div
@@ -956,7 +1061,13 @@ export class Openp41geSettingsDrawerHost extends LitElement {
             data-side="${side}"
             style="${side === "left" ? `left:${c.offset}px` : `right:${c.offset}px`}; width:${width}px"
           >
-            ${c.layer.styles ? html`<style>${c.layer.styles}</style>` : nothing}
+            ${
+              c.layer.styles
+                ? html`<style>
+                    ${c.layer.styles}
+                  </style>`
+                : nothing
+            }
             ${this._renderHead(c.layer, side)}
             <div class="sdw-body">${c.layer.render()}</div>
           </div>
@@ -971,6 +1082,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
         <span class="sdw-title" title="${layer.title}">${layer.title}</span>
         <span class="sdw-head-right">
           ${layer.status ? html`<span class="sdw-status">${layer.status}</span>` : nothing}
+          ${layer.headAction ? layer.headAction() : nothing}
           ${
             layer.closable === false
               ? nothing

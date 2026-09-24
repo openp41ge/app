@@ -121,10 +121,7 @@ export function highlightJsonToHtml(text: string): string {
   let out = "";
   for (const tok of tokenizeJsonText(text)) {
     const cls = JSON_SCOPE_CLASS[tok.scope];
-    const escaped = tok.text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    const escaped = tok.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     out += cls ? `<span class="${cls}">${escaped}</span>` : escaped;
   }
   return out;

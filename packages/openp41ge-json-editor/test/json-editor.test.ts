@@ -5,9 +5,14 @@
  * line numbers + highlighting, auto-closing pairs, auto-indent, auto-format,
  * and live value parsing / change events.
  */
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import "../src/json-editor";
-import { JSON_EDITOR_CHANGE, gutterWidthFor, DEFAULT_DIGIT_PX } from "../src/json-editor";
+import {
+  JSON_EDITOR_CHANGE,
+  gutterWidthFor,
+  DEFAULT_DIGIT_PX,
+  TOOLTIP_DELAY_MS,
+} from "../src/json-editor";
 
 const CONFIG = {
   providerId: "vllm",
@@ -151,7 +156,7 @@ describe("json-editor", () => {
     ta.dispatchEvent(new Event("blur", { bubbles: true }));
     await el.updateComplete;
     const formatted = input(el).value;
-    expect(formatted).toContain("\n  \"a\": 1");
+    expect(formatted).toContain('\n  "a": 1');
     expect(el.editedValue).toEqual({ a: 1, b: { c: 2 } });
   });
 
@@ -171,9 +176,13 @@ describe("json-editor", () => {
     expect(gutterWidthFor(1, DEFAULT_DIGIT_PX)).toBe(gutterWidthFor(5, DEFAULT_DIGIT_PX));
     expect(gutterWidthFor(9, DEFAULT_DIGIT_PX)).toBeLessThan(gutterWidthFor(10, DEFAULT_DIGIT_PX));
     expect(gutterWidthFor(10, DEFAULT_DIGIT_PX)).toBe(gutterWidthFor(99, DEFAULT_DIGIT_PX));
-    expect(gutterWidthFor(99, DEFAULT_DIGIT_PX)).toBeLessThan(gutterWidthFor(100, DEFAULT_DIGIT_PX));
+    expect(gutterWidthFor(99, DEFAULT_DIGIT_PX)).toBeLessThan(
+      gutterWidthFor(100, DEFAULT_DIGIT_PX),
+    );
     expect(gutterWidthFor(100, DEFAULT_DIGIT_PX)).toBe(gutterWidthFor(999, DEFAULT_DIGIT_PX));
-    expect(gutterWidthFor(999, DEFAULT_DIGIT_PX)).toBeLessThan(gutterWidthFor(1000, DEFAULT_DIGIT_PX));
+    expect(gutterWidthFor(999, DEFAULT_DIGIT_PX)).toBeLessThan(
+      gutterWidthFor(1000, DEFAULT_DIGIT_PX),
+    );
     expect(gutterWidthFor(0, DEFAULT_DIGIT_PX)).toBe(gutterWidthFor(1, DEFAULT_DIGIT_PX));
   });
 
@@ -186,27 +195,55 @@ describe("json-editor", () => {
 
   test("highlights the caret's line-number cell (only one at a time)", async () => {
     const ta = input(el);
+    ta.dispatchEvent(new Event("focus"));
     ta.setSelectionRange(0, 0);
     document.dispatchEvent(new Event("selectionchange"));
     await el.updateComplete;
-    const active = [...el.shadowRoot.querySelectorAll(".eg-col--line-numbers .eg-cell")]
-      .filter((c) => c.classList.contains("eg-cell--active"));
+    const active = [...el.shadowRoot.querySelectorAll(".eg-col--line-numbers .eg-cell")].filter(
+      (c) => c.classList.contains("eg-cell--active"),
+    );
     expect(active.length).toBe(1);
     expect(active[0].textContent).toBe("1");
   });
 
   test("moves the active line-number highlight with the caret", async () => {
     const ta = input(el);
+    ta.dispatchEvent(new Event("focus"));
     // Caret at the start of the line that holds "baseUrl".
     const idx = ta.value.indexOf('"baseUrl"');
     ta.setSelectionRange(idx, idx);
     document.dispatchEvent(new Event("selectionchange"));
     await el.updateComplete;
-    const active = [...el.shadowRoot.querySelectorAll(".eg-col--line-numbers .eg-cell")]
-      .filter((c) => c.classList.contains("eg-cell--active"));
+    const active = [...el.shadowRoot.querySelectorAll(".eg-col--line-numbers .eg-cell")].filter(
+      (c) => c.classList.contains("eg-cell--active"),
+    );
     const expectedLine = ta.value.slice(0, idx).split("\n").length; // 1-based
     expect(active.length).toBe(1);
     expect(active[0].textContent).toBe(String(expectedLine));
+  });
+
+  test("does not auto-highlight the bottom line until the editor is focused", async () => {
+    const el2 = await mount();
+    await el2.updateComplete;
+    const ta = input(el2);
+    // On open the value setter parks the caret at the end (last line) — but
+    // the editor is not focused, so no gutter cell should be active.
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    document.dispatchEvent(new Event("selectionchange"));
+    await el2.updateComplete;
+    const active = [...el2.shadowRoot.querySelectorAll(".eg-col--line-numbers .eg-cell")].filter(
+      (c) => c.classList.contains("eg-cell--active"),
+    );
+    expect(active.length).toBe(0);
+
+    // Focusing the editor brings the caret's row highlight back.
+    ta.dispatchEvent(new Event("focus"));
+    document.dispatchEvent(new Event("selectionchange"));
+    await el2.updateComplete;
+    const active2 = [...el2.shadowRoot.querySelectorAll(".eg-col--line-numbers .eg-cell")].filter(
+      (c) => c.classList.contains("eg-cell--active"),
+    );
+    expect(active2.length).toBe(1);
   });
 
   test("no more than one gutter cell is ever active", async () => {
@@ -214,8 +251,203 @@ describe("json-editor", () => {
     ta.setSelectionRange(ta.value.length, ta.value.length);
     document.dispatchEvent(new Event("selectionchange"));
     await el.updateComplete;
-    const active = [...el.shadowRoot.querySelectorAll(".eg-col--line-numbers .eg-cell")]
-      .filter((c) => c.classList.contains("eg-cell--active"));
+    const active = [...el.shadowRoot.querySelectorAll(".eg-col--line-numbers .eg-cell")].filter(
+      (c) => c.classList.contains("eg-cell--active"),
+    );
     expect(active.length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("json-editor schema tooltips", () => {
+  const SCHEMA = {
+    type: "object",
+    properties: {
+      providerId: { type: "string", description: "Active provider id." },
+      providers: {
+        type: "object",
+        additionalProperties: {
+          type: "object",
+          properties: {
+            baseUrl: { type: "string", description: "The endpoint URL." },
+            model: { type: "string", description: "Default model id." },
+          },
+        },
+      },
+    },
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Mount a schema-present editor without relying on real timers. */
+  async function mountSchemed() {
+    const el = document.createElement("json-editor");
+    el.value = CONFIG;
+    el.schema = SCHEMA;
+    document.body.appendChild(el);
+    vi.advanceTimersByTime(1);
+    await el.updateComplete;
+    return el;
+  }
+
+  /** Dispatch a mousemove on the textarea at a given row/column, matching the
+   *  real interaction (pointer events land on the overlay, not the spans). */
+  function hover(el, rowIdx, offsetX) {
+    const ta = input(el);
+    const ev = new MouseEvent("mousemove", {
+      bubbles: true,
+      composed: true,
+      clientX: 100,
+      clientY: 100,
+    });
+    Object.defineProperty(ev, "offsetX", { value: offsetX });
+    Object.defineProperty(ev, "offsetY", { value: rowIdx * 20 + 10 });
+    ta.dispatchEvent(ev);
+  }
+
+  function rowOf(el, needle) {
+    return el._visibleLines.findIndex((v) => v.text.includes(needle));
+  }
+
+  test("renders a hidden tooltip element", async () => {
+    const el = await mountSchemed();
+    const tip = el.shadowRoot.querySelector(".je-tooltip");
+    expect(tip).toBeTruthy();
+    expect(tip.style.display).not.toBe("block");
+  });
+
+  test("shows the schema description only after the hover delay", async () => {
+    const el = await mountSchemed();
+    const row = rowOf(el, '"baseUrl"');
+    expect(row).toBeGreaterThanOrEqual(0);
+    hover(el, row, 60);
+    const tip = el.shadowRoot.querySelector(".je-tooltip");
+    // Not shown yet (delay pending).
+    expect(tip.style.display).not.toBe("block");
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
+    expect(tip.style.display).toBe("block");
+    expect(tip.textContent).toBe("The endpoint URL.");
+  });
+
+  test("does not show if the cursor leaves the key before the delay", async () => {
+    const el = await mountSchemed();
+    const row = rowOf(el, '"baseUrl"');
+    hover(el, row, 60);
+    // Leave the key (move far right) before the delay elapses.
+    hover(el, row, 4000);
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
+    expect(el.shadowRoot.querySelector(".je-tooltip").style.display).not.toBe("block");
+  });
+
+  test("centers the tooltip on the key and clamps it within the viewport", async () => {
+    const el = await mountSchemed();
+    // Deterministic layout: content is 50px right of the viewport origin and
+    // the viewport is 600px wide. The 20px-wide tooltip should be centered on
+    // the key (shifted right/left of the key's first column).
+    const content = el.shadowRoot.querySelector(".je-content");
+    const viewport = el.shadowRoot.querySelector(".je-viewport");
+    content.getBoundingClientRect = () => ({
+      left: 50,
+      top: 0,
+      right: 650,
+      bottom: 400,
+      width: 600,
+      height: 400,
+      x: 50,
+      y: 0,
+    });
+    viewport.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      right: 600,
+      bottom: 400,
+      width: 600,
+      height: 400,
+      x: 0,
+      y: 0,
+    });
+    const row = rowOf(el, '"baseUrl"');
+    hover(el, row, 60);
+    const p = el._tooltipPending;
+    const tip = el.shadowRoot.querySelector(".je-tooltip");
+    Object.defineProperty(tip, "offsetWidth", { value: 20, configurable: true });
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
+    const left = Number.parseFloat(tip.style.left);
+    const top = Number.parseFloat(tip.style.top);
+    const cw = el._measureCharW() > 0 ? el._measureCharW() : 8;
+    const idealCentered = 10 + p.start * cw + (p.keyLen * cw - 20) / 2;
+    expect(left).toBeCloseTo(idealCentered, 0);
+    expect(top).toBeCloseTo((row + 1) * 20 + 2, 0);
+  });
+
+  test("clamps the tooltip so it never clips past the viewport right edge", async () => {
+    const el = await mountSchemed();
+    // A narrow viewport (content starts 50px into a 100px-wide viewport). The
+    // centered tooltip would reach past the right edge, so it clamps to it.
+    const content = el.shadowRoot.querySelector(".je-content");
+    const viewport = el.shadowRoot.querySelector(".je-viewport");
+    content.getBoundingClientRect = () => ({
+      left: 50,
+      top: 0,
+      right: 650,
+      bottom: 400,
+      width: 600,
+      height: 400,
+      x: 50,
+      y: 0,
+    });
+    viewport.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      right: 100,
+      bottom: 400,
+      width: 100,
+      height: 400,
+      x: 0,
+      y: 0,
+    });
+    const row = rowOf(el, '"baseUrl"');
+    hover(el, row, 60);
+    const tip = el.shadowRoot.querySelector(".je-tooltip");
+    Object.defineProperty(tip, "offsetWidth", { value: 20, configurable: true });
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
+    const left = Number.parseFloat(tip.style.left);
+    const vpRight = 100 - 50; // viewport right edge in content coords
+    expect(left).toBeCloseTo(vpRight - 20 - 4, 0);
+  });
+
+  test("hides the tooltip when moving off the key", async () => {
+    const el = await mountSchemed();
+    const row = rowOf(el, '"baseUrl"');
+    hover(el, row, 60);
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
+    expect(el.shadowRoot.querySelector(".je-tooltip").style.display).toBe("block");
+    // Move off the key → hides immediately.
+    hover(el, row, 4000);
+    expect(el.shadowRoot.querySelector(".je-tooltip").style.display).not.toBe("block");
+  });
+
+  test("keeps the tooltip hidden when the key has no description", async () => {
+    const el = await mountSchemed();
+    const row = rowOf(el, '"maxTokens"');
+    hover(el, row, 60);
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
+    expect(el.shadowRoot.querySelector(".je-tooltip").style.display).not.toBe("block");
+  });
+
+  test("does not show a tooltip without a schema", async () => {
+    const el = document.createElement("json-editor");
+    el.value = CONFIG;
+    document.body.appendChild(el);
+    vi.advanceTimersByTime(1);
+    await el.updateComplete;
+    const row = rowOf(el, '"baseUrl"');
+    hover(el, row, 60);
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
+    expect(el.shadowRoot.querySelector(".je-tooltip").style.display).not.toBe("block");
   });
 });
