@@ -294,27 +294,24 @@ describe("drop-box-overdraw", () => {
     spy.mockRestore();
   });
 
-  test("re-places its accents when the sibling box resizes in place", async () => {
-    // jsdom has no ResizeObserver; stub one that records the callback so the
-    // test can fire it on demand (as the browser would on a box resize). The
-    // overdraw watches the box, so when it resizes the accents must follow.
-    let roCallback: (() => void) | null = null;
-    class FakeRO {
-      constructor(cb: () => void) {
-        roCallback = cb;
-      }
-      observe() {}
-      disconnect() {
-        roCallback = null;
-      }
-    }
-    vi.stubGlobal("ResizeObserver", FakeRO);
+  test("re-places its accents when the sibling box changes geometry (size or position)", async () => {
+    // The overdraw tracks the box's rect each frame; drive the frame callback
+    // manually so the test can change the box's rect on demand.
+    let rafCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi
+      .spyOn(globalThis, "requestAnimationFrame")
+      .mockImplementation((cb) => {
+        rafCallback = cb;
+        return 1;
+      });
+    const cafSpy = vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(() => {});
     try {
       const host = document.createElement("div");
       host.style.position = "relative";
       const box = document.createElement("drop-box");
       const full = { left: 0, top: 40, right: 800, bottom: 600, width: 800, height: 560 };
       const half = { left: 0, top: 40, right: 400, bottom: 600, width: 400, height: 560 };
+      const shifted = { left: 400, top: 40, right: 1200, bottom: 600, width: 800, height: 560 };
       const spy = vi.spyOn(box, "getBoundingClientRect").mockReturnValue(full as DOMRect);
       const el = new DropBoxOverdraw();
       host.appendChild(box);
@@ -324,21 +321,30 @@ describe("drop-box-overdraw", () => {
       const g = (c: string) => el.shadowRoot?.querySelector<HTMLElement>(`.${c}`)!;
       // First placement is against the FULL-cell rect: the right edge is 800.
       expect(g("od-tr-h").style.left).toBe("800px");
-      // The overdraw registered a ResizeObserver on the box.
-      expect(typeof roCallback).toBe("function");
-      // The box now resizes in place (cell-centre -> split half) without the
-      // overdraw being re-created. Fire the observer; the accents must
-      // re-place against the NEW rect.
+      // The overdraw scheduled a frame loop.
+      expect(typeof rafCallback).toBe("function");
+      // The box resizes in place (cell-centre -> split half) without the
+      // overdraw being re-created. Drive the frame; the accents must follow.
       spy.mockReturnValue(half as DOMRect);
-      roCallback!();
+      rafCallback!(0);
       expect(g("od-tr-h").style.left).toBe("400px");
       expect(g("od-tl-h").style.right).toBe(`${window.innerWidth}px`);
       expect(g("od-tr-v").style.left).toBe("397px");
       expect(g("od-bl-v").style.top).toBe("600px");
       expect(g("od-tr-h").style.opacity).toBe("1");
+      // A position-only shift (same size, slides right) must ALSO be followed:
+      // a ResizeObserver would not fire here (no size change), so this is the
+      // case the frame loop covers.
+      spy.mockReturnValue(shifted as DOMRect);
+      rafCallback!(0);
+      expect(g("od-tr-h").style.left).toBe("1200px");
+      expect(g("od-tl-h").style.right).toBe(`${window.innerWidth - 400}px`);
+      expect(g("od-tr-v").style.left).toBe("1197px");
+      expect(g("od-tr-v").style.bottom).toBe(`${window.innerHeight - 40}px`);
       spy.mockRestore();
     } finally {
-      vi.unstubAllGlobals();
+      rafSpy.mockRestore();
+      cafSpy.mockRestore();
     }
   });
 });

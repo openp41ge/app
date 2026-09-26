@@ -33,11 +33,13 @@
  * ```
  *
  * It resolves the sibling <drop-box>` automatically (reads its `fade`),
- * places its accents against the box's rect, and re-places them (via a
- * ResizeObserver on the box) whenever the box's geometry changes — e.g. a
- * drag moving the landing box from a full cell to a split half resizes it in
- * place, so the accents must follow. The accents are hidden entirely when the
- * owning host unmounts the pair.
+ * places its accents against the box's rect, and re-places them whenever the
+ * box's geometry changes — a drag can move the landing box in place (from a
+ * full cell to a split half, or slide it to a new split position in the same
+ * column) without re-creating the overdraw, so the accents must follow. A
+ * ResizeObserver would only catch size changes, so the box's rect is tracked
+ * each frame and the accents re-place on any change (size OR position). The
+ * accents are hidden entirely when the owning host unmounts the pair.
  *
  * Styling hooks on the host:
  *  - `--drop-color` — accent colour; defaults to the shared drop indicator blue.
@@ -78,40 +80,49 @@ export class DropBoxOverdraw extends LitElement {
 
   firstUpdated(): void {
     this._place();
-    this._observeBox();
+    this._startLoop();
   }
 
   disconnectedCallback(): void {
-    this._resizeObserver?.disconnect();
-    this._resizeObserver = null;
+    if (this._rafId) cancelAnimationFrame(this._rafId);
+    this._rafId = 0;
     super.disconnectedCallback();
   }
 
+  private _rafId = 0;
+  private _lastRect = "";
+
   /**
-   * Watch the sibling <drop-box> so the accents re-place when the box's
-   * geometry changes. The box lives in the SAME column across some drop
-   * transitions — e.g. moving from a cell-centre target to a split target
-   * keeps the landing box in its column but resizes it from a full cell to a
-   * half-cell. The overdraw is NOT re-created in that case (only re-created
-   * when the landing column changes), so it must re-place itself when the box
-   * resizes, or its accents would stay at the old rect.
-   *
-   * A ResizeObserver on the box is the natural signal: the box is
-   * `position: absolute; inset: 0` inside its column, so its own box tracks
-   * the column's size, and a resize accompanies every such relayout. Falls
-   * back to nothing where ResizeObserver is unavailable (jsdom — the one-time
-   * `firstUpdated` placement still applies).
+   * Track the sibling <drop-box>'s rect every frame and re-place the accents
+   * on ANY change. The box can stay in the SAME column across some drop
+   * transitions while moving in place — e.g. sliding across a column boundary
+   * between two split halves keeps the landing box in the same column but
+   * shifts its position (same size, so a ResizeObserver would NOT fire), and
+   * moving from a cell-centre target to a split target resizes it from a full
+   * cell to a half-cell. The overdraw is not re-created in either case (only
+   * re-created when the landing column changes), so it must re-place itself
+   * when the box moves or resizes. A ResizeObserver alone misses the
+   * position-only shifts, so track the rect per frame instead. The loop only
+   * runs while mounted and is cancelled on disconnect; where
+   * requestAnimationFrame is unavailable (jsdom) the one-time `firstUpdated`
+   * placement still applies.
    */
-  private _observeBox(): void {
-    if (typeof ResizeObserver === "undefined") return;
-    const box = this._findDropBox();
-    if (!box) return;
-    this._resizeObserver?.disconnect();
-    this._resizeObserver = new ResizeObserver(() => this._place());
-    this._resizeObserver.observe(box);
+  private _startLoop(): void {
+    if (typeof requestAnimationFrame !== "function") return;
+    this._rafId = requestAnimationFrame(this._tick);
   }
 
-  private _resizeObserver: ResizeObserver | null = null;
+  private _tick = (): void => {
+    this._rafId = requestAnimationFrame(this._tick);
+    const box = this._findDropBox();
+    if (!box) return;
+    const r = box.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+    const key = `${r.left}|${r.top}|${r.width}|${r.height}`;
+    if (key === this._lastRect) return;
+    this._lastRect = key;
+    this._place();
+  };
 
   private _findDropBox(): HTMLElement | null {
     // Re-query the live sibling each time (do NOT cache): the owning host may
