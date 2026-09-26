@@ -108,6 +108,16 @@ export class DropBoxOverdraw extends LitElement {
     if (!topH || !topV || !botH) return;
     // Accents are as thick as the box's border lines they continue.
     for (const line of [topH, topV, botH]) line.style.setProperty("--overdraw-thickness", `${t}px`);
+    // Longer, smoother fade-out: these accents are as wide as the box's 3px
+    // border, so a short fade (the default 4-10px length with a 40% solid
+    // hold) reads as a hard line. Give them a longer length scaled to the
+    // stroke and a smaller solid hold, so they melt away gradually. The length
+    // is pre-set here (before/over the ordinal-derived length) so it stays.
+    const fadeLen = `${Math.max(Math.round(t * 5), 16)}px`;
+    for (const line of [topH, topV, botH]) {
+      line.style.setProperty("--overdraw-length", fadeLen);
+      line.style.setProperty("--overdraw-hold", "30%");
+    }
     // Horizontal accents: continue the top & bottom borders PAST the far edge.
     if (far === "right") {
       topH.style.left = `${out}px`;

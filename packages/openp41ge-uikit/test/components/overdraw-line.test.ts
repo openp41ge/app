@@ -51,6 +51,27 @@ describe("OverdrawLine", () => {
     expect(el.style.getPropertyValue("--overdraw-thickness")).toBe("3px");
   });
 
+  test("fade-out length is configurable via --overdraw-hold", async () => {
+    const el = new OverdrawLine();
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const css = styleOf(el);
+    // The solid portion before the fade is a custom property (default 40%),
+    // so a thicker line can lengthen/smooth the fade by lowering it.
+    expect(css).toContain("var(--overdraw-hold)");
+    expect(css).toContain("--overdraw-hold: 40%");
+  });
+
+  test("honors a pre-set length instead of the ordinal-derived one", async () => {
+    const el = new OverdrawLine();
+    // A consumer (e.g. a thick border accent) may pre-set a longer length so
+    // the fade-out is more gradual; it must not be replaced by the ordinal.
+    el.style.setProperty("--overdraw-length", "16px");
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.style.getPropertyValue("--overdraw-length")).toBe("16px");
+  });
+
   test("freezes the drawn length inline so it never changes afterwards", async () => {
     const el = new OverdrawLine();
     document.body.appendChild(el);

@@ -33,7 +33,10 @@
  * Styling hooks on the host:
  *  - `--drop-color`            — line colour; mirrors the drag line's.
  *  - `--drop-width`            — line width; mirrors the drag line's.
- *  - `--drop-overdraw-length`  — how far it extends up (px).
+ *  - `--drop-overdraw-length`  — how far it extends up, and the fade-out
+ *    distance (px). Thicker lines need a longer fade, so this is the fade
+ *    length; the gradient reaches the full drag-line colour exactly at the
+ *    drag line's top, so it flows continuously into the line.
  */
 
 import { LitElement, html, css } from "lit";
@@ -45,7 +48,7 @@ export class DragLineOverdraw extends LitElement {
       /* Defaults mirror <drag-line>; consumers may override to match. */
       --drop-color: rgba(74, 158, 255, 0.7);
       --drop-width: 3px;
-      --drop-overdraw-length: 14px;
+      --drop-overdraw-length: 24px;
     }
     .od {
       position: fixed;
@@ -53,13 +56,16 @@ export class DragLineOverdraw extends LitElement {
       top: 0;
       width: var(--drop-width);
       height: var(--drop-overdraw-length);
-      /* Full-height mirror: solid along the drag line, with the leading
-         --drop-overdraw-length above it fading out (40% solid hold, then
-         transparent) so it reads as the line continuing up into the top bar. */
+      /* Full-height mirror: continues the drag line's colour, with the leading
+         --drop-overdraw-length above it being one smooth fade from the line's
+         colour down to transparent — no abrupt solid block, so the line reads
+         as gently melting away into the top bar. Because the fade reaches the
+         full colour exactly at the drag line's top, there is no visible join
+         where the mirror hands off to the real drag line. */
       background: linear-gradient(
         to bottom,
         transparent 0px,
-        var(--drop-color) calc(var(--drop-overdraw-length) * 0.6)
+        var(--drop-color) var(--drop-overdraw-length)
       );
       opacity: 0;
       transition: opacity 0.12s ease;

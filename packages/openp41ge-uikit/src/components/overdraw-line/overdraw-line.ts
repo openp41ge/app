@@ -29,7 +29,11 @@
  * Styling hooks on the host:
  *  - `--overdraw-color`  — line color; defaults to `var(--border-color)`.
  *  - `--overdraw-length` — length (px); normally set on first draw, but can
- *                          be overridden per-host.
+ *                          be pre-set per-host (see below) to override it.
+ *  - `--overdraw-thickness` — perpendicular stroke width (px); default 1px.
+ *  - `--overdraw-hold`   — fraction of the length held solid before the fade
+ *                          (default 40%). Thicker lines set this lower (e.g.
+ *                          25%) so the fade-out is longer and more gradual.
  */
 
 import { LitElement, html, css } from "lit";
@@ -65,12 +69,16 @@ export class OverdrawLine extends LitElement {
       pointer-events: none;
       box-sizing: content-box;
       --overdraw-color: var(--border-color, #2a2a2a);
-      /* Pre-draw default; replaced with the ordinal-derived length on first draw. */
+      /* Pre-draw default; replaced with the ordinal-derived length on first draw
+         unless the consumer pre-sets a length (thicker accents use a longer one). */
       --overdraw-length: 6px;
       /* Perpendicular thickness (the solid stroke width). Default 1px; an
          accent that must match a thicker box border can override it (e.g.
          the drop-box indicator's 3px border). */
       --overdraw-thickness: 1px;
+      /* Fraction of the length held solid before the fade; lower = longer,
+         smoother fade-out (thicker lines need it to look gentle). */
+      --overdraw-hold: 40%;
     }
 
     :host([dir="left"]),
@@ -87,28 +95,28 @@ export class OverdrawLine extends LitElement {
     :host([dir="left"]) {
       background: linear-gradient(
         to left,
-        var(--overdraw-color) 40%,
+        var(--overdraw-color) var(--overdraw-hold),
         transparent 100%
       );
     }
     :host([dir="right"]) {
       background: linear-gradient(
         to right,
-        var(--overdraw-color) 40%,
+        var(--overdraw-color) var(--overdraw-hold),
         transparent 100%
       );
     }
     :host([dir="up"]) {
       background: linear-gradient(
         to top,
-        var(--overdraw-color) 40%,
+        var(--overdraw-color) var(--overdraw-hold),
         transparent 100%
       );
     }
     :host([dir="down"]) {
       background: linear-gradient(
         to bottom,
-        var(--overdraw-color) 40%,
+        var(--overdraw-color) var(--overdraw-hold),
         transparent 100%
       );
     }
@@ -120,9 +128,13 @@ export class OverdrawLine extends LitElement {
   protected firstUpdated(): void {
     // Assign a document-wide ordinal once and pin the resulting length inline
     // so the line never changes afterwards (consistent across re-renders, and
-    // the sequence is deterministic for the same draw order).
+    // the sequence is deterministic for the same draw order). A consumer that
+    // PRE-SETS a length (e.g. a thicker accent needing a longer fade) wins and
+    // is left untouched.
     if (this._frozen) return;
     this._frozen = true;
+    const preset = parseFloat(this.style.getPropertyValue("--overdraw-length"));
+    if (Number.isFinite(preset) && preset > 0) return;
     if (this._ordinal < 0) this._ordinal = nextOrdinal++;
     const length = overdrawLengthForOrdinal(this._ordinal);
     this.style.setProperty("--overdraw-length", `${length}px`);

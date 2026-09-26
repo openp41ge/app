@@ -193,6 +193,11 @@ describe("drop-box-overdraw", () => {
     expect(caps![0].style.getPropertyValue("--overdraw-thickness")).toBe("3px");
     expect(caps![1].style.getPropertyValue("--overdraw-thickness")).toBe("3px");
     expect(caps![2].style.getPropertyValue("--overdraw-thickness")).toBe("3px");
+    // The wide (3px) strokes get a longer fade length and a smaller solid hold
+    // so they melt away gradually instead of ending in a hard line.
+    expect(caps![0].style.getPropertyValue("--overdraw-length")).toBe("16px");
+    expect(caps![0].style.getPropertyValue("--overdraw-hold")).toBe("30%");
+    for (const cap of caps!) expect(cap.style.getPropertyValue("--overdraw-hold")).toBe("30%");
     // Horizontal accents start at the box's far (right) edge, matching the
     // top border at r.top and the bottom border at r.bottom - thickness.
     expect(caps![0].style.left).toBe("891px");
