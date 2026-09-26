@@ -92,7 +92,7 @@ describe("drop-box", () => {
     expect(customElements.get("drop-box")).toBe(DropBox);
   });
 
-  test("has a blue border, a transparent default, and the wash on by default", async () => {
+  test("has a blue border (inset ring), a transparent default, and the wash on by default", async () => {
     const el = new DropBox();
     document.body.appendChild(el);
     await el.updateComplete;
@@ -100,6 +100,11 @@ describe("drop-box", () => {
     expect(css).toContain("--drop-color: rgb(74, 158, 255)");
     expect(css).toContain("--drop-wash: rgba(74, 158, 255, 0.2)");
     expect(css).toContain(":host([wash])");
+    // The border is an inset box-shadow ring (the app's global `border-width:
+    // 0` reset overrides a shadow-root :host border, so a real border would
+    // compute to 0). Pin that here so it never regresses to `border:`.
+    expect(css).toContain("inset 0 0 0 var(--drop-border) var(--drop-color)");
+    expect(css).not.toContain("border: var(--drop-border)");
     expect(el.hasAttribute("wash")).toBe(true);
   });
 
