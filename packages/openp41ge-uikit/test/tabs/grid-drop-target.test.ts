@@ -167,8 +167,13 @@ describe("GridGhostManager drop indicator", () => {
     // splitLeft → the new tab lands on the left half (highlighted); the right
     // half is the subtle split-pair, which keeps only a wash and no box.
     expect(cols[0].querySelector(":scope > drop-box")).not.toBeNull();
+    expect(cols[0].querySelector(":scope > drop-box-overdraw")).not.toBeNull();
     expect(cols[1].querySelector(":scope > drop-box")).toBeNull();
     expect(cols[2].querySelector(":scope > drop-box")).toBeNull();
+    // The landing box carries a directional fade so the overdraw companion
+    // can bleed its accents outward past the anchored (solid) edge.
+    const fade = cols[0].querySelector(":scope > drop-box")!.getAttribute("fade");
+    expect(["left", "right"]).toContain(fade);
     // The landing column no longer paints its own ring (the box does).
     expect(cols[0].style.boxShadow).toBe("");
     expect(cols[0].style.background).toBe("transparent");
@@ -186,23 +191,27 @@ describe("GridGhostManager drop indicator", () => {
     const overlay = grid.querySelector(".openp41ge-ghost-overlay") as HTMLElement;
     const cols = [...overlay.children] as HTMLElement[];
     expect(cols[1].querySelector(":scope > drop-box")).not.toBeNull();
+    expect(cols[1].querySelector(":scope > drop-box-overdraw")).not.toBeNull();
     expect(cols[0].querySelector(":scope > drop-box")).toBeNull();
     expect(cols[2].querySelector(":scope > drop-box")).toBeNull();
     gm.dispose();
   });
 
-  test("re-hovering to a non-landing column removes the <drop-box>", () => {
+  test("re-hovering to a non-landing column removes the <drop-box> and its overdraw", () => {
     const grid = makeGrid(2);
     const gm = new GhostManager();
     gm.showGhost(grid, { cols: 2, activeCol: 0, columnFlex: [0.5, 0.5] });
     let cols = [...grid.querySelectorAll(".openp41ge-ghost-overlay > div")] as HTMLElement[];
     expect(cols[0].querySelector(":scope > drop-box")).not.toBeNull();
+    expect(cols[0].querySelector(":scope > drop-box-overdraw")).not.toBeNull();
 
     // Move to a cell-centre on column 1; column 0 stops being a landing spot.
     gm.showGhost(grid, { cols: 2, activeCol: 1, columnFlex: [0.5, 0.5] });
     cols = [...grid.querySelectorAll(".openp41ge-ghost-overlay > div")] as HTMLElement[];
     expect(cols[0].querySelector(":scope > drop-box")).toBeNull();
+    expect(cols[0].querySelector(":scope > drop-box-overdraw")).toBeNull();
     expect(cols[1].querySelector(":scope > drop-box")).not.toBeNull();
+    expect(cols[1].querySelector(":scope > drop-box-overdraw")).not.toBeNull();
     gm.dispose();
   });
 });

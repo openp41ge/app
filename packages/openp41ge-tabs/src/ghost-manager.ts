@@ -116,18 +116,34 @@ export class GhostManager {
       // column the dragged tab will land in — the highlighted half of a split
       // or the active cell-centre target. Columns that are not the landing
       // spot (the subtle split-pair, or plain background columns) keep only a
-      // faint wash and no box. The <drop-box> custom element is registered by
+      // faint wash and no box. A <drop-box-overdraw> sibling paints the box's
+      // overdraw accents: it bleeds the border outward past the nearer grid
+      // edge (the box fades toward the grid interior, the opposite side). The
+      // <drop-box> / <drop-box-overdraw> custom elements are registered by
       // <tab-grid> (the sole GhostManager consumer) via the drop-indicator
       // module.
       const wantsBox = col.highlighted || col.active;
       let box = colDiv.querySelector<HTMLElement>(":scope > drop-box");
-      if (wantsBox && !box) {
-        box = document.createElement("drop-box");
-        box.style.inset = "0";
-        colDiv.appendChild(box);
-      } else if (!wantsBox && box) {
-        box.remove();
+      let over = colDiv.querySelector<HTMLElement>(":scope > drop-box-overdraw");
+      if (wantsBox) {
+        if (!box) {
+          box = document.createElement("drop-box");
+          box.style.inset = "0";
+          colDiv.appendChild(box);
+        }
+        if (!over) {
+          over = document.createElement("drop-box-overdraw");
+          colDiv.appendChild(over);
+        }
+        // The box anchors on the edge nearer the grid's outer edge (its solid
+        // side) and fades toward the interior; the overdraw companion reads
+        // this `fade` and bleeds the accents outward past that anchored edge.
+        box.setAttribute("fade", this._boxFade(overlay, colDiv));
+      } else {
+        box?.remove();
+        over?.remove();
         box = null;
+        over = null;
       }
       // The box paints its own border ring + wash; the column div itself must
       // not also paint a ring/wash or they would double up.
@@ -140,6 +156,24 @@ export class GhostManager {
     }
 
     entry.childCount = targetCount;
+  }
+
+  /**
+   * The drop-box's fade direction, so its overdraw accents bleed outward past
+   * the nearer grid edge. A box in the left half of the grid anchors on its
+   * left (solid) edge and fades toward the right (interior) — its accents
+   * extend leftward, past the grid's left edge; a box in the right half does
+   * the mirror. This keeps the overdraws running outward past the grid
+   * boundary (into the titlebar / sidebar), the same language as the drawer's
+   * edge-snap box.
+   */
+  private _boxFade(overlay: HTMLElement, colDiv: HTMLElement): "left" | "right" {
+    const o = overlay.getBoundingClientRect();
+    if (o.width <= 0 || o.height <= 0) return "right";
+    const c = colDiv.getBoundingClientRect();
+    const boxCenter = c.left + c.width / 2;
+    const gridCenter = o.left + o.width / 2;
+    return boxCenter < gridCenter ? "right" : "left";
   }
 
   private _previewToDropZone(preview: GhostPreview): GhostDropZone {
