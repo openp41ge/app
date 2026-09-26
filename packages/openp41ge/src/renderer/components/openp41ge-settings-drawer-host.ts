@@ -1134,7 +1134,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
                 orientation="vertical"
                 ?show=${this._resizingSide === side || this._hoverSide === side}
               ></drag-line>
-              <drag-line-overdraw></drag-line-overdraw>
+              <drag-line-overdraw caps=${side === "left" ? "right" : "left"}></drag-line-overdraw>
             </div>
             ${
               hasChildren

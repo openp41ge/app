@@ -243,3 +243,22 @@ describe("openp41ge-settings-drawer-host edge snap", () => {
     expect(host.querySelector(".sdw-edge-snap")).toBeNull();
   });
 });
+
+describe("openp41ge-settings-drawer-host drag-line caps", () => {
+  it("points the far-edge overdraw caps away from the anchor side", async () => {
+    const host = await mountHost();
+    host.openSurface(makeSurface(), "left");
+    await host.updateComplete;
+    // A left drawer's far edge is on the right, so its horizontal caps overdraw
+    // rightward (past the grid boundary, over the adjacent region).
+    expect(host.querySelector('.sdw-drawer[data-side="left"] .sdw-resize drag-line-overdraw')?.getAttribute("caps")).toBe(
+      "right",
+    );
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    // A right drawer's far edge is on the left, so its caps overdraw leftward.
+    expect(
+      host.querySelector('.sdw-drawer[data-side="right"] .sdw-resize drag-line-overdraw')?.getAttribute("caps"),
+    ).toBe("left");
+  });
+});

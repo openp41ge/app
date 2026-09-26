@@ -224,6 +224,87 @@ describe("drag-line-overdraw", () => {
     spy.mockRestore();
   });
 
+  test("renders horizontal top/bottom caps when `caps` is set", async () => {
+    const notch = document.createElement("div");
+    const dragLine = document.createElement("drag-line");
+    const el = new DragLineOverdraw();
+    el.setAttribute("caps", "right");
+    notch.appendChild(dragLine);
+    notch.appendChild(el);
+    document.body.appendChild(notch);
+    await el.updateComplete;
+
+    const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
+    expect(caps?.length).toBe(2);
+    expect(caps?.[0].getAttribute("dir")).toBe("right");
+    expect(caps?.[1].getAttribute("dir")).toBe("right");
+    // The caps are reuse of <overdraw-line> (fixed layer propagates) and inherit
+    // the drag-line colour so they read as the line continuing horizontally.
+    const layer = el.shadowRoot?.querySelector<HTMLElement>(".od-layer");
+    expect(layer).toBeTruthy();
+    expect(styleOf(el)).toContain(".od-layer overdraw-line");
+    expect(styleOf(el)).toContain("--overdraw-color: var(--drop-color)");
+  });
+
+  test("places caps along the drag line's top and bottom edges", async () => {
+    const notch = document.createElement("div");
+    const dragLine = document.createElement("drag-line");
+    const el = new DragLineOverdraw();
+    el.setAttribute("caps", "right");
+    notch.appendChild(dragLine);
+    notch.appendChild(el);
+    document.body.appendChild(notch);
+    await el.updateComplete;
+
+    const rect = { left: 100, top: 200, width: 3, height: 500, right: 103, bottom: 700 };
+    const spy = vi.spyOn(dragLine, "getBoundingClientRect").mockReturnValue(rect as DOMRect);
+    dragLine.setAttribute("show", "");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
+    // Top cap: 1px at the drag line's top edge, extending right from its right edge.
+    expect(caps![0].style.top).toBe("200px");
+    expect(caps![0].style.left).toBe("103px"); // drag line right edge
+    // Bottom cap: 1px at the drag line's bottom edge.
+    expect(caps![1].style.top).toBe("699px"); // bottom - 1
+    expect(caps![1].style.left).toBe("103px");
+    // Both mirror the drag line's visibility.
+    expect(caps![0].style.opacity).toBe("1");
+    expect(caps![1].style.opacity).toBe("1");
+    spy.mockRestore();
+  });
+
+  test('caps="left" extends left from the drag line\'s left edge', async () => {
+    const notch = document.createElement("div");
+    const dragLine = document.createElement("drag-line");
+    const el = new DragLineOverdraw();
+    el.setAttribute("caps", "left");
+    notch.appendChild(dragLine);
+    notch.appendChild(el);
+    document.body.appendChild(notch);
+    await el.updateComplete;
+
+    const rect = { left: 100, top: 200, width: 3, height: 500, right: 103, bottom: 700 };
+    const spy = vi.spyOn(dragLine, "getBoundingClientRect").mockReturnValue(rect as DOMRect);
+    dragLine.setAttribute("show", "");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
+    // Solid end sits on the drag line's left edge, extending leftward.
+    expect(caps![0].style.right).toBe(`${window.innerWidth - 100}px`);
+    expect(caps![1].style.right).toBe(`${window.innerWidth - 100}px`);
+    expect(caps![0].style.left).toBe("auto");
+    spy.mockRestore();
+  });
+
+  test("renders no caps when `caps` is empty", async () => {
+    const el = new DragLineOverdraw();
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelectorAll(".od-cap").length).toBe(0);
+    expect(el.shadowRoot?.querySelector(".od-layer")).toBeNull();
+  });
+
   test("hides and tears down cleanly when disconnected", async () => {
     const notch = document.createElement("div");
     const dragLine = document.createElement("drag-line");
