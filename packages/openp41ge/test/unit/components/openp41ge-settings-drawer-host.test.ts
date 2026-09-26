@@ -129,12 +129,12 @@ describe("openp41ge-settings-drawer-host open width", () => {
     expect(host.drawerWidthFor("right")).toBe(host.maxDrawerWidth);
   });
 
-  it("clamps 1px short of the grid width so the drag bar stays inside the grid", async () => {
+  it("clamps to the full grid width so the drawer opens 100%", async () => {
     const host = await mountHost();
     Object.defineProperty(host, "clientWidth", { configurable: true, value: 500 });
     host.openSurface(makeSurface(), "right");
     await host.updateComplete;
-    expect(host.drawerWidthFor("right")).toBe(499);
+    expect(host.drawerWidthFor("right")).toBe(500);
   });
 
   it("never opens below the (unchanged) min width", async () => {
@@ -147,7 +147,7 @@ describe("openp41ge-settings-drawer-host open width", () => {
 });
 
 describe("openp41ge-settings-drawer-host no max width", () => {
-  it("can grow beyond maxDrawerWidth up to the full grid width (1px short, so the drag bar stays inside)", async () => {
+  it("can grow beyond maxDrawerWidth up to the full grid width", async () => {
     const host = await mountHost();
     Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
     host.openSurface(makeSurface(), "right");
@@ -155,7 +155,7 @@ describe("openp41ge-settings-drawer-host no max width", () => {
     expect(host.drawerWidthFor("right")).toBe(host.maxDrawerWidth);
     host.setDrawerWidthFor("right", 800);
     await host.updateComplete;
-    expect(host.drawerWidthFor("right")).toBe(799);
+    expect(host.drawerWidthFor("right")).toBe(800);
   });
 
   it("double-clicking the drag bar grows the drawer to the full grid width", async () => {
@@ -167,7 +167,7 @@ describe("openp41ge-settings-drawer-host no max width", () => {
     const bar = host.querySelector(".sdw-resize")!;
     bar.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
     await host.updateComplete;
-    expect(host.drawerWidthFor("right")).toBe(799);
+    expect(host.drawerWidthFor("right")).toBe(800);
   });
 });
 
@@ -200,7 +200,7 @@ describe("openp41ge-settings-drawer-host edge snap", () => {
       new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
     );
     await host.updateComplete;
-    expect(host.drawerWidthFor("right")).toBe(799);
+    expect(host.drawerWidthFor("right")).toBe(800);
     expect(host.querySelector(".sdw-edge-snap")).toBeNull();
   });
 

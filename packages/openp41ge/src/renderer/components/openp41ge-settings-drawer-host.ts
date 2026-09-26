@@ -516,11 +516,13 @@ export class Openp41geSettingsDrawerHost extends LitElement {
    * bound (it can't slide under the opposite sidebar / off the window).
    */
   private _sideMaxWidth(side: DrawerSide, gridWidth: number): number {
-    // Cap 1px short of the grid edge so the 3px drag bar (which overhangs the
-    // drawer's inner-edge border by 1px on each side) stays fully inside the
-    // grid area. At exactly gridWidth the outboard pixel would be clipped by
-    // the grid area's overflow hidden when the drawer spans the whole grid.
-    return Math.max(this._minWidth, gridWidth - 1);
+    // The drawer may grow all the way to the grid's own edge, so a full-width
+    // drawer spans the entire grid area. (The 3px drag bar overhangs the
+    // drawer's inner-edge border by 1px on each side, so at exactly full
+    // width its outboard pixel is clipped by the grid area's overflow hidden —
+    // but the sidebar's portalled notch line renders the same boundary in
+    // full, so the two read as a single line and the drawer is truly 100%.)
+    return Math.max(this._minWidth, gridWidth);
   }
 
   // ── Resize handles ──────────────────────────────────────────────────────
