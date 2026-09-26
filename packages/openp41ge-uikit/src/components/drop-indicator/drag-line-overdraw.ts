@@ -2,18 +2,22 @@
  * <drag-line-overdraw> — the overdraw companion to a <drag-line>.
  *
  * A <drag-line> is the translucent blue vertical line you hover over to drag
- * a sidebar / window boundary. This component renders an <overdraw-line>-style
- * accent at the TOP of that drag line: the same colour and the SAME WIDTH as
- * the drag line, positioned over it, extending upward past the panel boundary
- * and INTO the apps top bar, fading out. It appears only while the drag line
- * is visible (hovered / dragging), so it reads as the drag line continuing up
- * into the top bar.
+ * a sidebar / window boundary. This component renders a mirror of that drag
+ * line — the same colour and the SAME WIDTH, spanning the drag line's full
+ * height plus an accent extending upward past the panel boundary and INTO the
+ * apps top bar, fading out. It appears only while the drag line is visible
+ * (hovered / dragging), so it reads as the drag line continuing up into the
+ * top bar — and, because it is a full-height mirror sitting BELOW the real
+ * drag line, it also peeks out at any edge where the drag line is clipped by
+ * an ancestor's `overflow: hidden` (e.g. a full-width drawer's far edge cut by
+ * the grid wrapper), so the line is never cut off there either.
  *
  * The line is `position: fixed`, so it escapes any `overflow: hidden` panel
- * and paints over the top bar; its `left`/`top` track the drag line's viewport
- * rect. Because the drag line can move while it is being dragged (a sidebar
- * resize), the component re-places itself every animation frame while shown —
- * cheap, since it only runs while the line is visible and only reads one rect.
+ * and paints over the top bar; its `left`/`top`/`height` track the drag line's
+ * viewport rect. Because the drag line can move while it is being dragged (a
+ * sidebar resize), the component re-places itself every animation frame while
+ * shown — cheap, since it only runs while the line is visible and only reads
+ * one rect.
  *
  * The consumer places it next to its <drag-line> (in the same resize notch):
  *
@@ -49,14 +53,25 @@ export class DragLineOverdraw extends LitElement {
       top: 0;
       width: var(--drop-width);
       height: var(--drop-overdraw-length);
-      background: linear-gradient(to top, var(--drop-color) 40%, transparent 100%);
+      /* Full-height mirror: solid along the drag line, with the leading
+         --drop-overdraw-length above it fading out (40% solid hold, then
+         transparent) so it reads as the line continuing up into the top bar. */
+      background: linear-gradient(
+        to bottom,
+        transparent 0px,
+        var(--drop-color) calc(var(--drop-overdraw-length) * 0.6)
+      );
       opacity: 0;
       transition: opacity 0.12s ease;
       pointer-events: none;
-      /* Above page chrome (grid tabs, sidebars, top bar) and above the drawer
-         host (z-index:1001) + its full-window dim mask, so the line stays
-         visible ("on top") even while a drawer overlay is open. */
-      z-index: 1002;
+      /* Sits BELOW the sibling drag-line in the owning panel's stacking
+         context, so the visible line is always the real drag-line and this
+         mirror is only revealed where the drag line is clipped (its far edge
+         under an opposing panel / the grid wrapper's overflow:hidden) and in
+         the fade above it. The owning panel's context itself sits above the
+         drawer host (z-index:1001) + its full-window dim mask, so the line
+         stays visible ("on top") while a drawer overlay is open. */
+      z-index: -1;
     }
   `;
 
@@ -158,9 +173,17 @@ export class DragLineOverdraw extends LitElement {
     const r = dragLine.getBoundingClientRect();
     // Track the drag line's actual width and position so the overdraw reads
     // as the drag line continuing up (whatever width it is drawn at).
+    const ext = this._overdrawLength();
     od.style.width = `${r.width}px`;
     od.style.left = `${r.left}px`;
-    od.style.top = `${r.top - od.offsetHeight}px`;
+    od.style.top = `${r.top - ext}px`;
+    od.style.height = `${r.height + ext}px`;
+  }
+
+  /** Resolve the custom `--drop-overdraw-length` (defaults to 14px). */
+  private _overdrawLength(): number {
+    const v = parseFloat(getComputedStyle(this).getPropertyValue("--drop-overdraw-length"));
+    return Number.isFinite(v) && v > 0 ? v : 14;
   }
 
   private get _od(): HTMLElement | null {

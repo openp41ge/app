@@ -5,7 +5,7 @@
  * shadow roots (jsdom does not compute shadow styles for the host element, so
  * we assert on the `<style>` text rather than `getComputedStyle`).
  */
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, vi } from "vitest";
 import { DropLine } from "../../src/components/drop-indicator/drop-line";
 import { DragLine } from "../../src/components/drop-indicator/drag-line";
 import { DragLineOverdraw } from "../../src/components/drop-indicator/drag-line-overdraw";
@@ -138,14 +138,18 @@ describe("drag-line-overdraw", () => {
     expect(customElements.get("drag-line-overdraw")).toBe(DragLineOverdraw);
   });
 
-  test("renders a fixed upward-fading line, drag-line width", async () => {
+  test("renders a fixed full-height mirror line, drag-line width", async () => {
     const el = new DragLineOverdraw();
     document.body.appendChild(el);
     await el.updateComplete;
     const css = styleOf(el);
     expect(css).toContain("position: fixed");
     expect(css).toContain("--drop-width: 3px");
-    expect(css).toContain("linear-gradient(to top");
+    expect(css).toContain("linear-gradient");
+    expect(css).toContain("to bottom");
+    // Sits below the sibling <drag-line> so it never double-renders; it only
+    // peeks out where the drag line is clipped and in the fade above it.
+    expect(css).toContain("z-index: -1");
     expect(el.shadowRoot?.querySelector(".od")).toBeTruthy();
   });
 
@@ -193,6 +197,31 @@ describe("drag-line-overdraw", () => {
     replacement.removeAttribute("show");
     await new Promise((r) => setTimeout(r, 0));
     expect(od!.style.opacity).toBe("0");
+  });
+
+  test("mirrors the full drag-line height so it peeks out where clipped", async () => {
+    const notch = document.createElement("div");
+    const dragLine = document.createElement("drag-line");
+    const el = new DragLineOverdraw();
+    notch.appendChild(dragLine);
+    notch.appendChild(el);
+    document.body.appendChild(notch);
+    await el.updateComplete;
+
+    // The overdraw mirrors the drag line's full rect (not just a stub): its
+    // height is drag-line height + overdraw length, so where the drag line is
+    // clipped by an ancestor's overflow the mirror still paints the cut edge.
+    const rect = { left: 100, top: 200, width: 3, height: 500, right: 103, bottom: 700 };
+    const spy = vi.spyOn(dragLine, "getBoundingClientRect").mockReturnValue(rect as DOMRect);
+    dragLine.setAttribute("show", "");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const od = el.shadowRoot?.querySelector<HTMLElement>(".od");
+    expect(od!.style.width).toBe("3px");
+    expect(od!.style.left).toBe("100px");
+    expect(od!.style.top).toBe("186px"); // 200 - 14 (default overdraw length)
+    expect(od!.style.height).toBe("514px"); // 500 + 14
+    spy.mockRestore();
   });
 
   test("hides and tears down cleanly when disconnected", async () => {

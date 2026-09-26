@@ -553,12 +553,15 @@ class Openp41geWindowView extends LitElement {
           flex-shrink: 0;
           cursor: col-resize;
           position: relative;
-          /* Above the settings drawer host (z-index:1001) so the sidebar resize
-           * bar stays fully grabbable and its hover highlight isn't clipped by
-           * an open drawer sliding out of the adjacent sidebar. The drawer
-           * covers the grid but starts at the boundary, so without this only
-           * the 3px on the sidebar side of the notch would be reachable. */
-          z-index: 1002;
+          /* Above the settings drawer host (z-index:1001) AND above the
+           * anchor sidebar (openp41ge-sidebar.wv-drawer-anchor, z-index:
+           * 1003) — while a drawer is open that anchor sidebar is raised above
+           * the drawer's dim mask, and without this it would paint over the
+           * notch and cover all but the 3px of the drag-line that sits over
+           * the grid, leaving only ~1px visible. Raising the notch above it
+           * keeps the whole sidebar drag bar (and its hover highlight) over
+           * the anchor sidebar and fully grabbable. */
+          z-index: 1004;
           background: transparent;
           /* Asymmetric negative margins cancel the 7px width to a ZERO-width
              flex track (margin-box 7 - 3 - 4 = 0), so the sidebar border sits
