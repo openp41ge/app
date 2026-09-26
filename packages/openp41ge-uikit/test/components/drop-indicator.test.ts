@@ -165,9 +165,12 @@ describe("drop-box-overdraw", () => {
     expect(caps?.[1].getAttribute("dir")).toBe("up");
     expect(caps?.[2].className).toContain("od-bot-h");
     expect(caps?.[2].getAttribute("dir")).toBe("right");
-    // The accents inherit the drop-box blue and sit below the real box.
+    // The accents inherit the drop-box blue, match its border thickness, and
+    // sit below the real box.
     expect(styleOf(el)).toContain(".od-layer overdraw-line");
     expect(styleOf(el)).toContain("--overdraw-color: var(--drop-color)");
+    expect(styleOf(el)).toContain("--overdraw-thickness: var(--drop-border)");
+    expect(styleOf(el)).toContain("--drop-border: 3px");
   });
 
   test("places accents along the box's far edge and top/bottom borders", async () => {
@@ -185,13 +188,20 @@ describe("drop-box-overdraw", () => {
     await el.updateComplete;
 
     const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
-    // Horizontal accents start at the box's far (right) edge, at top & bottom.
+    // Accents are as thick as the box's border (--drop-border = 3px, matching
+    // the 3px drag line).
+    expect(caps![0].style.getPropertyValue("--overdraw-thickness")).toBe("3px");
+    expect(caps![1].style.getPropertyValue("--overdraw-thickness")).toBe("3px");
+    expect(caps![2].style.getPropertyValue("--overdraw-thickness")).toBe("3px");
+    // Horizontal accents start at the box's far (right) edge, matching the
+    // top border at r.top and the bottom border at r.bottom - thickness.
     expect(caps![0].style.left).toBe("891px");
     expect(caps![0].style.top).toBe("35px");
     expect(caps![2].style.left).toBe("891px");
-    expect(caps![2].style.top).toBe("860px");
-    // Vertical accent rises from the top border, centred on the far edge.
-    expect(caps![1].style.left).toBe("890px"); // right edge minus 1
+    expect(caps![2].style.top).toBe("857px"); // 860 - 3px border
+    // Vertical accent rises from the top border, flush with the far edge's
+    // border span (right edge minus border width).
+    expect(caps![1].style.left).toBe("888px"); // 891 - 3px
     expect(caps![1].style.bottom).toBe(`${window.innerHeight - 35}px`);
     // All accents become visible once placed.
     expect(caps![0].style.opacity).toBe("1");

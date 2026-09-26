@@ -67,16 +67,20 @@ export class OverdrawLine extends LitElement {
       --overdraw-color: var(--border-color, #2a2a2a);
       /* Pre-draw default; replaced with the ordinal-derived length on first draw. */
       --overdraw-length: 6px;
+      /* Perpendicular thickness (the solid stroke width). Default 1px; an
+         accent that must match a thicker box border can override it (e.g.
+         the drop-box indicator's 3px border). */
+      --overdraw-thickness: 1px;
     }
 
     :host([dir="left"]),
     :host([dir="right"]) {
       width: var(--overdraw-length);
-      height: 1px;
+      height: var(--overdraw-thickness);
     }
     :host([dir="up"]),
     :host([dir="down"]) {
-      width: 1px;
+      width: var(--overdraw-thickness);
       height: var(--overdraw-length);
     }
 

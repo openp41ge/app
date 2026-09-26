@@ -6,6 +6,11 @@ import { describe, test, expect, beforeEach, vi, afterEach } from "vitest";
 import { OverdrawLine, OVERDRAW_LENGTHS, overdrawLengthForOrdinal } from "../../src/components/overdraw-line/overdraw-line";
 import { attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws } from "../../src/components/overdraw-line/corner-accent";
 
+function styleOf(el: HTMLElement): string {
+  const style = el.shadowRoot?.querySelector("style");
+  return style?.textContent ?? "";
+}
+
 describe("OverdrawLine", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
@@ -29,6 +34,21 @@ describe("OverdrawLine", () => {
     el.dir = "up";
     await el.updateComplete;
     expect(el.getAttribute("dir")).toBe("up");
+  });
+
+  test("defaults to a 1px stroke and honors a custom thickness", async () => {
+    const el = new OverdrawLine();
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const css = styleOf(el);
+    // The perpendicular stroke is 1px by default.
+    expect(css).toContain("height: var(--overdraw-thickness)");
+    expect(css).toContain("width: var(--overdraw-thickness)");
+    expect(css).toContain("--overdraw-thickness: 1px");
+
+    // Overriding the thickness makes the stroke as wide as a thicker border.
+    el.style.setProperty("--overdraw-thickness", "3px");
+    expect(el.style.getPropertyValue("--overdraw-thickness")).toBe("3px");
   });
 
   test("freezes the drawn length inline so it never changes afterwards", async () => {

@@ -33,6 +33,9 @@
  *
  * Styling hooks on the host:
  *  - `--drop-color` — accent colour; defaults to the shared drop indicator blue.
+ *  - `--drop-border` — accent thickness (px); defaults to 3px so the accents
+ *    are as wide as the drop-box's border lines (and the 3px drag line) they
+ *    continue.
  */
 
 import { LitElement, css, html, nothing, unsafeCSS } from "lit";
@@ -48,6 +51,7 @@ export class DropBoxOverdraw extends LitElement {
       z-index: 30;
       pointer-events: none;
       --drop-color: ${unsafeCSS(DROP_INDICATOR_COLOR)};
+      --drop-border: 3px;
     }
     .od-layer {
       position: fixed;
@@ -59,6 +63,7 @@ export class DropBoxOverdraw extends LitElement {
     }
     .od-layer overdraw-line {
       --overdraw-color: var(--drop-color);
+      --overdraw-thickness: var(--drop-border);
       opacity: 0;
       transition: opacity 0.12s ease;
     }
@@ -74,9 +79,19 @@ export class DropBoxOverdraw extends LitElement {
     return this.parentElement?.querySelector<HTMLElement>("drop-box") ?? null;
   }
 
+  /** The border thickness to match (px), read from the box's `--drop-border`.
+   *  Falls back to 3px (the drop-box default, matching the 3px drag line). */
+  private _borderThickness(box: HTMLElement): number {
+    const v = getComputedStyle(box).getPropertyValue("--drop-border");
+    const n = parseFloat(v);
+    return Number.isFinite(n) && n > 0 ? n : 3;
+  }
+
   /** Place the three accents against the sibling drop-box's rect. The box is
    *  static while shown, so a single placement suffices; the accents fade in
-   *  via the lines' own opacity transition (set to 1 on placement). */
+   *  via the lines' own opacity transition (set to 1 on placement). Each
+   *  accent spans the same thickness as the box's border (`--drop-border`) so
+   *  it reads as that border continuing past the far edge. */
   private _place(): void {
     const box = this._findDropBox();
     if (!box) return;
@@ -84,12 +99,15 @@ export class DropBoxOverdraw extends LitElement {
     if (!fade || fade === "none") return;
     const r = box.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return;
+    const t = this._borderThickness(box);
     const far = fade === "left" ? "right" : "left";
     const out = far === "right" ? r.right : r.left;
     const topH = this._cap("od-top-h");
     const topV = this._cap("od-top-v");
     const botH = this._cap("od-bot-h");
     if (!topH || !topV || !botH) return;
+    // Accents are as thick as the box's border lines they continue.
+    for (const line of [topH, topV, botH]) line.style.setProperty("--overdraw-thickness", `${t}px`);
     // Horizontal accents: continue the top & bottom borders PAST the far edge.
     if (far === "right") {
       topH.style.left = `${out}px`;
@@ -98,11 +116,13 @@ export class DropBoxOverdraw extends LitElement {
       topH.style.right = `${window.innerWidth - out}px`;
       botH.style.right = `${window.innerWidth - out}px`;
     }
+    // Align each horizontal accent's span with the border it continues: the
+    // top border spans [r.top, r.top + t]; the bottom spans [r.bottom - t, r.bottom].
     topH.style.top = `${r.top}px`;
-    botH.style.top = `${r.bottom}px`;
-    // Vertical accent: rises from the top border, centred on the far edge, so
-    // it reads as the box's solid edge continuing up into the top bar.
-    topV.style.left = `${far === "right" ? out - 1 : out}px`;
+    botH.style.top = `${r.bottom - t}px`;
+    // Vertical accent: rises from the top border, flush with the far edge's
+    // border span, so it reads as the box's solid edge continuing up.
+    topV.style.left = `${far === "right" ? out - t : out}px`;
     topV.style.bottom = `${window.innerHeight - r.top}px`;
     for (const line of [topH, topV, botH]) line.style.opacity = "1";
   }
