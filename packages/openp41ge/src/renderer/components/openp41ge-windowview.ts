@@ -79,6 +79,11 @@ class Openp41geWindowView extends LitElement {
   /** Drawer width on the dragged side at drag start (so widening the sidebar
    * can take that space from the open drawer). */
   private _dragStartDrawerWidth = 0;
+  /** True when the drawer on the dragged side was ALREADY at full grid width
+   * when the drag began. A full-width drawer tracks the grid as the sidebar
+   * moves (staying full), whereas a partial drawer keeps its far edge fixed
+   * and only grows back up to its width at drag start. */
+  private _dragStartDrawerFull = false;
   /** True while the sidebar rubber-bands past its OWN max width. */
   private _isOverMax = false;
   private _overMaxTarget = 0;
@@ -173,6 +178,7 @@ class Openp41geWindowView extends LitElement {
     // sidebar can take space from the drawer (and stop at its minimum).
     const host = this._drawerHost();
     this._dragStartDrawerWidth = host ? host.drawerWidthFor(handle) : 0;
+    this._dragStartDrawerFull = !!host?.isDrawerFullWidth(handle);
     this._isOverMax = false;
     this._overMaxTarget = 0;
     this._isOverMin = false;
@@ -254,18 +260,12 @@ class Openp41geWindowView extends LitElement {
       this._isOverMin = true;
       this._overMinTarget = MIN_SIDEBAR_WIDTH;
       if (open) {
-        const growth = newWidth - startWidth;
-        drawerWidth = Math.max(minDrawer, Math.min(drawerStart, drawerStart - growth));
+        drawerWidth = this._drawerWidthForDrag(minDrawer, drawerStart, newWidth, startWidth);
       }
     } else {
       newWidth = Math.min(maxSidebar, desired);
       if (open) {
-        // While the drawer has headroom, shrink it to absorb the sidebar's
-        // growth so its far edge stays put; once it reaches its minimum the
-        // drawer clamps there and slides with the sidebar rather than blocking
-        // the resize. Narrowing grows it back up to the width at drag start.
-        const growth = newWidth - startWidth;
-        drawerWidth = Math.max(minDrawer, Math.min(drawerStart, drawerStart - growth));
+        drawerWidth = this._drawerWidthForDrag(minDrawer, drawerStart, newWidth, startWidth);
       }
       // Above its own max — rubber band up, spring back on release.
       if (desired > maxSidebar) {
@@ -276,6 +276,31 @@ class Openp41geWindowView extends LitElement {
     }
 
     return { newWidth, drawerWidth: open ? drawerWidth : null };
+  }
+
+  /** Compute the drawer width for a sidebar drag move.
+   *
+   * While the drawer has headroom it shrinks to absorb the sidebar's growth
+   * so its far edge stays put; once it reaches its minimum it clamps there and
+   * slides with the sidebar rather than blocking the resize. Narrowing grows
+   * it back up to the width at drag start.
+   *
+   * A drawer that was ALREADY full width when the drag began instead tracks
+   * the grid: it stays full as the sidebar narrows (the grid grows) and its
+   * far edge follows the grid edge, rather than being held at the drag-start
+   * width. `setDrawerWidthFor` clamps the value to the current grid width, so
+   * a full-width drawer can never overshoot the grid.
+   */
+  private _drawerWidthForDrag(
+    minDrawer: number,
+    drawerStart: number,
+    newWidth: number,
+    startWidth: number,
+  ): number {
+    const growth = newWidth - startWidth;
+    return this._dragStartDrawerFull
+      ? Math.max(minDrawer, drawerStart - growth)
+      : Math.max(minDrawer, Math.min(drawerStart, drawerStart - growth));
   }
 
   /**

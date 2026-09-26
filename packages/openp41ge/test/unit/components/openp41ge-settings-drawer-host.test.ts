@@ -137,6 +137,18 @@ describe("openp41ge-settings-drawer-host open width", () => {
     expect(host.drawerWidthFor("right")).toBe(500);
   });
 
+  it("reports full width only when the drawer spans the whole grid", async () => {
+    const host = await mountHost();
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    // Opens at the preferred width (720), short of the grid.
+    expect(host.isDrawerFullWidth("right")).toBe(false);
+    host.setDrawerWidthFor("right", 800);
+    await host.updateComplete;
+    expect(host.isDrawerFullWidth("right")).toBe(true);
+  });
+
   it("never opens below the (unchanged) min width", async () => {
     const host = await mountHost();
     Object.defineProperty(host, "clientWidth", { configurable: true, value: 100 });

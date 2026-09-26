@@ -53,9 +53,10 @@ export class DragLineOverdraw extends LitElement {
       opacity: 0;
       transition: opacity 0.12s ease;
       pointer-events: none;
-      /* Above page chrome (grid tabs, sidebars, top bar) but below the drawer
-         host (z-index 1001), so an open drawer covers it. */
-      z-index: 999;
+      /* Above page chrome (grid tabs, sidebars, top bar) and above the drawer
+         host (z-index:1001) + its full-window dim mask, so the line stays
+         visible ("on top") even while a drawer overlay is open. */
+      z-index: 1002;
     }
   `;
 

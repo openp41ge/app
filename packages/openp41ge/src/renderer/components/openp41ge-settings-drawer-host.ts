@@ -275,6 +275,12 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     return Math.max(this._minWidth, this._drawerWidths[side]);
   }
 
+  /** True when the drawer on `side` currently spans the full grid width. */
+  isDrawerFullWidth(side: DrawerSide): boolean {
+    const gridWidth = this.clientWidth || 0;
+    return gridWidth > 0 && this.drawerWidthFor(side) >= this._sideMaxWidth(side, gridWidth);
+  }
+
   /**
    * Set the drawer width for `side`, clamped to [min, max]. Used by the sidebar
    * drag to shrink a drawer as the sidebar widens (taking space from it).
