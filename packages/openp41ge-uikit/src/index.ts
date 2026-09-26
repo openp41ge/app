@@ -10,7 +10,7 @@ export { OverdrawLine, attachTopCornerOverdraws, attachTopOverdraw, attachTopHor
 export type { OverdrawDirection } from "./components/overdraw-line";
 
 // ─── Drop indicators (shared blue drag/drop lines + box) ────────────────
-export { DropLine, DragLine, DragLineOverdraw, DropBox, DROP_INDICATOR_COLOR, DROP_LINE_GLOW } from "./components/drop-indicator";
+export { DropLine, DragLine, DragLineOverdraw, DropBox, DropBoxOverdraw, DROP_INDICATOR_COLOR, DROP_LINE_GLOW } from "./components/drop-indicator";
 export type { DropFadeDirection } from "./components/drop-indicator";
 
 // ─── Scrollbar ──────────────────────────────────────────────────────────

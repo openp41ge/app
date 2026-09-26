@@ -242,23 +242,31 @@ describe("openp41ge-settings-drawer-host edge snap", () => {
     expect(host.drawerWidthFor("right")).toBe(700);
     expect(host.querySelector(".sdw-edge-snap")).toBeNull();
   });
-});
 
-describe("openp41ge-settings-drawer-host drag-line caps", () => {
-  it("points the far-edge overdraw caps away from the anchor side", async () => {
+  it("renders the drop-box-overdraw companion alongside the edge-snap indicator", async () => {
     const host = await mountHost();
-    host.openSurface(makeSurface(), "left");
-    await host.updateComplete;
-    // A left drawer's far edge is on the right, so its horizontal caps overdraw
-    // rightward (past the grid boundary, over the adjacent region).
-    expect(host.querySelector('.sdw-drawer[data-side="left"] .sdw-resize drag-line-overdraw')?.getAttribute("caps")).toBe(
-      "right",
-    );
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
     host.openSurface(makeSurface(), "right");
     await host.updateComplete;
-    // A right drawer's far edge is on the left, so its caps overdraw leftward.
-    expect(
-      host.querySelector('.sdw-drawer[data-side="right"] .sdw-resize drag-line-overdraw')?.getAttribute("caps"),
-    ).toBe("left");
+    host.setDrawerWidthFor("right", 300);
+    await host.updateComplete;
+    const bar = host.querySelector(".sdw-resize")!;
+    bar.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 0, clientY: 10, pointerId: 1 }),
+    );
+    document.dispatchEvent(
+      new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
+    );
+    await host.updateComplete;
+    // A right drawer snaps to the grid's LEFT edge, so the overdraw companion
+    // is present and reads the box's fade to place its accents on the far side.
+    const box = host.querySelector(".sdw-edge-snap")!;
+    expect(box.getAttribute("fade")).toBe("right");
+    expect(host.querySelector("drop-box-overdraw")).not.toBeNull();
+    document.dispatchEvent(
+      new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
+    );
+    await host.updateComplete;
+    expect(host.querySelector("drop-box-overdraw")).toBeNull();
   });
 });

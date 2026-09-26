@@ -11,5 +11,6 @@ export { DropLine } from "./drop-line";
 export { DragLine } from "./drag-line";
 export { DragLineOverdraw } from "./drag-line-overdraw";
 export { DropBox } from "./drop-box";
+export { DropBoxOverdraw } from "./drop-box-overdraw";
 export type { DropFadeDirection } from "./drop-box";
 export { DROP_INDICATOR_COLOR, DROP_LINE_GLOW } from "./color";

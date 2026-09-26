@@ -10,6 +10,7 @@ import { DropLine } from "../../src/components/drop-indicator/drop-line";
 import { DragLine } from "../../src/components/drop-indicator/drag-line";
 import { DragLineOverdraw } from "../../src/components/drop-indicator/drag-line-overdraw";
 import { DropBox, type DropFadeDirection } from "../../src/components/drop-indicator/drop-box";
+import { DropBoxOverdraw } from "../../src/components/drop-indicator/drop-box-overdraw";
 import { DROP_INDICATOR_COLOR, DROP_LINE_GLOW } from "../../src/components/drop-indicator/color";
 
 function styleOf(el: HTMLElement): string {
@@ -105,6 +106,8 @@ describe("drop-box", () => {
     // compute to 0). Pin that here so it never regresses to `border:`.
     expect(css).toContain("inset 0 0 0 var(--drop-border) var(--drop-color)");
     expect(css).not.toContain("border: var(--drop-border)");
+    // The drop indicator has sharp (square) corners — no border radius.
+    expect(css).toContain("--drop-radius: 0px");
     expect(el.hasAttribute("wash")).toBe(true);
   });
 
@@ -126,6 +129,86 @@ describe("drop-box", () => {
   test("DropFadeDirection type is a literal union", () => {
     const d: DropFadeDirection = "left";
     expect(["none", "left", "right"]).toContain(d);
+  });
+});
+
+describe("drop-box-overdraw", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function mount(fade: "left" | "right"): { box: HTMLElement; el: DropBoxOverdraw } {
+    const host = document.createElement("div");
+    host.style.position = "relative";
+    const box = document.createElement("drop-box");
+    box.setAttribute("fade", fade);
+    const el = new DropBoxOverdraw();
+    host.appendChild(box);
+    host.appendChild(el);
+    document.body.appendChild(host);
+    return { box, el };
+  }
+
+  test("registers as <drop-box-overdraw>", () => {
+    expect(customElements.get("drop-box-overdraw")).toBe(DropBoxOverdraw);
+  });
+
+  test("renders top-horizontal + top-vertical + bottom-horizontal accents, fading toward the box's solid far edge", async () => {
+    const { el } = mount("left");
+    await el.updateComplete;
+    const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
+    expect(caps?.length).toBe(3);
+    // fade=left means the box's solid far edge is the RIGHT; accents bleed right.
+    expect(caps?.[0].className).toContain("od-top-h");
+    expect(caps?.[0].getAttribute("dir")).toBe("right");
+    expect(caps?.[1].className).toContain("od-top-v");
+    expect(caps?.[1].getAttribute("dir")).toBe("up");
+    expect(caps?.[2].className).toContain("od-bot-h");
+    expect(caps?.[2].getAttribute("dir")).toBe("right");
+    // The accents inherit the drop-box blue and sit below the real box.
+    expect(styleOf(el)).toContain(".od-layer overdraw-line");
+    expect(styleOf(el)).toContain("--overdraw-color: var(--drop-color)");
+  });
+
+  test("places accents along the box's far edge and top/bottom borders", async () => {
+    const host = document.createElement("div");
+    host.style.position = "relative";
+    const box = document.createElement("drop-box");
+    box.setAttribute("fade", "left");
+    // Mock the box rect BEFORE mount so the component's initial placement uses it.
+    const rect = { left: 791, top: 35, right: 891, bottom: 860, width: 100, height: 825 };
+    const spy = vi.spyOn(box, "getBoundingClientRect").mockReturnValue(rect as DOMRect);
+    const el = new DropBoxOverdraw();
+    host.appendChild(box);
+    host.appendChild(el);
+    document.body.appendChild(host);
+    await el.updateComplete;
+
+    const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
+    // Horizontal accents start at the box's far (right) edge, at top & bottom.
+    expect(caps![0].style.left).toBe("891px");
+    expect(caps![0].style.top).toBe("35px");
+    expect(caps![2].style.left).toBe("891px");
+    expect(caps![2].style.top).toBe("860px");
+    // Vertical accent rises from the top border, centred on the far edge.
+    expect(caps![1].style.left).toBe("890px"); // right edge minus 1
+    expect(caps![1].style.bottom).toBe(`${window.innerHeight - 35}px`);
+    // All accents become visible once placed.
+    expect(caps![0].style.opacity).toBe("1");
+    expect(caps![1].style.opacity).toBe("1");
+    expect(caps![2].style.opacity).toBe("1");
+    spy.mockRestore();
+  });
+
+  test("does not render accents when the sibling box has no fade", async () => {
+    const host = document.createElement("div");
+    const box = document.createElement("drop-box");
+    const el = new DropBoxOverdraw();
+    host.appendChild(box);
+    host.appendChild(el);
+    document.body.appendChild(host);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelectorAll(".od-layer").length).toBe(0);
   });
 });
 
@@ -222,87 +305,6 @@ describe("drag-line-overdraw", () => {
     expect(od!.style.top).toBe("186px"); // 200 - 14 (default overdraw length)
     expect(od!.style.height).toBe("514px"); // 500 + 14
     spy.mockRestore();
-  });
-
-  test("renders horizontal top/bottom caps when `caps` is set", async () => {
-    const notch = document.createElement("div");
-    const dragLine = document.createElement("drag-line");
-    const el = new DragLineOverdraw();
-    el.setAttribute("caps", "right");
-    notch.appendChild(dragLine);
-    notch.appendChild(el);
-    document.body.appendChild(notch);
-    await el.updateComplete;
-
-    const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
-    expect(caps?.length).toBe(2);
-    expect(caps?.[0].getAttribute("dir")).toBe("right");
-    expect(caps?.[1].getAttribute("dir")).toBe("right");
-    // The caps are reuse of <overdraw-line> (fixed layer propagates) and inherit
-    // the drag-line colour so they read as the line continuing horizontally.
-    const layer = el.shadowRoot?.querySelector<HTMLElement>(".od-layer");
-    expect(layer).toBeTruthy();
-    expect(styleOf(el)).toContain(".od-layer overdraw-line");
-    expect(styleOf(el)).toContain("--overdraw-color: var(--drop-color)");
-  });
-
-  test("places caps along the drag line's top and bottom edges", async () => {
-    const notch = document.createElement("div");
-    const dragLine = document.createElement("drag-line");
-    const el = new DragLineOverdraw();
-    el.setAttribute("caps", "right");
-    notch.appendChild(dragLine);
-    notch.appendChild(el);
-    document.body.appendChild(notch);
-    await el.updateComplete;
-
-    const rect = { left: 100, top: 200, width: 3, height: 500, right: 103, bottom: 700 };
-    const spy = vi.spyOn(dragLine, "getBoundingClientRect").mockReturnValue(rect as DOMRect);
-    dragLine.setAttribute("show", "");
-    await new Promise((r) => setTimeout(r, 0));
-
-    const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
-    // Top cap: 1px at the drag line's top edge, extending right from its right edge.
-    expect(caps![0].style.top).toBe("200px");
-    expect(caps![0].style.left).toBe("103px"); // drag line right edge
-    // Bottom cap: 1px at the drag line's bottom edge.
-    expect(caps![1].style.top).toBe("699px"); // bottom - 1
-    expect(caps![1].style.left).toBe("103px");
-    // Both mirror the drag line's visibility.
-    expect(caps![0].style.opacity).toBe("1");
-    expect(caps![1].style.opacity).toBe("1");
-    spy.mockRestore();
-  });
-
-  test('caps="left" extends left from the drag line\'s left edge', async () => {
-    const notch = document.createElement("div");
-    const dragLine = document.createElement("drag-line");
-    const el = new DragLineOverdraw();
-    el.setAttribute("caps", "left");
-    notch.appendChild(dragLine);
-    notch.appendChild(el);
-    document.body.appendChild(notch);
-    await el.updateComplete;
-
-    const rect = { left: 100, top: 200, width: 3, height: 500, right: 103, bottom: 700 };
-    const spy = vi.spyOn(dragLine, "getBoundingClientRect").mockReturnValue(rect as DOMRect);
-    dragLine.setAttribute("show", "");
-    await new Promise((r) => setTimeout(r, 0));
-
-    const caps = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap");
-    // Solid end sits on the drag line's left edge, extending leftward.
-    expect(caps![0].style.right).toBe(`${window.innerWidth - 100}px`);
-    expect(caps![1].style.right).toBe(`${window.innerWidth - 100}px`);
-    expect(caps![0].style.left).toBe("auto");
-    spy.mockRestore();
-  });
-
-  test("renders no caps when `caps` is empty", async () => {
-    const el = new DragLineOverdraw();
-    document.body.appendChild(el);
-    await el.updateComplete;
-    expect(el.shadowRoot?.querySelectorAll(".od-cap").length).toBe(0);
-    expect(el.shadowRoot?.querySelector(".od-layer")).toBeNull();
   });
 
   test("hides and tears down cleanly when disconnected", async () => {

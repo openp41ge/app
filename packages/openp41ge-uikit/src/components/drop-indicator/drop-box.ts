@@ -44,7 +44,7 @@ export class DropBox extends LitElement {
       box-sizing: border-box;
       --drop-color: ${unsafeCSS(DROP_INDICATOR_COLOR)};
       --drop-border: 2px;
-      --drop-radius: 3px;
+      --drop-radius: 0px;
       --drop-wash: rgba(74, 158, 255, 0.2);
       border-radius: var(--drop-radius);
       background: transparent;

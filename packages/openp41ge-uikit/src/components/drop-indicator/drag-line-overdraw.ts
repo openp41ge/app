@@ -34,24 +34,11 @@
  *  - `--drop-color`            — line colour; mirrors the drag line's.
  *  - `--drop-width`            — line width; mirrors the drag line's.
  *  - `--drop-overdraw-length`  — how far it extends up (px).
- *
- * The optional `caps` attribute adds horizontal <overdraw-line> accents at
- * the drag line's top and bottom, fading in the given direction (`"left"` or
- * `"right"`). For a drawer's far-edge resize bar this reads as the drag line
- * continuing along the drawer's top and bottom borders past the corner. They
- * are `position: fixed` (via the same fixed layer) so they too escape any
- * `overflow: hidden` panel and paint over the adjacent region. When `caps` is
- * empty the component renders just the vertical mirror (notches, cell grid).
  */
 
-import { LitElement, html, css, nothing } from "lit";
-import { property } from "lit/decorators.js";
-import "../overdraw-line/overdraw-line";
+import { LitElement, html, css } from "lit";
 
 export class DragLineOverdraw extends LitElement {
-  /** Fade direction of the horizontal top/bottom caps; empty = no caps. */
-  @property({ reflect: true }) caps: "left" | "right" | "" = "";
-
   static styles = css`
     :host {
       display: block;
@@ -59,23 +46,6 @@ export class DragLineOverdraw extends LitElement {
       --drop-color: rgba(74, 158, 255, 0.7);
       --drop-width: 3px;
       --drop-overdraw-length: 14px;
-    }
-    /* Fixed viewport layer for the horizontal caps: it escapes any
-       overflow:hidden panel and rides the same stacking context as the
-       vertical mirror (z-index: -1, below the real drag line). */
-    .od-layer {
-      position: fixed;
-      left: 0;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      pointer-events: none;
-      z-index: -1;
-    }
-    .od-layer overdraw-line {
-      --overdraw-color: var(--drop-color);
-      opacity: 0;
-      transition: opacity 0.12s ease;
     }
     .od {
       position: fixed;
@@ -165,7 +135,6 @@ export class DragLineOverdraw extends LitElement {
     if (!od) return;
     const shown = !!dragLine?.hasAttribute("show");
     od.style.opacity = shown ? "1" : "0";
-    for (const cap of this._caps) cap.style.opacity = shown ? "1" : "0";
     if (shown) {
       // Place immediately (a throttled/backgrounded tab may not run the frame
       // loop promptly), then keep tracking for drag movement.
@@ -209,27 +178,6 @@ export class DragLineOverdraw extends LitElement {
     od.style.left = `${r.left}px`;
     od.style.top = `${r.top - ext}px`;
     od.style.height = `${r.height + ext}px`;
-    this._placeCaps(r);
-  }
-
-  /** Place the horizontal caps along the drag line's top and bottom edges,
-   *  extending in the `caps` direction. The solid end sits on the drag line
-   *  so the caps read as the line continuing along the borders. */
-  private _placeCaps(r: DOMRect): void {
-    const caps = this._caps;
-    if (!this.caps || caps.length !== 2) return;
-    const leftEdge = this.caps === "left";
-    for (const cap of caps) {
-      if (leftEdge) {
-        cap.style.right = `${window.innerWidth - r.left}px`;
-        cap.style.left = "auto";
-      } else {
-        cap.style.left = `${r.right}px`;
-        cap.style.right = "auto";
-      }
-    }
-    caps[0].style.top = `${r.top}px`;
-    caps[1].style.top = `${r.bottom - 1}px`;
   }
 
   /** Resolve the custom `--drop-overdraw-length` (defaults to 14px). */
@@ -242,22 +190,8 @@ export class DragLineOverdraw extends LitElement {
     return this.shadowRoot?.querySelector<HTMLElement>(".od") ?? null;
   }
 
-  private get _caps(): HTMLElement[] {
-    return Array.from(this.shadowRoot?.querySelectorAll<HTMLElement>(".od-cap") ?? []);
-  }
-
   render() {
-    return html`
-      <div class="od" aria-hidden="true"></div>
-      ${this.caps
-        ? html`
-            <div class="od-layer" aria-hidden="true">
-              <overdraw-line class="od-cap od-cap-top" dir=${this.caps}></overdraw-line>
-              <overdraw-line class="od-cap od-cap-bottom" dir=${this.caps}></overdraw-line>
-            </div>
-          `
-        : nothing}
-    `;
+    return html`<div class="od" aria-hidden="true"></div>`;
   }
 }
 

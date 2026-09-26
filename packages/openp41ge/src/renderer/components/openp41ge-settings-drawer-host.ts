@@ -1077,7 +1077,8 @@ export class Openp41geSettingsDrawerHost extends LitElement {
                 top: 0; bottom: 0; width: 100px; z-index: 30;
                 ${this._edgeSnapSide === "left" ? "right: 0" : "left: 0"}
               "
-            ></drop-box>`
+            ></drop-box>
+            <drop-box-overdraw></drop-box-overdraw>`
         : nothing}
     `;
   }
@@ -1134,7 +1135,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
                 orientation="vertical"
                 ?show=${this._resizingSide === side || this._hoverSide === side}
               ></drag-line>
-              <drag-line-overdraw caps=${side === "left" ? "right" : "left"}></drag-line-overdraw>
+              <drag-line-overdraw></drag-line-overdraw>
             </div>
             ${
               hasChildren
