@@ -23,11 +23,19 @@ import {
 } from "openp41ge-constants";
 
 import type { Openp41geSettingsDrawerHost } from "./openp41ge-settings-drawer-host";
+import type { Openp41geSidebar } from "./openp41ge-sidebar";
 
 import "./openp41ge-sidebar";
 // Registers <drag-line>, the shared translucent blue hover affordance used by
 // the resize notches (the "you can drag this" sibling of <drop-line>).
 import "openp41ge-uikit/drop-indicator";
+// Registers <overdraw-line>, the 1px fade-out accent used to continue a
+// divider/box border past its end.
+import "openp41ge-uikit/overdraw-line";
+
+/** How far (px) a populated sidebar's grid-side divider overdraws up past the
+ *  title-bar seam when the grid is empty. */
+export const SIDEBAR_OVERDRAW_LENGTH = 14;
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -63,6 +71,14 @@ class Openp41geWindowView extends LitElement {
    * opposing sidebar stealing the drag. */
   @state()
   private _drawerOpenSide: "left" | "right" | null = null;
+
+  /** Portalled <overdraw-line> accents that continue a populated sidebar's
+   * grid-side divider up past the title-bar seam when the grid has no tabs
+   * (so the sidebar edge stays visible against the empty grid). Keyed by side;
+   * created lazily and removed when the condition goes away. */
+  private _sbDividerOverdraw = new Map<string, HTMLElement>();
+  /** rAF handle for the per-frame divider tracking while any overdraw shows. */
+  private _sbOverdrawRaf = 0;
 
   // ── Drag state ────────────────────────────────────────────────────────
 
@@ -130,6 +146,12 @@ class Openp41geWindowView extends LitElement {
     }
     document.removeEventListener("mousemove", this._onResizeMove);
     document.removeEventListener("mouseup", this._onResizeEnd);
+    if (this._sbOverdrawRaf) {
+      cancelAnimationFrame(this._sbOverdrawRaf);
+      this._sbOverdrawRaf = 0;
+    }
+    for (const line of this._sbDividerOverdraw.values()) line.remove();
+    this._sbDividerOverdraw.clear();
   }
 
   private _onWorkspacesUpdate = (): void => {
@@ -407,6 +429,106 @@ class Openp41geWindowView extends LitElement {
     if (line) line.toggleAttribute("show", on);
   }
 
+  // ── Sidebar divider overdraws ────────────────────────────────────────
+
+  /**
+   * When the grid has no tabs, an empty window leaves the sidebars with no
+   * visual anchor — the populated sidebar's grid-side 1px divider is the only
+   * thing separating it from the empty grid, and its top sits exactly at the
+   * main-area's top edge (the title-bar seam), where it just stops. Continue
+   * that divider up past the seam with a short <overdraw-line> fade-out accent
+   * so the sidebar edge reads clearly against the empty grid.
+   *
+   * The line is portalled to a fixed viewport layer because the divider's top
+   * is at the main-area's top edge: an absolutely positioned line would be
+   * clipped by the main area's `overflow: hidden`. It is positioned to run
+   * exactly over the divider's x and to fade out upward. Runs on every render
+   * (sidebar drags and window resizes re-render here), and is removed when the
+   * condition stops holding or the sidebar is closed off-screen.
+   */
+  private _placeSidebarDividerOverdraws(): void {
+    const win = this.windowData;
+    const gridEmpty = !win?.grid?.placements.some((p) => p.tabIds.length > 0);
+    let anyShown = false;
+    for (const side of ["left", "right"] as const) {
+      const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
+      const shouldShow = gridEmpty && !!sb?.isOpen && (sb?.systemTabs?.length ?? 0) > 0;
+      const existing = this._sbDividerOverdraw.get(side) ?? null;
+      if (!shouldShow) {
+        if (existing) {
+          existing.remove();
+          this._sbDividerOverdraw.delete(side);
+        }
+        continue;
+      }
+      if (!sb) continue;
+      anyShown = true;
+      const line = existing ?? this._createSbDividerOverdraw();
+      this._sbDividerOverdraw.set(side, line);
+    }
+    if (anyShown) this._startSbOverdrawLoop();
+    else this._stopSbOverdrawLoop();
+  }
+
+  /** Re-position each shown line over its sidebar's grid-side divider. The
+   * positions are read from the sidebar HOST's box (available even before the
+   * sidebar's internal gutter has rendered — the windowview's `updated()` runs
+   * before a freshly created child sidebar has painted its content) and the
+   * line is placed to run exactly over the divider's x, fading out upward. */
+  private _positionSbDividerOverdraws(): void {
+    for (const side of ["left", "right"] as const) {
+      const line = this._sbDividerOverdraw.get(side);
+      if (!line) continue;
+      const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
+      if (!sb) continue;
+      const rect = sb.getBoundingClientRect();
+      // Left sidebar's grid-side divider is its right edge, right's is left.
+      const dividerX = side === "left" ? rect.right - 1 : rect.left;
+      line.style.left = `${dividerX}px`;
+      line.style.top = `${rect.top - SIDEBAR_OVERDRAW_LENGTH}px`;
+    }
+  }
+
+  /** While any sidebar overdraw is shown, track the divider each frame so the
+   * line follows a live sidebar drag / window resize (the windowview re-renders
+   * on release, not during the drag, so `updated()` alone would go stale). */
+  private _startSbOverdrawLoop(): void {
+    if (this._sbOverdrawRaf) return;
+    if (typeof requestAnimationFrame !== "function") {
+      this._positionSbDividerOverdraws();
+      return;
+    }
+    const tick = (): void => {
+      this._positionSbDividerOverdraws();
+      this._sbOverdrawRaf = requestAnimationFrame(tick);
+    };
+    this._sbOverdrawRaf = requestAnimationFrame(tick);
+  }
+
+  private _stopSbOverdrawLoop(): void {
+    if (this._sbOverdrawRaf) cancelAnimationFrame(this._sbOverdrawRaf);
+    this._sbOverdrawRaf = 0;
+  }
+
+  /** Create a portalled <overdraw-line dir="up"> that fades out going up (the
+   * solid end sits on the divider's top). One shared fixed viewport layer; the
+   * line only paints where placed. */
+  private _createSbDividerOverdraw(): HTMLElement {
+    const line = document.createElement("overdraw-line");
+    line.setAttribute("dir", "up");
+    line.setAttribute("aria-hidden", "true");
+    line.style.cssText = [
+      "position: fixed",
+      "z-index: 999",
+      "pointer-events: none",
+      "--overdraw-color: var(--border-divider, #2d2d2d)",
+      "--overdraw-thickness: 1px",
+      `--overdraw-length: ${SIDEBAR_OVERDRAW_LENGTH}px`,
+    ].join(";");
+    document.body.appendChild(line);
+    return line;
+  }
+
   // ═══ Helpers ─────────────────────────────────────────────────────────
 
   private _getSystemTabTitle(tabId: string): string {
@@ -679,6 +801,10 @@ class Openp41geWindowView extends LitElement {
   }
 
   updated(): void {
+    // Continue populated sidebars' grid-side dividers up past the title-bar
+    // seam when the grid is empty (re-placed on every render so sidebar drags
+    // and window resizes keep the line over the divider).
+    this._placeSidebarDividerOverdraws();
     // Context menu is shown synchronously from the event handler
   }
 
