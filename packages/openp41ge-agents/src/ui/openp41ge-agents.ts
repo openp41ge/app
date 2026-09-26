@@ -18,6 +18,7 @@ import { LitElement, html, type TemplateResult, type PropertyValues } from "lit"
 import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
+import { attachTopOverdraw, attachTopHorizontalOverdraws } from "openp41ge-uikit/overdraw-line";
 import { tooltipContent, tooltipController } from "openp41ge-uikit/tooltip";
 import type {
   Chat,
@@ -214,6 +215,10 @@ class Openp41geAgents extends LitElement {
 
   /** Per code-block line-wrap toggle, keyed by `${msgId}::${index}`. */
   @state() private _codeWrap: Record<string, boolean> = {};
+
+  /** Tool calls the user has expanded, keyed by tool-call id. An expanded call
+   *  detaches from its group and renders as its own spaced standalone box. */
+  @state() private _openToolCalls: Set<string> = new Set();
 
   /** The code-block language picker that is currently open, or null. */
   @state() private _openLangMenu: string | null = null;
@@ -2091,12 +2096,21 @@ class Openp41geAgents extends LitElement {
         size: 9,
         // Fade the bar out after the cursor leaves the chat for a few seconds.
         autoHide: true,
-        // Show a pin icon at the bottom of the track whenever the chat is
-        // pinned (auto-following the newest message). The host drives the
-        // pinned state via `setPinned()` as the user scrolls; the icon is
-        // decorative and hides when the bar fades out.
+        // A decorative pin icon mirrors the pinned-to-bottom state (it shows
+        // while auto-following and fades with the bar), and a separate
+        // scroll-to-bottom arrow button appears whenever the user has scrolled
+        // up — clicking it jumps back to the newest message.
         pinned: this._pinnedToBottom,
+        scrollToBottom: true,
       });
+      // The scrollbar is a lower-level package that can't depend on the uikit
+      // tooltip system (uikit itself imports the scrollbar), so the host wires
+      // the standard tooltips onto the decorative pin and the scroll-to-bottom
+      // arrow.
+      const pinEl = this._chatScrollbar.pinElement;
+      if (pinEl) tooltipController.attach(pinEl, { type: "simple", text: "Pinned to bottom" });
+      const downEl = this._chatScrollbar.scrollDownElement;
+      if (downEl) tooltipController.attach(downEl, { type: "simple", text: "Scroll to bottom" });
     }
     // Anchor the freshly-loaded chat to the newest message (content is now
     // laid out, so the rAF in `_scrollToBottom` reads a real scrollHeight).
@@ -2112,6 +2126,9 @@ class Openp41geAgents extends LitElement {
     this._syncComposerInputWidth();
     this._syncProviderMenuHeight();
     this._syncCodeBlockScrollbars();
+    this._syncBottombarOverdraws();
+    this._syncSeparatorOverdraws();
+    this._positionTableDecorations();
     // Re-run the in-chat find against the fresh DOM only when the messages
     // themselves changed (a streaming/render pass wipes the injected <mark>s).
     // Gating on `_messages` (not the search state) avoids looping, since the
@@ -2119,6 +2136,65 @@ class Openp41geAgents extends LitElement {
     if (this._searchOpen && this._searchQuery && changed.has("_messages")) {
       this._runSearch(false);
     }
+  }
+
+  /**
+   * Position the horizontal middling-line fades on the table's internal divider
+   * lines. The fades are generated as static siblings of each table (one pair
+   * per internal rule), but their `top` depends on the laid-out row heights, so
+   * the host measures each divider's y-offset relative to the wrap and sets it
+   * after render. The squares are absolutely positioned and out of flow, so they
+   * never shift the table layout. jsdom/test env has no layout, so it skips.
+   */
+  private _positionTableDecorations(): void {
+    if (typeof ResizeObserver === "undefined") return;
+    this.renderRoot.querySelectorAll<HTMLElement>(".msg-table-wrap").forEach((wrap) => {
+      const table = wrap.querySelector("table");
+      if (!table) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const wrapTop = wrapRect.top;
+      const wrapLeft = wrapRect.left;
+      const ys: number[] = [];
+      // Internal horizontal rules, in order: header/body divider, then each
+      // data-row divider except the last (its bottom border merges with the box
+      // frame). Each rule is placed on the row boundary; the fades are snapped
+      // to whole pixels (Math.round) so they land on the same device-pixel row
+      // the collapsed border is painted on (the reported rects are fractional).
+      const thead = table.querySelector("thead");
+      if (thead) ys.push(thead.getBoundingClientRect().bottom - wrapTop);
+      const rows = table.querySelectorAll<HTMLElement>("tbody tr");
+      rows.forEach((tr, i) => {
+        if (i === rows.length - 1) return;
+        ys.push(tr.getBoundingClientRect().bottom - wrapTop);
+      });
+      const mids = wrap.querySelectorAll<HTMLElement>(".tbl-mid");
+      ys.forEach((y, i) => {
+        const l = mids[i * 2];
+        const r = mids[i * 2 + 1];
+        // The collapsed border is drawn centered on the row boundary, so it
+        // spans [y-0.5, y+0.5]; anchor the 1px fade at its top edge.
+        const top = `${y - 0.5}px`;
+        if (l) l.style.top = top;
+        if (r) r.style.top = top;
+      });
+      // Internal vertical column rules, in order: the boundary between column i
+      // and i+1 for the first N-1 columns. The fade `left` is anchored at the
+      // separator line's left edge (boundary center minus half a pixel) so it
+      // lands exactly on the drawn line.
+      const xs: number[] = [];
+      const ths = table.querySelectorAll<HTMLElement>("thead tr th");
+      ths.forEach((th, i) => {
+        if (i < ths.length - 1) xs.push(th.getBoundingClientRect().right - wrapLeft);
+      });
+      const vfades = wrap.querySelectorAll<HTMLElement>(".tbl-vfade");
+      xs.forEach((x, i) => {
+        const t = vfades[i * 2];
+        const b = vfades[i * 2 + 1];
+        const left = `${x - 0.5}px`;
+        if (t) t.style.left = left;
+        if (b) b.style.left = left;
+      });
+    });
   }
 
   /**
@@ -2142,6 +2218,11 @@ class Openp41geAgents extends LitElement {
       const pre = block?.querySelector<HTMLElement>("pre");
       if (!pre || !block) return;
       if (block.classList.contains("wrap")) return; // wrapped → reflows, no h-scroll
+      desired.add(pre);
+    });
+    // Tool-call argument JSON never wraps (always horizontal scroll), so it
+    // gets the same overlay bar as unwrapped code blocks.
+    this.renderRoot.querySelectorAll<HTMLElement>(".tool-call-json").forEach((pre) => {
       desired.add(pre);
     });
 
@@ -2179,6 +2260,29 @@ class Openp41geAgents extends LitElement {
     this._codeScrollbars.clear();
   }
 
+  /** Attach the top-corner overdraw accent to the chat bottom bar's search
+   *  button — specifically at the TOP of its right-hand separator line, so the
+   *  divider appears to continue upward past the bar's top border (a line
+   *  pointing down would run off the window). Idempotent so re-renders never
+   *  duplicate the accent. */
+  private _syncBottombarOverdraws(): void {
+    if (!this.renderRoot) return;
+    const sep = this.renderRoot.querySelector<HTMLElement>(".chat-bottombar .bb-sep");
+    if (sep) attachTopOverdraw(sep);
+  }
+
+  /** Attach the horizontal top overdraw accents to the composer and the
+   *  (conditional) chat find bar: a 1px line that continues each box's top
+   *  separator line out past its two top corners and fades. Idempotent so
+   *  re-renders (and find-bar toggles) never duplicate the accents. */
+  private _syncSeparatorOverdraws(): void {
+    if (!this.renderRoot) return;
+    const composer = this.renderRoot.querySelector<HTMLElement>(".composer");
+    if (composer) attachTopHorizontalOverdraws(composer);
+    const findbar = this.renderRoot.querySelector<HTMLElement>(".chat-findbar");
+    if (findbar) attachTopHorizontalOverdraws(findbar);
+  }
+
   /** When a provider/model dropdown is open, size the text area so the composer
    *  can grow to reveal the whole list (pushing the top border up when the text
    *  is short). The list is positioned over the text area, so its measured
@@ -2198,30 +2302,6 @@ class Openp41geAgents extends LitElement {
   }
 
   // ─── Rendering ──────────────────────────────────────────────────────
-
-  private _toolResultFor(tc: ToolCall): string | undefined {
-    const live = this._toolResults[tc.id];
-    if (live !== undefined) return live;
-    const msg = this._messages.find((m) => m.role === "tool" && m.toolCallId === tc.id);
-    return msg?.content;
-  }
-
-  /**
-   * Open a completed tool-call card's result in a tab in the next cell,
-   * instead of expanding an inline accordion. Only fires for cards that have
-   * a result available (the tool has finished).
-   */
-  private _openToolResult(tc: ToolCall): void {
-    const result = this._toolResultFor(tc);
-    if (result === undefined) return;
-    this.dispatchEvent(
-      new CustomEvent("chat:tool-open", {
-        bubbles: true,
-        composed: true,
-        detail: { toolCall: tc, result },
-      }),
-    );
-  }
 
   /**
    * The provider-diagnostic status text shown in the strip above the
@@ -2278,8 +2358,10 @@ class Openp41geAgents extends LitElement {
           border-top: 1px solid var(--border-color, #2a2a2a);
           background: var(--bg-primary, #1e1e1e);
           white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          /* Kept visible so the bb-sep overdraw accent can extend upward
+             past the bar's top border. The only overflow-prone content is the
+             right-hand status text, which clips itself (see .bb-tps). */
+          overflow: visible;
           flex-shrink: 0;
         }
         .bb-usage {
@@ -2327,7 +2409,10 @@ class Openp41geAgents extends LitElement {
           flex: 1;
         }
         .bb-tps {
-          flex-shrink: 0;
+          flex-shrink: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
           margin-left: 8px;
           text-transform: none;
           letter-spacing: normal;
@@ -2488,12 +2573,31 @@ class Openp41geAgents extends LitElement {
           padding: 0;
           max-width: 100%;
           white-space: normal;
+          /* Uniform, roomier vertical rhythm between every element in a
+             response (paragraphs, headers, lists, code blocks, tables, tool
+             calls, reasoning). Both this container and its .msg-content are
+             flex-columns with the same gap, so spacing is identical whether
+             two elements share one segment or sit in different segments. */
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .reasoning-wrap {
+          position: relative;
+        }
+        /* When one response ends with a tool-call group and the next opens with
+           a reasoning block, keep extra space between them. Each box's corner
+           accents overdraw ~7–8px past its own edge, so at the normal 8px
+           message gap the two sets of lines would meet and read as one box. */
+        .chat-message.assistant:has(> .tool-call-group:last-child) +
+        .chat-message.assistant:has(> .reasoning-wrap:first-child) {
+          margin-top: 12px;
         }
         .msg-reasoning {
-          margin: 2px 0 10px;
-          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
-          border-radius: 6px;
-          background: color-mix(in srgb, var(--panel-bg, #1b1e24) 55%, transparent);
+          margin: 0;
+          border: 1px solid var(--border-color, #2a2a2a);
+          border-radius: 0;
+          background: var(--bg-primary, #1e1e1e);
         }
         .msg-reasoning summary {
           cursor: pointer;
@@ -2530,25 +2634,115 @@ class Openp41geAgents extends LitElement {
           white-space: nowrap;
         }
         .msg-reasoning .msg-reasoning-body {
+          position: relative;
           padding: 10px 14px 12px;
-          white-space: pre-wrap;
+          white-space: normal;
           word-wrap: break-word;
           font-size: 13px;
           color: color-mix(in srgb, var(--muted-color, #8b93a1) 80%, #fff);
           border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
+        /* Horizontal line extensions at the header/body divider (only visible
+           when the reasoning block is open, i.e. when the body is shown): a
+           short continuation of the divider's border that fades out left/right
+           beyond the box, mirroring the corner accents but with no verticals.
+           Drawn with the shared <overdraw-line> element (varied lengths). */
+        .chat-message.assistant .reasoning-ext {
+          --overdraw-color: rgba(255, 255, 255, 0.09);
+          top: -1px;
+        }
+        .chat-message.assistant .reasoning-ext[dir="left"] {
+          right: 100%;
+        }
+        .chat-message.assistant .reasoning-ext[dir="right"] {
+          left: 100%;
+        }
+        /* Corner overdraw accents shared by every box frame, drawn with the
+           shared <overdraw-line> uikit element so each line gets a varied length
+           from the document-wide ordinal. Bordered boxes (code blocks, their
+           toolbar groups, tool-call groups) anchor their lines 1px outside the
+           padding box (top/left: -1px) so the solid end sits on the border; the
+           stroke extends outward past the corner and fades to its tip. */
+        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="tl"][dir="left"] {
+          top: -1px;
+          right: 100%;
+        }
+        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="tl"][dir="up"] {
+          left: -1px;
+          bottom: 100%;
+        }
+        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="tr"][dir="right"] {
+          top: -1px;
+          left: 100%;
+        }
+        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="tr"][dir="up"] {
+          left: 100%;
+          bottom: 100%;
+        }
+        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="bl"][dir="left"] {
+          top: 100%;
+          right: 100%;
+        }
+        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="bl"][dir="down"] {
+          left: -1px;
+          top: 100%;
+        }
+        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="br"][dir="right"] {
+          top: 100%;
+          left: 100%;
+        }
+        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="br"][dir="down"] {
+          left: 100%;
+          top: 100%;
+        }
+        /* Unbordered boxes (the reasoning block and markdown-table wrappers have
+           no border of their own - an inner element carries it), so the corner
+           lines anchor at 0/calc(100% - 1px) to land on that inner border (its
+           inner edge is 1px inside the container). */
+        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="tl"][dir="left"] {
+          top: 0;
+          right: calc(100% - 1px);
+        }
+        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="tl"][dir="up"] {
+          left: 0;
+          bottom: calc(100% - 1px);
+        }
+        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="tr"][dir="right"] {
+          top: 0;
+          left: calc(100% - 1px);
+        }
+        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="tr"][dir="up"] {
+          left: calc(100% - 1px);
+          bottom: calc(100% - 1px);
+        }
+        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="bl"][dir="left"] {
+          top: calc(100% - 1px);
+          right: calc(100% - 1px);
+        }
+        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="bl"][dir="down"] {
+          left: 0;
+          top: calc(100% - 1px);
+        }
+        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="br"][dir="right"] {
+          top: calc(100% - 1px);
+          left: calc(100% - 1px);
+        }
+        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="br"][dir="down"] {
+          left: calc(100% - 1px);
+          top: calc(100% - 1px);
+        }
         .chat-message.assistant .msg-content {
           white-space: normal;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
         }
         .msg-content {
           white-space: pre-wrap;
           word-wrap: break-word;
         }
         .chat-message.assistant .msg-content p {
-          margin: 0 0 8px;
-        }
-        .chat-message.assistant .msg-content p:last-child {
-          margin-bottom: 0;
+          margin: 0;
         }
         .chat-message.assistant .msg-content h1,
         .chat-message.assistant .msg-content h2,
@@ -2556,19 +2750,19 @@ class Openp41geAgents extends LitElement {
         .chat-message.assistant .msg-content h4,
         .chat-message.assistant .msg-content h5,
         .chat-message.assistant .msg-content h6 {
-          margin: 12px 0 6px;
+          margin: 0;
           line-height: 1.3;
         }
         .chat-message.assistant .msg-content ul,
         .chat-message.assistant .msg-content ol {
-          margin: 0 0 8px;
+          margin: 0;
           padding-left: 20px;
         }
         .chat-message.assistant .msg-content li {
           margin: 2px 0;
         }
         .chat-message.assistant .msg-content blockquote {
-          margin: 0 0 8px;
+          margin: 0;
           padding: 2px 12px;
           border-left: 3px solid var(--border-color, #3a3a3a);
           color: var(--text-secondary, #999);
@@ -2593,65 +2787,101 @@ class Openp41geAgents extends LitElement {
            clicking the badge opens an inline language picker. */
         .chat-message.assistant .msg-content .code-block-wrap {
           position: relative;
-          margin: 0 0 10px;
         }
         .chat-message.assistant .msg-content .code-block-toolbar {
           position: relative;
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: 6px;
-          margin-bottom: 6px;
+          gap: 0;
+          margin-top: 0;
+        }
+        /* Frame around the wrap + language buttons: a bordered box whose own
+           corners carry the same overdraw accents as the code block. The
+           toolbar group is right-aligned and sits flush against the code
+           block's bottom edge, so the group's borders stand in for the code
+           block's bottom-right corner overdraws. */
+        .chat-message.assistant .msg-content .code-block-toolbar-group {
+          position: relative;
+          display: inline-flex;
+          align-items: stretch;
+          /* No top border: the group sits flush under the code block, whose
+             own bottom border already draws that edge, so adding one would
+             create a doubled line. */
+          border: 1px solid var(--border-color, #2a2a2a);
+          border-top: none;
+          background: var(--bg-primary, #1e1e1e);
         }
         .chat-message.assistant .msg-content .code-lang {
           display: inline-flex;
           align-items: center;
-          height: 20px;
-          padding: 0 8px;
+          justify-content: center;
+          height: 22px;
+          padding: 0 7px;
           font-size: 11px;
           line-height: 1;
           color: var(--text-secondary, #999);
-          background: var(--bg-active, #2d2d2d);
-          border: 1px solid var(--border-color, #3a3a3a);
-          border-radius: 4px;
+          background: transparent;
+          border: none;
+          border-radius: 0;
           cursor: pointer;
-          opacity: 0.9;
         }
-        .chat-message.assistant .msg-content .code-lang:hover,
-        .chat-message.assistant .msg-content .code-lang.active {
-          opacity: 1;
+        .chat-message.assistant .msg-content .code-lang:hover {
           color: var(--text-primary, #d4d4d4);
-          border-color: var(--border-color, #4a4a4a);
+          background: var(--bg-active, #2d2d2d);
+        }
+        .chat-message.assistant .msg-content .code-lang.active {
+          color: var(--text-primary, #d4d4d4);
         }
         .chat-message.assistant .msg-content .code-wrap {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 20px;
-          height: 20px;
+          width: 22px;
+          height: 22px;
           padding: 0;
+          box-sizing: border-box;
+          border: none;
+          border-radius: 0;
           color: var(--text-secondary, #999);
-          background: var(--bg-active, #2d2d2d);
-          border: 1px solid var(--border-color, #3a3a3a);
-          border-radius: 4px;
+          background: transparent;
           cursor: pointer;
-          opacity: 0.9;
+        }
+        /* Vertical divider between the wrap toggle and the language label.
+           The solid 1px line runs the group's height; two <overdraw-line>
+           children carry the same fade-out overdraw at its top and bottom
+           ends as the box corners. */
+        .chat-message.assistant .msg-content .code-toolbar-sep {
+          position: relative;
+          width: 1px;
+          align-self: stretch;
+          flex: none;
+          background: var(--border-color, #2a2a2a);
+        }
+        .chat-message.assistant .msg-content .code-toolbar-sep overdraw-line {
+          position: absolute;
+          left: 0;
+        }
+        .chat-message.assistant .msg-content .code-toolbar-sep overdraw-line[dir="up"] {
+          bottom: 100%;
+        }
+        .chat-message.assistant .msg-content .code-toolbar-sep overdraw-line[dir="down"] {
+          top: 100%;
         }
         .chat-message.assistant .msg-content .code-wrap:hover {
-          opacity: 1;
           color: var(--text-primary, #d4d4d4);
+          background: var(--bg-active, #2d2d2d);
         }
         .chat-message.assistant .msg-content .code-wrap.active {
-          opacity: 1;
           color: #4b9fff;
-          border-color: #4b9fff;
+          background: var(--bg-active, #2d2d2d);
         }
         .chat-message.assistant .msg-content .code-block {
           position: relative;
           border: 1px solid var(--border-color, #2a2a2a);
-          border-radius: 6px;
-          background: var(--bg-tertiary, #222);
-          overflow: hidden;
+          border-radius: 0;
+          background: var(--bg-primary, #1e1e1e);
+          overflow: visible;
         }
         .chat-message.assistant .msg-content .code-block pre {
           margin: 0;
@@ -2665,7 +2895,7 @@ class Openp41geAgents extends LitElement {
           border-radius: 0;
           font-size: 12px;
         }
-        .chat-message.assistant .msg-content .code-block.wrap pre {
+        .code-block.wrap pre {
           white-space: pre-wrap;
           word-break: break-word;
           overflow-x: hidden;
@@ -2673,71 +2903,77 @@ class Openp41geAgents extends LitElement {
         .chat-message.assistant .msg-content .code-block.wrap code {
           white-space: pre-wrap;
         }
+        .chat-message.assistant .msg-content .code-lang-mask {
+          position: fixed;
+          inset: 0;
+          z-index: 39;
+          background: rgba(0, 0, 0, 0.45);
+        }
         .chat-message.assistant .msg-content .code-lang-menu {
           position: absolute;
           top: 100%;
           right: 0;
-          z-index: 20;
+          z-index: 40;
           display: flex;
           flex-direction: column;
-          gap: 2px;
-          margin-top: 4px;
-          min-width: 140px;
-          padding: 4px;
-          background: var(--bg-active, #2d2d2d);
-          border: 1px solid var(--border-color, #3a3a3a);
-          border-radius: 6px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+          gap: 0;
+          margin-top: 0;
+          width: max-content;
+          min-width: 0;
+          padding: 0;
+          background: var(--bg-primary, #1e1e1e);
+          border: 1px solid var(--border-color, #2a2a2a);
+          border-radius: 0;
         }
         .chat-message.assistant .msg-content .code-lang-option {
           display: block;
           text-align: left;
           width: 100%;
-          padding: 4px 8px;
+          padding: 6px 10px;
           border: none;
           background: transparent;
           color: var(--text-secondary, #999);
-          border-radius: 4px;
+          border-radius: 0;
           cursor: pointer;
           font-size: 11px;
         }
         .chat-message.assistant .msg-content .code-lang-option:hover,
         .chat-message.assistant .msg-content .code-lang-option.selected {
           color: var(--text-primary, #d4d4d4);
-          background: #3a3a3a;
+          background: var(--bg-active, #2d2d2d);
         }
-        .chat-message.assistant .msg-content .hl-key {
+        .chat-message.assistant .hl-key {
           color: #7ec6f0;
         }
-        .chat-message.assistant .msg-content .hl-string {
+        .chat-message.assistant .hl-string {
           color: #ce9178;
         }
-        .chat-message.assistant .msg-content .hl-number {
+        .chat-message.assistant .hl-number {
           color: #b5cea8;
         }
-        .chat-message.assistant .msg-content .hl-bool,
-        .chat-message.assistant .msg-content .hl-null {
+        .chat-message.assistant .hl-bool,
+        .chat-message.assistant .hl-null {
           color: #569cd6;
         }
-        .chat-message.assistant .msg-content .hl-punct {
+        .chat-message.assistant .hl-punct {
           color: #808080;
         }
-        .chat-message.assistant .msg-content .hl-text {
+        .chat-message.assistant .hl-text {
           color: #d4d4d4;
         }
-        .chat-message.assistant .msg-content .hl-comment {
+        .chat-message.assistant .hl-comment {
           color: #6a9955;
         }
-        .chat-message.assistant .msg-content .hl-escape {
+        .chat-message.assistant .hl-escape {
           color: #d7ba7d;
         }
-        .chat-message.assistant .msg-content .hl-bracket {
+        .chat-message.assistant .hl-bracket {
           color: #ffd700;
         }
-        .chat-message.assistant .msg-content .hl-method {
+        .chat-message.assistant .hl-method {
           color: #dcdcaa;
         }
-        .chat-message.assistant .msg-content .hl-type {
+        .chat-message.assistant .hl-type {
           color: #4ec9b0;
         }
         .chat-message.assistant .msg-content a {
@@ -2756,26 +2992,55 @@ class Openp41geAgents extends LitElement {
           border: none;
           border-top: 1px solid var(--border-color, #2a2a2a);
         }
+        .chat-message.assistant .msg-content .msg-table-wrap {
+          position: relative;
+        }
         .chat-message.assistant .msg-content table {
-          margin: 0 0 8px;
+          margin: 0;
           border-collapse: collapse;
           width: 100%;
           font-size: 12px;
+          border: 1px solid var(--border-color, #2a2a2a);
         }
         .chat-message.assistant .msg-content th,
         .chat-message.assistant .msg-content td {
           padding: 4px 8px;
-          border: 1px solid var(--border-color, #2a2a2a);
+          border: none;
+          border-right: 1px solid var(--border-color, #2a2a2a);
           text-align: left;
         }
-        .chat-message.assistant .msg-content th {
-          background: var(--bg-tertiary, #222);
+        .chat-message.assistant .msg-content thead th:last-child,
+        .chat-message.assistant .msg-content tbody td:last-child {
+          border-right: none;
+        }
+        .chat-message.assistant .msg-content thead th {
           font-weight: 600;
+          border-bottom: 1px solid var(--border-color, #2a2a2a);
         }
-        .chat-message.assistant .msg-content tbody tr:nth-child(even) td {
-          background: var(--bg-tertiary, #222);
+        .chat-message.assistant .msg-content tbody tr td {
+          border-bottom: 1px solid var(--border-color, #2a2a2a);
         }
-        /* A single "thinking…" tail shown at the bottom of the transcript while
+        .chat-message.assistant .msg-content tbody tr:last-child td {
+          border-bottom: none;
+        }
+        /* Horizontal “middling line” fades and vertical column-separator fades
+           for tables: short continuations of each internal divider/rule that
+           extend past the box and fade out, drawn with the shared
+           <overdraw-line> element (varied lengths). The host sets each pair's
+           top/left to its divider line after layout. */
+        .chat-message.assistant .msg-table-wrap overdraw-line.tbl-mid[dir="left"] {
+          right: 100%;
+        }
+        .chat-message.assistant .msg-table-wrap overdraw-line.tbl-mid[dir="right"] {
+          left: 100%;
+        }
+        .chat-message.assistant .msg-table-wrap overdraw-line.tbl-vfade[dir="up"] {
+          bottom: 100%;
+        }
+        .chat-message.assistant .msg-table-wrap overdraw-line.tbl-vfade[dir="down"] {
+          top: 100%;
+        }
+/* A single "thinking…" tail shown at the bottom of the transcript while
            streaming — replaces the old flashing caret that was appended to every
            assistant response block. The label stays put while the three dots
            pulse in sequence, so it never pushes existing content around. */
@@ -2816,113 +3081,109 @@ class Openp41geAgents extends LitElement {
             opacity: 1;
           }
         }
-        .tool-calls {
-          margin-top: 8px;
-          border-top: 1px solid var(--border-color, #333);
-          padding-top: 6px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
+        /* Grouped tool calls share one frame: consecutive calls (in a row)
+           sit flush together with a single divider between them whose ends
+           fade out, rather than stacked bordered boxes with gaps. */
+        .tool-call-group {
+          position: relative;
+          border: 1px solid var(--border-color, #2a2a2a);
+          border-radius: 0;
+          background: var(--bg-primary, #1e1e1e);
         }
-        .tool-call-row {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          font-family: var(--font-mono, "JetBrains Mono", monospace);
-          font-size: 11.5px;
-          background: color-mix(in srgb, var(--panel-bg, #1b1e24) 55%, transparent);
-          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
-          border-radius: 6px;
-          padding: 4px 8px;
+        /* When one call is opened and detaches into its own box, the adjacent
+           closed run / standalone box needs extra room so each box's corner
+           accents (which overdraw ~8px past an edge) never meet across the
+           normal 14px flex gap. */
+        .tool-call-group + .tool-call-group {
+          margin-top: 7px;
         }
-        .tool-call-actions {
+        .tool-call-details {
+          margin: 0;
+          border: none;
+          background: transparent;
+          position: relative;
+        }
+        /* Shared divider between two adjacent tool calls (single line, no
+           doubled borders) with fading line extensions beyond each side. */
+        .tool-call-details + .tool-call-details {
+          border-top: 1px solid var(--border-color, #2a2a2a);
+        }
+        .chat-message.assistant .tool-divider {
+          --overdraw-color: rgba(255, 255, 255, 0.09);
+          /* Live inside the always-visible <summary> (a <details> hides its
+             content box when closed, which would otherwise clip the line), and
+             anchor to the details' top border via top: -1px. */
+          top: -1px;
+        }
+        .chat-message.assistant .tool-divider[dir="left"] {
+          right: 100%;
+        }
+        .chat-message.assistant .tool-divider[dir="right"] {
+          left: 100%;
+        }
+        .tool-call-details summary {
+          cursor: pointer;
+          padding: 6px 10px;
           display: flex;
           align-items: center;
-          justify-content: flex-end;
           gap: 6px;
-          margin-left: auto;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--muted-color, #8b93a1);
+          user-select: none;
+          list-style: none;
         }
-        .tool-call-footer {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-top: 6px;
+        .tool-call-details summary::-webkit-details-marker {
+          display: none;
         }
-        .tool-call-btn {
+        .tool-call-chevron {
           display: inline-flex;
           align-items: center;
-          justify-content: center;
-          width: 20px;
-          height: 20px;
-          padding: 0;
-          color: var(--text-secondary, #999);
-          background: var(--bg-active, #2d2d2d);
-          border: 1px solid var(--border-color, #3a3a3a);
-          border-radius: 4px;
-          cursor: pointer;
-          opacity: 0.9;
+          vertical-align: -0.16em;
+          transition: transform 0.15s ease;
         }
-        .tool-call-btn:hover {
-          opacity: 1;
-          color: var(--text-primary, #d4d4d4);
-        }
-        .tool-call-btn.primary {
-          color: var(--text-primary, #d4d4d4);
-        }
-        .tool-call-btn svg {
-          width: 11px;
-          height: 11px;
-        }
-        .chat-message.assistant > .tool-call-wrap {
-          margin: 5px 0;
-        }
-        .tool-call-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+        .tool-call-details[open] .tool-call-chevron {
+          transform: rotate(90deg);
         }
         .tool-call-name {
-          font-weight: 600;
-          color: var(--text-secondary, #ccc);
-          flex: 1 1 auto;
+          margin-left: auto;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: 0.04em;
+          text-transform: none;
+          opacity: 0.65;
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
         }
-        .tool-call-args {
-          color: var(--text-muted, #999);
-          font-size: 11px;
-          white-space: pre-wrap;
-          word-break: break-word;
-          line-height: 1.35;
+        /* Horizontal line extensions at the summary/body divider (only visible
+           when the tool call is expanded) - mirrors the reasoning block. Drawn
+           with the shared <overdraw-line> element (varied lengths). */
+        .chat-message.assistant .tool-call-ext {
+          --overdraw-color: rgba(255, 255, 255, 0.09);
+          top: -1px;
         }
-        .tool-call-status {
-          display: inline-flex;
-          align-items: center;
-          gap: 3px;
-          padding: 2px 8px;
-          border-radius: 999px;
-          font-size: 10px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          line-height: 1.2;
-          border: 1px solid transparent;
+        .chat-message.assistant .tool-call-ext[dir="left"] {
+          right: 100%;
         }
-        .tool-call-status.running {
-          color: var(--accent, #4a9eff);
-          border-color: color-mix(in srgb, var(--accent, #4a9eff) 40%, transparent);
-          background: color-mix(in srgb, var(--accent, #4a9eff) 12%, transparent);
+        .chat-message.assistant .tool-call-ext[dir="right"] {
+          left: 100%;
         }
-        .tool-call-status.done {
-          color: #4caf50;
-          border-color: color-mix(in srgb, #4caf50 35%, transparent);
-          background: color-mix(in srgb, #4caf50 12%, transparent);
+        .tool-call-body {
+          position: relative;
+          padding: 8px 12px 10px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .tool-call-status.failed {
-          color: #ef5555;
-          border-color: color-mix(in srgb, #ef5555 35%, transparent);
-          background: color-mix(in srgb, #ef5555 12%, transparent);
+        .tool-call-json {
+          margin: 0;
+          font-family: var(--font-mono, "JetBrains Mono", monospace);
+          font-size: 12px;
+          line-height: 1.45;
+          color: var(--text-secondary, #ccc);
+          /* Never wrap: long argument lines scroll horizontally instead. */
+          white-space: pre;
+          overflow-x: auto;
         }
         .composer {
           flex-shrink: 0;
@@ -3312,73 +3573,6 @@ class Openp41geAgents extends LitElement {
         </div>
       </div>
 
-      ${
-        this._searchOpen
-          ? html`<div class="chat-findbar">
-              <input
-                class="find-input"
-                type="text"
-                placeholder="Find in chat"
-                spellcheck="false"
-                .value=${this._searchQuery}
-                @input=${this._onFindInput}
-                @keydown=${this._onFindKeyDown}
-              />
-              ${
-                this._searchHits.length > 0
-                  ? html`<span class="find-count"
-                      >${this._searchIndex + 1}/${this._searchTotal}</span
-                    >`
-                  : html``
-              }
-              <button
-                type="button"
-                class="find-toggle"
-                title="Previous match"
-                ?disabled=${this._searchHits.length === 0}
-                @click=${() => this._nextMatch(-1)}
-              >
-                ${unsafeHTML(ICON_CHAT_PREV)}
-              </button>
-              <button
-                type="button"
-                class="find-toggle"
-                title="Next match"
-                ?disabled=${this._searchHits.length === 0}
-                @click=${() => this._nextMatch(1)}
-              >
-                ${unsafeHTML(ICON_CHAT_NEXT)}
-              </button>
-              <button
-                type="button"
-                class="find-toggle ${this._searchRegex ? "on" : ""}"
-                title="Regex"
-                aria-pressed=${this._searchRegex}
-                @click=${() => this._toggleSearchRegex()}
-              >
-                ${unsafeHTML(ICON_REGEX)}
-              </button>
-              <button
-                type="button"
-                class="find-toggle ${this._searchCase ? "on" : ""}"
-                title="Match case"
-                aria-pressed=${this._searchCase}
-                @click=${() => this._toggleSearchCase()}
-              >
-                ${unsafeHTML(ICON_MATCH_CASE)}
-              </button>
-              <button
-                type="button"
-                class="find-toggle"
-                title="Close search (Esc)"
-                @click=${() => this._closeSearch()}
-              >
-                ${unsafeHTML(ICON_CHAT_CLOSE)}
-              </button>
-            </div>`
-          : html``
-      }
-
       <div class="composer ${this._menuOpen ? "menu-open" : ""}">
         <div
           class="composer-content"
@@ -3574,6 +3768,73 @@ class Openp41geAgents extends LitElement {
         ></textarea>
       </div>
 
+      ${
+        this._searchOpen
+          ? html`<div class="chat-findbar">
+              <input
+                class="find-input"
+                type="text"
+                placeholder="Find in chat"
+                spellcheck="false"
+                .value=${this._searchQuery}
+                @input=${this._onFindInput}
+                @keydown=${this._onFindKeyDown}
+              />
+              ${
+                this._searchHits.length > 0
+                  ? html`<span class="find-count"
+                      >${this._searchIndex + 1}/${this._searchTotal}</span
+                    >`
+                  : html``
+              }
+              <button
+                type="button"
+                class="find-toggle"
+                title="Previous match"
+                ?disabled=${this._searchHits.length === 0}
+                @click=${() => this._nextMatch(-1)}
+              >
+                ${unsafeHTML(ICON_CHAT_PREV)}
+              </button>
+              <button
+                type="button"
+                class="find-toggle"
+                title="Next match"
+                ?disabled=${this._searchHits.length === 0}
+                @click=${() => this._nextMatch(1)}
+              >
+                ${unsafeHTML(ICON_CHAT_NEXT)}
+              </button>
+              <button
+                type="button"
+                class="find-toggle ${this._searchRegex ? "on" : ""}"
+                title="Regex"
+                aria-pressed=${this._searchRegex}
+                @click=${() => this._toggleSearchRegex()}
+              >
+                ${unsafeHTML(ICON_REGEX)}
+              </button>
+              <button
+                type="button"
+                class="find-toggle ${this._searchCase ? "on" : ""}"
+                title="Match case"
+                aria-pressed=${this._searchCase}
+                @click=${() => this._toggleSearchCase()}
+              >
+                ${unsafeHTML(ICON_MATCH_CASE)}
+              </button>
+              <button
+                type="button"
+                class="find-toggle"
+                title="Close search (Esc)"
+                @click=${() => this._closeSearch()}
+              >
+                ${unsafeHTML(ICON_CHAT_CLOSE)}
+              </button>
+            </div>`
+          : html``
+      }
+
       <div class="chat-bottombar">
         <button
           type="button"
@@ -3620,18 +3881,33 @@ class Openp41geAgents extends LitElement {
 
   /** Collapsible reasoning/thinking block above an assistant answer. It is
    *  auto-expanded for the in-flight message so the user sees it stream. */
-  private _renderReasoning(reasoning: string | undefined, live: boolean): TemplateResult {
+  private _renderReasoning(
+    reasoning: string | undefined,
+    live: boolean,
+    msgId: string,
+    codeLanguages: Record<number, string>,
+  ): TemplateResult {
     if (!reasoning) return html``;
-    const words = reasoning.trim() ? reasoning.trim().split(/\s+/).length : 0;
-    const sizeLabel = words > 0 ? `${this._fmtTok(words)} words` : "";
-    return html`<details class="msg-reasoning" ?open=${live}>
-      <summary>
-        <span class="msg-reasoning-chevron">${unsafeHTML(ICON_REASONING_CHEVRON)}</span>
-        <span class="msg-reasoning-label">Reasoning</span>
-        ${sizeLabel ? html`<span class="msg-reasoning-size">${sizeLabel}</span>` : html``}
-      </summary>
-      <div class="msg-reasoning-body">${reasoning}</div>
-    </details>`;
+    const text = reasoning.trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    const sizeLabel = words > 0 ? `~${this._fmtTok(words)} words` : "";
+    const segments = text
+      ? renderMarkdownSegments(text, { codeLanguages, msgId })
+      : [];
+    return html`<div class="reasoning-wrap">
+      <details class="msg-reasoning" ?open=${live}>
+        <summary>
+          <span class="msg-reasoning-chevron">${unsafeHTML(ICON_REASONING_CHEVRON)}</span>
+          <span class="msg-reasoning-label">Reasoning</span>
+          ${sizeLabel ? html`<span class="msg-reasoning-size">${sizeLabel}</span>` : html``}
+        </summary>
+        <div class="msg-reasoning-body"><overdraw-line class="reasoning-ext" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="reasoning-ext" dir="right" aria-hidden="true"></overdraw-line><div class="msg-content" @click=${this._onMsgContentClick}>${segments.map((s) => this._renderSegment(s))}</div></div>
+      </details>
+      <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
+      <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
+      <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
+      <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
+    </div>`;
   }
 
   private _renderMessage(msg: ChatMessage): TemplateResult {
@@ -3653,18 +3929,32 @@ class Openp41geAgents extends LitElement {
     // New messages carry an ordered segment list (text/tool interleaved) so tool
     // calls render inline at the position they occurred in the response.
     if (msg.segments && msg.segments.length > 0) {
+      const out: unknown[] = [];
+      for (let i = 0; i < msg.segments.length; ) {
+        const seg = msg.segments[i];
+        if (seg.type === "tool") {
+          // Consecutive tool calls render as one grouped box; a text segment
+          // between them breaks the group.
+          const run: ToolCall[] = [];
+          while (i < msg.segments.length && msg.segments[i].type === "tool") {
+            run.push(msg.segments[i].toolCall!);
+            i++;
+          }
+          out.push(this._renderToolCalls(run));
+          continue;
+        }
+        const parts = seg.text
+          ? renderMarkdownSegments(seg.text, { codeLanguages: overrides, msgId: msg.id })
+          : [];
+        out.push(html`<div class="msg-content" @click=${this._onMsgContentClick}>
+          ${parts.map((s) => this._renderSegment(s))}
+        </div>`);
+        i++;
+      }
       return html`
         <div class="chat-message assistant" data-msg-id=${msg.id}>
-          ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1])}
-          ${msg.segments.map((seg) => {
-            if (seg.type === "tool") return this._renderToolCall(seg.toolCall!);
-            const parts = seg.text
-              ? renderMarkdownSegments(seg.text, { codeLanguages: overrides, msgId: msg.id })
-              : [];
-            return html`<div class="msg-content" @click=${this._onMsgContentClick}>
-              ${parts.map((s) => this._renderSegment(s))}
-            </div>`;
-          })}
+          ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1], msg.id, overrides)}
+          ${out}
         </div>
       `;
     }
@@ -3674,13 +3964,13 @@ class Openp41geAgents extends LitElement {
       : [];
     return html`
       <div class="chat-message assistant" data-msg-id=${msg.id}>
-        ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1])}
+        ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1], msg.id, overrides)}
         <div class="msg-content" @click=${this._onMsgContentClick}>
           ${segments.map((seg) => this._renderSegment(seg))}
         </div>
         ${
           toolCalls.length > 0
-            ? html`<div class="tool-calls">${toolCalls.map((tc) => this._renderToolCall(tc))}</div>`
+            ? this._renderToolCalls(toolCalls)
             : ""
         }
       </div>
@@ -3694,6 +3984,20 @@ class Openp41geAgents extends LitElement {
   }
 
   /** Render an interactive fenced code block with a toolbar + language picker. */
+  /** 1px fade-out overdraw accents for a box's four corners (uikit <overdraw-line>).
+   *  `skipBrVertical` omits the bottom-right vertical, used by the code block
+   *  whose toolbar group's border draws that edge instead. */
+  private _overdrawCorners(opts?: { skipBrVertical?: boolean }): TemplateResult {
+    const l = (corner: string, dir: string) =>
+      html`<overdraw-line dir=${dir} corner=${corner} aria-hidden="true"></overdraw-line>`;
+    return html`
+      ${l("tl", "left")}${l("tl", "up")}
+      ${l("tr", "right")}${l("tr", "up")}
+      ${l("bl", "left")}${l("bl", "down")}
+      ${l("br", "right")}${opts?.skipBrVertical ? "" : l("br", "down")}
+    `;
+  }
+
   private _renderCodeBlock(seg: CodeBlockSegment): TemplateResult {
     const key = `${seg.msgId ?? ""}::${seg.index}`;
     const wrapped = !!this._codeWrap[key];
@@ -3702,32 +4006,50 @@ class Openp41geAgents extends LitElement {
     const label = langLabel(seg.language);
     return html`
       <div class="code-block-wrap" data-code-index=${seg.index}>
+        <div class="code-block ${wrapped ? "wrap" : ""}">
+          <pre><code>${unsafeHTML(highlight(seg.code, seg.language))}</code></pre>
+          ${this._overdrawCorners({ skipBrVertical: true })}
+        </div>
         <div class="code-block-toolbar">
-          <button
-            type="button"
-            class="code-wrap ${wrapped ? "active" : ""}"
-            ${tooltipContent({ type: "simple", text: "Toggle line wrap" })}
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              this._toggleWrap(key);
-            }}
-          >
-            ${unsafeHTML(this._wrapIcon(wrapped))}
-          </button>
-          <button
-            type="button"
-            class="code-lang ${menuOpen ? "active" : ""}"
-            ${tooltipContent({ type: "simple", text: "Change language" })}
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              this._toggleLangMenu(key);
-            }}
-          >
-            ${label}
-          </button>
+          <div class="code-block-toolbar-group">
+            ${this._overdrawCorners()}
+            <button
+              type="button"
+              class="code-wrap ${wrapped ? "active" : ""}"
+              ${tooltipContent({ type: "simple", text: "Toggle line wrap" })}
+              @click=${(e: Event) => {
+                e.stopPropagation();
+                this._toggleWrap(key);
+              }}
+            >
+              ${unsafeHTML(this._wrapIcon())}
+            </button>
+            <span class="code-toolbar-sep" aria-hidden="true">
+              <overdraw-line dir="up" aria-hidden="true"></overdraw-line>
+              <overdraw-line dir="down" aria-hidden="true"></overdraw-line>
+            </span>
+            <button
+              type="button"
+              class="code-lang ${menuOpen ? "active" : ""}"
+              ${tooltipContent({ type: "simple", text: "Change language" })}
+              @click=${(e: Event) => {
+                e.stopPropagation();
+                this._toggleLangMenu(key);
+              }}
+            >
+              ${label}
+            </button>
+          </div>
           ${
             menuOpen
               ? html`
+                  <div
+                    class="code-lang-mask"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      this._openLangMenu = null;
+                    }}
+                  ></div>
                   <div class="code-lang-menu" @click=${(e: Event) => e.stopPropagation()}>
                     ${candidates.map(
                       (id) => html`
@@ -3745,9 +4067,6 @@ class Openp41geAgents extends LitElement {
                 `
               : ""
           }
-        </div>
-        <div class="code-block ${wrapped ? "wrap" : ""}">
-          <pre><code>${unsafeHTML(highlight(seg.code, seg.language))}</code></pre>
         </div>
       </div>
     `;
@@ -3801,152 +4120,113 @@ class Openp41geAgents extends LitElement {
   }
 
   /** A small inline SVG icon for the line-wrap toggle. */
-  private _wrapIcon(active: boolean): string {
-    return `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h6"/><path d="${active ? "M8 12l2 2 2-2" : "M11 10l3 2-3 2"}"/></svg>`;
+  private _wrapIcon(): string {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="M588-132 440-280l148-148 56 58-50 50h96q29 0 49.5-20.5T760-390q0-29-20.5-49.5T690-460H160v-80h530q63 0 106.5 43.5T840-390q0 63-43.5 106.5T690-240h-96l50 50-56 58ZM160-240v-80h200v80H160Zm0-440v-80h640v80H160Z"/></svg>`;
   }
 
-  private _renderToolCall(tc: ToolCall): TemplateResult {
-    const status = tc.status ?? "running";
-    const result = this._toolResultFor(tc);
-    const openable = status !== "running" && result !== undefined;
-    const statusLabel =
-      status === "running"
-        ? html`loading<span class="thinking-dots"
-              ><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span
-            >`
-        : status === "done"
-          ? "success"
-          : "fail";
+  /** Render one or more consecutive tool calls as a single grouped box: the
+   *  calls share one frame with corner accents, and the boundary between two
+   *  adjacent calls is a single divider whose ends fade out (mirroring the
+   *  table / reasoning treatment) instead of doubled borders + gaps. */
+  /** Render consecutive tool calls, splitting them into grouped runs and
+   *  standalone boxes. Closed calls stay grouped (one shared frame, single
+   *  dividers), while any call the user has opened detaches into its own
+   *  boxed card — spaced apart — and keeps its content below the header. */
+  private _renderToolCalls(calls: ToolCall[]): TemplateResult {
+    const parts: ToolCall[][] = [];
+    let run: ToolCall[] = [];
+    for (const tc of calls) {
+      if (this._openToolCalls.has(tc.id)) {
+        if (run.length) parts.push(run);
+        run = [];
+        parts.push([tc]);
+      } else {
+        run.push(tc);
+      }
+    }
+    if (run.length) parts.push(run);
+    return html`${parts.map((part) => this._renderToolGroup(part))}`;
+  }
+
+  /** One boxed frame (with corner accents) rendering a single closed run of
+   *  calls or one opened standalone call. */
+  private _renderToolGroup(calls: ToolCall[]): TemplateResult {
     return html`
-      <div class="tool-call-wrap" data-tool-call-id=${tc.id}>
-        <div class="tool-call-row">
-          <div class="tool-call-header">
-            <span class="tool-call-name">${tc.name}</span>
-          </div>
-          <div class="tool-call-args">${this._toolArgsSummary(tc)}</div>
-        </div>
-        <div class="tool-call-footer">
-          <span class="tool-call-status ${status}">${statusLabel}</span>
-          ${
-            openable
-              ? html`<div class="tool-call-actions">
-                  <button
-                    type="button"
-                    class="tool-call-btn"
-                    ${tooltipContent({ type: "simple", text: "Copy result" })}
-                    aria-label="Copy result"
-                    @click=${(e: Event) => {
-                      e.stopPropagation();
-                      void this._copyToolResult(tc);
-                    }}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        fill="currentColor"
-                        d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    class="tool-call-btn primary"
-                    ${tooltipContent({ type: "simple", text: "Open result in a new tab" })}
-                    aria-label="Open result in a new tab"
-                    @click=${(e: Event) => {
-                      e.stopPropagation();
-                      this._openToolResult(tc);
-                    }}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        fill="currentColor"
-                        d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
-                      />
-                    </svg>
-                  </button>
-                </div>`
-              : ""
-          }
-        </div>
+      <div class="tool-call-group">
+        ${calls.map((tc, i) => this._renderToolCallItem(tc, i))}
+        <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
+        <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
+        <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
+        <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
       </div>
     `;
   }
 
-  /** Copy a completed tool-call card's result to the clipboard. */
-  private async _copyToolResult(tc: ToolCall): Promise<void> {
-    const result = this._toolResultFor(tc);
-    if (result === undefined) return;
-    try {
-      await navigator.clipboard.writeText(result);
-    } catch {
-      // Clipboard may be unavailable (e.g. no permission); fail silently.
-    }
+  private _renderToolCallItem(tc: ToolCall, index = 0): TemplateResult {
+    return html`
+      <details class="tool-call-details" data-tool-call-id=${tc.id}
+        ?open=${this._openToolCalls.has(tc.id)}
+        @toggle=${this._onToolCallToggle}>
+        <summary class="tool-call-row">
+          ${index > 0
+            ? html`<overdraw-line class="tool-divider" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tool-divider" dir="right" aria-hidden="true"></overdraw-line>`
+            : html``}
+          <span class="tool-call-chevron">${unsafeHTML(ICON_REASONING_CHEVRON)}</span>
+          <span class="tool-call-label">Tool</span>
+          <span class="tool-call-name">${tc.name}</span>
+        </summary>
+        <div class="tool-call-body">
+          <overdraw-line class="tool-call-ext" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tool-call-ext" dir="right" aria-hidden="true"></overdraw-line>
+          <pre class="tool-call-json">${unsafeHTML(highlight(this._formatToolArgs(tc), "json"))}</pre>
+        </div>
+      </details>
+    `;
   }
 
-  /** Human-friendly second line for a tool call (path / query + worktrees). */
-  private _toolArgsSummary(tc: ToolCall): string {
-    const args = this._parseArgs(tc.arguments);
-    if (tc.name === "read_file") {
-      const p = args.path;
-      if (typeof p === "string" && p.trim()) return p.trim();
-    }
-    // Only the target path — the full file content can be huge and is better
-    // viewed in the file editor (the card's open-in-new-tab button).
-    if (tc.name === "create_or_replace_file") {
-      const p = args.path;
-      if (typeof p === "string" && p.trim()) return p.trim();
-    }
-    if (tc.name === "search_files") {
-      const q = typeof args.query === "string" ? args.query : "";
-      const roots = Array.isArray(args.roots)
-        ? (args.roots as unknown[]).filter((r): r is string => typeof r === "string")
-        : [];
-      const scope = roots.length
-        ? roots.map((r) => this._worktreeLabel(r)).join(", ")
-        : "all worktrees";
-      return q.trim() ? `“${q.trim()}” · ${scope}` : scope;
-    }
-    return this._argsText(tc.arguments);
+  /** Track which tool call the user opened so the next render can detach it
+   *  from its group. Ignore spurious toggle events (e.g. attribute churn)
+   *  that don't actually change state, so this never re-triggers a render.
+   *  After the partition re-render the opened row is re-anchored to its
+   *  previous viewport position (the detach adds a gap above it, which would
+   *  otherwise push the header down away from the cursor). */
+  private async _onToolCallToggle(e: Event): Promise<void> {
+    const details = e.currentTarget as HTMLDetailsElement;
+    const id = details.dataset.toolCallId;
+    if (!id) return;
+    const isOpen = details.open;
+    if (this._openToolCalls.has(id) === isOpen) return;
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    const beforeTop = details.getBoundingClientRect().top;
+    const next = new Set(this._openToolCalls);
+    if (isOpen) next.add(id);
+    else next.delete(id);
+    this._openToolCalls = next;
+    await this.updateComplete;
+    if (!list) return;
+    const after = this.renderRoot.querySelector<HTMLElement>(`[data-tool-call-id="${id}"]`);
+    if (!after) return;
+    // An element's viewport top is docTop - scrollTop, so to bring the header
+    // back to beforeTop after the re-render moved it by `shift`, add the shift
+    // back into scrollTop (scrolling down moves content up and vice versa).
+    const shift = after.getBoundingClientRect().top - beforeTop;
+    if (shift !== 0) list.scrollTop += shift;
   }
 
-  private _parseArgs(args: ToolCall["arguments"]): Record<string, unknown> {
-    if (typeof args === "string") {
+  /** Pretty-printed JSON for the tool-call arguments shown when expanded. */
+  private _formatToolArgs(tc: ToolCall): string {
+    const raw = tc.arguments;
+    if (typeof raw === "string") {
+      if (!raw.trim()) return raw;
       try {
-        const parsed = JSON.parse(args);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          return parsed as Record<string, unknown>;
-        }
+        return JSON.stringify(JSON.parse(raw), null, 2);
       } catch {
-        // not JSON
+        return raw;
       }
-      return {};
     }
-    return args ?? {};
-  }
-
-  /** Compact repo/branch label for a worktree root path. */
-  private _worktreeLabel(p: string): string {
-    const segs = p.split("/").filter(Boolean);
-    if (segs.length >= 2) return `${segs[segs.length - 2]}/${segs[segs.length - 1]}`;
-    return p;
-  }
-
-  private _argsText(args: ToolCall["arguments"]): string {
-    if (typeof args === "string") return args;
     try {
-      return JSON.stringify(args);
+      return JSON.stringify(raw, null, 2);
     } catch {
-      return String(args);
+      return String(raw);
     }
   }
 

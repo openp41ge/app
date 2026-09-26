@@ -108,7 +108,22 @@ describe("AgentsSystemTabController", () => {
     // The footer holds the search tool (new) + this tab's own settings gear.
     const settingsBtn = host.querySelector('button[aria-label="Agent settings"]') as HTMLButtonElement;
     expect(settingsBtn).toBeTruthy();
-    expect(host.querySelector('button[aria-label="Search chats"]')).toBeTruthy();
+    const searchBtn = host.querySelector('button[aria-label="Search chats"]') as HTMLButtonElement;
+    expect(searchBtn).toBeTruthy();
+    // The footer button group is split off by two 1px separator lines flanking
+    // the search button; each separator carries a single top overdraw accent
+    // (an upward line, so the divider continues past the footer's top border).
+    const seps = Array.from(host.querySelectorAll("span.footer-sep"));
+    expect(seps).toHaveLength(2);
+    for (const sep of seps) {
+      const lines = Array.from(sep.querySelectorAll("overdraw-line"));
+      expect(lines).toHaveLength(1);
+      expect(lines[0].getAttribute("dir")).toBe("up");
+    }
+    // The buttons themselves carry no overdraw accents — only the separators do.
+    for (const btn of [settingsBtn, searchBtn]) {
+      expect(btn.querySelectorAll("overdraw-line")).toHaveLength(0);
+    }
     const openEventSpy = vi.fn();
     document.addEventListener("openp41ge:open-agents-settings-drawer", openEventSpy);
     settingsBtn.click();

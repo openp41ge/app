@@ -5,6 +5,14 @@ export { Openp41geInlineIcon } from "./components/openp41ge-inline-icon";
 export { FileExtensionSvg } from "./components/file-extension-svg";
 export { iconRegistry } from "./icons";
 
+// ─── Overdraw line (fade-out accent) ─────────────────────────────────────
+export { OverdrawLine, attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws } from "./components/overdraw-line";
+export type { OverdrawDirection } from "./components/overdraw-line";
+
+// ─── Drop indicators (shared blue drag/drop lines + box) ────────────────
+export { DropLine, DragLine, DragLineOverdraw, DropBox, DROP_INDICATOR_COLOR, DROP_LINE_GLOW } from "./components/drop-indicator";
+export type { DropFadeDirection } from "./components/drop-indicator";
+
 // ─── Scrollbar ──────────────────────────────────────────────────────────
 export {
   OverlayScrollbar,

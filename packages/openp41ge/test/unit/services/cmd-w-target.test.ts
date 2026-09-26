@@ -2,23 +2,24 @@
 /**
  * Unit tests for resolveCmdWTarget — the pure Cmd+W target resolver.
  *
- * Verifies: no grid tabs → close window; the target is the most-recently
- * activated OPEN tab (activation-history order, not right-to-left); closed /
- * not-open tabs in the history are skipped; empty history falls back to the
- * last grid tab; unknown window/workspace → null.
+ * Cmd+W closes the grid tab the user is CURRENTLY focused on: the active tab
+ * of the focused cell/column (not the rightmost tab). When no grid tabs
+ * remain, it closes the window. Sidebar/system tabs are never candidates, and
+ * an unknown window/workspace → null. (Back/Forward navigation is handled
+ * separately by TabActivationHistory.)
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
 import * as types from "@openp41ge/layout/types";
 import * as ops from "@openp41ge/layout/operations";
 import { resolveCmdWTarget } from "../../../src/renderer/services/cmd-w-target";
-import { TabActivationHistory } from "../../../src/renderer/services/tab-activation-history";
+import { Openp41geTabsEventHandler } from "../../../src/renderer/services/openp41ge-tabs-event-handler";
 
 const winId = (ws: types.Workspace): string => ws.windows[0].id;
 
 describe("resolveCmdWTarget", () => {
   beforeEach(() => {
-    TabActivationHistory._reset();
+    Openp41geTabsEventHandler.lastFocusedCol = {};
   });
 
   it("returns close-window when the grid has no tabs", () => {
@@ -26,46 +27,42 @@ describe("resolveCmdWTarget", () => {
     expect(resolveCmdWTarget(ws, winId(ws))).toEqual({ kind: "close-window" });
   });
 
-  it("closes the most-recently-activated tab (activation order, not right-to-left)", () => {
+  it("closes the ACTIVE tab of the cell, not the rightmost", () => {
     const ws = types.createWorkspace("w2");
     const id = winId(ws);
     let r = ops.addTabToCell(ws, id, types.createTab("t1", "terminal", "T1"), 0, 0);
     r = ops.addTabToCell(r, id, types.createTab("t2", "markdown", "T2"), 0, 0);
     r = ops.addTabToCell(r, id, types.createTab("t3", "video", "T3"), 0, 0);
 
-    // Activation order: t1 → t3 → t2. Most recent = t2 (not rightmost t3).
-    TabActivationHistory.pushActivation(id, "t1");
-    TabActivationHistory.pushActivation(id, "t3");
-    TabActivationHistory.pushActivation(id, "t2");
-
+    // The user focuses the MIDDLE tab (t2). Cmd+W must close t2, not the
+    // rightmost t3.
+    r = ops.activateTabInCell(r, id, "t2");
     expect(resolveCmdWTarget(r, id)).toEqual({ kind: "close-tab", tabId: "t2" });
   });
 
-  it("skips tabs that were closed (removed from grid), even if still in history", () => {
+  it("closes the active tab of the focused column in a multi-cell grid", () => {
     const ws = types.createWorkspace("w3");
     const id = winId(ws);
+    ws.windows[0].grid.cols = 3;
     let r = ops.addTabToCell(ws, id, types.createTab("t1", "terminal", "T1"), 0, 0);
-    r = ops.addTabToCell(r, id, types.createTab("t2", "markdown", "T2"), 0, 0);
-    r = ops.addTabToCell(r, id, types.createTab("t3", "video", "T3"), 0, 0);
+    r = ops.addTabToCell(r, id, types.createTab("t2", "markdown", "T2"), 0, 1);
+    r = ops.addTabToCell(r, id, types.createTab("t3", "video", "T3"), 0, 2);
 
-    TabActivationHistory.pushActivation(id, "t1");
-    TabActivationHistory.pushActivation(id, "t2");
-    TabActivationHistory.pushActivation(id, "t3");
-
-    // User closes t3. Most recent open tab is now t2.
-    r = ops.removeTabFromCell(r, id, "t3");
+    // Focus the middle column (col 1); its active tab is t2. Cmd+W closes t2.
+    Openp41geTabsEventHandler.lastFocusedCol[id] = 1;
     expect(resolveCmdWTarget(r, id)).toEqual({ kind: "close-tab", tabId: "t2" });
   });
 
-  it("falls back to the last grid tab when no activations have been recorded", () => {
+  it("defaults to col 0 when no column has been focused", () => {
     const ws = types.createWorkspace("w4");
     const id = winId(ws);
+    ws.windows[0].grid.cols = 3;
     let r = ops.addTabToCell(ws, id, types.createTab("t1", "terminal", "T1"), 0, 0);
-    r = ops.addTabToCell(r, id, types.createTab("t2", "markdown", "T2"), 0, 0);
-    r = ops.addTabToCell(r, id, types.createTab("t3", "video", "T3"), 0, 0);
+    r = ops.addTabToCell(r, id, types.createTab("t2", "markdown", "T2"), 0, 1);
+    r = ops.addTabToCell(r, id, types.createTab("t3", "video", "T3"), 0, 2);
 
-    // Empty history — fall back to the rightmost/last grid tab.
-    expect(resolveCmdWTarget(r, id)).toEqual({ kind: "close-tab", tabId: "t3" });
+    // No focus recorded → default to col 0's active tab (t1).
+    expect(resolveCmdWTarget(r, id)).toEqual({ kind: "close-tab", tabId: "t1" });
   });
 
   it("returns null for an unknown window or null workspace", () => {
@@ -78,7 +75,6 @@ describe("resolveCmdWTarget", () => {
     const ws = types.createWorkspace("w6");
     const id = winId(ws);
     const r = ops.addTabToCell(ws, id, types.createTab("t1", "terminal", "T1"), 0, 0);
-    TabActivationHistory.pushActivation(id, "t1");
     // The resolver reports a grid tab id, never a system-tab id.
     expect(resolveCmdWTarget(r, id)).toEqual({ kind: "close-tab", tabId: "t1" });
   });

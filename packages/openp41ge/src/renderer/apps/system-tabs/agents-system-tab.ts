@@ -25,6 +25,7 @@ import { openSearchDrawer, type SearchDrawerProvider } from "../../services/sear
 import type { Openp41geSettingsDrawerHost } from "../../components/openp41ge-settings-drawer-host";
 import { plusIcon, searchIcon } from "../../icons";
 import { tooltipController } from "openp41ge-uikit";
+import { attachTopOverdraw } from "openp41ge-uikit/overdraw-line";
 import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("openp41ge", "AgentsSystemTabController");
@@ -159,6 +160,16 @@ export class AgentsSystemTabController implements SystemTabController {
     );
     const searchBtn = this._makeFooterToolButton(searchIcon(20), "Search chats");
     searchBtn.addEventListener("click", () => this._openChatSearch());
+    // Two 1px separator lines flank the search button: one cap on the bar's
+    // outer edge and one between the search and settings buttons. Each carries
+    // the overdraw accent at its top so the divider appears to continue
+    // upward past the footer's top border (same treatment as the agent-chat
+    // bottom bar's search separator). Only the top overdraw is drawn — a line
+    // pointing down would run off the bottom of the window.
+    const capSep = this._makeFooterSeparator();
+    const btnSep = this._makeFooterSeparator();
+    attachTopOverdraw(capSep);
+    attachTopOverdraw(btnSep);
     // Both icons sit on the INSIDE edge (facing the grid), settings first then
     // search, regardless of which side the sidebar is docked to. A flex spacer
     // on the outer side pushes the group toward the grid.
@@ -168,12 +179,16 @@ export class AgentsSystemTabController implements SystemTabController {
       // Inside edge = right → spacer on the left, then the icon group reading
       // toward the inside edge (settings innermost, search outward).
       footer.appendChild(spacer);
+      footer.appendChild(capSep);
       footer.appendChild(searchBtn);
+      footer.appendChild(btnSep);
       footer.appendChild(settingsBtn);
     } else {
       // Inside edge = left → settings innermost, then search, then spacer.
       footer.appendChild(settingsBtn);
+      footer.appendChild(btnSep);
       footer.appendChild(searchBtn);
+      footer.appendChild(capSep);
       footer.appendChild(spacer);
     }
     wrapper.appendChild(footer);
@@ -253,11 +268,26 @@ export class AgentsSystemTabController implements SystemTabController {
     btn.dataset.tip = title;
     btn.innerHTML = icon;
     btn.className = "p41ge-icon-btn agent-tool-btn";
-    // The search button is the outermost action button; its outer edge gets a
-    // cap separator (data-cap-side) so the group is split off from the bar.
-    btn.dataset.capSide = this._side;
     tooltipController.attach(btn, { type: "simple", text: title });
     return btn;
+  }
+
+  /** 1px full-height separator for the footer action-button group. The cap
+   *  (outer) and between-button separators are explicit elements so they can
+   *  carry the top overdraw accent — the overdraw needs an element to hang off
+   *  that isn't clipped by the bar's own overflow, and a button border can't
+   *  extend beyond the bar. */
+  private _makeFooterSeparator(): HTMLSpanElement {
+    const sep = document.createElement("span");
+    sep.setAttribute("aria-hidden", "true");
+    sep.className = "footer-sep";
+    Object.assign(sep.style, {
+      width: "1px",
+      alignSelf: "stretch",
+      flexShrink: "0",
+      background: "var(--divider, #333)",
+    });
+    return sep;
   }
 
   /**

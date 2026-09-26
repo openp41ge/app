@@ -515,7 +515,14 @@ function tokenizeLine(line: string, cfg: LangConfig): Token[] {
         s += line[i];
         i++;
       }
-      tokens.push({ type: "string", value: s });
+      // A quoted string immediately followed by `:` is a JSON/YAML key (quoted
+      // keys), not a value — so give it the key colour like unquoted keys.
+      let skip = i;
+      while (skip < line.length && (line[skip] === " " || line[skip] === "\t")) skip++;
+      tokens.push({
+        type: cfg.keyBeforeColon === true && line[skip] === ":" ? "key" : "string",
+        value: s,
+      });
       continue;
     }
 

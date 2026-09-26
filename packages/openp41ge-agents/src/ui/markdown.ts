@@ -156,13 +156,39 @@ function tryRenderTable(lines: string[], start: number): { html: string; next: n
     return `<${tag}${style}>${text}</${tag}>`;
   };
 
-  let html = "<table><thead><tr>";
+  // Wrap the table in a relative container with the same corner accents and
+  // horizontal “middling line” fades used on the reasoning box: four L-fades at
+  // the corners plus a fade pair per internal horizontal divider (the header/
+  // body rule and each row rule). The accents are drawn with the shared
+  // <overdraw-line> uikit element (so each line gets its own varied length from
+  // the document-wide ordinal), and the host positions the middling fades on
+  // the actual divider lines after layout (the last row's bottom border merges
+  // with the box frame, so it is handled by the bottom corner accents instead).
+  let html = '<div class="msg-table-wrap">';
+  const corner = (c: "tl" | "tr" | "bl" | "br") => {
+    const h = c === "tl" || c === "bl" ? "left" : "right";
+    const v = c === "tl" || c === "tr" ? "up" : "down";
+    return `<overdraw-line corner="${c}" dir="${h}" aria-hidden="true"></overdraw-line><overdraw-line corner="${c}" dir="${v}" aria-hidden="true"></overdraw-line>`;
+  };
+  html += corner("tl") + corner("tr") + corner("bl") + corner("br");
+  html += "<table><thead><tr>";
   html += header.map((_, idx) => cell(header, idx, "th")).join("");
   html += "</tr></thead><tbody>";
   html += body
     .map((row) => `<tr>${header.map((_, idx) => cell(row, idx, "td")).join("")}</tr>`)
     .join("");
   html += "</tbody></table>";
+  html += '<overdraw-line class="tbl-mid" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-mid" dir="right" aria-hidden="true"></overdraw-line>';
+  for (let k = 0; k < body.length - 1; k++) {
+    html += '<overdraw-line class="tbl-mid" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-mid" dir="right" aria-hidden="true"></overdraw-line>';
+  }
+  // Vertical column-separator fades: one top + bottom pair per internal column
+  // rule (between columns; the outer edges are the box frame). The host sets
+  // their `left` on the separator line after layout.
+  for (let k = 0; k < header.length - 1; k++) {
+    html += '<overdraw-line class="tbl-vfade" dir="up" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-vfade" dir="down" aria-hidden="true"></overdraw-line>';
+  }
+  html += "</div>";
 
   return { html, next: j };
 }

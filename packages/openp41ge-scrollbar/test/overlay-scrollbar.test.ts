@@ -46,13 +46,19 @@ afterEach(() => {
 });
 
 describe("OverlayScrollbar pinned icon", () => {
-  it("creates a non-interactive pin icon when the `pinned` option is provided", () => {
-    const { container } = attach(makeScrollTarget(), { pinned: true });
+  it("creates a decorative pin icon (hoverable for its tooltip) when the `pinned` option is provided", () => {
+    const { container, sb } = attach(makeScrollTarget(), { pinned: true });
     const pin = container.querySelector<HTMLElement>(".os-pin");
     expect(pin).not.toBeNull();
     expect(pin!.tagName).toBe("SPAN"); // an icon, never a button
     expect(pin!.getAttribute("aria-hidden")).toBe("true");
     expect(pin!.querySelector("svg path")).not.toBeNull();
+    expect(sb.pinElement).toBe(pin);
+    // No native title — the host wires the custom uikit tooltip instead.
+    expect(pin!.hasAttribute("title")).toBe(false);
+    // Hoverable so it can show a tooltip + hover chip, and so hovering it
+    // doesn't fall through to the track's own hover-widen.
+    expect(getComputedStyle(pin!).pointerEvents).toBe("auto");
   });
 
   it("does not create the pin icon without the option", () => {
@@ -87,5 +93,55 @@ describe("OverlayScrollbar pinned icon", () => {
     vi.advanceTimersByTime(3000);
     expect(pin.classList.contains("os-pin-hidden")).toBe(true);
     vi.useRealTimers();
+  });
+});
+
+describe("OverlayScrollbar scroll-to-bottom arrow", () => {
+  it("creates the arrow when the `scrollToBottom` option is provided", () => {
+    const { container, sb } = attach(makeScrollTarget(), { scrollToBottom: true });
+    const arrow = container.querySelector<HTMLElement>(".os-scroll-down");
+    expect(arrow).not.toBeNull();
+    expect(arrow!.getAttribute("role")).toBe("button");
+    expect(arrow!.hasAttribute("title")).toBe(false);
+    expect(sb.scrollDownElement).toBe(arrow);
+    expect(arrow!.querySelector("svg path")).not.toBeNull();
+  });
+
+  it("does not create the arrow without the option", () => {
+    const { container } = attach(makeScrollTarget());
+    expect(container.querySelector(".os-scroll-down")).toBeNull();
+  });
+
+  it("shows the arrow when scrolled up and hides it at the bottom", () => {
+    const target = makeScrollTarget();
+    const { container, sb } = attach(target, { scrollToBottom: true });
+    const arrow = container.querySelector<HTMLElement>(".os-scroll-down")!;
+
+    // Scrolled up away from the bottom → visible.
+    target.scrollTop = 500;
+    sb.update();
+    expect(arrow.classList.contains("os-scroll-down-hidden")).toBe(false);
+    // Back at the very bottom → nothing to scroll, arrow hides.
+    target.scrollTop = target.scrollHeight;
+    sb.update();
+    expect(arrow.classList.contains("os-scroll-down-hidden")).toBe(true);
+  });
+
+  it("hides the arrow when there is nothing to scroll", () => {
+    const target = makeScrollTarget();
+    Object.defineProperty(target, "scrollHeight", { value: 400, configurable: true });
+    const { container } = attach(target, { scrollToBottom: true });
+    const arrow = container.querySelector<HTMLElement>(".os-scroll-down")!;
+    expect(arrow.classList.contains("os-scroll-down-hidden")).toBe(true);
+  });
+
+  it("scrolls the target to the bottom when clicked", () => {
+    const target = makeScrollTarget();
+    const { container } = attach(target, { scrollToBottom: true });
+    const arrow = container.querySelector<HTMLElement>(".os-scroll-down")!;
+    target.scrollTop = 500;
+    expect(target.scrollTop).toBe(500);
+    arrow.dispatchEvent(new PointerEvent("click", { bubbles: true }));
+    expect(target.scrollTop).toBe(target.scrollHeight);
   });
 });

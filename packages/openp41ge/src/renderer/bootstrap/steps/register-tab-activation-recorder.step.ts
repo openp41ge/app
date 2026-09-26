@@ -12,14 +12,17 @@
  * It observes the workspace state and records tabs that newly appear. Crucially
  * it does NOT record active-tab *switches* — closing a tab sets the survivor
  * active, and back/forward navigation also changes the active tab, neither of
- * which is a fresh activation. The very first state observation is used only as
- * a baseline so a restored workspace is not seeded into the history.
+ * which is a fresh activation. The very first state observation is used as a
+ * baseline and seeds only the grid's currently-active tab as the history's
+ * current position (not a navigation chain), so Cmd+W and Back/Forward have a
+ * correct starting point for a restored workspace.
  */
 
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import type { Workspace } from "../../../layout/types";
 import { TabActivationHistory } from "../../services/tab-activation-history";
+import { Openp41geTabsEventHandler } from "../../services/openp41ge-tabs-event-handler";
 
 export class RegisterTabActivationRecorderStep implements IStartupStep {
   readonly name = "register-tab-activation-recorder";
@@ -55,17 +58,20 @@ export class RegisterTabActivationRecorderStep implements IStartupStep {
     const isFirst = !this._initialised;
     this._initialised = true;
 
-    // Baseline on first observation — don't seed history from a restored
-    // workspace (or a fresh empty grid).
+    // Baseline on first observation. A restored workspace is not seeded as a
+    // *navigation chain* (no user activations have happened yet), but the
+    // currently-active tab is still tracked as the history's current position
+    // so Cmd+W closes the tab the user is actually looking at rather than the
+    // rightmost, and Back/Forward have a correct starting point.
     if (isFirst) {
       this._knownTabs = openTabs;
+      const activeTab = this._activeTabFor(win, winId);
+      if (activeTab) TabActivationHistory.pushActivation(winId, activeTab);
       return;
     }
 
-    // Prune tabs that were closed from the history.
-    for (const t of this._knownTabs) {
-      if (!openTabs.has(t)) TabActivationHistory.remove(winId, t);
-    }
+    // The activation log is append-only and immutable: closing a tab does NOT
+    // remove its entries (Back/Forward simply skip closed tabs).
 
     // Record newly-appeared tabs (user-opened). A new tab is never a side
     // effect of a close, so this is always a genuine activation.
@@ -76,5 +82,23 @@ export class RegisterTabActivationRecorderStep implements IStartupStep {
     }
 
     this._knownTabs = openTabs;
+  }
+
+  /**
+   * Resolve the grid's currently-active tab (focused column, defaulting to
+   * col 0) for the history baseline. Returns the placement's `activeTabId`
+   * (or its first tab) so Cmd+W targets the tab that is actually visible.
+   */
+  private _activeTabFor(win: Workspace["windows"][number], winId: string): string | null {
+    const focusedCol = Openp41geTabsEventHandler.getLastFocusedCol(winId);
+    const placements = [...win.grid.placements].sort(
+      (a, b) => a.position.col - b.position.col,
+    );
+    const placement =
+      placements.find((pl) => pl.position.col === focusedCol) ??
+      placements.find((pl) => pl.position.col === 0) ??
+      placements[0];
+    if (!placement) return null;
+    return (placement.activeTabId ?? placement.tabIds[0]) as string;
   }
 }

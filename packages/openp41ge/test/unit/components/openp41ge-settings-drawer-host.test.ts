@@ -121,7 +121,7 @@ describe("openp41ge-settings-drawer-host click-away", () => {
 });
 
 describe("openp41ge-settings-drawer-host open width", () => {
-  it("opens at the widest allowed width (max drawer width)", async () => {
+  it("opens at the preferred width (maxDrawerWidth)", async () => {
     const host = await mountHost();
     Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
     host.openSurface(makeSurface(), "right");
@@ -129,12 +129,12 @@ describe("openp41ge-settings-drawer-host open width", () => {
     expect(host.drawerWidthFor("right")).toBe(host.maxDrawerWidth);
   });
 
-  it("clamps to the grid width when the grid is narrower than the max", async () => {
+  it("clamps 1px short of the grid width so the drag bar stays inside the grid", async () => {
     const host = await mountHost();
     Object.defineProperty(host, "clientWidth", { configurable: true, value: 500 });
     host.openSurface(makeSurface(), "right");
     await host.updateComplete;
-    expect(host.drawerWidthFor("right")).toBe(500);
+    expect(host.drawerWidthFor("right")).toBe(499);
   });
 
   it("never opens below the (unchanged) min width", async () => {
@@ -143,5 +143,91 @@ describe("openp41ge-settings-drawer-host open width", () => {
     host.openSurface(makeSurface(), "right");
     await host.updateComplete;
     expect(host.drawerWidthFor("right")).toBe(host.defaultDrawerWidth);
+  });
+});
+
+describe("openp41ge-settings-drawer-host no max width", () => {
+  it("can grow beyond maxDrawerWidth up to the full grid width (1px short, so the drag bar stays inside)", async () => {
+    const host = await mountHost();
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(host.maxDrawerWidth);
+    host.setDrawerWidthFor("right", 800);
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(799);
+  });
+
+  it("double-clicking the drag bar grows the drawer to the full grid width", async () => {
+    const host = await mountHost();
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(host.maxDrawerWidth);
+    const bar = host.querySelector(".sdw-resize")!;
+    bar.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(799);
+  });
+});
+
+describe("openp41ge-settings-drawer-host edge snap", () => {
+  it("shows the anchor indicator while dragging in the snap zone and snaps to full width on release", async () => {
+    const host = await mountHost();
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    host.setDrawerWidthFor("right", 300);
+    await host.updateComplete;
+    expect(host.querySelector(".sdw-edge-snap")).toBeNull();
+    const bar = host.querySelector(".sdw-resize")!;
+    // Start a drag, then move so the proposed width lands within 75px of the
+    // grid edge (320 min + 445 = 765, inside 800 - 75 = 725). The drawer must
+    // NOT snap mid-drag — it tracks the pointer, and the indicator appears.
+    bar.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 0, clientY: 10, pointerId: 1 }),
+    );
+    document.dispatchEvent(
+      new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
+    );
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(765);
+    const indicator = host.querySelector(".sdw-edge-snap");
+    expect(indicator).not.toBeNull();
+    expect(indicator?.getAttribute("fade")).toBe("right");
+    // Release inside the snap zone -> the drawer anchors to the full grid width.
+    document.dispatchEvent(
+      new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
+    );
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(799);
+    expect(host.querySelector(".sdw-edge-snap")).toBeNull();
+  });
+
+  it("tracks the pointer when more than 75px from the grid edge (no snap, no indicator)", async () => {
+    const host = await mountHost();
+    Object.defineProperty(host, "clientWidth", { configurable: true, value: 800 });
+    host.openSurface(makeSurface(), "right");
+    await host.updateComplete;
+    host.setDrawerWidthFor("right", 300);
+    await host.updateComplete;
+    const bar = host.querySelector(".sdw-resize")!;
+    // Proposed width 320 (min) + 380 = 700 (< 725), so it must NOT snap and no
+    // indicator should show.
+    bar.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 0, clientY: 10, pointerId: 1 }),
+    );
+    document.dispatchEvent(
+      new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: -380, clientY: 10, pointerId: 1 }),
+    );
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(700);
+    expect(host.querySelector(".sdw-edge-snap")).toBeNull();
+    document.dispatchEvent(
+      new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: -380, clientY: 10, pointerId: 1 }),
+    );
+    await host.updateComplete;
+    expect(host.drawerWidthFor("right")).toBe(700);
+    expect(host.querySelector(".sdw-edge-snap")).toBeNull();
   });
 });

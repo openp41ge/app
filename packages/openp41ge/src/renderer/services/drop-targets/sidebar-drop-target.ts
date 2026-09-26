@@ -204,19 +204,15 @@ export class SidebarDropTarget implements IDropTarget {
 
     // ── Tab bar drop indicator line ────────────────────────────────
     if (!this._indicatorEl || !this.element.contains(this._indicatorEl)) {
-      this._indicatorEl = document.createElement("div");
+      this._indicatorEl = document.createElement("drop-line");
       this._indicatorEl.className = "sidebar-drop-indicator";
       this._indicatorEl.style.cssText = [
         "position:absolute",
         "top:4px",
         "bottom:4px",
-        "width:3px",
-        "background:rgb(74,158,255)",
-        "border-radius:2px",
         "display:none",
         "pointer-events:none",
         "z-index:31",
-        "box-shadow:0 0 8px rgba(74,158,255,0.8), 0 0 16px rgba(74,158,255,0.4)",
       ].join(";");
       this.element.appendChild(this._indicatorEl);
     }

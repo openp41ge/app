@@ -36,6 +36,20 @@ export default defineConfig({
         find: "openp41ge-uikit/tooltip",
         replacement: path.resolve(__dirname, "../openp41ge-uikit/src/components/tooltip"),
       },
+      {
+        find: "openp41ge-uikit/overdraw-line",
+        replacement: path.resolve(
+          __dirname,
+          "../openp41ge-uikit/src/components/overdraw-line",
+        ),
+      },
+      {
+        find: "openp41ge-uikit/drop-indicator",
+        replacement: path.resolve(
+          __dirname,
+          "../openp41ge-uikit/src/components/drop-indicator",
+        ),
+      },
       { find: "openp41ge-uikit", replacement: path.resolve(__dirname, "../openp41ge-uikit/src") },
       {
         find: "openp41ge-uikit/theme",

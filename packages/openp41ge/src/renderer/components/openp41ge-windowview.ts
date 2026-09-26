@@ -25,6 +25,9 @@ import {
 import type { Openp41geSettingsDrawerHost } from "./openp41ge-settings-drawer-host";
 
 import "./openp41ge-sidebar";
+// Registers <drag-line>, the shared translucent blue hover affordance used by
+// the resize notches (the "you can drag this" sibling of <drop-line>).
+import "openp41ge-uikit/drop-indicator";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -175,7 +178,7 @@ class Openp41geWindowView extends LitElement {
     this._isOverMin = false;
     this._overMinTarget = 0;
     // Keep the notch's blue indicator lit for the whole drag (not just hover).
-    this.querySelector(`.wv-notch-v.${handle}-notch`)?.classList.add("dragging");
+    this._setDragLine(handle, true);
 
     document.addEventListener("mousemove", this._onResizeMove);
     document.addEventListener("mouseup", this._onResizeEnd);
@@ -368,10 +371,16 @@ class Openp41geWindowView extends LitElement {
     localStorage.setItem("openp41ge:sidebar-width-right", String(this._rightWidth));
 
     // Clear the drag indicator and overrun state.
-    this.querySelector(".wv-notch-v.dragging")?.classList.remove("dragging");
+    if (handle) this._setDragLine(handle, false);
     this._isOverMax = false;
     this._isOverMin = false;
   };
+
+  /** Toggle the shared <drag-line> inside a resize notch (hover / dragging). */
+  private _setDragLine(side: "left" | "right", on: boolean): void {
+    const line = this.querySelector(`.wv-notch-v.${side}-notch drag-line`);
+    if (line) line.toggleAttribute("show", on);
+  }
 
   // ═══ Helpers ─────────────────────────────────────────────────────────
 
@@ -533,21 +542,6 @@ class Openp41geWindowView extends LitElement {
           margin-left: -${NOTCH_OVERFLOW}px;
           margin-right: -${NOTCH_WIDTH - NOTCH_OVERFLOW}px;
         }
-        .wv-notch-v::before {
-          content: "";
-          position: absolute;
-          top: 0;
-          width: 3px;
-          height: 100%;
-          background: rgba(74, 158, 255, 0.7);
-          opacity: 0;
-          transition: opacity 0.12s ease;
-          pointer-events: none;
-        }
-        .wv-notch-v:hover::before,
-        .wv-notch-v.dragging::before {
-          opacity: 1;
-        }
         /* Animated spring-back for the sidebar when released after a rubber-band
            overrun. The class is added just before the width change and removed
            once the transition finishes; during the drag itself it is absent so
@@ -556,12 +550,6 @@ class Openp41geWindowView extends LitElement {
           transition:
             flex-basis 0.18s ease,
             max-width 0.18s ease;
-        }
-        .wv-notch-v.left-notch::before {
-          left: 1px;
-        }
-        .wv-notch-v.right-notch::before {
-          right: 2px;
         }
         /* While a settings drawer is open from a sidebar, that anchor sidebar is
          * raised above the drawer host's full-window dim mask (z-index:1001) so
@@ -579,9 +567,6 @@ class Openp41geWindowView extends LitElement {
         .wv-notch-v.wv-notch-disabled {
           cursor: default;
           pointer-events: none;
-        }
-        .wv-notch-v.wv-notch-disabled::before {
-          opacity: 0;
         }
       </style>
       <div class="flex flex-col w-full h-full bg-surface relative">
@@ -608,7 +593,12 @@ class Openp41geWindowView extends LitElement {
           <div
             class="wv-notch-v left-notch ${ws?.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"} ${this._notchDisabled("left") ? "wv-notch-disabled" : ""}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "left")}
-          ></div>
+            @mouseenter=${() => this._setDragLine("left", true)}
+            @mouseleave=${() => this._setDragLine("left", false)}
+          >
+            <drag-line orientation="vertical" style="left:1px"></drag-line>
+            <drag-line-overdraw></drag-line-overdraw>
+          </div>
 
           <!-- Central area: grid always renders -->
           <div class="flex flex-col flex-1 overflow-hidden" style="min-width:280px">
@@ -637,7 +627,12 @@ class Openp41geWindowView extends LitElement {
           <div
             class="wv-notch-v right-notch ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"} ${this._notchDisabled("right") ? "wv-notch-disabled" : ""}"
             @mousedown=${(e: MouseEvent) => this._onResizeStart(e, "right")}
-          ></div>
+            @mouseenter=${() => this._setDragLine("right", true)}
+            @mouseleave=${() => this._setDragLine("right", false)}
+          >
+            <drag-line orientation="vertical" style="right:2px"></drag-line>
+            <drag-line-overdraw></drag-line-overdraw>
+          </div>
 
           <!-- Right sidebar -->
           <openp41ge-sidebar

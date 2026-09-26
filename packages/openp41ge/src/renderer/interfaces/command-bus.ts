@@ -1,3 +1,5 @@
+import type { Workspace } from "../../layout/types";
+
 /**
  * Command bus — abstraction over workspace dispatch.
  *
@@ -11,4 +13,10 @@ export interface ICommandBus {
    * The operation is applied to the workspace state in the main process.
    */
   dispatch(fn: string, ...args: unknown[]): void;
+
+  /**
+   * Provide a live workspace getter so the command bus can resolve the tab to
+   * focus when a grid tab is closed (the previous activation-log entry).
+   */
+  setWorkspaceGetter(fn: () => Workspace | null): void;
 }

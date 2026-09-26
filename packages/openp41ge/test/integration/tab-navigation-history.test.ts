@@ -95,7 +95,7 @@ describe("Tab navigation history — integration", () => {
     expect(TabActivationHistory.getCurrent("w2")).toBe("ta");
   });
 
-  it("forward stack cleared on new activation after going back", () => {
+  it("new activation after going back appends to the log (chronological)", () => {
     // Build history via events
     document.dispatchEvent(
       new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t1" } }),
@@ -107,14 +107,54 @@ describe("Tab navigation history — integration", () => {
       new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t3" } }),
     );
 
-    TabActivationHistory.goBack("w1"); // now at t2, t3 in forward
+    TabActivationHistory.goBack("w1"); // at t2, t3 ahead in the log
 
-    // New activation via event
+    // New activation via event (append-only — t3 is NOT cleared)
     document.dispatchEvent(
       new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t4" } }),
     );
 
-    expect(TabActivationHistory.canGoForward("w1")).toBe(false);
-    expect(TabActivationHistory.goBack("w1")).toBe("t2"); // not t3
+    expect(TabActivationHistory.getCurrent("w1")).toBe("t4");
+    expect(TabActivationHistory.getHistory("w1")).toEqual(["t1", "t2", "t3", "t4"]);
+    // Back goes to the chronological predecessor t3, not t2.
+    expect(TabActivationHistory.goBack("w1")).toBe("t3");
+    expect(TabActivationHistory.goBack("w1")).toBe("t2");
+    expect(TabActivationHistory.goBack("w1")).toBe("t1");
+  });
+
+  it("refocusing an earlier tab via event appends a duplicate entry", () => {
+    document.dispatchEvent(
+      new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t1" } }),
+    );
+    document.dispatchEvent(
+      new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t2" } }),
+    );
+    // Refocus t1 (opened earlier) — appends a NEW entry.
+    document.dispatchEvent(
+      new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t1" } }),
+    );
+
+    expect(TabActivationHistory.getHistory("w1")).toEqual(["t1", "t2", "t1"]);
+    expect(TabActivationHistory.getCurrent("w1")).toBe("t1");
+    expect(TabActivationHistory.goBack("w1")).toBe("t2");
+    expect(TabActivationHistory.goBack("w1")).toBe("t1");
+  });
+
+  it("closed tabs are skipped by back/forward but remain in the log", () => {
+    document.dispatchEvent(
+      new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t1" } }),
+    );
+    document.dispatchEvent(
+      new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t2" } }),
+    );
+    document.dispatchEvent(
+      new CustomEvent("grid-activate", { detail: { winId: "w1", tabId: "t3" } }),
+    );
+
+    // t2 is closed — Back from t3 lands on t1, skipping t2.
+    const isOpen = (t: string) => t !== "t2";
+    expect(TabActivationHistory.goBack("w1", isOpen)).toBe("t1");
+    // t2 is still in the immutable log.
+    expect(TabActivationHistory.getHistory("w1")).toEqual(["t1", "t2", "t3"]);
   });
 });

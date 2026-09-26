@@ -136,6 +136,9 @@ export class StartupContext {
    * Called as part of the init-services step.
    */
   wireServices(): void {
+    // Let the command bus resolve the close-focus tab from live state.
+    this.commandBus.setWorkspaceGetter(() => this.workspaceState.getWorkspace());
+
     this.contextMenuBuilder.init(this.commandBus);
     this.fileOpenHandler.init(this.commandBus, this.workspaceState, this.tabMountManager);
     this.commitOpenHandler.init(this.commandBus, this.workspaceState);

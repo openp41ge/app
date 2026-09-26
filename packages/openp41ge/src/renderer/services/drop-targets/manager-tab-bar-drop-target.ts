@@ -23,11 +23,10 @@ import type {
 /** Event fired on the bar when a manager tab is dropped to reorder it. */
 export const MANAGER_TAB_REORDER_EVENT = "manager-tab-reorder";
 
-/** Blue insert line — matches the grid/sidebar tab-bar insert marker. */
+/** Blue insert line — matches the grid/sidebar tab-bar insert marker. The
+ *  look (3px solid blue + glow) comes from the shared <drop-line> element;
+ *  the class remains only as an identity marker for drag-capture hiding. */
 const INDICATOR_CLASS = "wm-tab-drop-indicator";
-const INDICATOR_STYLE =
-  "position:absolute;top:0;bottom:0;width:2px;pointer-events:none;z-index:9;" +
-  "background:#4a9eff;box-shadow:0 0 4px rgba(74,158,255,0.78);";
 
 export function managerTabButtons(bar: HTMLElement): HTMLElement[] {
   return Array.from(bar.querySelectorAll<HTMLElement>(".wm-tab"));
@@ -142,9 +141,9 @@ export class ManagerTabBarDropTarget implements IDropTarget {
   /** Lazily create the indicator element inside the bar (shadow DOM). */
   private _getIndicator(): HTMLElement {
     if (this._indicator) return this._indicator;
-    const el = document.createElement("div");
+    const el = document.createElement("drop-line");
     el.className = INDICATOR_CLASS;
-    el.style.cssText = INDICATOR_STYLE;
+    el.style.zIndex = "9";
     el.style.display = "none";
     this.element.appendChild(el);
     this._indicator = el;

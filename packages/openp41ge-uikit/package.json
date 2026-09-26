@@ -12,6 +12,10 @@
       "types": "./dist/theme/index.d.ts",
       "import": "./dist/theme.js"
     },
+    "./overdraw-line": {
+      "types": "./dist/components/overdraw-line/index.d.ts",
+      "import": "./dist/overdraw-line.js"
+    },
     "./file-editor": {
       "types": "./dist/file-editor/index.d.ts",
       "import": "./dist/file-editor/index.js"
@@ -20,7 +24,11 @@
       "types": "./dist/components/tooltip/index.d.ts",
       "import": "./dist/tooltip.js"
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": "./dist/styles.css",
+    "./drop-indicator": {
+      "types": "./dist/components/drop-indicator/index.d.ts",
+      "import": "./dist/drop-indicator.js"
+    }
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

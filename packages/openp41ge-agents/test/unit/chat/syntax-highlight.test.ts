@@ -28,6 +28,14 @@ describe("syntax-highlight", () => {
     expect(html).toContain('<span class="hl-key">return</span>');
   });
 
+  it("highlights quoted JSON keys as keys, not string values", () => {
+    const html = highlight('{"name": "pi", "age": 3}', "json");
+    expect(html).toContain('<span class="hl-key">"name"</span>');
+    expect(html).toContain('<span class="hl-key">"age"</span>');
+    expect(html).toContain('<span class="hl-string">"pi"</span>');
+    expect(html).toContain('<span class="hl-number">3</span>');
+  });
+
   it("escapes HTML in code so it cannot be injected", () => {
     const html = highlight("<script>alert(1)</script>", "javascript");
     expect(html).toContain("&lt;");

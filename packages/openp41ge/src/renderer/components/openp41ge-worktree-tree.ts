@@ -18,6 +18,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { state, property } from "lit/decorators.js";
 import { tooltipController, OverlayScrollbar } from "openp41ge-uikit";
+import { attachTopCornerOverdraws } from "openp41ge-uikit/overdraw-line";
 import { toastService } from "./openp41ge-toast";
 import { repoTreeRenderer } from "../services/repo-tree-renderer";
 import {
@@ -1663,6 +1664,16 @@ class Openp41geWorktreeTree extends LitElement {
 
     // Attach the custom tooltips to the footer buttons (replaces native title).
     this._syncFooterTooltips();
+    this._syncTopCornerOverdraws();
+  }
+
+  /** Attach the top-corner overdraw accents to the bottom-bar action buttons.
+   *  Only the lines above a button are drawn — a line pointing down from a
+   *  bottom-bar button would run off the bottom of the window. */
+  private _syncTopCornerOverdraws(): void {
+    this.querySelectorAll<HTMLElement>(".sb-bottom-bar .p41ge-icon-btn").forEach(
+      (btn) => attachTopCornerOverdraws(btn),
+    );
   }
 
   /** Register custom tooltips on the bottom-bar buttons via data-tip. */

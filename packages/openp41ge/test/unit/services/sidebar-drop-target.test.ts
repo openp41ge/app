@@ -196,7 +196,7 @@ describe("ClosedSidebarDropTarget", () => {
     expect(ind!.style.top).toBe("35px"); // below the title bar — sidebar doesn't go above it
     expect(ind!.style.bottom).toBe("12px"); // stops above the OS-rounded bottom corner strip
     expect(ind!.style.borderBottomLeftRadius).toBe(""); // no rounding on the thin line
-    expect(ind!.style.width).toBe("3px");
+    expect(ind!.tagName).toBe("DROP-LINE"); // the 3px blue look comes from <drop-line>
     expect(document.body.contains(ind)).toBe(true);
   });
 

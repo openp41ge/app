@@ -1,25 +1,28 @@
 /**
- * TabActivationHistory — per-window back/forward tab navigation.
+ * TabActivationHistory — per-window tab activation log for back/forward nav.
  *
- * Maintains a navigation stack per window ID, similar to a browser's
- * back/forward history. The stack is capped at MAX_HISTORY entries per
- * window to avoid unbounded memory growth.
+ * A monotonic, append-only log of tab activations. Every activation — opening
+ * a tab, clicking / refocusing an already-open tab, double-clicking an item in
+ * the tree, or navigating with Back/Forward — appends a NEW entry to the log,
+ * **even if that tab appeared earlier**. The log may therefore contain the
+ * same tab more than once, in the exact order it was activated.
  *
- * Closed tabs are excluded from navigation: every navigation method accepts
- * an optional `isOpen(tabId)` predicate, and closed entries are skipped (and
- * dropped) as the stacks are traversed. `remove()` / `pruneClosed()` can also
- * be used to drop a tab from the history explicitly.
+ * The log is immutable once created: closing a tab does NOT remove its
+ * entries. Back/Forward cycle the log in order, skipping entries whose tab is
+ * no longer open (per the `isOpen` predicate), never re-opening a closed tab.
+ *
+ * `position` is the index of the entry for the tab currently focused. A
+ * closed tab may still be the last-focused entry; navigation simply skips over
+ * it.
  *
  * API:
- *   pushActivation(windowId, tabId)      — record a tab activation
+ *   pushActivation(windowId, tabId)   — append an activation (no-op if the tab
+ *                                       is already the focused/current one)
  *   goBack(windowId, isOpen?) → tabId|null
  *   goForward(windowId, isOpen?) → tabId|null
- *   canGoBack(windowId, isOpen?) → boolean
- *   canGoForward(windowId, isOpen?) → boolean
+ *   canGoBack / canGoForward(windowId, isOpen?) → boolean
  *   getCurrent(windowId) → tabId|null
- *   remove(windowId, tabId)              — prune a closed tab from the stacks
- *   getCloseCandidates(windowId) → string[] — activation order (current first)
- *   pruneClosed(windowId, isOpen)        — drop every not-open tab
+ *   getHistory(windowId) → string[] (copy, oldest → newest)
  *   clear(windowId)
  *   _reset()
  */
@@ -29,9 +32,8 @@ import { MAX_HISTORY } from "openp41ge-constants";
 type IsOpen = (tabId: string) => boolean;
 
 interface WindowHistory {
-  backStack: string[];
-  forwardStack: string[];
-  currentTabId: string | null;
+  log: string[];
+  position: number;
 }
 
 const _histories = new Map<string, WindowHistory>();
@@ -39,7 +41,7 @@ const _histories = new Map<string, WindowHistory>();
 function getOrCreateHistory(winId: string): WindowHistory {
   let h = _histories.get(winId);
   if (!h) {
-    h = { backStack: [], forwardStack: [], currentTabId: null };
+    h = { log: [], position: -1 };
     _histories.set(winId, h);
   }
   return h;
@@ -47,154 +49,134 @@ function getOrCreateHistory(winId: string): WindowHistory {
 
 export const TabActivationHistory = {
   /**
-   * Record a tab activation. If the tab is different from the current one,
-   * the current tab is pushed onto the back stack and the forward stack
-   * is cleared (standard browser behaviour).
+   * Record a tab activation. Appends the tab to the END of the log and moves
+   * the focus position to it. If the tab is already the focused/current one,
+   * this is a no-op (no duplicate for the same tab being clicked twice).
    *
    * Returns true if the history was modified, false if it was a no-op.
    */
   pushActivation(winId: string, tabId: string): boolean {
     const h = getOrCreateHistory(winId);
 
-    if (h.currentTabId === tabId) {
-      return false; // No-op: same tab
+    // No-op if this tab is already the one currently focused.
+    if (h.position >= 0 && h.log[h.position] === tabId) {
+      return false;
     }
 
-    if (h.currentTabId !== null) {
-      h.backStack.push(h.currentTabId);
-      // Cap the back stack
-      if (h.backStack.length > MAX_HISTORY) {
-        h.backStack.shift();
-      }
+    h.log.push(tabId);
+    // Cap the log at MAX_HISTORY (drop the oldest entries).
+    if (h.log.length > MAX_HISTORY) {
+      h.log.shift();
     }
-
-    // Clear forward stack on new navigation
-    h.forwardStack = [];
-    h.currentTabId = tabId;
-
+    h.position = h.log.length - 1;
     return true;
   },
 
   /**
-   * Navigate back to the previous tab. Returns the tab ID or null if
-   * there's no open history to go back to. Closed entries (per `isOpen`)
-   * are skipped and discarded.
+   * Navigate back to the previous open tab. Scans the log backwards from the
+   * current position, skipping closed entries (per `isOpen`), and moves the
+   * focus position to the first open entry found. Returns the tab ID or null.
    */
   goBack(winId: string, isOpen?: IsOpen): string | null {
     const h = _histories.get(winId);
-    if (!h || h.backStack.length === 0) return null;
+    if (!h || h.position < 0) return null;
 
-    let prevTabId: string | null = null;
-    while (h.backStack.length > 0) {
-      const candidate = h.backStack.pop()!;
-      if (!isOpen || isOpen(candidate)) {
-        prevTabId = candidate;
-        break;
+    for (let i = h.position - 1; i >= 0; i--) {
+      const tab = h.log[i];
+      if (!isOpen || isOpen(tab)) {
+        h.position = i;
+        return tab;
       }
     }
-    if (prevTabId === null) return null;
-
-    // Push current tab onto forward stack
-    if (h.currentTabId !== null) {
-      h.forwardStack.push(h.currentTabId);
-    }
-
-    h.currentTabId = prevTabId;
-    return prevTabId;
+    return null;
   },
 
   /**
-   * Navigate forward to the next tab. Returns the tab ID or null if
-   * there's no open forward history. Closed entries (per `isOpen`)
-   * are skipped and discarded.
+   * Navigate forward to the next open tab. Scans the log forwards from the
+   * current position, skipping closed entries (per `isOpen`). Returns the tab
+   * ID or null.
    */
   goForward(winId: string, isOpen?: IsOpen): string | null {
     const h = _histories.get(winId);
-    if (!h || h.forwardStack.length === 0) return null;
+    if (!h || h.position < 0) return null;
 
-    let nextTabId: string | null = null;
-    while (h.forwardStack.length > 0) {
-      const candidate = h.forwardStack.pop()!;
-      if (!isOpen || isOpen(candidate)) {
-        nextTabId = candidate;
-        break;
+    for (let i = h.position + 1; i < h.log.length; i++) {
+      const tab = h.log[i];
+      if (!isOpen || isOpen(tab)) {
+        h.position = i;
+        return tab;
       }
     }
-    if (nextTabId === null) return null;
-
-    // Push current tab onto back stack
-    if (h.currentTabId !== null) {
-      h.backStack.push(h.currentTabId);
-    }
-
-    h.currentTabId = nextTabId;
-    return nextTabId;
+    return null;
   },
 
+  /** True if there is an open entry before the current position. */
   canGoBack(winId: string, isOpen?: IsOpen): boolean {
     const h = _histories.get(winId);
-    if (!h || h.backStack.length === 0) return false;
-    if (!isOpen) return true;
-    return h.backStack.some(isOpen);
+    if (!h || h.position < 0) return false;
+
+    for (let i = h.position - 1; i >= 0; i--) {
+      if (!isOpen || isOpen(h.log[i])) return true;
+    }
+    return false;
   },
 
+  /** True if there is an open entry after the current position. */
   canGoForward(winId: string, isOpen?: IsOpen): boolean {
     const h = _histories.get(winId);
-    if (!h || h.forwardStack.length === 0) return false;
-    if (!isOpen) return true;
-    return h.forwardStack.some(isOpen);
+    if (!h || h.position < 0) return false;
+
+    for (let i = h.position + 1; i < h.log.length; i++) {
+      if (!isOpen || isOpen(h.log[i])) return true;
+    }
+    return false;
   },
 
   /**
-   * Get the current tab ID for a window, if any.
+   * The tab at the current focus position, or null. May return a tab that has
+   * since been closed (navigation skips it); callers that need an open tab
+   * should filter via `isOpen`.
    */
   getCurrent(winId: string): string | null {
     const h = _histories.get(winId);
-    return h ? h.currentTabId : null;
+    if (!h || h.position < 0 || h.position >= h.log.length) return null;
+    return h.log[h.position];
   },
 
   /**
-   * Remove a tab from the navigation history (e.g. when it is closed).
-   * No-op if the tab is not present.
+   * A copy of the full activation log, oldest → newest (duplicates included).
    */
-  remove(winId: string, tabId: string): void {
+  getHistory(winId: string): string[] {
     const h = _histories.get(winId);
-    if (!h) return;
-    if (h.currentTabId === tabId) h.currentTabId = null;
-    h.backStack = h.backStack.filter((t) => t !== tabId);
-    h.forwardStack = h.forwardStack.filter((t) => t !== tabId);
+    return h ? [...h.log] : [];
   },
 
   /**
-   * Cmd+W close order — activation order, most-recently-activated first.
-   * The current tab comes first, then the back stack traversed from most
-   * recent to least. `isOpen` filtering (see resolveCmdWTarget) picks the
-   * next tab to close while skipping closed entries. Does not mutate state.
+   * When a tab is closed, advance the focus position to the PREVIOUS OPEN
+   * entry in the log (the entry activated just before the closed tab's most
+   * recent activation), skipping the closed tab itself and any other closed
+   * entries. Moves `position` to that entry and returns it, or returns null
+   * if there is no previous open entry (or the closed tab isn't in the log).
    */
-  getCloseCandidates(winId: string): string[] {
+  focusPreviousOpen(winId: string, closedTabId: string, isOpen?: IsOpen): string | null {
     const h = _histories.get(winId);
-    if (!h) return [];
+    if (!h || h.log.length === 0) return null;
 
-    const ordered: string[] = [];
-    if (h.currentTabId !== null) ordered.push(h.currentTabId);
-    for (let i = h.backStack.length - 1; i >= 0; i--) ordered.push(h.backStack[i]);
-    return ordered;
+    const start = h.log.lastIndexOf(closedTabId);
+    if (start < 0) return null; // tab was never activated → nothing to go back to
+
+    for (let i = start - 1; i >= 0; i--) {
+      const tab = h.log[i];
+      if (tab === closedTabId) continue; // skip earlier occurrences of the closed tab
+      if (!isOpen || isOpen(tab)) {
+        h.position = i;
+        return tab;
+      }
+    }
+    return null;
   },
 
-  /**
-   * Drop every tab that is no longer open (per `isOpen`) from the stacks.
-   */
-  pruneClosed(winId: string, isOpen: IsOpen): void {
-    const h = _histories.get(winId);
-    if (!h) return;
-    if (h.currentTabId !== null && !isOpen(h.currentTabId)) h.currentTabId = null;
-    h.backStack = h.backStack.filter((t) => isOpen(t));
-    h.forwardStack = h.forwardStack.filter((t) => isOpen(t));
-  },
-
-  /**
-   * Clear all history for a window (e.g., on window close).
-   */
+  /** Clear all history for a window (e.g., on window close). */
   clear(winId: string): void {
     _histories.delete(winId);
   },

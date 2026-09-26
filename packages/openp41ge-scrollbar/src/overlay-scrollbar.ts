@@ -49,6 +49,13 @@ export interface OverlayScrollbarOptions {
    *  and updating it via `setPinned()`. The icon is only created when this
    *  option is provided.  Default: false (feature off). */
   pinned?: boolean;
+  /** Show a scroll-to-bottom arrow button at the bottom of a vertical track
+   *  (a distinct control from the pin icon). It appears whenever the view has
+   *  content to scroll and is not already at the bottom, gets a background on
+   *  hover, and clicking it scrolls the view back to the bottom. Unlike the pin
+   *  (which follows the auto-hide fade), the arrow stays available while the
+   *  view is scrolled up. Default: false (feature off). */
+  scrollToBottom?: boolean;
 }
 
 const OVERLAY_DEFAULT_SIZE = 6;
@@ -64,6 +71,10 @@ const OVERLAY_FADE_MS = 250;
 const PIN_ICON =
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">` +
   `<path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></svg>`;
+
+/** Downward-arrow glyph for the scroll-to-bottom button. */
+const SCROLL_DOWN_ICON =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 1.5v6.5M2.2 4.9 5 7.7l2.8-2.8"/></svg>`;
 
 // ─── Pure geometry (unit-testable) ─────────────────────────────────────
 
@@ -109,6 +120,7 @@ interface AxisState {
   track: HTMLElement;
   thumb: HTMLElement;
   pin?: HTMLElement;
+  scrollDown?: HTMLElement;
 }
 
 export class OverlayScrollbar {
@@ -130,6 +142,7 @@ export class OverlayScrollbar {
   private _autoHideDelay = OVERLAY_DEFAULT_AUTO_HIDE_DELAY;
   private _pinEnabled = false;
   private _pinned = false;
+  private _scrollDownEnabled = false;
   private _hideTimer = 0;
   private _pointerInside = false;
   private _visible = true;
@@ -160,6 +173,7 @@ export class OverlayScrollbar {
     this._autoHideDelay = options.autoHideDelay ?? OVERLAY_DEFAULT_AUTO_HIDE_DELAY;
     this._pinEnabled = options.pinned !== undefined;
     this._pinned = options.pinned ?? false;
+    this._scrollDownEnabled = options.scrollToBottom === true;
   }
 
   static attach(target: HTMLElement, options: OverlayScrollbarOptions = {}): OverlayScrollbar {
@@ -241,8 +255,8 @@ export class OverlayScrollbar {
         overflow: hidden;
         opacity: 1; transition: opacity ${OVERLAY_FADE_MS}ms ease; }
       .os-track.os-hidden { opacity: 0; pointer-events: none; }
-      .os-track--v { border-left: 1px solid rgba(128,128,128,0.25); }
-      .os-track--h { border-top: 1px solid rgba(128,128,128,0.25); }
+      .os-track--v { border-left: 1px solid rgba(128,128,128,0.08); }
+      .os-track--h { border-top: 1px solid rgba(128,128,128,0.08); }
       .os-thumb {
         position: absolute; background: var(--os-thumb, ${OVERLAY_DEFAULT_THUMB_COLOR}); border-radius: 0;
         box-sizing: border-box; pointer-events: auto; cursor: default;
@@ -265,25 +279,81 @@ export class OverlayScrollbar {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        /* Sized to the visible track strip (the track box minus its 1px left
-           border) so the icon centres on the strip. */
-        width: calc(var(--os-hover, 10px) - 1px);
-        height: calc(var(--os-hover, 10px) - 1px);
+        /* Cover the full track box (no 1px sliver left exposed on the hover
+           side) so pointing anywhere over the bar's width hits the pin's
+           hover state instead of falling through to the track's hover-widen. */
+        width: var(--os-hover, 10px);
+        height: var(--os-hover, 10px);
+        /* The visible scrollbar bar is right-aligned inside the track box
+           (os-size = track box - 1px border), e.g. 9px at [r-9,r] whose
+           centre is 0.5px right of the box centre. Nudge the glyph content
+           right by that 1px border so the icon centres over the bar. */
+        padding-left: 1px;
         box-sizing: border-box;
         /* A dark grey — clearly darker than the translucent thumb (which
            renders ~#4f4f4f) so the glyph stands out on the scrollbar. */
         color: #2e2e2e;
-        pointer-events: none; /* purely decorative — not a button */
+        /* Hoverable (for its tooltip + hover chip); because the pin sits on
+           top of the track it captures the hover, so the bar's own
+           hover-widen no longer fires while the pin is pointed at. */
+        pointer-events: auto;
+        cursor: default;
         user-select: none;
-        transition: opacity 0.15s ease;
+        transition: opacity 0.15s ease, background-color 0.12s ease, color 0.12s ease;
+      }
+      .os-pin:hover {
+        /* A dark chip — darker than the light hover behind the scroll-down
+           button so the two indicators read differently. */
+        background: rgba(0, 0, 0, 0.5);
+        color: #d4d4d4;
       }
       .os-pin svg {
-        /* Fill the strip box so the glyph occupies the full width. */
-        width: 100%; height: 100%;
+        /* The pushpin's ink spans only the middle half of its square viewBox
+           width, so at 100% of the 10px strip it renders a thin ~4.5px glyph.
+           Render the svg larger than the box and let flex centre it (the
+           overflow past the strip is transparent — only the ink shows), so
+           the pin is ~6px wide — thinner than the scroll-down arrow, with a
+           clear 1px gap on either side. The glyph ink stays centred over the
+           visible bar. */
+        width: 12px; height: 12px;
         flex: none;
         display: block;
       }
-      .os-pin.os-pin-hidden { opacity: 0; }
+      .os-pin.os-pin-hidden { opacity: 0; pointer-events: none; }
+      .os-scroll-down {
+        position: absolute;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        /* Same width as the track strip (not wider), but taller, so the
+           arrow reads bigger while the icon has breathing room above it
+           inside the hover chip (the glyph no longer touches the chip's top
+           edge). */
+        width: var(--os-hover, 10px);
+        height: 18px;
+        /* Nudge the arrow glyph right to centre it over the visible bar (the
+           bar sits 1px in from the track box's left border — see .os-pin). */
+        padding-left: 1px;
+        padding-top: 4px;
+        box-sizing: border-box;
+        /* Match the app's standard border-line grey (not the faded track
+           border), so the arrow reads as one of the UI's line greys. */
+        color: var(--border-color, #2a2a2a);
+        pointer-events: auto;
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+      }
+      .os-scroll-down svg {
+        width: 11px; height: 11px;
+        flex: none;
+        display: block;
+      }
+      .os-scroll-down:hover {
+        color: #e6e6e6;
+        background: rgba(120, 120, 120, 0.35);
+      }
+      .os-scroll-down.os-scroll-down-hidden { opacity: 0; pointer-events: none; }
     `;
     const root = this._styleTarget;
     if (root instanceof ShadowRoot) {
@@ -340,13 +410,14 @@ export class OverlayScrollbar {
       pin.innerHTML = PIN_ICON;
       const ins = this._inset;
       Object.assign(pin.style, {
-        // Keep a little breathing room above the container's bottom edge so
-        // the icon doesn't sit flush against the line. `calc(0 + 2px)` is
-        // invalid (number + length), so default `bottom` to a unit value.
+        // A small gap of clearance above the container's bottom edge so the
+        // glyph doesn't sit flush against the line without hanging too far
+        // up. `calc(0 + 4px)` is invalid (number + length), so default
+        // `bottom` to a unit value.
         bottom:
           ins.bottom === undefined || ins.bottom === "0"
-            ? "2px"
-            : `calc(${ins.bottom} + 2px)`,
+            ? "4px"
+            : `calc(${ins.bottom} + 4px)`,
         right: ins.right ?? "0",
         zIndex: String(this._zIndex + 1),
       });
@@ -354,6 +425,35 @@ export class OverlayScrollbar {
       pin.style.setProperty("--os-hover", `${this._hoverSize}px`);
       this._container.appendChild(pin);
       this._axes[axis]!.pin = pin;
+    }
+
+    if (this._scrollDownEnabled && axis === "vertical") {
+      const btn = document.createElement("span");
+      btn.className = "os-scroll-down os-scroll-down-hidden";
+      btn.setAttribute("role", "button");
+      btn.setAttribute("aria-label", "Scroll to bottom");
+      btn.setAttribute("data-os-axis", axis);
+      btn.innerHTML = SCROLL_DOWN_ICON;
+      const ins = this._inset;
+      Object.assign(btn.style, {
+        bottom:
+          ins.bottom === undefined || ins.bottom === "0"
+            ? "2px"
+            : `calc(${ins.bottom} + 2px)`,
+        right: ins.right ?? "0",
+        zIndex: String(this._zIndex + 1),
+      });
+      // Size the square button to the track width (matches `--os-hover`).
+      btn.style.setProperty("--os-hover", `${this._hoverSize}px`);
+      // A click scrolls the target straight back to the bottom (the scroll
+      // event then lets the host re-engage auto-follow if it wants to).
+      btn.addEventListener("click", (e: PointerEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._target.scrollTop = this._target.scrollHeight;
+      });
+      this._container.appendChild(btn);
+      this._axes[axis]!.scrollDown = btn;
     }
 
     thumb.addEventListener("pointerdown", (e: PointerEvent) => this._onThumbPointerDown(e, axis));
@@ -433,6 +533,18 @@ export class OverlayScrollbar {
     this._paintPin();
   }
 
+  /** The pinned-state indicator element (vertical axis), or null if the
+   *  `pinned` option wasn't set. Lets a host attach its own tooltip. */
+  get pinElement(): HTMLElement | null {
+    return this._axes["vertical"]?.pin ?? null;
+  }
+
+  /** The scroll-to-bottom control element (vertical axis), or null if the
+   *  `scrollToBottom` option wasn't set. Lets a host attach its own tooltip. */
+  get scrollDownElement(): HTMLElement | null {
+    return this._axes["vertical"]?.scrollDown ?? null;
+  }
+
   /** Show the scrollbar and cancel any pending auto-hide. */
   private _show(): void {
     if (!this._autoHide) return;
@@ -482,6 +594,19 @@ export class OverlayScrollbar {
     state.pin.classList.toggle("os-pin-hidden", hidden);
   }
 
+  /** Repaint the scroll-to-bottom arrow: visible only while the vertical axis
+   *  has overflow AND the view is not already at the bottom (there is
+   *  somewhere to scroll back down to). Independent of the auto-hide fade so
+   *  it stays available while the user is reading older messages. */
+  private _paintScrollDown(): void {
+    const state = this._axes["vertical"];
+    if (!state?.scrollDown) return;
+    const target = this._target;
+    const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 2;
+    const hidden = state.track.style.display === "none" || atBottom;
+    state.scrollDown.classList.toggle("os-scroll-down-hidden", hidden);
+  }
+
   private _isDragging(): boolean {
     for (const key of Object.keys(this._axes) as ScrollbarAxis[]) {
       const state = this._axes[key];
@@ -509,6 +634,7 @@ export class OverlayScrollbar {
         thumb.style.display = "none";
         track.style.display = "none";
         this._paintPin();
+        this._paintScrollDown();
         return;
       }
       thumb.style.display = "";
@@ -520,6 +646,7 @@ export class OverlayScrollbar {
       // The pin icon's visibility is driven by the host's pinned state (via
       // `setPinned`) and the scrollbar's own visibility (auto-hide/scroll).
       this._paintPin();
+      this._paintScrollDown();
     } else {
       const viewport = this._target.clientWidth;
       const scrollLen = this._target.scrollWidth;
@@ -559,6 +686,7 @@ export class OverlayScrollbar {
       if (state) {
         state.track.remove();
         state.pin?.remove();
+        state.scrollDown?.remove();
       }
     }
     this._axes = {};

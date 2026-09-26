@@ -15,6 +15,12 @@ import type { TabContent } from "./tab-content";
 import "./tab-bar";
 import "./tab-content";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
+// The cell-divider hover affordance is the shared <drag-line> (translucent
+// blue) plus its <drag-line-overdraw> companion, which extends the line up
+// past the grid into the top bar — the grid-cell equivalent of the sidebar
+// resize-notch drag line.
+import "../drop-indicator/drag-line";
+import "../drop-indicator/drag-line-overdraw";
 
 /** Repo-row drag MIME (value: repoName). */
 const REPO_DRAG_TYPE = "application/x-openp41ge-repo";
@@ -109,6 +115,8 @@ export class TabGrid extends LitElement {
   /** Per-column flex-basis widths (px). 0 means auto/shared. */
   @state() private _cellWidths: number[] = [];
   private _resizeCol = -1;
+  /** Column whose cell divider is currently hovered (drives the drag line). */
+  @state() private _hoverResizeCol = -1;
   /** Column currently springing back into range after a rubber-band overrun. */
   @state() private _snapbackCol = -1;
   private _resizeStartX = 0;
@@ -986,20 +994,12 @@ export class TabGrid extends LitElement {
              whole 5px strip stays grabbable/visible. */
           z-index: 1000;
         }
-        .grid-resize-handle::before {
-          content: "";
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          left: 1px;
-          width: 3px;
-          background: rgba(74, 158, 255, 0.7);
-          opacity: 0;
-          transition: opacity 0.12s ease;
-        }
-        .grid-resize-handle:hover::before,
-        .grid-resize-handle.dragging::before {
-          opacity: 1;
+        /* The blue indicator is the shared <drag-line> (opacity driven by the
+           show attribute, toggled on hover / drag); it tracks the cell
+           divider's top edge and its <drag-line-overdraw> companion extends it
+           up into the top bar. */
+        .grid-resize-handle drag-line {
+          left: 0;
         }
         /* Animated spring-back for a cell returning from a rubber-band overrun.
            The class is present only during the return (set on release, cleared
@@ -1050,14 +1050,24 @@ export class TabGrid extends LitElement {
   }
 
   private _renderResizeHandle(colIndex: number): TemplateResult {
+    const shown = this._hoverResizeCol === colIndex || this._resizeCol === colIndex;
     return html`
       <div
         class="grid-resize-handle ${this._resizeCol === colIndex ? "dragging" : ""}"
         data-resize-col=${colIndex}
         @pointerdown=${(e: PointerEvent) => this._onCellResizeStart(e, colIndex)}
+        @pointerenter=${() => {
+          if (this._hoverResizeCol !== colIndex) this._hoverResizeCol = colIndex;
+        }}
+        @pointerleave=${() => {
+          if (this._hoverResizeCol === colIndex) this._hoverResizeCol = -1;
+        }}
         @dblclick=${(e: MouseEvent) => this._onCellResizeDblClick(e)}
         title="Drag to resize column. Double-click to equalize all columns"
-      ></div>
+      >
+        <drag-line orientation="vertical" ?show=${shown}></drag-line>
+        <drag-line-overdraw></drag-line-overdraw>
+      </div>
     `;
   }
 

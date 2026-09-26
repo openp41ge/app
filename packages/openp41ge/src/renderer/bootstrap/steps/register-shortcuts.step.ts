@@ -9,7 +9,6 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { emitEvent } from "../../app";
 import { resolveCmdWTarget } from "../../services/cmd-w-target";
-import { TabActivationHistory } from "../../services/tab-activation-history";
 import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("openp41ge", "register-shortcuts");
@@ -53,9 +52,11 @@ export class RegisterShortcutsStep implements IStartupStep {
           const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
           if (!myWindowId) return;
 
-          // Close the next grid tab in activation-history order (most-recently
-          // activated first, ignoring sidebar focus). When no grid tabs remain,
-          // close the window. Sidebar (system) tabs are never closed by Cmd+W.
+          // Cmd+W closes the grid tab the user is CURRENTLY focused on (the
+          // active tab of the focused column). When no grid tabs remain, close
+          // the window. Sidebar (system) tabs are never closed by Cmd+W. The
+          // closed tab stays in the activation log (only skipped when
+          // navigating).
           const target = resolveCmdWTarget(ws, myWindowId);
           if (!target) return;
           if (target.kind === "close-window") {
@@ -66,9 +67,8 @@ export class RegisterShortcutsStep implements IStartupStep {
             windowId: myWindowId,
             paneId: target.tabId,
           });
-          // Drop the closed tab from the activation history so Back/Forward
-          // never navigate to it again.
-          TabActivationHistory.remove(myWindowId, target.tabId);
+          // The closed tab stays in the activation log (it is only skipped when
+          // navigating); the tab-remove-from-cell reducer updates the grid.
         } catch (err) {
           log.warn("Cmd+W handler error:", err);
         }

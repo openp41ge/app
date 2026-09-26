@@ -103,19 +103,15 @@ export class ClosedSidebarDropTarget implements IDropTarget {
       return;
     }
 
-    const el = document.createElement("div");
+    const el = document.createElement("drop-line");
     el.className = "closed-sidebar-edge-indicator";
-    // The indicator runs from just below the title bar (the sidebar does not
-    // extend above the title bar) down to WINDOW_BOTTOM_CLEARANCE above the
-    // window's bottom edge — keeping it clear of the OS-rounded bottom corner.
+    // Look (3px solid blue + glow) comes from <drop-line>; only the fixed
+    // placement at the app-window edge is set here.
     el.style.cssText = [
       "position:fixed",
       this.side === "left" ? "left:0" : "right:0",
       `top:${TITLEBAR_HEIGHT}px`,
       `bottom:${WINDOW_BOTTOM_CLEARANCE}px`,
-      "width:3px",
-      "background:rgb(74,158,255)",
-      "box-shadow:0 0 10px rgba(74,158,255,0.8), 0 0 24px rgba(74,158,255,0.4)",
       "pointer-events:none",
       "z-index:100000",
     ].join(";");

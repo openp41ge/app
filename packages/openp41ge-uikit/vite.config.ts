@@ -9,6 +9,8 @@ export default defineConfig({
         theme: path.resolve(__dirname, "src/theme/index.ts"),
         "file-editor": path.resolve(__dirname, "src/file-editor/index.ts"),
         tooltip: path.resolve(__dirname, "src/components/tooltip/index.ts"),
+        "overdraw-line": path.resolve(__dirname, "src/components/overdraw-line/index.ts"),
+        "drop-indicator": path.resolve(__dirname, "src/components/drop-indicator/index.ts"),
       },
       formats: ["es"],
       fileName: (format, entryName) => `${entryName}.js`,

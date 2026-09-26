@@ -24,7 +24,9 @@
  *
  * MIN / MAX WIDTH:
  *   - The drawer width is always within `[minWidth (= defaultDrawerWidth),
- *     maxWidth (= maxDrawerWidth, clamped to the grid width)]`.
+ *     grid width]` — there is no artificial max, so the drawer may grow all
+ *     the way to the grid's edge (double-clicking the drag bar jumps straight
+ *     to full grid width).
  *   - Because only one drawer is open at a time there is no opposite drawer to
  *     share the grid with, so the drawer may extend past the grid's midpoint
  *     up to its max width, and no overlap bookkeeping is needed.
@@ -55,6 +57,9 @@
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
+// Registers <drop-box>, the shared blue drop-zone indicator, so the edge-snap
+// anchor uses the same blue family as every other drag/drop indicator.
+import "openp41ge-uikit/drop-indicator";
 
 export type DrawerSide = "left" | "right";
 
@@ -185,9 +190,16 @@ export class Openp41geSettingsDrawerHost extends LitElement {
   private _resizeSide: DrawerSide = "left";
   private _resizeStartX = 0;
   private _resizeStartWidth = 0;
+  /** Side whose drag bar is currently hovered (drives the drag line's show).
+   *  Plain field (not reactive) so hovering the 3px bar never re-renders the
+   *  drawer stack; the bar is shown imperatively and re-derived on render. */
+  private _hoverSide: DrawerSide | null = null;
 
   /** Elastic resistance factor applied when dragging a drawer past its limit. */
   private readonly _RESISTANCE = 0.2;
+  /** Within this many px of the grid's edge a dragged drawer snaps to the
+   *  full grid width (an "anchor": no point leaving a small gap). */
+  private readonly _EDGE_SNAP = 75;
 
   /** Side currently being resized — drives the `sdw-resizing` class (keeps the
    * blue indicator lit while dragging, even when the cursor leaves the bar). */
@@ -198,6 +210,11 @@ export class Openp41geSettingsDrawerHost extends LitElement {
    * `sdw-snapback` class so the width transition animates the return). */
   @state()
   private _snapbackSide: DrawerSide | null = null;
+
+  /** Side whose drag is currently within the edge-snap zone (drives the
+   * full-width anchor indicator; null while not in the zone). */
+  @state()
+  private _edgeSnapSide: DrawerSide | null = null;
 
   /** The floor for the drawer width (the "default drawer width"). */
   private get _minWidth(): number {
@@ -296,10 +313,9 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     const target = side ?? this.side;
     const other = target === "left" ? "right" : "left";
 
-    // Open much larger than the min width: default to the widest allowed
-    // (the max drawer width, clamped to the grid area). The min width
-    // (`defaultDrawerWidth`) is unchanged — it stays the floor — only the
-    // width the drawer OPENS to changes.
+    // Open at the preferred width (`maxDrawerWidth`, clamped to the grid
+    // area); this is the initial width, not a bound — the drawer can be
+    // resized or double-clicked up to the full grid width.
     const gridWidth = this.clientWidth || 0;
     if (gridWidth) {
       this._drawerWidths = {
@@ -486,22 +502,48 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     return Math.min(peek, room);
   }
 
-  /** Width a drawer opens to: the widest allowed, clamped to the grid area. */
+  /** Width a drawer opens to: the preferred width (`maxDrawerWidth`, clamped
+   *  to the grid area). This is the initial width, not an upper bound. */
   private _openWidthFor(side: DrawerSide, gridWidth: number): number {
-    return this._sideMaxWidth(side, gridWidth);
+    return Math.max(this._minWidth, Math.min(this.maxDrawerWidth, this._sideMaxWidth(side, gridWidth)));
   }
 
   /**
    * The single max width for an open drawer. Only one drawer is open at a time,
    * so there is no opposite drawer to share the grid with — the drawer is free
-   * to extend past the grid's midpoint, up to `maxDrawerWidth`. It is clamped
-   * to the grid width so it never overflows the grid area.
+   * to extend past the grid's midpoint. There is no artificial max width: the
+   * drawer may grow all the way to the grid's own edge, which is the only
+   * bound (it can't slide under the opposite sidebar / off the window).
    */
   private _sideMaxWidth(side: DrawerSide, gridWidth: number): number {
-    return Math.max(this._minWidth, Math.min(this.maxDrawerWidth, gridWidth));
+    // Cap 1px short of the grid edge so the 3px drag bar (which overhangs the
+    // drawer's inner-edge border by 1px on each side) stays fully inside the
+    // grid area. At exactly gridWidth the outboard pixel would be clipped by
+    // the grid area's overflow hidden when the drawer spans the whole grid.
+    return Math.max(this._minWidth, gridWidth - 1);
   }
 
   // ── Resize handles ──────────────────────────────────────────────────────
+
+  private _onResizeEnter = (side: DrawerSide): void => {
+    this._hoverSide = side;
+    this._setResizeLineShow(side, true);
+  };
+
+  private _onResizeLeave = (side: DrawerSide): void => {
+    if (this._hoverSide === side) this._hoverSide = null;
+    this._setResizeLineShow(side, false);
+  };
+
+  /** Toggle the shared <drag-line> inside a side's drawer drag bars. */
+  private _setResizeLineShow(side: DrawerSide, show: boolean): void {
+    this.renderRoot
+      ?.querySelectorAll(`.sdw-drawer[data-side="${side}"] .sdw-resize drag-line`)
+      .forEach((el) => {
+        if (show) el.setAttribute("show", "");
+        else el.removeAttribute("show");
+      });
+  }
 
   private _onResizeDown = (e: PointerEvent, side: DrawerSide): void => {
     e.preventDefault();
@@ -510,6 +552,7 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     this._resizeSide = side;
     this._resizingSide = side;
     this._snapbackSide = null;
+    this._edgeSnapSide = null;
     this.requestUpdate();
     this._resizeStartX = e.clientX;
     this._resizeStartWidth = this._drawerWidths[side];
@@ -519,6 +562,25 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     document.addEventListener("pointerup", this._onResizeUp, true);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
+  };
+
+  /** Double-clicking the drag bar grows the drawer to the full grid width. */
+  private _onResizeDblClick = (e: MouseEvent, side: DrawerSide): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    const gridWidth = this.clientWidth || 0;
+    if (!gridWidth || this._drawerWidths[side] >= this._sideMaxWidth(side, gridWidth)) return; // already full
+    this.setDrawerWidthFor(side, gridWidth);
+    // The base drawer only transitions left/right; apply the snapback class for
+    // one frame so the width transition animates the grow (cleared once the
+    // transition finishes, mirroring `_onResizeUp`).
+    this._snapbackSide = side;
+    window.setTimeout(() => {
+      if (this._snapbackSide === side) {
+        this._snapbackSide = null;
+        this.requestUpdate();
+      }
+    }, 260);
   };
 
   private _onResizeMove = (e: PointerEvent): void => {
@@ -531,17 +593,15 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     const gridWidth = this.clientWidth || 0;
     // The drawer must never pass the grid's own edge (it would slide under the
     // opposite sidebar / off the window), so that edge is a HARD clamp with no
-    // rubber band. Within the grid, the drawer bends elastically at its designed
-    // max (`maxDrawerWidth`) if that is reached before the grid edge; it once
-    // again springs back to that settled max on release (`_onResizeUp`).
-    const gridMax = gridWidth;
-    const bandMax = this._sideMaxWidth(side, gridWidth);
+    // rubber band. There is no artificial max width, so within the grid the
+    // drawer tracks the pointer exactly — the drawer does NOT snap mid-drag;
+    // it only anchors (animated) on release below. Below the min width it
+    // bends elastically and (via `_onResizeUp`) springs back.
+    const gridMax = this._sideMaxWidth(side, gridWidth);
     const min = this._minWidth;
     let width = proposed;
     if (width > gridMax) {
-      width = gridMax; // hard clamp at the grid edge (no band)
-    } else if (width > bandMax) {
-      width = Math.min(gridMax, bandMax + (width - bandMax) * this._RESISTANCE);
+      width = gridMax; // hard clamp at the grid edge
     } else if (width < min) {
       width = min - (min - width) * this._RESISTANCE;
     }
@@ -549,6 +609,9 @@ export class Openp41geSettingsDrawerHost extends LitElement {
       ...this._drawerWidths,
       [side]: width,
     };
+    // While the drag is within the edge-snap zone (near the grid's edge) show
+    // the full-width anchor indicator; it fades out toward the drawer.
+    this._edgeSnapSide = width > gridMax - this._EDGE_SNAP ? side : null;
   };
 
   private _onResizeUp = (): void => {
@@ -559,13 +622,18 @@ export class Openp41geSettingsDrawerHost extends LitElement {
     document.removeEventListener("pointerup", this._onResizeUp, true);
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
-    // Spring the drawer back into its allowed range if the drag overshot a
-    // limit. `_resizingSide` is cleared in the same render so the width
-    // transition plays the snap-back instead of popping.
+    // Hide the edge-snap anchor indicator now that the drag has ended, then
+    // decide the final width: if the drag ended within the edge-snap zone,
+    // snap to the full grid width (animated); otherwise spring back into the
+    // allowed range if the drag overshot below the min width.
+    // `_resizingSide` is cleared in the same render so the width transition
+    // plays the snap/grow instead of popping.
+    this._edgeSnapSide = null;
     const gridWidth = this.clientWidth || 0;
     const max = this._sideMaxWidth(side, gridWidth);
     const cur = this._drawerWidths[side];
-    const clamped = Math.max(this._minWidth, Math.min(max, cur));
+    let clamped = Math.max(this._minWidth, Math.min(max, cur));
+    if (gridWidth && cur > gridWidth - this._EDGE_SNAP) clamped = max; // snap to full grid width
     if (cur !== clamped) {
       this._drawerWidths = { ...this._drawerWidths, [side]: clamped };
       // Apply the snapback class for one frame so the width transition plays the
@@ -786,25 +854,21 @@ export class Openp41geSettingsDrawerHost extends LitElement {
           user-select: none;
           background: transparent;
         }
-        .sdw-resize::before {
-          content: "";
-          position: absolute;
-          top: 0;
-          bottom: 0;
+        /* The blue indicator is the shared <drag-line>, shown on hover / drag
+           via its show attribute; its <drag-line-overdraw> companion extends
+           the line up into the top bar. It fills the 3px bar. */
+        .sdw-resize drag-line {
           left: 0;
-          width: 100%;
-          background: rgba(74, 158, 255, 0.7);
-          opacity: 0;
-          transition: opacity 0.12s ease;
         }
-        .sdw-resize:hover::before {
-          opacity: 1;
-        }
-        /* Keep the indicator lit for the whole drag, not just while hovering. */
-        .sdw-drawer.sdw-resizing .sdw-resize::before,
-        .sdw-drawer.sdw-resizing .sdw-resize:hover::before {
-          opacity: 1;
-        }
+        /* Full-width anchor indicator shown while a drag is within the
+         * edge-snap zone: a soft blue wash with a bright blue border stamped
+         * against the grid's opposite edge (where the drawer will anchor on
+         * release), like the tab drop indicators. It is wider than the snap
+         * zone, and since the drawer's left edge is within that zone the fade
+         * runs over the drawer surface itself: the wash paints across it and
+         * fades out toward the drawer. The box itself is <drop-box> (shared
+         * blue border + wash + directional fade); only its geometry is set
+         * here/at the call site. */
         /* Invisible click mask over a parent drawer while a child is open.
          * It makes the parent inert (clicks can't reach its body/controls) and
          * turning it into a "back" affordance: clicking the parent closes the
@@ -997,6 +1061,16 @@ export class Openp41geSettingsDrawerHost extends LitElement {
 
       ${this.isOpen ? html`<div class="sdw-mask"></div>` : nothing} ${this._renderStack("left")}
       ${this._renderStack("right")}
+      ${this._edgeSnapSide
+        ? html`<drop-box
+              class="sdw-edge-snap"
+              fade="${this._edgeSnapSide === "left" ? "left" : "right"}"
+              style="
+                top: 0; bottom: 0; width: 100px; z-index: 30;
+                ${this._edgeSnapSide === "left" ? "right: 0" : "left: 0"}
+              "
+            ></drop-box>`
+        : nothing}
     `;
   }
 
@@ -1019,6 +1093,9 @@ export class Openp41geSettingsDrawerHost extends LitElement {
       ${stack.layers.map((layer, i) => {
         const offset = this._layerOffset(side, i, n, width, this.clientWidth || 0);
         const pos = side === "left" ? `left:${offset}px` : `right:${offset}px`;
+        // The 3px bar is centred over the drawer's inner-edge border (1px on
+        // each side of the 1px border line). `-2px` accounts for the border
+        // offset because `position:absolute` resolves against the padding box.
         const resizeSide = side === "left" ? "right:-2px" : "left:-2px";
         const hasChildren = i < n - 1;
         return html`
@@ -1039,9 +1116,18 @@ export class Openp41geSettingsDrawerHost extends LitElement {
             <div
               class="sdw-resize"
               style="${resizeSide}"
-              title="Drag to resize drawer width"
+              title="Drag to resize · double-click to expand to full width"
               @pointerdown=${(e: PointerEvent) => this._onResizeDown(e, side)}
-            ></div>
+              @pointerenter=${() => this._onResizeEnter(side)}
+              @pointerleave=${() => this._onResizeLeave(side)}
+              @dblclick=${(e: MouseEvent) => this._onResizeDblClick(e, side)}
+            >
+              <drag-line
+                orientation="vertical"
+                ?show=${this._resizingSide === side || this._hoverSide === side}
+              ></drag-line>
+              <drag-line-overdraw></drag-line-overdraw>
+            </div>
             ${
               hasChildren
                 ? html`<div

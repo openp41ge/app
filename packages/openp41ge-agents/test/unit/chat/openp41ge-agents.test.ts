@@ -244,6 +244,107 @@ describe("Openp41geAgents (custom element)", () => {
     expect(el.shadowRoot!.querySelector(".code-block")!.classList.contains("wrap")).toBe(true);
   });
 
+  it("boxes the toolbar buttons in a bordered group with a divider and corners", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+
+    el.addMessage("assistant", "```js\nconst x = 1;\n```");
+    await el.updateComplete;
+
+    const group = el.shadowRoot!.querySelector(".code-block-toolbar-group") as HTMLElement;
+    expect(group).not.toBeNull();
+    // Both buttons live inside the framed group.
+    expect(group.querySelector(".code-wrap")).not.toBeNull();
+    expect(group.querySelector(".code-lang")).not.toBeNull();
+    // The divider between the wrap toggle and the language label is its own
+    // element (so it can carry the overdraw extensions top and bottom), not a
+    // border on the wrap button.
+    expect(group.querySelector(".code-toolbar-sep")).not.toBeNull();
+    // Corner overdraw accents are the shared <overdraw-line> uikit element:
+    // four corners x two lines each, plus the divider's two end overdraws.
+    const groupLines = Array.from(group.children).filter(
+      (c) => c.tagName.toLowerCase() === "overdraw-line",
+    );
+    expect(groupLines).toHaveLength(8);
+    const sep = group.querySelector(".code-toolbar-sep")!;
+    expect(
+      Array.from(sep.children).filter((c) => c.tagName.toLowerCase() === "overdraw-line"),
+    ).toHaveLength(2);
+    // The code block itself draws all four corners too, but omits the
+    // bottom-right vertical (the toolbar group's border covers that edge).
+    const block = el.shadowRoot!.querySelector(".code-block")!;
+    expect(
+      Array.from(block.children).filter((c) => c.tagName.toLowerCase() === "overdraw-line"),
+    ).toHaveLength(7);
+  });
+
+  it("attaches the overdraw accent to the top of the search button's right separator", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    el.addMessage("assistant", "hi");
+    await el.updateComplete;
+
+    // The composer toolbar buttons and the search button itself carry no
+    // overdraw accents — only the top of the separator to the button's right
+    // is decorated (the divider appears to continue up past the bar border).
+    const toolbarButtons = el.shadowRoot!.querySelectorAll(
+      ".composer-toolbar .composer-tool, .composer-toolbar .composer-select",
+    );
+    for (const btn of toolbarButtons) {
+      expect(btn.querySelectorAll("overdraw-line")).toHaveLength(0);
+    }
+    const find = el.shadowRoot!.querySelector(".chat-bottombar .bb-find");
+    expect(find!.querySelectorAll("overdraw-line")).toHaveLength(0);
+
+    const sep = el.shadowRoot!.querySelector<HTMLElement>(".chat-bottombar .bb-sep");
+    expect(sep).toBeTruthy();
+    const lines = Array.from(sep!.querySelectorAll("overdraw-line"));
+    expect(lines).toHaveLength(1);
+    expect(lines[0].getAttribute("dir")).toBe("up");
+  });
+
+  it("portals horizontal top overdraw accents for the composer and chat find bar", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    el.addMessage("assistant", "hi");
+    await el.updateComplete;
+
+    // The composer's top separator line is extended past each top corner by a
+    // single horizontal <overdraw-line> (dir=left at tl, dir=right at tr). The
+    // lines are NOT children of the composer: they're portalled into a fixed
+    // top-layer div on the body so they escape the panel's own overflow and
+    // paint above neighbouring grid tabs/sidebars.
+    const layers = () =>
+      Array.from(document.body.querySelectorAll(".p41ge-overdraw-layer"));
+    expect(layers()).toHaveLength(1);
+    const composerLines = Array.from(layers()[0].querySelectorAll("overdraw-line"));
+    expect(composerLines).toHaveLength(2);
+    expect(composerLines.map((l) => l.getAttribute("corner")).sort()).toEqual(["tl", "tr"]);
+    expect(composerLines.map((l) => l.getAttribute("dir")).sort()).toEqual(["left", "right"]);
+    expect(
+      el.shadowRoot!.querySelector(".composer")!.querySelectorAll("overdraw-line"),
+    ).toHaveLength(0);
+
+    // The same accents apply to the (initially hidden) chat find bar's top
+    // separator once it is opened.
+    const bar = el.shadowRoot!.querySelector(".chat-bottombar") as HTMLElement;
+    bar.querySelector(".bb-find")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await el.updateComplete;
+    const findbar = el.shadowRoot!.querySelector<HTMLElement>(".chat-findbar");
+    expect(findbar).toBeTruthy();
+    expect(layers()).toHaveLength(2);
+    for (const layer of layers()) {
+      const lines = Array.from(layer.querySelectorAll("overdraw-line"));
+      expect(lines).toHaveLength(2);
+      expect(lines.map((l) => l.getAttribute("dir")).sort()).toEqual(["left", "right"]);
+    }
+
+    // Re-renders must not duplicate the accents.
+    el.addMessage("user", "again");
+    await el.updateComplete;
+    expect(layers()).toHaveLength(2);
+  });
+
   it("attaches horizontal overlay scrollbars to code blocks, but only while unwrapped", async () => {
     // jsdom ships no ResizeObserver, and the component skips attaching without
     // one. Stub it so the sync logic runs and we can assert the lifecycle.
@@ -460,7 +561,8 @@ describe("Openp41geAgents (custom element)", () => {
     expect(shadow.querySelectorAll(".chat-message.assistant")).toHaveLength(1);
     const toolRow = shadow.querySelector(".tool-call-row") as HTMLElement;
     expect(toolRow.textContent).toContain("read_file");
-    expect(toolRow.textContent).toContain("/a");
+    const toolJson = shadow.querySelector(".tool-call-json");
+    expect(toolJson?.textContent).toContain("/a");
 
     // Tool calls render inline, interleaved with the response text per `segments`:
     // the tool row comes before the streamed content (no grouped `.tool-calls` container).
@@ -581,10 +683,42 @@ describe("Openp41geAgents (custom element)", () => {
 
     const reasoning = el.renderRoot.querySelector(".msg-reasoning");
     expect(reasoning).not.toBeNull();
+    // No template-literal whitespace leaks into the pre-wrap body: content
+    // starts flush at the top with no leading blank line or indent.
     expect(reasoning!.querySelector(".msg-reasoning-body")!.textContent).toBe(
       "Let me think about this",
     );
-    expect(reasoning!.querySelector(".msg-reasoning-size")!.textContent).toBe("5 words");
+    expect(reasoning!.querySelector(".msg-reasoning-size")!.textContent).toBe("~5 words");
+  });
+
+  it("parses reasoning as markdown (bold, lists, fenced code)", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    el.setChat({
+      messages: [
+        {
+          id: "r1",
+          role: "assistant",
+          reasoning:
+            "Let me **think hard** about this.\n\n- step one\n- step two\n\n```js\nconst x = 1;\n```",
+          content: "Done.",
+        },
+      ],
+    });
+    await el.updateComplete;
+    const reasoning = el.renderRoot.querySelector(".msg-reasoning");
+    expect(reasoning).not.toBeNull();
+    const body = reasoning!.querySelector(".msg-reasoning-body");
+    expect(body).not.toBeNull();
+    const content = body!.querySelector(".msg-content");
+    expect(content).not.toBeNull();
+    expect(content!.querySelector("strong")!.textContent).toBe("think hard");
+    expect(content!.querySelectorAll("ul li").length).toBe(2);
+    expect(content!.querySelector(".code-block-wrap pre code")!.textContent).toBe(
+      "const x = 1;",
+    );
+    el.remove();
   });
 
   it("keeps reasoning in the same message when it interleaves with content", async () => {
@@ -610,7 +744,7 @@ describe("Openp41geAgents (custom element)", () => {
     // Exactly one reasoning block (not a split "word / reasoning / rest").
     const blocks = el.renderRoot.querySelectorAll(".msg-reasoning");
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]!.querySelector(".msg-reasoning-body")!.textContent).toBe(".");
+    expect(blocks[0]!.querySelector(".msg-reasoning-body")!.textContent!.trim()).toBe(".");
   });
 
   it("appendReasoning after a tool call starts a NEW assistant block, not merging into the old one", async () => {
@@ -647,10 +781,10 @@ describe("Openp41geAgents (custom element)", () => {
     // Two separate reasoning blocks render sequentially in the DOM.
     const blocks = el.renderRoot.querySelectorAll(".msg-reasoning");
     expect(blocks).toHaveLength(2);
-    expect(blocks[0]!.querySelector(".msg-reasoning-body")!.textContent).toBe(
+    expect(blocks[0]!.querySelector(".msg-reasoning-body")!.textContent!.trim()).toBe(
       "First turn reasoning",
     );
-    expect(blocks[1]!.querySelector(".msg-reasoning-body")!.textContent).toBe(
+    expect(blocks[1]!.querySelector(".msg-reasoning-body")!.textContent!.trim()).toBe(
       "Second turn reasoning",
     );
   });
@@ -680,14 +814,10 @@ describe("Openp41geAgents (custom element)", () => {
     expect(done.status).toBe("done");
   });
 
-  it("emits chat:tool-open with the tool result when a done card is clicked", async () => {
+  it("shows a success pill in the collapsible tool header", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
     await el.updateComplete;
-
-    const opened = new Promise<CustomEvent>((resolve) => {
-      el.addEventListener("chat:tool-open", (e) => resolve(e as CustomEvent), { once: true });
-    });
 
     el.setToolCallState(
       { id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "done" },
@@ -695,42 +825,164 @@ describe("Openp41geAgents (custom element)", () => {
     );
     await el.updateComplete;
 
-    const row = el.shadowRoot!.querySelector(".tool-call-row")! as HTMLElement;
-    // The card body is NOT clickable — a right-aligned action row appears.
-    const actions = el.shadowRoot!.querySelector(".tool-call-actions")!;
-    expect(actions).not.toBeNull();
-    // No inline result panel — the result lives in the opened tab.
+    // No action buttons / status pill; the card is a collapsible details box
+    // with corners. The header row carries chevron + Tool label + right-aligned name.
+    expect(el.shadowRoot!.querySelector(".tool-call-actions")).toBeNull();
+    expect(el.shadowRoot!.querySelectorAll('.tool-call-group overdraw-line[corner]')).toHaveLength(8);
     expect(el.shadowRoot!.querySelector(".tool-call-result")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".tool-call-status")).toBeNull();
+    const summary = el.shadowRoot!.querySelector(".tool-call-row")!;
+    expect(summary.querySelector(".tool-call-chevron")).not.toBeNull();
+    expect(summary.querySelector(".tool-call-label")?.textContent).toBe("Tool");
+    expect(summary.querySelector(".tool-call-name")?.textContent).toBe("read_file");
+    // The JSON body is hidden until the collapsible is opened.
+    const details = el.shadowRoot!.querySelector(".tool-call-details")! as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+  });
 
-    const openBtn = el.shadowRoot!.querySelector(".tool-call-btn.primary")! as HTMLElement;
-    // The buttons are icon-only, below the card (not inside it).
-    expect(openBtn.querySelector("svg")).not.toBeNull();
-    const copyBtn = el.shadowRoot!.querySelector(".tool-call-btn:not(.primary)")! as HTMLElement;
-    expect(copyBtn.querySelector("svg")).not.toBeNull();
-    // A success pill sits in the footer to the left of the action buttons.
-    const pill = el.shadowRoot!.querySelector(".tool-call-status.done")!;
-    expect(pill.textContent).toBe("success");
-    expect(actions.closest(".tool-call-footer")!.contains(pill)).toBe(true);
-    // The actions row is in a footer below the card (a sibling of the card row).
-    expect(actions.closest(".tool-call-row")).toBeNull();
-    expect(actions.parentElement!.classList.contains("tool-call-footer")).toBe(true);
-    expect(actions.closest(".tool-call-wrap")!.querySelector(".tool-call-row")).not.toBeNull();
-    openBtn.click();
-    const detail = ((await opened) as CustomEvent<{ toolCall?: { id: string }; result?: string }>)
-      .detail!;
-    expect(detail.toolCall?.id).toBe("tc1");
-    expect(detail.result).toBe("file contents");
+  it("opens a tool call to reveal the JSON arguments", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setToolCallState({
+      id: "tc1",
+      name: "read_file",
+      arguments: '{"path":"/a"}',
+      status: "done",
+    });
+    await el.updateComplete;
+
+    const details = el.shadowRoot!.querySelector(".tool-call-details")! as HTMLDetailsElement;
+    const summary = details.querySelector(".tool-call-row") as HTMLElement;
+    expect(details.querySelector(".tool-call-body")).not.toBeNull();
+    expect(details.open).toBe(false);
+    summary.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(details.open).toBe(true);
+    expect(details.querySelector(".tool-call-json")?.textContent).toBe(
+      JSON.stringify({ path: "/a" }, null, 2),
+    );
+    // Opening reveals the divider line extensions along the body's top edge.
+    const ext = details.querySelectorAll(".tool-call-ext");
+    expect(ext).toHaveLength(2);
+  });
+
+  it("groups consecutive tool calls into one box sharing dividers", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // Legacy path (no segments): all tool calls group together.
+    el.setChat({
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "ok",
+          toolCalls: [
+            { id: "tc1", name: "read_file", arguments: '{"path":"/a"}', status: "done" },
+            { id: "tc2", name: "grep", arguments: '{"pattern":"x"}', status: "done" },
+            { id: "tc3", name: "write_file", arguments: '{"path":"/b"}', status: "done" },
+          ],
+          timestamp: 1,
+        },
+      ],
+    });
+    await el.updateComplete;
+    const shadow = el.shadowRoot!;
+    expect(shadow.querySelectorAll(".tool-call-group")).toHaveLength(1);
+    expect(shadow.querySelectorAll(".tool-call-details")).toHaveLength(3);
+    expect(shadow.querySelectorAll('.tool-call-group overdraw-line[corner]')).toHaveLength(8);
+    // Two shared dividers between the three calls (and their fade extensions).
+    expect(shadow.querySelectorAll(".tool-call-details + .tool-call-details")).toHaveLength(2);
+    // No grouped `.tool-calls` container any more.
+    expect(shadow.querySelector(".tool-calls")).toBeNull();
+
+    // Consecutive tool segments group inline; a text segment breaks the group.
+    el.setChat({
+      messages: [
+        {
+          id: "m2",
+          role: "assistant",
+          content: "",
+          segments: [
+            { type: "tool", toolCall: { id: "t1", name: "a", arguments: "{}", status: "done" } },
+            { type: "tool", toolCall: { id: "t2", name: "b", arguments: "{}", status: "done" } },
+            { type: "text", text: "done." },
+            { type: "tool", toolCall: { id: "t3", name: "c", arguments: "{}", status: "done" } },
+          ],
+          timestamp: 2,
+        },
+      ],
+    });
+    await el.updateComplete;
+    const groups = shadow.querySelectorAll(".tool-call-group");
+    expect(groups).toHaveLength(2);
+    expect(groups[0].querySelectorAll(".tool-call-details")).toHaveLength(2);
+    expect(groups[1].querySelectorAll(".tool-call-details")).toHaveLength(1);
+    // Boundary between the two grouped calls has a shared divider with fades.
+    const divider = groups[0].querySelector(".tool-call-details + .tool-call-details")!;
+    expect(divider).not.toBeNull();
+  });
+
+  it("detaches an opened tool call from its group and spaces it apart", async () => {
+    const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.setChat({
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          segments: [
+            { type: "tool", toolCall: { id: "a", name: "read", arguments: "{}", status: "done" } },
+            { type: "tool", toolCall: { id: "b", name: "bash", arguments: "{}", status: "done" } },
+            { type: "tool", toolCall: { id: "c", name: "write", arguments: "{}", status: "done" } },
+            { type: "tool", toolCall: { id: "d", name: "bash", arguments: "{}", status: "done" } },
+          ],
+          timestamp: 1,
+        },
+      ],
+    });
+    await el.updateComplete;
+    const shadow = el.shadowRoot!;
+
+    // All closed: a single grouped box.
+    expect(shadow.querySelectorAll(".tool-call-group")).toHaveLength(1);
+    expect(shadow.querySelector(".tool-call-group")!.querySelectorAll(".tool-call-details")).toHaveLength(4);
+
+    // Open the 2nd call (b): it detaches into its own boxed card, while the
+    // remaining closed calls re-group so the first and last two still touch.
+    const second = shadow.querySelector<HTMLDetailsElement>('.tool-call-details[data-tool-call-id="b"]')!;
+    second.open = true;
+    second.dispatchEvent(new Event("toggle", { bubbles: false }));
+    await el.updateComplete;
+
+    const groups = [...shadow.querySelectorAll(".tool-call-group")];
+    expect(groups).toHaveLength(3);
+    expect([...groups[0].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId)).toEqual(["a"]);
+    expect([...groups[1].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId)).toEqual(["b"]);
+    expect(groups[1].querySelector(".tool-call-details")!.hasAttribute("open")).toBe(true);
+    expect([...groups[2].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId)).toEqual(["c", "d"]);
+
+    // Closing it returns all four calls to one grouped box.
+    const re = shadow.querySelector<HTMLDetailsElement>('.tool-call-details[data-tool-call-id="b"]')!;
+    re.open = false;
+    re.dispatchEvent(new Event("toggle", { bubbles: false }));
+    await el.updateComplete;
+    expect(shadow.querySelectorAll(".tool-call-group")).toHaveLength(1);
+    expect(shadow.querySelector(".tool-call-group")!.querySelectorAll(".tool-call-details")).toHaveLength(4);
+
+    el.remove();
   });
 
   it("does not open a running (no-result) card", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
     await el.updateComplete;
-
-    let opened = false;
-    el.addEventListener("chat:tool-open", () => {
-      opened = true;
-    });
 
     el.setToolCallState({
       id: "tc1",
@@ -740,19 +992,13 @@ describe("Openp41geAgents (custom element)", () => {
     });
     await el.updateComplete;
 
-    // No action row while the tool is still running (no result yet), but a
-    // "loading…" pill with animated dots is shown.
+    // No action/status elements are shown; the card is a plain grouped box.
     expect(el.shadowRoot!.querySelector(".tool-call-actions")).toBeNull();
-    const running = el.shadowRoot!.querySelector(".tool-call-status.running")!;
-    expect(running).not.toBeNull();
-    expect(running.textContent).toBe("loading...");
-    expect(running.querySelectorAll(".dot").length).toBe(3);
-    const row = el.shadowRoot!.querySelector(".tool-call-row")! as HTMLElement;
-    row.click();
-    expect(opened).toBe(false);
+    expect(el.shadowRoot!.querySelector(".tool-call-status")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".tool-call-result")).toBeNull();
   });
 
-  it("shows a friendly second line for read_file and search_files", async () => {
+  it("pretty-prints tool call arguments as JSON in the body", async () => {
     const el = document.createElement("openp41ge-agents") as unknown as Openp41geAgents;
     document.body.appendChild(el);
     await el.updateComplete;
@@ -777,14 +1023,24 @@ describe("Openp41geAgents (custom element)", () => {
     });
     await el.updateComplete;
 
-    const rows = el.shadowRoot!.querySelectorAll(".tool-call-row");
-    expect(rows[0].querySelector(".tool-call-args")?.textContent).toBe("/repo/src/a.ts");
-    expect(rows[1].querySelector(".tool-call-args")?.textContent).toBe(
-      "“store” · ascii-drawing-tool/main, tw050x.net/dev",
+    const jsons = el.shadowRoot!.querySelectorAll(".tool-call-json");
+    expect(jsons).toHaveLength(3);
+    expect(jsons[0].textContent).toBe(JSON.stringify({ path: "/repo/src/a.ts" }, null, 2));
+    expect(jsons[1].textContent).toBe(
+      JSON.stringify(
+        { query: "store", roots: ["/x/ascii-drawing-tool/main", "/x/tw050x.net/dev"] },
+        null,
+        2,
+      ),
     );
-    // Only the target path, never the (potentially huge) file content.
-    expect(rows[2].querySelector(".tool-call-args")?.textContent).toBe("/repo/src/app.ts");
-    expect(rows[2].querySelector(".tool-call-args")?.textContent).not.toContain("file body");
+    // The full pretty-printed JSON (including any content) is shown verbatim.
+    expect(jsons[2].textContent).toBe(
+      JSON.stringify(
+        { path: "/repo/src/app.ts", content: "...full file body...", mode: "replace" },
+        null,
+        2,
+      ),
+    );
   });
 
   it("renders tool calls inline, interleaved with streamed text in order", async () => {
