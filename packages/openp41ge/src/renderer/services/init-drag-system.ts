@@ -2741,15 +2741,36 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
 let _ghostShownGrid: HTMLElement | null = null;
 
 function updateGridGhost(clientX: number, clientY: number): void {
-  clearGridGhost();
-
   const target = openp41geTargetResolver(clientX, clientY);
-  if (!target || target.type !== "grid") return;
+  if (!target || target.type !== "grid") {
+    clearGridGhost();
+    return;
+  }
 
   const source = _currentSource;
-  if (!source) return;
+  if (!source) {
+    clearGridGhost();
+    return;
+  }
+
   const feedback = target.onHover(source, clientX, clientY);
-  if (!feedback || !feedback.showGhost || !feedback.ghostConfig) return;
+  if (!feedback || !feedback.showGhost || !feedback.ghostConfig) {
+    clearGridGhost();
+    return;
+  }
+
+  // Re-showing on the SAME grid must NOT tear down and rebuild the ghost
+  // overlay on every mousemove. clearGridGhost() (hideGhost) + showGhost()
+  // would destroy and recreate the <drop-box> and its <drop-box-overdraw>
+  // accents on every frame, so the accents would re-fade-in from opacity 0 and
+  // flicker/appear-and-disappear over and over. showGhost() reuses the existing
+  // overlay (and its box + overdraw) while it is still attached, so only tear
+  // the previous overlay down when the new ghost is on a DIFFERENT grid (so the
+  // old grid's overlay is actually removed).
+  if (_ghostShownGrid && _ghostShownGrid !== target.element) {
+    _ghostManager.hideGhost(_ghostShownGrid);
+    _ghostShownGrid = null;
+  }
 
   const cfg = feedback.ghostConfig as Record<string, unknown>;
   _ghostManager.showGhost(target.element, {

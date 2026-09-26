@@ -214,6 +214,28 @@ describe("GridGhostManager drop indicator", () => {
     expect(cols[1].querySelector(":scope > drop-box-overdraw")).not.toBeNull();
     gm.dispose();
   });
+
+  test("re-shows on the same grid reuse the overlay, box and overdraw — no per-frame churn", () => {
+    const grid = makeGrid(2);
+    const gm = new GhostManager();
+    gm.showGhost(grid, { cols: 2, activeCol: 0, columnFlex: [0.5, 0.5] });
+    const overlay = grid.querySelector(".openp41ge-ghost-overlay") as HTMLElement;
+    const box = grid.querySelector(".openp41ge-ghost-overlay drop-box");
+    const over = grid.querySelector(".openp41ge-ghost-overlay drop-box-overdraw");
+
+    // Re-show on the same grid, as the app does on every mousemove while a tab
+    // is dragged. The overlay, box and overdraw must stay the SAME element
+    // instances — destroying and recreating them each frame would reset the
+    // overdraw accents to opacity 0 and re-fade them in, so they'd appear and
+    // disappear over and over (flicker).
+    for (let i = 0; i < 25; i++) {
+      gm.showGhost(grid, { cols: 2, activeCol: 0, columnFlex: [0.5, 0.5] });
+    }
+    expect(grid.querySelector(".openp41ge-ghost-overlay")).toBe(overlay);
+    expect(grid.querySelector(".openp41ge-ghost-overlay drop-box")).toBe(box);
+    expect(grid.querySelector(".openp41ge-ghost-overlay drop-box-overdraw")).toBe(over);
+    gm.dispose();
+  });
 });
 
 // ─── open-tab (git-entry) drops ───────────────────────────────────────────
