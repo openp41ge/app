@@ -32,10 +32,12 @@
  * <drop-box-overdraw></drop-box-overdraw>
  * ```
  *
- * It resolves the sibling <drop-box>` automatically (reads its `fade`), and
- * places its accents once against the box's rect — the box anchors at a fixed
- * position while shown, so its rect is static, and the accents are hidden
- * entirely when the owning host unmounts the pair.
+ * It resolves the sibling <drop-box>` automatically (reads its `fade`),
+ * places its accents against the box's rect, and re-places them (via a
+ * ResizeObserver on the box) whenever the box's geometry changes — e.g. a
+ * drag moving the landing box from a full cell to a split half resizes it in
+ * place, so the accents must follow. The accents are hidden entirely when the
+ * owning host unmounts the pair.
  *
  * Styling hooks on the host:
  *  - `--drop-color` — accent colour; defaults to the shared drop indicator blue.
@@ -76,7 +78,40 @@ export class DropBoxOverdraw extends LitElement {
 
   firstUpdated(): void {
     this._place();
+    this._observeBox();
   }
+
+  disconnectedCallback(): void {
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
+    super.disconnectedCallback();
+  }
+
+  /**
+   * Watch the sibling <drop-box> so the accents re-place when the box's
+   * geometry changes. The box lives in the SAME column across some drop
+   * transitions — e.g. moving from a cell-centre target to a split target
+   * keeps the landing box in its column but resizes it from a full cell to a
+   * half-cell. The overdraw is NOT re-created in that case (only re-created
+   * when the landing column changes), so it must re-place itself when the box
+   * resizes, or its accents would stay at the old rect.
+   *
+   * A ResizeObserver on the box is the natural signal: the box is
+   * `position: absolute; inset: 0` inside its column, so its own box tracks
+   * the column's size, and a resize accompanies every such relayout. Falls
+   * back to nothing where ResizeObserver is unavailable (jsdom — the one-time
+   * `firstUpdated` placement still applies).
+   */
+  private _observeBox(): void {
+    if (typeof ResizeObserver === "undefined") return;
+    const box = this._findDropBox();
+    if (!box) return;
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = new ResizeObserver(() => this._place());
+    this._resizeObserver.observe(box);
+  }
+
+  private _resizeObserver: ResizeObserver | null = null;
 
   private _findDropBox(): HTMLElement | null {
     // Re-query the live sibling each time (do NOT cache): the owning host may
