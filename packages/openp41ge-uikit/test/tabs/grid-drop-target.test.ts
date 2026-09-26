@@ -170,10 +170,10 @@ describe("GridGhostManager drop indicator", () => {
     expect(cols[0].querySelector(":scope > drop-box-overdraw")).not.toBeNull();
     expect(cols[1].querySelector(":scope > drop-box")).toBeNull();
     expect(cols[2].querySelector(":scope > drop-box")).toBeNull();
-    // The landing box carries a directional fade so the overdraw companion
-    // can bleed its accents outward past the anchored (solid) edge.
-    const fade = cols[0].querySelector(":scope > drop-box")!.getAttribute("fade");
-    expect(["left", "right"]).toContain(fade);
+    // The landing box is a SOLID target: it never fades (only the drawer's
+    // slide-to-fill anchor does), so the overdraw companion bleeds all four
+    // corners.
+    expect(cols[0].querySelector(":scope > drop-box")!.hasAttribute("fade")).toBe(false);
     // The landing column no longer paints its own ring (the box does).
     expect(cols[0].style.boxShadow).toBe("");
     expect(cols[0].style.background).toBe("transparent");

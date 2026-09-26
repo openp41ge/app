@@ -1,44 +1,49 @@
 /**
  * <drop-box-overdraw> — the overdraw companion to a <drop-box>.
  *
- * A <drop-box> is the blue-bordered drop-zone / anchor indicator (e.g. the
- * settings drawer's "snap to full grid width" box). This component renders
- * the overdraw accents that make the box read as a draggable anchor region:
+ * A <drop-box> is the blue-bordered drop-zone / anchor indicator. This
+ * component renders the overdraw accents that make the box read as a
+ * draggable anchor region. The accents depend on whether the box is a SOLID
+ * landing target or a faded, directional anchor:
  *
- *   - a horizontal accent continuing the box's TOP border past its far edge,
- *   - a vertical accent rising UP from the top border at the far edge,
- *   - a horizontal accent continuing the box's BOTTOM border past its far edge.
+ *   - A SOLID box (no `fade`), e.g. the grid's drop target: the box must stay
+ *     fully visible, so it is never masked — instead its border bleeds
+ *     OUTWARD at ALL FOUR corners. Each corner draws the two lines that
+ *     continue the borders meeting there (the top/bottom border extending
+ *     horizontally past the corner, the left/right border extending
+ *     vertically past the corner), fading out into the surrounding chrome.
  *
- * The "far edge" is the box's SOLID side (the edge it anchors on), which is
- * the side OPPOSITE its `fade` direction: a box that fades leftward anchors on
- * its right edge, so its accents stop/bleed on the right. The accents are
- * <overdraw-line>s rendered in a fixed, viewport-wide layer, so they escape any
- * `overflow: hidden` panel (the grid wrapper) and paint over the adjacent
- * region / the top bar. They sit in the same stacking context as the drop-box
- * (its companion sibling, so the drop-box's own fade `mask` never affects
- * them), and the host is given the same `z-index` as its box so the accents
- * stay visible (un-dimmed) above the drawer's dim mask.
+ *   - A FADED box (`fade="left"`/"right"), e.g. the settings drawer's
+ *     edge-snap anchor: the box melts toward the drawer and its three accents
+ *     sit on the far (solid) edge — a horizontal accent continuing the top
+ *     border past it, a vertical accent rising from the top corner, and a
+ *     horizontal accent continuing the bottom border past it.
+ *
+ * The accents are <overdraw-line>s rendered in a fixed, viewport-wide layer,
+ * so they escape any `overflow: hidden` panel (the grid wrapper) and paint
+ * over the adjacent region / the top bar. They sit in the same stacking
+ * context as the drop-box (its companion sibling, so the drop-box's own fade
+ * `mask` never affects them).
  *
  * The consumer places it next to its <drop-box> (in the same host):
  *
  * ```html
- * <drop-box fade="left"></drop-box>
+ * <drop-box></drop-box>
  * <drop-box-overdraw></drop-box-overdraw>
  * ```
  *
  * It resolves the sibling <drop-box>` automatically (reads its `fade`), and
  * places its accents once against the box's rect — the box anchors at a fixed
- * grid edge while shown, so its rect is static, and the accents are hidden
+ * position while shown, so its rect is static, and the accents are hidden
  * entirely when the owning host unmounts the pair.
  *
  * Styling hooks on the host:
  *  - `--drop-color` — accent colour; defaults to the shared drop indicator blue.
  *  - `--drop-border` — accent thickness (px); defaults to 3px so the accents
- *    are as wide as the drop-box's border lines (and the 3px drag line) they
- *    continue.
+ *    are as wide as the drop-box's border lines they continue.
  */
 
-import { LitElement, css, html, nothing, unsafeCSS } from "lit";
+import { LitElement, css, html, unsafeCSS } from "lit";
 import { DROP_INDICATOR_COLOR } from "./color";
 import "../overdraw-line/overdraw-line";
 
@@ -95,11 +100,16 @@ export class DropBoxOverdraw extends LitElement {
   private _place(): void {
     const box = this._findDropBox();
     if (!box) return;
-    const fade = box.getAttribute("fade");
-    if (!fade || fade === "none") return;
     const r = box.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return;
     const t = this._borderThickness(box);
+    const fade = box.getAttribute("fade");
+    // A solid box (no fade) is a landing target that must stay fully visible,
+    // so it is never masked: its border bleeds outward at all four corners.
+    if (!fade || fade === "none") {
+      this._placeCorners(r, t);
+      return;
+    }
     const far = fade === "left" ? "right" : "left";
     const out = far === "right" ? r.right : r.left;
     const topH = this._cap("od-top-h");
@@ -137,6 +147,62 @@ export class DropBoxOverdraw extends LitElement {
     for (const line of [topH, topV, botH]) line.style.opacity = "1";
   }
 
+  /**
+   * Place the four-corner accents on a SOLID (non-faded) box. Each corner
+   * draws the two lines that continue the borders meeting there, extending
+   * OUTWARD and fading into the surrounding chrome:
+   *
+   *   - tl: top border → left (dir=left);        left border → up (dir=up)
+   *   - tr: top border → right (dir=right);      right border → up (dir=up)
+   *   - bl: bottom border → left (dir=left);     left border → down (dir=down)
+   *   - br: bottom border → right (dir=right);   right border → down (dir=down)
+   *
+   * Each horizontal accent is aligned with the horizontal border span it
+   * continues ([r.top, r.top+t] or [r.bottom-t, r.bottom]); each vertical
+   * accent is aligned with the vertical border span ([r.left, r.left+t] or
+   * [r.right-t, r.right]) and starts at the box edge it extends past.
+   */
+  private _placeCorners(r: DOMRect, t: number): void {
+    const tlH = this._cap("od-tl-h");
+    const tlV = this._cap("od-tl-v");
+    const trH = this._cap("od-tr-h");
+    const trV = this._cap("od-tr-v");
+    const blH = this._cap("od-bl-h");
+    const blV = this._cap("od-bl-v");
+    const brH = this._cap("od-br-h");
+    const brV = this._cap("od-br-v");
+    if (!tlH || !tlV || !trH || !trV || !blH || !blV || !brH || !brV) return;
+    const lines = [tlH, tlV, trH, trV, blH, blV, brH, brV];
+    for (const line of lines) {
+      line.style.setProperty("--overdraw-thickness", `${t}px`);
+      // Slightly shorter than the single far-edge accents: four corners bleed
+      // in many directions at once, so a modest length keeps it from crowding.
+      line.style.setProperty("--overdraw-length", `${Math.max(Math.round(t * 4), 14)}px`);
+      line.style.setProperty("--overdraw-hold", "30%");
+    }
+    // Top border continues horizontally past the two top corners.
+    tlH.style.top = `${r.top}px`;
+    tlH.style.right = `${window.innerWidth - r.left}px`;
+    trH.style.top = `${r.top}px`;
+    trH.style.left = `${r.right}px`;
+    // Bottom border continues horizontally past the two bottom corners.
+    blH.style.top = `${r.bottom - t}px`;
+    blH.style.right = `${window.innerWidth - r.left}px`;
+    brH.style.top = `${r.bottom - t}px`;
+    brH.style.left = `${r.right}px`;
+    // Left border continues vertically past the two left corners.
+    tlV.style.left = `${r.left}px`;
+    tlV.style.bottom = `${window.innerHeight - r.top}px`;
+    blV.style.left = `${r.left}px`;
+    blV.style.top = `${r.bottom}px`;
+    // Right border continues vertically past the two right corners.
+    trV.style.left = `${r.right - t}px`;
+    trV.style.bottom = `${window.innerHeight - r.top}px`;
+    brV.style.left = `${r.right - t}px`;
+    brV.style.top = `${r.bottom}px`;
+    for (const line of lines) line.style.opacity = "1";
+  }
+
   private _cap(cls: string): HTMLElement | null {
     return this.shadowRoot?.querySelector<HTMLElement>(`.${cls}`) ?? null;
   }
@@ -144,7 +210,22 @@ export class DropBoxOverdraw extends LitElement {
   render() {
     const box = this._findDropBox();
     const fade = box?.getAttribute("fade");
-    if (!fade || fade === "none") return nothing;
+    // A solid box gets the four-corner bleed; a faded (directional) box gets
+    // the far-edge accents (the drawer's slide-to-fill anchor).
+    if (!fade || fade === "none") {
+      return html`
+        <div class="od-layer" aria-hidden="true">
+          <overdraw-line class="od-corner od-tl-h" dir="left"></overdraw-line>
+          <overdraw-line class="od-corner od-tl-v" dir="up"></overdraw-line>
+          <overdraw-line class="od-corner od-tr-h" dir="right"></overdraw-line>
+          <overdraw-line class="od-corner od-tr-v" dir="up"></overdraw-line>
+          <overdraw-line class="od-corner od-bl-h" dir="left"></overdraw-line>
+          <overdraw-line class="od-corner od-bl-v" dir="down"></overdraw-line>
+          <overdraw-line class="od-corner od-br-h" dir="right"></overdraw-line>
+          <overdraw-line class="od-corner od-br-v" dir="down"></overdraw-line>
+        </div>
+      `;
+    }
     const far = fade === "left" ? "right" : "left";
     return html`
       <div class="od-layer" aria-hidden="true">

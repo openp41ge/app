@@ -228,7 +228,7 @@ describe("drop-box-overdraw", () => {
     spy.mockRestore();
   });
 
-  test("does not render accents when the sibling box has no fade", async () => {
+  test("renders four-corner bleed accents when the sibling box is solid (no fade)", async () => {
     const host = document.createElement("div");
     const box = document.createElement("drop-box");
     const el = new DropBoxOverdraw();
@@ -236,7 +236,62 @@ describe("drop-box-overdraw", () => {
     host.appendChild(el);
     document.body.appendChild(host);
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelectorAll(".od-layer").length).toBe(0);
+    const corners = el.shadowRoot?.querySelectorAll<HTMLElement>(".od-corner");
+    // A SOLID box never masks (only the drawer's slide-to-fill box fades) — it
+    // gets a four-corner bleed, one horizontal + one vertical accent per corner.
+    expect(corners?.length).toBe(8);
+    expect(corners![0].className).toContain("od-tl-h");
+    expect(corners![0].getAttribute("dir")).toBe("left");
+    expect(corners![1].className).toContain("od-tl-v");
+    expect(corners![1].getAttribute("dir")).toBe("up");
+    expect(corners![4].className).toContain("od-bl-h");
+    expect(corners![4].getAttribute("dir")).toBe("left");
+    expect(corners![5].className).toContain("od-bl-v");
+    expect(corners![5].getAttribute("dir")).toBe("down");
+    expect(corners![6].className).toContain("od-br-h");
+    expect(corners![6].getAttribute("dir")).toBe("right");
+    expect(corners![7].className).toContain("od-br-v");
+    expect(corners![7].getAttribute("dir")).toBe("down");
+  });
+
+  test("places four-corner accents against a solid box's edges", async () => {
+    const host = document.createElement("div");
+    host.style.position = "relative";
+    const box = document.createElement("drop-box");
+    const rect = { left: 100, top: 40, right: 400, bottom: 600, width: 300, height: 560 };
+    const spy = vi.spyOn(box, "getBoundingClientRect").mockReturnValue(rect as DOMRect);
+    const el = new DropBoxOverdraw();
+    host.appendChild(box);
+    host.appendChild(el);
+    document.body.appendChild(host);
+    await el.updateComplete;
+    const g = (c: string) => el.shadowRoot?.querySelector<HTMLElement>(`.${c}`)!;
+    // Top border bleeds left/right past the two top corners at r.top.
+    expect(g("od-tl-h").style.top).toBe("40px");
+    expect(g("od-tl-h").style.right).toBe(`${window.innerWidth - 100}px`);
+    expect(g("od-tr-h").style.top).toBe("40px");
+    expect(g("od-tr-h").style.left).toBe("400px");
+    // Bottom border bleeds past the two bottom corners at r.bottom - t.
+    expect(g("od-bl-h").style.top).toBe("597px");
+    expect(g("od-br-h").style.top).toBe("597px");
+    expect(g("od-br-h").style.left).toBe("400px");
+    // Left border bleeds up from the top-left (solid end at the left edge).
+    expect(g("od-tl-v").style.left).toBe("100px");
+    expect(g("od-tl-v").style.bottom).toBe(`${window.innerHeight - 40}px`);
+    // Right border bleeds up, aligned with the right border span (r.right - t).
+    expect(g("od-tr-v").style.left).toBe("397px");
+    expect(g("od-tr-v").style.bottom).toBe(`${window.innerHeight - 40}px`);
+    // Bottom corners extend downward from the box's bottom edge.
+    expect(g("od-bl-v").style.left).toBe("100px");
+    expect(g("od-bl-v").style.top).toBe("600px");
+    expect(g("od-br-v").style.left).toBe("397px");
+    expect(g("od-br-v").style.top).toBe("600px");
+    // Accents are as thick as the border and become visible once placed.
+    for (const c of ["od-tl-h", "od-tl-v", "od-tr-h", "od-tr-v", "od-bl-h", "od-bl-v", "od-br-h", "od-br-v"])
+      expect(g(c).style.opacity).toBe("1");
+    expect(g("od-tl-h").style.getPropertyValue("--overdraw-thickness")).toBe("3px");
+    expect(g("od-tl-h").style.getPropertyValue("--overdraw-hold")).toBe("30%");
+    spy.mockRestore();
   });
 });
 
