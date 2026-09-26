@@ -82,6 +82,17 @@ describe("drag-line", () => {
     await el.updateComplete;
     expect(el.hasAttribute("show")).toBe(true);
   });
+
+  test("does not paint itself: the companion mirror is the sole painter", async () => {
+    // The host must be transparent. If it painted a translucent layer over the
+    // full-height mirror its colour would stack and render visibly brighter
+    // than the overdraw fade above it, creating a hard step at the junction.
+    const el = new DragLine();
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const host = getComputedStyle(el);
+    expect(host.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  });
 });
 
 describe("drop-box", () => {

@@ -11,6 +11,13 @@
  * The host is `position: absolute`; place it with inline `left/right/top/
  * bottom`, set `z-index` as needed. `--drop-color` / `--drop-width` override
  * the translucency and thickness.
+ *
+ * The host itself paints only the transparent slot: its colour is drawn by the
+ * companion <drag-line-overdraw> mirror, which sits just beneath it and is the
+ * sole painter of the line (full height + the fade above). This keeps the line
+ * a SINGLE translucent layer — if the drag-line also painted, it would stack
+ * over the mirror and come out visibly brighter, creating a hard colour step
+ * where the overdraw fade meets the line.
  */
 
 import { LitElement, css, html } from "lit";
@@ -34,7 +41,10 @@ export class DragLine extends LitElement {
       --drop-width: 3px;
       top: 0;
       bottom: 0;
-      background: var(--drop-color);
+      /* The mirror paints the line (full height + top fade); the host only
+         supplies the position, thickness and the show signal. Painting here
+         too would stack over the mirror and look brighter than the fade. */
+      background: transparent;
       opacity: 0;
       transition: opacity 0.12s ease;
     }
