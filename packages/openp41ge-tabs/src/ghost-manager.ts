@@ -110,22 +110,33 @@ export class GhostManager {
       colDiv.style.position = "relative";
       colDiv.style.borderRight = c < targetCount - 1 ? "1px solid rgba(74,158,255,0.15)" : "";
 
-      if (col.highlighted) {
-        colDiv.style.background = "rgba(74,158,255,0.12)";
-        colDiv.style.boxShadow = "inset 0 0 0 2px rgba(74,158,255,0.50)";
-      } else if (col.splitPair) {
-        colDiv.style.background = "rgba(74,158,255,0.06)";
-        colDiv.style.boxShadow = "";
-      } else if (col.active) {
-        const alpha = preview.isFileDrop ? "rgba(74,158,255,0.08)" : "rgba(74,158,255,0.06)";
-        colDiv.style.background = alpha;
-        colDiv.style.boxShadow = preview.isFileDrop
-          ? "inset 0 0 0 2px rgba(74,158,255,0.45)"
-          : "inset 0 0 0 1px rgba(74,158,255,0.25)";
-      } else {
-        colDiv.style.background = "rgba(74,158,255,0.04)";
-        colDiv.style.boxShadow = "";
+      // The drop indicator is the shared <drop-box>: a blue-bordered,
+      // transparent-backed drop-zone box (the same component the settings
+      // drawer uses to mark its edge-snap target). The box fills whatever
+      // column the dragged tab will land in — the highlighted half of a split
+      // or the active cell-centre target. Columns that are not the landing
+      // spot (the subtle split-pair, or plain background columns) keep only a
+      // faint wash and no box. The <drop-box> custom element is registered by
+      // <tab-grid> (the sole GhostManager consumer) via the drop-indicator
+      // module.
+      const wantsBox = col.highlighted || col.active;
+      let box = colDiv.querySelector<HTMLElement>(":scope > drop-box");
+      if (wantsBox && !box) {
+        box = document.createElement("drop-box");
+        box.style.inset = "0";
+        colDiv.appendChild(box);
+      } else if (!wantsBox && box) {
+        box.remove();
+        box = null;
       }
+      // The box paints its own border ring + wash; the column div itself must
+      // not also paint a ring/wash or they would double up.
+      colDiv.style.boxShadow = "";
+      colDiv.style.background = wantsBox
+        ? "transparent"
+        : col.splitPair
+          ? "rgba(74,158,255,0.06)"
+          : "rgba(74,158,255,0.04)";
     }
 
     entry.childCount = targetCount;

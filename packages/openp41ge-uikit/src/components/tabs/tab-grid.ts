@@ -21,6 +21,7 @@ import { OverlayScrollbar } from "openp41ge-scrollbar";
 // resize-notch drag line.
 import "../drop-indicator/drag-line";
 import "../drop-indicator/drag-line-overdraw";
+import "../drop-indicator/drop-box";
 
 /** Repo-row drag MIME (value: repoName). */
 const REPO_DRAG_TYPE = "application/x-openp41ge-repo";
