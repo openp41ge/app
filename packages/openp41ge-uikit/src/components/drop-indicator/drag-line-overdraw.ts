@@ -1,9 +1,9 @@
 /**
  * <drag-line-overdraw> — the overdraw companion to a <drag-line>.
  *
- * A <drag-line> is the translucent blue vertical line you hover over to drag
- * a sidebar / window boundary. This component renders a mirror of that drag
- * line — the same colour and the SAME WIDTH, spanning the drag line's full
+ * A <drag-line> is the blue line you hover over to drag a sidebar / window
+ * boundary. This component renders a mirror of that drag line — the same
+ * colour and the SAME WIDTH, spanning the drag line's full
  * height plus an accent extending upward past the panel boundary and INTO the
  * apps top bar, fading out. It appears only while the drag line is visible
  * (hovered / dragging), so it reads as the drag line continuing up into the
@@ -45,8 +45,13 @@ export class DragLineOverdraw extends LitElement {
   static styles = css`
     :host {
       display: block;
-      /* Defaults mirror <drag-line>; consumers may override to match. */
-      --drop-color: rgba(74, 158, 255, 0.7);
+      /* Defaults mirror <drag-line>; consumers may override to match. Opaque
+         so the line renders identically over whatever background it crosses
+         (e.g. a brighter boundary separator under the drag bar vs. the darker
+         titlebar the overdraw fades across) — a translucent line would let the
+         background show through and make the bar and its fade read as two
+         different colours. */
+      --drop-color: rgb(74, 158, 255);
       --drop-width: 3px;
       --drop-overdraw-length: 24px;
     }

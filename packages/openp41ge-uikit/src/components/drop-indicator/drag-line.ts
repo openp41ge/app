@@ -1,12 +1,15 @@
 /**
- * <drag-line> — the semi-transparent blue line you hover over to drag a
- * sidebar / window boundary.
+ * <drag-line> — the blue line you hover over to drag a sidebar / window
+ * boundary.
  *
  * Unlike <drop-line> (a solid, glowing "you will drop here" marker), this is a
- * quieter affordance: a translucent blue line that fades in while you hover
+ * quieter affordance: a flat blue line (no glow) that fades in while you hover
  * or drag (driven by the consumer toggling the `show` attribute, since the
  * 3px strip is too thin to be reliably hovered itself). It shares the same
- * blue family so it reads as related to the drop markers.
+ * blue family so it reads as related to the drop markers, and it is OPAQUE so
+ * it renders identically whatever background it crosses — a translucent line
+ * would let a brighter separator or a different-titlebar background show
+ * through and make the bar read as a different colour from its overdraw fade.
  *
  * The host is `position: absolute`; place it with inline `left/right/top/
  * bottom`, set `z-index` as needed. `--drop-color` / `--drop-width` override
@@ -37,7 +40,7 @@ export class DragLine extends LitElement {
       display: block;
       pointer-events: none;
       box-sizing: border-box;
-      --drop-color: rgba(74, 158, 255, 0.7);
+      --drop-color: rgb(74, 158, 255);
       --drop-width: 3px;
       top: 0;
       bottom: 0;

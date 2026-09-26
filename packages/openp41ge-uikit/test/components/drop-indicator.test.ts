@@ -68,12 +68,14 @@ describe("drag-line", () => {
     expect(customElements.get("drag-line")).toBe(DragLine);
   });
 
-  test("is translucent, hidden by default, and shown by the show attribute", async () => {
+  test("is opaque blue, hidden by default, and shown by the show attribute", async () => {
     const el = new DragLine();
     document.body.appendChild(el);
     await el.updateComplete;
     const css = styleOf(el);
-    expect(css).toContain("--drop-color: rgba(74, 158, 255, 0.7)");
+    // Opaque (not translucent) so the line renders identically whatever
+    // background it crosses; see drag-line-overdraw for the rationale.
+    expect(css).toContain("--drop-color: rgb(74, 158, 255)");
     expect(css).toContain("opacity: 0");
     expect(css).toContain(":host([show])");
     expect(el.hasAttribute("show")).toBe(false);
