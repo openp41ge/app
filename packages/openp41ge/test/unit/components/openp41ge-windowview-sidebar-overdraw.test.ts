@@ -20,6 +20,7 @@ import {
   CELL_DIVIDER_OVERDRAW_LENGTH,
   SIDEBAR_FOOTER_OVERDRAW_LENGTH,
   SIDEBAR_OVERDRAW_LENGTH,
+  SIDEBAR_SEP_OVERDRAW_LENGTH,
 } from "../../../src/renderer/components/openp41ge-windowview";
 
 // jsdom has no real animation frame loop; capture callbacks so the per-frame
@@ -349,5 +350,128 @@ describe("openp41ge-windowview grid cell-divider overdraws", () => {
     await wv.updateComplete.catch(() => {});
     expect(wv._cellOverdraw.size).toBe(0);
     expect(document.body.querySelectorAll("overdraw-line").length).toBe(0);
+  });
+});
+
+describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
+  const sepRect = (left: number, right: number, top: number, h = 30) => ({
+    left, top, right, bottom: top + h, width: right - left, height: h, x: left, y: top, toJSON() {},
+  });
+
+  // Build a visible host holding marked separator rows ([data-sb-sep]) like the
+  // agents tab emits — rows carry a 1px top and/or bottom separator border.
+  // `y` is the row's top coordinate; `top`/`bottom` declare which borders are
+  // separators (they must not collide with the position key).
+  function addSepHost(
+    sb: HTMLElement,
+    rows: Array<{ top?: boolean; bottom?: boolean; left: number; right: number; y: number; h?: number; noBottom?: boolean }>,
+  ): HTMLElement {
+    const host = document.createElement("div");
+    host.className = "sidebar-tab-host visible";
+    for (const cfg of rows) {
+      const row = document.createElement("div");
+      const marks: string[] = [];
+      if (cfg.top) {
+        row.style.borderTop = "1px solid #333";
+        marks.push("top");
+      }
+      if (cfg.bottom) {
+        // A suppressed separator is still marked (the agents tab always sets
+        // data-sb-sep="bottom" on the last row) but carries no border — the
+        // windowview reads the live computed border width, so it must skip it.
+        if (!cfg.noBottom) row.style.borderBottom = "1px solid #333";
+        marks.push("bottom");
+      }
+      if (marks.length) row.dataset.sbSep = marks.join(" ");
+      Object.defineProperty(row, "getBoundingClientRect", {
+        configurable: true,
+        value: () => sepRect(cfg.left, cfg.right, cfg.y, cfg.h),
+      });
+      host.appendChild(row);
+    }
+    sb.appendChild(host);
+    return host;
+  }
+
+  function stubSidebars(wv: HTMLElement): [HTMLElement, HTMLElement] {
+    const left = wv.querySelector('openp41ge-sidebar[side="left"]')!;
+    const right = wv.querySelector('openp41ge-sidebar[side="right"]')!;
+    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => sbRect(0, 209, 36) });
+    Object.defineProperty(right, "getBoundingClientRect", { configurable: true, value: () => sbRect(490, 656, 36) });
+    return [left, right];
+  }
+
+  const rightLines = () => [...document.body.querySelectorAll('overdraw-line[dir="right"]')];
+  const leftLines = () => [...document.body.querySelectorAll('overdraw-line[dir="left"]')];
+
+  it("draws one horizontal overdraw per marked separator border", async () => {
+    const { wv } = await mount();
+    const [left, right] = stubSidebars(wv);
+    // Left sidebar: new-chat bottom separator + a mid row with top+bottom.
+    addSepHost(left, [
+      { bottom: true, left: 0, right: 209, y: 60 },
+      { top: true, bottom: true, left: 0, right: 209, y: 90 },
+    ]);
+    // Right sidebar: only the last-row bottom separator.
+    addSepHost(right, [{ bottom: true, left: 490, right: 656, y: 60 }]);
+
+    wv._syncSidebarSepOverdraws();
+
+    expect(wv._sbSepOverdraw.size).toBe(3);
+    expect(rightLines().length).toBe(3); // left sidebar's 3 separators
+    expect(leftLines().length).toBe(1); // right sidebar's 1 separator
+
+    const [nl, rowTop, rowBottom] = rightLines();
+    // Left sidebar separators fade right from the sidebar's right edge.
+    expect(nl.getAttribute("dir")).toBe("right");
+    expect(parseFloat(nl.style.left)).toBe(209);
+    expect(parseFloat(nl.style.top)).toBe(60 + 30 - 1); // bottom of the new-chat row
+    expect(parseFloat(rowTop.style.top)).toBe(90); // mid row's top border
+    expect(parseFloat(rowBottom.style.top)).toBe(90 + 30 - 1);
+
+    // Right sidebar separator fades left from its left edge.
+    const r = leftLines()[0];
+    expect(parseFloat(r.style.left)).toBe(490 - SIDEBAR_SEP_OVERDRAW_LENGTH);
+    expect(parseFloat(r.style.top)).toBe(60 + 30 - 1);
+  });
+
+  it("does not draw a bottom accent when the row's bottom border is suppressed", async () => {
+    const { wv } = await mount();
+    const [left] = stubSidebars(wv);
+    // Last row is marked "bottom" but carries no bottom border (the
+    // overflow-suppressed case) — no accent may be created for it.
+    addSepHost(left, [{ bottom: true, left: 0, right: 209, y: 60, noBottom: true }]);
+
+    wv._syncSidebarSepOverdraws();
+
+    expect(wv._sbSepOverdraw.size).toBe(1);
+    expect(rightLines().length).toBe(0);
+    expect([...document.body.querySelectorAll("overdraw-line")].every((l) => l.getAttribute("dir") === "up")).toBe(true);
+  });
+
+  it("drops accents when the separator rows leave the DOM", async () => {
+    const { wv } = await mount();
+    const [left] = stubSidebars(wv);
+    const host = addSepHost(left, [{ bottom: true, left: 0, right: 209, y: 60 }]);
+    wv._syncSidebarSepOverdraws();
+    expect(rightLines().length).toBe(1);
+
+    host.remove(); // refresh rebuilt the list
+    wv._syncSidebarSepOverdraws();
+    expect(wv._sbSepOverdraw.size).toBe(0);
+    expect(rightLines().length).toBe(0);
+  });
+
+  it("cleans up the separator overdraws when disconnected", async () => {
+    const { wv } = await mount();
+    const [left] = stubSidebars(wv);
+    addSepHost(left, [{ bottom: true, left: 0, right: 209, y: 60 }]);
+    wv._syncSidebarSepOverdraws();
+    expect(wv._sbSepOverdraw.size).toBe(1);
+
+    wv.remove();
+    await wv.updateComplete.catch(() => {});
+    expect(wv._sbSepOverdraw.size).toBe(0);
+    expect(rightLines().length).toBe(0);
   });
 });

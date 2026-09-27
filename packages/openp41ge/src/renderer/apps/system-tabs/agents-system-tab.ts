@@ -3,7 +3,7 @@
  * (registration id `"agents"`).
  *
  * Lists all shared chats with full-content search (message text + tool-call
- * commands, never results), a per-row tool-call sublist, and open-once UX:
+ * commands, never results), and open-once UX:
  *   - clicking a row opens the chat as an unpinned preview tab in the grid;
  *     a second click promotes it to pinned.
  *   - when a chat is open in ANOTHER window, the row shows an indicator + a
@@ -11,7 +11,8 @@
  *
  * Data access goes through the ChatStoreModel interface (public `_storeModel`
  * property for test injection — production IpcChatStoreModel, tests
- * TestChatStoreModel). Tool-call sublists are loaded lazily on expand.
+ * TestChatStoreModel). The list's separator borders are tagged with
+ * `data-sb-sep` so the windowview can overdraw them out into the grid.
  */
 /* marker:footer-icons-inside-edge */
 
@@ -43,7 +44,6 @@ export class AgentsSystemTabController implements SystemTabController {
   private _container: HTMLElement | null = null;
 
   private _chats: ChatSummary[] = [];
-  private _expanded = new Set<string>();
   private _openChats: Record<string, string> = {};
   private _unsubscribers: Array<() => void> = [];
   private _resizeObserver: ResizeObserver | null = null;
@@ -114,6 +114,9 @@ export class AgentsSystemTabController implements SystemTabController {
       flexShrink: "0",
     });
     newChatRow.addEventListener("click", () => void this._newChat());
+    // Mark the row's bottom border as a separator so the windowview can pull
+    // its overdraw line out into the grid (see openp41ge-windowview).
+    newChatRow.dataset.sbSep = "bottom";
     wrapper.appendChild(newChatRow);
 
     // ── Chat list ──────────────────────────────────────────────────────
@@ -209,32 +212,6 @@ export class AgentsSystemTabController implements SystemTabController {
       [data-system-tab="agents"] .chat-new-row { color: var(--text-secondary,#999); background: transparent; }
       [data-system-tab="agents"] .chat-new-row:hover { background: var(--bg-hover,#2a2d2e); color: var(--text-primary,#fff); }
       [data-system-tab="agents"] .chat-new-row span { pointer-events: none; }
-      /* Merged tool-call pill: tool icon + count + chevron. Ghost button —
-         no background or border until hovered, only a subtle corner radius. */
-      [data-system-tab="agents"] .chat-chevron-btn {
-        flex-shrink: 0;
-        display: inline-flex;
-        align-items: center;
-        gap: 3px;
-        height: 20px;
-        padding: 0 6px;
-        font-size: 10px;
-        font-family: var(--font-mono, "JetBrains Mono", monospace);
-        color: var(--text-secondary, #aaa);
-        background: transparent;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      [data-system-tab="agents"] .chat-chevron-btn:hover {
-        /* Distinct from the row-head hover (#2a2d2e) so the pill visibly lights
-           up instead of blending into the highlighted row. */
-        background: var(--bg-active, #37373d);
-        color: var(--text-primary, #fff);
-      }
-      [data-system-tab="agents"] .chat-chevron-btn .chat-chevron-tool {
-        line-height: 1;
-      }
       /* The footer action buttons (settings gear + search) use the shared
          .p41ge-icon-btn class for their full-height, square, hover-background
          and separators — no per-tab colour overrides needed here. */
@@ -448,7 +425,18 @@ export class AgentsSystemTabController implements SystemTabController {
     }
 
     list.replaceChildren();
-    for (const chat of chats) list.appendChild(this._chatRow(chat));
+    for (let i = 0; i < chats.length; i++) {
+      const row = this._chatRow(chats[i]);
+      // Mark which of the row's horizontal borders are list separators. Rows
+      // after the first carry a top border; the last row carries a bottom
+      // border (suppressed by `.is-overflowing` — the windowview reads the
+      // live computed border width so it stays in sync).
+      const marks: string[] = [];
+      if (i > 0) marks.push("top");
+      if (i === chats.length - 1) marks.push("bottom");
+      if (marks.length > 0) row.dataset.sbSep = marks.join(" ");
+      list.appendChild(row);
+    }
     this._syncScrollState();
   }
 
@@ -470,7 +458,6 @@ export class AgentsSystemTabController implements SystemTabController {
     row.className = "chat-row";
     row.dataset.chatId = chat.id;
     row.dataset.chatTitle = chat.title;
-    if (this._expanded.has(chat.id)) row.classList.add("open");
     Object.assign(row.style, {
       display: "flex",
       flexDirection: "column",
@@ -559,54 +546,10 @@ export class AgentsSystemTabController implements SystemTabController {
       head.appendChild(hlBtn);
     }
 
-    // Expand/collapse tool calls — a single ghost pill that merges the tool
-    // icon (left), the tool-call count (middle) and the chevron (right). It
-    // has no background or border until hovered, and only a subtle radius.
-    if (chat.toolCallCount > 0) {
-      const chevronBtn = document.createElement("button");
-      chevronBtn.type = "button";
-      chevronBtn.className = "chat-chevron-btn";
-      const tooltipText = this._expanded.has(chat.id)
-        ? "Collapse tool calls"
-        : "Show tool calls";
-      chevronBtn.setAttribute("aria-label", tooltipText);
-      tooltipController.attach(chevronBtn, { type: "simple", text: tooltipText });
-
-      const tool = document.createElement("span");
-      tool.className = "chat-chevron-tool";
-      tool.innerHTML = `<svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 -960 960 960"
-        width="11"
-        height="11"
-        fill="currentColor"
-        aria-hidden="true"
-      ><path d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"/></svg>`;
-      chevronBtn.appendChild(tool);
-
-      const count = document.createElement("span");
-      count.className = "chat-chevron-count";
-      count.textContent = String(chat.toolCallCount);
-      chevronBtn.appendChild(count);
-
-      const chevron = document.createElement("openp41ge-icon");
-      chevron.setAttribute("name", this._expanded.has(chat.id) ? "chevron-up" : "chevron-down");
-      chevron.setAttribute("size", "10");
-      chevronBtn.appendChild(chevron);
-
-      // The pill toggles the tool-call sublist; does NOT open the chat.
-      chevronBtn.addEventListener("mousedown", (e: MouseEvent) => e.stopPropagation());
-      chevronBtn.addEventListener("click", (e: MouseEvent) => {
-        e.stopPropagation();
-        this._toggleExpanded(chat.id);
-      });
-      head.appendChild(chevronBtn);
-    }
-
     row.appendChild(head);
 
-    // Click handling: expand chevron toggles sublist; opening a row that is
-    // open in another window shows a toast + highlight instead of a duplicate.
+    // Click handling: a row that is open in another window shows a toast + a
+    // highlight affordance instead of opening a duplicate chat.
     head.addEventListener("click", (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest("button")) return; // highlight button handled above
@@ -617,81 +560,7 @@ export class AgentsSystemTabController implements SystemTabController {
       this._openChat(chat.id, chat.title);
     });
 
-    // Expanded tool-call sublist — loaded lazily.
-    if (this._expanded.has(chat.id)) {
-      const sub = document.createElement("div");
-      sub.className = "chat-tool-sublist";
-      Object.assign(sub.style, {
-        display: "flex",
-        flexDirection: "column",
-        gap: "2px",
-        padding: "0 8px 6px 8px",
-      });
-      sub.appendChild(this._message("Loading…", "var(--text-muted,#777)"));
-      row.appendChild(sub);
-      void this._loadToolCalls(chat.id, sub);
-    }
-
     return row;
-  }
-
-  private async _loadToolCalls(chatId: string, sub: HTMLElement): Promise<void> {
-    try {
-      const chat = await this._storeModel.get(chatId);
-      if (!this._view || !sub.isConnected) return;
-      const toolCalls = (chat?.messages ?? []).flatMap((m) => m.toolCalls ?? []);
-      if (toolCalls.length === 0) {
-        sub.replaceChildren(this._message("No tool calls", "var(--text-muted,#777)"));
-        return;
-      }
-      sub.replaceChildren();
-      for (const tc of toolCalls) {
-        const row = document.createElement("div");
-        Object.assign(row.style, {
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-          fontSize: "11px",
-          fontFamily: "var(--font-mono,'JetBrains Mono',monospace)",
-          color: "var(--text-secondary,#aaa)",
-        });
-        const name = document.createElement("span");
-        name.textContent = tc.name;
-        Object.assign(name.style, { fontWeight: "600", color: "var(--text-primary,#ccc)" });
-        row.appendChild(name);
-        const args = document.createElement("span");
-        args.textContent =
-          typeof tc.arguments === "string" ? tc.arguments : JSON.stringify(tc.arguments);
-        Object.assign(args.style, {
-          flex: "1",
-          minWidth: "0",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          color: "var(--text-muted,#888)",
-        });
-        row.appendChild(args);
-        const status = document.createElement("span");
-        status.textContent = tc.status === "running" ? "…" : tc.status === "done" ? "✓" : "✗";
-        status.style.color =
-          tc.status === "done" ? "#4caf50" : tc.status === "error" ? "#f44336" : "var(--accent)";
-        row.appendChild(status);
-        sub.appendChild(row);
-      }
-    } catch (err) {
-      log.warn("failed to load tool calls:", (err as Error).message);
-      sub.replaceChildren(this._message("Failed to load", "var(--error,#e53e3e)"));
-    }
-  }
-
-  private _toggleExpanded(chatId: string): void {
-    if (this._expanded.has(chatId)) this._expanded.delete(chatId);
-    else this._expanded.add(chatId);
-    this._rerender();
-  }
-
-  private _rerender(): void {
-    this._renderList();
   }
 
   private _openChat(chatId: string, title: string): void {

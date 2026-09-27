@@ -46,6 +46,15 @@ export const SIDEBAR_FOOTER_OVERDRAW_LENGTH = 18;
  *  the grid has 2 or more columns). */
 export const CELL_DIVIDER_OVERDRAW_LENGTH = 14;
 
+/** How far (px) each chat-list separator line (the 1px horizontal borders
+ *  between the "+ New chat" row and the chat sessions) overdraws horizontally
+ *  into the grid from the sidebar's grid-side edge. Always shown while an open
+ *  sidebar has marked separator rows ([data-sb-sep]). */
+export const SIDEBAR_SEP_OVERDRAW_LENGTH = 10;
+
+/** A separator row's live overdraw accents (one per marked border). */
+type SbSepEntry = { side: "left" | "right"; top?: HTMLElement; bottom?: HTMLElement };
+
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -97,6 +106,10 @@ class Openp41geWindowView extends LitElement {
    * cell divider up past the title-bar seam. Keyed by the left column index
    * (0..cols-2); created lazily, removed when the grid has <2 columns. */
   private _cellOverdraw = new Map<number, HTMLElement>();
+  /** Portalled horizontal <overdraw-line> accents that continue each chat-list
+   * separator line into the grid. Keyed by the separator element; each entry
+   * may hold an accent for the element's top border and/or its bottom border. */
+  private _sbSepOverdraw = new Map<Element, SbSepEntry>();
   /** rAF handle for the per-frame divider tracking while any overdraw shows. */
   private _sbOverdrawRaf = 0;
 
@@ -177,6 +190,11 @@ class Openp41geWindowView extends LitElement {
     this._sbFooterEl.clear();
     for (const line of this._cellOverdraw.values()) line.remove();
     this._cellOverdraw.clear();
+    for (const { top, bottom } of this._sbSepOverdraw.values()) {
+      if (top) top.remove();
+      if (bottom) bottom.remove();
+    }
+    this._sbSepOverdraw.clear();
   }
 
   private _onWorkspacesUpdate = (): void => {
@@ -536,6 +554,7 @@ class Openp41geWindowView extends LitElement {
   private _syncOverdraws(): void {
     this._placeSidebarFooterOverdraws();
     this._placeCellDividerOverdraws();
+    this._syncSidebarSepOverdraws();
     this._positionSidebarOverdraws();
     this._positionCellDividerOverdraws();
   }
@@ -549,7 +568,8 @@ class Openp41geWindowView extends LitElement {
     if (
       this._sbDividerOverdraw.size > 0 ||
       this._sbFooterOverdraw.size > 0 ||
-      this._cellOverdraw.size > 0
+      this._cellOverdraw.size > 0 ||
+      this._sbSepOverdraw.size > 0
     ) {
       this._startSbOverdrawLoop();
     } else {
@@ -745,6 +765,110 @@ class Openp41geWindowView extends LitElement {
       "--overdraw-color: #333",
       "--overdraw-thickness: 1px",
       `--overdraw-length: ${CELL_DIVIDER_OVERDRAW_LENGTH}px`,
+    ].join(";");
+    document.body.appendChild(line);
+    return line;
+  }
+
+  // ── Sidebar chat-list separator overdraws ────────────────────────────
+
+  /**
+   * The agents sidebar's chat list is separated by 1px horizontal divider
+   * lines (below the "+ New chat" row and between each chat session, plus one
+   * under the last session). These lines stop at the sidebar's grid-side edge,
+   * so this sync step overdraws each marked separator row a short way into the
+   * grid with a horizontal fade-out accent — the list reads as continuing past
+   * the sidebar even when it holds many sessions.
+   *
+   * The list rows self-identify via `data-sb-sep` (space-separated list of the
+   * borders that carry a separator: "top" and/or "bottom"). The windowview
+   * reads the live computed border width so a suppressed bottom border (e.g.
+   * the overflow-suppressed last-row separator) never gets an accent.
+   *
+   * Accents are portalled (fixed, z-index 999) so the sidebar's overflow
+   * clipping cannot hide them, and are keyed by the separator element so a
+   * re-rendered list simply reuses the live rows. This runs per frame while the
+   * shared rAF loop is active so scroll/resize keep the accents pinned to their
+   * separator lines.
+   */
+  private _syncSidebarSepOverdraws(): void {
+    const seen = new Set<Element>();
+    for (const side of ["left", "right"] as const) {
+      const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
+      if (!sb?.isOpen) continue;
+      const host = sb.querySelector<HTMLElement>(".sidebar-tab-host.visible");
+      if (!host) continue;
+      const sbRect = sb.getBoundingClientRect();
+      for (const el of host.querySelectorAll<HTMLElement>("[data-sb-sep]")) {
+        seen.add(el);
+        let entry = this._sbSepOverdraw.get(el);
+        if (!entry) {
+          entry = { side, top: undefined, bottom: undefined };
+          this._sbSepOverdraw.set(el, entry);
+        }
+        const marks = (el.dataset.sbSep ?? "").split(/\s+/).filter(Boolean);
+        const cs = getComputedStyle(el);
+        const wantTop = marks.includes("top") && cs.borderTopWidth === "1px";
+        const wantBottom = marks.includes("bottom") && cs.borderBottomWidth === "1px";
+        if (wantTop && !entry.top) entry.top = this._createSepOverdraw();
+        if (!wantTop && entry.top) {
+          entry.top.remove();
+          entry.top = undefined;
+        }
+        if (wantBottom && !entry.bottom) entry.bottom = this._createSepOverdraw();
+        if (!wantBottom && entry.bottom) {
+          entry.bottom.remove();
+          entry.bottom = undefined;
+        }
+        const r = el.getBoundingClientRect();
+        if (entry.top) {
+          entry.top.style.top = `${r.top}px`;
+          this._placeSepOverdraw(entry.top, side, sbRect);
+        }
+        if (entry.bottom) {
+          entry.bottom.style.top = `${r.bottom - 1}px`;
+          this._placeSepOverdraw(entry.bottom, side, sbRect);
+        }
+      }
+    }
+    // Drop accents for separators that left the DOM or were an unknown sidebar.
+    for (const [el, entry] of this._sbSepOverdraw) {
+      if (!seen.has(el) || !el.isConnected) {
+        if (entry.top) entry.top.remove();
+        if (entry.bottom) entry.bottom.remove();
+        this._sbSepOverdraw.delete(el);
+      }
+    }
+  }
+
+  /** Place one separator accent at `top` over the separator line's y, fading
+   *  from the sidebar's grid-side edge into the grid. */
+  private _placeSepOverdraw(
+    line: HTMLElement,
+    side: "left" | "right",
+    sbRect: DOMRect,
+  ): void {
+    if (side === "left") {
+      line.setAttribute("dir", "right");
+      line.style.left = `${sbRect.right}px`;
+    } else {
+      line.setAttribute("dir", "left");
+      line.style.left = `${sbRect.left - SIDEBAR_SEP_OVERDRAW_LENGTH}px`;
+    }
+  }
+
+  /** Create a portalled horizontal <overdraw-line> that fades into the grid
+   *  from the sidebar's grid-side edge (solid end on the separator line). */
+  private _createSepOverdraw(): HTMLElement {
+    const line = document.createElement("overdraw-line");
+    line.setAttribute("aria-hidden", "true");
+    line.style.cssText = [
+      "position: fixed",
+      "z-index: 999",
+      "pointer-events: none",
+      "--overdraw-color: var(--divider, #333)",
+      "--overdraw-thickness: 1px",
+      `--overdraw-length: ${SIDEBAR_SEP_OVERDRAW_LENGTH}px`,
     ].join(";");
     document.body.appendChild(line);
     return line;
@@ -1030,6 +1154,7 @@ class Openp41geWindowView extends LitElement {
     this._placeSidebarDividerOverdraws();
     this._placeSidebarFooterOverdraws();
     this._placeCellDividerOverdraws();
+    this._syncSidebarSepOverdraws();
     this._syncOverdrawLoop();
     // Context menu is shown synchronously from the event handler
   }

@@ -88,20 +88,10 @@ describe("AgentsSystemTabController", () => {
     const rows = host.querySelectorAll(".chat-row");
     expect(rows.length).toBe(2);
 
-    // Text is left-aligned; a merged tool-call pill (tool icon + count +
-    // chevron) sits on the right and appears only for expandable rows (those
-    // with tool calls).
-    const toolsRow = Array.from(rows).find((r) => r.textContent?.includes("Fix bug"))!;
-    const noToolsRow = Array.from(rows).find((r) => r.textContent?.includes("Write tests"))!;
-    const chevronBtn = toolsRow.querySelector(".chat-chevron-btn");
-    expect(chevronBtn).toBeTruthy();
-    expect(chevronBtn?.tagName).toBe("BUTTON");
-    // The chevron button is the rightmost element of the row head.
-    const toolsHead = toolsRow.querySelector(".chat-row-head")!;
-    expect(toolsHead.lastElementChild).toBe(chevronBtn);
-    expect(noToolsRow.querySelector(".chat-chevron-btn")).toBeNull();
+    // No expandable tool-call pill (tool icon + count + chevron) is rendered.
+    expect(host.querySelector(".chat-chevron-btn")).toBeNull();
+    expect(host.querySelector(".chat-tool-sublist")).toBeNull();
 
-    // The New Chat is a clickable row at the top of the tab.
     const newChatRow = host.querySelector('button.chat-new-row') as HTMLButtonElement;
     expect(newChatRow).toBeTruthy();
 
@@ -223,25 +213,20 @@ describe("AgentsSystemTabController", () => {
     expect(rows[0].textContent).toContain("Write tests");
   });
 
-  it("expands a row to show its tool-call sublist", async () => {
+  it("marks the chat-list separator borders for the windowview overdraws", async () => {
     controller.mount(host);
     await flush();
 
-    // Expand the "Fix bug" row by mimicking the header click.
-    const row = Array.from(host.querySelectorAll<HTMLElement>(".chat-row")).find((r) =>
-      r.textContent?.includes("Fix bug"),
-    )!;
-    const chevron = row.querySelector(".chat-chevron-btn") as HTMLElement;
-    chevron.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await flush();
-
-    // Re-query: the toggle re-rendered the list, so the original row is detached.
-    const sub = host.querySelector(
-      '.chat-row[data-chat-id="chat_1"] .chat-tool-sublist',
-    ) as HTMLElement;
-    expect(sub).toBeTruthy();
-    expect(sub.textContent).toContain("read_file");
-    expect(sub.textContent).toContain("cfg.json");
+    // "+ New chat" row carries a bottom separator; the last chat row carries
+    // both the top (inter-session) and bottom (list-end) separators; the first
+    // chat row itself carries none (its separators are the new-chat row's
+    // bottom border and the second row's top border).
+    const newChatRow = host.querySelector('button.chat-new-row') as HTMLElement;
+    expect(newChatRow.dataset.sbSep).toBe("bottom");
+    const rows = Array.from(host.querySelectorAll<HTMLElement>(".chat-row"));
+    expect(rows).toHaveLength(2);
+    expect(rows[0].dataset.sbSep).toBeUndefined();
+    expect(rows[1].dataset.sbSep).toBe("top bottom");
   });
 
   it("shows the open-in-another-window indicator + Highlight dispatch", async () => {
