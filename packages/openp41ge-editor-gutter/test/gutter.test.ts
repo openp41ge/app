@@ -151,6 +151,48 @@ describe("Gutter", () => {
     });
   });
 
+  describe("fold-chevron hover border overdraw", () => {
+    it("portals corner accents around a hovered collapse icon and clears on leave", () => {
+      const realRaf = (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame;
+      const rafCbs: FrameRequestCallback[] = [];
+      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+        rafCbs.push(cb);
+        return rafCbs.length;
+      };
+      try {
+        gutter.setRows(rows(2), (key) => ({ hasChevron: key === 0 }));
+        const chev = gutter.root.querySelector<HTMLElement>(".eg-col--fold button.eg-fold-chevron")!;
+        chev.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+
+        // The hovered collapse icon portals a fixed layer of 8 corner accents
+        // (2 per edge), matching the hover-box overdraw aesthetic.
+        const layer = document.body.querySelector<HTMLElement>("div[style*='position: fixed']");
+        expect(layer).toBeTruthy();
+        const strokes = Array.from(layer!.querySelectorAll("overdraw-line"));
+        expect(strokes).toHaveLength(8);
+        expect(strokes.every((s) => s.style.getPropertyValue("--overdraw-color") === "var(--eg-hover-ring, rgba(255,255,255,0.16))")).toBe(true);
+        expect(new Set(strokes.map((s) => s.getAttribute("corner"))).size).toBe(8);
+
+        // Step one frame with a stubbed chevron rect to place the accents.
+        chev.getBoundingClientRect = () =>
+          ({ left: 10, top: 5, right: 34, bottom: 29, width: 24, height: 24, x: 10, y: 5, toJSON() {} }) as DOMRect;
+        for (const cb of rafCbs.splice(0)) cb(0);
+        const brRight = strokes.find((s) => s.getAttribute("corner") === "br-right")!;
+        const brBottom = strokes.find((s) => s.getAttribute("corner") === "br-bottom")!;
+        expect(parseFloat(brRight.style.top)).toBe(29);
+        expect(parseFloat(brRight.style.left)).toBe(33);
+        expect(parseFloat(brBottom.style.top)).toBe(28);
+        expect(parseFloat(brBottom.style.left)).toBe(34);
+
+        // Leaving the chevron (pointer exits the button) removes the accents.
+        chev.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body }));
+        expect(document.body.querySelector("div[style*='position: fixed']")).toBeNull();
+      } finally {
+        (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = realRaf;
+      }
+    });
+  });
+
   describe("click / drag line selection", () => {
     it("fires onRowClick on mousedown of a highlightable cell", () => {
       const onClick = vi.fn();

@@ -61,6 +61,11 @@ export const GUTTER_DEFAULT_CSS = /* css */ `
   .eg-fold-chevron:hover {
     background: var(--eg-fold-hover-bg, rgba(121, 192, 255, 0.18));
     color: var(--eg-fold-hover-color, #a5d6ff);
+    /* Inset ring on hover so the collapse icon reads as a highlighted box
+     * (like the unified hover box). The gutter host portals corner overdraw
+     * accents past each corner of the button while it is hovered, using the
+     * same --eg-hover-ring token. */
+    box-shadow: inset 0 0 0 1px var(--eg-hover-ring, rgba(255, 255, 255, 0.16));
   }
   /* Unified hover box: spans the highlightable columns on non-foldable rows,
      but stays on the line-number cell only when the row has a chevron (the

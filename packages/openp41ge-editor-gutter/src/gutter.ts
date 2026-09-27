@@ -269,6 +269,7 @@ export class Gutter {
   dispose(): void {
     this._detachDoc();
     this._detachHoverOverdraw();
+    this._clearChevronHover();
     this._columns = [];
     this._rows = [];
     this.root.remove();
@@ -294,6 +295,16 @@ export class Gutter {
   /** Delegate `mouseover` to the cell under the pointer → row hover. */
   private _onMouseOver = (event: Event): void => {
     const target = event.target as HTMLElement | null;
+    // A fold chevron button owns its hover: portal its border overdraw and
+    // never light the row's other cells (same rule as before, but now the
+    // collapse icon gets a real border + corner accents instead of just bg).
+    const chevron = (target && target.closest?.(".eg-fold-chevron")) as HTMLElement | null;
+    if (chevron) {
+      this._setChevronHover(chevron);
+      if (this._hoverKey !== null) this._applyHover(null);
+      return;
+    }
+    this._setChevronHover(null);
     const cell = (target && target.closest?.(".eg-cell")) as HTMLElement | null;
     if (!cell || !cell.dataset.key) return;
     const key = Number(cell.dataset.key);
@@ -316,12 +327,25 @@ export class Gutter {
   /** Clear the hover when the pointer leaves the gutter entirely. */
   private _onMouseOut = (event: MouseEvent): void => {
     const related = event.relatedTarget as Node | null;
+    const from = event.target as HTMLElement | null;
+    // Leaving a fold chevron (and not re-entering the same one) clears its
+    // border overdraw. This also fires as the pointer moves between the
+    // chevron's own children, so only clear once the pointer exits the button.
+    if (this._inChevron(from) && !this._inChevron(related)) {
+      this._setChevronHover(null);
+    }
     if (related && this.root.contains(related)) return;
     if (this._hoverKey !== null) {
       this._applyHover(null);
       this._events.onHoverChange?.(null);
     }
   };
+
+  /** Whether `node` is (or is nested inside) a fold-chevron button. */
+  private _inChevron(node: Node | null): boolean {
+    const el = node as HTMLElement | null;
+    return !!el?.closest?.(".eg-fold-chevron");
+  }
 
   private _applyHoverToCells(): void {
     for (const state of this._columns) {
@@ -427,7 +451,7 @@ export class Gutter {
     const layer = document.createElement("div");
     layer.setAttribute("aria-hidden", "true");
     layer.style.cssText =
-      "position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:999;";
+      "position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:1002;";
     document.body.appendChild(layer);
     const color = "var(--eg-hover-ring, rgba(255,255,255,0.16))";
     const length = 8;
@@ -488,6 +512,100 @@ export class Gutter {
     if (s.raf) cancelAnimationFrame(s.raf);
     s.layer.remove();
     this._hoverOverdraw = null;
+  }
+
+  // ── Fold-chevron hover overdraw accents ─────────────────────────────────
+
+  /** Current hovered fold-chevron button + its portalled accent layer (null
+   *  when no chevron is hovered). The button can be pruned when rows are
+   *  rebuilt/clipped, so the accents re-attach per hover and track the button
+   *  each frame (hiding when its rect collapses, detaching if it disappears). */
+  private _chevronOverdraw: {
+    button: HTMLElement;
+    layer: HTMLElement;
+    lines: Array<{ edge: string; corner: string; dir: string; el: HTMLElement }>;
+    raf: number;
+  } | null = null;
+
+  /** Show (or clear) the corner overdraw accents + inset ring continue around
+   *  a hovered fold-chevron button. Idempotent on the same button. */
+  private _setChevronHover(button: HTMLElement | null): void {
+    if (this._chevronOverdraw?.button === button) return;
+    this._clearChevronHover();
+    if (!button || !button.isConnected) return;
+    const layer = document.createElement("div");
+    layer.setAttribute("aria-hidden", "true");
+    // z-index 1002: above the settings-drawer host (z-index 1001) so the
+    // accents stay visible over the JSON editor hosted inside a drawer (the
+    // editor-gutter is shared by the file editor AND the JSON settings editor).
+    layer.style.cssText =
+      "position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:1002;";
+    document.body.appendChild(layer);
+    const color = "var(--eg-hover-ring, rgba(255,255,255,0.16))";
+    const length = 8;
+    const lines: Array<{ edge: string; corner: string; dir: string; el: HTMLElement }> = [];
+    for (const edge of ["top", "bottom", "left", "right"]) {
+      for (const [corner, dir, ,] of Gutter.HOVER_EDGE_CORNERS[edge]) {
+        const line = document.createElement("overdraw-line");
+        line.setAttribute("dir", dir);
+        line.setAttribute("corner", `${corner}-${edge}`);
+        line.setAttribute("aria-hidden", "true");
+        line.style.setProperty("--overdraw-color", color);
+        line.style.setProperty("--overdraw-thickness", "1px");
+        line.style.setProperty("--overdraw-length", `${length}px`);
+        layer.appendChild(line);
+        lines.push({ edge, corner, dir, el: line });
+      }
+    }
+    const overdraw = { button, layer, lines, raf: 0 };
+    const place = (): void => {
+      if (!overdraw.button.isConnected) {
+        this._clearChevronHover();
+        return;
+      }
+      const r = overdraw.button.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) {
+        overdraw.layer.style.display = "none";
+        return;
+      }
+      overdraw.layer.style.display = "";
+      for (const { edge, corner, dir, el } of overdraw.lines) {
+        const [, , ax, ay] = Gutter.HOVER_EDGE_CORNERS[edge].find(([c]) => c === corner)!;
+        if (dir === "left" || dir === "right") {
+          const y = ay === "top" ? r.top : r.bottom - 1;
+          const x = ax === "left" ? r.left : r.right;
+          const left = dir === "left" ? x - length : x;
+          el.style.left = `${left}px`;
+          el.style.top = `${y}px`;
+        } else {
+          const x = ax === "left" ? r.left : r.right - 1;
+          const y = ay === "top" ? r.top : r.bottom;
+          const top = dir === "up" ? y - length : y;
+          el.style.left = `${x}px`;
+          el.style.top = `${top}px`;
+        }
+      }
+    };
+    const loop = (): void => {
+      place();
+      if (this._chevronOverdraw === overdraw) {
+        overdraw.raf = requestAnimationFrame(loop);
+      }
+    };
+    if (typeof requestAnimationFrame === "function") {
+      overdraw.raf = requestAnimationFrame(loop);
+    } else {
+      place();
+    }
+    this._chevronOverdraw = overdraw;
+  }
+
+  private _clearChevronHover(): void {
+    const s = this._chevronOverdraw;
+    if (!s) return;
+    if (s.raf) cancelAnimationFrame(s.raf);
+    s.layer.remove();
+    this._chevronOverdraw = null;
   }
 
   private _onCellMousedown(state: ColumnState, row: GutterRow, event: MouseEvent): void {
