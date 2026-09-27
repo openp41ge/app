@@ -240,6 +240,42 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     expect(wv._sbFooterOverdraw.has("right")).toBe(false);
   });
 
+  it("follows the footer overdraw to a newly-accented sidebar tab", async () => {
+    const { wv } = await mount();
+    const left = wv.querySelector('openp41ge-sidebar[side="left"]');
+    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => sbRect(0, 209, 36) });
+
+    const hostA = document.createElement("div");
+    hostA.className = "sidebar-tab-host visible";
+    const footerA = document.createElement("div");
+    footerA.style.borderTop = "1px solid #333";
+    hostA.appendChild(footerA);
+    left.appendChild(hostA);
+    const hostB = document.createElement("div");
+    hostB.className = "sidebar-tab-host";
+    const footerB = document.createElement("div");
+    footerB.style.borderTop = "1px solid #333";
+    hostB.appendChild(footerB);
+    left.appendChild(hostB);
+    for (const el of [hostA, footerA, hostB, footerB]) {
+      Object.defineProperty(el, "getBoundingClientRect", { configurable: true, value: () => footRect("left") });
+    }
+
+    wv._placeSidebarFooterOverdraws();
+    expect(wv._sbFooterEl.get("left")).toBe(footerA);
+    expect(wv._sbFooterOverdraw.has("left")).toBe(true);
+
+    // Switch the active tab: the accent must move to the newly-visible host's
+    // footer even though the old (hidden) host's footer is still connected.
+    hostA.classList.remove("visible");
+    hostB.classList.add("visible");
+    wv._placeSidebarFooterOverdraws();
+    expect(wv._sbFooterEl.get("left")).toBe(footerB);
+    expect(wv._sbFooterOverdraw.has("left")).toBe(true);
+    wv._positionSidebarFooterOverdraws();
+    expect(parseFloat(wv._sbFooterOverdraw.get("left").style.top)).toBe(826);
+  });
+
   it("removes the footer overdraws once the grid gets a tab (divider lines remain)", async () => {
     const { wv, win } = await mount();
     const left = wv.querySelector('openp41ge-sidebar[side="left"]');

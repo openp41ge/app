@@ -630,9 +630,13 @@ class Openp41geWindowView extends LitElement {
       }
       if (!sb) continue;
       // Only draw when this sidebar's active system tab actually has a bottom
-      // bar to continue (e.g. the Agents list footer).
+      // bar to continue (e.g. the Agents list footer). Re-find when the active
+      // tab host changes (a hidden host's footer stays connected, so the cache
+      // would otherwise keep the previous tab's footer forever — the accent
+      // must follow whichever tab is currently visible).
       let footer = this._sbFooterEl.get(side) ?? null;
-      if (!footer || !footer.isConnected) {
+      const activeHost = sb.querySelector<HTMLElement>(".sidebar-tab-host.visible");
+      if (!footer || !footer.isConnected || (activeHost && !activeHost.contains(footer))) {
         footer = this._findSidebarFooter(sb);
         this._sbFooterEl.set(side, footer);
       }
@@ -671,7 +675,8 @@ class Openp41geWindowView extends LitElement {
       if (!line) continue;
       const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
       let footer = this._sbFooterEl.get(side) ?? null;
-      if (sb && (!footer || !footer.isConnected)) {
+      const activeHost = sb?.querySelector<HTMLElement>(".sidebar-tab-host.visible");
+      if (sb && (!footer || !footer.isConnected || (activeHost && !activeHost.contains(footer)))) {
         footer = this._findSidebarFooter(sb);
         this._sbFooterEl.set(side, footer);
       }
