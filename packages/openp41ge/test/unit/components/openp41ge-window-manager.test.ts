@@ -379,4 +379,28 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     expect((wm as Wm)._drawers).toHaveLength(1);
     expect(((wm as Wm)._drawers as Array<{ workspacePath: string }>)[0].workspacePath).toBe("/w/a");
   });
+
+  it("extends the footer's three vertical separators with up overdraws", async () => {
+    expect(wm.shadowRoot?.querySelector(".ws-list-footer")).not.toBeNull();
+
+    const lines = wm.shadowRoot?.querySelectorAll(".ws-list-footer overdraw-line");
+    expect(lines?.length).toBe(3);
+
+    const search = wm.shadowRoot?.querySelector<HTMLElement>(".ws-list-footer .dw-search > overdraw-line");
+    expect(search?.getAttribute("dir")).toBe("up");
+    expect(search?.style.right).toBe("-1px");
+    expect(search?.style.left).toBe("");
+
+    for (const btn of wm.shadowRoot?.querySelectorAll<HTMLElement>(".ws-list-footer .dw-add, .ws-list-footer .dw-delete") ?? []) {
+      const line = btn.querySelector<HTMLElement>("overdraw-line");
+      expect(line?.getAttribute("dir")).toBe("up");
+      expect(line?.style.left).toBe("-1px");
+      expect(line?.style.right).toBe("");
+    }
+
+    // Idempotent: triggering another update must not duplicate the lines.
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+    expect(wm.shadowRoot?.querySelectorAll(".ws-list-footer overdraw-line")?.length).toBe(3);
+  });
 });

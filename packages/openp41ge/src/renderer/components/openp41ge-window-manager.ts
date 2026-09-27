@@ -36,6 +36,34 @@ const THUMB_H = 42;
 /** Maximum window skeletons shown side by side in each workspace row. */
 const MAX_VISIBLE_THUMBS = 3;
 
+/**
+ * Attach an `up` overdraw continuation to a footer button's edge separator.
+ *
+ * The separator is the button's own 1px border on its left or right edge. The
+ * line extends that border up past the footer's top border so the separator
+ * appears to bleed upward. `side` selects which edge carries the separator; the
+ * line is offset by the 1px border width because an absolutely-positioned child
+ * anchors to the padding box (one border-width inside the border-box edge).
+ *
+ * Idempotent — guarded by `data-overdraw` so repeated calls (e.g. after delete
+ * mode toggles and the buttons are recreated) never duplicate the line. The
+ * host is made `position: relative` so the line resolves against it.
+ */
+function attachTopEdgeOverdraw(host: HTMLElement, side: "left" | "right"): void {
+  const key = side === "right" ? "up-top-r" : "up-top-l";
+  if (host.dataset.overdraw === key) return;
+  host.dataset.overdraw = key;
+  if (getComputedStyle(host).position !== "relative") {
+    host.style.position = "relative";
+  }
+  const line = document.createElement("overdraw-line");
+  line.setAttribute("dir", "up");
+  line.setAttribute("aria-hidden", "true");
+  line.style.setProperty("bottom", "100%");
+  line.style.setProperty(side, "-1px");
+  host.appendChild(line);
+}
+
 interface OpenWindowSummary {
   windowId: string;
   windowType: "workspace" | "window-manager";
@@ -232,6 +260,7 @@ export class Openp41geWindowManager extends LitElement {
   /** Attach custom tooltips to the footer tool buttons (replaces native `title`). */
   updated(): void {
     this._measureListOverflow();
+    this._attachWorkspaceFooterOverdraws();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
       ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close, .wm-tab-close, .wm-tabbar-add",
     );
@@ -649,6 +678,22 @@ export class Openp41geWindowManager extends LitElement {
     // Keep the drawer showing the freshly-added repo, and refresh the card list.
     this._drawers = this._drawers.map((x) => (x.id === d.id ? { ...x, data } : x));
     await this._load();
+  }
+
+  /** Extend each vertical separator in the workspace-list footer up past the
+   *  footer's top border: one `up` overdraw per separator. The separators are
+   *  the buttons' own edge borders (`dw-search` right edge, `dw-add`/`dw-delete`
+   *  left edge). Idempotent per element, so it is safe on every re-render. */
+  private _attachWorkspaceFooterOverdraws(): void {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const search = root.querySelector<HTMLElement>(".ws-list-footer .dw-search");
+    if (search) attachTopEdgeOverdraw(search, "right");
+    for (const btn of root.querySelectorAll<HTMLElement>(
+      ".ws-list-footer .dw-add, .ws-list-footer .dw-delete",
+    )) {
+      attachTopEdgeOverdraw(btn, "left");
+    }
   }
 
   /** Footer for the top-level workspace list (+ / trashcan, delete mode). */
