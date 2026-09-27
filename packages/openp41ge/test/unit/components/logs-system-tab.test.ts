@@ -102,4 +102,13 @@ describe("LogsSystemTabController", () => {
     expect(settingsBtn).toBeTruthy();
     expect(host.querySelector('input[type="checkbox"]')).toBeNull();
   });
+
+  it("gives the footer button's cap separator a top overdraw accent", () => {
+    const sep = host.querySelector(".footer-sep");
+    expect(sep).toBeTruthy();
+    const line = sep!.querySelector("overdraw-line");
+    expect(line).toBeTruthy();
+    expect(line!.getAttribute("dir")).toBe("up");
+    expect(sep!.style.position).toBe("relative");
+  });
 });

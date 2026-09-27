@@ -13,7 +13,8 @@
  */
 
 import type { SystemTabController } from "../../controllers/types";
-import { appendSettingsButton, type Side } from "../../services/settings-button";
+import { createSettingsButton, type Side } from "../../services/settings-button";
+import { attachTopOverdraw } from "openp41ge-uikit/overdraw-line";
 import {
   listLogStreams,
   subscribeLogStreams,
@@ -103,7 +104,6 @@ export class LogsSystemTabController implements SystemTabController {
       height: "34px",
       display: "flex",
       alignItems: "center",
-      gap: "6px",
       padding: this._side === "left" ? "0 0 0 8px" : "0 8px 0 0",
       borderTop: "1px solid var(--divider,#333)",
       fontSize: "12px",
@@ -111,15 +111,37 @@ export class LogsSystemTabController implements SystemTabController {
       background: "var(--bg-secondary, #161616)",
       userSelect: "none",
     });
-    appendSettingsButton(
-      footer,
-      this._side,
+    const settingsBtn = createSettingsButton(
       "openp41ge:open-logs-settings-drawer",
       "logs-settings",
       "Logs",
       "Log settings",
       this._side,
     );
+    // The cap separator on the button's outer edge is an explicit element so
+    // it can carry the vertical overdraw accent — a button border can't extend
+    // past the bar (same treatment as the Agents footer's button separators).
+    const capSep = document.createElement("span");
+    capSep.setAttribute("aria-hidden", "true");
+    capSep.className = "footer-sep";
+    Object.assign(capSep.style, {
+      width: "1px",
+      alignSelf: "stretch",
+      flexShrink: "0",
+      background: "var(--divider, #333)",
+    });
+    attachTopOverdraw(capSep);
+    const spacer = document.createElement("div");
+    Object.assign(spacer.style, { flex: "1 1 auto" });
+    if (this._side === "left") {
+      footer.appendChild(spacer);
+      footer.appendChild(capSep);
+      footer.appendChild(settingsBtn);
+    } else {
+      footer.appendChild(settingsBtn);
+      footer.appendChild(capSep);
+      footer.appendChild(spacer);
+    }
 
     view.append(list, footer);
     container.appendChild(view);
