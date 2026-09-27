@@ -1676,7 +1676,11 @@ export class JsonEditorElement extends LitElement {
   private _foldMeta(fold: FoldRange | undefined): string {
     if (!fold || !this._root) return "";
     const m = findEntryAtLine(this._root, fold.openLine);
-    const node = m?.node;
+    let node = m?.node;
+    // findEntryAtLine only matches members/elements, so the ROOT fold (the
+    // whole document collapsed onto its first/only row) yields no match. Fall
+    // back to the root node when the fold opens on the root's own line.
+    if (!node && fold.openLine === this._root.line) node = this._root;
     if (!node || (node.type !== "object" && node.type !== "array")) return "";
     const summary = summarize(node.value as Record<string, unknown> | unknown[]);
     // Render the summary INSIDE the braces — the row is the property key plus

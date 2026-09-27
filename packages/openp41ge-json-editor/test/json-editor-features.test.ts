@@ -87,6 +87,22 @@ describe("json-editor structure features", () => {
     expect((text.match(/\{/g) || []).length).toBe(1);
   });
 
+  test("folding the ROOT row still shows the summary metadata", async () => {
+    chevronFor(el, 1).click();
+    await new Promise((r) => setTimeout(r, 20));
+    const meta = el.shadowRoot.querySelector(".je-fold-meta");
+    expect(meta).toBeTruthy();
+    // Root is the whole document: 2 properties · 1 object · ...
+    expect(meta.textContent).toContain("2 propert");
+    expect(meta.textContent).toContain("1 object");
+    // The whole document is hidden (only the folded root row remains).
+    expect(input(el).value.includes("baseUrl")).toBe(false);
+
+    chevronFor(el, 1).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(input(el).value.includes("baseUrl")).toBe(true);
+  });
+
   test("editing while folded reconciles to the full text without losing content", async () => {
     chevronFor(el, 3).click();
     await new Promise((r) => setTimeout(r, 20));
