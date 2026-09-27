@@ -1,13 +1,11 @@
 /**
  * Vertical overdraw strokes for a tab-bar drop indicator.
  *
- * A tab-bar drop indicator is a full-height blue line. Its horizontal
- * cross-cap ticks (attachDropTipOverdraws) sit at the top and bottom tips
- * inside the bar. These vertical strokes instead continue the line PAST the
- * bar's top and bottom edges — a short fade-up stroke above the top tip and
- * a fade-down stroke below the bottom tip — so the line reads as the overdraw
- * family's border bleed (it keeps going a little beyond the seam it is
- * clipped at).
+ * A tab-bar drop indicator is a full-height blue line. These vertical
+ * strokes continue that line PAST the bar's top and bottom edges — a short
+ * fade-up stroke above the top tip and a fade-down stroke below the bottom
+ * tip — so the line reads as the overdraw family's border bleed (it keeps
+ * going a little beyond the seam it is clipped at).
  *
  * The bar's scroll container clips `overflow-y: hidden`, so vertical strokes
  * that extend outside it must be `position: fixed` to escape the clip. The

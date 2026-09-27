@@ -116,40 +116,12 @@ export class TabBarDropTarget implements IDropTarget {
     this.element.dispatchEvent(new CustomEvent(type, { bubbles: true, detail }));
   }
 
-  /** The blue ticks that cross-cap the indicator at its top and bottom tips.
-   *  Each is a self-contained 1px fade-out stroke (opaque at the line's edge,
-   *  fading outward) so it reads as the overdraw family's border bleed. Kept
-   *  self-contained (plain <div> + inline gradient) because this package has
-   *  no dependency on the uikit <overdraw-line> element. */
-  private _attachTipOverdraws(): void {
-    const host = this._indicatorEl;
-    if (!host || (host as HTMLElement).dataset.tipOverdraw === "1") return;
-    (host as HTMLElement).dataset.tipOverdraw = "1";
-    const ticks: Array<[string, string, string]> = [
-      // [dir, top, horizontal positioning] — solid end sits on the line's edge.
-      ["left", "0", "right:100%"],
-      ["right", "0", "left:100%"],
-      ["left", "calc(100% - 1px)", "right:100%"],
-      ["right", "calc(100% - 1px)", "left:100%"],
-    ];
-    for (const [dir, top, horiz] of ticks) {
-      const tick = document.createElement("div");
-      const grad =
-        dir === "left"
-          ? "linear-gradient(to left, rgb(74,158,255) 40%, transparent)"
-          : "linear-gradient(to right, rgb(74,158,255) 40%, transparent)";
-      tick.style.cssText = `position:absolute;top:${top};${horiz};width:8px;height:1px;background:${grad};pointer-events:none;`;
-      host.appendChild(tick);
-    }
-  }
-
   private _showIndicator(dropIndex: number): void {
     if (!this._indicatorEl) {
       this._indicatorEl = document.createElement("div");
       this._indicatorEl.className = "tab-drop-indicator";
       this._indicatorEl.style.cssText =
         "position:absolute;top:0;bottom:0;width:3px;background:rgb(74,158,255);box-shadow:0 0 10px rgba(74,158,255,0.6);display:none;pointer-events:none;z-index:10;";
-      this._attachTipOverdraws();
       attachDropTipVerticalOverdraws(this._indicatorEl);
       this.element.appendChild(this._indicatorEl);
     }

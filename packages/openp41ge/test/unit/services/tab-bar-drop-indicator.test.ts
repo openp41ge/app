@@ -4,8 +4,7 @@
  * The TabBarDropTarget (openp41ge-tabs) draws the blue insertion line on a
  * cell's tab bar during a tab drag/reorder. These tests pin that the marker is
  * FULL tab-bar height (flush with the top and bottom edges, not inset), square,
- * 3px with a glow, cross-capped with the overdraw-family blue ticks at its top
- * and bottom tips, continues past the bar's top/bottom edges (vertical
+ * 3px with a glow, continues past the bar's top/bottom edges (vertical
  * overdraw strokes), and is suppressed for same-cell no-op reorders.
  */
 import { describe, it, expect, beforeEach } from "vitest";
@@ -48,12 +47,6 @@ describe("TabBarDropTarget tab-bar indicator geometry", () => {
     return b;
   }
 
-  function crossCapTicks(ind: HTMLElement): HTMLElement[] {
-    return Array.from(ind.querySelectorAll<HTMLElement>(
-      "div:not(.drop-tip-vod-up):not(.drop-tip-vod-down)",
-    ));
-  }
-
   it("is full-height (3px, glow, square) once the indicator is shown", () => {
     const b = bar();
     const target = new TabBarDropTarget(b, "w1", 0);
@@ -70,27 +63,6 @@ describe("TabBarDropTarget tab-bar indicator geometry", () => {
     // Square + glow (matches the sidebar <drop-line> look).
     expect(ind.style.boxShadow).toContain("rgba(74,158,255");
     expect(ind.style.display).toBe("block");
-  });
-
-  it("cross-caps the indicator with four blue tip ticks", () => {
-    const b = bar();
-    const target = new TabBarDropTarget(b, "w1", 0);
-    target.onHover(fakeTabSource(), 10, 15);
-
-    const ind = b.querySelector<HTMLElement>(".tab-drop-indicator")!;
-    const ticks = crossCapTicks(ind);
-    expect(ticks).toHaveLength(4);
-    expect(ticks.map((t) => t.style.backgroundImage)).toEqual([
-      "linear-gradient(to left, rgb(74, 158, 255) 40%, transparent)",
-      "linear-gradient(to right, rgb(74, 158, 255) 40%, transparent)",
-      "linear-gradient(to left, rgb(74, 158, 255) 40%, transparent)",
-      "linear-gradient(to right, rgb(74, 158, 255) 40%, transparent)",
-    ]);
-    // Top pair sits at the line's top edge, bottom pair at its last pixel row.
-    expect(ticks[0].style.top).toBe("0px");
-    expect(ticks[2].style.top).toBe("calc(100% - 1px)");
-    expect(ticks[0].style.right).toBe("100%");
-    expect(ticks[1].style.left).toBe("100%");
   });
 
   it("adds two fixed vertical overdraw strokes (up + down) at the tips", () => {
@@ -117,7 +89,7 @@ describe("TabBarDropTarget tab-bar indicator geometry", () => {
     );
   });
 
-  it("does not re-append the ticks/strokes when the indicator is reused across hovers", () => {
+  it("does not re-append the strokes when the indicator is reused across hovers", () => {
     const b = bar();
     const target = new TabBarDropTarget(b, "w1", 0);
     target.onHover(fakeTabSource(), 10, 15);
@@ -126,8 +98,9 @@ describe("TabBarDropTarget tab-bar indicator geometry", () => {
     target.onHover(fakeTabSource(), 20, 15);
     expect(b.querySelectorAll(".tab-drop-indicator")).toHaveLength(1);
     const ind = b.querySelector<HTMLElement>(".tab-drop-indicator")!;
-    expect(crossCapTicks(ind)).toHaveLength(4);
+    // Only the two vertical overdraw strokes — no horizontal cross-cap ticks.
     expect(ind.querySelectorAll(".drop-tip-vod-up, .drop-tip-vod-down")).toHaveLength(2);
+    expect(ind.querySelectorAll("div")).toHaveLength(2);
   });
 
   it("hides the indicator for a same-cell drag at the tab's own position (no-op reorder)", () => {
