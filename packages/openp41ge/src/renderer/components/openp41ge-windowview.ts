@@ -34,7 +34,7 @@ import "openp41ge-uikit/drop-indicator";
 import "openp41ge-uikit/overdraw-line";
 
 /** How far (px) a populated sidebar's grid-side divider overdraws up past the
- *  title-bar seam when the grid is empty. */
+ *  title-bar seam (always shown while the sidebar is open). */
 export const SIDEBAR_OVERDRAW_LENGTH = 14;
 
 /** How far (px) a populated sidebar's bottom-bar top border overdraws
@@ -446,26 +446,23 @@ class Openp41geWindowView extends LitElement {
   // ── Sidebar divider overdraws ────────────────────────────────────────
 
   /**
-   * When the grid has no tabs, an empty window leaves the sidebars with no
-   * visual anchor — the populated sidebar's grid-side 1px divider is the only
-   * thing separating it from the empty grid, and its top sits exactly at the
-   * main-area's top edge (the title-bar seam), where it just stops. Continue
-   * that divider up past the seam with a short <overdraw-line> fade-out accent
-   * so the sidebar edge reads clearly against the empty grid.
+   * An open sidebar's grid-side 1px divider is the boundary separating it from
+   * the grid, and its top sits exactly at the main-area's top edge (the
+   * title-bar seam), where it just stops. Continue that divider up past the
+   * seam with a short <overdraw-line> fade-out accent so the sidebar edge
+   * reads clearly against the grid — whether the grid is empty or hosts tabs.
    *
    * The line is portalled to a fixed viewport layer because the divider's top
    * is at the main-area's top edge: an absolutely positioned line would be
    * clipped by the main area's `overflow: hidden`. It is positioned to run
    * exactly over the divider's x and to fade out upward. Runs on every render
    * (sidebar drags and window resizes re-render here), and is removed when the
-   * condition stops holding or the sidebar is closed off-screen.
+   * sidebar is closed or loses its system tabs.
    */
   private _placeSidebarDividerOverdraws(): void {
-    const win = this.windowData;
-    const gridEmpty = !win?.grid?.placements.some((p) => p.tabIds.length > 0);
     for (const side of ["left", "right"] as const) {
       const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
-      const shouldShow = gridEmpty && !!sb?.isOpen && (sb?.systemTabs?.length ?? 0) > 0;
+      const shouldShow = !!sb?.isOpen && (sb?.systemTabs?.length ?? 0) > 0;
       const existing = this._sbDividerOverdraw.get(side) ?? null;
       if (!shouldShow) {
         if (existing) {

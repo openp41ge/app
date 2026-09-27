@@ -111,22 +111,24 @@ describe("openp41ge-windowview sidebar divider overdraws", () => {
     expect(parseFloat(r.style.top)).toBe(36 - SIDEBAR_OVERDRAW_LENGTH);
   });
 
-  it("removes the lines once the grid gets a tab", async () => {
+  it("keeps the divider lines visible once the grid gets a tab", async () => {
     const { wv, win } = await mount();
     expect(lines().length).toBe(2);
     win.grid.placements = [{ position: { row: 0, col: 0 }, tabIds: ["t1"] }];
     wv.windowData = { ...win };
     await wv.updateComplete;
-    expect(lines().length).toBe(0);
-    expect(wv._sbDividerOverdraw.size).toBe(0);
+    // Vertical divider overdraws are always shown while a sidebar is open,
+    // even when the grid hosts tabs.
+    expect(lines().length).toBe(2);
+    expect(wv._sbDividerOverdraw.size).toBe(2);
   });
 
-  it("reappears when the grid empties again", async () => {
+  it("keeps the lines across a grid tab round-trip (add then empty)", async () => {
     const { wv, win } = await mount();
     win.grid.placements = [{ position: { row: 0, col: 0 }, tabIds: ["t1"] }];
     wv.windowData = { ...win };
     await wv.updateComplete;
-    expect(lines().length).toBe(0);
+    expect(lines().length).toBe(2);
 
     win.grid.placements = [];
     wv.windowData = { ...win };
@@ -236,7 +238,7 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     expect(wv._sbFooterOverdraw.has("right")).toBe(false);
   });
 
-  it("removes the footer overdraws once the grid gets a tab", async () => {
+  it("removes the footer overdraws once the grid gets a tab (divider lines remain)", async () => {
     const { wv, win } = await mount();
     const left = wv.querySelector('openp41ge-sidebar[side="left"]');
     const right = wv.querySelector('openp41ge-sidebar[side="right"]');
@@ -248,8 +250,11 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     win.grid.placements = [{ position: { row: 0, col: 0 }, tabIds: ["t1"] }];
     wv.windowData = { ...win };
     await wv.updateComplete;
-    expect(document.body.querySelectorAll("overdraw-line").length).toBe(0);
+    // Footer overdraws go away (a tab's own bottom bar now provides the line),
+    // but the vertical divider overdraws stay.
     expect(wv._sbFooterOverdraw.size).toBe(0);
+    expect(wv._sbDividerOverdraw.size).toBe(2);
+    expect([...document.body.querySelectorAll("overdraw-line")].every((l) => l.getAttribute("dir") === "up")).toBe(true);
   });
 
   it("cleans up the footer overdraws when disconnected", async () => {
