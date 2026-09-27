@@ -505,54 +505,17 @@ export class AgentsSystemTabController implements SystemTabController {
     titleBlock.appendChild(desc);
     head.appendChild(titleBlock);
 
-    // Open-in-another-window indicator + Highlight.
+    // Open-in-another-window: clicking the row shows a toast instead of
+    // opening a duplicate chat.
     const owner = this._openChats[chat.id];
     const myWinId = window.openp41ge?.workspace?.getWindowId();
     const openElsewhere = owner !== undefined && owner !== myWinId;
-    if (openElsewhere) {
-      const ind = document.createElement("span");
-      ind.title = "Open in another window";
-      ind.textContent = "↗";
-      Object.assign(ind.style, {
-        flexShrink: "0",
-        color: "var(--accent,#4a9eff)",
-        fontSize: "12px",
-      });
-      head.appendChild(ind);
-
-      const hlBtn = document.createElement("button");
-      hlBtn.type = "button";
-      hlBtn.title = "Highlight the open chat tab";
-      hlBtn.textContent = "✧";
-      Object.assign(hlBtn.style, {
-        flexShrink: "0",
-        width: "20px",
-        height: "20px",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "12px",
-        color: "var(--accent,#4a9eff)",
-        background: "transparent",
-        border: "1px solid var(--divider,#333)",
-        borderRadius: "4px",
-        cursor: "pointer",
-      });
-      hlBtn.addEventListener("mousedown", (e: MouseEvent) => e.stopPropagation());
-      hlBtn.addEventListener("click", (e: MouseEvent) => {
-        e.stopPropagation();
-        void this._storeModel.highlight(chat.id);
-      });
-      head.appendChild(hlBtn);
-    }
 
     row.appendChild(head);
 
-    // Click handling: a row that is open in another window shows a toast + a
-    // highlight affordance instead of opening a duplicate chat.
-    head.addEventListener("click", (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest("button")) return; // highlight button handled above
+    // Click handling: a row that is open in another window shows a toast
+    // instead of opening a duplicate chat.
+    head.addEventListener("click", () => {
       if (openElsewhere) {
         this._showOpenElsewhereToast(chat);
         return;

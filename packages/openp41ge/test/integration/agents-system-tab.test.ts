@@ -229,7 +229,7 @@ describe("AgentsSystemTabController", () => {
     expect(rows[1].dataset.sbSep).toBe("top bottom");
   });
 
-  it("shows the open-in-another-window indicator + Highlight dispatch", async () => {
+  it("does not render the open-in-another-window row icons; clicking still toasts", async () => {
     mockBridge("win-local");
     // Open chat_1 in a different window.
     storeModel.setCurrentWinId("win-other");
@@ -241,12 +241,14 @@ describe("AgentsSystemTabController", () => {
     const row = Array.from(host.querySelectorAll<HTMLElement>(".chat-row")).find((r) =>
       r.textContent?.includes("Fix bug"),
     )!;
-    expect(row.textContent).toContain("↗");
+    // The right-end indicator + Highlight icons are removed.
+    expect(row.textContent).not.toContain("↗");
+    expect(row.textContent).not.toContain("✧");
+    expect(Array.from(row.querySelectorAll("button")).length).toBe(0);
 
-    const hlBtn = Array.from(row.querySelectorAll("button")).find((b) => b.textContent === "✧");
-    expect(hlBtn).toBeTruthy();
-    const openCountBefore = storeModel.calls.filter((c) => c.op === "highlight").length;
-    hlBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(storeModel.calls.filter((c) => c.op === "highlight")).toHaveLength(openCountBefore + 1);
+    // Clicking the row still shows the open-in-another-window toast.
+    const clickRowHead = row.querySelector<HTMLElement>(".chat-row-head")!;
+    clickRowHead.click();
+    await flush();
   });
 });
