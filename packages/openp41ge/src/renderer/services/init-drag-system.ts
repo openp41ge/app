@@ -148,6 +148,24 @@ let _currentSource: IDragSource | null = null;
 let _fileRowSuppressedDrag: HTMLElement | null = null;
 let _ghostManager = new GhostManager();
 
+// ─── Drag-ghost dimming over tab bars ──────────────────────────────────────
+// While the cursor hovers a tab bar, a drop indicator bar is drawn there under
+// the floating drag ghost. The ghost would otherwise cover it, so we fade the
+// ghost to a low opacity to let the drop indicator show through. The opacity is
+// animated in the main-process DragGhostManager (IPC `drag:setOpacity`).
+const DRAG_GHOST_DIM_OPACITY = 0.33;
+/** Drop-target types that draw a bar indicator inside a tab bar. */
+const TAB_BAR_TARGET_TYPES = new Set(["sidebar-tab-bar", "tab-bar", "manager-tab-bar"]);
+let _dragGhostDimmed = false;
+
+function _setDragGhostDimmed(target: IDropTarget | null): void {
+  const dim = !!target && TAB_BAR_TARGET_TYPES.has(target.type);
+  if (dim === _dragGhostDimmed) return;
+  _dragGhostDimmed = dim;
+  // The drag bridge may be absent (e.g. unit tests / non-Electron renderer).
+  window.openp41ge?.drag?.setOpacity?.(dim ? DRAG_GHOST_DIM_OPACITY : 1);
+}
+
 /** Whether another Electron window has an active drag. */
 let _remoteDragActive = false;
 /** Drag source type of the remote (other-window) drag, from the drag-state broadcast. */
@@ -720,10 +738,11 @@ export function initDragSystem(): () => void {
   _myWinId = window.openp41ge.workspace.getWindowId();
 
   // ── Create the orchestrator ──────────────────────────────────────────
-  _orchestrator = new DragOrchestrator(openp41geTargetResolver);
+  _orchestrator = new DragOrchestrator(openp41geTargetResolver, _setDragGhostDimmed);
   cleanups.push(() => {
     _orchestrator?.dispose();
     _orchestrator = null;
+    _dragGhostDimmed = false;
   });
 
   // ── Mousedown: initiate tab drags ────────────────────────────────────

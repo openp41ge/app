@@ -302,6 +302,14 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     dragGhost.move(screenX, screenY);
   });
 
+  // Fade the ghost content so the drop indicator under the cursor shows through
+  // while hovering a tab bar (0–1; animates quickly via a CSS transition).
+  ipcMain.on("openp41ge:drag-opacity", (_event, opacity: unknown) => {
+    if (typeof opacity === "number" && Number.isFinite(opacity)) {
+      dragGhost.setOpacity(opacity);
+    }
+  });
+
   // Pre-capture the source element region at pointer-down so the ghost can pop
   // with the real skeleton the instant the drag starts (see drag-start).
   ipcMain.on("openp41ge:drag-prepare-bitmap", (event, raw: string) => {

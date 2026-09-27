@@ -97,6 +97,7 @@ declare global {
       drag: {
         start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number, dragType?: string, filePath?: string, captureRect?: { x: number; y: number; width: number; height: number }, inset?: number, openTabData?: { appType?: string; tabConfig?: Record<string, unknown> }) => void;
         move: (screenX: number, screenY: number) => void;
+        setOpacity: (opacity: number) => void;
         end: () => void;
         activate: () => void;
         prepareBitmap: (rect: { x: number; y: number; width: number; height: number }) => void;

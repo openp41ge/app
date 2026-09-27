@@ -77,3 +77,78 @@ describe("buildBitmapGhostHtml", () => {
     expect(html).not.toContain("op41ge-lift");
   });
 });
+
+// ─── DragGhostManager.setOpacity ────────────────────────────────────────
+
+import { vi } from "vitest";
+import { DragGhostManager } from "../../../src/main/services/drag-ghost-manager.js";
+
+class FakeWindow {
+  destroyed = false;
+  executed: string[] = [];
+  webContents = {
+    on: () => {},
+    executeJavaScript: (js: string) => {
+      this.executed.push(js);
+      return Promise.resolve("");
+    },
+  };
+  constructor(public _opts: Record<string, unknown> = {}) {}
+  setIgnoreMouseEvents(): void {}
+  loadURL(): void {}
+  getBounds(): { x: number; y: number; width: number; height: number } {
+    return { x: 0, y: 0, width: 100, height: 40 };
+  }
+  setBounds(): void {}
+  show(): void {}
+  isDestroyed(): boolean {
+    return this.destroyed;
+  }
+  close(): void {
+    this.destroyed = true;
+  }
+  on(): void {}
+}
+
+function lastExecuted(ghost: DragGhostManager): FakeWindow | null {
+  return (ghost as unknown as { _ghost: FakeWindow | null })._ghost;
+}
+
+describe("DragGhostManager.setOpacity", () => {
+  it("fades the ghost body to the requested opacity with a CSS transition", () => {
+    const mgr = new DragGhostManager(FakeWindow as never);
+    mgr.show("A", 0, 0, undefined, 100, 30);
+    const win = lastExecuted(mgr)!;
+    mgr.setOpacity(0.33);
+    expect(win.executed.at(-1)).toContain('transition="opacity 120ms ease"');
+    expect(win.executed.at(-1)).toContain('opacity="0.33"');
+  });
+
+  it("restores to full opacity when set back to 1", () => {
+    const mgr = new DragGhostManager(FakeWindow as never);
+    mgr.show("A", 0, 0, undefined, 100, 30);
+    const win = lastExecuted(mgr)!;
+    mgr.setOpacity(0.33);
+    mgr.setOpacity(1);
+    expect(win.executed.at(-1)).toContain('opacity="1"');
+  });
+
+  it("clamps out-of-range opacities into [0, 1]", () => {
+    const mgr = new DragGhostManager(FakeWindow as never);
+    mgr.show("A", 0, 0, undefined, 100, 30);
+    const win = lastExecuted(mgr)!;
+    mgr.setOpacity(2);
+    expect(win.executed.at(-1)).toContain('opacity="1"');
+    mgr.setOpacity(-1);
+    expect(win.executed.at(-1)).toContain('opacity="0"');
+  });
+
+  it("does not call into a destroyed ghost", () => {
+    const mgr = new DragGhostManager(FakeWindow as never);
+    mgr.show("A", 0, 0, undefined, 100, 30);
+    const win = lastExecuted(mgr)!;
+    win.destroyed = true;
+    expect(() => mgr.setOpacity(0.33)).not.toThrow();
+    expect(win.executed).toEqual([]);
+  });
+});

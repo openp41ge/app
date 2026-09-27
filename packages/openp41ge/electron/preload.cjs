@@ -286,6 +286,11 @@ contextBridge.exposeInMainWorld("openp41ge", {
     move: (screenX, screenY) => {
       ipcRenderer.send("openp41ge:drag-move", JSON.stringify({ screenX, screenY }));
     },
+    /** Fade the ghost content (0–1) so the drop indicator under the cursor shows
+     *  through while hovering a tab bar. Animates quickly. */
+    setOpacity: (opacity) => {
+      ipcRenderer.send("openp41ge:drag-opacity", opacity);
+    },
     end: () => {
       ipcRenderer.send("openp41ge:drag-end");
     },

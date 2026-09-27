@@ -87,7 +87,10 @@ export class DragOrchestrator implements IDragHandler {
     return this._session !== null;
   }
 
-  constructor(resolveTarget?: TargetResolver) {
+  constructor(
+    resolveTarget?: TargetResolver,
+    private readonly _onTargetChange?: (target: IDropTarget | null) => void,
+  ) {
     this._resolveTarget = resolveTarget ?? defaultTargetResolver;
   }
 
@@ -182,6 +185,9 @@ export class DragOrchestrator implements IDragHandler {
       }
       this._clearOverlays();
       s.currentTarget = newTarget;
+      // Let the host react to the drop target changing — e.g. fade the drag
+      // ghost so a tab-bar drop indicator under the cursor shows through.
+      this._onTargetChange?.(newTarget);
     }
 
     if (s.currentTarget) {
@@ -318,10 +324,15 @@ export class DragOrchestrator implements IDragHandler {
       this._session.ghost.parentNode.removeChild(this._session.ghost);
     }
 
+    const hadTarget = !!this._session.currentTarget;
     if (this._session.currentTarget) {
       this._session.currentTarget.onLeave();
     }
     this._clearOverlays();
     this._session = null;
+    // A drag that was over a target (e.g. ended on a tab bar) must restore the
+    // host's per-target ghost feedback to its default state. Nothing to restore
+    // if no target was ever active.
+    if (hadTarget) this._onTargetChange?.(null);
   }
 }

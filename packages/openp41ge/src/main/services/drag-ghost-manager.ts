@@ -140,6 +140,9 @@ export class DragGhostManager implements IDragGhostManager {
   private _pageLoaded = false;
   /** A skeleton swap that arrived before the page loaded; applied on load. */
   private _pendingSkeleton: (() => void) | null = null;
+  /** The ghost content's current opacity (1 = opaque). Faded to let the drop
+   *  indicator under the cursor show through while hovering a tab bar. */
+  private _opacity = 1;
 
   constructor(BrowserWindowCtor: typeof BrowserWindow) {
     this._BrowserWindow = BrowserWindowCtor;
@@ -267,6 +270,9 @@ ${nameHtml}</div>`;
 
     ghost.webContents.on("did-finish-load", () => {
       if (ghost.isDestroyed()) return;
+      // Re-apply any target opacity (e.g. a tab-bar hover that dimmed the ghost
+      // before its content finished loading) now that the body exists.
+      if (this._opacity !== 1) this._applyOpacity(this._opacity);
       // Measure the content and resize the window to match exactly
       ghost.webContents
         .executeJavaScript(
@@ -394,6 +400,33 @@ ${nameHtml}</div>`;
     }
   }
 
+  /**
+   * Set the ghost's content opacity, animating quickly to the new value.
+   *
+   * The drag ghost floats above the drop indicator under the cursor, so while
+   * hovering a tab bar the indicator can be hard to see. Dimming the ghost to
+   * ~33% lets the indicator show through. The opacity is applied to the ghost
+   * page's <body> with a CSS transition (persists across in-place bitmap swaps,
+   * since `setBitmap` only rewrites the body's children, never the body node),
+   * giving a smooth fade in both directions. The native window stays
+   * transparent/always-on-top, so only the content fades.
+   */
+  setOpacity(opacity: number): void {
+    const o = Math.max(0, Math.min(1, opacity));
+    this._opacity = o;
+    this._applyOpacity(o);
+  }
+
+  private _applyOpacity(opacity: number): void {
+    if (!this._ghost || this._ghost.isDestroyed()) return;
+    const js = `document.body.style.transition="opacity 120ms ease";document.body.style.opacity=${JSON.stringify(
+      String(opacity),
+    )};`;
+    this._ghost.webContents.executeJavaScript(js).catch(() => {
+      /* page could be closing; the ghost is being hidden */
+    });
+  }
+
   hide(): void {
     if (this._ghost && !this._ghost.isDestroyed()) {
       this._ghost.close();
@@ -409,6 +442,7 @@ ${nameHtml}</div>`;
     this._allowAutoPosition = true;
     this._pageLoaded = false;
     this._pendingSkeleton = null;
+    this._opacity = 1;
   }
 
   isActive(): boolean {

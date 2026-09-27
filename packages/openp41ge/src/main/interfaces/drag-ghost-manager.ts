@@ -39,6 +39,12 @@ export interface IDragGhostManager {
   /** Move the drag ghost window to a new screen position. */
   move(screenX: number, screenY: number): void;
 
+  /**
+   * Fade the ghost content (0–1). Animates quickly; used to let the drop
+   * indicator under the cursor show through while hovering a tab bar.
+   */
+  setOpacity(opacity: number): void;
+
   /** Hide and destroy the drag ghost window. */
   hide(): void;
 
