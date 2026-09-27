@@ -79,7 +79,7 @@ async function mount() {
   return { wv, win, ws };
 }
 
-const lines = () => [...document.body.querySelectorAll('overdraw-line[dir="up"]')];
+const lines = () => [...document.body.querySelectorAll('overdraw-line[dir="up"]:not([corner])')];
 
 const sbRect = (left: number, right: number, top: number) => ({
   left, top, right, bottom: top + 400, width: right - left, height: 400, x: left, y: top, toJSON() {},
@@ -150,13 +150,15 @@ describe("openp41ge-windowview sidebar divider overdraws", () => {
     expect(wv._sbDividerOverdraw.get("right")).toBeTruthy();
   });
 
-  it("does not draw a line for an open sidebar with no system tabs", async () => {
+  it("draws a line for an open sidebar even with no system tabs", async () => {
     const { wv, ws } = await mount();
     const ws2 = { ...ws, sidebar: { ...ws.sidebar, rightSidebarTabs: [] } };
     wv.workspaceData = ws2;
     await wv.updateComplete;
-    expect(lines().length).toBe(1);
-    expect(wv._sbDividerOverdraw.get("right")).toBeUndefined();
+    // The vertical divider overdraw is gated only on the sidebar being open,
+    // never on its tab count — an empty sidebar still carries its grid-side edge.
+    expect(lines().length).toBe(2);
+    expect(wv._sbDividerOverdraw.get("right")).toBeTruthy();
   });
 
   it("reuses a line element across re-places instead of recreating it", async () => {
@@ -292,7 +294,7 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     // but the vertical divider overdraws stay.
     expect(wv._sbFooterOverdraw.size).toBe(0);
     expect(wv._sbDividerOverdraw.size).toBe(2);
-    expect([...document.body.querySelectorAll("overdraw-line")].every((l) => l.getAttribute("dir") === "up")).toBe(true);
+    expect([...document.body.querySelectorAll('overdraw-line:not([corner])')].every((l) => l.getAttribute("dir") === "up")).toBe(true);
   });
 
   it("cleans up the footer overdraws when disconnected", async () => {
@@ -385,7 +387,7 @@ describe("openp41ge-windowview grid cell-divider overdraws", () => {
     wv.remove();
     await wv.updateComplete.catch(() => {});
     expect(wv._cellOverdraw.size).toBe(0);
-    expect(document.body.querySelectorAll("overdraw-line").length).toBe(0);
+    expect(document.body.querySelectorAll('overdraw-line:not([corner])').length).toBe(0);
   });
 });
 
@@ -437,8 +439,8 @@ describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
     return [left, right];
   }
 
-  const rightLines = () => [...document.body.querySelectorAll('overdraw-line[dir="right"]')];
-  const leftLines = () => [...document.body.querySelectorAll('overdraw-line[dir="left"]')];
+  const rightLines = () => [...document.body.querySelectorAll('overdraw-line[dir="right"]:not([corner])')];
+  const leftLines = () => [...document.body.querySelectorAll('overdraw-line[dir="left"]:not([corner])')];
 
   it("draws one horizontal overdraw per marked separator border", async () => {
     const { wv } = await mount();
@@ -487,7 +489,7 @@ describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
 
     expect(wv._sbSepOverdraw.size).toBe(1);
     expect(rightLines().length).toBe(0);
-    expect([...document.body.querySelectorAll("overdraw-line")].every((l) => l.getAttribute("dir") === "up")).toBe(true);
+    expect([...document.body.querySelectorAll('overdraw-line:not([corner])')].every((l) => l.getAttribute("dir") === "up")).toBe(true);
   });
 
   it("drops accents when the separator rows leave the DOM", async () => {

@@ -268,6 +268,7 @@ export class Gutter {
 
   dispose(): void {
     this._detachDoc();
+    this._detachHoverOverdraw();
     this._columns = [];
     this._rows = [];
     this.root.remove();
@@ -356,6 +357,7 @@ export class Gutter {
       box.className = "eg-hoverbox";
       box.style.display = "none";
       this.root.appendChild(box);
+      this._attachHoverOverdraw(box);
     }
     // Find the rightmost highlightable, VISIBLE column; the box spans all
     // visible columns from the left edge through it (matching the JSON
@@ -385,6 +387,107 @@ export class Gutter {
   private _columnHighlightable(state: ColumnState, row: GutterRow): boolean {
     const fn = state.column.highlightable;
     return fn ? fn(row, this._dataFor?.(row.key)) : true;
+  }
+
+  // ── Hover-box corner overdraw accents ────────────────────────────────────
+
+  /** [corner, dir, anchorX, anchorY] per border edge, mapped in attach(). */
+  private static readonly HOVER_EDGE_CORNERS: Record<
+    string,
+    Array<[string, string, "left" | "right", "top" | "bottom"]>
+  > = {
+    top: [
+      ["tl", "left", "left", "top"],
+      ["tr", "right", "right", "top"],
+    ],
+    bottom: [
+      ["bl", "left", "left", "bottom"],
+      ["br", "right", "right", "bottom"],
+    ],
+    left: [
+      ["tl", "up", "left", "top"],
+      ["bl", "down", "left", "bottom"],
+    ],
+    right: [
+      ["tr", "up", "right", "top"],
+      ["br", "down", "right", "bottom"],
+    ],
+  };
+
+  private _hoverOverdraw: { layer: HTMLElement; lines: Array<{ edge: string; corner: string; dir: string; el: HTMLElement }>; raf: number } | null = null;
+
+  /** Continue the hover box's inset ring border past each corner with short,
+   * portalled <overdraw-line> fade accents (the same overdraw aesthetic used
+   * across the app's bars and dividers). The hover box is reused across rows,
+   * so this attaches once on creation and tracks the box each frame; the
+   * accents hide while the box is hidden (rect collapses to 0x0). Portalled
+   * (fixed, z-index 999) so the editor's overflow cannot clip them. */
+  private _attachHoverOverdraw(box: HTMLElement): void {
+    if (this._hoverOverdraw) return;
+    const layer = document.createElement("div");
+    layer.setAttribute("aria-hidden", "true");
+    layer.style.cssText =
+      "position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:999;";
+    document.body.appendChild(layer);
+    const color = "var(--eg-hover-ring, rgba(255,255,255,0.16))";
+    const length = 8;
+    const lines: Array<{ edge: string; corner: string; dir: string; el: HTMLElement }> = [];
+    for (const edge of ["top", "bottom", "left", "right"]) {
+      for (const [corner, dir, ,] of Gutter.HOVER_EDGE_CORNERS[edge]) {
+        const line = document.createElement("overdraw-line");
+        line.setAttribute("dir", dir);
+        line.setAttribute("corner", `${corner}-${edge}`);
+        line.setAttribute("aria-hidden", "true");
+        line.style.setProperty("--overdraw-color", color);
+        line.style.setProperty("--overdraw-thickness", "1px");
+        line.style.setProperty("--overdraw-length", `${length}px`);
+        layer.appendChild(line);
+        lines.push({ edge, corner, dir, el: line });
+      }
+    }
+    const place = (): void => {
+      const r = box.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) {
+        layer.style.display = "none";
+        return;
+      }
+      layer.style.display = "";
+      for (const { edge, corner, dir, el } of lines) {
+        const [, , ax, ay] = Gutter.HOVER_EDGE_CORNERS[edge].find(([c]) => c === corner)!;
+        if (dir === "left" || dir === "right") {
+          const y = ay === "top" ? r.top : r.bottom - 1;
+          const x = ax === "left" ? r.left : r.right;
+          const left = dir === "left" ? x - length : x;
+          el.style.left = `${left}px`;
+          el.style.top = `${y}px`;
+        } else {
+          const x = ax === "left" ? r.left : r.right - 1;
+          const y = ay === "top" ? r.top : r.bottom;
+          const top = dir === "up" ? y - length : y;
+          el.style.left = `${x}px`;
+          el.style.top = `${top}px`;
+        }
+      }
+    };
+    const loop = (): void => {
+      place();
+      this._hoverOverdraw!.raf = requestAnimationFrame(loop);
+    };
+    let raf = 0;
+    if (typeof requestAnimationFrame === "function") {
+      raf = requestAnimationFrame(loop);
+    } else {
+      place();
+    }
+    this._hoverOverdraw = { layer, lines, raf };
+  }
+
+  private _detachHoverOverdraw(): void {
+    const s = this._hoverOverdraw;
+    if (!s) return;
+    if (s.raf) cancelAnimationFrame(s.raf);
+    s.layer.remove();
+    this._hoverOverdraw = null;
   }
 
   private _onCellMousedown(state: ColumnState, row: GutterRow, event: MouseEvent): void {

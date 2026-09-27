@@ -116,7 +116,10 @@ describe("AgentsSystemTabController", () => {
     // The "+" icon is decorative (not a button), right-aligned + centered.
     const plus = newHead.querySelector<HTMLElement>(".chat-new-plus")!;
     expect(plus).toBeTruthy();
-    expect(plus.querySelector("svg")).toBeTruthy();
+    const plusSvg = plus.querySelector("svg")!;
+    expect(plusSvg).toBeTruthy();
+    expect(plusSvg.getAttribute("width")).toBe("16px");
+    expect(plusSvg.getAttribute("fill")).toBe("currentColor");
     expect(plus.style.alignSelf).toBe("center");
     expect(plus.getAttribute("aria-hidden")).toBe("true");
 

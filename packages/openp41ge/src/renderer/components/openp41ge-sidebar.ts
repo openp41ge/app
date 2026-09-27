@@ -14,7 +14,8 @@ import { getSystemTabRegistration } from "../apps/app-registry";
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import type { SystemTabController } from "../controllers/types";
-import { tooltipContent } from "openp41ge-uikit";
+import { tooltipContent, attachTabEdgeOverdraws } from "openp41ge-uikit";
+import type { TabEdge } from "openp41ge-uikit";
 
 // Keep in sync with openp41ge-windowview if changed
 
@@ -277,6 +278,8 @@ class Openp41geSidebar extends LitElement {
     // setVisible(false) so they run no background work while inactive.
     this._reconcileHosts();
     this._syncActiveHost();
+    this._attachAddOverdraws();
+    this._attachTabOverdraws();
     if (changed.has("width") || changed.has("activeTabId")) {
       const el = this.querySelector(".sidebar-tab-scroll");
       if (el) {
@@ -287,6 +290,39 @@ class Openp41geSidebar extends LitElement {
       if (bar) {
         this._tabBarHeight = bar.getBoundingClientRect().height;
       }
+    }
+  }
+
+  /** Attach portalled corner overdraws to the ＋ button's separators. The
+   * vertical strip-separator (left border) is always present and is continued
+   * up past the tab-bar top and down past the tab-bar bottom; the bottom
+   * separator (and its left/right overdraws) appears only while the sidebar
+   * hosts no tabs — the tab bar then has no bottom border of its own to carry
+   * the line. Idempotent per edge-set. */
+  private _attachAddOverdraws(): void {
+    if (!this.isOpen) return;
+    const btn = this.querySelector<HTMLElement>(".sidebar-tab-add");
+    if (!btn) return;
+    const edges: TabEdge[] = this.systemTabs.length === 0 ? ["left", "bottom"] : ["left"];
+    attachTabEdgeOverdraws(btn, { edges, color: "var(--border-divider, #2d2d2d)" });
+  }
+
+  /** Attach per-corner overdraw accents to each sidebar tab, continuing its
+   * right separator (and the tab bar's bottom border when present) past the
+   * corners. The strokes are portalled so the bar's `overflow-x: auto` clip
+   * cannot crop them; removed with each tab. */
+  private _attachTabOverdraws(): void {
+    if (!this.isOpen) return;
+    const tabs = this.querySelectorAll<HTMLElement>(".sidebar-tab");
+    const hasBarBorder = this.systemTabs.length > 0;
+    for (const tab of tabs) {
+      attachTabEdgeOverdraws(tab, {
+        edges: hasBarBorder ? ["right", "bottom"] : ["right"],
+        edgeColors: {
+          right: "var(--border-divider, #2d2d2d)",
+          bottom: "var(--border-divider, #2d2d2d)",
+        },
+      });
     }
   }
 
@@ -400,7 +436,7 @@ class Openp41geSidebar extends LitElement {
           <!-- + button: open inline menu of registered sidebar tabs -->
           <div
             class="sidebar-tab-add absolute top-0 flex items-center justify-center cursor-pointer select-none transition-colors duration-75"
-            style="height:34px;width:34px;top:0;right:0;color:var(--text-secondary,#999);z-index:2;border-radius:0;"
+            style="height:34px;width:34px;top:0;right:0;color:var(--text-secondary,#999);z-index:2;border-radius:0;border-left:1px solid var(--border-divider, #2d2d2d);${this.systemTabs.length === 0 ? "border-bottom:1px solid var(--border-divider, #2d2d2d);" : ""}"
             ${tooltipContent({ type: "simple", text: "Open sidebar tab" })}
             @click=${this._onAddTabClick}
             @mouseenter=${(e: MouseEvent) => {

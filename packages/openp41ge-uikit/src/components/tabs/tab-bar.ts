@@ -12,6 +12,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { TabBarDropTarget } from "openp41ge-tabs/targets/tab-bar-drop-target";
 import { getDropIndexInBar, getTabButtonsInBar } from "openp41ge-tabs/boundary";
 import { attachDropTipVerticalOverdraws } from "openp41ge-tabs/drop-tip-overdraw";
+import { attachTabEdgeOverdraws } from "../overdraw-line";
 
 /** Scroll speed for overflowing tab text (pixels per second). */
 const TAB_TEXT_SCROLL_SPEED = 40;
@@ -105,6 +106,23 @@ export class TabBar extends LitElement {
           delete this._localEphemeralPinned[id];
         }
       }
+    }
+    this._attachTabOverdraws();
+  }
+
+  /** Attach per-corner overdraw accents to each tab button, continuing its
+   * right separator (#333) and the bar's bottom border past the corners. The
+   * strokes are portalled (fixed) so the bar's `overflow: hidden` cannot clip
+   * them; they re-place each frame and are removed with the tab. */
+  private _attachTabOverdraws(): void {
+    if (typeof document === "undefined") return;
+    const btns =
+      (this.renderRoot?.querySelectorAll<HTMLElement>(".tab-btn") as NodeListOf<HTMLElement>) ?? [];
+    for (const btn of btns) {
+      attachTabEdgeOverdraws(btn, {
+        edges: ["right", "bottom"],
+        edgeColors: { right: "#333", bottom: "var(--border-divider, #2d2d2d)" },
+      });
     }
   }
 

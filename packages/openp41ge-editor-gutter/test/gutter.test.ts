@@ -109,6 +109,46 @@ describe("Gutter", () => {
       const box = gutter.root.querySelector<HTMLElement>(".eg-hoverbox")!;
       expect(box.style.display).toBe("none");
     });
+
+    it("portals corner overdraw accents around the hover box and removes them on dispose", () => {
+      const realRaf = (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame;
+      const rafCbs: FrameRequestCallback[] = [];
+      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+        rafCbs.push(cb);
+        return rafCbs.length;
+      };
+      try {
+        gutter.setRows(rows(1), () => ({}));
+        gutter.setHoverRow(0);
+
+        const layer = document.body.querySelector<HTMLElement>("div[style*='position: fixed']");
+        expect(layer).toBeTruthy();
+        const strokes = Array.from(layer!.querySelectorAll("overdraw-line"));
+        // 4 edges x 2 corners.
+        expect(strokes).toHaveLength(8);
+        expect(strokes.every((s) => s.style.getPropertyValue("--overdraw-color") === "var(--eg-hover-ring, rgba(255,255,255,0.16))")).toBe(true);
+        expect(new Set(strokes.map((s) => s.getAttribute("corner"))).size).toBe(8);
+
+        // Step one frame with a stubbed box rect to place the strokes.
+        const box = gutter.root.querySelector<HTMLElement>(".eg-hoverbox")!;
+        box.getBoundingClientRect = () =>
+          ({ left: 100, top: 40, right: 200, bottom: 74, width: 100, height: 34, x: 100, y: 40, toJSON() {} }) as DOMRect;
+        // Run the pending frame; place() schedules the next, so only splice once.
+        for (const cb of rafCbs.splice(0)) cb(0);
+        const brRight = strokes.find((s) => s.getAttribute("corner") === "br-right")!;
+        const brBottom = strokes.find((s) => s.getAttribute("corner") === "br-bottom")!;
+        expect(parseFloat(brRight.style.top)).toBe(74);
+        expect(parseFloat(brRight.style.left)).toBe(199);
+        expect(parseFloat(brBottom.style.top)).toBe(73);
+        expect(parseFloat(brBottom.style.left)).toBe(200);
+
+        gutter.dispose();
+        expect(document.body.querySelector("div[style*='position: fixed']")).toBeNull();
+        // afterEach disposes again — dispose() is idempotent.
+      } finally {
+        (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = realRaf;
+      }
+    });
   });
 
   describe("click / drag line selection", () => {

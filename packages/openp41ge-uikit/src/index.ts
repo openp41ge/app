@@ -6,8 +6,8 @@ export { FileExtensionSvg } from "./components/file-extension-svg";
 export { iconRegistry } from "./icons";
 
 // ─── Overdraw line (fade-out accent) ─────────────────────────────────────
-export { OverdrawLine, attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws } from "./components/overdraw-line";
-export type { OverdrawDirection } from "./components/overdraw-line";
+export { OverdrawLine, attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws, attachTabEdgeOverdraws, detachTabEdgeOverdraws } from "./components/overdraw-line";
+export type { OverdrawDirection, TabEdge, TabEdgeOverdrawOptions } from "./components/overdraw-line";
 
 // ─── Drop indicators (shared blue drag/drop lines + box) ────────────────
 export { DropLine, DragLine, DragLineOverdraw, DropBox, DropBoxOverdraw, DROP_INDICATOR_COLOR, DROP_LINE_GLOW } from "./components/drop-indicator";

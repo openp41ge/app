@@ -17,7 +17,7 @@ import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
 import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
 import "openp41ge-uikit";
-import { tooltipController, OverlayScrollbar } from "openp41ge-uikit";
+import { tooltipController, OverlayScrollbar, attachTabEdgeOverdraws } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
@@ -274,12 +274,30 @@ export class Openp41geWindowManager extends LitElement {
     this._overlayScrollbar = null;
   }
 
+  /** Attach per-corner overdraw accents to each management-window tab,
+   * continuing its right separator and the tab bar's bottom border past the
+   * corners (the same recipe as the grid/sidebar tab bars). The strokes are
+   * portalled (fixed) so the bar's `overflow-x: auto` clip cannot crop them. */
+  private _attachManagerTabOverdraws(): void {
+    const tabs = this.shadowRoot?.querySelectorAll<HTMLElement>(".wm-tab") ?? [];
+    for (const tab of tabs) {
+      attachTabEdgeOverdraws(tab, {
+        edges: ["right", "bottom"],
+        edgeColors: {
+          right: "var(--divider, #333)",
+          bottom: "var(--divider, #2d2d2d)",
+        },
+      });
+    }
+  }
+
   /** Attach custom tooltips to the footer tool buttons (replaces native `title`). */
   updated(): void {
     this._measureListOverflow();
     this._attachDrawerOverdraws();
     this._attachWorkspaceFooterOverdraws();
     this._attachWorkspaceSearchBarOverdraws();
+    this._attachManagerTabOverdraws();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
       ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close, .wm-tab-close, .wm-tabbar-add",
     );
