@@ -41,6 +41,11 @@ export const SIDEBAR_OVERDRAW_LENGTH = 14;
  *  horizontally into the grid when the grid has no tabs. */
 export const SIDEBAR_FOOTER_OVERDRAW_LENGTH = 18;
 
+/** How far (px) each grid-interior cell divider (the 1px vertical separator
+ *  between two columns) overdraws up past the title-bar seam (shown whenever
+ *  the grid has 2 or more columns). */
+export const CELL_DIVIDER_OVERDRAW_LENGTH = 14;
+
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -88,6 +93,10 @@ class Openp41geWindowView extends LitElement {
    * (or null when the active tab has no bottom bar), so the per-frame tracker
    * only has to read one rect (not re-scan the tree). */
   private _sbFooterEl = new Map<string, HTMLElement | null>();
+  /** Portalled vertical <overdraw-line> accents that continue each grid-interior
+   * cell divider up past the title-bar seam. Keyed by the left column index
+   * (0..cols-2); created lazily, removed when the grid has <2 columns. */
+  private _cellOverdraw = new Map<number, HTMLElement>();
   /** rAF handle for the per-frame divider tracking while any overdraw shows. */
   private _sbOverdrawRaf = 0;
 
@@ -166,6 +175,8 @@ class Openp41geWindowView extends LitElement {
     for (const line of this._sbFooterOverdraw.values()) line.remove();
     this._sbFooterOverdraw.clear();
     this._sbFooterEl.clear();
+    for (const line of this._cellOverdraw.values()) line.remove();
+    this._cellOverdraw.clear();
   }
 
   private _onWorkspacesUpdate = (): void => {
@@ -503,11 +514,11 @@ class Openp41geWindowView extends LitElement {
   private _startSbOverdrawLoop(): void {
     if (this._sbOverdrawRaf) return;
     if (typeof requestAnimationFrame !== "function") {
-      this._syncSbOverdraws();
+      this._syncOverdraws();
       return;
     }
     const tick = (): void => {
-      this._syncSbOverdraws();
+      this._syncOverdraws();
       this._sbOverdrawRaf = requestAnimationFrame(tick);
     };
     this._sbOverdrawRaf = requestAnimationFrame(tick);
@@ -518,13 +529,15 @@ class Openp41geWindowView extends LitElement {
     this._sbOverdrawRaf = 0;
   }
 
-  /** Per-frame work while any sidebar overdraw is shown: fold in footer lines
-   * (a sidebar's bottom bar may only exist on a later frame than the
-   * windowview's own `updated()`, so creation must run here too) and place all
-   * lines over their anchors. */
-  private _syncSbOverdraws(): void {
+  /** Per-frame work while any overdraw is shown: fold in footer + cell-divider
+   * lines (a sidebar's bottom bar or the grid's cells may only exist on a
+   * later frame than the windowview's own `updated()`, so creation must run
+   * here too) and place all lines over their anchors. */
+  private _syncOverdraws(): void {
     this._placeSidebarFooterOverdraws();
+    this._placeCellDividerOverdraws();
     this._positionSidebarOverdraws();
+    this._positionCellDividerOverdraws();
   }
 
   private _positionSidebarOverdraws(): void {
@@ -532,8 +545,12 @@ class Openp41geWindowView extends LitElement {
     this._positionSidebarFooterOverdraws();
   }
 
-  private _syncSbOverdrawLoop(): void {
-    if (this._sbDividerOverdraw.size > 0 || this._sbFooterOverdraw.size > 0) {
+  private _syncOverdrawLoop(): void {
+    if (
+      this._sbDividerOverdraw.size > 0 ||
+      this._sbFooterOverdraw.size > 0 ||
+      this._cellOverdraw.size > 0
+    ) {
       this._startSbOverdrawLoop();
     } else {
       this._stopSbOverdrawLoop();
@@ -664,6 +681,70 @@ class Openp41geWindowView extends LitElement {
       "--overdraw-color: var(--divider, #333)",
       "--overdraw-thickness: 1px",
       `--overdraw-length: ${SIDEBAR_FOOTER_OVERDRAW_LENGTH}px`,
+    ].join(";");
+    document.body.appendChild(line);
+    return line;
+  }
+
+  // ── Grid cell-divider overdraws ──────────────────────────────────────
+
+  /**
+   * When the grid has two or more columns, each pair of adjacent cells is
+   * separated by a 1px vertical divider whose top sits exactly at the
+   * main-area's top edge (the title-bar seam) where it just stops — the
+   * grid-content equivalent of the sidebar divider. Continue each interior
+   * divider up past the seam with a short <overdraw-line dir="up"> fade accent
+   * so the cell boundary reads clearly against the top bar.
+   *
+   * Lines are portalled (fixed, z-index 999) so the grid area's
+   * `overflow: hidden` cannot clip them, and are keyed by the left column index
+   * so they survive re-renders and cell resizes. They exist whenever the grid
+   * has 2+ columns (independent of whether cells host tabs).
+   */
+  private _placeCellDividerOverdraws(): void {
+    const cells = this.querySelectorAll<HTMLElement>(".openp41ge-grid-area tab-grid .grid-cell");
+    const cols = cells.length;
+    const wanted = new Set<number>();
+    for (let i = 0; i < cols - 1; i++) wanted.add(i);
+    for (const [col, line] of this._cellOverdraw) {
+      if (!wanted.has(col)) {
+        line.remove();
+        this._cellOverdraw.delete(col);
+      }
+    }
+    for (const col of wanted) {
+      if (this._cellOverdraw.has(col)) continue;
+      this._cellOverdraw.set(col, this._createCellOverdraw());
+    }
+  }
+
+  /** Position each cell-divider overdraw over its cell's right edge (the 1px
+   *  border runs at `right - 1`), fading out upward from the cell's top. */
+  private _positionCellDividerOverdraws(): void {
+    for (const [col, line] of this._cellOverdraw) {
+      const cell = this.querySelector<HTMLElement>(
+        `.openp41ge-grid-area tab-grid .grid-cell[data-cell-col="${col}"]`,
+      );
+      if (!cell) continue;
+      const r = cell.getBoundingClientRect();
+      line.style.left = `${r.right - 1}px`;
+      line.style.top = `${r.top - CELL_DIVIDER_OVERDRAW_LENGTH}px`;
+    }
+  }
+
+  /** Create a portalled <overdraw-line dir="up"> that fades out going up (the
+   * solid end sits on the cell divider's top). */
+  private _createCellOverdraw(): HTMLElement {
+    const line = document.createElement("overdraw-line");
+    line.setAttribute("dir", "up");
+    line.setAttribute("aria-hidden", "true");
+    line.style.cssText = [
+      "position: fixed",
+      "z-index: 999",
+      "pointer-events: none",
+      "--overdraw-color: #333",
+      "--overdraw-thickness: 1px",
+      `--overdraw-length: ${CELL_DIVIDER_OVERDRAW_LENGTH}px`,
     ].join(";");
     document.body.appendChild(line);
     return line;
@@ -942,12 +1023,14 @@ class Openp41geWindowView extends LitElement {
 
   updated(): void {
     // Continue populated sidebars' grid-side dividers up past the title-bar
-    // seam when the grid is empty, and continue each open sidebar's bottom-bar
-    // top border into the empty grid. Re-placed on every render so sidebar
-    // drags and window resizes keep the lines over their anchors.
+    // seam, continue each open sidebar's bottom-bar top border into the empty
+    // grid, and continue each grid-interior cell divider up past the seam.
+    // Re-placed on every render so sidebar drags, cell resizes and window
+    // resizes keep the lines over their anchors.
     this._placeSidebarDividerOverdraws();
     this._placeSidebarFooterOverdraws();
-    this._syncSbOverdrawLoop();
+    this._placeCellDividerOverdraws();
+    this._syncOverdrawLoop();
     // Context menu is shown synchronously from the event handler
   }
 

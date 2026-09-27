@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../../src/renderer/components/openp41ge-windowview";
 
 import {
+  CELL_DIVIDER_OVERDRAW_LENGTH,
   SIDEBAR_FOOTER_OVERDRAW_LENGTH,
   SIDEBAR_OVERDRAW_LENGTH,
 } from "../../../src/renderer/components/openp41ge-windowview";
@@ -269,5 +270,84 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     await wv.updateComplete.catch(() => {});
     expect(wv._sbFooterOverdraw.size).toBe(0);
     expect(cancel).toHaveBeenCalledWith(9);
+  });
+});
+
+describe("openp41ge-windowview grid cell-divider overdraws", () => {
+  // Mount with a multi-column grid so the real <tab-grid> renders that many
+  // .grid-cell elements (tab-grid is registered via openp41ge-uikit).
+  async function mountGrid(cols: number) {
+    const win = makeWin();
+    win.grid.cols = cols;
+    win.grid.placements = Array.from({ length: cols }, (_, c) => ({
+      position: { row: 0, col: c },
+      tabIds: [`g${c}`],
+    }));
+    const ws = makeWs(win);
+    const wv = document.createElement("openp41ge-windowview");
+    wv.windowData = win;
+    wv.workspaceData = ws;
+    document.body.appendChild(wv);
+    await wv.updateComplete;
+    return { wv, win };
+  }
+  const rect = (left: number, right: number, top: number) => ({
+    left, top, right, bottom: top + 800, width: right - left, height: 800, x: left, y: top, toJSON() {},
+  });
+  function stubCell(wv: HTMLElement, col: number, left: number, right: number, top = 60) {
+    const cell = wv.querySelector<HTMLElement>(`.openp41ge-grid-area tab-grid .grid-cell[data-cell-col="${col}"]`)!;
+    Object.defineProperty(cell, "getBoundingClientRect", { configurable: true, value: () => rect(left, right, top) });
+    return cell;
+  }
+
+  it("draws one overdraw per interior cell divider when the grid has 2+ columns", async () => {
+    const { wv } = await mountGrid(2);
+    stubCell(wv, 0, 225, 525);
+    stubCell(wv, 1, 525, 900);
+
+    wv._placeCellDividerOverdraws();
+    expect(wv._cellOverdraw.size).toBe(1);
+    expect(wv._cellOverdraw.has(0)).toBe(true);
+    expect(wv._cellOverdraw.has(1)).toBe(false); // last column has no divider
+
+    wv._positionCellDividerOverdraws();
+    const line = wv._cellOverdraw.get(0)!;
+    expect(line.getAttribute("dir")).toBe("up");
+    expect(parseFloat(line.style.left)).toBe(525 - 1);
+    expect(parseFloat(line.style.top)).toBe(60 - CELL_DIVIDER_OVERDRAW_LENGTH);
+  });
+
+  it("draws two overdraws for a 3-column grid and removes them when the grid drops to 1 column", async () => {
+    const { wv, win } = await mountGrid(3);
+    stubCell(wv, 0, 100, 400);
+    stubCell(wv, 1, 400, 700);
+    stubCell(wv, 2, 700, 1000);
+    wv._placeCellDividerOverdraws();
+    expect(wv._cellOverdraw.size).toBe(2);
+    expect(wv._cellOverdraw.has(0)).toBe(true);
+    expect(wv._cellOverdraw.has(1)).toBe(true);
+
+    // Grid drops to a single column: the extra cells disappear on re-render,
+    // so the cell overdraws are removed (sidebar divider overdraws remain).
+    win.grid.cols = 1;
+    win.grid.placements = [{ position: { row: 0, col: 0 }, tabIds: ["g0"] }];
+    wv.windowData = { ...win };
+    await wv.updateComplete;
+    wv._placeCellDividerOverdraws();
+    expect(wv._cellOverdraw.size).toBe(0);
+    expect(wv._cellOverdraw.has(0)).toBe(false);
+    expect(wv._cellOverdraw.has(1)).toBe(false);
+  });
+
+  it("cleans up the cell overdraws when disconnected", async () => {
+    const { wv } = await mountGrid(2);
+    stubCell(wv, 0, 225, 525);
+    stubCell(wv, 1, 525, 900);
+    wv._placeCellDividerOverdraws();
+    expect(wv._cellOverdraw.size).toBe(1);
+    wv.remove();
+    await wv.updateComplete.catch(() => {});
+    expect(wv._cellOverdraw.size).toBe(0);
+    expect(document.body.querySelectorAll("overdraw-line").length).toBe(0);
   });
 });
