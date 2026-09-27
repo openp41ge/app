@@ -172,6 +172,9 @@ export class LogsSystemTabController implements SystemTabController {
   private _row(sys: LogSystem): HTMLElement {
     const row = document.createElement("div");
     row.dataset.logSystem = sys.system;
+    // Each row's bottom border is a list separator; tag it so the windowview
+    // can overdraw it out into the grid (see openp41ge-windowview).
+    row.dataset.sbSep = "bottom";
     Object.assign(row.style, {
       display: "flex",
       alignItems: "center",

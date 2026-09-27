@@ -57,6 +57,16 @@ describe("LogsSystemTabController", () => {
     expect(rows).toHaveLength(2);
   });
 
+  it("marks each row's bottom border as a separator for the grid overdraws", () => {
+    registerLogStream("openp41ge", "a");
+    registerLogStream("openp41ge-terminal", "b");
+    const rows = host.querySelectorAll("[data-log-system]");
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect((row as HTMLElement).dataset.sbSep).toBe("bottom");
+    }
+  });
+
   it("updates the count when a system emits new entries", () => {
     registerLogStream("openp41ge", "beta");
     pushLog(LogLevel.WARN, "openp41ge", "beta", "one");
