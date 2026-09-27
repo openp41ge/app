@@ -34,6 +34,24 @@ export class Openp41geSettingsSurface extends LitElement {
     return this._label;
   }
 
+  /**
+   * Forward the hosted content's drawer head actions (if it exposes a
+   * `renderHeadAction`, e.g. the Explorer settings' Reset/Save buttons) so the
+   * drawer host mounts them next to ✕. The content is given a reference to the
+   * drawer host so it can call `host.refresh()` when its dirty/saving state
+   * changes and re-render these actions. Returns undefined when the content has
+   * no head actions (undefined actions render nothing — no behaviour change).
+   */
+  get renderHeadAction(): (() => TemplateResult) | undefined {
+    const content = this._content as unknown as {
+      renderHeadAction?: () => TemplateResult;
+      host?: Openp41geSettingsDrawerHost | null;
+    };
+    if (typeof content?.renderHeadAction !== "function") return undefined;
+    content.host = this.host;
+    return () => content.renderHeadAction!();
+  }
+
   render(): TemplateResult {
     return html`
       <style>

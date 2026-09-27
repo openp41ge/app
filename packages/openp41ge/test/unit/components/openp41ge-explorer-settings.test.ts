@@ -3,12 +3,14 @@
  * the settings drawer, which edits `explorer.indentSize` and
  * `explorer.prefetchDepth`.
  *
- * Verifies the no-auto-save contract: edits stage in the JSON editor, and
- * only an explicit Save writes the Explorer keys. Reset discards staged
- * edits.
+ * The surface body is entirely the JSON editor (no header/footer — those live
+ * in the drawer head via `renderHeadAction`). Verifies the no-auto-save
+ * contract: edits stage in the JSON editor, and only an explicit Save writes
+ * the Explorer keys. Reset discards staged edits.
  */
 // @ts-nocheck
 import { describe, test, expect, beforeEach } from "vitest";
+import { render } from "lit";
 import "../../../src/renderer/components/openp41ge-explorer-settings";
 
 /** Minimal ConfigService fake that captures set() and notifies key listeners. */
@@ -61,17 +63,30 @@ function commit(el, value) {
   je.dispatchEvent(new CustomEvent("json-editor-change", { detail: { value } }));
 }
 
+/** Render the surface's drawer head actions (Reset + Save) into a container. */
+function head(el) {
+  const box = document.createElement("div");
+  render(el.renderHeadAction(), box);
+  return box;
+}
+
 describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
   });
 
-  test("renders a <json-editor> bound to the Explorer settings", async () => {
+  test("renders a full-height <json-editor> with no header/footer", async () => {
     const el = await mount(new FakeConfig(CONFIG));
     const je = el.querySelector(".exs-editor > json-editor");
     expect(je).toBeTruthy();
     expect(je.editedValue).toEqual({ indentSize: 16, prefetchDepth: 2 });
-    expect(el.querySelector(".exs-footer")).toBeTruthy();
+    // Header + hint and the body footer are gone (actions live in the head).
+    expect(el.querySelector(".exs-section-title")).toBeNull();
+    expect(el.querySelector(".exs-hint")).toBeNull();
+    expect(el.querySelector(".exs-footer")).toBeNull();
+    expect(el.querySelector(".exs-status")).toBeNull();
+    // The editor pane fills the surface.
+    expect(el.querySelector(".exs-editor")).toBeTruthy();
   });
 
   test("defaults to the sensible defaults when the keys are absent", async () => {
@@ -80,9 +95,15 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     expect(je.editedValue).toEqual({ indentSize: 16, prefetchDepth: 2 });
   });
 
-  test("shows 'All changes saved.' when clean", async () => {
+  test("exposes Reset/Save as drawer head actions", async () => {
     const el = await mount(new FakeConfig(CONFIG));
-    expect(el.querySelector(".exs-status").textContent).toContain("All changes saved");
+    const h = head(el);
+    expect(h.querySelector(".sdw-reset")).toBeTruthy();
+    const save = h.querySelector(".sdw-save");
+    expect(save).toBeTruthy();
+    // Clean: Reset disabled, Save not marked dirty.
+    expect(h.querySelector(".sdw-reset").disabled).toBe(true);
+    expect(save.classList.contains("sdw-save--dirty")).toBe(false);
   });
 
   test("stages edits but does NOT persist until Save (no auto-save)", async () => {
@@ -90,7 +111,10 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     const el = await mount(fake);
     commit(el, DIRTY);
     await tick();
-    expect(el.querySelector(".exs-status").textContent).toContain("Unsaved changes");
+    const h = head(el);
+    // Dirty: Save is highlighted blue, Reset enabled.
+    expect(h.querySelector(".sdw-save").classList.contains("sdw-save--dirty")).toBe(true);
+    expect(h.querySelector(".sdw-reset").disabled).toBe(false);
     // Nothing written to the config service just from staging.
     expect(fake.sets.length).toBe(0);
   });
@@ -100,7 +124,7 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     const el = await mount(fake);
     commit(el, DIRTY);
     await tick();
-    el.querySelector(".exs-btn--primary").click();
+    head(el).querySelector(".sdw-save").click();
     await tick();
     expect(fake.sets.length).toBe(2);
     const keys = fake.sets.map((s) => s.key).sort();
@@ -109,7 +133,10 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     expect(indent.value).toBe(24);
     const prefetch = fake.sets.find((s) => s.key === "explorer.prefetchDepth");
     expect(prefetch.value).toBe(3);
-    expect(el.querySelector(".exs-status").textContent).toContain("All changes saved");
+    // Clean again: Save no longer dirty, Reset disabled.
+    const h = head(el);
+    expect(h.querySelector(".sdw-save").classList.contains("sdw-save--dirty")).toBe(false);
+    expect(h.querySelector(".sdw-reset").disabled).toBe(true);
   });
 
   test("Reset discards the staged edits", async () => {
@@ -117,7 +144,7 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     const el = await mount(fake);
     commit(el, { indentSize: 48, prefetchDepth: 0 });
     await tick();
-    el.querySelectorAll(".exs-btn")[0].click();
+    head(el).querySelector(".sdw-reset").click();
     await tick();
     const je = el.querySelector(".exs-editor > json-editor");
     expect(je.editedValue).toEqual({ indentSize: 16, prefetchDepth: 2 });
@@ -130,16 +157,16 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     expect(je.rowHeight).toBe(30);
   });
 
-  test("Save is disabled until there is a staged edit, and Reset is disabled when clean", async () => {
+  test("Reset is disabled when clean, and Save highlights dirty after a staged edit", async () => {
     const fake = new FakeConfig(CONFIG);
     const el = await mount(fake);
-    const save = () => el.querySelector(".exs-btn--primary");
-    const reset = () => el.querySelectorAll(".exs-btn")[0];
-    expect(save().disabled).toBe(true);
+    const reset = () => head(el).querySelector(".sdw-reset");
+    const save = () => head(el).querySelector(".sdw-save");
     expect(reset().disabled).toBe(true);
+    expect(save().classList.contains("sdw-save--dirty")).toBe(false);
     commit(el, DIRTY);
     await tick();
-    expect(save().disabled).toBe(false);
     expect(reset().disabled).toBe(false);
+    expect(save().classList.contains("sdw-save--dirty")).toBe(true);
   });
 });

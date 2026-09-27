@@ -7,6 +7,11 @@
  * Save (Reset discards the staged edits). Saving writes each setting through
  * the config service, so the Explorer re-flows on Save.
  *
+ * The Reset/Save actions live in the drawer head (exported via
+ * `renderHeadAction`, mounted by the settings drawer host next to ✕) rather
+ * than in the surface body, so the JSON editor fills the drawer's full
+ * height.
+ *
  * Settings:
  *  - `explorer.indentSize` — the indentation unit (px, default 16) used as
  *    the base multiple for every Explorer row. Indentation is always a
@@ -22,6 +27,7 @@ import "openp41ge-json-editor/json-editor";
 import { cloneDeep } from "openp41ge-json-editor";
 import { EXPLORER_SETTINGS_SCHEMA } from "../models/explorer-settings-schema";
 import type { ConfigService } from "../services/config-service";
+import type { Openp41geSettingsDrawerHost } from "./openp41ge-settings-drawer-host";
 import { appServices } from "../app";
 
 /** Config key for the Explorer indentation unit (px per tree level). */
@@ -52,6 +58,14 @@ interface ExplorerSettings {
 export class Openp41geExplorerSettings extends LitElement {
   /** Injectable for tests (defaults to the platform ConfigService). */
   configService: ConfigService = appServices.configService;
+
+  /**
+   * The drawer host that mounted this surface, bridged by
+   * <openp41ge-settings-surface>. Used to force the host to re-render the
+   * drawer-head Reset/Save actions when this content's dirty/saving state
+   * changes. Null when used standalone (e.g. as a grid tab).
+   */
+  host: Openp41geSettingsDrawerHost | null = null;
 
   @state()
   private _config: ExplorerSettings | null = null;
@@ -87,6 +101,7 @@ export class Openp41geExplorerSettings extends LitElement {
   /** The JSON editor committed an edit — stage it into the draft only. */
   private _onJsonEditorChange(e: CustomEvent): void {
     this._config = (e.detail as { value: ExplorerSettings }).value;
+    this.host?.refresh();
   }
 
   /** True when the staged draft differs from the persisted baseline. */
@@ -108,6 +123,7 @@ export class Openp41geExplorerSettings extends LitElement {
       this._error = "Failed to save the Explorer settings.";
     } finally {
       this._saving = false;
+      this.host?.refresh();
     }
   }
 
@@ -115,6 +131,7 @@ export class Openp41geExplorerSettings extends LitElement {
   private _reset(): void {
     if (!this._savedConfig) return;
     this._config = cloneDeep(this._savedConfig);
+    this.host?.refresh();
   }
 
   /** Row height for the JSON editor — follows the global platform
@@ -139,6 +156,46 @@ export class Openp41geExplorerSettings extends LitElement {
     return Math.min(MAX_PREFETCH, Math.max(MIN_PREFETCH, n));
   }
 
+  /**
+   * Head actions for the drawer: a square Reset button (disabled until there
+   * are unsaved changes) followed by a square Save button, both shown next to
+   * ✕ (right-aligned, Reset immediately before Save). Save is highlighted blue
+   * while there are unsaved changes — matching the Agent settings drawer.
+   * Bound `this` so the host can call it as `surface.renderHeadAction()`.
+   */
+  readonly renderHeadAction = (): TemplateResult => {
+    const dirty = this._isDirty();
+    return html`
+      <button
+        class="sdw-reset"
+        type="button"
+        aria-label="Reset"
+        title="Reset"
+        ?disabled=${!dirty}
+        @click=${() => this._reset()}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+          <path
+            d="M520-330v-60h160v60H520Zm60 210v-50h-60v-60h60v-50h60v160h-60Zm100-50v-60h160v60H680Zm40-110v-160h60v50h60v60h-60v50h-60Zm111-280h-83q-26-88-99-144t-169-56q-117 0-198.5 81.5T200-480q0 72 32.5 132t87.5 98v-110h80v240H160v-80h94q-62-50-98-122.5T120-480q0-75 28.5-140.5t77-114q48.5-48.5 114-77T480-840q129 0 226.5 79.5T831-560Z"
+          />
+        </svg>
+      </button>
+      <button
+        class="sdw-save ${dirty ? "sdw-save--dirty" : ""}"
+        type="button"
+        aria-label="Save"
+        title="Save"
+        @click=${() => void this._save()}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+          <path
+            d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"
+          />
+        </svg>
+      </button>
+    `;
+  };
+
   render(): TemplateResult {
     return html`
       <style>
@@ -149,25 +206,13 @@ export class Openp41geExplorerSettings extends LitElement {
           flex-direction: column;
           overflow: hidden;
           /* Match the other drawer surfaces (agent-matching 18px). */
-          padding: var(--settings-pane-padding, 28px 32px);
+          padding: var(--settings-pane-padding, 0 0 28px);
           background: var(--settings-pane-bg, var(--bg-primary, #161616));
           color: var(--text-primary, #ccc);
           font-size: 13px;
         }
-        .exs-section-title {
-          margin: 0 0 6px;
-          font-size: 11px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: var(--text-secondary, #999);
-        }
-        .exs-hint {
-          margin: 0 0 12px;
-          font-size: 12px;
-          line-height: 1.5;
-          color: var(--text-secondary, #999);
-        }
+        /* The JSON editor fills the whole surface height now that the header
+         * and footer live in the drawer head. */
         .exs-editor {
           flex: 1;
           min-height: 0;
@@ -186,98 +231,21 @@ export class Openp41geExplorerSettings extends LitElement {
         .exs-note--error {
           color: var(--danger, #f44336);
         }
-        .exs-footer {
-          flex: none;
-          margin-top: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding-top: 10px;
-          border-top: 1px solid var(--border, #2a2a2a);
-        }
-        .exs-status {
-          font-size: 12px;
-          color: var(--text-secondary, #999);
-        }
-        .exs-actions {
-          display: flex;
-          gap: 8px;
-        }
-        .exs-btn {
-          font: inherit;
-          font-size: 12px;
-          padding: 6px 14px;
-          border-radius: 4px;
-          border: 1px solid var(--border, #333);
-          background: rgba(255, 255, 255, 0.08);
-          color: var(--text-primary, #ddd);
-          cursor: pointer;
-        }
-        .exs-btn:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.14);
-        }
-        .exs-btn--primary {
-          background: rgb(86, 156, 214);
-          border-color: rgb(86, 156, 214);
-          color: #fff;
-        }
-        .exs-btn--primary:hover:not(:disabled) {
-          background: rgb(100, 168, 224);
-        }
-        .exs-btn:disabled {
-          opacity: 0.4;
-          cursor: default;
-        }
       </style>
       <div class="exs-pane">
-        <div class="exs-section-title">Explorer</div>
-        <p class="exs-hint">
-          Explorer preferences. Edits are staged and only applied when you press Save.
-        </p>
-
         ${
           this._loading
             ? html`<p class="exs-note">Loading…</p>`
-            : html`
-                <div class="exs-editor">
-                  <json-editor
-                    .rowHeight=${this._rowHeight()}
-                    .value=${this._config}
-                    .schema=${EXPLORER_SETTINGS_SCHEMA}
-                    @json-editor-change=${(e: CustomEvent) => void this._onJsonEditorChange(e)}
-                  ></json-editor>
-                </div>
-                ${
-                  this._error
-                    ? html`<p class="exs-note exs-note--error">${this._error}</p>`
-                    : nothing
-                }
-                <footer class="exs-footer">
-                  <span class="exs-status"
-                    >${this._isDirty() ? "Unsaved changes." : "All changes saved."}</span
-                  >
-                  <div class="exs-actions">
-                    <button
-                      class="exs-btn"
-                      type="button"
-                      ?disabled=${!this._isDirty() || this._saving}
-                      @click=${() => this._reset()}
-                    >
-                      Reset
-                    </button>
-                    <button
-                      class="exs-btn exs-btn--primary"
-                      type="button"
-                      ?disabled=${!this._isDirty() || this._saving}
-                      @click=${() => void this._save()}
-                    >
-                      Save
-                    </button>
-                  </div>
-                </footer>
-              `
+            : html`<div class="exs-editor">
+                <json-editor
+                  .rowHeight=${this._rowHeight()}
+                  .value=${this._config}
+                  .schema=${EXPLORER_SETTINGS_SCHEMA}
+                  @json-editor-change=${(e: CustomEvent) => void this._onJsonEditorChange(e)}
+                ></json-editor>
+              </div>`
         }
+        ${this._error ? html`<p class="exs-note exs-note--error">${this._error}</p>` : nothing}
       </div>
     `;
   }
