@@ -9,8 +9,10 @@
  *
  * The Reset/Save actions live in the drawer head (exported via
  * `renderHeadAction`, mounted by the settings drawer host next to ✕) rather
- * than in the surface body, so the JSON editor fills the drawer's full
- * height.
+ * than in the surface body, so the JSON editor fills the drawer's height
+ * above the bottom bar. The bottom bar (`.exs-footer`, pinned flush under
+ * the editor) holds a right-aligned Sort keys action — matching the Agent
+ * settings drawer's footer.
  *
  * Settings:
  *  - `explorer.indentSize` — the indentation unit (px, default 16) used as
@@ -24,7 +26,7 @@
 import { customElement, state } from "lit/decorators.js";
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import "openp41ge-json-editor/json-editor";
-import { cloneDeep } from "openp41ge-json-editor";
+import { cloneDeep, sortJsonKeys } from "openp41ge-json-editor";
 import { EXPLORER_SETTINGS_SCHEMA } from "../models/explorer-settings-schema";
 import type { ConfigService } from "../services/config-service";
 import type { Openp41geSettingsDrawerHost } from "./openp41ge-settings-drawer-host";
@@ -134,6 +136,15 @@ export class Openp41geExplorerSettings extends LitElement {
     this.host?.refresh();
   }
 
+  /** Sort every object key (recursively) in the staged draft so the JSON
+   *  reads in a stable order — matching the Agent settings drawer's Sort keys
+   *  bottom-bar action. Nothing is persisted until Save. */
+  private _sortConfig(): void {
+    if (!this._config) return;
+    this._config = sortJsonKeys(this._config);
+    this.host?.refresh();
+  }
+
   /** Row height for the JSON editor — follows the global platform
    *  line-height setting, a little larger to give the inline edit/insert
    *  affordances room. */
@@ -205,23 +216,64 @@ export class Openp41geExplorerSettings extends LitElement {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          /* Match the other drawer surfaces (agent-matching 18px). */
-          padding: var(--settings-pane-padding, 0 0 28px);
           background: var(--settings-pane-bg, var(--bg-primary, #161616));
           color: var(--text-primary, #ccc);
           font-size: 13px;
         }
-        /* The JSON editor fills the whole surface height now that the header
-         * and footer live in the drawer head. */
+        /* The JSON editor fills the surface height above the bottom bar. It
+         * owns the content padding (matched to the other drawer surfaces). */
         .exs-editor {
           flex: 1;
           min-height: 0;
           display: flex;
           flex-direction: column;
+          padding: var(--settings-pane-padding, 0 0 28px);
         }
         .exs-editor > json-editor {
           flex: 1;
           min-height: 0;
+        }
+        /* Bottom bar pinned under the JSON editor — full-width, flush with
+         * the drawer edges, matching the Agent settings drawer's footer. */
+        .exs-footer {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          height: 34px;
+          box-sizing: border-box;
+          border-top: 1px solid var(--divider, #333);
+          background: var(--bg-surface, #161616);
+        }
+        /* Square icon-only action (e.g. Sort keys) in the bottom bar: full
+         * height, right-aligned with a left-side separator — like the drawer
+         * head buttons. */
+        .exs-footer-btn {
+          height: 100%;
+          aspect-ratio: 1 / 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          border: none;
+          border-left: 1px solid var(--border-divider, #2d2d2d);
+          border-radius: 0;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          cursor: pointer;
+        }
+        .exs-footer-btn:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .exs-footer-btn[disabled]:hover {
+          background: transparent;
+          color: var(--text-secondary, #999);
+        }
+        .exs-footer-btn svg {
+          width: 14px;
+          height: 14px;
+          fill: currentColor;
         }
         .exs-note {
           margin: 6px 0 0;
@@ -246,6 +298,20 @@ export class Openp41geExplorerSettings extends LitElement {
               </div>`
         }
         ${this._error ? html`<p class="exs-note exs-note--error">${this._error}</p>` : nothing}
+        <div class="exs-footer">
+          <button
+            class="exs-footer-btn"
+            type="button"
+            title="Sort keys"
+            aria-label="Sort keys"
+            ?disabled=${!this._config}
+            @click=${() => this._sortConfig()}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+              <path d="M120-240v-80h240v80H120Zm0-200v-80h480v80H120Zm0-200v-80h720v80H120Z" />
+            </svg>
+          </button>
+        </div>
       </div>
     `;
   }

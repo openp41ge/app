@@ -3,10 +3,12 @@
  * the settings drawer, which edits `explorer.indentSize` and
  * `explorer.prefetchDepth`.
  *
- * The surface body is entirely the JSON editor (no header/footer — those live
- * in the drawer head via `renderHeadAction`). Verifies the no-auto-save
- * contract: edits stage in the JSON editor, and only an explicit Save writes
- * the Explorer keys. Reset discards staged edits.
+ * The surface body is the JSON editor (filling the height above a bottom
+ * bar) — the Reset/Save actions live in the drawer head via
+ * `renderHeadAction`. The bottom bar holds a right-aligned Sort keys action,
+ * matching the Agent settings drawer. Verifies the no-auto-save contract:
+ * edits stage in the JSON editor, and only an explicit Save writes the
+ * Explorer keys. Reset discards staged edits.
  */
 // @ts-nocheck
 import { describe, test, expect, beforeEach } from "vitest";
@@ -75,18 +77,38 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     document.body.innerHTML = "";
   });
 
-  test("renders a full-height <json-editor> with no header/footer", async () => {
+  test("renders a full-height <json-editor> above the bottom bar", async () => {
     const el = await mount(new FakeConfig(CONFIG));
     const je = el.querySelector(".exs-editor > json-editor");
     expect(je).toBeTruthy();
     expect(je.editedValue).toEqual({ indentSize: 16, prefetchDepth: 2 });
-    // Header + hint and the body footer are gone (actions live in the head).
+    // Header + hint and the body status footer are gone (actions live in the
+    // head), but a bottom bar with a Sort keys action is present.
     expect(el.querySelector(".exs-section-title")).toBeNull();
     expect(el.querySelector(".exs-hint")).toBeNull();
-    expect(el.querySelector(".exs-footer")).toBeNull();
     expect(el.querySelector(".exs-status")).toBeNull();
-    // The editor pane fills the surface.
+    const footer = el.querySelector(".exs-footer");
+    expect(footer).toBeTruthy();
+    const sortBtn = footer.querySelector(".exs-footer-btn");
+    expect(sortBtn).toBeTruthy();
+    expect(sortBtn.getAttribute("aria-label")).toBe("Sort keys");
+    expect(sortBtn.disabled).toBe(false);
+    // The editor pane fills the surface above the bottom bar.
     expect(el.querySelector(".exs-editor")).toBeTruthy();
+  });
+
+  test("the bottom bar Sort keys button reorders keys without saving", async () => {
+    const fake = new FakeConfig(CONFIG);
+    const el = await mount(fake);
+    // Stage a draft whose keys are in a non-alphabetical order.
+    commit(el, { prefetchDepth: 3, indentSize: 24 });
+    await tick();
+    expect(Object.keys(el._config)).toEqual(["prefetchDepth", "indentSize"]);
+    el.querySelector(".exs-footer .exs-footer-btn").click();
+    await tick();
+    expect(Object.keys(el._config)).toEqual(["indentSize", "prefetchDepth"]);
+    // Sort is staging-only — nothing persisted.
+    expect(fake.sets.length).toBe(0);
   });
 
   test("defaults to the sensible defaults when the keys are absent", async () => {
