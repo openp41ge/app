@@ -498,4 +498,40 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     expect((wm as Wm)._addingWorkspace).toBe(false);
     expect(wm.shadowRoot?.querySelector(".ws-row--new")).toBeNull();
   });
+
+  it("attaches overdraw accents to the drawer footer and head buttons", async () => {
+    (wm as Wm)._workspaces = [{ filePath: "/w/a", data: { name: "A", repos: [] } }] as never;
+    (wm as Wm)._drawers = [{ id: "d1", kind: "workspace", workspacePath: "/w/a", title: "A", data: { repos: [] } }] as never;
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+
+    // Bottom bar: the full-height + / trash buttons bleed their border-left
+    // separator up past the footer's top border.
+    for (const sel of [".drawer-footer .dw-add", ".drawer-footer .dw-delete"]) {
+      const line = wm.shadowRoot?.querySelector<HTMLElement>(`${sel} > overdraw-line`);
+      expect(line?.getAttribute("dir")).toBe("up");
+      expect(line?.style.left).toBe("-1px");
+    }
+    // Top bar: the close button bleeds its border-left separator down past the
+    // head's bottom border, and up past the drawer's top edge into the tab bar.
+    const closeLines = wm.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".drawer-actions .dw-close > overdraw-line",
+    );
+    expect(closeLines?.length).toBe(2);
+    const dirs = [...(closeLines ?? [])].map((l) => l.getAttribute("dir")).sort();
+    expect(dirs).toEqual(["down", "up"]);
+    const down = [...(closeLines ?? [])].find((l) => l.getAttribute("dir") === "down");
+    expect(down?.style.left).toBe("-1px");
+    // The up-bleed is a fixed portal stroke (so it can escape the layer's
+    // overflow clip) and stays hidden until the drawer's slide settles.
+    const up = [...(closeLines ?? [])].find((l) => l.getAttribute("dir") === "up");
+    expect(up?.style.position).toBe("fixed");
+    expect(up?.style.opacity).toBe("0");
+
+    // Idempotent across another update.
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+    expect(wm.shadowRoot?.querySelectorAll(".drawer-footer .dw-add > overdraw-line")?.length).toBe(1);
+    expect(wm.shadowRoot?.querySelectorAll(".drawer-actions .dw-close > overdraw-line")?.length).toBe(2);
+  });
 });

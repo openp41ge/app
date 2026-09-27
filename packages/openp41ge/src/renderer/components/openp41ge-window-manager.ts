@@ -277,6 +277,7 @@ export class Openp41geWindowManager extends LitElement {
   /** Attach custom tooltips to the footer tool buttons (replaces native `title`). */
   updated(): void {
     this._measureListOverflow();
+    this._attachDrawerOverdraws();
     this._attachWorkspaceFooterOverdraws();
     this._attachWorkspaceSearchBarOverdraws();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
@@ -696,6 +697,89 @@ export class Openp41geWindowManager extends LitElement {
     // Keep the drawer showing the freshly-added repo, and refresh the card list.
     this._drawers = this._drawers.map((x) => (x.id === d.id ? { ...x, data } : x));
     await this._load();
+  }
+
+  /** Extend the drawer bar buttons' vertical separators past their bar's
+   *  horizontal border.
+   *
+   *  Bottom bar (`.drawer-footer`, at the window bottom) — the full-height
+   *  `+`/trash buttons bleed their `border-left` separator up past the bar's
+   *  top border, matching the workspace-list footer treatment. (A downward
+   *  bleed would fall off the window edge, so it is not used.)
+   *
+   *  Top bar (`.drawer-head`) — the close button's `border-left` separator
+   *  bleeds down past the head's bottom border into the body, AND bleeds up
+   *  past the drawer's top edge into the window's tab bar (a `fixed` portal
+   *  stroke that escapes the layer's `overflow: hidden` clip — see
+   *  `_attachDrawerHeadUpBleed`).
+   *
+   *  Idempotent per element, safe on every re-render. */
+  private _attachDrawerOverdraws(): void {
+    const root = this.shadowRoot;
+    if (!root) return;
+    for (const btn of root.querySelectorAll<HTMLElement>(
+      ".drawer-footer .dw-add, .drawer-footer .dw-delete",
+    )) {
+      attachEdgeOverdraw(btn, "left", "up");
+    }
+    for (const close of root.querySelectorAll<HTMLElement>(".drawer-actions .dw-close")) {
+      attachEdgeOverdraw(close, "left", "down");
+      this._attachDrawerHeadUpBleed(close);
+    }
+  }
+
+  /**
+   * Up-bleed for the drawer head's close button: a `fixed` portal stroke that
+   * continues the button's left separator up past the drawer's top edge into
+   * the window's tab bar. The drawer layer clips `overflow: hidden`, so the
+   * stroke must escape it (position `fixed`). While the drawer's slide
+   * animation runs, its transform makes `position: fixed` resolve against the
+   * drawer (misplacing the stroke), so the stroke is hidden until it settles.
+   * It tracks the button's viewport rect each frame and stops once the button
+   * is removed (the drawer closed).
+   */
+  private _attachDrawerHeadUpBleed(close: HTMLElement): void {
+    if (close.dataset.drawerHeadUpBleed === "1") return;
+    close.dataset.drawerHeadUpBleed = "1";
+
+    const line = document.createElement("overdraw-line");
+    line.setAttribute("dir", "up");
+    line.setAttribute("aria-hidden", "true");
+    line.style.position = "fixed";
+    line.style.left = "0px";
+    line.style.top = "0px";
+    line.style.zIndex = "1";
+    line.style.opacity = "0";
+    close.appendChild(line);
+
+    // The drawer that animates the slide, so we can hide the stroke until it
+    // settles (an active transform makes `fixed` resolve against the drawer).
+    const drawer = close.closest<HTMLElement>(".drawer");
+
+    let raf = 0;
+    const loop = (): void => {
+      if (!close.isConnected) {
+        raf = 0;
+        return;
+      }
+      const settling =
+        drawer != null &&
+        typeof drawer.getAnimations === "function" &&
+        drawer.getAnimations().length > 0;
+      const r = close.getBoundingClientRect();
+      if (!settling && r.width > 0 && r.height > 0) {
+        const preset = parseFloat(line.style.getPropertyValue("--overdraw-length"));
+        const length = Number.isFinite(preset) && preset > 0 ? preset : 6;
+        line.style.left = `${r.left}px`;
+        line.style.top = `${r.top - length}px`;
+        line.style.opacity = "";
+      } else {
+        line.style.opacity = "0";
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    if (typeof requestAnimationFrame !== "function") return;
+    raf = requestAnimationFrame(loop);
   }
 
   /** Extend each vertical separator in the workspace-list footer up past the
