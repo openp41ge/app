@@ -2107,6 +2107,38 @@ export class Openp41geWindowManager extends LitElement {
         .ws-edit svg {
           display: block;
         }
+        /* Confirm / cancel buttons on the inline "new workspace" row, sitting at
+           the row's right edge (where the thumbs + edit button live on normal
+           rows). Same rounded + hover treatment as the edit button. */
+        .ws-new-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        .ws-action {
+          flex-shrink: 0;
+          align-self: center;
+          width: 28px;
+          height: 28px;
+          padding: 0;
+          border: none;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: background 0.1s ease, color 0.1s ease;
+        }
+        .ws-action:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .ws-action svg {
+          display: block;
+        }
         /* Workspace-list delete mode + inline "new workspace" row. */
         .ws-row--select {
           cursor: pointer;
@@ -2890,6 +2922,32 @@ export class Openp41geWindowManager extends LitElement {
                                     <div class="ws-pills">
                                       <span class="ws-skeleton ws-skeleton--pill"></span>
                                     </div>
+                                  </div>
+                                  <div class="ws-new-actions">
+                                    <button
+                                      class="ws-action ws-action--confirm"
+                                      aria-label="Create workspace"
+                                      title="Create workspace"
+                                      @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                                      @click=${(e: Event) => {
+                                        e.stopPropagation();
+                                        void this._createWorkspaceFromInput();
+                                      }}
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>
+                                    </button>
+                                    <button
+                                      class="ws-action ws-action--cancel"
+                                      aria-label="Cancel"
+                                      title="Cancel"
+                                      @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                                      @click=${(e: Event) => {
+                                        e.stopPropagation();
+                                        this._addingWorkspace = false;
+                                      }}
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                                    </button>
                                   </div>
                                 </li>
                               `

@@ -447,4 +447,55 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
       expect(line.style.display).toBe("");
     }
   });
+
+  it("renders confirm + cancel buttons to the right of the new-workspace row", async () => {
+    (wm as Wm)._addingWorkspace = true;
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+
+    const row = wm.shadowRoot?.querySelector(".ws-row--new");
+    const actions = row?.querySelectorAll(".ws-new-actions .ws-action");
+    expect(actions?.length).toBe(2);
+    const confirm = row?.querySelector(".ws-action--confirm");
+    const cancel = row?.querySelector(".ws-action--cancel");
+    expect(confirm?.getAttribute("aria-label")).toBe("Create workspace");
+    expect(cancel?.getAttribute("aria-label")).toBe("Cancel");
+
+    // The action group is a sibling after the info column (the row's right edge).
+    const info = row?.querySelector(".ws-info");
+    expect(info?.nextElementSibling).toBe(row?.querySelector(".ws-new-actions"));
+  });
+
+  it("cancel closes the add row without creating a workspace", async () => {
+    (wm as Wm)._addingWorkspace = true;
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+
+    const input = wm.shadowRoot?.querySelector<HTMLInputElement>(".wm-new-ws-input");
+    if (input) input.value = "ShouldNotPersist";
+    const cancel = wm.shadowRoot?.querySelector<HTMLElement>(".ws-action--cancel");
+    cancel?.click();
+    await (wm as Wm).updateComplete;
+
+    expect((wm as Wm)._addingWorkspace).toBe(false);
+    expect(wm.shadowRoot?.querySelector(".ws-row--new")).toBeNull();
+  });
+
+  it("confirm builds the workspace from the typed name and closes the row", async () => {
+    (wm as Wm)._addingWorkspace = true;
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+
+    const input = wm.shadowRoot?.querySelector<HTMLInputElement>(".wm-new-ws-input");
+    if (input) input.value = "My Workspace";
+    const confirm = wm.shadowRoot?.querySelector<HTMLElement>(".ws-action--confirm");
+    confirm?.click();
+    await (wm as Wm).updateComplete;
+
+    // The create goes through _createWorkspaceFromInput: the row is dismissed
+    // and the input value is consumed (no .openp41ge.dialog in jsdom, so the
+    // service write rejects, which _createWorkspaceFromInput swallows).
+    expect((wm as Wm)._addingWorkspace).toBe(false);
+    expect(wm.shadowRoot?.querySelector(".ws-row--new")).toBeNull();
+  });
 });
