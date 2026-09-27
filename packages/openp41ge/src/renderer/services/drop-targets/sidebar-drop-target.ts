@@ -105,11 +105,11 @@ export class SidebarDropTarget implements IDropTarget {
     const barRect = this.element.getBoundingClientRect();
     const isOverTabBar = clientY >= barRect.top && clientY <= barRect.bottom;
 
-    this._showOverlay(dropIndex, isOverTabBar && !noOpReorder);
-    return { indicatorKey: `sidebar-bar-${this.winId}-${this.side}` };
+    this._showOverlay(dropIndex, isOverTabBar && !noOpReorder, isOverTabBar);
+    return { indicatorKey: `sidebar-bar-${this.winId}-${this.side}`, overTabBar: isOverTabBar };
   }
 
-  async onDrop(source: IDragSource, clientX: number, _clientY: number): Promise<DragResult> {
+  async onDrop(source: IDragSource, clientX: number, clientY: number): Promise<DragResult> {
     this._hideOverlay();
 
     const data = source.getDragData() as Record<string, unknown>;
@@ -117,7 +117,12 @@ export class SidebarDropTarget implements IDropTarget {
       return { success: false, reason: "only system tabs can be dropped on sidebar tab bars" };
     }
 
-    const dropIndex = getDropIndexInSidebarBar(this.element, clientX);
+    // Position only matters while hovering the tab bar. Dropping anywhere on
+    // the sidebar body/cell below always APPENDS to the end of the tab bar.
+    const barRect = this.element.getBoundingClientRect();
+    const overTabBar = clientY >= barRect.top && clientY <= barRect.bottom;
+    const tabs = getTabButtonsInSidebarBar(this.element);
+    const dropIndex = overTabBar ? getDropIndexInSidebarBar(this.element, clientX) : tabs.length;
     const sourceSide = data.side as "left" | "right";
 
     // Same sidebar — reorder
@@ -173,8 +178,13 @@ export class SidebarDropTarget implements IDropTarget {
    * - Full sidebar drop-box (the grid's solid <drop-box> landing target + its
    *   <drop-box-overdraw> corner bleed) highlighting the whole sidebar
    * - Precise drop indicator line on the tab bar (when `showIndicator` is true)
+   *
+   * While the cursor is over the TAB BAR (`overTabBar`), the box drops its
+   * border + overdraw accents and keeps only its wash background, so the
+   * tab-bar insert line reads clearly (the wash still makes it obvious the
+   * drop lands in the sidebar). Hovering the body keeps the full box.
    */
-  private _showOverlay(dropIndex: number, showIndicator: boolean = true): void {
+  private _showOverlay(dropIndex: number, showIndicator: boolean, overTabBar: boolean): void {
     // Suppressed while the drag ghost captures its bitmap frame — no overlay or
     // drop indicator may be painted into the snapshot.
     if (_feedbackSuppressed) return;
@@ -202,6 +212,18 @@ export class SidebarDropTarget implements IDropTarget {
         this._overdrawEl = document.createElement("drop-box-overdraw");
         this._overdrawEl.className = "sidebar-drop-zone-overdraw";
         sidebarHost.appendChild(this._overdrawEl);
+      }
+
+      // Framing: border + overdraw bleed while over the body; wash-only (no
+      // border accents) while over the tab bar so the insert line reads. Set
+      // the FRAME PROPERTY (not just the attribute) — Lit reflects the default
+      // `frame = true` back onto the attribute on first render, so removing
+      // the attribute alone would be overridden.
+      if (this._overlayEl) {
+        (this._overlayEl as unknown as { frame: boolean }).frame = !overTabBar;
+      }
+      if (this._overdrawEl) {
+        this._overdrawEl.style.display = overTabBar ? "none" : "";
       }
     }
 

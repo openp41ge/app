@@ -87,7 +87,7 @@ describe("ManagerTabBarDropTarget", () => {
     const target = new ManagerTabBarDropTarget(bar);
     const source = new ManagerTabDragSource(bar.children[0], "workspaces", "wm-1", "Workspaces");
     const feedback = target.onHover(source, 150, 10);
-    expect(feedback).toEqual({ cssClass: "wm-tabbar--drop-active" });
+    expect(feedback).toEqual({ cssClass: "wm-tabbar--drop-active", overTabBar: true });
     const indicator = bar.querySelector(".wm-tab-drop-indicator");
     expect(indicator).not.toBeNull();
     expect(indicator.style.display).toBe("block");

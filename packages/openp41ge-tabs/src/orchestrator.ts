@@ -34,6 +34,9 @@ interface DragSession {
   startY: number;
   thresholdMet: boolean;
   currentTarget: IDropTarget | null;
+  /** True while the cursor sits over a tab bar (the resolved target's
+   *  `onHover` feedback reports `overTabBar`). Drives ghost dimming. */
+  overTabBar: boolean;
   initiated: boolean;
 }
 
@@ -89,7 +92,7 @@ export class DragOrchestrator implements IDragHandler {
 
   constructor(
     resolveTarget?: TargetResolver,
-    private readonly _onTargetChange?: (target: IDropTarget | null) => void,
+    private readonly _onTargetChange?: (target: IDropTarget | null, overTabBar: boolean) => void,
   ) {
     this._resolveTarget = resolveTarget ?? defaultTargetResolver;
   }
@@ -108,6 +111,7 @@ export class DragOrchestrator implements IDragHandler {
       startY: clientY,
       thresholdMet: false,
       currentTarget: null,
+      overTabBar: false,
       initiated: false,
     };
 
@@ -178,16 +182,33 @@ export class DragOrchestrator implements IDragHandler {
     }
 
     const newTarget = s.thresholdMet ? this._resolveTarget(ev.clientX, ev.clientY) : null;
+    const prevTarget = s.currentTarget;
+    const prevOverTabBar = s.overTabBar;
 
-    if (newTarget !== s.currentTarget) {
-      if (s.currentTarget) {
-        s.currentTarget.onLeave();
+    if (newTarget !== prevTarget) {
+      if (prevTarget) {
+        prevTarget.onLeave();
       }
       this._clearOverlays();
       s.currentTarget = newTarget;
-      // Let the host react to the drop target changing — e.g. fade the drag
-      // ghost so a tab-bar drop indicator under the cursor shows through.
-      this._onTargetChange?.(newTarget);
+      s.overTabBar = false;
+    }
+
+    if (s.currentTarget) {
+      // `onHover` also returns whether the cursor is over a tab bar (vs the
+      // cell/sidebar body) so the host can fade the drag ghost or soften the
+      // drop box while a tab-bar insert line is under the cursor.
+      const feedback = s.currentTarget.onHover(s.source, ev.clientX, ev.clientY);
+      s.overTabBar = !!feedback?.overTabBar;
+    } else {
+      s.overTabBar = false;
+    }
+
+    // Notify the host when the resolved target OR the tab-bar hover state
+    // changes (moving over a tab bar toggles the ghost dim / box framing even
+    // though the resolved target stays the same).
+    if (s.currentTarget !== prevTarget || s.overTabBar !== prevOverTabBar) {
+      this._onTargetChange?.(s.currentTarget, s.overTabBar);
     }
 
     if (s.currentTarget) {
@@ -333,6 +354,6 @@ export class DragOrchestrator implements IDragHandler {
     // A drag that was over a target (e.g. ended on a tab bar) must restore the
     // host's per-target ghost feedback to its default state. Nothing to restore
     // if no target was ever active.
-    if (hadTarget) this._onTargetChange?.(null);
+    if (hadTarget) this._onTargetChange?.(null, false);
   }
 }

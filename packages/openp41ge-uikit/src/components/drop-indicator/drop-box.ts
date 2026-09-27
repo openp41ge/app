@@ -19,6 +19,13 @@
  * fade out toward the drag target (the mask fades the host's painted content,
  * including the inset border ring). `fade="none"` is the solid drop-zone box.
  *
+ * `frame="false"` (i.e. removing the `frame` attribute) is the "wash-only"
+ * variant: the box keeps its soft blue wash but drops the border ring and its
+ * glow. Used when the cursor hovers a tab bar while a drop box marks the
+ * landing cell — the wash makes it clear the drop still lands in that cell
+ * while the border/overdraw accents step aside so the tab bar's insert line
+ * stays readable.
+ *
  * The host is `position: absolute`; place it with inline `left/right/top/
  * bottom` and `z-index`. Style hooks: `--drop-color`, `--drop-border`,
  * `--drop-radius`, `--drop-wash`.
@@ -35,6 +42,9 @@ export class DropBox extends LitElement {
   @property({ reflect: true }) fade: DropFadeDirection = "none";
   /** Render the soft blue wash behind the border (off = fully transparent). */
   @property({ type: Boolean, reflect: true }) wash = true;
+  /** Render the border ring + glow. Set `frame="false"` for a wash-only box
+   *  (keeps the wash, drops the border so the tab bar's insert line reads). */
+  @property({ type: Boolean, reflect: true }) frame = true;
 
   static styles = css`
     :host {
@@ -56,6 +66,11 @@ export class DropBox extends LitElement {
     }
     :host([wash]) {
       background: var(--drop-wash);
+    }
+    /* Wash-only: no border ring, no glow — just the tint, so the box marks
+       the landing region without occluding the tab bar's insert line. */
+    :host(:not([frame])) {
+      box-shadow: none;
     }
     :host([fade="right"]) {
       -webkit-mask-image: linear-gradient(to right, #000, transparent);

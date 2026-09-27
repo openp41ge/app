@@ -63,7 +63,7 @@ export class ManagerTabBarDropTarget implements IDropTarget {
     // Only manager tabs can be dropped on a management tab bar.
     if (source.type !== "manager-tab") return null;
     this._showIndicator(clientX);
-    return { cssClass: "wm-tabbar--drop-active" };
+    return { cssClass: "wm-tabbar--drop-active", overTabBar: true };
   }
 
   onDrop(source: IDragSource, clientX: number, _clientY: number): Promise<DragResult> {

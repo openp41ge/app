@@ -67,6 +67,10 @@ export interface TargetFeedback {
   ghostConfig?: Record<string, unknown>;
   /** Re-usable indicator element key — target creates/manages its own DOM */
   indicatorKey?: string;
+  /** True while the cursor is over a tab bar (vs the cell/sidebar body). The
+   *  host fades the drag ghost / softens the drop box so the tab-bar insert
+   *  line reads clearly. */
+  overTabBar?: boolean;
 }
 
 /**

@@ -16,6 +16,10 @@ export interface GhostPreview {
   splitHighlightCol?: number;
   columnFlex?: number[];
   isFileDrop?: boolean;
+  /** Show the landing box wash-only (no border ring, no overdraw accents).
+   *  Used while the cursor is over a tab bar so the tab bar's insert line
+   *  reads clearly; the wash still marks the landing cell. */
+  suppressFrame?: boolean;
 }
 
 interface GhostOverlayEntry {
@@ -120,9 +124,11 @@ export class GhostManager {
       // overdraw accents: because the grid box is a SOLID landing target, it
       // never fades, and its border bleeds outward at all four corners. (Only
       // the settings drawer's box fades — to show it will slide to fill the
-      // space if dropped.) The <drop-box> / <drop-box-overdraw> custom
-      // elements are registered by <tab-grid> (the sole GhostManager
-      // consumer) via the drop-indicator module.
+      // space if dropped.) While the cursor is over a tab bar (`suppressFrame`)
+      // the box drops its border ring + overdraw accents and keeps only the
+      // wash, so the tab bar's insert line reads clearly (the wash still marks
+      // the landing cell).
+      const suppressFrame = !!preview.suppressFrame;
       const wantsBox = col.highlighted || col.active;
       let box = colDiv.querySelector<HTMLElement>(":scope > drop-box");
       let over = colDiv.querySelector<HTMLElement>(":scope > drop-box-overdraw");
@@ -139,6 +145,12 @@ export class GhostManager {
         // The box stays solid (no `fade`) so the overdraw companion bleeds
         // its accents outward at every corner.
         box.removeAttribute("fade");
+        // Set the FRAME PROPERTY (not just the attribute): Lit reflects the
+        // property to the attribute, so removing the attribute alone would get
+        // re-added by the default `frame = true` on the element's first
+        // render. Setting `.frame` drives the reflection properly.
+        (box as unknown as { frame: boolean }).frame = !suppressFrame;
+        if (over) over.style.display = suppressFrame ? "none" : "";
       } else {
         box?.remove();
         over?.remove();

@@ -41,6 +41,10 @@ export interface TargetFeedback {
   showGhost?: boolean;
   ghostConfig?: Record<string, unknown>;
   indicatorKey?: string;
+  /** True while the cursor is over a tab bar (vs the cell/sidebar body). The
+   *  host uses this to fade the drag ghost / soften the drop box so the
+   *  tab-bar insert line reads clearly. */
+  overTabBar?: boolean;
 }
 
 export interface IDropTarget {

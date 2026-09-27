@@ -188,6 +188,108 @@ describe("SidebarDropTarget no-op reorder suppression", () => {
   });
 });
 
+describe("SidebarDropTarget tab-bar vs body framing / drop", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function box(): HTMLElement | null {
+    return document.querySelector(".sidebar-drop-zone-box");
+  }
+  function overdraw(): HTMLElement | null {
+    return document.querySelector(".sidebar-drop-zone-overdraw");
+  }
+
+  it("reports overTabBar and shows a wash-only box (no border frame, no overdraw) while over the tab bar", () => {
+    const { bar } = buildRightBar(3);
+    const target = new SidebarDropTarget(bar, "w1", "right");
+
+    // clientY=15 is within the bar rect (top:0, bottom:30) → tab bar
+    const feedback = target.onHover(fakeSystemTabSource("t1", "left"), 80, 15);
+
+    expect(feedback).not.toBeNull();
+    expect(feedback!.overTabBar).toBe(true);
+    // The box is kept (the wash still marks the drop target) but loses its
+    // border ring, and the overdraw corner accents are hidden so the tab-bar
+    // insert line reads clearly.
+    expect(box()).not.toBeNull();
+    expect((box() as unknown as { frame: boolean }).frame).toBe(false);
+    expect(overdraw()).not.toBeNull();
+    expect(getComputedStyle(overdraw()!).display).toBe("none");
+    // The precise insert line IS shown over the tab bar.
+    expect(indicatorVisible()).toBe(true);
+  });
+
+  it("reports overTabBar=false and shows the full box + overdraw while over the body", () => {
+    const { bar } = buildRightBar(3);
+    const target = new SidebarDropTarget(bar, "w1", "right");
+
+    // clientY=100 is below the bar rect (top:0, bottom:30) → sidebar body
+    const feedback = target.onHover(fakeSystemTabSource("t1", "left"), 80, 100);
+
+    expect(feedback).not.toBeNull();
+    expect(feedback!.overTabBar).toBe(false);
+    expect((box() as unknown as { frame: boolean }).frame).toBe(true);
+    expect(getComputedStyle(overdraw()!).display).not.toBe("none");
+    // No insert line over the body (drop always appends there).
+    expect(indicatorVisible()).toBe(false);
+  });
+
+  it("re-frames the box when the cursor moves from bar to body", () => {
+    const { bar } = buildRightBar(3);
+    const target = new SidebarDropTarget(bar, "w1", "right");
+
+    target.onHover(fakeSystemTabSource("t1", "left"), 80, 15);
+    expect((box() as unknown as { frame: boolean }).frame).toBe(false);
+
+    target.onHover(fakeSystemTabSource("t1", "left"), 80, 100);
+    expect((box() as unknown as { frame: boolean }).frame).toBe(true);
+    expect(getComputedStyle(overdraw()!).display).not.toBe("none");
+  });
+
+  it("appends (dropIndex = tab count) when dropped on the sidebar body, regardless of X", async () => {
+    const { bar } = buildRightBar(3); // three tabs t0,t1,t2
+    const target = new SidebarDropTarget(bar, "w1", "right");
+    const listener = vi.fn();
+    document.addEventListener(SIDEBAR_DROP_EVENT, listener);
+
+    // Cross-sidebar drop low in the sidebar (clientY below the bar).
+    const result = await target.onDrop(fakeSystemTabSource("s1", "left"), 30, 500);
+
+    expect(result).toEqual({ success: true });
+    expect(listener).toHaveBeenCalledTimes(1);
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.dropIndex).toBe(3); // appended at the end, not at X-based index
+    expect(detail.targetSide).toBe("right");
+  });
+
+  it("uses the X-based index when dropped on the tab bar", async () => {
+    const { bar } = buildRightBar(3);
+    const target = new SidebarDropTarget(bar, "w1", "right");
+    const listener = vi.fn();
+    document.addEventListener(SIDEBAR_DROP_EVENT, listener);
+
+    // clientX=30 → dropIndex 0 (before tab at midpoint 50) while over the bar.
+    await target.onDrop(fakeSystemTabSource("s1", "left"), 30, 15);
+
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.dropIndex).toBe(0);
+  });
+
+  it("same-side drop over the body moves the tab to the end", async () => {
+    const { bar } = buildRightBar(3);
+    const target = new SidebarDropTarget(bar, "w1", "right");
+    const listener = vi.fn();
+    document.addEventListener(SIDEBAR_DROP_EVENT, listener);
+
+    // Drop t1 (index 1) low in the sidebar → append to end (adjusted index 2).
+    await target.onDrop(fakeSystemTabSource("t1", "right"), 30, 500);
+
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.dropIndex).toBe(2);
+  });
+});
+
 describe("ClosedSidebarDropTarget", () => {
   beforeEach(() => {
     document.body.innerHTML = "";

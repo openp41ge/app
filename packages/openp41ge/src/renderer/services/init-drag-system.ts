@@ -152,18 +152,18 @@ let _ghostManager = new GhostManager();
 // While the cursor hovers a tab bar, a drop indicator bar is drawn there under
 // the floating drag ghost. The ghost would otherwise cover it, so we fade the
 // ghost to a low opacity to let the drop indicator show through. The opacity is
-// animated in the main-process DragGhostManager (IPC `drag:setOpacity`).
+// animated in the main-process DragGhostManager (IPC `drag:setOpacity`). The
+// resolved target's `onHover` feedback reports `overTabBar`, so the ghost is
+// dimmed ONLY while the cursor is actually over a tab bar — not over the
+// sidebar/cell body beneath it.
 const DRAG_GHOST_DIM_OPACITY = 0.33;
-/** Drop-target types that draw a bar indicator inside a tab bar. */
-const TAB_BAR_TARGET_TYPES = new Set(["sidebar-tab-bar", "tab-bar", "manager-tab-bar"]);
 let _dragGhostDimmed = false;
 
-function _setDragGhostDimmed(target: IDropTarget | null): void {
-  const dim = !!target && TAB_BAR_TARGET_TYPES.has(target.type);
-  if (dim === _dragGhostDimmed) return;
-  _dragGhostDimmed = dim;
+function _setDragGhostDimmed(_target: IDropTarget | null, overTabBar: boolean): void {
+  if (overTabBar === _dragGhostDimmed) return;
+  _dragGhostDimmed = overTabBar;
   // The drag bridge may be absent (e.g. unit tests / non-Electron renderer).
-  window.openp41ge?.drag?.setOpacity?.(dim ? DRAG_GHOST_DIM_OPACITY : 1);
+  window.openp41ge?.drag?.setOpacity?.(overTabBar ? DRAG_GHOST_DIM_OPACITY : 1);
 }
 
 /** Whether another Electron window has an active drag. */
@@ -2761,7 +2761,36 @@ let _ghostShownGrid: HTMLElement | null = null;
 
 function updateGridGhost(clientX: number, clientY: number): void {
   const target = openp41geTargetResolver(clientX, clientY);
-  if (!target || target.type !== "grid") {
+  if (!target) {
+    clearGridGhost();
+    return;
+  }
+
+  // Cursor over a grid cell's tab bar: the TabBarDropTarget owns the reorder /
+  // insert line, but the landing cell's drop box keeps its WASH with the
+  // border + overdraw accents suppressed, so the insert line reads clearly
+  // (the wash still marks the landing cell).
+  if (target.type === "tab-bar") {
+    const barEl = target.element as HTMLElement;
+    const gridEl = barEl.closest("tab-grid");
+    const col = (target as unknown as { col?: number }).col;
+    if (!(gridEl instanceof HTMLElement) || col === undefined || col < 0) {
+      clearGridGhost();
+      return;
+    }
+    // Re-showing on the SAME grid reuses the overlay (see the grid branch
+    // below); only tear it down when switching to a DIFFERENT grid.
+    if (_ghostShownGrid && _ghostShownGrid !== gridEl) {
+      _ghostManager.hideGhost(_ghostShownGrid);
+      _ghostShownGrid = null;
+    }
+    const gridCols = (gridEl as unknown as { cols?: number }).cols ?? 1;
+    _ghostManager.showGhost(gridEl, { cols: gridCols, activeCol: col, suppressFrame: true });
+    _ghostShownGrid = gridEl;
+    return;
+  }
+
+  if (target.type !== "grid") {
     clearGridGhost();
     return;
   }

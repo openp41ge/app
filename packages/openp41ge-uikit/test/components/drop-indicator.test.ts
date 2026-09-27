@@ -143,6 +143,23 @@ describe("drop-box", () => {
     const d: DropFadeDirection = "left";
     expect(["none", "left", "right"]).toContain(d);
   });
+
+  test("frame=false strips the border ring + glow (wash-only box)", async () => {
+    const el = new DropBox();
+    document.body.appendChild(el);
+    await el.updateComplete;
+    // Bordered by default (border ring + glow via the inset box-shadow).
+    expect(el.hasAttribute("frame")).toBe(true);
+
+    el.frame = false;
+    await el.updateComplete;
+    expect(el.hasAttribute("frame")).toBe(false);
+    const css = styleOf(el);
+    // The wash-only variant keeps the wash but drops the ring + glow so the
+    // tab bar's insert line reads clearly under the drop box.
+    expect(css).toContain(":host(:not([frame]))");
+    expect(css).toContain("box-shadow: none");
+  });
 });
 
 describe("drop-box-overdraw", () => {

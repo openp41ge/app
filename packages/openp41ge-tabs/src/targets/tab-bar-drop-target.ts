@@ -35,10 +35,16 @@ export class TabBarDropTarget implements IDropTarget {
     this._col = col;
   }
 
+  /** The grid column this tab bar belongs to (read by the host so it can show
+   *  the wash-only drop box on the right cell while the cursor is over the bar). */
+  get col(): number {
+    return this._col;
+  }
+
   onHover(_source: IDragSource, clientX: number, _clientY: number): TargetFeedback | null {
     const dropIndex = getDropIndexInBar(this.element, clientX);
     this._showIndicator(dropIndex);
-    return { indicatorKey: `tab-bar-${this.winId}-${this._col}` };
+    return { indicatorKey: `tab-bar-${this.winId}-${this._col}`, overTabBar: true };
   }
 
   async onDrop(source: IDragSource, clientX: number, _clientY: number): Promise<DragResult> {
