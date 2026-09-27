@@ -822,10 +822,12 @@ class Openp41geWindowView extends LitElement {
         }
         const r = el.getBoundingClientRect();
         if (entry.top) {
+          entry.top.style.setProperty("--overdraw-color", cs.borderTopColor);
           entry.top.style.top = `${r.top}px`;
           this._placeSepOverdraw(entry.top, side, sbRect);
         }
         if (entry.bottom) {
+          entry.bottom.style.setProperty("--overdraw-color", cs.borderBottomColor);
           entry.bottom.style.top = `${r.bottom - 1}px`;
           this._placeSepOverdraw(entry.bottom, side, sbRect);
         }

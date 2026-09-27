@@ -433,6 +433,11 @@ describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
     const r = leftLines()[0];
     expect(parseFloat(r.style.left)).toBe(490 - SIDEBAR_SEP_OVERDRAW_LENGTH);
     expect(parseFloat(r.style.top)).toBe(60 + 30 - 1);
+
+    // Each accent uses the separator's own border color (the app styles use
+    // per-site `var(--divider, …)` fallbacks that differ between tabs).
+    expect(nl.style.getPropertyValue("--overdraw-color")).toBe("rgb(51, 51, 51)");
+    expect(rowBottom.style.getPropertyValue("--overdraw-color")).toBe("rgb(51, 51, 51)");
   });
 
   it("does not draw a bottom accent when the row's bottom border is suppressed", async () => {
