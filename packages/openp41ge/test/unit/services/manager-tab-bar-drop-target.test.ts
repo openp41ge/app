@@ -93,6 +93,27 @@ describe("ManagerTabBarDropTarget", () => {
     expect(indicator.style.display).toBe("block");
   });
 
+  test("the indicator is the shared full-height square look with vertical strokes (no cross-cap ticks)", () => {
+    const { bar } = makeBar();
+    const target = new ManagerTabBarDropTarget(bar);
+    const source = new ManagerTabDragSource(bar.children[0], "workspaces", "wm-1", "Workspaces");
+    target.onHover(source, 50, 10);
+
+    const ind = bar.querySelector<HTMLElement>(".wm-tab-drop-indicator")!;
+    // A plain div (NOT <drop-line>), matching the grid/sidebar indicators.
+    expect(ind.tagName).toBe("DIV");
+    // Full-height, square, 3px blue with a glow.
+    expect(ind.style.top).toBe("0px");
+    expect(ind.style.bottom).toBe("0px");
+    expect(ind.style.width).toBe("3px");
+    expect(ind.style.background).toContain("rgb(74, 158, 255");
+    expect(ind.style.borderRadius).toBe("0px");
+    // Two vertical overdraw strokes; no horizontal cross-cap ticks.
+    expect(ind.querySelectorAll(".drop-tip-vod-up, .drop-tip-vod-down")).toHaveLength(2);
+    expect(ind.querySelectorAll("overdraw-line")).toHaveLength(0);
+    expect(ind.querySelectorAll("div")).toHaveLength(2);
+  });
+
   test("onLeave hides the indicator", () => {
     const { bar } = makeBar();
     const target = new ManagerTabBarDropTarget(bar);

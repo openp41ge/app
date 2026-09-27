@@ -19,13 +19,14 @@ import type {
   TargetFeedback,
   DragResult,
 } from "../../interfaces/drag-handler";
+import { attachDropTipVerticalOverdraws } from "openp41ge-uikit";
 
 /** Event fired on the bar when a manager tab is dropped to reorder it. */
 export const MANAGER_TAB_REORDER_EVENT = "manager-tab-reorder";
 
 /** Blue insert line — matches the grid/sidebar tab-bar insert marker. The
- *  look (3px solid blue + glow) comes from the shared <drop-line> element;
- *  the class remains only as an identity marker for drag-capture hiding. */
+ *  look (3px solid blue + glow) is applied directly on the element, and the
+ *  class remains only as an identity marker for drag-capture hiding. */
 const INDICATOR_CLASS = "wm-tab-drop-indicator";
 
 export function managerTabButtons(bar: HTMLElement): HTMLElement[] {
@@ -141,10 +142,17 @@ export class ManagerTabBarDropTarget implements IDropTarget {
   /** Lazily create the indicator element inside the bar (shadow DOM). */
   private _getIndicator(): HTMLElement {
     if (this._indicator) return this._indicator;
-    const el = document.createElement("drop-line");
+    // A plain div (NOT a <drop-line>): the drop-line renders in shadow DOM with
+    // no slot, so its appended children (the vertical overdraw strokes) would
+    // never paint. A plain div's light-DOM children render — matching the
+    // grid/sidebar indicators exactly.
+    const el = document.createElement("div");
     el.className = INDICATOR_CLASS;
-    el.style.zIndex = "9";
-    el.style.display = "none";
+    el.style.cssText =
+      "position:absolute;top:0;bottom:0;width:3px;background:rgb(74,158,255);box-shadow:0 0 10px rgba(74,158,255,0.6);display:none;pointer-events:none;z-index:9;border-radius:0;";
+    // Continue the line past the bar's top/bottom edges (vertical overdraw
+    // strokes), matching the grid/sidebar tab-bar drop indicators.
+    attachDropTipVerticalOverdraws(el);
     this.element.appendChild(el);
     this._indicator = el;
     return el;
