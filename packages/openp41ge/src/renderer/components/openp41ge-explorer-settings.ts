@@ -220,14 +220,15 @@ export class Openp41geExplorerSettings extends LitElement {
           color: var(--text-primary, #ccc);
           font-size: 13px;
         }
-        /* The JSON editor fills the surface height above the bottom bar. It
-         * owns the content padding (matched to the other drawer surfaces). */
+        /* The JSON editor fills the surface height above the bottom bar,
+         * flush with the drawer edges (no content padding) — like the Agent
+         * settings drawer's json pane. */
         .exs-editor {
           flex: 1;
           min-height: 0;
           display: flex;
           flex-direction: column;
-          padding: var(--settings-pane-padding, 0 0 28px);
+          padding: 0;
         }
         .exs-editor > json-editor {
           flex: 1;
