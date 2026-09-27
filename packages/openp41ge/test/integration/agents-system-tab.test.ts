@@ -92,8 +92,18 @@ describe("AgentsSystemTabController", () => {
     expect(host.querySelector(".chat-chevron-btn")).toBeNull();
     expect(host.querySelector(".chat-tool-sublist")).toBeNull();
 
-    const newChatRow = host.querySelector('button.chat-new-row') as HTMLButtonElement;
+    const newChatRow = host.querySelector(".chat-new-row") as HTMLElement;
     expect(newChatRow).toBeTruthy();
+    // The new-chat row mirrors a normal chat row's layout: a title line plus
+    // a muted description line, with the placeholder name "New chat".
+    const newHead = newChatRow.querySelector<HTMLElement>(".chat-row-head")!;
+    const titleBlock = newHead.firstElementChild as HTMLElement;
+    const newTitle = titleBlock.firstElementChild as HTMLElement;
+    const newDesc = titleBlock.querySelector<HTMLElement>(".chat-row-desc");
+    expect(newTitle?.textContent).toBe("New chat");
+    expect(newDesc?.textContent).toBe("No description");
+    // No plus-icon row: the heading directly holds the title/description.
+    expect(newHead.textContent).toContain("New chat");
 
     // The footer holds the search tool (new) + this tab's own settings gear.
     const settingsBtn = host.querySelector('button[aria-label="Agent settings"]') as HTMLButtonElement;
@@ -131,7 +141,7 @@ describe("AgentsSystemTabController", () => {
     const before = storeModel.calls.filter((c) => c.op === "create").length;
     const openChatSpy = vi.fn();
     document.addEventListener("openp41ge:open-chat", openChatSpy);
-    (host.querySelector('button.chat-new-row') as HTMLButtonElement).click();
+    (host.querySelector(".chat-new-row") as HTMLElement).click();
     await flush();
     document.removeEventListener("openp41ge:open-chat", openChatSpy);
 
@@ -221,7 +231,7 @@ describe("AgentsSystemTabController", () => {
     // both the top (inter-session) and bottom (list-end) separators; the first
     // chat row itself carries none (its separators are the new-chat row's
     // bottom border and the second row's top border).
-    const newChatRow = host.querySelector('button.chat-new-row') as HTMLElement;
+    const newChatRow = host.querySelector(".chat-new-row") as HTMLElement;
     expect(newChatRow.dataset.sbSep).toBe("bottom");
     const rows = Array.from(host.querySelectorAll<HTMLElement>(".chat-row"));
     expect(rows).toHaveLength(2);

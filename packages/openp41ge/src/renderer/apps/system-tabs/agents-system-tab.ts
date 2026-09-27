@@ -24,7 +24,7 @@ import { toastService } from "../../components/openp41ge-toast";
 import { createSettingsButton, type Side } from "../../services/settings-button";
 import { openSearchDrawer, type SearchDrawerProvider } from "../../services/search-drawer";
 import type { Openp41geSettingsDrawerHost } from "../../components/openp41ge-settings-drawer-host";
-import { plusIcon, searchIcon } from "../../icons";
+import { searchIcon } from "../../icons";
 import { tooltipController } from "openp41ge-uikit";
 import { attachTopOverdraw } from "openp41ge-uikit/overdraw-line";
 import { createLogger } from "openp41ge-logger";
@@ -95,24 +95,21 @@ export class AgentsSystemTabController implements SystemTabController {
     });
 
     // ── New chat row (top): click to create a chat ─────────────────────
-    const newChatRow = document.createElement("button");
-    newChatRow.type = "button";
+    // Styled exactly like a normal chat row (title + muted description),
+    // with a placeholder name.
+    const newChatRow = document.createElement("div");
     newChatRow.className = "chat-new-row";
     newChatRow.title = "New chat";
-    newChatRow.innerHTML = `${plusIcon(14)}<span>New chat</span>`;
     Object.assign(newChatRow.style, {
       display: "flex",
-      alignItems: "center",
-      gap: "6px",
-      width: "100%",
-      padding: "7px 10px",
-      fontSize: "12px",
-      border: "none",
-      borderBottom: "1px solid var(--divider,#2a2a2a)",
+      flexDirection: "column",
+      userSelect: "none",
       cursor: "pointer",
-      textAlign: "left",
       flexShrink: "0",
+      borderBottom: "1px solid var(--divider,#2a2a2a)",
     });
+    const newChatHead = this._chatRowHead("New chat", "No description");
+    newChatRow.appendChild(newChatHead);
     newChatRow.addEventListener("click", () => void this._newChat());
     // Mark the row's bottom border as a separator so the windowview can pull
     // its overdraw line out into the grid (see openp41ge-windowview).
@@ -209,9 +206,9 @@ export class AgentsSystemTabController implements SystemTabController {
       [data-system-tab="agents"] .chat-row + .chat-row { border-top: 1px solid var(--divider,#2a2a2a); }
       [data-system-tab="agents"] .chat-row:last-child { border-bottom: 1px solid var(--divider,#2a2a2a); }
       [data-system-tab="agents"] .chat-list.is-overflowing .chat-row:last-child { border-bottom: none; }
-      [data-system-tab="agents"] .chat-new-row { color: var(--text-secondary,#999); background: transparent; }
-      [data-system-tab="agents"] .chat-new-row:hover { background: var(--bg-hover,#2a2d2e); color: var(--text-primary,#fff); }
-      [data-system-tab="agents"] .chat-new-row span { pointer-events: none; }
+      /* The new-chat row reuses the chat-row-head layout; its hover bg and
+         hover colour come from .chat-row-head:hover, and its bottom border is
+         set inline (it is not a sibling of the rows inside .chat-list). */
       /* The footer action buttons (settings gear + search) use the shared
          .p41ge-icon-btn class for their full-height, square, hover-background
          and separators — no per-tab colour overrides needed here. */
@@ -465,45 +462,10 @@ export class AgentsSystemTabController implements SystemTabController {
       cursor: "pointer",
     });
 
-    const head = document.createElement("div");
-    head.className = "chat-row-head";
-    Object.assign(head.style, {
-      display: "flex",
-      alignItems: "flex-start",
-      gap: "6px",
-      padding: "7px 8px",
-      fontSize: "13px",
-    });
-
-    const titleBlock = document.createElement("div");
-    Object.assign(titleBlock.style, { flex: "1", minWidth: "0", overflow: "hidden" });
-
-    const title = document.createElement("div");
-    title.textContent = chat.title;
-    title.title = chat.title;
-    Object.assign(title.style, {
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      color: "var(--text-primary,#ccc)",
-    });
-    titleBlock.appendChild(title);
-
-    // AI-written one-line description (falls back to "No description").
-    const desc = document.createElement("div");
-    desc.className = "chat-row-desc";
-    desc.textContent = (chat.description ?? "").trim() || "No description";
-    Object.assign(desc.style, {
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      fontSize: "11px",
-      lineHeight: "1.3",
-      marginTop: "2px",
-      color: "var(--text-muted,#777)",
-    });
-    titleBlock.appendChild(desc);
-    head.appendChild(titleBlock);
+    const head = this._chatRowHead(
+      chat.title,
+      (chat.description ?? "").trim() || "No description",
+    );
 
     // Open-in-another-window: clicking the row shows a toast instead of
     // opening a duplicate chat.
@@ -524,6 +486,49 @@ export class AgentsSystemTabController implements SystemTabController {
     });
 
     return row;
+  }
+
+  /** Build a row header: a one-line title + muted description. */
+  private _chatRowHead(title: string, desc: string): HTMLElement {
+    const head = document.createElement("div");
+    head.className = "chat-row-head";
+    Object.assign(head.style, {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: "6px",
+      padding: "7px 8px",
+      fontSize: "13px",
+    });
+
+    const titleBlock = document.createElement("div");
+    Object.assign(titleBlock.style, { flex: "1", minWidth: "0", overflow: "hidden" });
+
+    const titleEl = document.createElement("div");
+    titleEl.textContent = title;
+    titleEl.title = title;
+    Object.assign(titleEl.style, {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      color: "var(--text-primary,#ccc)",
+    });
+    titleBlock.appendChild(titleEl);
+
+    const descEl = document.createElement("div");
+    descEl.className = "chat-row-desc";
+    descEl.textContent = desc;
+    Object.assign(descEl.style, {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      fontSize: "11px",
+      lineHeight: "1.3",
+      marginTop: "2px",
+      color: "var(--text-muted,#777)",
+    });
+    titleBlock.appendChild(descEl);
+    head.appendChild(titleBlock);
+    return head;
   }
 
   private _openChat(chatId: string, title: string): void {
