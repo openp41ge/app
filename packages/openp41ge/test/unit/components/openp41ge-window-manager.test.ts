@@ -45,6 +45,13 @@ function stubWindow(): {
       openWindowSummaries: vi.fn().mockResolvedValue([]),
       onOpenWindowsChanged: vi.fn(() => () => {}),
       openWorkspaceWindow,
+      onActivateTab: vi.fn(() => () => {}),
+    },
+    workspace: {
+      getLaunchTab: vi.fn(() => null),
+    },
+    welcome: {
+      isDismissed: vi.fn().mockResolvedValue(false),
     },
   };
   return { dragStart, dragActivate, dragMove, dragEnd, openWorkspaceWindow };
@@ -180,116 +187,29 @@ describe("Openp41geWindowManager skeleton drag", () => {
     expect(args[10]).toBe(40 - 20);
   });
 
-  it("steps the carousel between window skeletons via _gotoCarousel", () => {
-    wm._workspaces = [{ filePath: "/w/two", data: { name: "Two", windows: [{}, {}] } }] as never;
-    (wm as Wm)._gotoCarousel("/w/two", 1);
-    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);
-    expect(wm._carouselLive).toBe(false);
-    (wm as Wm)._gotoCarousel("/w/two", 0);
-    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(0);
-  });
+  it("opens a drag-out on a sideways move — the carousel swipe gesture is gone", () => {
+    withWindows(wm, "/w/two", 2);
+    down(wm, "/w/two", 300, 40, 450, 300);
+    move(wm, 230, 42, 380, 302); // well inside the window
 
-  it("clamps carousel navigation at the edges", () => {
-    wm._workspaces = [{ filePath: "/w/two", data: { name: "Two", windows: [{}, {}] } }] as never;
-    (wm as Wm)._gotoCarousel("/w/two", 9); // beyond last
-    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);
-    (wm as Wm)._gotoCarousel("/w/two", -3); // before first
-    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(0);
-  });
-
-  it("marks the carousel as live (no transition) while swiping, then clears it", () => {
-    wm._workspaces = [{ filePath: "/w/two", data: { name: "Two", windows: [{}, {}] } }] as never;
-    (wm as Wm)._drag = {
-      startX: 50,
-      startY: 40,
-      startScreenX: 200,
-      startScreenY: 300,
-      captureRect: null,
-      path: "/w/two",
-      label: "Two",
-      active: true,
-      mode: "carousel",
-      windowCount: 2,
-      baseIndex: 0,
-    } as never;
-    const move = new PointerEvent("pointermove", {
-      clientX: 10,
-      clientY: 42,
-      screenX: 160,
-      screenY: 302,
-    });
-    Object.defineProperty(move, "currentTarget", { value: { clientWidth: 132 } });
-    (wm as Wm)._onThumbPointerMove(move as PointerEvent);
-    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);
-    expect(wm._carouselLive).toBe(true);
-    (wm as Wm)._teardownDrag();
-    expect(wm._carouselLive).toBe(false);
-  });
-
-  it("opens on a fast sideways flick — a one-window workspace has no carousel to page", () => {
-    // Regression: the gesture used to be split on the dominant axis alone, so a
-    // quick drag-out (the skeleton sits at the left edge of the row, so it travels
-    // mostly sideways) was read as a carousel swipe and simply did nothing.
-    down(wm, "/w/one", 50, 40, 200, 300);
-    move(wm, 10, 42, 160, 302); // dx -40, dy 2 → sideways
-
+    // No matter how horizontal the move, there is no carousel to page — it is a
+    // drag-out.
     expect((wm._drag as { mode: string }).mode).toBe("open");
     expect(drags.dragStart).toHaveBeenCalledTimes(1);
     expect(drags.dragActivate).toHaveBeenCalledTimes(1);
   });
 
-  it("opens when a flick reaches the window edge, even with a carousel to page", () => {
-    withWindows(wm, "/w/two", 2);
-    down(wm, "/w/two", 50, 40, 200, 300);
-    move(wm, 1, 42, 151, 302); // already at the left edge → on its way out
-
-    expect((wm._drag as { mode: string }).mode).toBe("open");
-    expect(drags.dragStart).toHaveBeenCalledTimes(1);
-  });
-
-  it("still swipes the carousel on a deliberate sideways drag inside the row", () => {
-    withWindows(wm, "/w/two", 2);
-    down(wm, "/w/two", 300, 40, 450, 300);
-    move(wm, 230, 42, 380, 302); // a page's worth sideways, well inside the window
-
-    expect((wm._drag as { mode: string }).mode).toBe("carousel");
-    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(1);
-    expect(drags.dragStart).not.toHaveBeenCalled();
-  });
-
-  it("promotes a swipe to a drag-out once the pointer leaves the row", () => {
-    withWindows(wm, "/w/two", 2);
-    down(wm, "/w/two", 300, 40, 450, 300);
-    move(wm, 230, 42, 380, 302); // reads as a swipe on the first coarse sample
-    expect((wm._drag as { mode: string }).mode).toBe("carousel");
-
-    move(wm, 225, 110, 375, 370); // pulls off the row (dy > 3/4 of the skeleton)
-
-    expect((wm._drag as { mode: string }).mode).toBe("open");
-    // The carousel snaps back to where the press started — the swipe never happened.
-    expect((wm._carouselIndex as Map<string, number>).get("/w/two")).toBe(0);
-    expect(wm._carouselLive).toBe(false);
-    expect(drags.dragStart).toHaveBeenCalledTimes(1);
-    expect(drags.dragActivate).toHaveBeenCalledTimes(1);
-    expect(drags.dragMove).toHaveBeenCalled();
-  });
-
-  it("opens on a release outside the window even if the gesture read as a swipe", () => {
-    // A flick fast enough to leave the window before the next pointermove lands is
-    // still in carousel mode at release; the drop point is the real intent.
+  it("opens on a release outside the window", () => {
     withWindows(wm, "/w/two", 2);
     down(wm, "/w/two", 300, 40, 450, 300);
     move(wm, 230, 42, 380, 302);
-    expect((wm._drag as { mode: string }).mode).toBe("carousel");
 
     up(wm, 230, 42, window.screenX + window.outerWidth + 50, 302);
 
     expect(drags.openWorkspaceWindow).toHaveBeenCalledWith("/w/two");
-    // No ghost session was ever started, so there is nothing to end.
-    expect(drags.dragEnd).not.toHaveBeenCalled();
   });
 
-  it("does not open when a swipe is released inside the window", () => {
+  it("does not open when a drag is released inside the window", () => {
     withWindows(wm, "/w/two", 2);
     down(wm, "/w/two", 300, 40, 450, 300);
     move(wm, 230, 42, 380, 302);
@@ -380,5 +300,70 @@ describe("Openp41geWindowManager header search", () => {
     wm._exitSearch();
     expect(wm._searchOpen).toBe(false);
     expect(wm._searchQuery).toBe("");
+  });
+});
+
+describe("Openp41geWindowManager workspace row thumbnails", () => {
+  let wm: Wm;
+
+  beforeEach(() => {
+    stubWindow();
+    wm = new Openp41geWindowManager() as Wm;
+    (wm as Wm)._loaded = true;
+    document.body.appendChild(wm as unknown as HTMLElement);
+  });
+
+  afterEach(() => {
+    wm.remove();
+  });
+
+  function setWorkspace(windows: number): void {
+    (wm as Wm)._workspaces = [
+      { filePath: "/w/a", data: { name: "Alpha", windows: Array.from({ length: windows }, () => ({})) } },
+    ] as never;
+    return wm.requestUpdate();
+  }
+
+  it("shows at most 3 thumbnails and a +N more label", async () => {
+    setWorkspace(4);
+    await (wm as Wm).updateComplete;
+
+    const thumbs = wm.shadowRoot?.querySelectorAll(".ws-thumb");
+    expect(thumbs?.length).toBe(3);
+    const more = wm.shadowRoot?.querySelector(".ws-more");
+    expect(more?.textContent?.trim()).toBe("+ 1 more");
+    expect(wm.shadowRoot?.querySelector(".ws-chevron")).toBeNull();
+    expect(wm.shadowRoot?.querySelector(".ws-edit")).not.toBeNull();
+  });
+
+  it("omits the more label when 3 or fewer windows exist", async () => {
+    setWorkspace(3);
+    await (wm as Wm).updateComplete;
+
+    expect(wm.shadowRoot?.querySelectorAll(".ws-thumb")?.length).toBe(3);
+    expect(wm.shadowRoot?.querySelector(".ws-more")).toBeNull();
+  });
+
+  it("opens the workspace window on a row click", async () => {
+    setWorkspace(1);
+    await (wm as Wm).updateComplete;
+
+    const row = wm.shadowRoot?.querySelector(".ws-row");
+    row?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+
+    expect((window as unknown as { openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } } }).openp41ge.windowManager.openWorkspaceWindow).toHaveBeenCalledWith("/w/a");
+  });
+
+  it("opens the drawer on an edit-button click, without opening the window", async () => {
+    setWorkspace(1);
+    await (wm as Wm).updateComplete;
+
+    const edit = wm.shadowRoot?.querySelector<HTMLElement>(".ws-edit")!;
+    edit.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+
+    const om = (window as unknown as { openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } } }).openp41ge.windowManager.openWorkspaceWindow;
+    expect(om).not.toHaveBeenCalled();
+    expect((wm as Wm)._drawers).toHaveLength(1);
+    expect(((wm as Wm)._drawers as Array<{ workspacePath: string }>)[0].workspacePath).toBe("/w/a");
   });
 });

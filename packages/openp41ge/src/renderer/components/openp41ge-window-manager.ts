@@ -29,15 +29,12 @@ import { welcomePages } from "../content/welcome";
 const HOLD_MS = 350;
 /** Pointer travel past this many px starts an immediate drag (below the long-press hold). */
 const DRAG_THRESHOLD = 4;
-/** A carousel swipe has to be this much more horizontal than vertical. The skeleton
- *  sits at the left edge of the row, so pulling a workspace out of the window is
- *  itself a mostly-horizontal move — only a decisively sideways one is a swipe. */
-const SWIPE_AXIS_RATIO = 1.6;
-/** Vertical travel past this fraction of the skeleton's height ends a swipe: the
- *  pointer has left the row, so the gesture is a drag-out after all. */
-const SWIPE_EXIT_DY = 0.75;
-/** Within this many px of a window edge the pointer counts as on its way out. */
-const WINDOW_EDGE_MARGIN = 2;
+
+/** Mini workspace-window skeleton: width/height (at half the old carousel size). */
+const THUMB_W = 66;
+const THUMB_H = 42;
+/** Maximum window skeletons shown side by side in each workspace row. */
+const MAX_VISIBLE_THUMBS = 3;
 
 interface OpenWindowSummary {
   windowId: string;
@@ -89,16 +86,13 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _selectedRepos: Set<string> = new Set();
   @state() private _addingWorkspace = false;
   @state() private _workspaceDeleteMode = false;
+  /** Paths of workspaces selected in the list's delete mode. */
   @state() private _selectedWorkspaces: Set<string> = new Set();
   @state() private _addingWorktree = false;
   @state() private _worktreeDeleteMode = false;
   @state() private _selectedWorktrees: Set<string> = new Set();
   @state() private _crumbsOpen = false;
   @state() private _listOverflows = false;
-  /** Active carousel window index per workspace path (reactive — drives track + dots). */
-  @state() private _carouselIndex: Map<string, number> = new Map();
-  /** True while a carousel swipe follows the pointer (disables the slide transition). */
-  @state() private _carouselLive = false;
   /** The header is expanded into the workspace search bar. */
   @state() private _searchOpen = false;
   /** Raw text in the header search input. */
@@ -120,9 +114,7 @@ export class Openp41geWindowManager extends LitElement {
     path: string;
     label: string;
     active: boolean;
-    mode: "carousel" | "open" | null;
-    windowCount: number;
-    baseIndex: number;
+    mode: "open" | null;
   } | null = null;
   private _holdTimer: number | null = null;
   private _offEndSession: (() => void) | null = null;
@@ -327,7 +319,7 @@ export class Openp41geWindowManager extends LitElement {
     });
   }
 
-  /** Begin a pointer press on a workspace skeleton (drag-out or carousel swipe). */
+  /** Begin a pointer press on a workspace skeleton (drag-out). */
   private _onThumbPointerDown(e: PointerEvent, path: string, isOpen: boolean): void {
     if (e.button !== 0) return;
     // An already-open workspace isn't an interactive drag handle — avoid a second
@@ -335,7 +327,6 @@ export class Openp41geWindowManager extends LitElement {
     if (isOpen) return;
     this._teardownDrag();
     const ws = this._workspaces.find((w) => w.filePath === path);
-    const winCount = ws?.data.windows?.length ?? 1;
     const thumb = e.currentTarget as HTMLElement;
     const rect = thumb.getBoundingClientRect();
     const captureRect = {
@@ -360,8 +351,6 @@ export class Openp41geWindowManager extends LitElement {
       label: ws?.data.name?.trim() || "Unnamed",
       active: false,
       mode: null,
-      windowCount: Math.max(1, winCount),
-      baseIndex: this._carouselIndex.get(path) ?? 0,
     };
     try {
       thumb.setPointerCapture?.(e.pointerId);
@@ -391,8 +380,8 @@ export class Openp41geWindowManager extends LitElement {
    * ghost can leave the window. Passes the skeleton's capture rect so the main
    * process swaps in a bitmap of the actual skeleton (not just a label). The
    * window opens on the drop, only if the cursor is outside this window at
-   * release. Called from the long-press, from the first move past the threshold,
-   * and when a carousel swipe turns out to be a drag-out.
+   * release. Called from the long-press and from the first move past the
+   * threshold.
    */
   private _startOpenDrag(screenX: number, screenY: number): void {
     const drag = this._drag;
@@ -406,8 +395,8 @@ export class Openp41geWindowManager extends LitElement {
       undefined,
       undefined,
       undefined,
-      132,
-      84,
+      THUMB_W,
+      THUMB_H,
       drag.offsetX,
       drag.offsetY,
       "workspace",
@@ -425,75 +414,30 @@ export class Openp41geWindowManager extends LitElement {
     }
   }
 
-  /** True once the pointer is at (or past) a window edge, so the gesture is on its
-   * way out of the window rather than staying in the row. */
-  private _headingOutOfWindow(x: number, y: number): boolean {
-    const m = WINDOW_EDGE_MARGIN;
-    return x <= m || y <= m || x >= window.innerWidth - m || y >= window.innerHeight - m;
-  }
-
-  /** True when a carousel swipe has stopped looking like one: the pointer left the
-   * row vertically, or it is heading out of the window. Either way the user is
-   * pulling the workspace out, not paging its windows. */
-  private _swipeBroken(x: number, y: number): boolean {
-    const drag = this._drag;
-    if (!drag) return false;
-    const rect = drag.captureRect;
-    if (rect && Math.abs(y - drag.startY) > rect.height * SWIPE_EXIT_DY) return true;
-    return this._headingOutOfWindow(x, y);
-  }
-
   /**
-   * Once the drag passes the threshold, decide the gesture.
-   *
-   * Everything is a drag-out unless it reads unmistakably as a carousel swipe: a
-   * workspace with more than one window, a decisively horizontal move, and a
-   * pointer still inside the window. A drag-out starts from a skeleton at the left
-   * edge of the row, so it is mostly horizontal too — the old "dominant axis" split
-   * handed a fast sideways flick to the carousel (and to nothing at all for a
-   * single-window workspace, which has no carousel to page).
-   *
-   * The call also stays revisable: the first pointermove of a fast flick is one
-   * coarse sample, so a "swipe" that later leaves the row or reaches the window
-   * edge is promoted to a drag-out mid-gesture.
+   * Once the drag passes the threshold it is always a drag-out (the carousel is
+   * gone, so there is no swipe gesture to disambiguate). A drag means the
+   * following row click is not a navigation — suppress it so the workspace
+   * doesn't open over the drag. Cleared by the next pointerdown (see
+   * _onPointerDown) or by the row click itself.
    */
   private _onThumbPointerMove(e: PointerEvent): void {
     const drag = this._drag;
     if (!drag) return;
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
-    if (!drag.active) {
-      // A small movement kickstarts the drag immediately — the long-press hold
-      // delay is only for grab-and-hold with no movement, not for a quick drag.
-      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-      // A real drag beat the long-press timer — cancel the pending pickup.
-      this._clearHoldTimer();
-      drag.active = true;
-      // A drag/swipe means the following row click is not a navigation — suppress
-      // it so the drawer doesn't pop open over the drag. Cleared by the next
-      // pointerdown (see _onPointerDown) or by the row click itself.
-      this._suppressClick = true;
-      const isSwipe =
-        drag.windowCount > 1 &&
-        Math.abs(dx) > Math.abs(dy) * SWIPE_AXIS_RATIO &&
-        !this._swipeBroken(e.clientX, e.clientY);
-      if (isSwipe) drag.mode = "carousel";
-      else this._startOpenDrag(e.screenX, e.screenY);
-    } else if (drag.mode === "carousel" && this._swipeBroken(e.clientX, e.clientY)) {
-      // The swipe turned into a pull away from the row — snap the carousel back to
-      // where the press started and pick the workspace up instead.
-      this._setCarouselIndex(drag.path, drag.baseIndex, false);
-      this._startOpenDrag(e.screenX, e.screenY);
+    if (drag.active) {
+      if (drag.mode === "open") window.openp41ge.drag.move(e.screenX, e.screenY);
+      return;
     }
-    if (drag.mode === "open") {
-      window.openp41ge.drag.move(e.screenX, e.screenY);
-    } else if (drag.mode === "carousel") {
-      const width = (e.currentTarget as HTMLElement).clientWidth || 132;
-      const step = Math.max(20, width / 2);
-      const pages = Math.round(dx / step);
-      const idx = Math.max(0, Math.min(drag.windowCount - 1, drag.baseIndex - pages));
-      this._setCarouselIndex(drag.path, idx, true);
-    }
+    // A small movement kickstarts the drag immediately — the long-press hold
+    // delay is only for grab-and-hold with no movement, not for a quick drag.
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    // A real drag beat the long-press timer — cancel the pending pickup.
+    this._clearHoldTimer();
+    drag.active = true;
+    this._suppressClick = true;
+    this._startOpenDrag(e.screenX, e.screenY);
   }
 
   /** Release: open the workspace only if the cursor was outside this window at the drop. */
@@ -515,10 +459,7 @@ export class Openp41geWindowManager extends LitElement {
       e.screenY > window.screenY + window.outerHeight;
     // Only an open drag has a ghost session to tear down.
     if (mode === "open") window.openp41ge.drag.end();
-    // A release outside this window opens the workspace whatever we read the
-    // gesture as. A flick fast enough to leave the window before the next
-    // pointermove lands can still be sitting in carousel mode here, and the drop
-    // point is the real signal of intent.
+    // A release outside this window opens the workspace.
     if (outside) this._openWorkspaceWindow(path);
   }
 
@@ -530,25 +471,9 @@ export class Openp41geWindowManager extends LitElement {
     this._teardownDrag();
   }
 
-  /** Move the carousel to index `idx` for a workspace path. `live` = follows the pointer (no animation). */
-  private _setCarouselIndex(path: string, idx: number, live: boolean): void {
-    const cur = this._carouselIndex.get(path) ?? 0;
-    if (cur === idx && this._carouselLive === live) return;
-    this._carouselLive = live;
-    this._carouselIndex = new Map(this._carouselIndex).set(path, idx);
-  }
-
-  /** Arrow click: step to the previous/next window skeleton (animated). */
-  private _gotoCarousel(path: string, idx: number): void {
-    const count = this._workspaces.find((w) => w.filePath === path)?.data.windows?.length ?? 1;
-    const clamped = Math.max(0, Math.min(count - 1, idx));
-    this._setCarouselIndex(path, clamped, false);
-  }
-
   private _teardownDrag(): void {
     this._clearHoldTimer();
     this._drag = null;
-    this._carouselLive = false;
   }
 
   /** A fresh pointer press marks the end of any drag-follow-up click window. */
@@ -1909,7 +1834,7 @@ export class Openp41geWindowManager extends LitElement {
         li.ws-row {
           position: relative;
           display: flex;
-          align-items: stretch;
+          align-items: center;
           gap: 12px;
           padding: 16px;
           cursor: pointer;
@@ -1972,29 +1897,28 @@ export class Openp41geWindowManager extends LitElement {
         .ws-pill--open:hover {
           background: rgba(86, 156, 214, 0.25);
         }
-        .ws-chevron {
-          flex-shrink: 0;
-          display: block;
-          align-self: center;
-          color: var(--accent, #569cd6);
-        }
 
-        /* Skeleton + its carousel dots stacking. The dots stay inside the row's
-           bottom padding area, absolutely positioned so they never push content. */
-        .ws-thumb-wrap {
-          position: relative;
+        /* Inline row of mini workspace-window skeletons (up to 3) sitting at the
+           row's right edge, just before the edit button. */
+        .ws-thumbs {
           display: flex;
-          flex-direction: column;
           align-items: center;
+          gap: 6px;
           flex-shrink: 0;
-          align-self: flex-start;
+        }
+        .ws-more {
+          color: var(--text-secondary, #999);
+          font-size: 11px;
+          white-space: nowrap;
+          user-select: none;
         }
 
-        /* Mini workspace-window skeleton: title bar + carousel of window layouts. */
+        /* Mini workspace-window skeleton: title bar + window layout, half the
+           old carousel height. */
         .ws-thumb {
           position: relative;
-          width: 132px;
-          height: 84px;
+          width: 66px;
+          height: 42px;
           flex-shrink: 0;
           border-radius: 6px;
           background: var(--bg, #1e1e1e);
@@ -2010,153 +1934,84 @@ export class Openp41geWindowManager extends LitElement {
         .ws-row--open .ws-thumb {
           cursor: default;
         }
-        .ws-thumb--skeleton {
-          opacity: 0.75;
-          animation: ws-skeleton-pulse 1.3s ease-in-out infinite;
-        }
         .ws-thumb-chrome {
-          height: 12px;
+          height: 7px;
           flex-shrink: 0;
           background: var(--bg-secondary, #161616);
           border-bottom: 1px solid var(--divider, #333);
           display: flex;
           align-items: center;
-          gap: 3px;
-          padding: 0 5px;
+          gap: 2px;
+          padding: 0 4px;
         }
         .ws-thumb-dot {
-          width: 4px;
-          height: 4px;
+          width: 3px;
+          height: 3px;
           border-radius: 50%;
           background: var(--text-secondary, #999);
           opacity: 0.55;
-        }
-        .ws-carousel {
-          flex: 1;
-          min-height: 0;
-          overflow: hidden;
-          display: flex;
-        }
-        .ws-carousel-track {
-          display: flex;
-          height: 100%;
-          width: 100%;
-          will-change: transform;
-          transition: transform 0.25s ease;
-        }
-        /* While a swipe follows the pointer, disable the slide transition. */
-        .ws-carousel-track--live {
-          transition: none;
-        }
-        .ws-win {
-          flex: 0 0 100%;
-          display: flex;
-          flex-direction: column;
-          min-width: 0;
-          min-height: 0;
         }
         .ws-win-body {
           flex: 1;
           min-height: 0;
           display: flex;
-          gap: 3px;
-          padding: 4px;
+          gap: 2px;
+          padding: 3px;
           min-width: 0;
         }
         .ws-win-side {
-          width: 18px;
+          width: 12px;
           flex-shrink: 0;
           background: var(--bg-secondary, #161616);
-          border-radius: 3px;
+          border-radius: 2px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 2px;
-          padding: 4px 0;
+          gap: 1px;
+          padding: 2px 0;
         }
         .ws-thumb-side-row {
-          width: 12px;
-          height: 4px;
-          border-radius: 2px;
+          width: 8px;
+          height: 2px;
+          border-radius: 1px;
           background: var(--bg-active, #37373d);
         }
         .ws-win-grid {
           flex: 1;
           display: flex;
-          gap: 3px;
+          gap: 2px;
           min-width: 0;
         }
         .ws-thumb-cell {
           flex: 1 1 0;
           min-width: 0;
           background: var(--bg-active, #37373d);
-          border-radius: 3px;
+          border-radius: 2px;
         }
-        /* Carousel page dots — absolutely positioned just below the skeleton so
-           they add no height, but a few px above the row's bottom separator. */
-        .ws-carousel-dots {
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: -9px;
-          display: flex;
-          justify-content: center;
-          gap: 3px;
-          pointer-events: none;
-        }
-        .ws-dot {
-          width: 4px;
-          height: 4px;
-          border-radius: 50%;
-          background: var(--text-secondary, #999);
-          opacity: 0.4;
-        }
-        .ws-dot--active {
-          opacity: 1;
-          background: var(--accent, #569cd6);
-        }
-        /* Hover arrows to step the carousel to the next/previous window skeleton. */
-        .ws-carousel-arrow {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 18px;
-          height: 18px;
+
+        /* Edit (pencil) button replacing the old chevron: rounded + hover bg. */
+        .ws-edit {
+          flex-shrink: 0;
+          align-self: center;
+          width: 28px;
+          height: 28px;
           padding: 0;
-          border-radius: 50%;
           border: none;
-          background: rgba(0, 0, 0, 0.35);
-          color: var(--text-primary, #ddd);
+          border-radius: 6px;
+          background: transparent;
+          color: var(--text-secondary, #999);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          opacity: 0;
-          pointer-events: none;
-          transition:
-            opacity 0.12s ease,
-            background 0.12s ease;
-          z-index: 2;
+          transition: background 0.1s ease, color 0.1s ease;
         }
-        .ws-carousel-arrow:hover {
-          background: rgba(0, 0, 0, 0.55);
+        .ws-edit:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
         }
-        .ws-carousel-arrow svg {
+        .ws-edit svg {
           display: block;
-        }
-        .ws-carousel-arrow:disabled {
-          opacity: 0;
-          pointer-events: none;
-        }
-        .ws-carousel-arrow--prev {
-          left: 4px;
-        }
-        .ws-carousel-arrow--next {
-          right: 4px;
-        }
-        .ws-thumb:hover .ws-carousel-arrow {
-          opacity: 1;
-          pointer-events: auto;
         }
         /* Workspace-list delete mode + inline "new workspace" row. */
         .ws-row--select {
@@ -2214,13 +2069,6 @@ export class Openp41geWindowManager extends LitElement {
           width: 64px;
           height: 16px;
           border-radius: 999px;
-        }
-        .ws-skeleton--chevron {
-          align-self: center;
-          width: 16px;
-          height: 16px;
-          border-radius: 4px;
-          background: rgba(86, 156, 214, 0.35);
         }
         .empty {
           color: var(--text-secondary, #777);
@@ -2931,25 +2779,6 @@ export class Openp41geWindowManager extends LitElement {
                           this._addingWorkspace
                             ? html`
                                 <li class="ws-row ws-row--new">
-                                  <div class="ws-thumb ws-thumb--skeleton">
-                                    <div class="ws-carousel">
-                                      <div class="ws-carousel-track">
-                                        <div class="ws-win">
-                                          <div class="ws-thumb-chrome">
-                                            <span class="ws-thumb-dot"></span
-                                            ><span class="ws-thumb-dot"></span
-                                            ><span class="ws-thumb-dot"></span>
-                                          </div>
-                                          <div class="ws-win-body">
-                                            <div class="ws-win-grid">
-                                              <div class="ws-thumb-cell"></div>
-                                              <div class="ws-thumb-cell"></div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
                                   <div class="ws-info">
                                     <input
                                       class="wm-new-ws-input"
@@ -2968,7 +2797,6 @@ export class Openp41geWindowManager extends LitElement {
                                       <span class="ws-skeleton ws-skeleton--pill"></span>
                                     </div>
                                   </div>
-                                  <span class="ws-skeleton ws-skeleton--chevron"></span>
                                 </li>
                               `
                             : nothing
@@ -2986,14 +2814,37 @@ export class Openp41geWindowManager extends LitElement {
                           const leftOpen = !!shared?.leftSidebarOpen;
                           const rightOpen = !!shared?.rightSidebarOpen;
                           const wins = windows.length > 0 ? windows : [undefined];
-                          const idx = Math.min(
-                            this._carouselIndex.get(w.filePath) ?? 0,
-                            wins.length - 1,
-                          );
+                          const visibleWins = wins.slice(0, MAX_VISIBLE_THUMBS);
+                          const moreCount = wins.length - visibleWins.length;
                           const isLast = i === filtered.length - 1;
                           const sideRows = html`<span class="ws-thumb-side-row"></span
                             ><span class="ws-thumb-side-row"></span
                             ><span class="ws-thumb-side-row"></span>`;
+                          const renderThumb = (
+                            win: { grid?: { placements?: unknown[]; cols?: number } } | undefined,
+                          ) => html`
+                            <div
+                              class="ws-thumb"
+                              @pointerenter=${(e: PointerEvent) => this._onThumbPointerEnter(e, w.filePath, isOpen)}
+                              @pointerdown=${(e: PointerEvent) => this._onThumbPointerDown(e, w.filePath, isOpen)}
+                              @pointermove=${this._onThumbPointerMove}
+                              @pointerup=${this._onThumbPointerUp}
+                              @pointercancel=${this._onThumbPointerCancel}
+                            >
+                              <div class="ws-thumb-chrome">
+                                <span class="ws-thumb-dot"></span
+                                ><span class="ws-thumb-dot"></span
+                                ><span class="ws-thumb-dot"></span>
+                              </div>
+                              <div class="ws-win-body">
+                                ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                <div class="ws-win-grid">
+                                  ${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}
+                                </div>
+                                ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                              </div>
+                            </div>
+                          `;
                           return html`
                             <li
                               class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
@@ -3005,104 +2856,9 @@ export class Openp41geWindowManager extends LitElement {
                                 }
                                 if (this._workspaceDeleteMode)
                                   this._toggleWorkspaceSelection(w.filePath);
-                                else this._openWorkspace(w);
+                                else this._openWorkspaceWindow(w.filePath);
                               }}
                             >
-                              <div class="ws-thumb-wrap">
-                                <div
-                                  class="ws-thumb"
-                                  @pointerenter=${(e: PointerEvent) => this._onThumbPointerEnter(e, w.filePath, isOpen)}
-                                  @pointerdown=${(e: PointerEvent) => this._onThumbPointerDown(e, w.filePath, isOpen)}
-                                  @pointermove=${this._onThumbPointerMove}
-                                  @pointerup=${this._onThumbPointerUp}
-                                  @pointercancel=${this._onThumbPointerCancel}
-                                >
-                                  <div class="ws-carousel">
-                                    <div
-                                      class="ws-carousel-track ${this._carouselLive ? "ws-carousel-track--live" : ""}"
-                                      style="transform: translateX(${-idx * 100}%)"
-                                    >
-                                      ${wins.map(
-                                        (win) => html`
-                                          <div class="ws-win">
-                                            <div class="ws-thumb-chrome">
-                                              <span class="ws-thumb-dot"></span
-                                              ><span class="ws-thumb-dot"></span
-                                              ><span class="ws-thumb-dot"></span>
-                                            </div>
-                                            <div class="ws-win-body">
-                                              ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
-                                              <div class="ws-win-grid">
-                                                ${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}
-                                              </div>
-                                              ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
-                                            </div>
-                                          </div>
-                                        `,
-                                      )}
-                                    </div>
-                                  </div>
-                                  ${
-                                    wins.length > 1
-                                      ? html`
-                                          <button
-                                            class="ws-carousel-arrow ws-carousel-arrow--prev"
-                                            ?disabled=${idx === 0}
-                                            aria-label="Previous window"
-                                            @pointerdown=${(e: Event) => e.stopPropagation()}
-                                            @click=${(e: Event) => {
-                                              e.stopPropagation();
-                                              this._gotoCarousel(w.filePath, idx - 1);
-                                            }}
-                                          >
-                                            <svg
-                                              width="10"
-                                              height="10"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              stroke-width="3"
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                            >
-                                              <path d="M15 18l-6-6 6-6" />
-                                            </svg>
-                                          </button>
-                                          <button
-                                            class="ws-carousel-arrow ws-carousel-arrow--next"
-                                            ?disabled=${idx === wins.length - 1}
-                                            aria-label="Next window"
-                                            @pointerdown=${(e: Event) => e.stopPropagation()}
-                                            @click=${(e: Event) => {
-                                              e.stopPropagation();
-                                              this._gotoCarousel(w.filePath, idx + 1);
-                                            }}
-                                          >
-                                            <svg
-                                              width="10"
-                                              height="10"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              stroke-width="3"
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                            >
-                                              <path d="M9 18l6-6-6-6" />
-                                            </svg>
-                                          </button>
-                                        `
-                                      : nothing
-                                  }
-                                </div>
-                                ${
-                                  wins.length > 1
-                                    ? html`<div class="ws-carousel-dots">
-                                        ${wins.map((_win, wi) => html`<span class="ws-dot ${wi === idx ? "ws-dot--active" : ""}"></span>`)}
-                                      </div>`
-                                    : nothing
-                                }
-                              </div>
                               <div class="ws-info">
                                 <div class="ws-name">${name}</div>
                                 <div class="ws-meta">
@@ -3132,24 +2888,39 @@ export class Openp41geWindowManager extends LitElement {
                                       `
                                 }
                               </div>
+                              <div class="ws-thumbs">
+                                ${visibleWins.map(renderThumb)}
+                                ${
+                                  moreCount > 0
+                                    ? html`<span class="ws-more">+ ${moreCount} more</span>`
+                                    : nothing
+                                }
+                              </div>
                               ${
                                 this._workspaceDeleteMode
                                   ? html`<span
                                       class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"
                                     ></span>`
-                                  : html`<svg
-                                      class="ws-chevron"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      stroke-width="2"
-                                      stroke-linecap="round"
-                                      stroke-linejoin="round"
-                                    >
-                                      <path d="M9 6l6 6-6 6" />
-                                    </svg>`
+                                  : html`
+                                      <button
+                                        class="ws-edit"
+                                        aria-label="Edit ${name}"
+                                        @click=${(e: Event) => {
+                                          e.stopPropagation();
+                                          this._openWorkspace(w);
+                                        }}
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="16"
+                                          height="16"
+                                          viewBox="0 -960 960 960"
+                                          fill="currentColor"
+                                        >
+                                          <path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/>
+                                        </svg>
+                                      </button>
+                                    `
                               }
                             </li>
                           `;
