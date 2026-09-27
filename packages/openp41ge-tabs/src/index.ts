@@ -39,6 +39,7 @@ export type { GhostColumn } from "./ghost-layout";
 export { CursorManager } from "./cursor-manager";
 
 // ─── Boundary / utilities ─────────────────────────────────────────────────
+export { DROP_TIP_OVERDRAW_LENGTH, attachDropTipVerticalOverdraws } from "./drop-tip-overdraw";
 export {
   INSERT_BOUNDARY_THRESHOLD,
   classifyGridPosition,

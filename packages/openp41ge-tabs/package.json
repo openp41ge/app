@@ -43,6 +43,10 @@
     "./targets/tab-bar-drop-target": {
       "types": "./dist/targets/tab-bar-drop-target.d.ts",
       "import": "./dist/targets/tab-bar-drop-target.js"
+    },
+    "./drop-tip-overdraw": {
+      "types": "./dist/drop-tip-overdraw.d.ts",
+      "import": "./dist/drop-tip-overdraw.js"
     }
   },
   "main": "dist/index.js",

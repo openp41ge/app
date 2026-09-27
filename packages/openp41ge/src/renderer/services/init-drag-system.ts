@@ -2665,8 +2665,13 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
     return _getManagerTabBarTarget(clientX, clientY);
   }
 
+  // Accept any Element (including SVG): the tab icon is an inline <svg>, and
+  // elementFromPoint returns the SVG element (not an HTMLElement), which would
+  // otherwise fail the instanceof guard and break target resolution — hiding
+  // every drop indicator when the cursor crosses a tab icon. Element.closest
+  // works on SVG too, and every selector below resolves to an HTMLElement.
   const el = document.elementFromPoint(clientX, clientY);
-  if (!el || !(el instanceof HTMLElement)) return null;
+  if (!el) return null;
 
   // The sidebar side of the current drag, if it is a sidebar-tab drag. Read from
   // the live source during moves, or from _sidebarTabDragSide for the final

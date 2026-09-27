@@ -11,6 +11,7 @@ import { property } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { TabBarDropTarget } from "openp41ge-tabs/targets/tab-bar-drop-target";
 import { getDropIndexInBar, getTabButtonsInBar } from "openp41ge-tabs/boundary";
+import { attachDropTipVerticalOverdraws } from "openp41ge-tabs/drop-tip-overdraw";
 import { attachDropTipOverdraws } from "../overdraw-line/corner-accent";
 
 /** Scroll speed for overflowing tab text (pixels per second). */
@@ -222,8 +223,11 @@ export class TabBar extends LitElement {
         "position:absolute;top:0;bottom:0;width:3px;background:rgb(74,158,255);box-shadow:0 0 10px rgba(74,158,255,0.6);display:none;pointer-events:none;z-index:10;";
       barEl.style.position = "relative";
       // Full-height, square, cross-capped at both tips (top + bottom overdraw
-      // ticks), matching the tab-reorder indicator from the tabs package.
+      // ticks) and continuing past the bar's top/bottom edges (vertical
+      // overdraw strokes), matching the tab-reorder indicator from the tabs
+      // package.
       attachDropTipOverdraws(this._indicatorEl);
+      attachDropTipVerticalOverdraws(this._indicatorEl);
       barEl.appendChild(this._indicatorEl);
     }
   }

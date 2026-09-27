@@ -48,8 +48,10 @@ export type TargetResolver = (clientX: number, clientY: number) => IDropTarget |
  * Default target resolver using elementFromPoint + closest selectors.
  */
 export function defaultTargetResolver(clientX: number, clientY: number): IDropTarget | null {
+  // Accept any Element (including SVG icons): elementFromPoint returns the
+  // SVG element, and `closest` (on Element) still resolves the HTML ancestors.
   const el = document.elementFromPoint(clientX, clientY);
-  if (!el || !(el instanceof HTMLElement)) return null;
+  if (!el) return null;
 
   // Check for tab bar
   const tabBarEl = el.closest?.(".cell-tab-bar");

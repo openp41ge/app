@@ -412,6 +412,11 @@ describe("SidebarDropTarget tab-bar indicator geometry", () => {
 
     const ind = document.querySelector<HTMLElement>(".sidebar-drop-indicator");
     expect(ind).not.toBeNull();
+    // A plain div (NOT <drop-line>) so its light-DOM children render; it
+    // carries the same 3px blue + glow look itself.
+    expect(ind!.tagName).toBe("DIV");
+    expect(ind!.style.width).toBe("3px");
+    expect(ind!.style.background).toContain("rgb(74, 158, 255");
     // Flush with the tab bar's top and bottom edges (previously inset 4px).
     expect(ind!.style.top).toBe("0px");
     expect(ind!.style.bottom).toBe("0px");
@@ -421,6 +426,9 @@ describe("SidebarDropTarget tab-bar indicator geometry", () => {
     // Four blue overdraw ticks: a left+right pair at each tip.
     const ticks = Array.from(ind!.querySelectorAll("overdraw-line"));
     expect(ticks).toHaveLength(4);
+    // Plus the two fixed vertical overdraw strokes (up + down) continuing
+    // past the bar's top/bottom edges.
+    expect(ind!.querySelectorAll(".drop-tip-vod-up, .drop-tip-vod-down")).toHaveLength(2);
     expect(ticks.map((t) => t.getAttribute("dir"))).toEqual(["left", "right", "left", "right"]);
     expect(ticks[0].style.top).toBe("0px");
     expect(ticks[2].style.top).toBe("calc(100% - 1px)");

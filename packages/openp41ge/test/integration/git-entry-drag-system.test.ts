@@ -286,6 +286,37 @@ describe("git-entry drag wiring (init-drag-system)", () => {
     row.remove();
   });
 
+  it("openp41geTargetResolver resolves a tab drag over a tab icon (an SVG element)", () => {
+    // jsdom returns the SVG element under the cursor when hovering a tab's
+    // file icon. The old guard required an HTMLElement and bailed for SVG —
+    // hiding every drop indicator the moment the cursor crossed a tab icon.
+    const bar = document.createElement("tab-bar");
+    const btn = document.createElement("div");
+    btn.className = "tab-btn";
+    btn.setAttribute("data-tab-id", "t1");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    btn.appendChild(svg);
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+
+    const fake = { type: "tab-bar" } as unknown as { type: string };
+    // The <tab-bar> component exposes a readonly dropTarget getter; shadow it
+    // with an own writable property so the resolver's `closest` lookup finds it.
+    Object.defineProperty(bar, "dropTarget", { value: fake, writable: true });
+
+    (
+      document as unknown as { elementFromPoint: (x: number, y: number) => Element }
+    ).elementFromPoint = () => svg;
+
+    try {
+      const target = openp41geTargetResolver(300, 300);
+      expect(target).toBe(fake);
+    } finally {
+      bar.remove();
+      delete (document as unknown as { elementFromPoint?: unknown }).elementFromPoint;
+    }
+  });
+
   it("cross-window open-tab drop over the grid opens the git-repository pane (session ended)", async () => {
     // Seed a remote open-tab drag session (as if another window dragged a
     // worktree row) and drop it over THIS window's grid.

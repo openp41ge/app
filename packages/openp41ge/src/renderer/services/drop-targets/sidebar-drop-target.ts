@@ -33,6 +33,7 @@ export function setSidebarDropFeedbackSuppressed(v: boolean): void {
 
 import { SIDEBAR_DROP_EVENT, SIDEBAR_TAB_BUTTON_SELECTOR } from "openp41ge-constants";
 import { attachDropTipOverdraws } from "openp41ge-uikit/overdraw-line";
+import { attachDropTipVerticalOverdraws } from "openp41ge-uikit";
 
 export function getTabButtonsInSidebarBar(bar: HTMLElement): HTMLElement[] {
   return Array.from(bar.querySelectorAll(SIDEBAR_TAB_BUTTON_SELECTOR)).filter(
@@ -230,20 +231,29 @@ export class SidebarDropTarget implements IDropTarget {
 
     // ── Tab bar drop indicator line ────────────────────────────────
     if (!this._indicatorEl || !this.element.contains(this._indicatorEl)) {
-      this._indicatorEl = document.createElement("drop-line");
+      // A plain div (NOT a <drop-line>): the drop-line renders in shadow DOM
+      // with no slot, so its appended children (the overdraw ticks) would never
+      // paint. A plain div's light-DOM children render, matching the grid's
+      // tab-reorder indicator exactly.
+      this._indicatorEl = document.createElement("div");
       this._indicatorEl.className = "sidebar-drop-indicator";
       this._indicatorEl.style.cssText = [
         "position:absolute",
         "top:0",
         "bottom:0",
+        "width:3px",
+        "background:rgb(74,158,255)",
+        "box-shadow:0 0 10px rgba(74,158,255,0.6)",
         "display:none",
         "pointer-events:none",
         "z-index:31",
         "border-radius:0",
       ].join(";");
       // Full-height, square, cross-capped at both tips (top + bottom overdraw
-      // ticks extend the blue line's tips outward, like the overdraw family).
+      // ticks extend the blue line's tips outward) and continuing past the
+      // bar's top/bottom edges (vertical overdraw strokes).
       attachDropTipOverdraws(this._indicatorEl);
+      attachDropTipVerticalOverdraws(this._indicatorEl);
       this.element.appendChild(this._indicatorEl);
     }
 

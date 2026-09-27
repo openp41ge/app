@@ -71,6 +71,7 @@ export {
   isSameFilePathInCell,
 } from "openp41ge-tabs/boundary";
 export type { GridPosition } from "openp41ge-tabs/boundary";
+export { DROP_TIP_OVERDRAW_LENGTH, attachDropTipVerticalOverdraws } from "openp41ge-tabs/drop-tip-overdraw";
 
 // ─── File Editor Component ────────────────────────────────────────────────
 export { FileEditorElement } from "./components/file-editor/file-editor";

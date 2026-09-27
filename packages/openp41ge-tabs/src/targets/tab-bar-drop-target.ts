@@ -12,6 +12,7 @@
 
 import type { IDragSource, IDropTarget, DragResult, TargetFeedback } from "../interfaces";
 import { getDropIndexInBar, getTabButtonsInBar } from "../boundary";
+import { attachDropTipVerticalOverdraws } from "../drop-tip-overdraw";
 
 /**
  * Event types dispatched by TabBarDropTarget.
@@ -41,9 +42,11 @@ export class TabBarDropTarget implements IDropTarget {
     return this._col;
   }
 
-  onHover(_source: IDragSource, clientX: number, _clientY: number): TargetFeedback | null {
+  onHover(source: IDragSource, clientX: number, _clientY: number): TargetFeedback | null {
     const dropIndex = getDropIndexInBar(this.element, clientX);
-    this._showIndicator(dropIndex);
+    // A same-cell drag that lands on the tab's own position is a no-op
+    // reorder — never show the insert line there (the drop would not move it).
+    this._showIndicator(this._isNoOpReorder(source, dropIndex) ? -1 : dropIndex);
     return { indicatorKey: `tab-bar-${this.winId}-${this._col}`, overTabBar: true };
   }
 
@@ -92,6 +95,23 @@ export class TabBarDropTarget implements IDropTarget {
     this._hideIndicator();
   }
 
+  /** A same-cell reorder that would not change the tab's index (same
+   *  position, or immediately after itself) is a no-op and must not show an
+   *  indicator. Cross-cell drags (the dragged tab isn't in this bar) always
+   *  show one. Mirrors onDrop's refusal condition. */
+  private _isNoOpReorder(source: IDragSource, dropIndex: number): boolean {
+    const data = source.getDragData();
+    if (data?.type !== "tab") return false;
+    const tabButtons = this.element.querySelectorAll<HTMLElement>(
+      "openp41ge-tab-button, .tab-btn, [data-tab-id]",
+    );
+    const fromIndex = Array.from(tabButtons).findIndex(
+      (btn) => btn.getAttribute("data-tab-id") === data.tabId,
+    );
+    if (fromIndex < 0) return false;
+    return dropIndex === fromIndex || dropIndex === fromIndex + 1;
+  }
+
   private _fire(type: string, detail: Record<string, unknown>): void {
     this.element.dispatchEvent(new CustomEvent(type, { bubbles: true, detail }));
   }
@@ -130,7 +150,14 @@ export class TabBarDropTarget implements IDropTarget {
       this._indicatorEl.style.cssText =
         "position:absolute;top:0;bottom:0;width:3px;background:rgb(74,158,255);box-shadow:0 0 10px rgba(74,158,255,0.6);display:none;pointer-events:none;z-index:10;";
       this._attachTipOverdraws();
+      attachDropTipVerticalOverdraws(this._indicatorEl);
       this.element.appendChild(this._indicatorEl);
+    }
+
+    // Signal a no-op reorder by hiding the line entirely (no display/left set).
+    if (dropIndex < 0) {
+      this._hideIndicator();
+      return;
     }
 
     // Use same element set as getDropIndexInBar — exclude injected overlays
