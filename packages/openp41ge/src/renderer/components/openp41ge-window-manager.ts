@@ -37,30 +37,47 @@ const THUMB_H = 42;
 const MAX_VISIBLE_THUMBS = 3;
 
 /**
- * Attach an `up` overdraw continuation to a footer button's edge separator.
+ * Attach an edge overdraw continuation to a button's edge separator.
  *
  * The separator is the button's own 1px border on its left or right edge. The
- * line extends that border up past the footer's top border so the separator
- * appears to bleed upward. `side` selects which edge carries the separator; the
- * line is offset by the 1px border width because an absolutely-positioned child
- * anchors to the padding box (one border-width inside the border-box edge).
+ * line extends that border past the button's top (`up`, at `bottom:100%`) or
+ * bottom (`down`, at `top:100%`) edge so the divider appears to continue
+ * outward. `side` selects which edge carries the separator; the line is offset
+ * by the 1px border width because an absolutely-positioned child anchors to
+ * the padding box (one border-width inside the border-box edge).
+ *
+ * A `zIndex` lifts the line into the enclosing stacking context (no ancestor is
+ * given a stacking context by this helper), so an accent can paint above a
+ * sibling overlay that would otherwise cover it.
  *
  * Idempotent — guarded by `data-overdraw` so repeated calls (e.g. after delete
  * mode toggles and the buttons are recreated) never duplicate the line. The
  * host is made `position: relative` so the line resolves against it.
  */
-function attachTopEdgeOverdraw(host: HTMLElement, side: "left" | "right"): void {
-  const key = side === "right" ? "up-top-r" : "up-top-l";
-  if (host.dataset.overdraw === key) return;
-  host.dataset.overdraw = key;
+function attachEdgeOverdraw(
+  host: HTMLElement,
+  side: "left" | "right",
+  dir: "up" | "down",
+  zIndex?: string,
+): void {
+  // A host can carry several overdraws (e.g. a search-bar button gets both an
+  // `up` and a `down` line), so accumulate the keys into a space-separated set
+  // rather than a single value (which the second call would overwrite, causing
+  // the first to be re-attached on the next update).
+  const keys = (host.dataset.overdraw ?? "").split(/\s+/).filter(Boolean);
+  const key = `${dir}-${side}`;
+  if (keys.includes(key)) return;
+  keys.push(key);
+  host.dataset.overdraw = keys.join(" ");
   if (getComputedStyle(host).position !== "relative") {
     host.style.position = "relative";
   }
   const line = document.createElement("overdraw-line");
-  line.setAttribute("dir", "up");
+  line.setAttribute("dir", dir);
   line.setAttribute("aria-hidden", "true");
-  line.style.setProperty("bottom", "100%");
+  line.style.setProperty(dir === "up" ? "bottom" : "top", "100%");
   line.style.setProperty(side, "-1px");
+  if (zIndex) line.style.zIndex = zIndex;
   host.appendChild(line);
 }
 
@@ -261,6 +278,7 @@ export class Openp41geWindowManager extends LitElement {
   updated(): void {
     this._measureListOverflow();
     this._attachWorkspaceFooterOverdraws();
+    this._attachWorkspaceSearchBarOverdraws();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
       ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close, .wm-tab-close, .wm-tabbar-add",
     );
@@ -683,16 +701,39 @@ export class Openp41geWindowManager extends LitElement {
   /** Extend each vertical separator in the workspace-list footer up past the
    *  footer's top border: one `up` overdraw per separator. The separators are
    *  the buttons' own edge borders (`dw-search` right edge, `dw-add`/`dw-delete`
-   *  left edge). Idempotent per element, so it is safe on every re-render. */
+   *  left edge). The accents stay inside the footer (z-index 0), which paints
+   *  above the search bar (now z-order 0) so they are never covered by it.
+   *  Idempotent per element, so it is safe on every re-render. */
   private _attachWorkspaceFooterOverdraws(): void {
     const root = this.shadowRoot;
     if (!root) return;
     const search = root.querySelector<HTMLElement>(".ws-list-footer .dw-search");
-    if (search) attachTopEdgeOverdraw(search, "right");
+    if (search) attachEdgeOverdraw(search, "right", "up");
     for (const btn of root.querySelectorAll<HTMLElement>(
       ".ws-list-footer .dw-add, .ws-list-footer .dw-delete",
     )) {
-      attachTopEdgeOverdraw(btn, "left");
+      attachEdgeOverdraw(btn, "left", "up");
+    }
+  }
+
+  /** Extend each vertical separator of the search bar buttons (regex, case,
+   *  clear — all `border-left`) up past the search bar's top border and down
+   *  past its bottom edge. The search bar is z-order 0 (so the footer's accents
+   *  paint above it), so these accents are lifted with a z-index to escape and
+   *  stay visible over the footer. Hidden once a workspace drawer slides in
+   *  (its own z-index would otherwise poke above the drawer). */
+  private _attachWorkspaceSearchBarOverdraws(): void {
+    const root = this.shadowRoot;
+    if (!root) return;
+    for (const btn of root.querySelectorAll<HTMLElement>(
+      ".wm-search-bar .wm-search-toggle, .wm-search-bar .wm-search-clear",
+    )) {
+      attachEdgeOverdraw(btn, "left", "up", "1");
+      attachEdgeOverdraw(btn, "left", "down", "1");
+    }
+    const hide = this._drawers.length > 0;
+    for (const line of root.querySelectorAll<HTMLElement>(".wm-search-bar overdraw-line")) {
+      line.style.display = hide ? "none" : "";
     }
   }
 
@@ -1760,7 +1801,11 @@ export class Openp41geWindowManager extends LitElement {
           left: 0;
           right: 0;
           bottom: 34px;
-          z-index: 1;
+          /* No z-index: the bar is positioned after .wm-drawer-layer in the DOM
+             so it already paints above the body, while leaving the footer
+             (z-index 0) above it — so the footer's overdraw accents are not
+             covered when this bar is open. The bar's own accents are lifted
+             with an inline z-index (see attachEdgeOverdraw). */
           display: flex;
           align-items: stretch;
           height: 34px;

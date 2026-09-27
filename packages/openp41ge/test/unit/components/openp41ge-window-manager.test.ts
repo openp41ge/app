@@ -403,4 +403,48 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     await (wm as Wm).updateComplete;
     expect(wm.shadowRoot?.querySelectorAll(".ws-list-footer overdraw-line")?.length).toBe(3);
   });
+
+  it("gives each search-bar button an up and a down overdraw on its left separator", async () => {
+    (wm as Wm)._searchOpen = true;
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+
+    const buttons = wm.shadowRoot?.querySelectorAll<HTMLElement>(".wm-search-bar .wm-search-toggle, .wm-search-bar .wm-search-clear");
+    expect(buttons?.length).toBe(3);
+
+    for (const btn of buttons ?? []) {
+      const top = btn.querySelector<HTMLElement>("overdraw-line[dir=up]");
+      const bottom = btn.querySelector<HTMLElement>("overdraw-line[dir=down]");
+      expect(top?.style.left).toBe("-1px");
+      expect(top?.style.bottom).toBe("100%");
+      expect(bottom?.style.left).toBe("-1px");
+      expect(bottom?.style.top).toBe("100%");
+    }
+
+    // Idempotent: another update must not duplicate (2 lines per button).
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+    expect(wm.shadowRoot?.querySelectorAll(".wm-search-bar overdraw-line")?.length).toBe(6);
+  });
+
+  it("hides the search-bar overdraws when a workspace drawer is open", async () => {
+    (wm as Wm)._searchOpen = true;
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+
+    (wm as Wm)._drawers = [{ id: "d1", workspacePath: "/w/a", kind: "workspace", title: "A", data: { repos: [] } }] as never;
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+
+    for (const line of wm.shadowRoot?.querySelectorAll<HTMLElement>(".wm-search-bar overdraw-line") ?? []) {
+      expect(line.style.display).toBe("none");
+    }
+
+    (wm as Wm)._drawers = [] as never;
+    (wm as Wm).requestUpdate();
+    await (wm as Wm).updateComplete;
+    for (const line of wm.shadowRoot?.querySelectorAll<HTMLElement>(".wm-search-bar overdraw-line") ?? []) {
+      expect(line.style.display).toBe("");
+    }
+  });
 });
