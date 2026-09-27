@@ -2876,7 +2876,7 @@ export class Openp41geWindowManager extends LitElement {
                                   <div class="ws-info">
                                     <input
                                       class="wm-new-ws-input"
-                                      placeholder="Workspace name"
+                                      placeholder="Enter workspace name"
                                       spellcheck="false"
                                       @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
                                       @blur=${() => {
