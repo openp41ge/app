@@ -1841,9 +1841,8 @@ export class Openp41geWindowManager extends LitElement {
           border-bottom: 1px solid var(--divider, #2f3031);
           transition: background 0.1s ease;
         }
-        li.ws-row:hover {
-          background: var(--bg-hover, #2a2d2e);
-        }
+        /* No hover background on the row: a single click is a no-op, so an
+           interactive-looking hover would be misleading (double-click opens). */
         /* The last row's trailing separator only renders when the list fits the
            viewport (not below the fold), so a folded last row never shows a
            second bottom border when it scrolls into view. */
@@ -1909,8 +1908,13 @@ export class Openp41geWindowManager extends LitElement {
         .ws-more {
           color: var(--text-secondary, #999);
           font-size: 11px;
-          white-space: nowrap;
+          line-height: 1.25;
           user-select: none;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          gap: 1px;
         }
 
         /* Mini workspace-window skeleton: title bar + window layout, half the
@@ -2814,8 +2818,15 @@ export class Openp41geWindowManager extends LitElement {
                           const leftOpen = !!shared?.leftSidebarOpen;
                           const rightOpen = !!shared?.rightSidebarOpen;
                           const wins = windows.length > 0 ? windows : [undefined];
-                          const visibleWins = wins.slice(0, MAX_VISIBLE_THUMBS);
-                          const moreCount = wins.length - visibleWins.length;
+                          // Up to 3 thumbnails; once the row overflows, trade one
+                          // thumbnail for a "+ N more" counter (4 windows shows
+                          // 2 thumbs + "+ 2 more", never "+ 1 more").
+                          const showMore = wins.length > MAX_VISIBLE_THUMBS;
+                          const visibleWins = wins.slice(
+                            0,
+                            showMore ? MAX_VISIBLE_THUMBS - 1 : MAX_VISIBLE_THUMBS,
+                          );
+                          const moreCount = showMore ? wins.length - (MAX_VISIBLE_THUMBS - 1) : 0;
                           const isLast = i === filtered.length - 1;
                           const sideRows = html`<span class="ws-thumb-side-row"></span
                             ><span class="ws-thumb-side-row"></span
@@ -2856,7 +2867,11 @@ export class Openp41geWindowManager extends LitElement {
                                 }
                                 if (this._workspaceDeleteMode)
                                   this._toggleWorkspaceSelection(w.filePath);
-                                else this._openWorkspaceWindow(w.filePath);
+                              }}
+                              @dblclick=${(e: Event) => {
+                                e.stopPropagation();
+                                if (this._workspaceDeleteMode) return;
+                                this._openWorkspaceWindow(w.filePath);
                               }}
                             >
                               <div class="ws-info">
@@ -2892,7 +2907,10 @@ export class Openp41geWindowManager extends LitElement {
                                 ${visibleWins.map(renderThumb)}
                                 ${
                                   moreCount > 0
-                                    ? html`<span class="ws-more">+ ${moreCount} more</span>`
+                                    ? html`<span class="ws-more"
+                                        ><span class="ws-more-count">+ ${moreCount}</span
+                                        ><span class="ws-more-word">more</span></span
+                                      >`
                                     : nothing
                                 }
                               </div>

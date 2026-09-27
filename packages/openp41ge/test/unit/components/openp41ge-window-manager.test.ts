@@ -324,19 +324,22 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     return wm.requestUpdate();
   }
 
-  it("shows at most 3 thumbnails and a +N more label", async () => {
+  it("trades a thumbnail for a +N more label once the row overflows", async () => {
     setWorkspace(4);
     await (wm as Wm).updateComplete;
 
+    // Overflowing rows show 2 thumbnails + a two-line "+ 2" / "more" counter.
     const thumbs = wm.shadowRoot?.querySelectorAll(".ws-thumb");
-    expect(thumbs?.length).toBe(3);
+    expect(thumbs?.length).toBe(2);
     const more = wm.shadowRoot?.querySelector(".ws-more");
-    expect(more?.textContent?.trim()).toBe("+ 1 more");
+    expect(more?.querySelectorAll("span")?.length).toBe(2);
+    expect(more?.querySelector(".ws-more-count")?.textContent).toBe("+ 2");
+    expect(more?.querySelector(".ws-more-word")?.textContent).toBe("more");
     expect(wm.shadowRoot?.querySelector(".ws-chevron")).toBeNull();
     expect(wm.shadowRoot?.querySelector(".ws-edit")).not.toBeNull();
   });
 
-  it("omits the more label when 3 or fewer windows exist", async () => {
+  it("shows three thumbnails (no more label) when exactly three windows exist", async () => {
     setWorkspace(3);
     await (wm as Wm).updateComplete;
 
@@ -344,12 +347,22 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     expect(wm.shadowRoot?.querySelector(".ws-more")).toBeNull();
   });
 
-  it("opens the workspace window on a row click", async () => {
+  it("does not open the workspace on a single row click", async () => {
     setWorkspace(1);
     await (wm as Wm).updateComplete;
 
     const row = wm.shadowRoot?.querySelector(".ws-row");
     row?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+
+    expect((window as unknown as { openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } } }).openp41ge.windowManager.openWorkspaceWindow).not.toHaveBeenCalled();
+  });
+
+  it("opens the workspace window on a row double-click", async () => {
+    setWorkspace(1);
+    await (wm as Wm).updateComplete;
+
+    const row = wm.shadowRoot?.querySelector(".ws-row");
+    row?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true }));
 
     expect((window as unknown as { openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } } }).openp41ge.windowManager.openWorkspaceWindow).toHaveBeenCalledWith("/w/a");
   });
