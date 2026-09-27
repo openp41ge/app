@@ -528,10 +528,21 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     expect(up?.style.position).toBe("fixed");
     expect(up?.style.opacity).toBe("0");
 
+    // The head "Open" tile matches the close button's square-icon treatment
+    // and gets the same down + up bleeds.
+    expect(wm.shadowRoot?.querySelector(".drawer-actions .dw-open svg")).not.toBeNull();
+    const openLines = wm.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".drawer-actions .dw-open > overdraw-line",
+    );
+    expect(openLines?.length).toBe(2);
+    const openDirs = [...(openLines ?? [])].map((l) => l.getAttribute("dir")).sort();
+    expect(openDirs).toEqual(["down", "up"]);
+
     // Idempotent across another update.
     (wm as Wm).requestUpdate();
     await (wm as Wm).updateComplete;
     expect(wm.shadowRoot?.querySelectorAll(".drawer-footer .dw-add > overdraw-line")?.length).toBe(1);
     expect(wm.shadowRoot?.querySelectorAll(".drawer-actions .dw-close > overdraw-line")?.length).toBe(2);
+    expect(wm.shadowRoot?.querySelectorAll(".drawer-actions .dw-open > overdraw-line")?.length).toBe(2);
   });
 });

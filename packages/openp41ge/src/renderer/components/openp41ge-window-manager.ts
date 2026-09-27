@@ -718,11 +718,13 @@ export class Openp41geWindowManager extends LitElement {
     const root = this.shadowRoot;
     if (!root) return;
     for (const btn of root.querySelectorAll<HTMLElement>(
-      ".drawer-footer .dw-add, .drawer-footer .dw-delete",
+      ".drawer-footer .dw-add, .drawer-footer .dw-delete, .drawer-footer .dw-open",
     )) {
       attachEdgeOverdraw(btn, "left", "up");
     }
-    for (const close of root.querySelectorAll<HTMLElement>(".drawer-actions .dw-close")) {
+    for (const close of root.querySelectorAll<HTMLElement>(
+      ".drawer-actions .dw-close, .drawer-actions .dw-open",
+    )) {
       attachEdgeOverdraw(close, "left", "down");
       this._attachDrawerHeadUpBleed(close);
     }
@@ -1433,8 +1435,20 @@ export class Openp41geWindowManager extends LitElement {
                     e.stopPropagation();
                     this._openWorkspaceWindow(d.workspacePath);
                   }}
+                  aria-label="Open workspace"
+                  data-tip="Open workspace"
                 >
-                  Open
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    height="24px"
+                    viewBox="0 -960 960 960"
+                    width="24px"
+                    fill="#e3e3e3"
+                  >
+                    <path
+                      d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"
+                    />
+                  </svg>
                 </button>`
               : nothing
           }
@@ -2678,16 +2692,23 @@ export class Openp41geWindowManager extends LitElement {
         }
         .dw-open {
           border: none;
-          border-radius: 4px;
-          background: rgba(86, 156, 214, 0.15);
-          color: var(--accent, #569cd6);
-          font-size: 12px;
-          font-weight: 600;
-          padding: 4px 10px;
+          border-left: 1px solid var(--divider, #333);
+          border-radius: 0;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          /* Full-height square tile, like .dw-close / the footer action
+             buttons, with a left separator continuing the drawer edge. */
+          height: 100%;
+          aspect-ratio: 1 / 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
           cursor: pointer;
         }
         .dw-open:hover {
-          background: rgba(86, 156, 214, 0.25);
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
         }
         .dw-close {
           border: none;
@@ -3224,8 +3245,20 @@ export class Openp41geWindowManager extends LitElement {
                               e.stopPropagation();
                               this._openWorkspaceWindow(d.workspacePath);
                             }}
+                            aria-label="Open workspace"
+                            data-tip="Open workspace"
                           >
-                            Open
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              height="24px"
+                              viewBox="0 -960 960 960"
+                              width="24px"
+                              fill="#e3e3e3"
+                            >
+                              <path
+                                d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"
+                              />
+                            </svg>
                           </button>`
                         : nothing
                     }
