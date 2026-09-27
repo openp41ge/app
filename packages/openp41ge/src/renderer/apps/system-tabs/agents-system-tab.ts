@@ -25,6 +25,7 @@ import { createSettingsButton, type Side } from "../../services/settings-button"
 import { openSearchDrawer, type SearchDrawerProvider } from "../../services/search-drawer";
 import type { Openp41geSettingsDrawerHost } from "../../components/openp41ge-settings-drawer-host";
 import { searchIcon } from "../../icons";
+import { defaultChatTitle as formatTimestamp } from "openp41ge-constants";
 import { tooltipController } from "openp41ge-uikit";
 import { attachTopOverdraw } from "openp41ge-uikit/overdraw-line";
 import { createLogger } from "openp41ge-logger";
@@ -108,7 +109,21 @@ export class AgentsSystemTabController implements SystemTabController {
       flexShrink: "0",
       borderBottom: "1px solid var(--divider,#2a2a2a)",
     });
-    const newChatHead = this._chatRowHead("New chat", "No description");
+    const newChatHead = this._chatRowHead("New chat", "No description", "var(--text-muted,#777)");
+    // Decorative right-aligned "+" icon (not a button — the row itself is the
+    // clickable surface). Vertically centered against the two-line text.
+    const plus = document.createElement("span");
+    plus.className = "chat-new-plus";
+    plus.setAttribute("aria-hidden", "true");
+    plus.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>';
+    Object.assign(plus.style, {
+      flexShrink: "0",
+      alignSelf: "center",
+      display: "inline-flex",
+      lineHeight: "0",
+    });
+    newChatHead.appendChild(plus);
     newChatRow.appendChild(newChatHead);
     newChatRow.addEventListener("click", () => void this._newChat());
     // Mark the row's bottom border as a separator so the windowview can pull
@@ -413,7 +428,7 @@ export class AgentsSystemTabController implements SystemTabController {
     const list = this._list;
     if (!list) return;
 
-    const chats = this._chats;
+    const chats = this._chats.slice().sort((a, b) => b.updatedAt - a.updatedAt);
 
     if (chats.length === 0) {
       list.replaceChildren(this._message("No chats yet", "var(--text-muted,#777)"));
@@ -466,6 +481,21 @@ export class AgentsSystemTabController implements SystemTabController {
       chat.title,
       (chat.description ?? "").trim() || "No description",
     );
+    // Third row: the chat's last interaction time (falls back to creation).
+    const titleBlock = head.firstElementChild as HTMLElement;
+    const date = document.createElement("div");
+    date.className = "chat-row-date";
+    date.textContent = formatTimestamp(chat.updatedAt);
+    Object.assign(date.style, {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      fontSize: "10px",
+      lineHeight: "1.3",
+      marginTop: "2px",
+      color: "var(--text-muted,#777)",
+    });
+    titleBlock.appendChild(date);
 
     // Open-in-another-window: clicking the row shows a toast instead of
     // opening a duplicate chat.
@@ -489,7 +519,7 @@ export class AgentsSystemTabController implements SystemTabController {
   }
 
   /** Build a row header: a one-line title + muted description. */
-  private _chatRowHead(title: string, desc: string): HTMLElement {
+  private _chatRowHead(title: string, desc: string, titleColor = "var(--text-primary,#ccc)"): HTMLElement {
     const head = document.createElement("div");
     head.className = "chat-row-head";
     Object.assign(head.style, {
@@ -510,7 +540,7 @@ export class AgentsSystemTabController implements SystemTabController {
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
-      color: "var(--text-primary,#ccc)",
+      color: titleColor,
     });
     titleBlock.appendChild(titleEl);
 

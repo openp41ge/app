@@ -87,6 +87,13 @@ describe("AgentsSystemTabController", () => {
 
     const rows = host.querySelectorAll(".chat-row");
     expect(rows.length).toBe(2);
+    // Each chat row shows a third line with its last interaction time, and
+    // the rows are ordered by that time (most recent first).
+    for (const r of rows) {
+      expect(r.querySelector(".chat-row-date")).toBeTruthy();
+    }
+    expect(rows[0].textContent).toContain("Fix bug");
+    expect(rows[1].textContent).toContain("Write tests");
 
     // No expandable tool-call pill (tool icon + count + chevron) is rendered.
     expect(host.querySelector(".chat-chevron-btn")).toBeNull();
@@ -94,16 +101,24 @@ describe("AgentsSystemTabController", () => {
 
     const newChatRow = host.querySelector(".chat-new-row") as HTMLElement;
     expect(newChatRow).toBeTruthy();
-    // The new-chat row mirrors a normal chat row's layout: a title line plus
-    // a muted description line, with the placeholder name "New chat".
+    // The new-chat row mirrors a normal chat row's layout: a grey title line
+    // (placeholder name, same size as a normal title) + a muted description
+    // line, plus a decorative right-aligned, vertically-centered "+" icon.
     const newHead = newChatRow.querySelector<HTMLElement>(".chat-row-head")!;
     const titleBlock = newHead.firstElementChild as HTMLElement;
     const newTitle = titleBlock.firstElementChild as HTMLElement;
     const newDesc = titleBlock.querySelector<HTMLElement>(".chat-row-desc");
     expect(newTitle?.textContent).toBe("New chat");
+    expect(newTitle?.style.color).toBe("var(--text-muted,#777)");
     expect(newDesc?.textContent).toBe("No description");
-    // No plus-icon row: the heading directly holds the title/description.
-    expect(newHead.textContent).toContain("New chat");
+    // The new-chat row carries no third date line.
+    expect(titleBlock.querySelector(".chat-row-date")).toBeNull();
+    // The "+" icon is decorative (not a button), right-aligned + centered.
+    const plus = newHead.querySelector<HTMLElement>(".chat-new-plus")!;
+    expect(plus).toBeTruthy();
+    expect(plus.querySelector("svg")).toBeTruthy();
+    expect(plus.style.alignSelf).toBe("center");
+    expect(plus.getAttribute("aria-hidden")).toBe("true");
 
     // The footer holds the search tool (new) + this tab's own settings gear.
     const settingsBtn = host.querySelector('button[aria-label="Agent settings"]') as HTMLButtonElement;
@@ -150,6 +165,30 @@ describe("AgentsSystemTabController", () => {
     const detail = (openChatSpy.mock.calls[0][0] as CustomEvent).detail;
     expect(typeof detail.chatId).toBe("string");
     expect(detail.pinned).toBe(true);
+  });
+
+  it("orders chats by last interaction time; a new chat lands right below the New chat row", async () => {
+    // Insert the older chat first and the newer chat second, so the store's
+    // insertion order is the reverse of the expected render order.
+    storeModel.setFixtures([
+      { ...fixtureChats()[1], id: "old", title: "Old chat", updatedAt: 10 },
+      { ...fixtureChats()[0], id: "new", title: "Newer chat", updatedAt: 100 },
+    ]);
+    controller.mount(host);
+    await flush();
+
+    const rows = Array.from(host.querySelectorAll<HTMLElement>(".chat-row"));
+    expect(rows).toHaveLength(2);
+    // Most recent interaction first (the New chat row sits above the list).
+    expect(rows[0].textContent).toContain("Newer chat");
+    expect(rows[1].textContent).toContain("Old chat");
+    // A new chat is created with the current timestamp, so its summary sorts
+    // to the top — immediately below the New chat row.
+    await storeModel.create();
+    await flush();
+    const after = Array.from(host.querySelectorAll<HTMLElement>(".chat-row"));
+    expect(after).toHaveLength(3);
+    expect(after[0].textContent).not.toContain("Old chat");
   });
 
   it("opens a search drawer from the footer search tool (no inline bar)", async () => {
