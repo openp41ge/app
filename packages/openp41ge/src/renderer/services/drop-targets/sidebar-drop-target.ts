@@ -71,6 +71,7 @@ export class SidebarDropTarget implements IDropTarget {
   readonly winId: string;
   readonly side: "left" | "right";
   private _overlayEl: HTMLElement | null = null;
+  private _overdrawEl: HTMLElement | null = null;
   private _indicatorEl: HTMLElement | null = null;
 
   constructor(barEl: HTMLElement, winId: string, side: "left" | "right") {
@@ -169,7 +170,8 @@ export class SidebarDropTarget implements IDropTarget {
 
   /**
    * Show a visible drop overlay:
-   * - Full sidebar ghost overlay (blue-tinted highlight on entire sidebar)
+   * - Full sidebar drop-box (the grid's solid <drop-box> landing target + its
+   *   <drop-box-overdraw> corner bleed) highlighting the whole sidebar
    * - Precise drop indicator line on the tab bar (when `showIndicator` is true)
    */
   private _showOverlay(dropIndex: number, showIndicator: boolean = true): void {
@@ -187,18 +189,19 @@ export class SidebarDropTarget implements IDropTarget {
       }
 
       if (!this._overlayEl || !sidebarHost.contains(this._overlayEl)) {
-        this._overlayEl = document.createElement("div");
-        this._overlayEl.className = "sidebar-ghost-overlay";
-        this._overlayEl.style.cssText = [
-          "position:absolute",
-          "inset:0",
-          "z-index:30",
-          "pointer-events:none",
-          "background:rgba(74,158,255,0.08)",
-          "box-shadow:inset 0 0 0 2px rgba(74,158,255,0.50)",
-          "border-radius:4px",
-        ].join(";");
+        // The sidebar-wide drop indicator is the same <drop-box> landing
+        // target the grid uses, plus its <drop-box-overdraw> companion that
+        // bleeds the solid border outward at all four corners. The box covers
+        // the whole sidebar host (the target the tab will dock into). Both are
+        // registered by the sidebar, which pulls in the uikit drop-indicator
+        // module.
+        this._overlayEl = document.createElement("drop-box");
+        this._overlayEl.className = "sidebar-drop-zone-box";
+        this._overlayEl.style.inset = "0";
         sidebarHost.appendChild(this._overlayEl);
+        this._overdrawEl = document.createElement("drop-box-overdraw");
+        this._overdrawEl.className = "sidebar-drop-zone-overdraw";
+        sidebarHost.appendChild(this._overdrawEl);
       }
     }
 
@@ -253,6 +256,11 @@ export class SidebarDropTarget implements IDropTarget {
       this._overlayEl.parentNode.removeChild(this._overlayEl);
     }
     this._overlayEl = null;
+
+    if (this._overdrawEl && this._overdrawEl.parentNode) {
+      this._overdrawEl.parentNode.removeChild(this._overdrawEl);
+    }
+    this._overdrawEl = null;
 
     if (this._indicatorEl && this._indicatorEl.parentNode) {
       this._indicatorEl.parentNode.removeChild(this._indicatorEl);

@@ -101,7 +101,11 @@ function indicatorVisible(): boolean {
 }
 
 function overlayVisible(): boolean {
-  return !!document.querySelector(".sidebar-ghost-overlay");
+  return !!document.querySelector(".sidebar-drop-zone-box");
+}
+
+function overdrawVisible(): boolean {
+  return !!document.querySelector(".sidebar-drop-zone-overdraw");
 }
 
 describe("SidebarDropTarget no-op reorder suppression", () => {
@@ -144,6 +148,11 @@ describe("SidebarDropTarget no-op reorder suppression", () => {
     const feedback = target.onHover(source, 30, 15);
     expect(indicatorVisible()).toBe(true);
     expect(overlayVisible()).toBe(true);
+    // The sidebar drop box is the grid's shared <drop-box> landing target,
+    // with its <drop-box-overdraw> corner-bleed companion as a sibling.
+    expect(document.querySelector(".sidebar-drop-zone-box")!.tagName).toBe("DROP-BOX");
+    expect(overdrawVisible()).toBe(true);
+    expect(document.querySelector(".sidebar-drop-zone-overdraw")!.tagName).toBe("DROP-BOX-OVERDRAW");
     expect(feedback).not.toBeNull();
 
     target.onLeave();

@@ -1297,7 +1297,7 @@ export function initDragSystem(): () => void {
           // and the capture inset can't clip it (unlike the grid's edge line).
           setSidebarDropFeedbackSuppressed(true);
           document
-            .querySelectorAll(".sidebar-ghost-overlay, .sidebar-drop-indicator")
+            .querySelectorAll(".sidebar-drop-zone-box, .sidebar-drop-zone-overdraw, .sidebar-drop-indicator")
             .forEach((el) => el.remove());
           document.querySelectorAll(".tab-drop-indicator").forEach((el) => {
             (el as HTMLElement).style.display = "none";
