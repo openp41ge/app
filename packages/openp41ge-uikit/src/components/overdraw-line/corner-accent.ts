@@ -17,6 +17,7 @@
  */
 
 import "./overdraw-line";
+import { DROP_INDICATOR_COLOR } from "../drop-indicator/color";
 
 /** [corner, dir, inline positioning] — solid end sits on the box's border. */
 const TOP_CORNER_LINES: Array<[string, string, Record<string, string>]> = [
@@ -356,4 +357,41 @@ function isWithin(ancestor: Element, child: Element): boolean {
     cur = root instanceof ShadowRoot ? root.host : cur.parentNode;
   }
   return false;
+}
+
+/** Horizontal overdraw ticks at a vertical drop line's two tips. Each entry is
+ *  [dir, inline-positioning]: the solid end anchors on the line's edge and it
+ *  fades OUTWARD (left tick fades leftward, right tick fades rightward). A
+ *  fixed 8px length keeps the left/right ticks mirroring each other exactly. */
+const DROP_TIP_LINES: Array<[string, Record<string, string>]> = [
+  ["left", { top: "0", right: "100%" }],
+  ["right", { top: "0", left: "100%" }],
+  ["left", { top: "calc(100% - 1px)", right: "100%" }],
+  ["right", { top: "calc(100% - 1px)", left: "100%" }],
+];
+
+/** Attach the horizontal overdraw accents at the TOP and BOTTOM tips of a
+ *  vertical drop line, so the line reads as cross-capped at both ends — the
+ *  border-bleed look of the overdraw family applied to the insertion marker.
+ *  The line is the containing block, so `right:100%` / `left:100%` anchor each
+ *  tick on its edge and they extend outward. The ticks are short (8px) and
+ *  sit within the tab bar's bounds, so they are appended inline rather than
+ *  portalled (no overflow-hidden ancestor issue in practice).
+ *
+ *  Idempotent — guarded by `data-overdraw="tip"` so repeated calls (the
+ *  indicator is created once and only shown/hidden) never duplicate them.
+ */
+export function attachDropTipOverdraws(host: HTMLElement): void {
+  if (host.dataset.overdraw === "tip") return;
+  host.dataset.overdraw = "tip";
+
+  for (const [dir, pos] of DROP_TIP_LINES) {
+    const line = document.createElement("overdraw-line");
+    line.setAttribute("dir", dir);
+    line.setAttribute("aria-hidden", "true");
+    line.style.setProperty("--overdraw-color", DROP_INDICATOR_COLOR);
+    line.style.setProperty("--overdraw-length", "8px");
+    for (const [k, v] of Object.entries(pos)) line.style.setProperty(k, v);
+    host.appendChild(line);
+  }
 }

@@ -4,7 +4,7 @@
  */
 import { describe, test, expect, beforeEach, vi, afterEach } from "vitest";
 import { OverdrawLine, OVERDRAW_LENGTHS, overdrawLengthForOrdinal } from "../../src/components/overdraw-line/overdraw-line";
-import { attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws } from "../../src/components/overdraw-line/corner-accent";
+import { attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws, attachDropTipOverdraws } from "../../src/components/overdraw-line/corner-accent";
 
 function styleOf(el: HTMLElement): string {
   const style = el.shadowRoot?.querySelector("style");
@@ -336,3 +336,38 @@ describe("OverdrawLine", () => {
     expect(document.body.querySelector(".p41ge-overdraw-layer")).toBeNull();
   });
 });
+
+  test("attachDropTipOverdraws cross-caps a vertical line with four blue tips and is idempotent", () => {
+    const line = document.createElement("div");
+    // The line is the containing block (like a drop-line / indicator host).
+    line.style.position = "absolute";
+    document.body.appendChild(line);
+
+    attachDropTipOverdraws(line);
+
+    const ticks = Array.from(line.querySelectorAll("overdraw-line"));
+    expect(ticks).toHaveLength(4);
+    // Two ticks at each tip: left (fading leftward) + right (fading rightward).
+    expect(ticks.map((t) => t.getAttribute("dir"))).toEqual(["left", "right", "left", "right"]);
+    // Top pair sits at the line's top edge, bottom pair at its last pixel row.
+    expect(ticks[0].style.top).toBe("0px");
+    expect(ticks[1].style.top).toBe("0px");
+    expect(ticks[2].style.top).toBe("calc(100% - 1px)");
+    expect(ticks[3].style.top).toBe("calc(100% - 1px)");
+    // Left ticks fade leftward (anchor on the right), right ticks fade rightward.
+    expect(ticks[0].style.right).toBe("100%");
+    expect(ticks[1].style.left).toBe("100%");
+    expect(ticks[2].style.right).toBe("100%");
+    expect(ticks[3].style.left).toBe("100%");
+    // All ticks are blue (the drop-indicator color) and a fixed 8px so the
+    // left/right pair mirrors exactly.
+    for (const t of ticks) {
+      expect(t.style.getPropertyValue("--overdraw-color")).toBe("rgb(74, 158, 255)");
+      expect(t.style.getPropertyValue("--overdraw-length")).toBe("8px");
+      expect(t.getAttribute("aria-hidden")).toBe("true");
+    }
+
+    // Re-calling must not duplicate the accents.
+    attachDropTipOverdraws(line);
+    expect(line.querySelectorAll("overdraw-line")).toHaveLength(4);
+  });

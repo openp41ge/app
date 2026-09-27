@@ -32,6 +32,7 @@ export function setSidebarDropFeedbackSuppressed(v: boolean): void {
 }
 
 import { SIDEBAR_DROP_EVENT, SIDEBAR_TAB_BUTTON_SELECTOR } from "openp41ge-constants";
+import { attachDropTipOverdraws } from "openp41ge-uikit/overdraw-line";
 
 export function getTabButtonsInSidebarBar(bar: HTMLElement): HTMLElement[] {
   return Array.from(bar.querySelectorAll(SIDEBAR_TAB_BUTTON_SELECTOR)).filter(
@@ -233,12 +234,16 @@ export class SidebarDropTarget implements IDropTarget {
       this._indicatorEl.className = "sidebar-drop-indicator";
       this._indicatorEl.style.cssText = [
         "position:absolute",
-        "top:4px",
-        "bottom:4px",
+        "top:0",
+        "bottom:0",
         "display:none",
         "pointer-events:none",
         "z-index:31",
+        "border-radius:0",
       ].join(";");
+      // Full-height, square, cross-capped at both tips (top + bottom overdraw
+      // ticks extend the blue line's tips outward, like the overdraw family).
+      attachDropTipOverdraws(this._indicatorEl);
       this.element.appendChild(this._indicatorEl);
     }
 

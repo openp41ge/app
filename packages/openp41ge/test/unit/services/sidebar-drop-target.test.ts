@@ -394,3 +394,54 @@ describe("ClosedSidebarDropTarget", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe("SidebarDropTarget tab-bar indicator geometry", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function tickDirs(el: Element): string[] {
+    return Array.from(el.querySelectorAll("overdraw-line")).map((l) => l.getAttribute("dir")!);
+  }
+
+  it("is full-height, square, and cross-capped with blue top/bottom ticks", () => {
+    const { bar } = buildRightBar(3);
+    const target = new SidebarDropTarget(bar, "w1", "right");
+
+    target.onHover(fakeSystemTabSource("t1", "left"), 80, 15);
+
+    const ind = document.querySelector<HTMLElement>(".sidebar-drop-indicator");
+    expect(ind).not.toBeNull();
+    // Flush with the tab bar's top and bottom edges (previously inset 4px).
+    expect(ind!.style.top).toBe("0px");
+    expect(ind!.style.bottom).toBe("0px");
+    // Square corners — the <drop-line> default 2px radius is neutralized.
+    expect(ind!.style.borderRadius).toBe("0px");
+
+    // Four blue overdraw ticks: a left+right pair at each tip.
+    const ticks = Array.from(ind!.querySelectorAll("overdraw-line"));
+    expect(ticks).toHaveLength(4);
+    expect(ticks.map((t) => t.getAttribute("dir"))).toEqual(["left", "right", "left", "right"]);
+    expect(ticks[0].style.top).toBe("0px");
+    expect(ticks[2].style.top).toBe("calc(100% - 1px)");
+    for (const t of ticks) {
+      expect(t.style.getPropertyValue("--overdraw-color")).toBe("rgb(74, 158, 255)");
+      expect(t.style.getPropertyValue("--overdraw-length")).toBe("8px");
+    }
+  });
+
+  it("does not re-append the ticks when the indicator is reused across hovers", () => {
+    const { bar } = buildRightBar(3);
+    const target = new SidebarDropTarget(bar, "w1", "right");
+
+    target.onHover(fakeSystemTabSource("t1", "left"), 80, 15);
+    const ind = document.querySelector(".sidebar-drop-indicator")!;
+    expect(tickDirs(ind)).toHaveLength(4);
+
+    // Re-hover after a no-op reorder (indicator stays mounted) must not
+    // recreate the indicator or its ticks.
+    target.onHover(fakeSystemTabSource("t1", "right"), 80, 15);
+    expect(document.querySelectorAll(".sidebar-drop-indicator")).toHaveLength(1);
+    expect(tickDirs(document.querySelector(".sidebar-drop-indicator")!)).toHaveLength(4);
+  });
+});

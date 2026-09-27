@@ -3,4 +3,4 @@
  */
 export { OverdrawLine } from "./overdraw-line";
 export type { OverdrawDirection } from "./overdraw-line";
-export { attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws } from "./corner-accent";
+export { attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws, attachDropTipOverdraws } from "./corner-accent";

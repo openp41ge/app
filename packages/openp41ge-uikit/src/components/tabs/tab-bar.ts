@@ -11,6 +11,7 @@ import { property } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { TabBarDropTarget } from "openp41ge-tabs/targets/tab-bar-drop-target";
 import { getDropIndexInBar, getTabButtonsInBar } from "openp41ge-tabs/boundary";
+import { attachDropTipOverdraws } from "../overdraw-line/corner-accent";
 
 /** Scroll speed for overflowing tab text (pixels per second). */
 const TAB_TEXT_SCROLL_SPEED = 40;
@@ -218,8 +219,11 @@ export class TabBar extends LitElement {
       this._indicatorEl = document.createElement("div");
       this._indicatorEl.className = "tab-drop-indicator";
       this._indicatorEl.style.cssText =
-        "position:absolute;top:6px;bottom:6px;width:2px;background:rgb(74,158,255);display:none;pointer-events:none;z-index:10;";
+        "position:absolute;top:0;bottom:0;width:3px;background:rgb(74,158,255);box-shadow:0 0 10px rgba(74,158,255,0.6);display:none;pointer-events:none;z-index:10;";
       barEl.style.position = "relative";
+      // Full-height, square, cross-capped at both tips (top + bottom overdraw
+      // ticks), matching the tab-reorder indicator from the tabs package.
+      attachDropTipOverdraws(this._indicatorEl);
       barEl.appendChild(this._indicatorEl);
     }
   }
@@ -239,7 +243,9 @@ export class TabBar extends LitElement {
       const last = tabs[tabs.length - 1];
       pos = last.offsetLeft + last.offsetWidth;
     } else {
-      pos = tabs[dropIndex].offsetLeft;
+      // Shift left 1px so the 3px line is centered on the boundary (mirrors
+      // the tabs package's tab-reorder indicator, so both look identical).
+      pos = tabs[dropIndex].offsetLeft - 1;
     }
 
     this._indicatorEl.style.display = "block";
