@@ -16,7 +16,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../../src/renderer/components/openp41ge-windowview";
 
-import { SIDEBAR_OVERDRAW_LENGTH } from "../../../src/renderer/components/openp41ge-windowview";
+import {
+  SIDEBAR_FOOTER_OVERDRAW_LENGTH,
+  SIDEBAR_OVERDRAW_LENGTH,
+} from "../../../src/renderer/components/openp41ge-windowview";
 
 // jsdom has no real animation frame loop; capture callbacks so the per-frame
 // overdraw tracker never spins, and let tests step frames deterministically.
@@ -75,6 +78,10 @@ async function mount() {
 }
 
 const lines = () => [...document.body.querySelectorAll('overdraw-line[dir="up"]')];
+
+const sbRect = (left: number, right: number, top: number) => ({
+  left, top, right, bottom: top + 400, width: right - left, height: 400, x: left, y: top, toJSON() {},
+});
 
 describe("openp41ge-windowview sidebar divider overdraws", () => {
   it("shows one overdraw line per open populated sidebar when the grid is empty", async () => {
@@ -154,17 +161,108 @@ describe("openp41ge-windowview sidebar divider overdraws", () => {
     wv._placeSidebarDividerOverdraws();
     expect(lines()[0]).toBe(before);
   });
+});
 
-  it("removes the lines and cancels the tracker when disconnected", async () => {
+describe("openp41ge-windowview sidebar footer overdraws", () => {
+  const footRect = (side: string) => ({
+    left: side === "left" ? 0 : 515,
+    top: 826,
+    right: side === "left" ? 209 : 656,
+    bottom: 860,
+    width: side === "left" ? 209 : 141,
+    height: 34,
+    x: side === "left" ? 0 : 515,
+    y: 826,
+    toJSON() {},
+  });
+
+  // Inject a bottom bar (a light-DOM div pinned to the active host's bottom with
+  // a 1px top border) into a sidebar, stubbing its rects (jsdom reports zero).
+  function addFooter(sb: HTMLElement, side: "left" | "right"): HTMLElement {
+    const host = document.createElement("div");
+    host.className = "sidebar-tab-host visible";
+    const footer = document.createElement("div");
+    footer.style.borderTop = "1px solid #333";
+    host.appendChild(footer);
+    sb.appendChild(host);
+    Object.defineProperty(host, "getBoundingClientRect", {
+      configurable: true,
+      value: () => footRect(side),
+    });
+    Object.defineProperty(footer, "getBoundingClientRect", {
+      configurable: true,
+      value: () => footRect(side),
+    });
+    return footer;
+  }
+
+  it("draws one footer overdraw per open sidebar that has a bottom bar when the grid is empty", async () => {
     const { wv } = await mount();
-    expect(lines().length).toBe(2);
-    wv._sbOverdrawRaf = 7; // pretend a frame is pending
+    const left = wv.querySelector('openp41ge-sidebar[side="left"]');
+    const right = wv.querySelector('openp41ge-sidebar[side="right"]');
+    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => sbRect(0, 209, 36) });
+    Object.defineProperty(right, "getBoundingClientRect", { configurable: true, value: () => sbRect(490, 656, 36) });
+    addFooter(left, "left");
+    addFooter(right, "right");
+
+    wv._placeSidebarFooterOverdraws();
+
+    expect(wv._sbFooterOverdraw.has("left")).toBe(true);
+    expect(wv._sbFooterOverdraw.has("right")).toBe(true);
+
+    wv._positionSidebarFooterOverdraws();
+    const l = wv._sbFooterOverdraw.get("left");
+    const r = wv._sbFooterOverdraw.get("right");
+    // Left: fades right from the sidebar's right edge; right: fades left from its left edge.
+    expect(l.getAttribute("dir")).toBe("right");
+    expect(parseFloat(l.style.left)).toBe(209);
+    expect(parseFloat(l.style.top)).toBe(826);
+    expect(r.getAttribute("dir")).toBe("left");
+    expect(parseFloat(r.style.left)).toBe(490 - SIDEBAR_FOOTER_OVERDRAW_LENGTH);
+    expect(parseFloat(r.style.top)).toBe(826);
+  });
+
+  it("does not draw a footer overdraw for a sidebar with no bottom bar", async () => {
+    const { wv } = await mount();
+    const left = wv.querySelector('openp41ge-sidebar[side="left"]');
+    const right = wv.querySelector('openp41ge-sidebar[side="right"]');
+    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => sbRect(0, 209, 36) });
+    Object.defineProperty(right, "getBoundingClientRect", { configurable: true, value: () => sbRect(490, 656, 36) });
+    addFooter(left, "left");
+
+    wv._placeSidebarFooterOverdraws();
+
+    expect(wv._sbFooterOverdraw.has("left")).toBe(true);
+    expect(wv._sbFooterOverdraw.has("right")).toBe(false);
+  });
+
+  it("removes the footer overdraws once the grid gets a tab", async () => {
+    const { wv, win } = await mount();
+    const left = wv.querySelector('openp41ge-sidebar[side="left"]');
+    const right = wv.querySelector('openp41ge-sidebar[side="right"]');
+    addFooter(left, "left");
+    addFooter(right, "right");
+    wv._placeSidebarFooterOverdraws();
+    expect(wv._sbFooterOverdraw.size).toBe(2);
+
+    win.grid.placements = [{ position: { row: 0, col: 0 }, tabIds: ["t1"] }];
+    wv.windowData = { ...win };
+    await wv.updateComplete;
+    expect(document.body.querySelectorAll("overdraw-line").length).toBe(0);
+    expect(wv._sbFooterOverdraw.size).toBe(0);
+  });
+
+  it("cleans up the footer overdraws when disconnected", async () => {
+    const { wv } = await mount();
+    const left = wv.querySelector('openp41ge-sidebar[side="left"]');
+    addFooter(left, "left");
+    wv._placeSidebarFooterOverdraws();
+    wv._sbOverdrawRaf = 9;
     const cancel = vi.fn();
     (globalThis as unknown as { cancelAnimationFrame: unknown }).cancelAnimationFrame = cancel;
     wv.remove();
     await wv.updateComplete.catch(() => {});
-    expect(lines().length).toBe(0);
-    expect(wv._sbDividerOverdraw.size).toBe(0);
-    expect(cancel).toHaveBeenCalledWith(7);
+    expect(wv._sbFooterOverdraw.size).toBe(0);
+    expect(cancel).toHaveBeenCalledWith(9);
   });
 });

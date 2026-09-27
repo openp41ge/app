@@ -37,6 +37,10 @@ import "openp41ge-uikit/overdraw-line";
  *  title-bar seam when the grid is empty. */
 export const SIDEBAR_OVERDRAW_LENGTH = 14;
 
+/** How far (px) a populated sidebar's bottom-bar top border overdraws
+ *  horizontally into the grid when the grid has no tabs. */
+export const SIDEBAR_FOOTER_OVERDRAW_LENGTH = 18;
+
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
@@ -77,6 +81,13 @@ class Openp41geWindowView extends LitElement {
    * (so the sidebar edge stays visible against the empty grid). Keyed by side;
    * created lazily and removed when the condition goes away. */
   private _sbDividerOverdraw = new Map<string, HTMLElement>();
+  /** Portalled horizontal <overdraw-line> accents that continue an open
+   * sidebar's bottom-bar top border into the empty grid. Keyed by side. */
+  private _sbFooterOverdraw = new Map<string, HTMLElement>();
+  /** Cached bottom-bar (footer) element found in each sidebar's active host
+   * (or null when the active tab has no bottom bar), so the per-frame tracker
+   * only has to read one rect (not re-scan the tree). */
+  private _sbFooterEl = new Map<string, HTMLElement | null>();
   /** rAF handle for the per-frame divider tracking while any overdraw shows. */
   private _sbOverdrawRaf = 0;
 
@@ -152,6 +163,9 @@ class Openp41geWindowView extends LitElement {
     }
     for (const line of this._sbDividerOverdraw.values()) line.remove();
     this._sbDividerOverdraw.clear();
+    for (const line of this._sbFooterOverdraw.values()) line.remove();
+    this._sbFooterOverdraw.clear();
+    this._sbFooterEl.clear();
   }
 
   private _onWorkspacesUpdate = (): void => {
@@ -449,7 +463,6 @@ class Openp41geWindowView extends LitElement {
   private _placeSidebarDividerOverdraws(): void {
     const win = this.windowData;
     const gridEmpty = !win?.grid?.placements.some((p) => p.tabIds.length > 0);
-    let anyShown = false;
     for (const side of ["left", "right"] as const) {
       const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
       const shouldShow = gridEmpty && !!sb?.isOpen && (sb?.systemTabs?.length ?? 0) > 0;
@@ -462,12 +475,9 @@ class Openp41geWindowView extends LitElement {
         continue;
       }
       if (!sb) continue;
-      anyShown = true;
       const line = existing ?? this._createSbDividerOverdraw();
       this._sbDividerOverdraw.set(side, line);
     }
-    if (anyShown) this._startSbOverdrawLoop();
-    else this._stopSbOverdrawLoop();
   }
 
   /** Re-position each shown line over its sidebar's grid-side divider. The
@@ -489,17 +499,18 @@ class Openp41geWindowView extends LitElement {
     }
   }
 
-  /** While any sidebar overdraw is shown, track the divider each frame so the
-   * line follows a live sidebar drag / window resize (the windowview re-renders
-   * on release, not during the drag, so `updated()` alone would go stale). */
+  /** Run the one-shot placement fallback (jsdom lacks rAF) then, if any
+   * sidebar overdraw is shown, track each frame so the lines follow a live
+   * sidebar drag / window resize (the windowview re-renders on release, not
+   * during the drag, so `updated()` alone would go stale). */
   private _startSbOverdrawLoop(): void {
     if (this._sbOverdrawRaf) return;
     if (typeof requestAnimationFrame !== "function") {
-      this._positionSbDividerOverdraws();
+      this._syncSbOverdraws();
       return;
     }
     const tick = (): void => {
-      this._positionSbDividerOverdraws();
+      this._syncSbOverdraws();
       this._sbOverdrawRaf = requestAnimationFrame(tick);
     };
     this._sbOverdrawRaf = requestAnimationFrame(tick);
@@ -508,6 +519,28 @@ class Openp41geWindowView extends LitElement {
   private _stopSbOverdrawLoop(): void {
     if (this._sbOverdrawRaf) cancelAnimationFrame(this._sbOverdrawRaf);
     this._sbOverdrawRaf = 0;
+  }
+
+  /** Per-frame work while any sidebar overdraw is shown: fold in footer lines
+   * (a sidebar's bottom bar may only exist on a later frame than the
+   * windowview's own `updated()`, so creation must run here too) and place all
+   * lines over their anchors. */
+  private _syncSbOverdraws(): void {
+    this._placeSidebarFooterOverdraws();
+    this._positionSidebarOverdraws();
+  }
+
+  private _positionSidebarOverdraws(): void {
+    this._positionSbDividerOverdraws();
+    this._positionSidebarFooterOverdraws();
+  }
+
+  private _syncSbOverdrawLoop(): void {
+    if (this._sbDividerOverdraw.size > 0 || this._sbFooterOverdraw.size > 0) {
+      this._startSbOverdrawLoop();
+    } else {
+      this._stopSbOverdrawLoop();
+    }
   }
 
   /** Create a portalled <overdraw-line dir="up"> that fades out going up (the
@@ -524,6 +557,116 @@ class Openp41geWindowView extends LitElement {
       "--overdraw-color: var(--border-divider, #2d2d2d)",
       "--overdraw-thickness: 1px",
       `--overdraw-length: ${SIDEBAR_OVERDRAW_LENGTH}px`,
+    ].join(";");
+    document.body.appendChild(line);
+    return line;
+  }
+
+  // ── Sidebar bottom-bar overdraws ─────────────────────────────────────
+
+  /**
+   * When the grid has no tabs, the open sidebar's bottom bar (footer) top
+   * border ends abruptly at the sidebar's grid-side edge, leaving the empty
+   * grid with no continuation. Overdraw that top border a short way into the
+   * grid with a horizontal fade-out accent so the bottom bar reads as running
+   * on, even though the grid is empty.
+   *
+   * One accent per open sidebar whose bottom bar is present; the accent sits on
+   * the footer's top-border y and fades from the sidebar's grid-side edge into
+   * the grid (right for the left sidebar, left for the right). It is portalled
+   * (fixed) so the sidebar's `overflow: hidden` cannot clip it, and removed
+   * when the grid gets a tab (a tab's own bottom bar then provides the line) or
+   * the sidebar closes / loses its footer. Hidden — not drawn — while the grid
+   * hosts a tab that has a bottom bar.
+   */
+  private _placeSidebarFooterOverdraws(): void {
+    const win = this.windowData;
+    const gridEmpty = !win?.grid?.placements.some((p) => p.tabIds.length > 0);
+    for (const side of ["left", "right"] as const) {
+      const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
+      const shouldShow = gridEmpty && !!sb?.isOpen;
+      const existing = this._sbFooterOverdraw.get(side) ?? null;
+      if (!shouldShow) {
+        if (existing) {
+          existing.remove();
+          this._sbFooterOverdraw.delete(side);
+        }
+        this._sbFooterEl.delete(side);
+        continue;
+      }
+      if (!sb) continue;
+      // Only draw when this sidebar's active system tab actually has a bottom
+      // bar to continue (e.g. the Agents list footer).
+      let footer = this._sbFooterEl.get(side) ?? null;
+      if (!footer || !footer.isConnected) {
+        footer = this._findSidebarFooter(sb);
+        this._sbFooterEl.set(side, footer);
+      }
+      if (!footer) {
+        if (existing) {
+          existing.remove();
+          this._sbFooterOverdraw.delete(side);
+        }
+        continue;
+      }
+      const line = existing ?? this._createSbFooterOverdraw(side);
+      this._sbFooterOverdraw.set(side, line);
+    }
+  }
+
+  /** Find the active tab host's bottom bar (the element pinned to the host's
+   * bottom that carries a 1px top border). Null when the tab has no bottom bar. */
+  private _findSidebarFooter(sb: HTMLElement): HTMLElement | null {
+    const host = sb.querySelector<HTMLElement>(".sidebar-tab-host.visible");
+    if (!host) return null;
+    const hostBottom = host.getBoundingClientRect().bottom;
+    let footer: HTMLElement | null = null;
+    for (const el of host.querySelectorAll<HTMLElement>("*")) {
+      if (getComputedStyle(el).borderTopWidth !== "1px") continue;
+      const rect = el.getBoundingClientRect();
+      if (Math.abs(rect.bottom - hostBottom) < 1) footer = el;
+    }
+    return footer;
+  }
+
+  /** Position each footer overdraw on its footer's top-border y, fading from
+   * the sidebar's grid-side edge into the grid. */
+  private _positionSidebarFooterOverdraws(): void {
+    for (const side of ["left", "right"] as const) {
+      const line = this._sbFooterOverdraw.get(side);
+      if (!line) continue;
+      const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
+      let footer = this._sbFooterEl.get(side) ?? null;
+      if (sb && (!footer || !footer.isConnected)) {
+        footer = this._findSidebarFooter(sb);
+        this._sbFooterEl.set(side, footer);
+      }
+      if (!sb || !footer) continue;
+      const footerTop = footer.getBoundingClientRect().top;
+      const sbRect = sb.getBoundingClientRect();
+      line.style.top = `${footerTop}px`;
+      if (side === "left") {
+        line.setAttribute("dir", "right");
+        line.style.left = `${sbRect.right}px`;
+      } else {
+        line.setAttribute("dir", "left");
+        line.style.left = `${sbRect.left - SIDEBAR_FOOTER_OVERDRAW_LENGTH}px`;
+      }
+    }
+  }
+
+  /** Create a portalled horizontal <overdraw-line that fades into the grid from
+   * the sidebar's grid-side edge (solid end on the footer's top border). */
+  private _createSbFooterOverdraw(_side: "left" | "right"): HTMLElement {
+    const line = document.createElement("overdraw-line");
+    line.setAttribute("aria-hidden", "true");
+    line.style.cssText = [
+      "position: fixed",
+      "z-index: 999",
+      "pointer-events: none",
+      "--overdraw-color: var(--divider, #333)",
+      "--overdraw-thickness: 1px",
+      `--overdraw-length: ${SIDEBAR_FOOTER_OVERDRAW_LENGTH}px`,
     ].join(";");
     document.body.appendChild(line);
     return line;
@@ -802,9 +945,12 @@ class Openp41geWindowView extends LitElement {
 
   updated(): void {
     // Continue populated sidebars' grid-side dividers up past the title-bar
-    // seam when the grid is empty (re-placed on every render so sidebar drags
-    // and window resizes keep the line over the divider).
+    // seam when the grid is empty, and continue each open sidebar's bottom-bar
+    // top border into the empty grid. Re-placed on every render so sidebar
+    // drags and window resizes keep the lines over their anchors.
     this._placeSidebarDividerOverdraws();
+    this._placeSidebarFooterOverdraws();
+    this._syncSbOverdrawLoop();
     // Context menu is shown synchronously from the event handler
   }
 
