@@ -14,8 +14,14 @@ export const GLOBAL_SETTINGS_SCHEMA = {
   type: "object",
   additionalProperties: true,
   description:
-    "Global editor appearance preferences: the active theme and the base line height / font size used across every source and settings editor.",
+    "Global editor appearance preferences: the active theme, the base line height / font size used across every source and settings editor, and the auto-update channel.",
   properties: {
+    updateChannel: {
+      type: "string",
+      enum: ["latest", "alpha", "beta", "rc"],
+      description:
+        'Auto-update channel. "latest" (stable) only receives stable releases; "alpha" / "beta" / "rc" receive prerelease builds on that track. The channel is read at startup by the main process.',
+    },
     appTheme: {
       type: "string",
       enum: ["dark", "light"],
@@ -31,8 +37,7 @@ export const GLOBAL_SETTINGS_SCHEMA = {
     },
     fontSize: {
       type: "number",
-      description:
-        "Base editor font size in pixels. Raised/lowered uniformly across editors.",
+      description: "Base editor font size in pixels. Raised/lowered uniformly across editors.",
     },
   },
 } as const;

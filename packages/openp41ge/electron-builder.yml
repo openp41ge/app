@@ -25,8 +25,17 @@ files:
 
 asar: true
 
-# Never let electron-builder push to GitHub itself — CI creates the release.
-publish: null
+# Update feed → GitHub Releases. With a `publish` config present (even with
+# `--publish never`), electron-builder embeds `app-update.yml` into the app and
+# writes the per-channel update-info .yml (latest-mac.yml / alpha-mac.yml / …)
+# into `release/`; the release job uploads it as a release asset. v26's GitHub
+# provider emits ONLY the configured channel's file, so CI overrides `channel`
+# per build with `-c.publish.channel=<alpha|beta|rc>` (stable stays "latest").
+publish:
+  provider: github
+  owner: openp41ge
+  repo: app
+  channel: latest
 
 mac:
   category: public.app-category.developer-tools

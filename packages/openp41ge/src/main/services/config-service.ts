@@ -26,6 +26,9 @@ const log = createLogger("openp41ge", "ConfigService");
 export interface UserConfig {
   version: number;
   appTheme: "dark" | "light";
+  /** Auto-update channel — "latest" (stable) or a prerelease track ("alpha"/"beta"/"rc").
+   *  The default stable channel never receives prerelease builds. */
+  updateChannel: "latest" | "alpha" | "beta" | "rc";
   /** Platform-wide line height (px) — the openp41ge platform setting that all
    *  sub-package editors (file editor, JSON editor, …) align to. */
   lineHeight: number;
@@ -64,6 +67,7 @@ export const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024;
 const DEFAULT_CONFIG: UserConfig = {
   version: 1,
   appTheme: "dark",
+  updateChannel: "latest",
   lineHeight: 20,
   fontSize: 14,
   editor: {

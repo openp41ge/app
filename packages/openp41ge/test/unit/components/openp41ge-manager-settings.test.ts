@@ -35,6 +35,7 @@ class FakeBridge {
 const CONFIG = {
   version: 1,
   appTheme: "dark",
+  updateChannel: "latest",
   lineHeight: 20,
   fontSize: 14,
   editor: { fontFamily: "mono", maxFileSize: 52428800 },
@@ -42,8 +43,8 @@ const CONFIG = {
 };
 
 /** Only the platform-wide keys are editable in the global surface. */
-const GLOBAL = { appTheme: "dark", lineHeight: 20, fontSize: 14 };
-const DIRTY = { appTheme: "dark", lineHeight: 32, fontSize: 14 };
+const GLOBAL = { appTheme: "dark", updateChannel: "latest", lineHeight: 20, fontSize: 14 };
+const DIRTY = { appTheme: "dark", updateChannel: "alpha", lineHeight: 32, fontSize: 14 };
 
 async function mount(bridge) {
   const el = document.createElement("openp41ge-manager-settings");
@@ -100,13 +101,16 @@ describe("openp41ge-manager-settings — global platform settings JSON editor", 
     await tick();
     expect(bridge.sets.length).toBeGreaterThan(0);
     const keys = bridge.sets.map((s) => s.key);
-    expect(keys.sort()).toEqual(["appTheme", "fontSize", "lineHeight"]);
+    expect(keys.sort()).toEqual(["appTheme", "fontSize", "lineHeight", "updateChannel"]);
     // Sub-package sections are NOT persisted from this surface.
     expect(keys).not.toContain("editor");
     expect(keys).not.toContain("agent");
     // The staged line height persists at the top level.
     const lh = bridge.sets.find((s) => s.key === "lineHeight");
     expect(lh.value).toBe(32);
+    // The auto-update channel persists at the top level.
+    const uc = bridge.sets.find((s) => s.key === "updateChannel");
+    expect(uc.value).toBe("alpha");
     expect(el.shadowRoot.querySelector(".mms-status").textContent).toContain("All changes saved");
   });
 

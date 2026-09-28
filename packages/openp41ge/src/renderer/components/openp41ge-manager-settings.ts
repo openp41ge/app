@@ -24,7 +24,7 @@ export interface ManagerConfigBridge {
 }
 
 /** Platform-wide (global) settings shown here — sub-packages align to these. */
-const GLOBAL_KEYS = ["appTheme", "lineHeight", "fontSize"] as const;
+const GLOBAL_KEYS = ["appTheme", "updateChannel", "lineHeight", "fontSize"] as const;
 
 @customElement("openp41ge-manager-settings")
 export class Openp41geManagerSettings extends LitElement {
@@ -125,8 +125,8 @@ export class Openp41geManagerSettings extends LitElement {
         <header class="mms-header">
           <div class="mms-title">Global settings</div>
           <div class="mms-hint">
-            Platform-wide settings that the openp41ge sub-packages align to. Edits are staged
-            and only applied when you press Save.
+            Platform-wide settings that the openp41ge sub-packages align to. Edits are staged and
+            only applied when you press Save.
           </div>
         </header>
 

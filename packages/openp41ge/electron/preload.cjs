@@ -685,6 +685,21 @@ contextBridge.exposeInMainWorld("openp41ge", {
     getAll: () => ipcRenderer.invoke("config:get-all"),
   },
 
+  updater: {
+    /** Query the current auto-update status. */
+    getStatus: () => ipcRenderer.invoke("updater:get-status"),
+    /** Trigger an update check now. Returns the status after the check. */
+    check: () => ipcRenderer.invoke("updater:check"),
+    /** Install the staged update and restart (only valid when an update is downloaded). */
+    quitAndInstall: () => ipcRenderer.invoke("updater:quit-and-install"),
+    /** Subscribe to auto-update status changes. Returns unsubscribe. */
+    onStatus: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("updater:status", handler);
+      return () => ipcRenderer.removeListener("updater:status", handler);
+    },
+  },
+
   welcome: {
     isDismissed: () => ipcRenderer.invoke("welcome:is-dismissed"),
     setDismissed: (dismissed) => ipcRenderer.invoke("welcome:set-dismissed", dismissed),

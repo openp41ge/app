@@ -33,6 +33,7 @@ import {
 } from "../src/main/index.js";
 import { WorkspaceService } from "../src/main/services/workspace-service.js";
 import { ConfigService } from "../src/main/services/config-service.js";
+import { AutoUpdaterService } from "./auto-updater-service.js";
 import { resolveAppDataDir } from "../src/main/services/app-data-dir.js";
 import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-arg.js";
 import { ReposWatcher } from "./repos-watcher.js";
@@ -66,6 +67,7 @@ import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
 import { registerWelcomeHandlers } from "./ipc-handlers/welcome-handlers.js";
 import { registerLogHandlers } from "./ipc-handlers/log-handlers.js";
 import { registerChatHandlers } from "./ipc-handlers/chat-handlers.js";
+import { registerUpdaterHandlers } from "./ipc-handlers/updater-handlers.js";
 
 // ─── Lifecycle manager ──────────────────────────────────────────────────
 import { LifecycleManager, registerLifecycleHandlers } from "./lifecycle-manager.js";
@@ -80,6 +82,7 @@ export class Openp41geApplication {
 
   // ── Private service instances ─────────────────────────────────────────
   private configService!: ConfigService;
+  private autoUpdater!: AutoUpdaterService;
   private dispatcher!: OperationDispatcher;
   private terminalManager!: TerminalManager;
   private dragGhost!: DragGhostManager;
@@ -131,6 +134,9 @@ export class Openp41geApplication {
     // Wait for Electron to be ready, then create the UI
     await app.whenReady();
     this.lifecycle.notifyElectronReady();
+
+    // Kick off the startup update check (no-op in dev; channel from config).
+    void this.autoUpdater.start();
 
     this._createInitialWindow();
     this._setupMenu();
@@ -218,6 +224,18 @@ export class Openp41geApplication {
   private _initConfig(): void {
     this.configService = new ConfigService(this.openp41geDir);
     this.configService.init();
+    // Auto-update reads the persisted `updateChannel` and drives electron-updater.
+    this.autoUpdater = new AutoUpdaterService(this.configService);
+    this.autoUpdater.onStatus((status) => {
+      const payload = JSON.stringify(status);
+      for (const [, bw] of openp41geWindows) {
+        try {
+          bw.webContents.send("updater:status", payload);
+        } catch {
+          // window might be closing
+        }
+      }
+    });
   }
 
   // ── Step 4: Services ──────────────────────────────────────────────────
@@ -387,12 +405,10 @@ export class Openp41geApplication {
     registerWorkspaceHandlers(this.workspaceService, this.dispatcher, this.openp41geDir);
     registerGitHandlers(this.gitCommitService, this.gitService);
     registerConfigHandlers(this.configService);
-    registerWelcomeHandlers(
-      this.openp41geDir,
-      !app.isPackaged && !process.env.OPENP41GE_E2E_TEST,
-    );
+    registerWelcomeHandlers(this.openp41geDir, !app.isPackaged && !process.env.OPENP41GE_E2E_TEST);
     registerLogHandlers(this.logStore);
     registerChatHandlers(this.chatStore, this.agentRuntime, this.chatProviders, this.configService);
+    registerUpdaterHandlers(this.autoUpdater);
     registerLifecycleHandlers(this.lifecycle);
     registerDialogHandlers(this.openp41geDir);
   }
@@ -507,16 +523,19 @@ export class Openp41geApplication {
           // so Workspaces and Settings both open it with the matching tab.
           {
             label: "Workspaces",
-            click: () => openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "workspaces"),
+            click: () =>
+              openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "workspaces"),
           },
           {
             label: "Releases",
-            click: () => openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "releases"),
+            click: () =>
+              openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "releases"),
           },
           {
             label: "Settings…",
             accelerator: "CmdOrCtrl+,",
-            click: () => openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "settings"),
+            click: () =>
+              openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "settings"),
           },
           { type: "separator" },
           { role: "services" },

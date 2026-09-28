@@ -272,6 +272,8 @@ describe("ConfigService (main process)", () => {
     // Defaults filled in
     expect(configService.get("lineHeight")).toBe(20);
     expect(configService.get("fontSize")).toBe(14);
+    // The auto-update channel defaults to the stable "latest" track.
+    expect(configService.get("updateChannel")).toBe("latest");
     const themes = configService.get("syntaxThemes") as Record<string, string>;
     // syntaxThemes default is now empty — existing config is merged
     expect(themes).toEqual({});

@@ -26,6 +26,7 @@
     "concurrently": "^9.0.0",
     "electron": "^43.0.0",
     "electron-builder": "^26.0.0",
+    "electron-updater": "^6.8.9",
     "esbuild": "^0.25.12",
     "lit": "^3.3.3",
     "openp41ge-agents": "workspace:*",

@@ -155,7 +155,16 @@ jobs:
             x64)       FLAG="--x64" ;;
             *) echo "::error::Unsupported arch: $ARCH"; exit 1 ;;
           esac
-          pnpm exec electron-builder --mac "$FLAG" --publish never
+          # electron-builder's GitHub provider emits ONLY the configured channel's
+          # update-info file (latest-mac.yml / alpha-mac.yml / …), so set the
+          # channel from the release channel (stable -> latest). This is what
+          # the in-app auto-updater fetches by channel.
+          BUILD_CHANNEL="${{ needs.meta.outputs.channel }}"
+          [ "$BUILD_CHANNEL" = "stable" ] && BUILD_CHANNEL="latest"
+          CHANNEL_FLAG=""
+          [ "$BUILD_CHANNEL" != "latest" ] && CHANNEL_FLAG="-c.publish.channel=$BUILD_CHANNEL"
+          echo "Building update channel: $BUILD_CHANNEL"
+          pnpm exec electron-builder --mac "$FLAG" --publish never $CHANNEL_FLAG
 
       - name: Verify signature + notarization
         working-directory: packages/openp41ge
@@ -187,6 +196,7 @@ jobs:
           path: |
             packages/openp41ge/release/*.dmg
             packages/openp41ge/release/*.zip
+            packages/openp41ge/release/*.yml
             packages/openp41ge/release/SHA256SUMS
 
   release:

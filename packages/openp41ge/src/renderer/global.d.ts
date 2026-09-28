@@ -331,6 +331,18 @@ declare global {
         getAll: () => Promise<Record<string, any>>;
       };
 
+      /** Auto-update status + control (backed by the main-process AutoUpdaterService). */
+      updater: {
+        /** Current auto-update status snapshot. */
+        getStatus: () => Promise<UpdaterStatus>;
+        /** Trigger an update check now. */
+        check: () => Promise<UpdaterStatus>;
+        /** Download-and-install the staged update, then restart. */
+        quitAndInstall: () => Promise<void>;
+        /** Subscribe to auto-update status changes. Returns unsubscribe. */
+        onStatus: (callback: (status: UpdaterStatus) => void) => () => void;
+      };
+
       /** Welcome intro dismissal — backed by a marker file in the app-data dir. */
       welcome: {
         isDismissed: () => Promise<boolean>;
@@ -433,6 +445,15 @@ declare global {
     /** True when the file has more matches than the per-file cap. */
     truncated?: boolean;
   }
+
+  /** Auto-update status reported by the main process (channel from Settings). */
+  type UpdaterStatus =
+    | { state: "idle"; channel: string }
+    | { state: "checking"; channel: string }
+    | { state: "update-available"; version: string }
+    | { state: "update-not-available"; version: string }
+    | { state: "update-downloaded"; version: string }
+    | { state: "error"; message: string };
 
   /** A file that contains at least one content match, with its match instances. */
   interface FileContentSearchResult {

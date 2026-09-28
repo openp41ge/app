@@ -15,6 +15,8 @@ const log = createLogger("openp41ge", "config-service");
 export interface UserConfig {
   version: number;
   appTheme: "dark" | "light";
+  /** Auto-update channel — "latest" (stable) or a prerelease track ("alpha"/"beta"/"rc"). */
+  updateChannel: "latest" | "alpha" | "beta" | "rc";
   /** Platform-wide line height (px) — sub-package editors align to this. */
   lineHeight: number;
   /** Platform-wide font size (px) — sub-package editors align to this. */
