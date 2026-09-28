@@ -222,7 +222,7 @@ jobs:
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG exists — updating."
-            gh release edit "$TAG" --title "$TAG" --generate-notes
+            gh release edit "$TAG" --title "$TAG" $PREREL_FLAG $DRAFT_FLAG
           else
             echo "Creating release $TAG."
             gh release create "$TAG" \
