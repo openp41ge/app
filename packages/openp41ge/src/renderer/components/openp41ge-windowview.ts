@@ -104,6 +104,11 @@ class Openp41geWindowView extends LitElement {
    * border would otherwise stop at the sidebar's grid-side edge). Keyed by
    * side. */
   private _sbTabBarOverdraw = new Map<string, HTMLElement>();
+  /** Portalled horizontal <overdraw-line> accents that continue the grid's
+   * TAB-BAR bottom border into an EMPTY open sidebar (the grid tab bar's
+   * bottom border would otherwise stop at the grid area's grid-side edge).
+   * Keyed by side. */
+  private _sbGridTabBarOverdraw = new Map<string, HTMLElement>();
   /** Cached bottom-bar (footer) element found in each sidebar's active host
    * (or null when the active tab has no bottom bar), so the per-frame tracker
    * only has to read one rect (not re-scan the tree). */
@@ -195,6 +200,8 @@ class Openp41geWindowView extends LitElement {
     this._sbFooterOverdraw.clear();
     for (const line of this._sbTabBarOverdraw.values()) line.remove();
     this._sbTabBarOverdraw.clear();
+    for (const line of this._sbGridTabBarOverdraw.values()) line.remove();
+    this._sbGridTabBarOverdraw.clear();
     this._sbFooterEl.clear();
     for (const line of this._cellOverdraw.values()) line.remove();
     this._cellOverdraw.clear();
@@ -565,6 +572,7 @@ class Openp41geWindowView extends LitElement {
   private _syncOverdraws(): void {
     this._placeSidebarFooterOverdraws();
     this._placeSidebarTabBarOverdraws();
+    this._placeGridTabBarOverdraws();
     this._placeCellDividerOverdraws();
     this._syncSidebarSepOverdraws();
     this._positionSidebarOverdraws();
@@ -575,6 +583,7 @@ class Openp41geWindowView extends LitElement {
     this._positionSbDividerOverdraws();
     this._positionSidebarFooterOverdraws();
     this._positionSidebarTabBarOverdraws();
+    this._positionGridTabBarOverdraws();
   }
 
   private _syncOverdrawLoop(): void {
@@ -582,6 +591,7 @@ class Openp41geWindowView extends LitElement {
       this._sbDividerOverdraw.size > 0 ||
       this._sbFooterOverdraw.size > 0 ||
       this._sbTabBarOverdraw.size > 0 ||
+      this._sbGridTabBarOverdraw.size > 0 ||
       this._cellOverdraw.size > 0 ||
       this._sbSepOverdraw.size > 0
     ) {
@@ -790,6 +800,88 @@ class Openp41geWindowView extends LitElement {
   /** Create a portalled horizontal <overdraw-line that fades into the grid from
    * the sidebar's grid-side edge (solid end on the tab bar's bottom border). */
   private _createSbTabBarOverdraw(): HTMLElement {
+    const line = document.createElement("overdraw-line");
+    line.setAttribute("aria-hidden", "true");
+    line.style.cssText = [
+      "position: fixed",
+      "z-index: 999",
+      "pointer-events: none",
+      "--overdraw-color: var(--divider, #333)",
+      "--overdraw-thickness: 1px",
+      `--overdraw-length: ${SIDEBAR_FOOTER_OVERDRAW_LENGTH}px`,
+    ].join(";");
+    document.body.appendChild(line);
+    return line;
+  }
+
+  // ── Grid tab-bar overdraws (into an empty sidebar) ───────────────────
+
+  /**
+   * Mirror of `_placeSidebarTabBarOverdraws`: when the grid hosts at least one
+   * tab, the grid's tab bar carries a 1px bottom border. If an open sidebar
+   * hosts NO tabs, its own tab bar is visually hidden (only the `+` button row
+   * shows, and it has no bottom border), so the grid tab bar's border would
+   * stop at the grid area's grid-side edge — leaving the empty sidebar with no
+   * continuation. Overdraw the grid tab bar's bottom border a short way into
+   * the empty sidebar so it reads as running on. Removed once the sidebar gets
+   * its first tab (which supplies its own bar / border) or the grid empties.
+   */
+  private _placeGridTabBarOverdraws(): void {
+    const win = this.windowData;
+    const gridHasTabs = !!win?.grid?.placements.some((p) => p.tabIds.length > 0);
+    for (const side of ["left", "right"] as const) {
+      const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
+      const shouldShow = gridHasTabs && !!sb?.isOpen && (sb?.systemTabs?.length ?? 0) === 0;
+      const existing = this._sbGridTabBarOverdraw.get(side) ?? null;
+      if (!shouldShow) {
+        if (existing) {
+          existing.remove();
+          this._sbGridTabBarOverdraw.delete(side);
+        }
+        continue;
+      }
+      if (!sb) continue;
+      const gridArea = this.querySelector<HTMLElement>(".openp41ge-grid-area");
+      const tabBar = gridArea?.querySelector<HTMLElement>(".grid-cell tab-bar .tab-bar-container");
+      if (!gridArea || !tabBar) {
+        if (existing) {
+          existing.remove();
+          this._sbGridTabBarOverdraw.delete(side);
+        }
+        continue;
+      }
+      const line = existing ?? this._createSbGridTabBarOverdraw();
+      this._sbGridTabBarOverdraw.set(side, line);
+    }
+  }
+
+  /** Position each grid tab-bar overdraw on the grid tab bar's bottom-border y,
+   * fading from the grid area's grid-side edge into the empty sidebar. */
+  private _positionGridTabBarOverdraws(): void {
+    for (const side of ["left", "right"] as const) {
+      const line = this._sbGridTabBarOverdraw.get(side);
+      if (!line) continue;
+      const gridArea = this.querySelector<HTMLElement>(".openp41ge-grid-area");
+      if (!gridArea) continue;
+      const tabBar = gridArea.querySelector<HTMLElement>(".grid-cell tab-bar .tab-bar-container");
+      if (!tabBar) continue;
+      const gaRect = gridArea.getBoundingClientRect();
+      const tbRect = tabBar.getBoundingClientRect();
+      line.style.top = `${tbRect.bottom - 1}px`;
+      if (side === "left") {
+        line.setAttribute("dir", "left");
+        line.style.left = `${gaRect.left - SIDEBAR_FOOTER_OVERDRAW_LENGTH}px`;
+      } else {
+        line.setAttribute("dir", "right");
+        line.style.left = `${gaRect.right}px`;
+      }
+    }
+  }
+
+  /** Create a portalled horizontal <overdraw-line that fades from the grid
+   * tab-bar border into the empty sidebar (solid end on the grid area's
+   * grid-side edge). */
+  private _createSbGridTabBarOverdraw(): HTMLElement {
     const line = document.createElement("overdraw-line");
     line.setAttribute("aria-hidden", "true");
     line.style.cssText = [
@@ -1254,6 +1346,7 @@ class Openp41geWindowView extends LitElement {
     this._placeSidebarDividerOverdraws();
     this._placeSidebarFooterOverdraws();
     this._placeSidebarTabBarOverdraws();
+    this._placeGridTabBarOverdraws();
     this._placeCellDividerOverdraws();
     this._syncSidebarSepOverdraws();
     this._syncOverdrawLoop();

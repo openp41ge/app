@@ -395,6 +395,27 @@ describe("ClosedSidebarDropTarget", () => {
   });
 });
 
+describe("SidebarDropTarget empty-bar indicator suppression", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("hides the tab-bar insert line for an empty sidebar (only the full sidebar overlay shows)", () => {
+    const { bar } = buildRightBar(0); // no tabs in the bar
+    const target = new SidebarDropTarget(bar, "w1", "right");
+    const source = fakeSystemTabSource("t1", "left");
+
+    // clientY=15 is within the bar rect (top:0, bottom:30) → over the tab bar,
+    // but the bar is empty (visually hidden) so no insert line may appear.
+    const feedback = target.onHover(source, 20, 15);
+
+    expect(feedback).not.toBeNull();
+    expect(feedback!.overTabBar).toBe(true);
+    expect(indicatorVisible()).toBe(false); // no tab-bar insert line
+    expect(overlayVisible()).toBe(true); // only the full sidebar overlay
+  });
+});
+
 describe("SidebarDropTarget tab-bar indicator geometry", () => {
   beforeEach(() => {
     document.body.innerHTML = "";

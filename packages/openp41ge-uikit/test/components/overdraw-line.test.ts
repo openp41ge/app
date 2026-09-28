@@ -454,4 +454,71 @@ describe("attachTabEdgeOverdraws", () => {
     attachTabEdgeOverdraws(tab, { edges: ["right"] });
     expect(document.body.querySelector("div[style*='position: fixed']")).toBeNull();
   });
+
+  test("hides strokes whose anchor lies outside the clip container (scrolled/overflowing tabs)", () => {
+    const tab = document.createElement("div");
+    document.body.appendChild(tab);
+    stubRect(tab, { left: 100, top: 40, right: 260, bottom: 74, width: 160, height: 34 });
+    const clip = document.createElement("div");
+    document.body.appendChild(clip);
+    stubRect(clip, { left: 100, top: 40, right: 200, bottom: 90, width: 100, height: 50 });
+
+    const raf = (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame;
+    (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = undefined;
+    try {
+      attachTabEdgeOverdraws(tab, { edges: ["right", "bottom"], length: 8, clipContainer: clip });
+    } finally {
+      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = raf;
+    }
+
+    const lines = Array.from(
+      document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"),
+    );
+    // Anchors: right-edge strokes sit on x=r.right=260 (outside the clip's
+    // right=200) → hidden. bl-bottom sits on (x=r.left=100, y=r.bottom=74)
+    // → inside → shown. br-bottom sits on x=260 → hidden.
+    const visible = lines.filter((l) => l.style.display !== "none");
+    expect(visible.map((l) => l.getAttribute("corner")).sort()).toEqual(["bl-bottom"]);
+    expect(lines.filter((l) => l.style.display === "none").map((l) => l.getAttribute("corner")).sort()).toEqual([
+      "br-bottom",
+      "br-right",
+      "tr-right",
+    ]);
+  });
+
+  test("keeps all strokes when the clip container fully contains the host", () => {
+    const tab = document.createElement("div");
+    document.body.appendChild(tab);
+    stubRect(tab, { left: 100, top: 40, right: 260, bottom: 74, width: 160, height: 34 });
+    const clip = document.createElement("div");
+    document.body.appendChild(clip);
+    stubRect(clip, { left: 90, top: 30, right: 290, bottom: 90, width: 200, height: 60 });
+
+    const raf = (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame;
+    (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = undefined;
+    try {
+      attachTabEdgeOverdraws(tab, { edges: ["right", "bottom"], length: 8, clipContainer: clip });
+    } finally {
+      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = raf;
+    }
+
+    const lines = Array.from(
+      document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"),
+    );
+    expect(lines.filter((l) => l.style.display !== "none")).toHaveLength(4);
+  });
+
+  test("re-attaches when the clip container changes even with the same edges", () => {
+    const tab = document.createElement("div");
+    document.body.appendChild(tab);
+    const clip1 = document.createElement("div");
+    const clip2 = document.createElement("div");
+    document.body.appendChild(clip1);
+    document.body.appendChild(clip2);
+    attachTabEdgeOverdraws(tab, { edges: ["right"], clipContainer: clip1 });
+    const layer1 = document.body.querySelector("div[style*='position: fixed']");
+    attachTabEdgeOverdraws(tab, { edges: ["right"], clipContainer: clip2 });
+    const layer2 = document.body.querySelector("div[style*='position: fixed']");
+    expect(layer2).not.toBe(layer1);
+  });
 });

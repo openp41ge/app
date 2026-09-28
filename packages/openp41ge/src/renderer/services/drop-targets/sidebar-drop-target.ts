@@ -101,12 +101,14 @@ export class SidebarDropTarget implements IDropTarget {
     const noOpReorder = fromIndex >= 0 && (dropIndex === fromIndex || dropIndex === fromIndex + 1);
 
     // Only show the precise drop indicator when cursor is directly over the
-    // tab bar. When hovering the content area below, only the sidebar-wide
-    // overlay is shown (drop always appends to end).
+    // tab bar AND the bar has at least one tab. When the sidebar is empty its
+    // tab bar is visually hidden (only the `+` button row shows), so the
+    // tab-bar insert line must not appear — only the sidebar-wide overlay.
+    const hasTabs = getTabButtonsInSidebarBar(this.element).length > 0;
     const barRect = this.element.getBoundingClientRect();
     const isOverTabBar = clientY >= barRect.top && clientY <= barRect.bottom;
 
-    this._showOverlay(dropIndex, isOverTabBar && !noOpReorder, isOverTabBar);
+    this._showOverlay(dropIndex, isOverTabBar && !noOpReorder && hasTabs, isOverTabBar);
     return { indicatorKey: `sidebar-bar-${this.winId}-${this.side}`, overTabBar: isOverTabBar };
   }
 

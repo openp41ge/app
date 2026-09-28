@@ -35,6 +35,10 @@ export interface TabEdgeOverdrawOptions {
   length?: number;
   /** Stroke thickness (px), for the border being continued. */
   thickness?: number;
+  /** Optional scroll/clip container. Strokes whose anchor point lies outside
+   *  this container's rect (e.g. tabs scrolled out of a tab bar) are hidden,
+   *  so clipped tabs don't leave floating overdraw lines. */
+  clipContainer?: HTMLElement;
 }
 
 /** [corner, dir, anchor-on-x, anchor-on-y] — per edge, the two corners at
@@ -63,6 +67,7 @@ const EDGE_CORNERS: Record<
 
 interface AttachedEdgeOverdraw {
   edges: string;
+  clip: HTMLElement | null;
   lines: Array<{ edge: TabEdge; corner: string; dir: OverdrawDirection; el: HTMLElement }>;
   layer: HTMLElement;
   raf: number;
@@ -85,8 +90,9 @@ function edgeKey(edges: TabEdge[]): string {
  */
 export function attachTabEdgeOverdraws(host: HTMLElement, opts: TabEdgeOverdrawOptions): void {
   const key = edgeKey(opts.edges);
+  const clip = opts.clipContainer ?? null;
   const existing = state.get(host);
-  if (existing && existing.edges === key) return;
+  if (existing && existing.edges === key && existing.clip === clip) return;
   if (existing) detachTabEdgeOverdraws(host);
   if (opts.edges.length === 0 || !host.isConnected) return;
 
@@ -136,9 +142,28 @@ export function attachTabEdgeOverdraws(host: HTMLElement, opts: TabEdgeOverdrawO
     }
     layer.style.display = "";
     const nudge = thickness / 2 - 0.5;
+    // If the clip container is disconnected (e.g. the bar was re-rendered),
+    // fall back to no clipping so the strokes aren't all masked off.
+    const cr = clip && clip.isConnected ? clip.getBoundingClientRect() : null;
     for (const { edge, corner, dir, el } of lines) {
       const entry = EDGE_CORNERS[edge].find(([c]) => c === corner)!;
       const [, , ax, ay] = entry;
+      if (cr) {
+        // Hide strokes whose anchor point (the border point they continue)
+        // falls outside the clip container — e.g. a tab scrolled/overflowing
+        // out of the bar. The strokes bleed OUTWARD from the anchor, so only
+        // the anchor must be inside the clip.
+        const anchorX = ax === "left" ? r.left : r.right;
+        const anchorY = ay === "top" ? r.top : r.bottom;
+        const visible =
+          anchorX >= cr.left - 0.5 &&
+          anchorX <= cr.right + 0.5 &&
+          anchorY >= cr.top - 0.5 &&
+          anchorY <= cr.bottom + 0.5;
+        el.style.display = visible ? "" : "none";
+      } else {
+        el.style.display = "";
+      }
       if (dir === "left" || dir === "right") {
         // Horizontal stroke: continues a top/bottom border past the corner.
         // The bottom border usually lives on the tab BAR (1px below the tab's
@@ -180,7 +205,7 @@ export function attachTabEdgeOverdraws(host: HTMLElement, opts: TabEdgeOverdrawO
     place();
   }
 
-  state.set(host, { edges: key, lines, layer, raf, ro });
+  state.set(host, { edges: key, clip, lines, layer, raf, ro });
 }
 
 /** Remove the portalled overdraw accents attached to `host`. */

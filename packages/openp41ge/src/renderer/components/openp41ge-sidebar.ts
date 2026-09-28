@@ -315,6 +315,7 @@ class Openp41geSidebar extends LitElement {
     if (!this.isOpen) return;
     const tabs = this.querySelectorAll<HTMLElement>(".sidebar-tab");
     const hasBarBorder = this.systemTabs.length > 0;
+    const scroll = this.querySelector<HTMLElement>(".sidebar-tab-scroll") ?? undefined;
     for (const tab of tabs) {
       attachTabEdgeOverdraws(tab, {
         edges: hasBarBorder ? ["right", "bottom"] : ["right"],
@@ -322,6 +323,7 @@ class Openp41geSidebar extends LitElement {
           right: "var(--border-divider, #2d2d2d)",
           bottom: "var(--border-divider, #2d2d2d)",
         },
+        clipContainer: scroll,
       });
     }
   }

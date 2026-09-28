@@ -518,3 +518,118 @@ describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
     expect(rightLines().length).toBe(0);
   });
 });
+
+describe("openp41ge-windowview grid tab-bar overdraws (into an empty sidebar)", () => {
+  // Mirror of the sidebar-tab-bar overdraw: when the grid hosts a tab but an
+  // open sidebar hosts NO tabs, the grid tab bar's bottom border would stop at
+  // the grid area's grid-side edge (the empty sidebar's tab bar is visually
+  // hidden and carries no bottom border). The windowview overdraws that border
+  // a short way into the empty sidebar.
+  async function mountGridToEmpty(emptySide: "left" | "right") {
+    const win = makeWin();
+    win.grid.placements = [{ position: { row: 0, col: 0 }, tabIds: ["t1"] }];
+    const ws = makeWs(win);
+    ws.sidebar = {
+      ...ws.sidebar,
+      leftSidebarTabs: emptySide === "left" ? [] : ws.sidebar.leftSidebarTabs,
+      rightSidebarTabs: emptySide === "right" ? [] : ws.sidebar.rightSidebarTabs,
+    };
+    const wv = document.createElement("openp41ge-windowview");
+    wv.windowData = win;
+    wv.workspaceData = ws;
+    document.body.appendChild(wv);
+    await wv.updateComplete;
+    // The tab-bar's nested <tab-bar> may not have updated yet (jsdom doesn't
+    // await nested lit updateComplete), so ensure a .tab-bar-container exists
+    // for the grid tab-bar; the placement code reads its rect.
+    const tabBar = wv.querySelector<HTMLElement>(".openp41ge-grid-area .grid-cell tab-bar");
+    let container = tabBar?.querySelector<HTMLElement>(".tab-bar-container") ?? null;
+    if (tabBar && !container) {
+      container = document.createElement("div");
+      container.className = "tab-bar-container";
+      tabBar.appendChild(container);
+    }
+    return { wv, win, ws, container };
+  }
+
+  function stubGrid(wv: HTMLElement, container: HTMLElement | null) {
+    const ga = wv.querySelector<HTMLElement>(".openp41ge-grid-area")!;
+    Object.defineProperty(ga, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ left: 210, top: 36, right: 490, bottom: 900, width: 280, height: 864, x: 210, y: 36, toJSON() {} }),
+    });
+    if (container) {
+      Object.defineProperty(container, "getBoundingClientRect", {
+        configurable: true,
+        value: () => ({ left: 210, top: 36, right: 490, bottom: 72, width: 280, height: 36, x: 210, y: 36, toJSON() {} }),
+      });
+    }
+  }
+
+  it("draws a grid tab-bar overdraw into an open EMPTY sidebar when the grid has a tab", async () => {
+    const { wv, container } = await mountGridToEmpty("right");
+    stubGrid(wv, container);
+
+    wv._placeGridTabBarOverdraws();
+    expect(wv._sbGridTabBarOverdraw.has("right")).toBe(true);
+    // Left sidebar hosts tabs, so no line overdraws into it.
+    expect(wv._sbGridTabBarOverdraw.has("left")).toBe(false);
+
+    wv._positionGridTabBarOverdraws();
+    const r = wv._sbGridTabBarOverdraw.get("right")!;
+    expect(r.getAttribute("dir")).toBe("right"); // fades right, into the sidebar
+    expect(parseFloat(r.style.left)).toBe(490); // solid end on the grid's right edge
+    expect(parseFloat(r.style.top)).toBe(72 - 1); // on the grid tab-bar bottom border
+  });
+
+  it("draws into an empty LEFT sidebar fading left from the grid's left edge", async () => {
+    const { wv, container } = await mountGridToEmpty("left");
+    stubGrid(wv, container);
+
+    wv._placeGridTabBarOverdraws();
+    expect(wv._sbGridTabBarOverdraw.has("right")).toBe(false); // right hosts tabs
+    expect(wv._sbGridTabBarOverdraw.has("left")).toBe(true);
+
+    wv._positionGridTabBarOverdraws();
+    const l = wv._sbGridTabBarOverdraw.get("left")!;
+    expect(l.getAttribute("dir")).toBe("left");
+    expect(parseFloat(l.style.left)).toBe(210 - SIDEBAR_FOOTER_OVERDRAW_LENGTH);
+    expect(parseFloat(l.style.top)).toBe(72 - 1);
+  });
+
+  it("removes the overdraw once the empty sidebar gets its first tab", async () => {
+    const { wv, ws, container } = await mountGridToEmpty("right");
+    stubGrid(wv, container);
+    wv._placeGridTabBarOverdraws();
+    expect(wv._sbGridTabBarOverdraw.has("right")).toBe(true);
+
+    const ws2 = { ...ws, sidebar: { ...ws.sidebar, rightSidebarTabs: ["sys-explorer"] } };
+    wv.workspaceData = ws2;
+    await wv.updateComplete;
+    expect(wv._sbGridTabBarOverdraw.has("right")).toBe(false);
+  });
+
+  it("removes the overdraw when the grid empties", async () => {
+    const { wv, win, container } = await mountGridToEmpty("right");
+    stubGrid(wv, container);
+    wv._placeGridTabBarOverdraws();
+    expect(wv._sbGridTabBarOverdraw.has("right")).toBe(true);
+
+    win.grid.placements = [];
+    wv.windowData = { ...win };
+    await wv.updateComplete;
+    expect(wv._sbGridTabBarOverdraw.has("right")).toBe(false);
+  });
+
+  it("cleans up the grid tab-bar overdraws when disconnected", async () => {
+    const { wv, container } = await mountGridToEmpty("right");
+    stubGrid(wv, container);
+    wv._placeGridTabBarOverdraws();
+    expect(wv._sbGridTabBarOverdraw.has("right")).toBe(true);
+
+    wv.remove();
+    await wv.updateComplete.catch(() => {});
+    expect(wv._sbGridTabBarOverdraw.size).toBe(0);
+    expect(document.body.querySelectorAll('overdraw-line:not([corner])').length).toBe(0);
+  });
+});
