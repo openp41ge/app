@@ -117,6 +117,9 @@ export class Gutter {
   private _events: GutterEvents;
   private _hoverBox: boolean;
   private _disposeDoc: (() => void) | null = null;
+  /** The hovered row + box geometry, used to re-derive the portalled box's
+   *  viewport position each frame so it tracks the gutter's scroll. */
+  private _hoverBoxState: { row: GutterRow; width: number; topOverlap: number } | null = null;
 
   // Drag state (click / drag row selection).
   private _anchor: GutterRow | null = null;
@@ -270,6 +273,7 @@ export class Gutter {
     this._detachDoc();
     this._detachHoverOverdraw();
     this._clearChevronHover();
+    this._hoverBoxState = null;
     this._columns = [];
     this._rows = [];
     this.root.remove();
@@ -380,6 +384,14 @@ export class Gutter {
       box = document.createElement("div");
       box.className = "eg-hoverbox";
       box.style.display = "none";
+      // Made position:fixed (kept inside the gutter root so the .eg-hoverbox
+      // styles and the inheritable --eg-hover-* custom props still apply).
+      // Fixed positioning removes it from the editor host's overflow clip, so
+      // its inset ring can overlap the 1px boundary lines (the settings
+      // drawer's border-left / head border-bottom, the file editor's content
+      // divider) without being clipped. Because it is fixed, it must track the
+      // gutter's viewport position per frame (see _attachHoverOverdraw).
+      box.style.position = "fixed";
       this.root.appendChild(box);
       this._attachHoverOverdraw(box);
     }
@@ -403,18 +415,23 @@ export class Gutter {
       width += this._columns[i].column.width();
     }
     box.style.display = "";
-    box.style.top = row.top + "px";
-    box.style.height = row.height + "px";
     // The gutter sits at its container's CONTENT edge, just right of a 1px
     // boundary line (the settings drawer's border-left, the file editor's
-    // content divider). The box's inset ring would otherwise sit 1px right of
-    // that line and the two read as a double border. Extend the box 1px left
-    // (widen by 1px so the right edge stays aligned) so the box's left edge
-    // lands ON the boundary line, collapsing the double into a single line
-    // (the box's own left ring falls outside the editor host's clip and is
-    // dropped, leaving the boundary line as the box's left edge).
-    box.style.left = "-1px";
-    box.style.width = width + 1 + "px";
+    // content divider), and the first row sits just below the editor's top
+    // boundary line (the drawer head's bottom border). The box's inset ring
+    // would otherwise sit 1px right/below those lines and the two read as a
+    // double border. Position the fixed box at viewport coordinates, starting
+    // 1px left of the gutter (and, on the first row, 1px up), extending the
+    // width/height by the same 1px so the far edges stay aligned — the box's
+    // ring then paints ON each boundary line as a single bright line instead
+    // of a dim boundary + a bright ring.
+    const gr = this.root.getBoundingClientRect();
+    const topOverlap = row.top === 0 ? 1 : 0;
+    box.style.left = `${gr.left - 1}px`;
+    box.style.top = `${gr.top + row.top - topOverlap}px`;
+    box.style.width = `${width + 1}px`;
+    box.style.height = `${row.height + topOverlap}px`;
+    this._hoverBoxState = { row, width, topOverlap };
   }
 
   private _columnHighlightable(state: ColumnState, row: GutterRow): boolean {
@@ -479,6 +496,17 @@ export class Gutter {
       }
     }
     const place = (): void => {
+      // Re-derive the fixed box's viewport position each frame (it is fixed,
+      // so it must track the gutter's scroll). Its geometry comes from the
+      // stored hover state; visibility is managed by _syncHoverBox.
+      const s = this._hoverBoxState;
+      if (s && box.isConnected) {
+        const gr = this.root.getBoundingClientRect();
+        box.style.left = `${gr.left - 1}px`;
+        box.style.top = `${gr.top + s.row.top - s.topOverlap}px`;
+        box.style.width = `${s.width + 1}px`;
+        box.style.height = `${s.row.height + s.topOverlap}px`;
+      }
       const r = box.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) {
         layer.style.display = "none";

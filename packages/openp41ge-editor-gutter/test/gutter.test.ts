@@ -82,6 +82,19 @@ describe("Gutter", () => {
       expect(box.style.top).toBe("20px");
     });
 
+    it("extends 1px up on the first row to overlap the container's top boundary", () => {
+      gutter.setRows(rows(3), () => ({}));
+      gutter.setHoverRow(0);
+      const box = gutter.root.querySelector<HTMLElement>(".eg-hoverbox")!;
+      expect(box.style.display).not.toBe("none");
+      // The gutter's bottom isn't scrutinized here (jsdom geometry is 0x0);
+      // the first row's box rises 1px onto the editor's top boundary line so
+      // its inset ring reads as ONE bright line there instead of a dim
+      // boundary + a bright ring (a double border). Mid rows stay put.
+      expect(box.style.top).toBe("-1px");
+      expect(box.style.height).toBe("21px"); // 20 + 1px top overlap
+    });
+
     it("stays on the line-number column only when the row has a chevron", () => {
       gutter.setRows(rows(3), (key) => ({ hasChevron: key === 1 }));
       gutter.setHoverRow(1);
@@ -123,7 +136,7 @@ describe("Gutter", () => {
         gutter.setRows(rows(1), () => ({}));
         gutter.setHoverRow(0);
 
-        const layer = document.body.querySelector<HTMLElement>("div[style*='position: fixed']");
+        const layer = document.body.querySelector<HTMLElement>("div[aria-hidden='true'][style*='position: fixed']");
         expect(layer).toBeTruthy();
         const strokes = Array.from(layer!.querySelectorAll("overdraw-line"));
         // 4 edges x 2 corners.
