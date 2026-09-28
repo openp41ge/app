@@ -179,12 +179,13 @@ describe("file-editor folding", () => {
     hover(7);
     await new Promise((r) => setTimeout(r, 20));
     expect(box()).not.toBeNull();
-    expect(parseFloat(box()!.style.width)).toBeCloseTo(numW() + foldW(), 1);
+    expect(parseFloat(box()!.style.width)).toBeCloseTo(numW() + foldW() + 1, 1); // +1px left overlap
+    expect(box()!.style.left).toBe("-1px");
 
     // Foldable row (line 1 has a chevron) → box stays on the number column.
     hover(1);
     await new Promise((r) => setTimeout(r, 20));
-    expect(parseFloat(box()!.style.width)).toBeCloseTo(numW(), 1);
+    expect(parseFloat(box()!.style.width)).toBeCloseTo(numW() + 1, 1);
   });
 
   test("clicking a line highlights both the number and fold gutter cells", async () => {

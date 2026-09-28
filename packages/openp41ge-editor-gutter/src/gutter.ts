@@ -405,7 +405,16 @@ export class Gutter {
     box.style.display = "";
     box.style.top = row.top + "px";
     box.style.height = row.height + "px";
-    box.style.width = width + "px";
+    // The gutter sits at its container's CONTENT edge, just right of a 1px
+    // boundary line (the settings drawer's border-left, the file editor's
+    // content divider). The box's inset ring would otherwise sit 1px right of
+    // that line and the two read as a double border. Extend the box 1px left
+    // (widen by 1px so the right edge stays aligned) so the box's left edge
+    // lands ON the boundary line, collapsing the double into a single line
+    // (the box's own left ring falls outside the editor host's clip and is
+    // dropped, leaving the boundary line as the box's left edge).
+    box.style.left = "-1px";
+    box.style.width = width + 1 + "px";
   }
 
   private _columnHighlightable(state: ColumnState, row: GutterRow): boolean {

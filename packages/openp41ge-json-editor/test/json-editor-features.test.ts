@@ -318,12 +318,13 @@ describe("json-editor structure features", () => {
     await new Promise((r) => setTimeout(r, 20));
     const hl = el.shadowRoot.querySelector(".eg-hoverbox");
     expect(hl.style.display).not.toBe("none");
-    expect(parseFloat(hl.style.width)).toBeCloseTo(numW + foldW);
+    expect(parseFloat(hl.style.width)).toBeCloseTo(numW + foldW + 1); // +1px left overlap
+    expect(hl.style.left).toBe("-1px");
     // Foldable row: overlay is number-only.
     numCells[emptyIdx].dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true }));
     numCells[chevIdx].dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true }));
     await new Promise((r) => setTimeout(r, 16));
-    expect(parseFloat(hl.style.width)).toBeCloseTo(numW);
+    expect(parseFloat(hl.style.width)).toBeCloseTo(numW + 1);
   });
 
   test("dragging across line numbers selects multiple lines", async () => {

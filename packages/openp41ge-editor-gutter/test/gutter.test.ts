@@ -77,7 +77,8 @@ describe("Gutter", () => {
       gutter.setHoverRow(1);
       const box = gutter.root.querySelector<HTMLElement>(".eg-hoverbox")!;
       expect(box.style.display).not.toBe("none");
-      expect(box.style.width).toBe("49px"); // 30 + 19
+      expect(box.style.width).toBe("50px"); // 30 + 19, plus 1px left overlap
+      expect(box.style.left).toBe("-1px");
       expect(box.style.top).toBe("20px");
     });
 
@@ -85,7 +86,8 @@ describe("Gutter", () => {
       gutter.setRows(rows(3), (key) => ({ hasChevron: key === 1 }));
       gutter.setHoverRow(1);
       const box = gutter.root.querySelector<HTMLElement>(".eg-hoverbox")!;
-      expect(box.style.width).toBe("30px");
+      expect(box.style.width).toBe("31px"); // 30 + 1 left overlap
+      expect(box.style.left).toBe("-1px");
     });
 
     it("clears the box when hover clears", () => {
