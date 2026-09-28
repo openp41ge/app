@@ -55,6 +55,10 @@ class Openp41geSidebar extends LitElement {
   @state()
   private _tabBarHeight = 34;
 
+  /** Whether the ＋ button is hovered (its separators + overdraws show only on
+   * hover while the sidebar hosts no tabs). */
+  private _addHover = false;
+
   private get _showLeftShadow(): boolean {
     const el = this.querySelector(".sidebar-tab-scroll");
     if (!el) return false;
@@ -298,12 +302,15 @@ class Openp41geSidebar extends LitElement {
    * up past the tab-bar top and down past the tab-bar bottom; the bottom
    * separator (and its left/right overdraws) appears only while the sidebar
    * hosts no tabs — the tab bar then has no bottom border of its own to carry
-   * the line. Idempotent per edge-set. */
+   * the line. While the sidebar hosts NO tabs, the separators + overdraws are
+   * shown only while the button is hovered (otherwise the bar would look like
+   * it has a stray bordered box). Idempotent per edge-set. */
   private _attachAddOverdraws(): void {
     if (!this.isOpen) return;
     const btn = this.querySelector<HTMLElement>(".sidebar-tab-add");
     if (!btn) return;
-    const edges: TabEdge[] = this.systemTabs.length === 0 ? ["left", "bottom"] : ["left"];
+    const edges: TabEdge[] =
+      this.systemTabs.length > 0 ? ["left"] : this._addHover ? ["left", "bottom"] : [];
     attachTabEdgeOverdraws(btn, { edges, color: "var(--border-divider, #2d2d2d)" });
   }
 
@@ -358,6 +365,17 @@ class Openp41geSidebar extends LitElement {
           }
           .sidebar-tab-add:hover {
             background: var(--bg-hover-strong, #444);
+          }
+          /* When the sidebar hosts no tabs, the ＋ button's own separators (and
+             their overdraws) only appear on hover — otherwise the bar would
+             show a stray bordered box with nothing in it. */
+          .sidebar-tab-add-empty {
+            border-left: 1px solid transparent;
+            border-bottom: 1px solid transparent;
+          }
+          .sidebar-tab-add-empty:hover {
+            border-left: 1px solid var(--border-divider, #2d2d2d);
+            border-bottom: 1px solid var(--border-divider, #2d2d2d);
           }
           /* Keep-alive hosts: one absolute full-fill container per tab. Only the
              active one is displayed; the rest stay mounted (hidden) so
@@ -437,15 +455,23 @@ class Openp41geSidebar extends LitElement {
           ></div>
           <!-- + button: open inline menu of registered sidebar tabs -->
           <div
-            class="sidebar-tab-add absolute top-0 flex items-center justify-center cursor-pointer select-none transition-colors duration-75"
-            style="height:34px;width:34px;top:0;right:0;color:var(--text-secondary,#999);z-index:2;border-radius:0;border-left:1px solid var(--border-divider, #2d2d2d);${this.systemTabs.length === 0 ? "border-bottom:1px solid var(--border-divider, #2d2d2d);" : ""}"
+            class="sidebar-tab-add absolute top-0 flex items-center justify-center cursor-pointer select-none transition-colors duration-75${this.systemTabs.length === 0 ? " sidebar-tab-add-empty" : ""}"
+            style="${this.systemTabs.length === 0 ? "height:35px;" : "height:34px;"}width:34px;top:0;right:0;color:var(--text-secondary,#999);z-index:2;border-radius:0;${this.systemTabs.length > 0 ? "border-left:1px solid var(--border-divider, #2d2d2d);" : ""}"
             ${tooltipContent({ type: "simple", text: "Open sidebar tab" })}
             @click=${this._onAddTabClick}
             @mouseenter=${(e: MouseEvent) => {
               (e.currentTarget as HTMLElement).style.color = "var(--text-primary,#ccc)";
+              if (this.systemTabs.length === 0) {
+                this._addHover = true;
+                this._attachAddOverdraws();
+              }
             }}
             @mouseleave=${(e: MouseEvent) => {
               (e.currentTarget as HTMLElement).style.color = "var(--text-secondary,#999)";
+              if (this.systemTabs.length === 0) {
+                this._addHover = false;
+                this._attachAddOverdraws();
+              }
             }}
           >
             ＋
