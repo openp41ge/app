@@ -555,7 +555,11 @@ class Openp41geWindowView extends LitElement {
     }
     const tick = (): void => {
       this._syncOverdraws();
-      this._sbOverdrawRaf = requestAnimationFrame(tick);
+      if (this._sbOverdrawsNeeded()) {
+        this._sbOverdrawRaf = requestAnimationFrame(tick);
+      } else {
+        this._sbOverdrawRaf = 0;
+      }
     };
     this._sbOverdrawRaf = requestAnimationFrame(tick);
   }
@@ -587,18 +591,43 @@ class Openp41geWindowView extends LitElement {
   }
 
   private _syncOverdrawLoop(): void {
-    if (
+    if (this._sbOverdrawsNeeded()) {
+      this._startSbOverdrawLoop();
+    } else {
+      this._stopSbOverdrawLoop();
+    }
+  }
+
+  /** True while any shown overdraw, or a grid tab-bar overdraw may still need
+   * lazy creation (the nested sidebar/tab-bar can render a frame after the
+   * windowview's own `updated()`). Keeps the loop alive through that transient
+   * so the grid tab-bar continuation into an empty open sidebar appears even
+   * when it is the *only* overdraw in play. */
+  private _sbOverdrawsNeeded(): boolean {
+    return (
       this._sbDividerOverdraw.size > 0 ||
       this._sbFooterOverdraw.size > 0 ||
       this._sbTabBarOverdraw.size > 0 ||
       this._sbGridTabBarOverdraw.size > 0 ||
       this._cellOverdraw.size > 0 ||
-      this._sbSepOverdraw.size > 0
-    ) {
-      this._startSbOverdrawLoop();
-    } else {
-      this._stopSbOverdrawLoop();
-    }
+      this._sbSepOverdraw.size > 0 ||
+      this._gridTabBarOverdrawPotential()
+    );
+  }
+
+  /** The grid tab-bar's bottom border should overdraw into a sidebar while the
+   * grid hosts tabs and that open sidebar hosts no tabs. Read from
+   * `workspaceData` (the source of truth) rather than the sidebar element, so it
+   * is already correct during the windowview's first `updated()`, before the
+   * nested sidebar has processed its own props. */
+  private _gridTabBarOverdrawPotential(): boolean {
+    const win = this.windowData;
+    if (!win?.grid?.placements.some((p) => p.tabIds.length > 0)) return false;
+    const sb = this.workspaceData?.sidebar;
+    if (!sb) return false;
+    const leftWants = sb.leftSidebarOpen && (sb.leftSidebarTabs?.length ?? 0) === 0;
+    const rightWants = sb.rightSidebarOpen && (sb.rightSidebarTabs?.length ?? 0) === 0;
+    return leftWants || rightWants;
   }
 
   /** Create a portalled <overdraw-line dir="up"> that fades out going up (the
@@ -829,9 +858,15 @@ class Openp41geWindowView extends LitElement {
   private _placeGridTabBarOverdraws(): void {
     const win = this.windowData;
     const gridHasTabs = !!win?.grid?.placements.some((p) => p.tabIds.length > 0);
+    // Read the sidebar open/empty state from workspaceData (the source of
+    // truth) so this is already correct during the windowview's first
+    // `updated()`, before the nested sidebar has processed its own props.
+    const sbSrc = this.workspaceData?.sidebar;
     for (const side of ["left", "right"] as const) {
       const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
-      const shouldShow = gridHasTabs && !!sb?.isOpen && (sb?.systemTabs?.length ?? 0) === 0;
+      const open = side === "left" ? sbSrc?.leftSidebarOpen : sbSrc?.rightSidebarOpen;
+      const tabIds = side === "left" ? sbSrc?.leftSidebarTabs : sbSrc?.rightSidebarTabs;
+      const shouldShow = gridHasTabs && !!sb && !!open && (tabIds?.length ?? 0) === 0;
       const existing = this._sbGridTabBarOverdraw.get(side) ?? null;
       if (!shouldShow) {
         if (existing) {

@@ -632,4 +632,27 @@ describe("openp41ge-windowview grid tab-bar overdraws (into an empty sidebar)", 
     expect(wv._sbGridTabBarOverdraw.size).toBe(0);
     expect(document.body.querySelectorAll('overdraw-line:not([corner])').length).toBe(0);
   });
+
+  it("wants the lazy-creating overdraw loop when the grid hosts a tab and an open sidebar is empty", async () => {
+    // Before the nested tab-bar has rendered, `updated()` can't create the
+    // line; the loop must still be wanted so a later frame can lazily create it.
+    const { wv } = await mountGridToEmpty("right");
+    expect(wv._gridTabBarOverdrawPotential()).toBe(true);
+    // A single overdraw frame then creates the line once the tab-bar exists.
+    wv._syncOverdraws();
+    expect(wv._sbGridTabBarOverdraw.has("right")).toBe(true);
+  });
+
+  it("does not want the loop when the grid has no tabs", async () => {
+    const { wv } = await mountGridToEmpty("right");
+    wv.windowData = { ...wv.windowData, grid: { ...wv.windowData.grid, placements: [] } };
+    expect(wv._gridTabBarOverdrawPotential()).toBe(false);
+  });
+
+  it("does not want the loop when the open sidebar hosts tabs", async () => {
+    const { wv, ws } = await mountGridToEmpty("right");
+    const ws2 = { ...ws, sidebar: { ...ws.sidebar, rightSidebarTabs: ["sys-explorer"] } };
+    wv.workspaceData = ws2;
+    expect(wv._gridTabBarOverdrawPotential()).toBe(false);
+  });
 });
