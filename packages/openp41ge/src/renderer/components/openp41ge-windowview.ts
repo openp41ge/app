@@ -113,6 +113,15 @@ class Openp41geWindowView extends LitElement {
    * (or null when the active tab has no bottom bar), so the per-frame tracker
    * only has to read one rect (not re-scan the tree). */
   private _sbFooterEl = new Map<string, HTMLElement | null>();
+  /** Portalled horizontal <overdraw-line> accents that continue a GRID tab's
+   * content bottom-bar top border into an EMPTY open sidebar (the grid's
+   * status/input bar top border would otherwise stop at the grid area's
+   * grid-side edge). Keyed by side. */
+  private _sbGridContentOverdraw = new Map<string, HTMLElement>();
+  /** Cached content bottom-bar element found in the edge grid cell (or null
+   * when the active grid tab's content has no bottom bar), so the per-frame
+   * tracker only reads one rect instead of re-scanning the content tree. */
+  private _sbGridContentEl = new Map<string, HTMLElement | null>();
   /** Portalled vertical <overdraw-line> accents that continue each grid-interior
    * cell divider up past the title-bar seam. Keyed by the left column index
    * (0..cols-2); created lazily, removed when the grid has <2 columns. */
@@ -203,6 +212,9 @@ class Openp41geWindowView extends LitElement {
     for (const line of this._sbGridTabBarOverdraw.values()) line.remove();
     this._sbGridTabBarOverdraw.clear();
     this._sbFooterEl.clear();
+    for (const line of this._sbGridContentOverdraw.values()) line.remove();
+    this._sbGridContentOverdraw.clear();
+    this._sbGridContentEl.clear();
     for (const line of this._cellOverdraw.values()) line.remove();
     this._cellOverdraw.clear();
     for (const { top, bottom } of this._sbSepOverdraw.values()) {
@@ -577,6 +589,7 @@ class Openp41geWindowView extends LitElement {
     this._placeSidebarFooterOverdraws();
     this._placeSidebarTabBarOverdraws();
     this._placeGridTabBarOverdraws();
+    this._placeGridContentOverdraws();
     this._placeCellDividerOverdraws();
     this._syncSidebarSepOverdraws();
     this._positionSidebarOverdraws();
@@ -588,6 +601,7 @@ class Openp41geWindowView extends LitElement {
     this._positionSidebarFooterOverdraws();
     this._positionSidebarTabBarOverdraws();
     this._positionGridTabBarOverdraws();
+    this._positionGridContentOverdraws();
   }
 
   private _syncOverdrawLoop(): void {
@@ -609,6 +623,7 @@ class Openp41geWindowView extends LitElement {
       this._sbFooterOverdraw.size > 0 ||
       this._sbTabBarOverdraw.size > 0 ||
       this._sbGridTabBarOverdraw.size > 0 ||
+      this._sbGridContentOverdraw.size > 0 ||
       this._cellOverdraw.size > 0 ||
       this._sbSepOverdraw.size > 0 ||
       this._gridTabBarOverdrawPotential()
@@ -917,6 +932,157 @@ class Openp41geWindowView extends LitElement {
    * tab-bar border into the empty sidebar (solid end on the grid area's
    * grid-side edge). */
   private _createSbGridTabBarOverdraw(): HTMLElement {
+    const line = document.createElement("overdraw-line");
+    line.setAttribute("aria-hidden", "true");
+    line.style.cssText = [
+      "position: fixed",
+      "z-index: 999",
+      "pointer-events: none",
+      "--overdraw-color: var(--divider, #333)",
+      "--overdraw-thickness: 1px",
+      `--overdraw-length: ${SIDEBAR_FOOTER_OVERDRAW_LENGTH}px`,
+    ].join(";");
+    document.body.appendChild(line);
+    return line;
+  }
+
+  // ── Grid content bottom-bar overdraws ────────────────────────────────
+
+  /** Continue a GRID tab's content bottom-bar top border (the editor status
+   * bar / Agents input bar) into an EMPTY open sidebar. The tab bar supplies
+   * its own continuation (see _placeGridTabBarOverdraws); this handles the
+   * content's own bottom bar pinned to the bottom of the cell, so its top
+   * border reads as running on beneath the empty sidebar's tab bar. Shown
+   * whenever the grid hosts a tab whose content has a bottom bar AND an open
+   * sidebar hosts no tabs; removed when either condition goes away or the
+   * active content has no bottom bar. */
+  private _placeGridContentOverdraws(): void {
+    const win = this.windowData;
+    const gridHasTabs = !!win?.grid?.placements.some((p) => p.tabIds.length > 0);
+    const sbSrc = this.workspaceData?.sidebar;
+    for (const side of ["left", "right"] as const) {
+      const sb = this.querySelector<Openp41geSidebar>(`openp41ge-sidebar[side="${side}"]`);
+      const open = side === "left" ? sbSrc?.leftSidebarOpen : sbSrc?.rightSidebarOpen;
+      const tabIds = side === "left" ? sbSrc?.leftSidebarTabs : sbSrc?.rightSidebarTabs;
+      const shouldShow = gridHasTabs && !!sb && !!open && (tabIds?.length ?? 0) === 0;
+      const existing = this._sbGridContentOverdraw.get(side) ?? null;
+      const cell = this._gridContentEdgeCell(side);
+      if (!shouldShow || !cell) {
+        if (existing) {
+          existing.remove();
+          this._sbGridContentOverdraw.delete(side);
+        }
+        this._sbGridContentEl.delete(side);
+        continue;
+      }
+      let bar = this._sbGridContentEl.get(side) ?? null;
+      const activePane = cell.querySelector<HTMLElement>(
+        "tab-content .tab-content-pane:not([hidden])",
+      );
+      if (!bar || !bar.isConnected || (activePane && !this._composedContains(activePane, bar))) {
+        bar = this._findGridContentBottomBar(cell);
+        this._sbGridContentEl.set(side, bar);
+      }
+      if (!bar) {
+        if (existing) {
+          existing.remove();
+          this._sbGridContentOverdraw.delete(side);
+        }
+        continue;
+      }
+      const line = existing ?? this._createSbGridContentOverdraw();
+      this._sbGridContentOverdraw.set(side, line);
+    }
+  }
+
+  /** The grid cell adjacent to the empty sidebar (leftmost column for the
+   * left sidebar, rightmost for the right). The grid is a single row of
+   * columns, so all cells' content bottom bars align at the grid area's
+   * bottom; the edge cell's bar is the one whose line meets the sidebar. */
+  private _gridContentEdgeCell(side: "left" | "right"): HTMLElement | null {
+    const gridArea = this.querySelector<HTMLElement>(".openp41ge-grid-area");
+    if (!gridArea) return null;
+    const cells = [...gridArea.querySelectorAll<HTMLElement>(".grid-cell")];
+    if (cells.length === 0) return null;
+    return side === "left" ? cells[0] : cells[cells.length - 1];
+  }
+
+  /** True when `node` is a descendant of `ancestor` in the COMPOSED tree
+   * (piercing shadow boundaries), so a cached bar inside a controller's shadow
+   * root still invalidates correctly when the active content pane changes. */
+  private _composedContains(ancestor: Element, node: Element): boolean {
+    let cur: Node | null = node;
+    while (cur) {
+      if (cur === ancestor) return true;
+      const root = cur.getRootNode();
+      if (root instanceof ShadowRoot) cur = root.host;
+      else cur = cur.parentNode;
+    }
+    return false;
+  }
+
+  /** Find the active tab content's bottom bar in a grid cell — the element
+   * pinned to the tab-content's bottom that carries a 1px top border (file
+   * editor status bar, Agents bottombar, ...). Pierces shadow roots. Null when
+   * the active tab's content has no bottom bar. */
+  private _findGridContentBottomBar(cell: HTMLElement): HTMLElement | null {
+    const content = cell.querySelector<HTMLElement>("tab-content");
+    if (!content) return null;
+    const contentBottom = content.getBoundingClientRect().bottom;
+    let found: HTMLElement | null = null;
+    const visit = (root: ParentNode): void => {
+      if (found) return;
+      for (const el of root.querySelectorAll<HTMLElement>("*")) {
+        if (found) return;
+        if (getComputedStyle(el).borderTopWidth !== "1px") {
+          if (el.shadowRoot) visit(el.shadowRoot);
+          continue;
+        }
+        const rect = el.getBoundingClientRect();
+        if (Math.abs(rect.bottom - contentBottom) < 1) {
+          found = el;
+          return;
+        }
+      }
+    };
+    visit(content);
+    return found;
+  }
+
+  /** Position each grid content overdraw on the content bottom-bar's top-border
+   * y, fading from the grid area's grid-side edge into the empty sidebar. */
+  private _positionGridContentOverdraws(): void {
+    for (const side of ["left", "right"] as const) {
+      const line = this._sbGridContentOverdraw.get(side);
+      if (!line) continue;
+      const gridArea = this.querySelector<HTMLElement>(".openp41ge-grid-area");
+      const cell = this._gridContentEdgeCell(side);
+      if (!gridArea || !cell) continue;
+      let bar = this._sbGridContentEl.get(side) ?? null;
+      const activePane = cell.querySelector<HTMLElement>(
+        "tab-content .tab-content-pane:not([hidden])",
+      );
+      if (!bar || !bar.isConnected || (activePane && !this._composedContains(activePane, bar))) {
+        bar = this._findGridContentBottomBar(cell);
+        this._sbGridContentEl.set(side, bar);
+      }
+      if (!bar) continue;
+      const gaRect = gridArea.getBoundingClientRect();
+      line.style.top = `${bar.getBoundingClientRect().top}px`;
+      if (side === "left") {
+        line.setAttribute("dir", "left");
+        line.style.left = `${gaRect.left - SIDEBAR_FOOTER_OVERDRAW_LENGTH}px`;
+      } else {
+        line.setAttribute("dir", "right");
+        line.style.left = `${gaRect.right}px`;
+      }
+    }
+  }
+
+  /** Create a portalled horizontal <overdraw-line that fades from the grid
+   * content bottom-bar border into the empty sidebar (solid end on the grid
+   * area's grid-side edge). */
+  private _createSbGridContentOverdraw(): HTMLElement {
     const line = document.createElement("overdraw-line");
     line.setAttribute("aria-hidden", "true");
     line.style.cssText = [
@@ -1382,6 +1548,7 @@ class Openp41geWindowView extends LitElement {
     this._placeSidebarFooterOverdraws();
     this._placeSidebarTabBarOverdraws();
     this._placeGridTabBarOverdraws();
+    this._placeGridContentOverdraws();
     this._placeCellDividerOverdraws();
     this._syncSidebarSepOverdraws();
     this._syncOverdrawLoop();

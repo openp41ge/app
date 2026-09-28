@@ -79,6 +79,67 @@ async function mount() {
   return { wv, win, ws };
 }
 
+/** Mount a windowview hosting a single grid tab, with one sidebar optionally
+ * emptied. Ensures a .tab-bar-container exists for the grid tab-bar (jsdom
+ * doesn't await the nested tab-bar's updateComplete). */
+async function mountGridToEmpty(emptySide: "left" | "right") {
+  const win = makeWin();
+  win.grid.placements = [{ position: { row: 0, col: 0 }, tabIds: ["t1"] }];
+  const ws = makeWs(win);
+  ws.sidebar = {
+    ...ws.sidebar,
+    leftSidebarTabs: emptySide === "left" ? [] : ws.sidebar.leftSidebarTabs,
+    rightSidebarTabs: emptySide === "right" ? [] : ws.sidebar.rightSidebarTabs,
+  };
+  const wv = document.createElement("openp41ge-windowview");
+  wv.windowData = win;
+  wv.workspaceData = ws;
+  document.body.appendChild(wv);
+  await wv.updateComplete;
+  const tabBar = wv.querySelector<HTMLElement>(".openp41ge-grid-area .grid-cell tab-bar");
+  let container = tabBar?.querySelector<HTMLElement>(".tab-bar-container") ?? null;
+  if (tabBar && !container) {
+    container = document.createElement("div");
+    container.className = "tab-bar-container";
+    tabBar.appendChild(container);
+  }
+  return { wv, win, ws, container };
+}
+
+function stubGrid(wv: HTMLElement, container: HTMLElement | null) {
+  const ga = wv.querySelector<HTMLElement>(".openp41ge-grid-area")!;
+  Object.defineProperty(ga, "getBoundingClientRect", {
+    configurable: true,
+    value: () => ({
+      left: 210,
+      top: 36,
+      right: 490,
+      bottom: 900,
+      width: 280,
+      height: 864,
+      x: 210,
+      y: 36,
+      toJSON() {},
+    }),
+  });
+  if (container) {
+    Object.defineProperty(container, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 210,
+        top: 36,
+        right: 490,
+        bottom: 72,
+        width: 280,
+        height: 36,
+        x: 210,
+        y: 36,
+        toJSON() {},
+      }),
+    });
+  }
+}
+
 const lines = () => [...document.body.querySelectorAll('overdraw-line[dir="up"]:not([corner])')];
 
 const sbRect = (left: number, right: number, top: number) => ({
@@ -520,52 +581,6 @@ describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
 });
 
 describe("openp41ge-windowview grid tab-bar overdraws (into an empty sidebar)", () => {
-  // Mirror of the sidebar-tab-bar overdraw: when the grid hosts a tab but an
-  // open sidebar hosts NO tabs, the grid tab bar's bottom border would stop at
-  // the grid area's grid-side edge (the empty sidebar's tab bar is visually
-  // hidden and carries no bottom border). The windowview overdraws that border
-  // a short way into the empty sidebar.
-  async function mountGridToEmpty(emptySide: "left" | "right") {
-    const win = makeWin();
-    win.grid.placements = [{ position: { row: 0, col: 0 }, tabIds: ["t1"] }];
-    const ws = makeWs(win);
-    ws.sidebar = {
-      ...ws.sidebar,
-      leftSidebarTabs: emptySide === "left" ? [] : ws.sidebar.leftSidebarTabs,
-      rightSidebarTabs: emptySide === "right" ? [] : ws.sidebar.rightSidebarTabs,
-    };
-    const wv = document.createElement("openp41ge-windowview");
-    wv.windowData = win;
-    wv.workspaceData = ws;
-    document.body.appendChild(wv);
-    await wv.updateComplete;
-    // The tab-bar's nested <tab-bar> may not have updated yet (jsdom doesn't
-    // await nested lit updateComplete), so ensure a .tab-bar-container exists
-    // for the grid tab-bar; the placement code reads its rect.
-    const tabBar = wv.querySelector<HTMLElement>(".openp41ge-grid-area .grid-cell tab-bar");
-    let container = tabBar?.querySelector<HTMLElement>(".tab-bar-container") ?? null;
-    if (tabBar && !container) {
-      container = document.createElement("div");
-      container.className = "tab-bar-container";
-      tabBar.appendChild(container);
-    }
-    return { wv, win, ws, container };
-  }
-
-  function stubGrid(wv: HTMLElement, container: HTMLElement | null) {
-    const ga = wv.querySelector<HTMLElement>(".openp41ge-grid-area")!;
-    Object.defineProperty(ga, "getBoundingClientRect", {
-      configurable: true,
-      value: () => ({ left: 210, top: 36, right: 490, bottom: 900, width: 280, height: 864, x: 210, y: 36, toJSON() {} }),
-    });
-    if (container) {
-      Object.defineProperty(container, "getBoundingClientRect", {
-        configurable: true,
-        value: () => ({ left: 210, top: 36, right: 490, bottom: 72, width: 280, height: 36, x: 210, y: 36, toJSON() {} }),
-      });
-    }
-  }
-
   it("draws a grid tab-bar overdraw into an open EMPTY sidebar when the grid has a tab", async () => {
     const { wv, container } = await mountGridToEmpty("right");
     stubGrid(wv, container);
@@ -654,5 +669,169 @@ describe("openp41ge-windowview grid tab-bar overdraws (into an empty sidebar)", 
     const ws2 = { ...ws, sidebar: { ...ws.sidebar, rightSidebarTabs: ["sys-explorer"] } };
     wv.workspaceData = ws2;
     expect(wv._gridTabBarOverdrawPotential()).toBe(false);
+  });
+});
+
+describe("openp41ge-windowview grid content bottom-bar overdraws", () => {
+  /** Stub the edge cell's tab-content with a 1px-top-border bottom bar pinned
+   * to the content's bottom, stubbing the content/bar rects (jsdom is zero). */
+  function stubContentBar(wv: HTMLElement, side: "left" | "right"): HTMLElement {
+    const gridArea = wv.querySelector<HTMLElement>(".openp41ge-grid-area")!;
+    const cells = [...gridArea.querySelectorAll<HTMLElement>(".grid-cell")];
+    const cell = side === "left" ? cells[0] : cells[cells.length - 1];
+    let content = cell?.querySelector<HTMLElement>("tab-content");
+    if (!content) {
+      content = document.createElement("tab-content");
+      cell!.appendChild(content);
+    }
+    Object.defineProperty(content, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 210,
+        top: 72,
+        right: 490,
+        bottom: 900,
+        width: 280,
+        height: 828,
+        x: 210,
+        y: 72,
+        toJSON() {},
+      }),
+    });
+    const bar = document.createElement("div");
+    bar.style.borderTop = "1px solid #333";
+    content.appendChild(bar);
+    Object.defineProperty(bar, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 210,
+        top: 865,
+        right: 490,
+        bottom: 900,
+        width: 280,
+        height: 35,
+        x: 210,
+        y: 865,
+        toJSON() {},
+      }),
+    });
+    return bar;
+  }
+
+  it("draws a content bottom-bar overdraw into an open EMPTY sidebar when the grid tab has a bottom bar", async () => {
+    const { wv } = await mountGridToEmpty("right");
+    stubGrid(wv, null);
+    stubContentBar(wv, "right");
+
+    wv._placeGridContentOverdraws();
+    expect(wv._sbGridContentOverdraw.has("right")).toBe(true);
+    expect(wv._sbGridContentOverdraw.has("left")).toBe(false); // left hosts tabs
+
+    wv._positionGridContentOverdraws();
+    const r = wv._sbGridContentOverdraw.get("right")!;
+    expect(r.getAttribute("dir")).toBe("right"); // fades right, into the sidebar
+    expect(parseFloat(r.style.left)).toBe(490); // solid end on the grid's right edge
+    expect(parseFloat(r.style.top)).toBe(865); // on the bottom bar's top border
+  });
+
+  it("fades left from the grid's left edge for the left empty sidebar", async () => {
+    const { wv } = await mountGridToEmpty("left");
+    stubGrid(wv, null);
+    stubContentBar(wv, "left");
+
+    wv._placeGridContentOverdraws();
+    expect(wv._sbGridContentOverdraw.has("left")).toBe(true);
+    expect(wv._sbGridContentOverdraw.has("right")).toBe(false); // right hosts tabs
+
+    wv._positionGridContentOverdraws();
+    const l = wv._sbGridContentOverdraw.get("left")!;
+    expect(l.getAttribute("dir")).toBe("left");
+    expect(parseFloat(l.style.left)).toBe(210 - SIDEBAR_FOOTER_OVERDRAW_LENGTH);
+    expect(parseFloat(l.style.top)).toBe(865);
+  });
+
+  it("does not draw when the grid tab's content has no bottom bar", async () => {
+    const { wv } = await mountGridToEmpty("right");
+    stubGrid(wv, null);
+    wv._placeGridContentOverdraws();
+    expect(wv._sbGridContentOverdraw.has("right")).toBe(false);
+  });
+
+  it("removes the overdraw once the empty sidebar gets its first tab", async () => {
+    const { wv, ws } = await mountGridToEmpty("right");
+    stubGrid(wv, null);
+    stubContentBar(wv, "right");
+    wv._placeGridContentOverdraws();
+    expect(wv._sbGridContentOverdraw.has("right")).toBe(true);
+
+    const ws2 = { ...ws, sidebar: { ...ws.sidebar, rightSidebarTabs: ["sys-explorer"] } };
+    wv.workspaceData = ws2;
+    await wv.updateComplete;
+    expect(wv._sbGridContentOverdraw.has("right")).toBe(false);
+  });
+
+  it("pierces a controller's shadow root to find a bottom bar", async () => {
+    const { wv } = await mountGridToEmpty("right");
+    stubGrid(wv, null);
+    const gridArea = wv.querySelector<HTMLElement>(".openp41ge-grid-area")!;
+    const cells = [...gridArea.querySelectorAll<HTMLElement>(".grid-cell")];
+    const cell = cells[cells.length - 1];
+    let content = cell.querySelector<HTMLElement>("tab-content");
+    if (!content) {
+      content = document.createElement("tab-content");
+      cell.appendChild(content);
+    }
+    Object.defineProperty(content, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 210,
+        top: 72,
+        right: 490,
+        bottom: 900,
+        width: 280,
+        height: 828,
+        x: 210,
+        y: 72,
+        toJSON() {},
+      }),
+    });
+    // The bottom bar lives inside a shadow boundary (like the Agents bottombar).
+    const host = document.createElement("div");
+    const shadow = host.attachShadow({ mode: "open" });
+    const bar = document.createElement("div");
+    bar.style.borderTop = "1px solid #333";
+    shadow.appendChild(bar);
+    content.appendChild(host);
+    Object.defineProperty(bar, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 210,
+        top: 865,
+        right: 490,
+        bottom: 900,
+        width: 280,
+        height: 35,
+        x: 210,
+        y: 865,
+        toJSON() {},
+      }),
+    });
+
+    wv._placeGridContentOverdraws();
+    expect(wv._sbGridContentOverdraw.has("right")).toBe(true);
+    expect(wv._sbGridContentEl.get("right")).toBe(bar);
+  });
+
+  it("cleans up the content overdraws when disconnected", async () => {
+    const { wv } = await mountGridToEmpty("right");
+    stubGrid(wv, null);
+    stubContentBar(wv, "right");
+    wv._placeGridContentOverdraws();
+    expect(wv._sbGridContentOverdraw.has("right")).toBe(true);
+
+    wv.remove();
+    await wv.updateComplete.catch(() => {});
+    expect(wv._sbGridContentOverdraw.size).toBe(0);
+    expect(document.body.querySelectorAll('overdraw-line:not([corner])').length).toBe(0);
   });
 });
