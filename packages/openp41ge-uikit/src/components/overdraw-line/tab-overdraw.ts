@@ -141,7 +141,16 @@ export function attachTabEdgeOverdraws(host: HTMLElement, opts: TabEdgeOverdrawO
       const [, , ax, ay] = entry;
       if (dir === "left" || dir === "right") {
         // Horizontal stroke: continues a top/bottom border past the corner.
-        const y = ay === "top" ? r.top : r.bottom - thickness;
+        // The bottom border usually lives on the tab BAR (1px below the tab's
+        // own rect bottom), not on the tab itself, so align the stroke with
+        // that border (r.bottom) unless the host really has its own bottom
+        // border (e.g. the `+` add button, whose border-bottom is the strip's
+        // bottom line when the bar has no border of its own).
+        const ownBottom =
+          ay === "bottom" &&
+          parseFloat(getComputedStyle(host).borderBottomWidth) > 0;
+        const y =
+          ay === "top" ? r.top : ownBottom ? r.bottom - thickness : r.bottom;
         const x = ax === "left" ? r.left : r.right;
         const left = dir === "left" ? x - length + nudge : x - nudge;
         el.style.left = `${left}px`;

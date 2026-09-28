@@ -409,14 +409,35 @@ describe("attachTabEdgeOverdraws", () => {
     const lines = Array.from(document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"));
 
     // bottom-right corner: the right border continues down, the bottom border
-    // continues right — both anchored at the bottom-right corner.
+    // continues right — both anchored at the bottom-right corner. The tab has
+    // no bottom border of its own (the bar owns it, 1px below the tab), so the
+    // bottom accent sits ON the bar's border line at r.bottom.
     const brDown = lines.find((l) => l.getAttribute("corner") === "br-right")!;
     const brRight = lines.find((l) => l.getAttribute("corner") === "br-bottom")!;
     expect(parseFloat(brDown.style.left)).toBe(260 - 1);
     expect(parseFloat(brDown.style.top)).toBe(74);
     expect(parseFloat(brRight.style.left)).toBe(260);
-    expect(parseFloat(brRight.style.top)).toBe(74 - 1);
+    expect(parseFloat(brRight.style.top)).toBe(74);
     expect(brDown.style.getPropertyValue("--overdraw-length")).toBe("8px");
+  });
+
+  test("keeps a bottom stroke on the host's own bottom border when it has one", () => {
+    const tab = document.createElement("div");
+    tab.style.borderBottom = "1px solid #333";
+    document.body.appendChild(tab);
+    stubRect(tab, { left: 100, top: 40, right: 260, bottom: 74, width: 160, height: 34 });
+    const raf = (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame;
+    (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = undefined;
+    try {
+      attachTabEdgeOverdraws(tab, { edges: ["bottom"], length: 8 });
+    } finally {
+      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = raf;
+    }
+    const lines = Array.from(document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"));
+    const brRight = lines.find((l) => l.getAttribute("corner") === "br-bottom")!;
+    // The host carries its own bottom border (inside the box, [bottom-1,bottom]),
+    // so the accent stays aligned with that border.
+    expect(parseFloat(brRight.style.top)).toBe(74 - 1);
   });
 
   test("detach removes the portalled layer and strokes", () => {
