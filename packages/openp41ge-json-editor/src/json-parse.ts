@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 /**
  * json-parse — a small recursive-descent JSON parser that tracks source
  * positions. It powers the editor's structure-aware features:

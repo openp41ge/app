@@ -1424,7 +1424,6 @@ export class Openp41geAgentSettingsDrawer extends LitElement {
   private _renderProviderEditor(layerId: string): TemplateResult {
     const draft = this._providerDrafts.get(layerId);
     if (!draft) return html`<div class="agds-pane"><p class="agds-empty">Loading…</p></div>`;
-    const preset = providerPreset(draft.presetId) ?? customPreset();
     const dirty = this._providerDirty.has(layerId);
     return html`
       <div class="agds-pane agds-model">

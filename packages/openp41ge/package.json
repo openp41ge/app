@@ -35,7 +35,6 @@
     "openp41ge-agents-tool-types": "workspace:*",
     "openp41ge-agents-tool-write-file": "workspace:*",
     "openp41ge-constants": "workspace:*",
-    "openp41ge-editor-gutter": "workspace:*",
     "openp41ge-filesystem": "workspace:*",
     "openp41ge-git": "workspace:*",
     "openp41ge-json-editor": "workspace:*",

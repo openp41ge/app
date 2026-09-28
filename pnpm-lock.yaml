@@ -181,9 +181,6 @@ importers:
       openp41ge-constants:
         specifier: workspace:*
         version: link:../openp41ge-constants
-      openp41ge-editor-gutter:
-        specifier: workspace:*
-        version: link:../openp41ge-editor-gutter
       openp41ge-filesystem:
         specifier: workspace:*
         version: link:../openp41ge-filesystem

@@ -16,7 +16,7 @@
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
-import { ref, createRef } from "lit/directives/ref.js";
+import { createRef } from "lit/directives/ref.js";
 import type { ConfigService } from "../services/config-service";
 import type { PropertyValues } from "lit";
 import { showConfirmModal } from "../components/openp41ge-confirm-modal";
@@ -976,8 +976,6 @@ export class Openp41geAgentSettings extends LitElement {
 
   render(): TemplateResult {
     const config = this._config;
-    const providers = config?.providers ?? {};
-    const entries = Object.entries(providers);
     return html`
       <style>
         :host {

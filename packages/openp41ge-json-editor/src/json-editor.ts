@@ -53,7 +53,7 @@ import {
   type SelectableRange,
 } from "./json-tokenize";
 import { cloneDeep, getAt, summarize, type JsonPath } from "./json-tree";
-import { renderMarkdown, isMarkdownFileRef, highlightCodeBlock } from "./md-render";
+import { renderMarkdown, isMarkdownFileRef } from "./md-render";
 import {
   Gutter,
   lineNumberColumn,
@@ -2116,7 +2116,6 @@ export class JsonEditorElement extends LitElement {
   }
 
   private _onKeyup = (e: KeyboardEvent): void => {
-    const k = e.key;
     const ta = e.target as HTMLTextAreaElement;
     this._updateBraceMatch(ta);
     this._syncActiveLine();
