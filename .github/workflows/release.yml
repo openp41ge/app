@@ -196,7 +196,7 @@ jobs:
           path: |
             packages/openp41ge/release/*.dmg
             packages/openp41ge/release/*.zip
-            packages/openp41ge/release/*.yml
+            packages/openp41ge/release/*-mac.yml
             packages/openp41ge/release/SHA256SUMS
 
   release:
