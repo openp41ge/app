@@ -683,6 +683,8 @@ contextBridge.exposeInMainWorld("openp41ge", {
     get: (key) => ipcRenderer.invoke("config:get", key),
     set: (key, value) => ipcRenderer.invoke("config:set", key, value),
     getAll: () => ipcRenderer.invoke("config:get-all"),
+    getDefaults: () => ipcRenderer.invoke("config:get-defaults"),
+    getOverrides: () => ipcRenderer.invoke("config:get-overrides"),
   },
 
   updater: {

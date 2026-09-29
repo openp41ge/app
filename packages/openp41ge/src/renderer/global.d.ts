@@ -329,6 +329,8 @@ declare global {
         get: (key?: string) => Promise<any>;
         set: (key: string, value: any) => Promise<void>;
         getAll: () => Promise<Record<string, any>>;
+        getDefaults: () => Promise<Record<string, any>>;
+        getOverrides: () => Promise<Record<string, any>>;
       };
 
       /** Auto-update status + control (backed by the main-process AutoUpdaterService). */

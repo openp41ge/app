@@ -731,6 +731,42 @@ export class CursorController {
     this.insertChar("\n");
   }
 
+  /** Alt/Option+ArrowUp/Down — move the primary cursor's current line up/down
+   *  (VS Code). Swaps the line with its neighbor and follows the caret to the
+   *  same column on the moved line. */
+  moveLine(dir: 1 | -1): void {
+    const line = this._cursor.position.lineNumber;
+    const target = line + dir;
+    if (target < 1 || target > this._model.lineCount) return;
+    const self = this._model.getLineContent(line);
+    const other = this._model.getLineContent(target);
+    this._captureCursorState();
+    const range =
+      dir < 0
+        ? {
+            startLineNumber: target,
+            startColumn: 1,
+            endLineNumber: line,
+            endColumn: self.length + 1,
+          }
+        : {
+            startLineNumber: line,
+            startColumn: 1,
+            endLineNumber: target,
+            endColumn: other.length + 1,
+          };
+    // The model stores lines ","-separated; the EOL is owned by the model, so
+    // insert with "\n" (it normalizes \r\n on the way in).
+    const text = dir < 0 ? `${self}\n${other}` : `${other}\n${self}`;
+    this._model.pushEditOperations([{ range, text }]);
+    // Follow the caret to the moved line at the same (clamped) column.
+    const newCol = Math.min(this._cursor.position.column, self.length + 1);
+    this._cursor.position = { lineNumber: target, column: newCol };
+    this._cursor.selectionAnchor = this._cursor.position;
+    this._cursor.goalColumn = newCol;
+    this._emit("edit");
+  }
+
   insertTab(): void {
     this._captureCursorState();
     const spaces = "    ";

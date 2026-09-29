@@ -5,7 +5,7 @@
  * tree/highlight helpers so consumers (and tests) can use them.
  */
 
-export { JsonEditorElement, JSON_EDITOR_CHANGE, JSON_EDITOR_OPEN } from "./json-editor";
+export { JsonEditorElement, JSON_EDITOR_CHANGE, JSON_EDITOR_OPEN, JSON_EDITOR_OVERWRITE } from "./json-editor";
 
 export { gutterWidthFor, GUTTER_PAD_PX, GUTTER_FOLD_PX, DEFAULT_DIGIT_PX } from "./json-editor";
 
@@ -20,6 +20,12 @@ export {
   isComposite,
   isArray,
   summarize,
+  pathKey,
+  pathFromKey,
+  leafPaths,
+  pinnedPaths,
+  stripDefaults,
+  mergeDefaults,
 } from "./json-tree";
 export type { JsonPath } from "./json-tree";
 

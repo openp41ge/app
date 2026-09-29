@@ -11,6 +11,12 @@ import {
   isComposite,
   isArray,
   summarize,
+  pathKey,
+  pathFromKey,
+  leafPaths,
+  pinnedPaths,
+  stripDefaults,
+  mergeDefaults,
 } from "../src/json-tree";
 
 describe("json-tree helpers", () => {
@@ -144,5 +150,91 @@ describe("json-tree helpers", () => {
     expect(sortJsonKeys(42)).toBe(42);
     expect(sortJsonKeys(null)).toBe(null);
     expect(sortJsonKeys("s")).toBe("s");
+  });
+});
+
+describe("stripDefaults / mergeDefaults", () => {
+  const DEFAULTS = {
+    appTheme: "dark",
+    lineHeight: 20,
+    fontSize: 14,
+    editor: { fontFamily: "mono", maxFileSize: 100 },
+  };
+
+  it("stripDefaults drops leaves equal to the default", () => {
+    const effective = { appTheme: "dark", lineHeight: 24, fontSize: 14 };
+    expect(stripDefaults(effective, DEFAULTS)).toEqual({ lineHeight: 24 });
+  });
+
+  it("stripDefaults prunes nested objects that are entirely at default", () => {
+    const effective = { ...DEFAULTS, lineHeight: 30 };
+    const stripped = stripDefaults(effective, DEFAULTS);
+    expect(stripped).toEqual({ lineHeight: 30 });
+    expect(stripped).not.toHaveProperty("editor");
+  });
+
+  it("stripDefaults keeps nested overrides", () => {
+    const effective = { ...DEFAULTS, editor: { fontFamily: "mono", maxFileSize: 500 } };
+    expect(stripDefaults(effective, DEFAULTS)).toEqual({ editor: { maxFileSize: 500 } });
+  });
+
+  it("mergeDefaults fills defaults and overlays overrides", () => {
+    const merged = mergeDefaults({ lineHeight: 30 }, DEFAULTS);
+    expect(merged).toEqual({ ...DEFAULTS, lineHeight: 30 });
+  });
+
+  it("stripDefaults and mergeDefaults are inverse", () => {
+    const effective = {
+      ...DEFAULTS,
+      appTheme: "light",
+      lineHeight: 22,
+      editor: { ...DEFAULTS.editor, maxFileSize: 9 },
+    };
+    const overrides = stripDefaults(effective, DEFAULTS);
+    expect(mergeDefaults(overrides!, DEFAULTS)).toEqual(effective);
+  });
+});
+
+describe("explicit / pinned paths", () => {
+  const DEFAULTS = {
+    appTheme: "dark",
+    lineHeight: 20,
+    editor: { fontFamily: "mono", maxFileSize: 100 },
+  };
+
+  it("pathKey encodes array indices and pathFromKey reverses it", () => {
+    expect(pathKey(["a", "b", 1, "c"])).toBe("a.b[1].c");
+    expect(pathFromKey("a.b[1].c")).toEqual(["a", "b", 1, "c"]);
+    expect(pathFromKey("")).toEqual([]);
+  });
+
+  it("leafPaths collects every leaf path", () => {
+    const v = { a: 1, b: { c: "x", d: [1, 2] } };
+    expect([...leafPaths(v)].sort()).toEqual(["a", "b.c", "b.d[0]", "b.d[1]"]);
+  });
+
+  it("pinnedPaths finds leaves equal to their default", () => {
+    const overrides = { appTheme: "dark", lineHeight: 25, editor: { maxFileSize: 100 } };
+    expect([...pinnedPaths(overrides, DEFAULTS)].sort()).toEqual(["appTheme", "editor.maxFileSize"]);
+  });
+
+  it("stripDefaults keeps a pinned path even when it equals the default", () => {
+    const effective = { appTheme: "dark", lineHeight: 25 };
+    const pins = new Set(["appTheme"]);
+    expect(stripDefaults(effective, DEFAULTS, pins)).toEqual({ appTheme: "dark", lineHeight: 25 });
+  });
+
+  it("stripDefaults keeps a pinned whole subtree verbatim", () => {
+    const effective = { ...DEFAULTS, lineHeight: 30 };
+    const pins = new Set(["editor"]);
+    expect(stripDefaults(effective, DEFAULTS, pins)).toEqual({ editor: DEFAULTS.editor, lineHeight: 30 });
+  });
+
+  it("stripDefaults drops unpinned default leaves and a pinned one stays after re-merge", () => {
+    const effective = { ...DEFAULTS, lineHeight: 25 };
+    const pins = new Set(["editor.maxFileSize"]);
+    const overrides = stripDefaults(effective, DEFAULTS, pins)!;
+    expect(overrides).toEqual({ lineHeight: 25, editor: { maxFileSize: 100 } });
+    expect(pinnedPaths(overrides, DEFAULTS)).toEqual(new Set(["editor.maxFileSize"]));
   });
 });

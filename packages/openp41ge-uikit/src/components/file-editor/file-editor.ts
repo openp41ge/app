@@ -1725,6 +1725,10 @@ export class FileEditorElement extends LitElement {
           if (e.key === "Backspace" || e.key === "Delete" || e.key === "Enter" || e.key === "Tab") {
             return true;
           }
+          // Alt/Option+ArrowUp/Down moves a line — an edit — so block it.
+          if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+            return true;
+          }
           return this._keyboardHandler!.handleKeyDown(e);
         }
         // Suppress scroll-to-reveal for Cmd+A (select all)

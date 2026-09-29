@@ -17,4 +17,12 @@ export function registerConfigHandlers(configService: ConfigService): void {
   ipcMain.handle("config:get-all", () => {
     return configService.getAll();
   });
+
+  ipcMain.handle("config:get-defaults", () => {
+    return configService.getDefaults();
+  });
+
+  ipcMain.handle("config:get-overrides", () => {
+    return configService.getOverrides();
+  });
 }

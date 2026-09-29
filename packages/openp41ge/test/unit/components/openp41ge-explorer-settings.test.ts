@@ -81,7 +81,10 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     const el = await mount(new FakeConfig(CONFIG));
     const je = el.querySelector(".exs-editor > json-editor");
     expect(je).toBeTruthy();
-    expect(je.editedValue).toEqual({ indentSize: 16, prefetchDepth: 2 });
+    // Default view shows ONLY overrides — the explorer defaults (16px / depth 2)
+    // are implied, so an untouched config renders empty.
+    expect(je.showDefaults).toBe(false);
+    expect(je.editedValue).toEqual({});
     // Header + hint and the body status footer are gone (actions live in the
     // head), but a bottom bar with a Sort keys action is present.
     expect(el.querySelector(".exs-section-title")).toBeNull();
@@ -89,12 +92,28 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     expect(el.querySelector(".exs-status")).toBeNull();
     const footer = el.querySelector(".exs-footer");
     expect(footer).toBeTruthy();
-    const sortBtn = footer.querySelector(".exs-footer-btn");
+    expect(footer.querySelector(".exs-toggle")).toBeTruthy();
+    const sortBtn = footer.querySelector(".exs-footer-btn[aria-label=\"Sort keys\"]");
     expect(sortBtn).toBeTruthy();
     expect(sortBtn.getAttribute("aria-label")).toBe("Sort keys");
     expect(sortBtn.disabled).toBe(false);
     // The editor pane fills the surface above the bottom bar.
     expect(el.querySelector(".exs-editor")).toBeTruthy();
+  });
+
+  test("the show-defaults toggle reveals the effective doc (defaults faded)", async () => {
+    const el = await mount(new FakeConfig(CONFIG));
+    const je = el.querySelector(".exs-editor > json-editor");
+    el.querySelector(".exs-footer .exs-toggle").click();
+    await tick();
+    expect(je.showDefaults).toBe(true);
+    expect(je.defaults).toEqual({ indentSize: 16, prefetchDepth: 2 });
+    expect(je.editedValue).toEqual({ indentSize: 16, prefetchDepth: 2 });
+    // Toggling again returns to the overrides-only view.
+    el.querySelector(".exs-footer .exs-toggle").click();
+    await tick();
+    expect(je.showDefaults).toBe(false);
+    expect(je.editedValue).toEqual({});
   });
 
   test("the bottom bar Sort keys button reorders keys without saving", async () => {
@@ -103,10 +122,10 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     // Stage a draft whose keys are in a non-alphabetical order.
     commit(el, { prefetchDepth: 3, indentSize: 24 });
     await tick();
-    expect(Object.keys(el._config)).toEqual(["prefetchDepth", "indentSize"]);
-    el.querySelector(".exs-footer .exs-footer-btn").click();
+    expect(Object.keys(el._overrides)).toEqual(["prefetchDepth", "indentSize"]);
+    el.querySelector('.exs-footer .exs-footer-btn[aria-label="Sort keys"]').click();
     await tick();
-    expect(Object.keys(el._config)).toEqual(["indentSize", "prefetchDepth"]);
+    expect(Object.keys(el._overrides)).toEqual(["indentSize", "prefetchDepth"]);
     // Sort is staging-only — nothing persisted.
     expect(fake.sets.length).toBe(0);
   });
@@ -114,7 +133,42 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
   test("defaults to the sensible defaults when the keys are absent", async () => {
     const el = await mount(new FakeConfig({ lineHeight: 20 }));
     const je = el.querySelector(".exs-editor > json-editor");
-    expect(je.editedValue).toEqual({ indentSize: 16, prefetchDepth: 2 });
+    expect(je.editedValue).toEqual({});
+    expect(je.defaults).toEqual({ indentSize: 16, prefetchDepth: 2 });
+  });
+
+  test("overwriting a faded default pins it into the overrides", async () => {
+    const fake = new FakeConfig(CONFIG);
+    const el = await mount(fake);
+    const je = el.querySelector(".exs-editor > json-editor");
+    expect(je.editedValue).toEqual({});
+    el.querySelector(".exs-footer .exs-toggle").click();
+    await tick();
+    je.dispatchEvent(
+      new CustomEvent("json-editor-overwrite", { detail: { path: ["indentSize"], value: 16 } }),
+    );
+    await tick();
+    // The pinned default becomes overrides, is dirty, and shows as an override.
+    expect(el._overrides).toEqual({ indentSize: 16 });
+    expect(head(el).querySelector(".sdw-save").classList.contains("sdw-save--dirty")).toBe(true);
+  });
+
+  test("Save writes only the override leaves (a pin included)", async () => {
+    const fake = new FakeConfig(CONFIG);
+    const el = await mount(fake);
+    const je = el.querySelector(".exs-editor > json-editor");
+    // Pin indentSize (equals default) — then stage the full doc.
+    je.dispatchEvent(
+      new CustomEvent("json-editor-overwrite", { detail: { path: ["indentSize"], value: 16 } }),
+    );
+    await tick();
+    commit(el, { indentSize: 16, prefetchDepth: 3 });
+    await tick();
+    head(el).querySelector(".sdw-save").click();
+    await tick();
+    const keys = fake.sets.map((s) => s.key).sort();
+    expect(keys).toEqual(["explorer.indentSize", "explorer.prefetchDepth"]);
+    expect(fake.sets.find((s) => s.key === "explorer.indentSize").value).toBe(16);
   });
 
   test("exposes Reset/Save as drawer head actions", async () => {
@@ -161,6 +215,22 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     expect(h.querySelector(".sdw-reset").disabled).toBe(true);
   });
 
+  test("Save orders the Explorer keys alphabetically", async () => {
+    const fake = new FakeConfig(CONFIG);
+    const el = await mount(fake);
+    // Stage the keys in a non-alphabetical order (prefetchDepth first).
+    commit(el, { prefetchDepth: 3, indentSize: 24 });
+    await tick();
+    head(el).querySelector(".sdw-save").click();
+    await tick();
+    expect(fake.sets.map((s) => s.key)).toEqual([
+      "explorer.indentSize",
+      "explorer.prefetchDepth",
+    ]);
+    // The staged document is reflected back in sorted order.
+    expect(Object.keys(el._overrides)).toEqual(["indentSize", "prefetchDepth"]);
+  });
+
   test("Reset discards the staged edits", async () => {
     const fake = new FakeConfig(CONFIG);
     const el = await mount(fake);
@@ -169,7 +239,8 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     head(el).querySelector(".sdw-reset").click();
     await tick();
     const je = el.querySelector(".exs-editor > json-editor");
-    expect(je.editedValue).toEqual({ indentSize: 16, prefetchDepth: 2 });
+    // Reset restores the persisted overrides (none) — the default view again.
+    expect(je.editedValue).toEqual({});
     expect(fake.sets.length).toBe(0);
   });
 

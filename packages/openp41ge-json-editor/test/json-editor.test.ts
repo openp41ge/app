@@ -35,6 +35,19 @@ async function mount(value = CONFIG, readonly = false) {
 }
 
 /** The editor's hidden textarea (the actual edit surface). */
+function hoverRow(el, rowIdx) {
+  const ta = input(el);
+  const ev = new MouseEvent("mousemove", {
+    bubbles: true,
+    composed: true,
+    clientX: 100,
+    clientY: 100,
+  });
+  Object.defineProperty(ev, "offsetX", { value: 40 });
+  Object.defineProperty(ev, "offsetY", { value: rowIdx * 20 + 10 });
+  ta.dispatchEvent(ev);
+}
+
 function input(el) {
   return el.shadowRoot.querySelector("textarea.je-input");
 }
@@ -449,5 +462,150 @@ describe("json-editor schema tooltips", () => {
     hover(el, row, 60);
     vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
     expect(el.shadowRoot.querySelector(".je-tooltip").style.display).not.toBe("block");
+  });
+});
+
+describe("json-editor defaults overlay", () => {
+  test("show-defaults off shows only the raw value (no fade)", async () => {
+    const el = await mount({ lineHeight: 24, fontSize: 14 }, false);
+    el.value = { lineHeight: 24, fontSize: 14 };
+    el.defaults = { lineHeight: 20, fontSize: 14 };
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.shadowRoot.querySelectorAll(".je-row--faded").length).toBe(0);
+  });
+
+  test("show-defaults fades default-valued lines and keeps overrides", async () => {
+    const el = await mount({ lineHeight: 24, fontSize: 14 }, false);
+    el.value = { lineHeight: 24, fontSize: 14 };
+    el.defaults = { lineHeight: 20, fontSize: 14 };
+    el.showDefaults = true;
+    await new Promise((r) => setTimeout(r, 20));
+    const faded = el.shadowRoot.querySelectorAll(".je-row--faded");
+    expect(faded.length).toBeGreaterThan(0);
+    // fontSize is at its default (14) → faded; lineHeight is overridden → not.
+    const text = [...faded].map((r) => r.textContent).join("\n");
+    expect(text).toContain("fontSize");
+    expect(text).not.toContain("lineHeight");
+  });
+
+  test("no overrides at all → default-value lines fade but the top-level object does not", async () => {
+    const el = await mount({ lineHeight: 20, fontSize: 14 }, false);
+    el.value = { lineHeight: 20, fontSize: 14 };
+    el.defaults = { lineHeight: 20, fontSize: 14 };
+    el.showDefaults = true;
+    await new Promise((r) => setTimeout(r, 20));
+    const faded = el.shadowRoot.querySelectorAll(".je-row--faded");
+    expect(faded.length).toBeGreaterThan(0);
+    // The top-level object always exists — its opening brace is never faded
+    // and never gets a delete/overwrite action.
+    const rootRow = el.shadowRoot.querySelector('.je-row[data-line="0"]');
+    expect(rootRow.classList.contains("je-row--faded")).toBe(false);
+    expect(rootRow.querySelector(".je-ow")).toBeNull();
+    expect(rootRow.querySelector(".je-del")).toBeNull();
+    // The fully-default value lines below it are still faded.
+    expect(el.shadowRoot.querySelector('.je-row--faded[data-line="1"]')).toBeTruthy();
+  });
+
+  test("toggling show-defaults back off clears the fade", async () => {
+    const el = await mount({ lineHeight: 24, fontSize: 14 }, false);
+    el.value = { lineHeight: 24, fontSize: 14 };
+    el.defaults = { lineHeight: 20, fontSize: 14 };
+    el.showDefaults = true;
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.shadowRoot.querySelectorAll(".je-row--faded").length).toBeGreaterThan(0);
+    el.showDefaults = false;
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.shadowRoot.querySelectorAll(".je-row--faded").length).toBe(0);
+  });
+});
+
+describe("json-editor overwrite / pinned-default rows", () => {
+  async function setup(value, defaults, showDefaults = true) {
+    const el = await mount(value, false);
+    el.defaults = defaults;
+    el.showDefaults = showDefaults;
+    await new Promise((r) => setTimeout(r, 20));
+    return el;
+  }
+
+  // Row layout for `{ lineHeight: 24, fontSize: 14 }`:
+  //   0: {      1: "lineHeight": 24,   2: "fontSize": 14,   3: }
+  test("faded default rows get an overwrite button and NO delete button", async () => {
+    const el = await setup({ lineHeight: 24, fontSize: 14 }, { lineHeight: 20, fontSize: 14 });
+    // fontSize row (line 2) is at its default → faded → offer overwrite, no delete.
+    const fadedRow = el.shadowRoot.querySelector('.je-row--faded[data-line="2"]');
+    expect(fadedRow).toBeTruthy();
+    expect(fadedRow.querySelector(".je-ow")).toBeTruthy();
+    expect(fadedRow.querySelector(".je-del")).toBeNull();
+    // The overridden lineHeight row (line 1) keeps its delete button.
+    const overrideRow = el.shadowRoot.querySelector('.je-row[data-line="1"]');
+    expect(overrideRow.querySelector(".je-del")).toBeTruthy();
+    expect(overrideRow.querySelector(".je-ow")).toBeNull();
+  });
+
+  test("clicking the overwrite button emits json-editor-overwrite with path+value", async () => {
+    const el = await setup({ lineHeight: 24, fontSize: 14 }, { lineHeight: 20, fontSize: 14 });
+    let received = null;
+    el.addEventListener("json-editor-overwrite", (e) => {
+      received = e.detail;
+    });
+    hoverRow(el, 2);
+    await new Promise((r) => setTimeout(r, 20));
+    el.shadowRoot.querySelector('.je-row--faded[data-line="2"] .je-ow').click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(received).toEqual({ path: ["fontSize"], value: 14 });
+  });
+
+  test("hovering the overwrite button highlights the whole row in blue (like delete does red)", async () => {
+    const el = await setup({ lineHeight: 24, fontSize: 14 }, { lineHeight: 20, fontSize: 14 });
+    const ow = el.shadowRoot.querySelector('.je-row--faded[data-line="2"] .je-ow');
+    ow.dispatchEvent(new Event("mouseenter"));
+    await new Promise((r) => setTimeout(r, 20));
+    // The default row (line 2) is highlighted blue, NOT red.
+    const row = el.shadowRoot.querySelector('.je-row[data-line="2"]');
+    expect(row.classList.contains("je-row--overwrite")).toBe(true);
+    expect(row.classList.contains("je-row--danger")).toBe(false);
+    // The delete button still uses the red danger highlight.
+    const del = el.shadowRoot.querySelector('.je-row[data-line="1"] .je-del');
+    del.dispatchEvent(new Event("mouseenter"));
+    await new Promise((r) => setTimeout(r, 20));
+    const delRow = el.shadowRoot.querySelector('.je-row[data-line="1"]');
+    expect(delRow.classList.contains("je-row--danger")).toBe(true);
+    expect(delRow.classList.contains("je-row--overwrite")).toBe(false);
+    // Moving over off clears the highlight.
+    ow.dispatchEvent(new Event("mouseleave"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.shadowRoot.querySelectorAll(".je-row--danger, .je-row--overwrite").length).toBe(0);
+  });
+
+  test("explicitPaths keeps a pinned default from fading", async () => {
+    const el = await setup({ lineHeight: 20, fontSize: 14 }, { lineHeight: 20, fontSize: 14 });
+    // Pin fontSize (still at its default) — it must NOT be faded.
+    el.explicitPaths = ["fontSize"];
+    await new Promise((r) => setTimeout(r, 20));
+    const fadedText = [...el.shadowRoot.querySelectorAll(".je-row--faded")]
+      .map((r) => r.textContent)
+      .join("\n");
+    expect(fadedText).not.toContain("fontSize");
+    // It should be a normal (delete-capable) row now.
+    expect(el.shadowRoot.querySelector('.je-row[data-line="2"] .je-del')).toBeTruthy();
+  });
+
+  test("overwrite button also works on nested default subtrees", async () => {
+    const el = await setup(
+      { lineHeight: 24, nested: { value: 7 } },
+      { lineHeight: 20, nested: { value: 7 } },
+    );
+    let received = null;
+    el.addEventListener("json-editor-overwrite", (e) => {
+      received = e.detail;
+    });
+    // The `nested` subtree (line 2) is entirely at default → faded; click overwrite.
+    hoverRow(el, 2);
+    await new Promise((r) => setTimeout(r, 20));
+    el.shadowRoot.querySelector('.je-row--faded[data-line="2"] .je-ow').click();
+    await new Promise((r) => setTimeout(r, 20));
+    // The entry path points at the whole default subtree.
+    expect(received?.path).toEqual(["nested"]);
   });
 });

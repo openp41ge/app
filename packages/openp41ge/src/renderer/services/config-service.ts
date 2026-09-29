@@ -105,6 +105,29 @@ export class ConfigService {
     return this._config;
   }
 
+  /** The raw platform defaults (NOT merged with user overrides). Settings
+   *  editors use these to render the faded defaults overlay and to compute
+   *  which values the user has actually overridden. */
+  async getDefaults(): Promise<UserConfig | null> {
+    try {
+      if (typeof window.openp41ge === "undefined") return null;
+      return (await window.openp41ge.config.getDefaults()) as UserConfig;
+    } catch {
+      return null;
+    }
+  }
+
+  /** The raw persisted overrides (values the user wrote, including pinned
+   *  defaults) — used to seed the settings editors' override view. */
+  async getOverrides(): Promise<UserConfig | null> {
+    try {
+      if (typeof window.openp41ge === "undefined") return null;
+      return (await window.openp41ge.config.getOverrides()) as UserConfig;
+    } catch {
+      return null;
+    }
+  }
+
   /** Set a config key (dot-separated) via IPC, updates cache, emits events. */
   async set(key: string, value: unknown): Promise<void> {
     try {

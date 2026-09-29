@@ -221,30 +221,36 @@ describe("json-editor structure features", () => {
     }
     // Opening / member rows still do.
     expect(el.shadowRoot.querySelector('.je-row[data-line="2"] .je-del')).toBeTruthy();
+    // The top-level object always exists — its opening row is never deletable.
+    expect(el.shadowRoot.querySelector('.je-row[data-line="0"] .je-del')).toBeNull();
   });
 
   test("delete buttons stay hidden until their row is hovered", async () => {
     expect(el.shadowRoot.querySelectorAll(".je-del--show").length).toBe(0);
     const ta = input(el);
-    ta.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, composed: true }));
+    const ev = new MouseEvent("mousemove", { bubbles: true, composed: true, clientX: 100, clientY: 100 });
+    Object.defineProperty(ev, "offsetY", { value: 30 });
+    ta.dispatchEvent(ev);
     await new Promise((r) => setTimeout(r, 20));
     expect(el.shadowRoot.querySelectorAll(".je-del--show").length).toBe(1);
   });
 
   test("the delete button stays visible while hovering it", async () => {
     const ta = input(el);
-    ta.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, composed: true }));
+    const ev = new MouseEvent("mousemove", { bubbles: true, composed: true, clientX: 100, clientY: 100 });
+    Object.defineProperty(ev, "offsetY", { value: 30 });
+    ta.dispatchEvent(ev);
     await new Promise((r) => setTimeout(r, 20));
     // Leaving the textarea (e.g. moving onto the button) hides the row hover…
-    let del = el.shadowRoot.querySelector('.je-row[data-line="0"] .je-del');
+    let del = el.shadowRoot.querySelector('.je-row[data-line="1"] .je-del');
     ta.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false }));
     await new Promise((r) => setTimeout(r, 20));
     expect(del.classList.contains("je-del--show")).toBe(false);
     // …but entering the button itself must restore it so the cross stays usable.
-    del = el.shadowRoot.querySelector('.je-row[data-line="0"] .je-del');
+    del = el.shadowRoot.querySelector('.je-row[data-line="1"] .je-del');
     del.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }));
     await new Promise((r) => setTimeout(r, 20));
-    const fresh = el.shadowRoot.querySelector('.je-row[data-line="0"] .je-del');
+    const fresh = el.shadowRoot.querySelector('.je-row[data-line="1"] .je-del');
     expect(fresh.classList.contains("je-del--show")).toBe(true);
   });
 
@@ -1375,5 +1381,50 @@ describe("json-editor markdown tooltips", () => {
     const tip = await hover(editor, '"providerId"');
     expect(getComputedStyle(tip).display).toBe("block");
     expect(tip.querySelector("strong")).toBeTruthy();
+  });
+});
+
+describe("Alt+Arrow line movement (VS Code)", () => {
+  const caretLine = (editor) => {
+    const ta = input(editor);
+    const caret = ta.selectionStart;
+    const s = ta.value.lastIndexOf("\n", caret - 1) + 1;
+    const e = ta.value.indexOf("\n", caret);
+    return ta.value.slice(s, e === -1 ? ta.value.length : e);
+  };
+
+  test("Alt+ArrowDown moves the caret's line down", async () => {
+    const editor = await mount();
+    const ta = input(editor);
+    ta.selectionStart = ta.selectionEnd = ta.value.indexOf('"providerId"');
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    const after = input(editor).value;
+    // `providers` now precedes `providerId`.
+    expect(after.indexOf('"providers"')).toBeLessThan(after.indexOf('"providerId"'));
+    // The caret follows its own (moved-down) line.
+    expect(caretLine(editor).trim()).toContain('"providerId"');
+  });
+
+  test("Alt+ArrowUp moves the caret's line up", async () => {
+    const editor = await mount();
+    const ta = input(editor);
+    ta.selectionStart = ta.selectionEnd = ta.value.indexOf('"providers"');
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", altKey: true, bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    const after = input(editor).value;
+    expect(after.indexOf('"providers"')).toBeLessThan(after.indexOf('"providerId"'));
+    expect(caretLine(editor).trim()).toContain('"providers"');
+  });
+
+  test("is a no-op at the document boundary (still valid JSON)", async () => {
+    const editor = await mount();
+    const ta = input(editor);
+    const text = ta.value;
+    // The root `{` is the first line — moving it up is a no-op.
+    ta.selectionStart = ta.selectionEnd = 0;
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", altKey: true, bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(input(editor).value).toBe(text);
   });
 });

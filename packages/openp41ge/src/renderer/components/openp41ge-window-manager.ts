@@ -17,9 +17,13 @@ import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
 import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
 import "openp41ge-uikit";
-import { tooltipController, OverlayScrollbar, attachTabEdgeOverdraws } from "openp41ge-uikit";
+import { tooltipController, OverlayScrollbar, attachTabEdgeOverdraws, attachTopCornerOverdraws } from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
+import {
+  MANAGER_SETTINGS_STATE_EVENT,
+} from "./openp41ge-manager-settings";
+import type { Openp41geManagerSettings } from "./openp41ge-manager-settings";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import { registerManagerTabBar } from "../services/init-drag-system";
 import { MANAGER_TAB_REORDER_EVENT } from "../services/drop-targets/manager-tab-bar-drop-target";
@@ -146,6 +150,12 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _caseSensitive = false;
   /** Treat the header search query as a regular expression. */
   @state() private _useRegex = false;
+  /** Live <openp41ge-manager-settings> element (Settings tab) — the footer's
+   *  Save/Reset/toggle actions call into it. */
+  private _settingsEl: Openp41geManagerSettings | null = null;
+  /** State mirror from the settings element, so the custom Settings footer can
+   *  enable/disable Save/Reset and reflect the Show-defaults toggle. */
+  @state() private _settingsState = { dirty: false, saving: false, showDefaults: false };
   private _drag: {
     startX: number;
     startY: number;
@@ -186,6 +196,9 @@ export class Openp41geWindowManager extends LitElement {
     // delegated at the shadow root (they're retargeted to the host by the time
     // they reach a document listener).
     this.shadowRoot?.addEventListener("click", this._onShadowClick);
+    // The Settings tab's content emits its dirty/saving/show-defaults state so
+    // the custom settings footer can stay in sync.
+    this.addEventListener(MANAGER_SETTINGS_STATE_EVENT, this._onSettingsState);
     // Any new pointer press clears the drag-follow-up suppression. A click can
     // only follow a drag within the same gesture (no pointerdown between), so a
     // fresh press always means the previous drag's follow-up click is moot.
@@ -258,6 +271,7 @@ export class Openp41geWindowManager extends LitElement {
     document.removeEventListener("keydown", this._onKeydown);
     document.removeEventListener("click", this._onDocumentClick);
     this.shadowRoot?.removeEventListener("click", this._onShadowClick);
+    this.removeEventListener(MANAGER_SETTINGS_STATE_EVENT, this._onSettingsState);
     document.removeEventListener("pointerdown", this._onPointerDown);
     this._offEndSession?.();
     this._offOpenWindowsChanged?.();
@@ -293,15 +307,29 @@ export class Openp41geWindowManager extends LitElement {
     }
   }
 
+  /** Attach the top-corner overdraw accents to the settings footer action
+   *  buttons (Show defaults / Reset / Save, and the search button) so the
+   *  footer's top border line appears to bleed past each button's corners.
+   *  Idempotent — repeated calls (on every render) never duplicate the lines. */
+  private _attachSettingsFooterOverdraws(): void {
+    this.shadowRoot?.querySelectorAll<HTMLElement>(".smd-footer button").forEach((btn) => {
+      attachTopCornerOverdraws(btn);
+    });
+  }
+
   /** Attach custom tooltips to the footer tool buttons (replaces native `title`). */
   updated(): void {
+    this._settingsEl =
+      this.shadowRoot?.querySelector<Openp41geManagerSettings>("openp41ge-manager-settings") ??
+      null;
     this._measureListOverflow();
     this._attachDrawerOverdraws();
     this._attachWorkspaceFooterOverdraws();
     this._attachWorkspaceSearchBarOverdraws();
     this._attachManagerTabOverdraws();
+    this._attachSettingsFooterOverdraws();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
-      ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close, .wm-tab-close, .wm-tabbar-add",
+      ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .dw-close, .wm-tab-close, .wm-tabbar-add, .smd-toggle, .smd-reset, .smd-save",
     );
     const live = new Set<Element>();
     if (btns) {
@@ -939,6 +967,111 @@ export class Openp41geWindowManager extends LitElement {
   }
 
   /** Toggle the inline "new workspace" name row on the top-level list. */
+  /** Settings footer state arrived from the live settings element. */
+  private _onSettingsState = (e: Event): void => {
+    const d = (e as CustomEvent).detail as {
+      dirty: boolean;
+      saving: boolean;
+      showDefaults: boolean;
+    };
+    this._settingsState = {
+      dirty: !!d?.dirty,
+      saving: !!d?.saving,
+      showDefaults: !!d?.showDefaults,
+    };
+  };
+
+  /** Footer for the Settings tab: the shared search utility on the left, then
+   *  the Show-defaults toggle and the Save/Reset icon actions on the right
+   *  (mirroring the settings drawer head actions). */
+  private _settingsListFooter(): TemplateResult {
+    const st = this._settingsState;
+    return html`
+      <div class="ws-list-footer smd-footer">
+        <button
+          class="dw-search"
+          aria-label="Search workspaces"
+          aria-pressed=${this._searchOpen}
+          data-tip="Search workspaces"
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            if (this._searchOpen) {
+              this._exitSearch();
+            } else {
+              this._startSearch();
+            }
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+        </button>
+        <span class="wm-footer-spacer"></span>
+        <button
+          class="smd-toggle ${st.showDefaults ? "smd-toggle--on" : ""}"
+          type="button"
+          aria-label="Show defaults"
+          aria-pressed=${st.showDefaults}
+          data-tip=${st.showDefaults ? "Hide defaults" : "Show defaults"}
+          @click=${() => this._toggleShowDefaults()}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+        <button
+          class="smd-reset"
+          type="button"
+          aria-label="Reset"
+          data-tip="Reset"
+          @click=${() => this._resetSettings()}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+            <path
+              d="M520-330v-60h160v60H520Zm60 210v-50h-60v-60h60v-50h60v160h-60Zm100-50v-60h160v60H680Zm40-110v-160h60v50h60v60h-60v50h-60Zm111-280h-83q-26-88-99-144t-169-56q-117 0-198.5 81.5T200-480q0 72 32.5 132t87.5 98v-110h80v240H160v-80h94q-62-50-98-122.5T120-480q0-75 28.5-140.5t77-114q48.5-48.5 114-77T480-840q129 0 226.5 79.5T831-560Z"
+            />
+          </svg>
+        </button>
+        <button
+          class="smd-save ${st.dirty ? "smd-save--dirty" : ""}"
+          type="button"
+          aria-label="Save"
+          data-tip="Save"
+          @click=${() => void this._saveSettings()}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+            <path
+              d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"
+            />
+          </svg>
+        </button>
+      </div>
+    `;
+  }
+
+  private _toggleShowDefaults(): void {
+    this._settingsEl?.toggleShowDefaults();
+  }
+
+  private _resetSettings(): void {
+    this._settingsEl?.reset();
+  }
+
+  private _saveSettings(): void {
+    void this._settingsEl?.save();
+  }
+
   private _toggleAddWorkspace(): void {
     this._workspaceDeleteMode = false;
     this._addingWorkspace = !this._addingWorkspace;
@@ -1907,6 +2040,53 @@ export class Openp41geWindowManager extends LitElement {
         }
         .wm-footer-spacer {
           flex: 1;
+        }
+        /* Settings-tab footer actions (Show defaults / Reset / Save): full-height
+           square icon buttons with a left-side separator, matching the settings
+           drawer head actions. Save turns blue while there are unsaved changes. */
+        .smd-toggle,
+        .smd-reset,
+        .smd-save {
+          border: none;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          border-radius: 0;
+          height: 100%;
+          aspect-ratio: 1 / 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          padding: 0;
+          border-left: 1px solid var(--divider, #333);
+        }
+        .smd-toggle:hover,
+        .smd-toggle--on,
+        .smd-reset:hover,
+        .smd-save:hover {
+          background: var(--bg-active, #37373d);
+          color: var(--text-primary, #ddd);
+        }
+        .smd-toggle--on {
+          color: rgb(86, 156, 214);
+        }
+        .smd-save--dirty {
+          background: rgb(86, 156, 214);
+          color: #fff;
+        }
+        .smd-save--dirty:hover {
+          background: rgb(100, 168, 224);
+          color: #fff;
+        }
+        .smd-toggle svg,
+        .smd-reset svg,
+        .smd-save svg {
+          width: 14px;
+          height: 14px;
+          fill: currentColor;
+        }
+        .smd-toggle svg {
+          fill: none;
         }
         /* Search bar: appears as a row just above the persistent bottom bar
            (like the file-editor tabs). Toggled by the footer search button. */
@@ -3401,7 +3581,11 @@ export class Openp41geWindowManager extends LitElement {
               `
             : nothing
         }
-        ${this._activeTab !== "welcome" ? this._workspaceListFooter() : nothing}
+        ${this._activeTab !== "welcome"
+          ? this._activeTab === "settings"
+            ? this._settingsListFooter()
+            : this._workspaceListFooter()
+          : nothing}
       </div>
     `;
   }

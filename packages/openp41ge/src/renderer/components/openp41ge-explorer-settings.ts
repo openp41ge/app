@@ -7,12 +7,26 @@
  * Save (Reset discards the staged edits). Saving writes each setting through
  * the config service, so the Explorer re-flows on Save.
  *
+ * The editor shows ONLY the Explorer values the user has overridden (the
+ * config stores just the overrides — the Explorer's own defaults of 16px /
+ * depth 2 are implied). A "show defaults" toggle in the bottom bar renders the
+ * full effective document with the default-valued parts faded, so the user can
+ * see what is available and what they've already set; each faded row offers an
+ * "overwrite" affordance that pins the value into the user config (after which
+ * it becomes a normal, editable, deletable override).
+ *
+ * The document being edited is the raw *overrides* (not the merged effective
+ * doc): each row maps 1:1 to a persisted value, so deleting a row removes it.
+ * In show-defaults mode the editor gets the merged effective doc plus the set
+ * of pinned leaf paths, so a value that equals a default still renders as an
+ * explicit override (not faded) and offers the overwrite affordance.
+ *
  * The Reset/Save actions live in the drawer head (exported via
  * `renderHeadAction`, mounted by the settings drawer host next to ✕) rather
  * than in the surface body, so the JSON editor fills the drawer's height
  * above the bottom bar. The bottom bar (`.exs-footer`, pinned flush under
- * the editor) holds a right-aligned Sort keys action — matching the Agent
- * settings drawer's footer.
+ * the editor) holds a show-defaults toggle on the left and the right-aligned
+ * Sort keys action — matching the Agent settings drawer's footer style.
  *
  * Settings:
  *  - `explorer.indentSize` — the indentation unit (px, default 16) used as
@@ -26,7 +40,18 @@
 import { customElement, state } from "lit/decorators.js";
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import "openp41ge-json-editor/json-editor";
-import { cloneDeep, sortJsonKeys } from "openp41ge-json-editor";
+import {
+  cloneDeep,
+  getAt,
+  leafPaths,
+  mergeDefaults,
+  pathFromKey,
+  pinnedPaths,
+  setAt,
+  sortJsonKeys,
+  stripDefaults,
+  type JsonPath,
+} from "openp41ge-json-editor";
 import { EXPLORER_SETTINGS_SCHEMA } from "../models/explorer-settings-schema";
 import type { ConfigService } from "../services/config-service";
 import type { Openp41geSettingsDrawerHost } from "./openp41ge-settings-drawer-host";
@@ -69,57 +94,167 @@ export class Openp41geExplorerSettings extends LitElement {
    */
   host: Openp41geSettingsDrawerHost | null = null;
 
-  @state()
-  private _config: ExplorerSettings | null = null;
+  /** The staged override document — what the user has written (also what will
+   *  be persisted). Pins (values equal to their default) live here too. */
+  @state() private _overrides: ExplorerSettings | null = null;
+  /** The last persisted override document (the dirty baseline). */
+  @state() private _savedOverrides: ExplorerSettings | null = null;
+  /** The Explorer's own defaults (16px indent, depth 2) for these settings. */
+  @state() private _defaults: ExplorerSettings = {
+    indentSize: DEFAULT_INDENT,
+    prefetchDepth: DEFAULT_PREFETCH,
+  };
+  /** The effective (defaults-merged) document — derived from `_overrides`. */
+  @state() private _effective: ExplorerSettings | null = null;
+  /** Dot-joined leaf paths the user has explicitly set (pins + overrides). */
+  @state() private _pinned = new Set<string>();
+  /** Whether the editor shows the full effective document with faded defaults. */
+  @state() private _showDefaults = false;
 
-  @state()
-  private _savedConfig: ExplorerSettings | null = null;
+  @state() private _loading = true;
+  @state() private _saving = false;
+  @state() private _error = "";
 
-  @state()
-  private _loading = true;
-
-  @state()
-  private _saving = false;
-
-  @state()
-  private _error = "";
-
-  connectedCallback(): void {
+  override connectedCallback(): void {
     super.connectedCallback();
-    this._loadConfig();
+    void this._loadConfig();
   }
 
-  /** Read the persisted Explorer settings and seed the staged draft. */
-  private _loadConfig(): void {
-    const current: ExplorerSettings = {
-      indentSize: this._readCurrentIndent(),
-      prefetchDepth: this._readCurrentPrefetch(),
+  /** Read the persisted Explorer overrides and seed the staged draft. */
+  private async _loadConfig(): Promise<void> {
+    const localDefaults: ExplorerSettings = {
+      indentSize: DEFAULT_INDENT,
+      prefetchDepth: DEFAULT_PREFETCH,
     };
-    this._config = current;
-    this._savedConfig = cloneDeep(current);
+    // The override document is the minimum needed to render; defaults are only
+    // needed for the faded-defaults overlay, so a missing/failing overrides
+    // source (e.g. a bridge that hasn't been upgraded to expose the raw
+    // overrides) degrades to diffing the effective config against the local
+    // Explorer defaults.
+    let overrides: ExplorerSettings | null = null;
+    try {
+      if (
+        this.configService &&
+        typeof (this.configService as unknown as { getOverrides?: unknown }).getOverrides ===
+          "function" &&
+        typeof (this.configService as unknown as { getDefaults?: unknown }).getDefaults ===
+          "function"
+      ) {
+        const defaults = await (
+          this.configService as unknown as {
+            getDefaults: () => Promise<Record<string, unknown> | null>;
+          }
+        ).getDefaults();
+        const raw = await (
+          this.configService as unknown as {
+            getOverrides: () => Promise<Record<string, unknown> | null>;
+          }
+        ).getOverrides();
+        const platDefaults = this._pickExplorer(defaults ?? {});
+        this._defaults = {
+          indentSize: platDefaults.indentSize ?? DEFAULT_INDENT,
+          prefetchDepth: platDefaults.prefetchDepth ?? DEFAULT_PREFETCH,
+        };
+        overrides = this._pickExplorer(raw ?? {});
+      }
+    } catch {
+      overrides = null;
+    }
+    if (!overrides) {
+      // Fallback: read the effective values and strip the defaults out.
+      const effective: ExplorerSettings = {
+        indentSize: this._readCurrentIndent(),
+        prefetchDepth: this._readCurrentPrefetch(),
+      };
+      overrides = (stripDefaults(effective, localDefaults) ?? {}) as ExplorerSettings;
+    }
+    this._savedOverrides = cloneDeep(overrides);
+    this._sync(overrides);
     this._loading = false;
+  }
+
+  /** Slice just the Explorer keys out of a raw config/overrides document. */
+  private _pickExplorer(raw: Record<string, unknown>): ExplorerSettings {
+    const ex = raw.explorer as Record<string, unknown> | undefined;
+    const out: ExplorerSettings = {} as ExplorerSettings;
+    if (ex && typeof ex === "object") {
+      if (typeof ex.indentSize === "number" && Number.isFinite(ex.indentSize)) {
+        out.indentSize = Math.min(MAX_INDENT, Math.max(MIN_INDENT, Math.round(ex.indentSize)));
+      }
+      if (typeof ex.prefetchDepth === "number" && Number.isFinite(ex.prefetchDepth)) {
+        out.prefetchDepth = Math.min(
+          MAX_PREFETCH,
+          Math.max(MIN_PREFETCH, Math.round(ex.prefetchDepth)),
+        );
+      }
+    }
+    return out;
+  }
+
+  /** Recompute the derived state (overrides → effective + pinned set). */
+  private _sync(overrides: ExplorerSettings): void {
+    this._overrides = overrides;
+    this._effective = mergeDefaults(overrides, this._defaults) as ExplorerSettings;
+    this._pinned = pinnedPaths(overrides, this._defaults);
+  }
+
+  /** The document passed to the editor: the overrides only, or the full
+   *  effective document when showing defaults. */
+  private _editorValue(): ExplorerSettings {
+    if (!this._overrides) return {} as ExplorerSettings;
+    if (this._showDefaults) return this._effective ?? ({} as ExplorerSettings);
+    return this._overrides;
   }
 
   /** The JSON editor committed an edit — stage it into the draft only. */
   private _onJsonEditorChange(e: CustomEvent): void {
-    this._config = (e.detail as { value: ExplorerSettings }).value;
+    const value = (e.detail as { value: ExplorerSettings }).value;
+    if (this._showDefaults) {
+      // Reconcile the effective edit back to the override document (a value
+      // the user left at its default is not an override unless pinned).
+      const next = (stripDefaults(value, this._defaults, this._pinned) ??
+        {}) as ExplorerSettings;
+      this._sync(next);
+    } else {
+      this._sync(value);
+    }
+    this.host?.refresh();
+  }
+
+  /** The user clicked "overwrite" on a faded default row — pin that value into
+   *  the override document so it's persisted and becomes deletable/editable. */
+  private _onOverwrite(e: CustomEvent): void {
+    const detail = e.detail as { path: JsonPath; value: unknown };
+    if (!this._overrides || !detail?.path?.length) return;
+    const next = cloneDeep(this._overrides);
+    setAt(next, detail.path, detail.value);
+    this._sync(next);
     this.host?.refresh();
   }
 
   /** True when the staged draft differs from the persisted baseline. */
   private _isDirty(): boolean {
-    if (!this._config || !this._savedConfig) return !!this._config;
-    return JSON.stringify(this._config) !== JSON.stringify(this._savedConfig);
+    if (!this._overrides || !this._savedOverrides) return !!this._overrides;
+    return JSON.stringify(this._overrides) !== JSON.stringify(this._savedOverrides);
   }
 
-  /** Persist the staged Explorer settings (Save) — writes both keys. */
+  /** Persist the staged Explorer settings (Save) — writes every override leaf. */
   private async _save(): Promise<void> {
-    if (!this._config) return;
+    if (!this._overrides) return;
     this._saving = true;
     try {
-      await this.configService.set(INDENT_KEY, this._config.indentSize);
-      await this.configService.set(PREFETCH_KEY, this._config.prefetchDepth);
-      this._savedConfig = cloneDeep(this._config);
+      // Persist the overrides with their keys sorted alphabetically so the
+      // config file reads in a stable order. Persist by leaf path so pinned
+      // values (a leaf equal to its default) are written as explicit keys.
+      const doc = sortJsonKeys(this._overrides) as ExplorerSettings;
+      for (const key of leafPaths(doc)) {
+        await this.configService.set(
+          `explorer.${key}`,
+          getAt(doc, pathFromKey(key)),
+        );
+      }
+      this._savedOverrides = cloneDeep(doc);
+      this._sync(doc);
       this._error = "";
     } catch {
       this._error = "Failed to save the Explorer settings.";
@@ -131,8 +266,14 @@ export class Openp41geExplorerSettings extends LitElement {
 
   /** Discard the staged edits and restore the last persisted settings. */
   private _reset(): void {
-    if (!this._savedConfig) return;
-    this._config = cloneDeep(this._savedConfig);
+    if (!this._savedOverrides) return;
+    this._sync(cloneDeep(this._savedOverrides));
+    this.host?.refresh();
+  }
+
+  /** Toggle the faded-defaults overlay in the JSON editor. */
+  private _toggleShowDefaults(): void {
+    this._showDefaults = !this._showDefaults;
     this.host?.refresh();
   }
 
@@ -140,8 +281,8 @@ export class Openp41geExplorerSettings extends LitElement {
    *  reads in a stable order — matching the Agent settings drawer's Sort keys
    *  bottom-bar action. Nothing is persisted until Save. */
   private _sortConfig(): void {
-    if (!this._config) return;
-    this._config = sortJsonKeys(this._config);
+    if (!this._overrides) return;
+    this._sync(sortJsonKeys(this._overrides) as ExplorerSettings);
     this.host?.refresh();
   }
 
@@ -240,15 +381,16 @@ export class Openp41geExplorerSettings extends LitElement {
           flex: 0 0 auto;
           display: flex;
           align-items: center;
-          justify-content: flex-end;
           height: 34px;
           box-sizing: border-box;
           border-top: 1px solid var(--divider, #333);
           background: var(--bg-surface, #161616);
         }
-        /* Square icon-only action (e.g. Sort keys) in the bottom bar: full
-         * height, right-aligned with a left-side separator — like the drawer
-         * head buttons. */
+        .exs-footer-spacer {
+          flex: 1 1 auto;
+        }
+        /* Square icon-only action in the bottom bar: full height with a
+         * left-side separator — like the drawer head buttons. */
         .exs-footer-btn {
           height: 100%;
           aspect-ratio: 1 / 1;
@@ -276,6 +418,9 @@ export class Openp41geExplorerSettings extends LitElement {
           height: 14px;
           fill: currentColor;
         }
+        .exs-toggle--on {
+          color: var(--accent, #58a6ff);
+        }
         .exs-note {
           margin: 6px 0 0;
           font-size: 12px;
@@ -292,20 +437,39 @@ export class Openp41geExplorerSettings extends LitElement {
             : html`<div class="exs-editor">
                 <json-editor
                   .rowHeight=${this._rowHeight()}
-                  .value=${this._config}
+                  .value=${this._editorValue()}
+                  .defaults=${this._defaults}
+                  .showDefaults=${this._showDefaults}
+                  .explicitPaths=${[...this._pinned]}
                   .schema=${EXPLORER_SETTINGS_SCHEMA}
                   @json-editor-change=${(e: CustomEvent) => void this._onJsonEditorChange(e)}
+                  @json-editor-overwrite=${(e: CustomEvent) => this._onOverwrite(e)}
                 ></json-editor>
               </div>`
         }
         ${this._error ? html`<p class="exs-note exs-note--error">${this._error}</p>` : nothing}
         <div class="exs-footer">
+          <span class="exs-footer-spacer"></span>
+          <button
+            class="exs-footer-btn exs-toggle ${this._showDefaults ? "exs-toggle--on" : ""}"
+            type="button"
+            title="Show default values"
+            aria-label="Show default values"
+            aria-pressed="${this._showDefaults}"
+            @click=${() => this._toggleShowDefaults()}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+              <path
+                d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-60q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35Zm0 180q-146 0-246-70T60-500q74-160 174-230t246-70q146 0 246 70t174 230q-74 160-174 230t-246 70Zm0-60q105 0 188-55t132-145q-49-90-132-145t-188-55q-105 0-188 55T120-500q49 90 132 145t188 55Z"
+              />
+            </svg>
+          </button>
           <button
             class="exs-footer-btn"
             type="button"
             title="Sort keys"
             aria-label="Sort keys"
-            ?disabled=${!this._config}
+            ?disabled=${!this._overrides}
             @click=${() => this._sortConfig()}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">

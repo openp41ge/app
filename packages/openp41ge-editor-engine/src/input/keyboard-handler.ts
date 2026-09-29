@@ -212,7 +212,7 @@ export class KeyboardHandler {
       }
     }
 
-    // Option+Arrow for word movement
+    // Option+Arrow for word movement & line move
     if (isAlt && !isCmd && !isShift) {
       switch (event.key) {
         case "ArrowLeft":
@@ -220,6 +220,14 @@ export class KeyboardHandler {
           return true;
         case "ArrowRight":
           this._cursorController.moveWordRight();
+          return true;
+        case "ArrowUp":
+          // Move the current line up (no-op at the top boundary).
+          this._cursorController.moveLine(-1);
+          return true;
+        case "ArrowDown":
+          // Move the current line down (no-op at the bottom boundary).
+          this._cursorController.moveLine(1);
           return true;
       }
     }

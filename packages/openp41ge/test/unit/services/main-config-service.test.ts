@@ -26,20 +26,27 @@ afterEach(() => {
 });
 
 describe("ConfigService (main process)", () => {
-  test("init() creates the config file with defaults when missing", () => {
+  test("init() creates an overrides-only config file when missing", () => {
     configService.init();
 
     const configPath = path.join(tmpDir, ".config", "config.json");
     expect(fs.existsSync(configPath)).toBe(true);
 
+    // Defaults are implied by the platform — a fresh config stores no overrides.
     const raw = fs.readFileSync(configPath, "utf-8");
     const parsed = JSON.parse(raw);
-    expect(parsed.version).toBe(1);
-    expect(parsed.appTheme).toBe("dark");
-    expect(parsed.lineHeight).toBe(20);
-    expect(parsed.fontSize).toBe(14);
-    expect(parsed.editor.maxFileSize).toBe(50 * 1024 * 1024);
-    expect(parsed.syntaxThemes).toEqual({});
+    expect(parsed).toEqual({});
+  });
+
+  test("getDefaults() returns the raw platform defaults", () => {
+    configService.init();
+    const d = configService.getDefaults();
+    expect(d.version).toBe(1);
+    expect(d.appTheme).toBe("dark");
+    expect(d.lineHeight).toBe(20);
+    expect(d.fontSize).toBe(14);
+    expect(d.editor.maxFileSize).toBe(50 * 1024 * 1024);
+    expect(d.agent.providerId).toBe("vllm");
   });
 
   test("init() reads existing config file correctly", () => {
@@ -228,7 +235,11 @@ describe("ConfigService (main process)", () => {
       agent: { providers: Record<string, Record<string, unknown>> };
     };
     expect("model" in parsed.agent.providers.vllm).toBe(false);
-    expect(parsed.agent.providers.vllm.defaultModel).toBe("");
+    // Overrides-only persistence: the values that differ from the defaults are
+    // stored; the migrated defaultModel ("") equals the default, so it is
+    // implied rather than persisted.
+    expect(parsed.agent.providers.vllm.baseUrl).toBe("http://x");
+    expect(parsed.agent.providers.vllm.models).toEqual([{ id: "deepseek-v4-flash" }]);
   });
 
   test("init() back-fills the maxFileSize default for legacy config files", () => {
@@ -322,6 +333,80 @@ describe("ConfigService (main process)", () => {
 
     expect(configService.get("lineHeight")).toBe(30);
     expect(configService.get("fontSize")).toBe(18);
+  });
+
+  test("getOverrides() returns only the user-written overrides", () => {
+    configService.init();
+    // Fresh config: nothing overridden → empty overrides document.
+    expect(configService.getOverrides()).toEqual({});
+    configService.set("lineHeight", 30);
+    expect(configService.getOverrides()).toEqual({ lineHeight: 30 });
+    // Defaults themselves are NOT overrides.
+    expect(configService.getOverrides()).not.toHaveProperty("appTheme");
+  });
+
+  test("getOverrides() and the persisted file are alphabetised on save", () => {
+    configService.init();
+    // Set keys in a non-alphabetical order (updateChannel before fontSize/lineHeight).
+    configService.set("updateChannel", "alpha");
+    configService.set("fontSize", 16);
+    configService.set("lineHeight", 30);
+    // The overrides doc read back is sorted by key.
+    expect(Object.keys(configService.getOverrides())).toEqual([
+      "fontSize",
+      "lineHeight",
+      "updateChannel",
+    ]);
+    // And the written file is sorted too.
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, ".config", "config.json"), "utf-8"),
+    );
+    expect(Object.keys(parsed)).toEqual(["fontSize", "lineHeight", "updateChannel"]);
+  });
+
+  test("set() persists an explicit pin even when it equals the default", () => {
+    configService.init();
+    // The user explicitly sets a value that happens to equal the default.
+    configService.set("lineHeight", 20);
+
+    const configPath = path.join(tmpDir, ".config", "config.json");
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    // It's stored (not pruned) so a future default change won't move it silently.
+    expect(parsed).toEqual({ lineHeight: 20 });
+    expect(configService.getOverrides()).toEqual({ lineHeight: 20 });
+    expect(configService.get("lineHeight")).toBe(20);
+  });
+
+  test("a pinned value in the config file survives a restart", () => {
+    const configDir = path.join(tmpDir, ".config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "config.json"),
+      JSON.stringify({ lineHeight: 20 }),
+      "utf-8",
+    );
+    configService.init();
+    // The pin is remembered as an override and not pruned on the next write.
+    expect(configService.getOverrides()).toEqual({ lineHeight: 20 });
+    configService.set("fontSize", 16);
+    const parsed = JSON.parse(fs.readFileSync(path.join(configDir, "config.json"), "utf-8"));
+    expect(parsed).toEqual({ lineHeight: 20, fontSize: 16 });
+  });
+
+  test("a bulk container write does NOT pin its default-valued leaves", () => {
+    configService.init();
+    // Saving the whole `agent` object (as the agent settings do) must not
+    // persist every leaf — only the leaves that actually differ from default.
+    configService.set("agent", {
+      providerId: "vllm",
+      providers: {
+        vllm: { baseUrl: "http://localhost:8000/v1", defaultModel: "" },
+      },
+    });
+    const configPath = path.join(tmpDir, ".config", "config.json");
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    // Everything is at its default → the agent section is pruned entirely.
+    expect(parsed).not.toHaveProperty("agent");
   });
 
   test("onChange() fires when config is updated via set()", () => {

@@ -86,7 +86,99 @@ const DEFAULT_CONFIG: UserConfig = {
   },
 };
 
+// ─── Helper: reduce a config to its overrides (defaults are implied) ─────
+
+/**
+ * Return a copy of `value` with every leaf equal to its `defaults` entry
+ * removed — the overrides-only shape that is persisted to disk. Defaults are
+ * implied by the platform, so they don't need to be stored; the config file
+ * holds only what the user explicitly set. Arrays and primitives are leaves: an
+ * entry is kept when it differs from the default.
+ *
+ * `explicitKeys` (dot-joined leaf paths the user explicitly "pinned") are kept
+ * even when they equal the default — a pinned value is stored so a future
+ * default change won't silently move it.
+ */
+function toOverrides(
+  value: unknown,
+  defaults: unknown = DEFAULT_CONFIG,
+  explicitKeys?: Set<string>,
+  path = "",
+): unknown {
+  if (Array.isArray(value)) {
+    if (path !== "" && explicitKeys?.has(path)) return value;
+    return JSON.stringify(value) === JSON.stringify(defaults) ? undefined : value;
+  }
+  if (value !== null && typeof value === "object") {
+    const src = value as Record<string, unknown>;
+    const def = (
+      defaults && typeof defaults === "object" && !Array.isArray(defaults)
+        ? defaults
+        : {}
+    ) as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(src)) {
+      const dv = src[key];
+      if (dv === undefined) continue;
+      const cur = path ? `${path}.${key}` : key;
+      if (Array.isArray(dv)) {
+        if (path !== "" && explicitKeys?.has(cur)) out[key] = dv;
+        else if (JSON.stringify(dv) !== JSON.stringify(def[key])) out[key] = dv;
+      } else if (dv !== null && typeof dv === "object") {
+        const pruned = toOverrides(dv, def[key], explicitKeys, cur);
+        if (pruned !== undefined && Object.keys(pruned as object).length > 0) out[key] = pruned;
+      } else if (JSON.stringify(dv) !== JSON.stringify(def[key]) || (explicitKeys?.has(cur) ?? false)) {
+        out[key] = dv;
+      }
+    }
+    return out;
+  }
+  return JSON.stringify(value) === JSON.stringify(defaults) ? undefined : value;
+}
+
+/** Collect the dot-joined leaf paths of a config value (the paths the user has
+ *  explicitly written). Used to remember pins (values equal to their default)
+ *  across a restart so they aren't pruned by `toOverrides`. */
+function collectLeafPaths(value: unknown, prefix = "", out = new Set<string>()): Set<string> {
+  if (value === null || value === undefined) return out;
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) collectLeafPaths(value[i], `${prefix}[${i}]`, out);
+    return out;
+  }
+  if (typeof value === "object") {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      collectLeafPaths(child, prefix ? `${prefix}.${key}` : key, out);
+    }
+    return out;
+  }
+  out.add(prefix);
+  return out;
+}
+
 // ─── Helper: deep merge ──────────────────────────────────────────────────
+
+/** Recursively sort every object key alphabetically so the persisted config
+ *  (and the overrides the renderer seeds its settings editors with) reads in
+ *  a stable, predictable order. Array element order is preserved. */
+function sortKeys<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => sortKeys(v)) as T;
+  if (value !== null && typeof value === "object") {
+    const src = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(src).sort()) out[key] = sortKeys(src[key]);
+    return out as T;
+  }
+  return value;
+}
+
+/** The overrides-only config with its keys sorted alphabetically — used both
+ *  for the persisted file and for the renderer's settings-editor seed. */
+function sortedOverrides(
+  config: UserConfig,
+  explicitKeys: Set<string>,
+): Record<string, unknown> {
+  return sortKeys(toOverrides(config, DEFAULT_CONFIG, explicitKeys)) as Record<string, unknown>;
+}
 
 function deepMerge<T extends Record<string, unknown>>(base: T, override: Partial<T>): T {
   const result = { ...base };
@@ -115,6 +207,10 @@ function deepMerge<T extends Record<string, unknown>>(base: T, override: Partial
 
 export class ConfigService {
   private _config: UserConfig = { ...DEFAULT_CONFIG };
+  /** Dot-joined leaf paths the user has explicitly set (from the file and from
+   *  `set`). Pins (values equal to their default) are kept in this set so
+   *  `toOverrides` doesn't prune them and they survive a restart. */
+  private _explicitKeys = new Set<string>();
   private _configPath: string;
   private _configDir: string;
   private _watchHandle: fs.FSWatcher | null = null;
@@ -140,6 +236,9 @@ export class ConfigService {
         const raw = fs.readFileSync(this._configPath, "utf-8");
         const parsed = JSON.parse(raw) as Partial<UserConfig>;
         this._config = deepMerge({ ...DEFAULT_CONFIG }, parsed);
+        // Everything in the file is explicitly set, so remember its leaf paths
+        // as pins/overrides so they aren't pruned by `toOverrides`.
+        this._explicitKeys = collectLeafPaths(parsed);
         if (this._migrateConfig(this._config)) {
           // Persist the migrated shape back to disk so legacy keys (e.g. the
           // provider-level `model` field) are physically removed and don't
@@ -148,6 +247,7 @@ export class ConfigService {
         }
         log.info("config-loaded", { source: "file", path: this._configPath });
       } else {
+        this._explicitKeys.clear();
         this._writeAtomic(this._config);
         log.info("config-initialized", { source: "defaults", path: this._configPath });
       }
@@ -173,9 +273,32 @@ export class ConfigService {
     return this._config;
   }
 
+  /** The raw platform defaults (NOT merged with user overrides). The renderer
+   *  uses these to render the faded defaults overlay in settings editors and
+   *  to compute what the user has actually overridden. */
+  getDefaults(): UserConfig {
+    return JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as UserConfig;
+  }
+
+  /** The raw persisted overrides — the values the user explicitly wrote (incl.
+   *  pinned values equal to their default). This is the exact shape stored on
+   *  disk, so settings editors can distinguish user-written values from implied
+   *  defaults. */
+  getOverrides(): UserConfig {
+    return sortedOverrides(this._config, this._explicitKeys) as unknown as UserConfig;
+  }
+
   /** Set a config key (dot-separated) and persist to disk. */
   set(key: string, value: unknown): void {
     log.debug("config-set", { key, value });
+    // An externally-set LEAF value is treated as explicit (a "pin"): it's
+    // stored even when it equals the default, so a future default change won't
+    // move it. Bulk container writes (e.g. saving the whole `agent` object) are
+    // NOT pinned — their default-valued leaves are still pruned, preserving the
+    // overrides-only persistence.
+    if (key && !(value !== null && typeof value === "object" && !Array.isArray(value))) {
+      this._explicitKeys.add(key);
+    }
     const keys = key.split(".");
     let obj: Record<string, unknown> = this._config as unknown as Record<string, unknown>;
     for (let i = 0; i < keys.length - 1; i++) {
@@ -223,14 +346,20 @@ export class ConfigService {
     return obj;
   }
 
-  /** Atomic write: write to temp file, then rename. */
+  /** Atomic write: write the overrides-only config to temp file, then rename.
+   *  Defaults are implied by the platform, so the file stores only what the
+   *  user has explicitly set (keys equal to their default are pruned). */
   private _writeAtomic(config: UserConfig): void {
     try {
       if (!fs.existsSync(this._configDir)) {
         fs.mkdirSync(this._configDir, { recursive: true });
       }
       const tmpPath = this._configPath + ".tmp";
-      fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        tmpPath,
+        JSON.stringify(sortedOverrides(config, this._explicitKeys), null, 2),
+        "utf-8",
+      );
       fs.renameSync(tmpPath, this._configPath);
     } catch (err) {
       log.warn("write error:", err);

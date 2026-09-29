@@ -52,7 +52,7 @@ import {
   type JsonToken,
   type SelectableRange,
 } from "./json-tokenize";
-import { cloneDeep, getAt, summarize, type JsonPath } from "./json-tree";
+import { cloneDeep, getAt, pathKey, summarize, type JsonPath } from "./json-tree"
 import { renderMarkdown, isMarkdownFileRef } from "./md-render";
 import {
   Gutter,
@@ -67,6 +67,7 @@ import type { TextPosition } from "openp41ge-editor-engine/model";
 
 export const JSON_EDITOR_CHANGE = "json-editor-change";
 export const JSON_EDITOR_OPEN = "json-editor-open";
+export const JSON_EDITOR_OVERWRITE = "json-editor-overwrite";
 
 /** Resolves a local Markdown file reference (a relative `*.md` path in a schema
  *  `description`) to the file's Markdown text, or null when it can't be
@@ -107,6 +108,82 @@ export function gutterWidthFor(rowCount: number, digitPx: number): number {
   return digits * digitPx + GUTTER_PAD_PX * 2;
 }
 
+// ─── Defaults-overlay (faded defaults) helpers ─────────────────────────────
+// When `showDefaults` is on, the document is the effective (defaults-merged)
+// value. Every part that still equals its default is rendered faded; the parts
+// that differ (the overrides) render normally in place.
+
+/** Collect the leaf paths where `value` differs from `defaults` (its overrides). */
+function collectOverrideLeaves(
+  value: unknown,
+  def: unknown,
+  path: JsonPath,
+  out: Set<string>,
+): void {
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    def !== null &&
+    typeof def === "object" &&
+    !Array.isArray(def)
+  ) {
+    for (const key of Object.keys(value)) {
+      collectOverrideLeaves(
+        (value as Record<string, unknown>)[key],
+        (def as Record<string, unknown>)[key],
+        [...path, key],
+        out,
+      );
+    }
+    return;
+  }
+  if (JSON.stringify(value) !== JSON.stringify(def)) out.add(pathKey(path));
+}
+
+/** True when an override exists at or below `key` (so the line must NOT fade). */
+function hasOverrideUnder(overrides: Set<string>, key: string): boolean {
+  if (overrides.has(key)) return true;
+  if (key === "") return overrides.size > 0;
+  const prefix = key + ".";
+  for (const q of overrides) {
+    if (q.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+/** Mark every line of subtrees that are entirely at default as faded. */
+function markDefaultLines(
+  node: JsonNode,
+  path: JsonPath,
+  faded: Set<number>,
+  overrides: Set<string>,
+  defaults: unknown,
+): void {
+  const key = pathKey(path);
+  // The document's top-level object (`{}`) always exists and is never an
+  // optional value — only its default-valued *subtrees* fade, so the container
+  // braces always render solid behind the faded contents.
+  if (
+    path.length > 0 &&
+    !hasOverrideUnder(overrides, key) &&
+    getAt(defaults, path) !== undefined
+  ) {
+    for (let l = node.line; l <= node.endLine; l++) faded.add(l);
+    return;
+  }
+  if (node.type === "object" && node.members) {
+    for (const m of node.members) {
+      markDefaultLines(m.value, [...path, m.key], faded, overrides, defaults);
+    }
+  } else if (node.type === "array" && node.elements) {
+    for (let i = 0; i < node.elements.length; i++) {
+      markDefaultLines(node.elements[i], [...path, i], faded, overrides, defaults);
+    }
+  }
+}
+
+
 interface VisibleLine {
   /** Full-text line index (0-based). */
   line: number;
@@ -129,6 +206,20 @@ export class JsonEditorElement extends LitElement {
    *  wires this to read bundled content or the filesystem. */
   @property({ attribute: false }) resolveResource: ResolveResource | null = null;
 
+  /** The platform defaults for this document. When `showDefaults` is on, every
+   *  part of the document that still equals its default (i.e. is not an
+   *  override) is rendered faded, while the overridden values render normally
+   *  in place — so the user sees what's available and what's been set. */
+  @property({ attribute: false }) defaults: unknown = null;
+  /** When true (and `defaults` is set), fade default-valued tokens/lines so the
+   *  overrides stand out. Defaults to false (show only the document as-is). */
+  @property({ type: Boolean, attribute: "show-defaults" }) showDefaults = false;
+  /** Dot-joined leaf paths the user has explicitly overridden ("pinned" — set
+   *  to a value that happens to equal the default). When `showDefaults` is on,
+   *  these paths render normally (not faded) alongside the derived overrides, so
+   *  a pinned value is never mistaken for an untouched default. */
+  @property({ attribute: false }) explicitPaths: string[] = [];
+
   /** Full JSON text — the source of truth that gets persisted. */
   @state() private _text = "";
   /** Last successfully parsed value (carried across transiently-invalid text). */
@@ -150,8 +241,16 @@ export class JsonEditorElement extends LitElement {
 
   private _tokens: JsonToken[] = [];
   private _selectables: SelectableRange[] = [];
-  /** Full-text line indexes currently highlighted red (delete hover). */
+  /** Full-text line indexes currently highlighted (row hover over an action
+   *  button — red for delete, blue for overwrite). */
   private _dangerLines = new Set<number>();
+  /** Which accent the current row highlight uses (`delete` red vs `overwrite`
+   *  blue). Only meaningful while `_dangerLines` is non-empty. */
+  private _highlightKind: "delete" | "overwrite" = "delete";
+  /** Full-text line indexes rendered faded in the defaults-overlay view. */
+  private _fadedLines = new Set<number>();
+  /** Leaf paths (dot-joined) that differ from the defaults (the overrides). */
+  private _overrideLeafPaths = new Set<string>();
   /** Full-text line index currently hovered (reveals its delete button). */
   @state() private _hoverLine: number | null = null;
   /** Gutter row key (full-text line, 0-based) of the caret's line — kept in
@@ -543,6 +642,15 @@ export class JsonEditorElement extends LitElement {
     .je-row--danger {
       background: rgba(244, 135, 113, 0.22);
     }
+    .je-row--overwrite {
+      background: rgba(88, 166, 255, 0.22);
+    }
+    .je-row--faded .je-line {
+      opacity: 0.38;
+    }
+    .je-row--faded .je-line:hover {
+      opacity: 0.6;
+    }
     .je-line {
       flex: 1 1 auto;
       min-width: 0;
@@ -591,6 +699,33 @@ export class JsonEditorElement extends LitElement {
     .je-del:hover {
       opacity: 1;
       color: #f48771;
+    }
+    /* Overwrite (pin this default into user config) button on faded rows. */
+    .je-ow {
+      pointer-events: auto;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary, #6e7681);
+      font: inherit;
+      line-height: 1;
+      cursor: pointer;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+    }
+    .je-ow svg {
+      stroke: currentColor;
+    }
+    .je-ow--show {
+      opacity: 1;
+    }
+    .je-ow:hover {
+      color: #58a6ff;
+      background: var(--bg-active, #37373d);
+      border-radius: 3px;
     }
 
     textarea.je-input {
@@ -720,6 +855,9 @@ export class JsonEditorElement extends LitElement {
     if (changed.has("rowHeight")) {
       this._applyRowHeight();
     }
+    if (changed.has("showDefaults") || changed.has("defaults") || changed.has("explicitPaths")) {
+      this._computeFadedLines();
+    }
   }
 
   /** The parsed value of the current text (last valid parse while transiently
@@ -811,6 +949,7 @@ export class JsonEditorElement extends LitElement {
     this._computeVisible();
     this._tokens = tokenizeJsonFull(this._visibleText);
     this._selectables = selectableRanges(this._tokens);
+    this._computeFadedLines();
 
     if (emitChange && json !== undefined && json !== this._committedJson) {
       this._committedJson = json;
@@ -825,6 +964,23 @@ export class JsonEditorElement extends LitElement {
 
     this._applyRowHeight();
     this.requestUpdate();
+  }
+
+  /** Recompute which lines are part of a default (non-overridden) subtree so
+   *  they render faded when `showDefaults` is on. No fade when the mode is off
+   *  or no defaults are supplied. */
+  private _computeFadedLines(): void {
+    this._fadedLines.clear();
+    this._overrideLeafPaths.clear();
+    if (!this.showDefaults || this.defaults == null || !this._root) return;
+    const overrides = new Set<string>();
+    collectOverrideLeaves(this._parsedValue, this.defaults, [], overrides);
+    // Explicitly-pinned paths are overrides even when they equal the default.
+    for (const p of this.explicitPaths) overrides.add(p);
+    this._overrideLeafPaths = overrides;
+    const faded = new Set<number>();
+    markDefaultLines(this._root, [], faded, overrides, this.defaults);
+    this._fadedLines = faded;
   }
 
   private _computeVisible(): void {
@@ -1243,8 +1399,18 @@ export class JsonEditorElement extends LitElement {
     const fold = this._foldForLine(v.line);
     const isFolded = this._folded.has(v.line);
     const danger = this._dangerLines.has(v.line);
+    const hlClass = danger
+      ? this._highlightKind === "overwrite"
+        ? " je-row--overwrite"
+        : " je-row--danger"
+      : "";
     const closeRow = /^\s*[}\]]\s*,?\s*$/.test(v.text);
-    const showDel = !closeRow && this._hoverLine === v.line;
+    const faded = this._fadedLines.has(v.line);
+    // The top-level object always exists — it is never deleted or overwritten,
+    // so its opening line gets no action button, and it is never faded.
+    const isRootLine = this._root != null && v.line === this._root.line;
+    const showDel = !closeRow && !faded && !isRootLine && this._hoverLine === v.line;
+    const showOverwrite = !closeRow && faded && !isRootLine && this._hoverLine === v.line;
     const tokens = tokenizeJsonFull(v.text);
     const { keyStarts, valueStarts } = this._classifyTokens(tokens);
     const meta = isFolded ? html`<span class="je-fold-meta">${this._foldMeta(fold)}</span>` : "";
@@ -1264,24 +1430,70 @@ export class JsonEditorElement extends LitElement {
         (this._braceMatch[0] === abs || this._braceMatch[1] === abs);
       return this._renderToken(t, keyStarts, valueStarts, brace);
     });
-    const del = closeRow
+    // Default (faded) rows are not in the user config yet, so they can't be
+    // deleted; instead they offer an "overwrite" affordance that pins the
+    // value into the user config (after which it becomes a normal, deletable
+    // override). Buttons stay in the DOM and are revealed on hover (opacity).
+    const actions = closeRow || isRootLine
       ? ""
-      : html`<button
-          class="je-del ${showDel ? "je-del--show" : ""}"
-          title="Delete"
-          @click=${() => this._deleteAtLine(v.line)}
-          @mouseenter=${() => {
-            this._hoverLine = v.line;
-            this._setDanger(v.line);
-          }}
-          @mouseleave=${() => this._clearDanger()}
-        >
-          ×
-        </button>`;
-    return html`<div class="je-row ${danger ? "je-row--danger" : ""}" data-line="${v.line}">
+      : faded
+        ? html`<button
+            class="je-ow ${showOverwrite ? "je-ow--show" : ""}"
+            title="Overwrite this default value"
+            @click=${() => this._overwriteAtLine(v.line)}
+            @mouseenter=${() => {
+              this._hoverLine = v.line;
+              this._setRowHighlight(v.line, "overwrite");
+            }}
+            @mouseleave=${() => this._clearDanger()}
+          >
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            </svg>
+          </button>`
+        : html`<button
+            class="je-del ${showDel ? "je-del--show" : ""}"
+            title="Delete"
+            @click=${() => this._deleteAtLine(v.line)}
+            @mouseenter=${() => {
+              this._hoverLine = v.line;
+              this._setRowHighlight(v.line, "delete");
+            }}
+            @mouseleave=${() => this._clearDanger()}
+          >
+            ×
+          </button>`;
+    return html`<div class="je-row ${hlClass}${faded ? " je-row--faded" : ""}" data-line="${v.line}">
       <div class="je-line">${content}${meta}</div>
-      <div class="je-actions">${del}</div>
+      <div class="je-actions">${actions}</div>
     </div>`;
+  }
+
+  /** Promote the default value at `fullLine` to an explicit override: emit a
+   *  `json-editor-overwrite` event carrying the entry's path and value so the
+   *  host can pin it into the user config. */
+  private _overwriteAtLine(fullLine: number): void {
+    if (this.readonly || !this._root || this._parsedValue === undefined) return;
+    const m = findEntryAtLine(this._root, fullLine);
+    if (!m) return;
+    const path = this._pathToNode(this._root, m.node);
+    if (path === null) return;
+    this.dispatchEvent(
+      new CustomEvent(JSON_EDITOR_OVERWRITE, {
+        detail: { path, value: getAt(this._parsedValue, path) },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   /** Per-line token classification: which tokens are object keys / scalar
@@ -1847,19 +2059,21 @@ export class JsonEditorElement extends LitElement {
     return null;
   }
 
-  private _setDanger(fullLine: number): void {
+  private _setRowHighlight(fullLine: number, kind: "delete" | "overwrite"): void {
     if (!this._root) return;
     const m = findEntryAtLine(this._root, fullLine);
     if (!m) return;
     const set = new Set<number>();
     for (let l = m.line; l <= m.node.endLine; l++) set.add(l);
     this._dangerLines = set;
+    this._highlightKind = kind;
     this.requestUpdate();
   }
 
   private _clearDanger(): void {
     if (this._dangerLines.size === 0) return;
     this._dangerLines = new Set();
+    this._highlightKind = "delete";
     this.requestUpdate();
   }
 
@@ -1928,6 +2142,7 @@ export class JsonEditorElement extends LitElement {
     if (this._hoverLine !== null || this._dangerLines.size > 0) {
       this._hoverLine = null;
       this._dangerLines = new Set();
+      this._highlightKind = "delete";
       this.requestUpdate();
     }
     this._resetTooltipState();
@@ -1986,6 +2201,22 @@ export class JsonEditorElement extends LitElement {
     if (this.readonly) return;
     const ta = e.target as HTMLTextAreaElement;
     const key = e.key;
+
+    // Alt/Option+ArrowUp/Down — move the caret's current line up/down (VS Code).
+    // Single-caret only: with multiple carets Alt+Arrow behaves like a plain
+    // arrow (it moves all carets), handled by the multi-caret block below.
+    if (
+      this._carets.length === 0 &&
+      e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      (key === "ArrowUp" || key === "ArrowDown")
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      this._moveLine(ta, key === "ArrowUp" ? -1 : 1);
+      return;
+    }
 
     // Key auto-complete is single-caret only: while the list is up, Up/Down
     // move the highlight, Enter/Tab accept it, Escape dismisses, and Left/Right
@@ -2681,6 +2912,52 @@ export class JsonEditorElement extends LitElement {
 
   private _replaceRange(ta: HTMLTextAreaElement, start: number, end: number, text: string): void {
     ta.setRangeText(text, start, end, "end");
+  }
+
+  /** Alt/Option+ArrowUp/Down — swap the caret's current line with the line
+   *  above/below (VS Code), keeping the caret at the same column on the moved
+   *  line. Operates on the visible text (the textarea value); `_afterEdit`
+   *  reconciles the change with the full/parsed text. */
+  private _moveLine(ta: HTMLTextAreaElement, dir: number): void {
+    const value = ta.value;
+    const caret = ta.selectionStart;
+    const lineStart = value.lastIndexOf("\n", caret - 1) + 1;
+    const col = caret - lineStart;
+
+    // 0-based index of the caret's line.
+    let lineIdx = 0;
+    for (let i = 0; i < caret; i++) if (value[i] === "\n") lineIdx++;
+
+    // Split into line units, each keeping its trailing newline (the last unit
+    // may have none), so the text reassembles exactly.
+    const units: string[] = [];
+    let last = 0;
+    for (let i = 0; i < value.length; i++) {
+      if (value[i] === "\n") {
+        units.push(value.slice(last, i + 1));
+        last = i + 1;
+      }
+    }
+    if (last < value.length) units.push(value.slice(last));
+
+    const target = lineIdx + dir;
+    if (target < 0 || target >= units.length) return; // boundary — no-op
+
+    const tmp = units[lineIdx];
+    units[lineIdx] = units[target];
+    units[target] = tmp;
+    const newVal = units.join("");
+    ta.value = newVal;
+
+    // Move the caret to the same column on the moved line.
+    let movedStart = 0;
+    for (let i = 0; i < target; i++) movedStart += units[i].length;
+    const movedLen = units[target].endsWith("\n")
+      ? Math.max(0, units[target].length - 1)
+      : units[target].length;
+    ta.setSelectionRange(movedStart + Math.min(col, movedLen), movedStart + Math.min(col, movedLen));
+
+    this._afterEdit(ta);
   }
 
   /** Keep the caret line in view within the scroll container. */

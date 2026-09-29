@@ -35,6 +35,14 @@ export default defineConfig({
         __dirname,
         "../openp41ge-uikit/src/file-editor",
       ),
+      "openp41ge-uikit/drop-indicator": path.resolve(
+        __dirname,
+        "../openp41ge-uikit/src/components/drop-indicator",
+      ),
+      "openp41ge-uikit/overdraw-line": path.resolve(
+        __dirname,
+        "../openp41ge-uikit/src/components/overdraw-line",
+      ),
       "openp41ge-uikit/git-repository": path.resolve(
         __dirname,
         "../openp41ge-uikit/src/git-repository",
