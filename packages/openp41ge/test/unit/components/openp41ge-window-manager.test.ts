@@ -335,20 +335,9 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     expect(wm.shadowRoot?.querySelector(".wm-root > .ws-list-footer")).toBeNull();
   });
 
-  it("renders the Logs button in the title bar that opens the Logs window", async () => {
-    const openLogsWindow = vi.fn();
-    (window as unknown as { openp41ge: unknown }).openp41ge = {
-      ...(window as unknown as { openp41ge: Record<string, unknown> }).openp41ge,
-      windowManager: {
-        ...(window as unknown as { openp41ge: { windowManager: object } }).openp41ge.windowManager,
-        openLogsWindow,
-      },
-    };
+  it("does not render a Logs button in the title bar (logs live in the app menu)", async () => {
     await (wm as Wm).updateComplete;
-    const btn = wm.shadowRoot?.querySelector<HTMLButtonElement>(".wm-open-logs");
-    expect(btn).not.toBeNull();
-    btn!.click();
-    expect(openLogsWindow).toHaveBeenCalledTimes(1);
+    expect(wm.shadowRoot?.querySelector<HTMLButtonElement>(".wm-open-logs")).toBeNull();
   });
 
   it("tracks the bottom bar into the Settings pane when the tab switches", async () => {

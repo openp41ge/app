@@ -1929,23 +1929,6 @@ export class Openp41geWindowManager extends LitElement {
           background: var(--bg-secondary, #161616);
           border-bottom: 1px solid var(--divider, #333);
         }
-        .wm-open-logs {
-          -webkit-app-region: no-drag;
-          flex-shrink: 0;
-          height: 22px;
-          padding: 0 10px;
-          border: 1px solid var(--divider, #333);
-          border-radius: 5px;
-          background: var(--bg-tertiary, #1f1f1f);
-          color: var(--text-secondary, #aaa);
-          font-size: 12px;
-          font-family: var(--font-ui, sans-serif);
-          cursor: pointer;
-        }
-        .wm-open-logs:hover {
-          background: var(--bg-hover, #2a2a2a);
-          color: var(--text-primary, #d4d4d4);
-        }
         .wm-winbtns {
           display: flex;
           align-items: center;
@@ -3242,13 +3225,6 @@ export class Openp41geWindowManager extends LitElement {
       </style>
       <div class="wm-root">
         <div class="wm-titlebar">
-          <button
-            class="wm-open-logs"
-            aria-label="Open Logs window"
-            @click=${() => window.openp41ge?.windowManager.openLogsWindow()}
-          >
-            Logs
-          </button>
           <div class="wm-winbtns">
             <button
               class="wm-winbtn wm-winbtn--close"
