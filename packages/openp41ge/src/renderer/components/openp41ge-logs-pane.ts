@@ -291,7 +291,8 @@ export class Openp41geLogsPane extends LitElement {
     return html`
       <style>
         :host {
-          display: block;
+          display: flex;
+          flex-direction: column;
           height: 100%;
           box-sizing: border-box;
           overflow: hidden;
