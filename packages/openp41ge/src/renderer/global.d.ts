@@ -323,9 +323,6 @@ declare global {
       onZoomOut: (callback: () => void) => () => void;
       onZoomReset: (callback: () => void) => () => void;
 
-      /** Listen for View > Logs… menu action (opens the system overlay Logs tab). */
-      onOpenLogs: (callback: () => void) => () => void;
-
       config: {
         get: (key?: string) => Promise<any>;
         set: (key: string, value: any) => Promise<void>;

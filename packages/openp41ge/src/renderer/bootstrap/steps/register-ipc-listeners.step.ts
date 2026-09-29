@@ -51,13 +51,6 @@ export class RegisterIpcListenersStep implements IStartupStep {
       window.openp41ge.windowManager.open();
     };
 
-    // ── Menu: View > Logs… (opens the Logs sidebar) ──────────────────
-    window.openp41ge.onOpenLogs(() => {
-      const winId = window.openp41ge?.workspace?.getWindowId?.();
-      if (!winId) return;
-      window.openp41ge.workspace.dispatch("openSystemTab", winId, "right", "logs", "Logs");
-    });
-
     // ── Chat highlight (from the Chat sidebar in another window) ───────
     if (window.openp41ge.chat?.onHighlight) {
       window.openp41ge.chat.onHighlight(({ chatId }) => {

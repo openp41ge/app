@@ -642,13 +642,6 @@ contextBridge.exposeInMainWorld("openp41ge", {
     return () => ipcRenderer.removeListener("zoom:reset", handler);
   },
 
-  /** Listen for View > Logs… menu action (opens the system overlay Logs tab). */
-  onOpenLogs: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu:open-logs", handler);
-    return () => ipcRenderer.removeListener("menu:open-logs", handler);
-  },
-
   /** Persistent log bus → main process (files under <dataDir>/logs). */
   logs: {
     /** Forward a batch of captured log entries to disk. */

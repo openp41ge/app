@@ -48,6 +48,7 @@ import {
   createOpenp41geWindow,
   promptQuit,
   openWindowManager,
+  openLogsWindow,
   setOpenWorkspaceWindowHandler,
   setAppQuitting,
   focusWorkspaceWindow,
@@ -545,6 +546,11 @@ export class Openp41geApplication {
             click: () =>
               openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "settings"),
           },
+          {
+            label: "Logs…",
+            accelerator: "CmdOrCtrl+Shift+L",
+            click: () => openLogsWindow(BrowserWindow.getFocusedWindow() ?? undefined),
+          },
           { type: "separator" },
           { role: "services" },
           { type: "separator" },
@@ -589,19 +595,6 @@ export class Openp41geApplication {
             accelerator: "CmdOrCtrl+0",
             click: () => BrowserWindow.getFocusedWindow()?.webContents.send("zoom:reset"),
           },
-          // Logs lives in the system overlay, which only exists in a workspace
-          // window — the compact Window Manager has no Logs tab, so omit it.
-          ...(isWindowManager
-            ? []
-            : [
-                { type: "separator" as const },
-                {
-                  label: "Logs…",
-                  click: () => {
-                    BrowserWindow.getFocusedWindow()?.webContents.send("menu:open-logs");
-                  },
-                },
-              ]),
         ],
       },
     ];
