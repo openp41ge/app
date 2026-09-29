@@ -254,7 +254,7 @@ export class ConfigService {
       this._watch();
     } catch (err) {
       // Recoverable — falls back to defaults. warn (not error) so it doesn't
-      // forward to the renderer's blocking error overlay.
+      // forward to the renderer's error capture.
       log.warn("init error:", err);
       captureError(err, {
         tags: { operation: "config.load" },

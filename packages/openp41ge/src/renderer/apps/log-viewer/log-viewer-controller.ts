@@ -9,7 +9,7 @@
  * If the `log:read-backward` IPC isn't available (no preload bridge, or a
  * stale main process), `LogFilePageReader.loadLatest` throws and the viewer
  * falls back to the in-memory bus — so a stale main process can't flood the
- * error overlay.
+ * error capture with toasts.
  *
  * A `system` config is passed through but the viewer shows all logs in
  * datetime order (no grouping).

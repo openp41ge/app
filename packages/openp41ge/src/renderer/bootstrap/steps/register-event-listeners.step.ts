@@ -115,8 +115,8 @@ export class RegisterEventListenersStep implements IStartupStep {
 
     // Catch unhandled promise rejections from Lit for debugging. Lit ChildPart
     // rejections are renderer-internal and are already surfaced as a
-    // rejection by the error overlay; log at warn so this duplicate detail
-    // doesn't add a second blocking overlay entry.
+    // rejection by the error capture; log at warn so this duplicate detail
+    // doesn't add a second error toast.
     window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => {
       if (event.reason?.message?.includes("ChildPart")) {
         log.warn("ChildPart Error:", event.reason.message);

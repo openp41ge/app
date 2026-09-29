@@ -56,7 +56,7 @@ export class LogFilePageReader implements LogPageReader {
    * mains). A newer main advertises `capabilities.readBackward`; an older main
    * does not. We must NOT call `readBackward` on an older main: Electron logs
    * "No handler registered" via console.error for a missing `invoke` channel,
-   * which would trip the blocking error overlay.
+   * which would trip the error capture.
    */
   private async _checkCapability(): Promise<boolean> {
     if (this._capable !== null) return this._capable;
@@ -79,7 +79,7 @@ export class LogFilePageReader implements LogPageReader {
     this._markSeen(res.entries);
     // Only start polling once the bridge is confirmed working — otherwise a
     // stale main process (no `log:read-backward` handler) would log a
-    // `console.error` on every poll and flood the error overlay.
+    // `console.error` on every poll and flood the error capture with toasts.
     this._startPolling();
     return this._mapPage(res);
   }

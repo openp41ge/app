@@ -67,7 +67,12 @@ function injectStyle(): void {
 // ─── Toast service ──────────────────────────────────────────────────────
 
 export interface IToastService {
-  show(message: string, type: "success" | "error" | "info", durationMs?: number): void;
+  show(
+    message: string,
+    type: "success" | "error" | "info",
+    durationMs?: number,
+    onClick?: () => void,
+  ): void;
 }
 
 class Openp41geToastService implements IToastService {
@@ -88,11 +93,20 @@ class Openp41geToastService implements IToastService {
     return this._container;
   }
 
-  show(message: string, type: "success" | "error" | "info" = "info", durationMs = 3000): void {
+  show(
+    message: string,
+    type: "success" | "error" | "info" = "info",
+    durationMs = 3000,
+    onClick?: () => void,
+  ): void {
     const container = this._getContainer();
     const item = document.createElement("div");
     item.className = `openp41ge-toast-item openp41ge-toast-${type}`;
     item.textContent = message;
+    if (onClick) {
+      item.style.cursor = "pointer";
+      item.addEventListener("click", onClick);
+    }
     container.appendChild(item);
 
     setTimeout(() => {
