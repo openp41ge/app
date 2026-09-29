@@ -18,6 +18,7 @@ import {
   LogLevel,
   LOG_LEVEL_LABELS,
   createLogger,
+  logLineChars,
   type LogQuery,
   type StoredLogEntry,
 } from "openp41ge-logger";
@@ -63,6 +64,29 @@ export interface LogBackPage {
    * confirmation (the viewer renders a "Load yesterday's logs" row).
    */
   nextDay?: { cursor: LogBackCursor; label: string } | null;
+  /**
+   * Monotonic maximum character length of a rendered log line across every
+   * entry the store has written or served. The renderer anchors its log-list
+   * content width to this so the horizontal scrollbar only grows when a
+   * genuinely longer line appears, instead of flickering as the virtual
+   * window scrolls past different entries.
+   */
+  maxLineChars: number;
+}
+
+/** Fold a single entry into the store's monotonic longest-line length. */
+function foldMax(
+  entry: {
+    levelLabel?: string;
+    level?: LogLevel;
+    timestamp: number;
+    source: string;
+    message: string;
+  },
+  current: number,
+): number {
+  const n = logLineChars(entry);
+  return n > current ? n : current;
 }
 
 const LIVE_FILE = "openp41ge.log";
@@ -80,6 +104,8 @@ export class LogFileStore {
   private _liveDay = "";
   /** Guards against the log-bus → append → log → append loop on write errors. */
   private _inWrite = false;
+  /** Monotonic longest rendered line (chars) across all entries written/served. */
+  private _maxLineChars = 0;
 
   constructor(baseDir: string, retentionDays = 14) {
     this._logsDir = path.join(baseDir, "logs");
@@ -157,6 +183,7 @@ export class LogFileStore {
     try {
       this._rollOverIfNeeded();
       fs.appendFileSync(this._livePath, this._serialize(entry) + "\n", "utf-8");
+      this._maxLineChars = foldMax(entry, this._maxLineChars);
     } catch (err) {
       // Never let persistence take down the app.
       log.error("[LogFileStore] append failed:", err);
@@ -173,6 +200,7 @@ export class LogFileStore {
       this._rollOverIfNeeded();
       const lines = entries.map((e) => this._serialize(e)).join("\n") + "\n";
       fs.appendFileSync(this._livePath, lines, "utf-8");
+      for (const e of entries) this._maxLineChars = foldMax(e, this._maxLineChars);
     } catch (err) {
       log.error("[LogFileStore] appendBatch failed:", err);
     } finally {
@@ -290,7 +318,13 @@ export class LogFileStore {
   readLogsBackward(cursor: LogBackCursor | null, limit = 200): LogBackPage {
     const files = this.listFiles(); // newest first
     if (files.length === 0) {
-      return { entries: [], hasOlder: false, cursor: null, nextDay: null };
+      return {
+        entries: [],
+        hasOlder: false,
+        cursor: null,
+        nextDay: null,
+        maxLineChars: this._maxLineChars,
+      };
     }
     const want = Math.max(1, Math.floor(limit));
     const fileIndex = cursor ? Math.max(0, Math.min(cursor.fileIndex, files.length - 1)) : 0;
@@ -312,9 +346,16 @@ export class LogFileStore {
             cursor: { fileIndex: nextIndex, lineCount: 0 },
             label: this._dayBoundaryLabel(files[nextIndex].name, nextIndex),
           },
+          maxLineChars: this._maxLineChars,
         };
       }
-      return { entries: [], hasOlder: false, cursor: null, nextDay: null };
+      return {
+        entries: [],
+        hasOlder: false,
+        cursor: null,
+        nextDay: null,
+        maxLineChars: this._maxLineChars,
+      };
     }
 
     const end = total - lineCount; // raw lines already served
@@ -322,7 +363,10 @@ export class LogFileStore {
     const entries: PersistedLogEntry[] = [];
     for (let i = start; i < end; i++) {
       const entry = this._parseLine(lines[i]);
-      if (entry) entries.push(entry);
+      if (entry) {
+        entries.push(entry);
+        this._maxLineChars = foldMax(entry, this._maxLineChars);
+      }
     }
     const newLineCount = lineCount + (end - start);
     const hasMoreInFile = newLineCount < total;
@@ -340,6 +384,7 @@ export class LogFileStore {
       hasOlder,
       cursor: hasOlder ? { fileIndex, lineCount: newLineCount } : null,
       nextDay,
+      maxLineChars: this._maxLineChars,
     };
   }
 

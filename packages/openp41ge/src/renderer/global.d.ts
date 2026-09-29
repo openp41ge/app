@@ -562,5 +562,8 @@ declare global {
     /** When hasOlder is false, an older day available only after explicit
      * confirmation (the viewer renders a "Load yesterday's logs" row). */
     nextDay?: { cursor: LogBackCursorShape; label: string } | null;
+    /** Monotonic longest rendered line (chars); anchors the viewer's stable
+     * horizontal content width. */
+    maxLineChars?: number;
   }
 }

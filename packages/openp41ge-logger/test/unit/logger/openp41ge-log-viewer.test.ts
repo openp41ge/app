@@ -1365,4 +1365,46 @@ describe("stream filter", () => {
     expect(msgs).toEqual(["foo one"]);
     await destroyViewer(el);
   });
+
+  // ── Stable horizontal content width (longest line anchoring) ───────────
+
+  it("renders a width spacer 0px when no content has loaded", async () => {
+    const el = await createViewer();
+    const spacer = el.querySelector(".log-width-spacer");
+    // No entries → maxLineChars is 0 → spacer is omitted (no horizontal overflow).
+    expect(spacer).toBeNull();
+    await destroyViewer(el);
+  });
+
+  it("renders a width spacer pinned to the longest line", async () => {
+    pushLog(LogLevel.INFO, "test", "mod", ["a short line"]);
+    const el = await createViewer();
+    const spacer = el.querySelector<HTMLElement>(".log-width-spacer");
+    expect(spacer).toBeTruthy();
+    // 12px monospace fallback ≈ 7.2px/glyph; width = ceil(7.2*chars + 32).
+    const expected = Math.ceil(7.2 * (el as any)._maxLineChars + 32);
+    expect(parseFloat(spacer!.style.width)).toBe(expected);
+    await destroyViewer(el);
+  });
+
+  it("hides the width spacer when line wrapping is enabled", async () => {
+    pushLog(LogLevel.INFO, "test", "mod", ["a long line"]);
+    const el = await createViewer();
+    expect(el.querySelector(".log-width-spacer")).toBeTruthy();
+    (el as any)._wrap = true;
+    await update(el);
+    expect(el.querySelector(".log-width-spacer")).toBeNull();
+    await destroyViewer(el);
+  });
+
+  it("grows the width spacer only when a longer line arrives", async () => {
+    pushLog(LogLevel.INFO, "test", "mod", ["short"]);
+    const el = await createViewer();
+    const before = parseFloat(el.querySelector<HTMLElement>(".log-width-spacer")!.style.width);
+    pushLog(LogLevel.INFO, "test", "mod", ["x".repeat(300)]);
+    await update(el);
+    const after = parseFloat(el.querySelector<HTMLElement>(".log-width-spacer")!.style.width);
+    expect(after).toBeGreaterThan(before);
+    await destroyViewer(el);
+  });
 });

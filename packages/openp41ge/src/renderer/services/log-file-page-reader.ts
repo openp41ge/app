@@ -106,11 +106,13 @@ export class LogFilePageReader implements LogPageReader {
     hasOlder: boolean;
     cursor: unknown;
     nextDay?: { cursor: unknown; label: string } | null;
+    maxLineChars?: number;
   }): LogPageResult {
     return {
       entries: res.entries.map((e) => this._toView(e)),
       hasOlder: res.hasOlder,
       cursor: res.cursor,
+      maxLineChars: res.maxLineChars,
       ...(res.nextDay
         ? {
             nextDayCursor: res.nextDay.cursor as LogPageResult["cursor"],

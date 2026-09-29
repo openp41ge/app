@@ -325,6 +325,22 @@ describe("LogFileStore.readLogsBackward", () => {
       hasOlder: false,
       cursor: null,
       nextDay: null,
+      maxLineChars: 0,
     });
+  });
+
+  test("reports a monotonic maxLineChars across pages and appends", () => {
+    seed(3); // m0,m1,m2 (short)
+    const p1 = store.readLogsBackward(null, 2); // m1,m2
+    const base = p1.maxLineChars;
+    expect(base).toBeGreaterThan(0);
+
+    // Appending a longer line grows the reported max immediately.
+    store.append(makeEntry({ system: "openp41ge", source: "mod", message: "x".repeat(400) }));
+    expect(store.readLogsBackward(null, 1).maxLineChars).toBeGreaterThan(base);
+
+    // Reading an older page cannot shrink it (monotonic).
+    const p2 = store.readLogsBackward(p1.cursor, 2);
+    expect(p2.maxLineChars).toBeGreaterThanOrEqual(base);
   });
 });

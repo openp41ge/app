@@ -37,6 +37,8 @@ export {
 export {
   MemLogPageReader,
   LOG_PAGE_DEFAULT_LIMIT,
+  formatLogTime,
+  logLineChars,
   type LogViewEntry,
   type LogPageResult,
   type LogPageReader,

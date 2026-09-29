@@ -19,6 +19,7 @@ import { LogLevel, LOG_LEVEL_LABELS } from "./log-buffer";
 import {
   LOG_PAGE_DEFAULT_LIMIT,
   MemLogPageReader,
+  logLineChars,
   type LogPageReader,
   type LogViewEntry,
 } from "./log-page-reader";
@@ -94,6 +95,11 @@ export class Openp41geLogViewer extends LitElement {
   @state() private _minLevel: LogLevel = LogLevel.DEBUG;
   @state() private _wrap = false;
   @state() private _entries: LogViewEntry[] = [];
+  /** Monotonic longest rendered line (chars) — from the reader's maxLineChars
+   *  (node/main computed) folded with local live entries. Drives the stable
+   *  horizontal content width so the scrollbar doesn't flicker as the virtual
+   *  window scrolls to different entries. */
+  @state() private _maxLineChars = 0;
 
   private _pageReader: LogPageReader | null = null;
   private _system: string | null = null;
@@ -108,6 +114,8 @@ export class Openp41geLogViewer extends LitElement {
   private _scrollToBottomPending = false;
   /** Custom overlay scrollbar (both axes) drawn over the log list. */
   private _scrollbar: OverlayScrollbar | null = null;
+  /** Cached monospace glyph advance (px); measured on first use. */
+  private _charWidthPx = 0;
 
   // Virtual list. Only the visible window of items is rendered; measured per-item
   // heights are cached by a stable key so they survive prepend/append/filter.
@@ -252,6 +260,39 @@ export class Openp41geLogViewer extends LitElement {
     this._attachScrollbar();
   }
 
+  /** Advance width (px) of one glyph in the viewer's monospace font, measured
+   *  once against a probe run and cached. Falls back to an estimate when the
+   *  DOM can't lay out (tests). */
+  private _measureCharWidth(): number {
+    if (this._charWidthPx > 0) return this._charWidthPx;
+    let w = 0;
+    try {
+      const s = document.createElement("span");
+      s.textContent = "M".repeat(200);
+      s.style.cssText =
+        "position:absolute;left:-9999px;top:-9999px;visibility:hidden;white-space:pre;" +
+        "font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;font-size:12px;";
+      document.body.appendChild(s);
+      w = s.getBoundingClientRect().width / 200;
+      s.remove();
+    } catch {
+      w = 0;
+    }
+    this._charWidthPx = w > 0 ? w : 7.2;
+    return this._charWidthPx;
+  }
+
+  /** Stable horizontal content width (px) anchored to the longest line. The
+   *  log list's scrollWidth therefore only changes when a genuinely longer
+   *  line is loaded — the node reports the longest line's char count (see
+   *  `logLineChars`), and the viewer converts it to pixels (monospace advance
+   *  × chars + the fixed per-row spacing: level/time/source margins + the
+   *  row's horizontal padding). 0 = no content yet (no horizontal overflow). */
+  private _contentWidthPx(): number {
+    if (this._maxLineChars <= 0) return 0;
+    return Math.ceil(this._measureCharWidth() * this._maxLineChars + 32);
+  }
+
   private _onPointerDown = (e: PointerEvent): void => {
     // Don't steal focus from interactive controls the user is about to operate.
     const t = e.target as HTMLElement | null;
@@ -317,6 +358,7 @@ export class Openp41geLogViewer extends LitElement {
     const reader = this._pageReader || new MemLogPageReader();
     this._pageReader = reader;
     this._entries = [];
+    this._maxLineChars = 0;
     this._cursor = null;
     this._hasOlder = false;
     this._nextDayCursor = null;
@@ -352,6 +394,11 @@ export class Openp41geLogViewer extends LitElement {
     this._loadLatest(reader);
   }
 
+  /** Fold a page's node-computed longest line into the local max (monotonic). */
+  private _acceptMaxChars(n: number | undefined): void {
+    if (typeof n === "number" && n > this._maxLineChars) this._maxLineChars = n;
+  }
+
   private _teardown(): void {
     this._unsubscribeLive?.();
     this._unsubscribeLive = null;
@@ -367,6 +414,7 @@ export class Openp41geLogViewer extends LitElement {
       this._layoutDirty = true;
       this._cursor = page.cursor;
       this._hasOlder = page.hasOlder;
+      this._acceptMaxChars(page.maxLineChars);
       this._nextDayCursor = page.nextDayCursor ?? null;
       this._nextDayLabel = page.nextDayLabel ?? "";
       this._scrollToBottomPending = true;
@@ -382,6 +430,7 @@ export class Openp41geLogViewer extends LitElement {
         this._layoutDirty = true;
         this._cursor = page.cursor;
         this._hasOlder = page.hasOlder;
+        this._acceptMaxChars(page.maxLineChars);
         this._nextDayCursor = page.nextDayCursor ?? null;
         this._nextDayLabel = page.nextDayLabel ?? "";
         this._scrollToBottomPending = true;
@@ -412,6 +461,7 @@ export class Openp41geLogViewer extends LitElement {
       this._layoutDirty = true;
       this._cursor = page.cursor;
       this._hasOlder = page.hasOlder;
+      this._acceptMaxChars(page.maxLineChars);
       this._nextDayCursor = page.nextDayCursor ?? null;
       this._nextDayLabel = page.nextDayLabel ?? "";
       await this.updateComplete;
@@ -437,6 +487,7 @@ export class Openp41geLogViewer extends LitElement {
   private _onLiveEntry(entry: LogViewEntry): void {
     this._entries = [...this._entries, entry];
     this._layoutDirty = true;
+    this._acceptMaxChars(logLineChars(entry));
     // If the user is at the bottom, auto-scroll to it on the next paint.
     if (!this._isScrolledUp) this._scrollToBottomPending = true;
     // Live entries may match the active query → refresh the search result set.
@@ -728,6 +779,7 @@ export class Openp41geLogViewer extends LitElement {
         collected.push(...page.entries);
         cursor = page.cursor;
         hasOlder = page.hasOlder;
+        this._acceptMaxChars(page.maxLineChars);
         nextDayCursor = page.nextDayCursor ?? null;
         nextDayLabel = page.nextDayLabel ?? "";
       }
@@ -914,6 +966,11 @@ export class Openp41geLogViewer extends LitElement {
   updated(): void {
     const el = this._listEl;
     if (!el) return;
+    // The overlay scrollbar reads scrollWidth/scrollHeight; a width change to
+    // the longest-line spacer (an attribute change, not a childList mutation
+    // the scrollbar's observer watches) won't repaint it on its own. Refresh it
+    // on every render so the thumb tracks the current content width/height.
+    this._scrollbar?.update();
 
     // Measure the rendered window so offset math stays accurate (rows may wrap
     // to variable heights). Cache by stable key and re-render once if anything
@@ -1169,6 +1226,13 @@ export class Openp41geLogViewer extends LitElement {
           word-break: normal;
         }
         .vspacer {
+          flex-shrink: 0;
+        }
+        /* Invisible row that pins the log list's content (scroll) width to the
+           longest line, so the horizontal scrollbar only changes when a
+           genuinely longer line is loaded. height:0 so it adds no row. */
+        .log-width-spacer {
+          height: 0;
           flex-shrink: 0;
         }
         .empty-msg {
@@ -1449,6 +1513,11 @@ export class Openp41geLogViewer extends LitElement {
                 )
           }
           ${offsetBottom > 0 ? html`<div class="vspacer" style="height:${offsetBottom}px"></div>` : ""}
+          ${
+            !this._wrap && this._contentWidthPx() > 0
+              ? html`<div class="log-width-spacer" style="width:${this._contentWidthPx()}px"></div>`
+              : ""
+          }
         </div>
         ${
           this._filterOpen || this._searchOpen
