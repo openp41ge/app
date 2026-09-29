@@ -291,11 +291,16 @@ export class Openp41geLogsPane extends LitElement {
     return html`
       <style>
         :host {
+          display: block;
+          height: 100%;
+          overflow: hidden;
+        }
+        .lp-root {
           display: flex;
           flex-direction: column;
           height: 100%;
+          min-height: 0;
           box-sizing: border-box;
-          overflow: hidden;
           position: relative;
           background: var(--bg-primary, #1e1e1e);
           color: var(--text-primary, #d4d4d4);
@@ -368,6 +373,7 @@ export class Openp41geLogsPane extends LitElement {
         }
         .lp-list {
           flex: 1;
+          min-height: 0;
           overflow-y: auto;
           padding: 4px 0;
           overflow-anchor: none;
@@ -609,210 +615,212 @@ export class Openp41geLogsPane extends LitElement {
         }
       </style>
 
-      <div class="lp-toolbar">
-        <span class="lp-title">Logs</span>
+      <div class="lp-root">
+        <div class="lp-toolbar">
+          <span class="lp-title">Logs</span>
+          ${
+            errorCount > 0
+              ? html`
+                  <button
+                    type="button"
+                    class="lp-error-btn"
+                    title="Jump to first error"
+                    @click=${() => this._scrollToFirstError()}
+                  >
+                    <span>Errors</span>
+                    <span class="lp-err-count">${errorCount}</span>
+                  </button>
+                `
+              : nothing
+          }
+          <span class="lp-spacer"></span>
+          <button
+            type="button"
+            class="lp-filter-btn${this._filterOpen ? " active" : ""}"
+            title="Filter logs"
+            data-testid="lp-filter-btn"
+            @click=${() => (this._filterOpen = !this._filterOpen)}
+          >
+            ${
+              this._selectedStreams.length > 0 || this._minLevel !== LogLevel.DEBUG || this._query
+                ? "Filter ●"
+                : "Filter"
+            }
+          </button>
+        </div>
+
+        <div class="lp-list" data-testid="lp-list" @scroll=${this._onScroll}>
+          ${
+            this._loading
+              ? html`<div class="lp-loading">Loading logs…</div>`
+              : rows.length === 0
+                ? html`<div class="lp-empty">
+                    No log entries${this._query ? " match the filter" : ""}.
+                  </div>`
+                : html`
+                    ${
+                      this._hasOlder
+                        ? html`<div class="lp-older-hint">Scroll up for older logs…</div>`
+                        : nothing
+                    }
+                    ${
+                      this._pageFailed
+                        ? html`<div class="lp-older-hint">
+                            Using in-memory log buffer (persisted history unavailable).
+                          </div>`
+                        : nothing
+                    }
+                    ${rows.map((r) => this._row(r))}
+                  `
+          }
+        </div>
+
         ${
-          errorCount > 0
+          this._filterOpen
             ? html`
-                <button
-                  type="button"
-                  class="lp-error-btn"
-                  title="Jump to first error"
-                  @click=${() => this._scrollToFirstError()}
-                >
-                  <span>Errors</span>
-                  <span class="lp-err-count">${errorCount}</span>
-                </button>
+                <div
+                  class="lp-backdrop"
+                  data-testid="lp-filter-backdrop"
+                  @click=${() => (this._filterOpen = false)}
+                ></div>
+                <aside class="lp-drawer" data-testid="lp-filter-drawer">
+                  <div class="lp-drawer-head">
+                    <span>Filter logs</span>
+                    <button
+                      class="lp-drawer-close"
+                      aria-label="Close filters"
+                      @click=${() => (this._filterOpen = false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div class="lp-drawer-body">
+                    <div class="lp-sec">
+                      <span class="lp-sec-title">Minimum level</span>
+                      <div class="lp-level-pills">
+                        ${[LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR].map(
+                          (lvl) => html`
+                            <button
+                              type="button"
+                              class="lp-pill${lvl === this._minLevel ? " active" : ""}"
+                              data-testid="lp-level-${LOG_LEVEL_LABELS[lvl]}"
+                              @click=${() => this._setLevel(lvl)}
+                            >
+                              ${LOG_LEVEL_LABELS[lvl]}
+                            </button>
+                          `,
+                        )}
+                      </div>
+                    </div>
+                    <div class="lp-sec">
+                      <span class="lp-sec-title">Streams</span>
+                      <div class="lp-streams">
+                        ${
+                          this._streams.length === 0
+                            ? html`<div class="lp-empty-streams">No streams logged yet.</div>`
+                            : this._streams.map(
+                                (s) => html`
+                                  <label class="lp-stream-row" data-testid="lp-stream-${s.name}">
+                                    <input
+                                      type="checkbox"
+                                      .checked=${this._selectedStreams.includes(s.name)}
+                                      @change=${() => this._toggleStream(s.name)}
+                                    />
+                                    <span>${s.name}</span>
+                                    <span class="lp-stream-count">${s.entryCount}</span>
+                                  </label>
+                                `,
+                              )
+                        }
+                      </div>
+                    </div>
+                    <div class="lp-sec">
+                      <span class="lp-sec-title">Text</span>
+                      <input
+                        type="text"
+                        class="lp-query"
+                        placeholder="Contains…"
+                        data-testid="lp-query"
+                        .value=${this._query}
+                        @input=${(e: Event) => (this._query = (e.target as HTMLInputElement).value)}
+                      />
+                    </div>
+                  </div>
+                  <div class="lp-drawer-actions">
+                    <button type="button" class="lp-btn lp-btn--clear" @click=${this._clearFilters}>
+                      Clear filters
+                    </button>
+                    <button type="button" class="lp-btn" @click=${() => (this._filterOpen = false)}>
+                      Done
+                    </button>
+                  </div>
+                </aside>
               `
             : nothing
         }
-        <span class="lp-spacer"></span>
-        <button
-          type="button"
-          class="lp-filter-btn${this._filterOpen ? " active" : ""}"
-          title="Filter logs"
-          data-testid="lp-filter-btn"
-          @click=${() => (this._filterOpen = !this._filterOpen)}
-        >
-          ${
-            this._selectedStreams.length > 0 || this._minLevel !== LogLevel.DEBUG || this._query
-              ? "Filter ●"
-              : "Filter"
-          }
-        </button>
-      </div>
-
-      <div class="lp-list" data-testid="lp-list" @scroll=${this._onScroll}>
         ${
-          this._loading
-            ? html`<div class="lp-loading">Loading logs…</div>`
-            : rows.length === 0
-              ? html`<div class="lp-empty">
-                  No log entries${this._query ? " match the filter" : ""}.
-                </div>`
-              : html`
-                  ${
-                    this._hasOlder
-                      ? html`<div class="lp-older-hint">Scroll up for older logs…</div>`
-                      : nothing
-                  }
-                  ${
-                    this._pageFailed
-                      ? html`<div class="lp-older-hint">
-                          Using in-memory log buffer (persisted history unavailable).
-                        </div>`
-                      : nothing
-                  }
-                  ${rows.map((r) => this._row(r))}
-                `
-        }
-      </div>
-
-      ${
-        this._filterOpen
-          ? html`
-              <div
-                class="lp-backdrop"
-                data-testid="lp-filter-backdrop"
-                @click=${() => (this._filterOpen = false)}
-              ></div>
-              <aside class="lp-drawer" data-testid="lp-filter-drawer">
-                <div class="lp-drawer-head">
-                  <span>Filter logs</span>
-                  <button
-                    class="lp-drawer-close"
-                    aria-label="Close filters"
-                    @click=${() => (this._filterOpen = false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div class="lp-drawer-body">
-                  <div class="lp-sec">
-                    <span class="lp-sec-title">Minimum level</span>
-                    <div class="lp-level-pills">
-                      ${[LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR].map(
-                        (lvl) => html`
-                          <button
-                            type="button"
-                            class="lp-pill${lvl === this._minLevel ? " active" : ""}"
-                            data-testid="lp-level-${LOG_LEVEL_LABELS[lvl]}"
-                            @click=${() => this._setLevel(lvl)}
-                          >
-                            ${LOG_LEVEL_LABELS[lvl]}
-                          </button>
-                        `,
-                      )}
-                    </div>
-                  </div>
-                  <div class="lp-sec">
-                    <span class="lp-sec-title">Streams</span>
-                    <div class="lp-streams">
-                      ${
-                        this._streams.length === 0
-                          ? html`<div class="lp-empty-streams">No streams logged yet.</div>`
-                          : this._streams.map(
-                              (s) => html`
-                                <label class="lp-stream-row" data-testid="lp-stream-${s.name}">
-                                  <input
-                                    type="checkbox"
-                                    .checked=${this._selectedStreams.includes(s.name)}
-                                    @change=${() => this._toggleStream(s.name)}
-                                  />
-                                  <span>${s.name}</span>
-                                  <span class="lp-stream-count">${s.entryCount}</span>
-                                </label>
-                              `,
-                            )
-                      }
-                    </div>
-                  </div>
-                  <div class="lp-sec">
-                    <span class="lp-sec-title">Text</span>
-                    <input
-                      type="text"
-                      class="lp-query"
-                      placeholder="Contains…"
-                      data-testid="lp-query"
-                      .value=${this._query}
-                      @input=${(e: Event) => (this._query = (e.target as HTMLInputElement).value)}
-                    />
-                  </div>
-                </div>
-                <div class="lp-drawer-actions">
-                  <button type="button" class="lp-btn lp-btn--clear" @click=${this._clearFilters}>
-                    Clear filters
-                  </button>
-                  <button type="button" class="lp-btn" @click=${() => (this._filterOpen = false)}>
-                    Done
-                  </button>
-                </div>
-              </aside>
-            `
-          : nothing
-      }
-      ${
-        this._detailOpen && this._detail
-          ? html`
-              <div
-                class="lp-backdrop"
-                data-testid="lp-detail-backdrop"
-                @click=${this._closeDetail}
-              ></div>
-              <aside class="lp-drawer" data-testid="lp-detail-drawer">
-                <div class="lp-drawer-head">
-                  <span>Error details</span>
-                  <button
-                    class="lp-drawer-close"
-                    aria-label="Close details"
-                    @click=${this._closeDetail}
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div class="lp-drawer-body">
-                  <div class="lp-sec">
-                    <div class="lp-detail-message">
-                      ${this._escape(this._detailError?.message ?? this._detail.message)}
-                    </div>
-                  </div>
-                  <div class="lp-sec">
-                    <span class="lp-sec-title"
-                      >${this._detailError?.type ?? this._detail.levelLabel}</span
+          this._detailOpen && this._detail
+            ? html`
+                <div
+                  class="lp-backdrop"
+                  data-testid="lp-detail-backdrop"
+                  @click=${this._closeDetail}
+                ></div>
+                <aside class="lp-drawer" data-testid="lp-detail-drawer">
+                  <div class="lp-drawer-head">
+                    <span>Error details</span>
+                    <button
+                      class="lp-drawer-close"
+                      aria-label="Close details"
+                      @click=${this._closeDetail}
                     >
-                    <div class="lp-detail-meta">
-                      <div>source: ${this._escape(this._detail.source)}</div>
-                      <div>system: ${this._escape(this._detail.system)}</div>
-                      <div>
-                        time: ${this._escape(formatDate(this._detail.timestamp))}
-                        ${this._escape(formatTime(this._detail.timestamp))}
+                      ✕
+                    </button>
+                  </div>
+                  <div class="lp-drawer-body">
+                    <div class="lp-sec">
+                      <div class="lp-detail-message">
+                        ${this._escape(this._detailError?.message ?? this._detail.message)}
                       </div>
                     </div>
-                  </div>
-                  ${
-                    this._detailError?.stack
-                      ? html`
-                          <div class="lp-sec">
-                            <span class="lp-sec-title">Stack</span>
-                            <pre class="lp-detail-stack">
-${this._escape(this._detailError.stack)}</pre>
-                          </div>
-                        `
-                      : this._detail.data
+                    <div class="lp-sec">
+                      <span class="lp-sec-title"
+                        >${this._detailError?.type ?? this._detail.levelLabel}</span
+                      >
+                      <div class="lp-detail-meta">
+                        <div>source: ${this._escape(this._detail.source)}</div>
+                        <div>system: ${this._escape(this._detail.system)}</div>
+                        <div>
+                          time: ${this._escape(formatDate(this._detail.timestamp))}
+                          ${this._escape(formatTime(this._detail.timestamp))}
+                        </div>
+                      </div>
+                    </div>
+                    ${
+                      this._detailError?.stack
                         ? html`
                             <div class="lp-sec">
-                              <span class="lp-sec-title">Data</span>
+                              <span class="lp-sec-title">Stack</span>
                               <pre class="lp-detail-stack">
-${this._escape(JSON.stringify(this._detail.data, null, 2))}</pre>
+${this._escape(this._detailError.stack)}</pre>
                             </div>
                           `
-                        : nothing
-                  }
-                </div>
-              </aside>
-            `
-          : nothing
-      }
+                        : this._detail.data
+                          ? html`
+                              <div class="lp-sec">
+                                <span class="lp-sec-title">Data</span>
+                                <pre class="lp-detail-stack">
+${this._escape(JSON.stringify(this._detail.data, null, 2))}</pre>
+                              </div>
+                            `
+                          : nothing
+                    }
+                  </div>
+                </aside>
+              `
+            : nothing
+        }
+      </div>
     `;
   }
 
