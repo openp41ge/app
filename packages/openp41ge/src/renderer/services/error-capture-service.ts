@@ -1,14 +1,12 @@
 /**
  * ErrorCaptureService — captures runtime errors (renderer + main process),
  * logs them to the log bus + on-disk file (and Sentry where available), and
- * surfaces them via a NON-BLOCKING error toast.
+ * surfaces them via a NON-BLOCKING persistent error toast.
  *
- * The old full-screen blocking red overlay is gone. Instead:
- *   - Every captured error logs + shows an error toast (dev and production).
- *   - In development, clicking the toast opens a dismissible detail modal
- *     listing all captured errors + stack traces.
- *   - In production the modal is disabled — the app never pauses for an
- *     error, only a toast is shown.
+ * The old full-screen blocking overlay and the toast-click modal are gone.
+ * Instead, captured errors are held in a reactive list that any UI (e.g. the
+ * manager window's "Errors" grid tab) can subscribe to. Clicking an error
+ * toast opens that grid via the "openp41ge:open-error-grid" document event.
  *
  * Renderer errors: window.onerror, unhandledrejection, console.error
  * Main process errors: forwarded via IPC channel "openp41ge:error"
@@ -17,6 +15,8 @@
  */
 
 const STORAGE_KEY = "openp41ge:captured-errors";
+/** Document event dispatched when an error toast is clicked (opens the Errors grid tab). */
+export const OPEN_ERROR_GRID_EVENT = "openp41ge:open-error-grid";
 
 import { createLogger } from "openp41ge-logger";
 import * as Sentry from "@sentry/electron/renderer";
@@ -25,7 +25,7 @@ import { toastService } from "../components/openp41ge-toast";
 
 const log = createLogger("openp41ge", "error-capture");
 
-interface CapturedError {
+export interface CapturedError {
   message: string;
   source: string;
   stack: string;
@@ -34,9 +34,12 @@ interface CapturedError {
 }
 
 let errors: CapturedError[] = [];
-let modalEl: HTMLElement | null = null;
-let modalStylesInjected = false;
 let isInstalled = false;
+
+/** Subscribe to the captured-errors list. The listener is called immediately
+ *  with the current list, then again on every change. */
+type ErrorListener = (errors: CapturedError[]) => void;
+const _listeners = new Set<ErrorListener>();
 
 /**
  * True while this service is emitting a `log.error` (which the console
@@ -46,32 +49,19 @@ let isInstalled = false;
  */
 let _suppressConsoleCapture = false;
 
-/**
- * Whether the detail modal is enabled. Defaults to the real dev flag
- * (`window.openp41ge.isDev()`). Disabled in packaged production builds.
- * Tests can override via setErrorCaptureDevMode().
- */
-let _isDev = detectIsDev();
-
 /** Coalesce rapid duplicate error toasts so a burst never floods the screen. */
 let _lastToastMessage = "";
 let _lastToastAt = 0;
 
-function detectIsDev(): boolean {
-  try {
-    if (window.openp41ge && typeof window.openp41ge.isDev === "function") {
-      return !!window.openp41ge.isDev();
+function emitChanges(): void {
+  const snapshot = errors;
+  for (const cb of _listeners) {
+    try {
+      cb(snapshot);
+    } catch {
+      /* a listener must never break error capture */
     }
-  } catch {
-    /* preload may not be ready */
   }
-  // Browser / test context behaves like dev so the modal stays available.
-  return true;
-}
-
-/** Override dev/production detection (used by tests). */
-export function setErrorCaptureDevMode(value: boolean): void {
-  _isDev = value;
 }
 
 function persist(): void {
@@ -86,10 +76,7 @@ function addError(err: CapturedError): void {
   errors = [err, ...errors].slice(0, MAX_ERRORS);
   persist();
   showErrorToast(err);
-  // If the detail modal is open, keep it in sync with the latest errors.
-  if (modalEl && modalEl.style.display === "flex") {
-    renderModal();
-  }
+  emitChanges();
 }
 
 function describeError(err: CapturedError): string {
@@ -108,160 +95,41 @@ function showErrorToast(err: CapturedError): void {
   _lastToastAt = now;
 
   const preview = full.length > 180 ? `${full.slice(0, 180)}…` : full;
-  // Only in development does clicking the toast open the detail modal.
-  const onClick = _isDev ? openErrorModal : undefined;
-  toastService.show(`Error: ${preview}`, "error", 6000, onClick);
-}
-
-// ── Detail modal (development only) ─────────────────────────────────────
-
-function injectModalStyles(): void {
-  if (modalStylesInjected) return;
-  modalStylesInjected = true;
-  const style = document.createElement("style");
-  style.textContent = `
-    #_openp41ge-error-modal {
-      position: fixed; inset: 0; z-index: 2147483647; display: none;
-      align-items: center; justify-content: center;
-      background: rgba(0, 0, 0, 0.55); font-family: var(--font-ui);
-    }
-    #_openp41ge-error-modal .op-err-card {
-      width: min(90vw, 800px); max-height: 85vh; display: flex; flex-direction: column;
-      background: #1e1e2e; color: #fff; border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 10px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-      overflow: hidden;
-    }
-    #_openp41ge-error-modal .op-err-head {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 18px; border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-    }
-    #_openp41ge-error-modal .op-err-title {
-      font-size: 15px; font-weight: 600;
-    }
-    #_openp41ge-error-modal .op-err-close {
-      background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
-      color: rgba(255, 255, 255, 0.8); width: 28px; height: 28px; border-radius: 6px;
-      cursor: pointer; font-size: 14px; line-height: 1;
-    }
-    #_openp41ge-error-modal .op-err-close:hover { background: rgba(255, 255, 255, 0.2); }
-    #_openp41ge-error-modal .op-err-body {
-      flex: 1; overflow-y: auto; padding: 12px 18px 18px;
-    }
-    #_openp41ge-error-modal .op-err-empty {
-      color: rgba(255, 255, 255, 0.6); padding: 12px 0; text-align: center;
-    }
-    #_openp41ge-error-modal .op-err-item {
-      background: rgba(0, 0, 0, 0.3); border-radius: 8px;
-      padding: 10px 12px; margin-bottom: 10px; position: relative;
-      font-size: 13px; line-height: 1.5;
-    }
-    #_openp41ge-error-modal .op-err-copy {
-      position: absolute; top: 8px; right: 8px;
-      background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 6px; color: rgba(255, 255, 255, 0.7); font-size: 12px;
-      padding: 2px 8px; cursor: pointer;
-    }
-    #_openp41ge-error-modal .op-err-msg {
-      color: #ffcdd2; font-weight: 600; margin-bottom: 4px; word-break: break-word;
-      padding-right: 60px;
-    }
-    #_openp41ge-error-modal .op-err-meta {
-      color: rgba(255, 255, 255, 0.5); font-size: 12px; margin-bottom: 6px;
-    }
-    #_openp41ge-error-modal .op-err-stack {
-      margin: 0; white-space: pre-wrap; color: rgba(255, 255, 255, 0.45);
-      font-size: 12px; overflow-wrap: anywhere;
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-function ensureModal(): HTMLElement {
-  if (modalEl) {
-    // Re-attach if it was detached (e.g. tests tore it down between cases).
-    if (document.body && !document.body.contains(modalEl)) {
-      document.body.appendChild(modalEl);
-    }
-    return modalEl;
-  }
-  injectModalStyles();
-  modalEl = document.createElement("div");
-  modalEl.id = "_openp41ge-error-modal";
-  // Click on the backdrop (not the card) dismisses.
-  modalEl.addEventListener("click", (e) => {
-    if (e.target === modalEl) closeErrorModal();
+  // Errors never auto-dismiss (duration 0) — the user must dismiss them, or
+  // click the toast to open the Errors grid tab (the manager window listens
+  // for OPEN_ERROR_GRID_EVENT).
+  toastService.show(`Error: ${preview}`, "error", 0, () => {
+    document.dispatchEvent(new CustomEvent(OPEN_ERROR_GRID_EVENT));
   });
-  const append = () => {
-    if (document.body && !document.body.contains(modalEl)) {
-      document.body.appendChild(modalEl!);
-    }
+}
+
+/** Current captured errors (newest first). */
+export function getCapturedErrors(): CapturedError[] {
+  return errors;
+}
+
+/** Subscribe to captured-error changes. Returns a cancel function. */
+export function subscribeErrors(listener: ErrorListener): () => void {
+  _listeners.add(listener);
+  try {
+    listener(errors);
+  } catch {
+    /* ignore */
+  }
+  return () => {
+    _listeners.delete(listener);
   };
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", append);
-  } else {
-    append();
-  }
-  return modalEl;
 }
 
-function escHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+/** Remove a single error by its index in the captured list. */
+export function removeCapturedError(index: number): void {
+  if (index < 0 || index >= errors.length) return;
+  errors = errors.filter((_, i) => i !== index);
+  persist();
+  emitChanges();
 }
 
-function renderModal(): void {
-  if (!modalEl) return;
-  const list =
-    errors.length === 0
-      ? `<div class="op-err-empty">No errors captured.</div>`
-      : errors
-          .map(
-            (e) => `
-          <div class="op-err-item">
-            <button class="op-err-copy"
-              onclick="(function(btn){var t=btn.parentElement.querySelector('.op-err-msg')?.textContent||'';navigator.clipboard.writeText(t).then(function(){var o=btn.textContent;btn.textContent='Copied!';setTimeout(function(){btn.textContent=o},1500)}).catch(function(){})})(this)"
-            >Copy</button>
-            <div class="op-err-msg">${escHtml(describeError(e))}</div>
-            <div class="op-err-meta">${escHtml(e.source)}${e.stack ? " — stack available" : ""}</div>
-            ${e.stack ? `<pre class="op-err-stack">${escHtml(e.stack.slice(0, 1000))}</pre>` : ""}
-          </div>
-        `,
-          )
-          .join("");
-
-  modalEl.innerHTML = `
-    <div class="op-err-card">
-      <div class="op-err-head">
-        <div class="op-err-title">⚠ ${errors.length} Error${errors.length !== 1 ? "s" : ""} Detected</div>
-        <button class="op-err-close" title="Close">✕</button>
-      </div>
-      <div class="op-err-body">${list}</div>
-    </div>
-  `;
-  modalEl.querySelector(".op-err-close")?.addEventListener("click", () => closeErrorModal());
-}
-
-function openErrorModal(): void {
-  if (!_isDev) return; // modal disabled in production
-  const el = ensureModal();
-  renderModal();
-  el.style.display = "flex";
-}
-
-function closeErrorModal(): void {
-  if (modalEl) modalEl.style.display = "none";
-}
-
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === "Escape" && modalEl && modalEl.style.display === "flex") {
-    closeErrorModal();
-  }
-}
-
-/** Clear all captured errors and close the detail modal. */
+/** Clear all captured errors. */
 export function clearCapturedErrors(): void {
   errors = [];
   try {
@@ -269,9 +137,7 @@ export function clearCapturedErrors(): void {
   } catch {
     /* ignore */
   }
-  if (modalEl && modalEl.style.display === "flex") {
-    closeErrorModal();
-  }
+  emitChanges();
 }
 
 /**
@@ -281,8 +147,6 @@ export function clearCapturedErrors(): void {
 export function installErrorCapture(): void {
   if (isInstalled) return;
   isInstalled = true;
-
-  document.addEventListener("keydown", onKeydown);
 
   // ── Listen for main-process errors forwarded via IPC ────────────────
   try {
@@ -414,19 +278,21 @@ export function installErrorCapture(): void {
   };
 
   // Restore any errors stored from a previous page load — surface a single
-  // summary toast (never a blocking screen). In dev it opens the modal.
+  // summary toast (never a blocking screen). Clicking it opens the grid.
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
       errors = JSON.parse(stored);
       if (errors.length > 0) {
-        const onClick = _isDev ? openErrorModal : undefined;
         toastService.show(
           `${errors.length} error${errors.length !== 1 ? "s" : ""} detected from a previous session`,
           "error",
-          7000,
-          onClick,
+          0,
+          () => {
+            document.dispatchEvent(new CustomEvent(OPEN_ERROR_GRID_EVENT));
+          },
         );
+        emitChanges();
       }
     }
   } catch {

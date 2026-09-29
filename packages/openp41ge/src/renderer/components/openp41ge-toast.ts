@@ -39,6 +39,34 @@ function injectStyle(): void {
       transition: opacity 0.2s ease, transform 0.2s ease;
       max-width: 360px;
       word-break: break-word;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .openp41ge-toast-msg {
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .openp41ge-toast-close {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border: none;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .openp41ge-toast-close:hover {
+      background: rgba(255, 255, 255, 0.3);
+      color: #fff;
     }
     .openp41ge-toast-item.openp41ge-toast-dismissing {
       opacity: 0;
@@ -102,19 +130,40 @@ class Openp41geToastService implements IToastService {
     const container = this._getContainer();
     const item = document.createElement("div");
     item.className = `openp41ge-toast-item openp41ge-toast-${type}`;
-    item.textContent = message;
+
+    const msg = document.createElement("span");
+    msg.className = "openp41ge-toast-msg";
+    msg.textContent = message;
+    item.appendChild(msg);
+
+    // Every toast is manually dismissible. `durationMs === 0` additionally
+    // disables auto-dismiss (used for error toasts so they don't vanish
+    // before the user can inspect them).
+    const close = document.createElement("button");
+    close.className = "openp41ge-toast-close";
+    close.type = "button";
+    close.setAttribute("aria-label", "Dismiss");
+    close.textContent = "✕";
+    close.addEventListener("click", (e) => {
+      e.stopPropagation();
+      item.remove();
+    });
+    item.appendChild(close);
+
     if (onClick) {
       item.style.cursor = "pointer";
       item.addEventListener("click", onClick);
     }
     container.appendChild(item);
 
-    setTimeout(() => {
-      item.classList.add("openp41ge-toast-dismissing");
+    if (durationMs > 0) {
       setTimeout(() => {
-        item.remove();
-      }, 200);
-    }, durationMs);
+        item.classList.add("openp41ge-toast-dismissing");
+        setTimeout(() => {
+          item.remove();
+        }, 200);
+      }, durationMs);
+    }
   }
 }
 

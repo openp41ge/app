@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Openp41geWindowManager } from "../../../src/renderer/components/openp41ge-window-manager";
+import { OPEN_ERROR_GRID_EVENT } from "../../../src/renderer/services/error-capture-service";
 
 const HOLD_MS = 350;
 
@@ -333,6 +334,13 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     // Workspaces tab), NOT a window-level bar that changes with tab activation.
     expect(wm.shadowRoot?.querySelector(".wm-workspaces-pane .ws-list-footer")).not.toBeNull();
     expect(wm.shadowRoot?.querySelector(".wm-root > .ws-list-footer")).toBeNull();
+  });
+
+  it("opens the Errors tab when the open-error-grid event is dispatched", async () => {
+    document.dispatchEvent(new CustomEvent(OPEN_ERROR_GRID_EVENT));
+    await (wm as Wm).updateComplete;
+    expect((wm as unknown as { _activeTab: string })._activeTab).toBe("errors");
+    expect((wm as unknown as { _openTabs: string[] })._openTabs).toContain("errors");
   });
 
   it("tracks the bottom bar into the Settings pane when the tab switches", async () => {
