@@ -17,6 +17,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { createLogger } from "openp41ge-logger";
+import { captureError } from "./sentry.js";
 import { APP_DATA_DIR_PRODUCTION } from "./app-data-dir.js";
 
 const log = createLogger("openp41ge", "ConfigService");
@@ -257,6 +258,11 @@ export class ConfigService {
       // Recoverable — falls back to defaults. warn (not error) so it doesn't
       // forward to the renderer's blocking error overlay.
       log.warn("init error:", err);
+      captureError(err, {
+        tags: { operation: "config.load" },
+        extra: { configPath: path.basename(this._configPath) },
+        level: "warning",
+      });
       this._config = { ...DEFAULT_CONFIG };
     }
   }
@@ -363,6 +369,11 @@ export class ConfigService {
       fs.renameSync(tmpPath, this._configPath);
     } catch (err) {
       log.warn("write error:", err);
+      captureError(err, {
+        tags: { operation: "config.save" },
+        extra: { configPath: path.basename(this._configPath) },
+        level: "error",
+      });
     }
   }
 

@@ -20,6 +20,7 @@ import type {
 import type { ToolDefinition } from "../interfaces/tool.js";
 import type { ChatMessage } from "openp41ge-agents";
 import { createLogger } from "openp41ge-logger";
+import { addSentryBreadcrumb, captureError, captureMessage } from "./sentry.js";
 
 const log = createLogger("openp41ge", "VllmChatProvider");
 
@@ -127,6 +128,31 @@ export class VllmChatProvider implements ChatProvider {
     const effort = resolveReasoningEffort(req.thinking);
     if (effort) body.reasoning_effort = effort;
 
+    // Breadcrumb on the request so any downstream failure carries the context
+    // of the call that produced it (model, prompt size, tool count).
+    const messageCount = req.messages.length;
+    const promptChars = req.messages.reduce(
+      (n, m) =>
+        n +
+        (typeof (m as { content?: unknown }).content === "string"
+          ? ((m as { content: string }).content.length)
+          : JSON.stringify((m as { content?: unknown }).content ?? "").length),
+      0,
+    );
+    const toolCount = req.tools?.length ?? 0;
+    addSentryBreadcrumb({
+      category: "chat.request",
+      level: "info",
+      data: {
+        model: this._config.defaultModel,
+        baseUrl: this._baseUrl(),
+        messageCount,
+        promptChars,
+        toolCount,
+        thinking: req.thinking ?? undefined,
+      },
+    });
+
     let res: Response;
     try {
       res = await fetch(`${this._baseUrl()}/chat/completions`, {
@@ -142,6 +168,21 @@ export class VllmChatProvider implements ChatProvider {
       const msg = (err as Error).message;
       if (req.signal?.aborted) return;
       log.error("stream request failed:", msg);
+      addSentryBreadcrumb({
+        category: "chat.stream",
+        level: "error",
+        message: `request failed: ${msg.slice(0, 200)}`,
+      });
+      captureError(err, {
+        tags: { operation: "chat.stream", model: this._config.defaultModel },
+        extra: {
+          baseUrl: this._baseUrl(),
+          messageCount,
+          promptChars,
+          toolCount,
+        },
+        level: "error",
+      });
       yield { type: "text", text: `[provider error: ${msg}]` };
       return;
     }
@@ -150,6 +191,15 @@ export class VllmChatProvider implements ChatProvider {
       const text = await res.text().catch(() => "");
       const msg = `vLLM returned ${res.status}: ${text.slice(0, 200)}`;
       log.error(msg);
+      captureMessage(msg, {
+        level: "error",
+        tags: { operation: "chat.upstream_error", model: this._config.defaultModel },
+        extra: {
+          status: res.status,
+          responseBody: text.slice(0, 500),
+          baseUrl: this._baseUrl(),
+        },
+      });
       yield { type: "text", text: `[provider error: ${msg}]` };
       return;
     }
@@ -229,6 +279,15 @@ export class VllmChatProvider implements ChatProvider {
     } catch (err) {
       if (!req.signal?.aborted) {
         log.error("stream read error:", (err as Error).message);
+        captureError(err, {
+          tags: { operation: "chat.stream.read", model: this._config.defaultModel },
+          extra: {
+            baseUrl: this._baseUrl(),
+            streamedTokens,
+            bufferTail: buffer.slice(-200),
+          },
+          level: "error",
+        });
       }
     } finally {
       try {

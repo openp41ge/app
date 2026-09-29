@@ -17,6 +17,7 @@
  */
 
 import { createLogger } from "openp41ge-logger";
+import { captureError } from "./sentry.js";
 import type {
   ChatMessage,
   ChatRuntimeStatus,
@@ -213,6 +214,14 @@ export class AgentRuntime {
       this._setStatus(winId, chatId, { streaming: false, providerOk: ping });
     } catch (err) {
       log.error("agent send error:", err);
+      captureError(err, {
+        tags: { operation: "agent.send", winId, chatId },
+        extra: {
+          enabledTools: enabledTools?.length ?? 0,
+          thinking: thinkingLevel ?? undefined,
+        },
+        level: "error",
+      });
       if (!controller.signal.aborted) {
         this._store.appendMessage(chatId, {
           id: this._id("msg"),

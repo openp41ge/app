@@ -11,6 +11,7 @@
 import fs from "fs";
 import path from "path";
 import { createLogger } from "openp41ge-logger";
+import { captureError } from "./sentry.js";
 import { CHATS_FILENAME, defaultChatTitle } from "openp41ge-constants";
 import { searchTranscript } from "openp41ge-agents/search";
 
@@ -149,6 +150,11 @@ export class ChatStoreService {
       log.info(`Chat store loaded: ${this._chats.size} chats`);
     } catch (err) {
       log.error("Failed to load chat store:", err);
+      captureError(err, {
+        tags: { operation: "chat-store.load" },
+        extra: { chatStorePath: path.basename(this._filePath) },
+        level: "error",
+      });
     }
   }
 
@@ -376,6 +382,11 @@ export class ChatStoreService {
       fs.renameSync(tmp, this._filePath);
     } catch (err) {
       log.error("Failed to persist chat store:", err);
+      captureError(err, {
+        tags: { operation: "chat-store.save" },
+        extra: { chatStorePath: path.basename(this._filePath) },
+        level: "error",
+      });
     }
   }
 

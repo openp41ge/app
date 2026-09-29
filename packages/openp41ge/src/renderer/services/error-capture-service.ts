@@ -17,6 +17,7 @@
 const STORAGE_KEY = "openp41ge:captured-errors";
 
 import { createLogger } from "openp41ge-logger";
+import * as Sentry from "@sentry/electron/renderer";
 import { MAX_ERRORS } from "openp41ge-constants";
 
 const log = createLogger("openp41ge", "error-capture");
@@ -269,6 +270,18 @@ export function installErrorCapture(): void {
     if (_suppressConsoleCapture) {
       origConsoleError.apply(console, args);
       return;
+    }
+    // Breadcrumb so a Sentry event (uncaught errors are auto-captured by the
+    // browser SDK's global handler) carries the console context that preceded
+    // it. Safe no-op when Sentry isn't initialized (e.g. no DSN).
+    try {
+      Sentry.addBreadcrumb({
+        category: "console",
+        level: "error",
+        message: msg.slice(0, 300),
+      });
+    } catch {
+      // never let telemetry throw
     }
     addError({
       message: msg,

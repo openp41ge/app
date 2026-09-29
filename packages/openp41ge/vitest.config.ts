@@ -19,6 +19,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // Unit tests import src/main/services/* which transitively reference
+      // @sentry/electron/main (which needs Electron to load). Replace it with
+      // a no-op stub so main-service tests run without Electron.
+      "@sentry/electron/main": path.resolve(__dirname, "./test/unit/stubs/sentry-main.ts"),
       "@openp41ge": path.resolve(__dirname, "./src"),
       "openp41ge-file-editor": path.resolve(__dirname, "../openp41ge-uikit/src/file-editor"),
       "openp41ge-git": path.resolve(__dirname, "../openp41ge-git/src"),

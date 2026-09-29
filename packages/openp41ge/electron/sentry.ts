@@ -1,11 +1,17 @@
 /**
- * openp41ge-sentry — Sentry (error monitoring) for the Electron main process.
+ * openp41ge-sentry — Sentry (error monitoring) init for the Electron main
+ * process.
+ *
+ * This module is imported ONLY by electron-process entry code
+ * (`electron/main.ts`). It depends on the `electron` module (`app`), and must
+ * stay out of the import graph of `src/main/services/*` so unit tests
+ * (which run without Electron) never load it.
  *
  * The manager / workspace windows (renderers) forward their errors to the main
- * process over Sentry's Inter-Process-Communication (see `@sentry/electron`),
- * so this single main-process init is the one place with the real DSN. The
- * renderer SDK only needs a bare `Sentry.init()`; the DSN and environment are
- * propagated by `@sentry/electron` itself and sent with the main client.
+ * process over Sentry's IPC (see `@sentry/electron`), so this single
+ * main-process init is the one place with the real DSN. The renderer SDK only
+ * needs a bare `Sentry.init()`; the DSN and environment are propagated by
+ * `@sentry/electron` itself and sent with the main client.
  *
  * The DSN is baked in as the default (Sentry DSNs are public client-side
  * identifiers, not secrets). It can still be overridden at runtime with the

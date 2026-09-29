@@ -10,6 +10,7 @@ import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-logger";
+import { addSentryBreadcrumb, captureError } from "../src/main/services/sentry.js";
 
 // ─── Service imports ─────────────────────────────────────────────────────
 import {
@@ -171,6 +172,7 @@ export class Openp41geApplication {
     process.on("uncaughtException", (err) => {
       if (isEpipe(err)) return;
       log.error("Uncaught Exception:", err);
+      captureError(err, { tags: { process: "main" } });
       forwardError(err.message, "main-process", err.stack);
       // Don't exit — let the app continue if possible
     });
@@ -179,6 +181,7 @@ export class Openp41geApplication {
       const msg = reason instanceof Error ? reason.message : String(reason);
       const stack = reason instanceof Error ? reason.stack : "";
       log.error("Unhandled Rejection:", reason);
+      captureError(reason, { tags: { process: "main" } });
       forwardError(msg, "main-process", stack);
     });
 
@@ -197,6 +200,11 @@ export class Openp41geApplication {
           msg.includes("DeprecationWarning")) &&
         !msg.toLowerCase().includes("error");
       if (!isNodeWarning && msg.trim().length > 0) {
+        addSentryBreadcrumb({
+          category: "console",
+          level: "warning",
+          message: msg.slice(0, 300),
+        });
         forwardError(msg, "main-process");
       }
       origError.apply(console, args);
