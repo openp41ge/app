@@ -7,11 +7,11 @@
  * renderer SDK only needs a bare `Sentry.init()`; the DSN and environment are
  * propagated by `@sentry/electron` itself and sent with the main client.
  *
- * The DSN is read from the `OPENP41GE_SENTRY_DSN` environment variable so a
- * DSN can be supplied without a rebuild (useful in dev and for rolling out the
- * DSN once the Sentry project exists). When it is unset, Sentry is left
- * disabled entirely — no network calls, no event capture — so the app works
- * and stays quiet until a DSN is configured.
+ * The DSN is baked in as the default (Sentry DSNs are public client-side
+ * identifiers, not secrets). It can still be overridden at runtime with the
+ * `OPENP41GE_SENTRY_DSN` environment variable (useful for dev / pointing at a
+ * different project); when the env var is set to an empty value, Sentry is
+ * left disabled entirely — no network calls, no event capture.
  *
  * IMPORTANT: `Sentry.init()` MUST run before Electron's `app` "ready" event —
  * the SDK registers the `sentry-ipc` privileged scheme and IPC/protocol
@@ -26,20 +26,32 @@ import { createLogger } from "openp41ge-logger";
 
 const log = createLogger("openp41ge", "sentry");
 
-/** The Sentry DSN for this app, or undefined to disable Sentry. */
+/** Default DSN for the openp41ge Sentry project (public client-side key). */
+const DEFAULT_DSN =
+  "https://c8d2d39392387bbd32284dda4961ebf5@o4506695653392384.ingest.us.sentry.io/4512165816369152";
+
+/**
+ * The Sentry DSN for this app, or undefined to disable Sentry. An empty
+ * `OPENP41GE_SENTRY_DSN` disables it; otherwise the env var overrides the
+ * baked-in default.
+ */
 function sentryDsn(): string | undefined {
-  const dsnValue = process.env.OPENP41GE_SENTRY_DSN;
-  return dsnValue && dsnValue.trim() !== "" ? dsnValue.trim() : undefined;
+  const envDsn = process.env.OPENP41GE_SENTRY_DSN;
+  if (envDsn !== undefined) {
+    return envDsn.trim() !== "" ? envDsn.trim() : undefined;
+  }
+  return DEFAULT_DSN;
 }
 
 /**
- * Initialize Sentry in the main process. No-op when `OPENP41GE_SENTRY_DSN` is
- * not set. Call this as early as possible (before `app.whenReady()`).
+ * Initialize Sentry in the main process. No-op only when a DSN is unavailable
+ * (i.e. `OPENP41GE_SENTRY_DSN` is set to an empty value). Call this as early as
+ * possible (before `app.whenReady()`).
  */
 export function initSentry(): void {
   const dsnValue = sentryDsn();
   if (!dsnValue) {
-    log.debug("Sentry disabled — OPENP41GE_SENTRY_DSN is not set.");
+    log.debug("Sentry disabled — OPENP41GE_SENTRY_DSN cleared.");
     return;
   }
 
