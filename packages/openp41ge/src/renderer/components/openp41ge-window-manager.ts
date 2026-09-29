@@ -27,7 +27,7 @@ import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { MANAGER_SETTINGS_STATE_EVENT } from "./openp41ge-manager-settings";
 import type { Openp41geManagerSettings } from "./openp41ge-manager-settings";
-import { OPEN_ERROR_GRID_EVENT, subscribeErrors } from "../services/error-capture-service";
+import { OPEN_LOGS_TAB_EVENT, subscribeErrors } from "../services/error-capture-service";
 import type { CapturedError } from "../services/error-capture-service";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import { registerManagerTabBar } from "../services/init-drag-system";
@@ -112,7 +112,7 @@ interface ClosingDrawer extends DrawerState {
 }
 
 /** Tabs available in the manager window's tab bar. */
-type ManagerTabId = "workspaces" | "settings" | "welcome" | "releases" | "errors";
+type ManagerTabId = "workspaces" | "settings" | "welcome" | "releases" | "logs";
 
 /** Labels for each manager tab, keyed by id. */
 const MANAGER_TAB_LABELS: Record<ManagerTabId, string> = {
@@ -120,7 +120,7 @@ const MANAGER_TAB_LABELS: Record<ManagerTabId, string> = {
   workspaces: "Workspaces",
   settings: "Settings",
   releases: "Releases",
-  errors: "Errors",
+  logs: "Logs",
 };
 
 export class Openp41geWindowManager extends LitElement {
@@ -216,12 +216,12 @@ export class Openp41geWindowManager extends LitElement {
     // When a drag-out opens a workspace window in the main process (cursor left
     // the window), the main process ends the session and notifies us to clear
     // the in-flight drag state.
-    // Keep the Errors tab badge in sync with captured errors, and open the
-    // Errors tab when an error toast is clicked (event from error-capture).
+    // Keep the Logs tab badge in sync with captured errors, and switch to the
+    // Logs tab when an error toast is clicked (event from error-capture).
     this._offErrors = subscribeErrors((errs: CapturedError[]) => {
       this._errorCount = errs.length;
     });
-    document.addEventListener(OPEN_ERROR_GRID_EVENT, this._onOpenErrorGrid);
+    document.addEventListener(OPEN_LOGS_TAB_EVENT, this._onOpenLogsTab);
     this._offEndSession = window.openp41ge.drag.onEndSession(() => this._teardownDrag());
     // Refresh the open-windows column immediately when any window opens/closes,
     // rather than waiting for this window to regain focus.
@@ -231,7 +231,13 @@ export class Openp41geWindowManager extends LitElement {
     // A menu item may request a specific tab when the manager window is already
     // open; activate it and bring the window to front (done in main).
     this._offActivateTab = window.openp41ge.windowManager.onActivateTab((tab) => {
-      if (tab === "workspaces" || tab === "settings" || tab === "welcome" || tab === "releases") {
+      if (
+        tab === "workspaces" ||
+        tab === "settings" ||
+        tab === "welcome" ||
+        tab === "releases" ||
+        tab === "logs"
+      ) {
         this._activateTab(tab);
       }
     });
@@ -291,7 +297,7 @@ export class Openp41geWindowManager extends LitElement {
     document.removeEventListener("pointerdown", this._onPointerDown);
     this._offErrors?.();
     this._offErrors = null;
-    document.removeEventListener(OPEN_ERROR_GRID_EVENT, this._onOpenErrorGrid);
+    document.removeEventListener(OPEN_LOGS_TAB_EVENT, this._onOpenLogsTab);
     this._offEndSession?.();
     this._offOpenWindowsChanged?.();
     this._offOpenWindowsChanged = null;
@@ -414,7 +420,13 @@ export class Openp41geWindowManager extends LitElement {
     const btn = target?.closest?.("button.wm-md-button[data-tab]") as HTMLElement | null;
     if (!btn) return;
     const tab = btn.dataset.tab ?? "";
-    if (tab === "workspaces" || tab === "settings" || tab === "welcome" || tab === "releases") {
+    if (
+      tab === "workspaces" ||
+      tab === "settings" ||
+      tab === "welcome" ||
+      tab === "releases" ||
+      tab === "logs"
+    ) {
       this._activateTab(tab);
     }
   };
@@ -1295,9 +1307,9 @@ export class Openp41geWindowManager extends LitElement {
 
   /** Open the inline + menu listing the available tabs, with an "O" badge on
    *  the right marking each tab already open in the bar. */
-  /** An error toast was clicked — open the Errors tab. */
-  private _onOpenErrorGrid = (): void => {
-    this._activateTab("errors");
+  /** An error toast was clicked — switch to the Logs tab (where the row lives). */
+  private _onOpenLogsTab = (): void => {
+    this._activateTab("logs");
   };
 
   private _onTabAddClick(e: Event): void {
@@ -2613,6 +2625,18 @@ export class Openp41geWindowManager extends LitElement {
         .wm-settings-pane > .ws-list-footer {
           flex-shrink: 0;
         }
+        /* Logs tab: a single full-height logs pane (fills the body edge-to-edge). */
+        .wm-logs-pane {
+          height: 100%;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          box-sizing: border-box;
+        }
+        .wm-logs-pane > openp41ge-logs-pane {
+          flex: 1;
+          min-height: 0;
+        }
         /* Workspaces tab: a full-height flex column whose bottom group (search
            bar + footer) sticks to the bottom of the pane as the list scrolls. */
         .wm-workspaces-pane {
@@ -3269,7 +3293,7 @@ export class Openp41geWindowManager extends LitElement {
                 >
                   <span class="wm-tab-title">${MANAGER_TAB_LABELS[id]}</span>
                   ${
-                    id === "errors" && this._errorCount > 0
+                    id === "logs" && this._errorCount > 0
                       ? html`<span class="wm-tab-badge">${this._errorCount}</span>`
                       : nothing
                   }
@@ -3328,9 +3352,9 @@ export class Openp41geWindowManager extends LitElement {
                         <openp41ge-manager-settings></openp41ge-manager-settings>
                         ${this._settingsListFooter()}
                       </div>`
-                    : this._activeTab === "errors"
-                      ? html`<div class="wm-tab-pane">
-                          <openp41ge-error-grid></openp41ge-error-grid>
+                    : this._activeTab === "logs"
+                      ? html`<div class="wm-tab-pane wm-logs-pane">
+                          <openp41ge-logs-pane></openp41ge-logs-pane>
                         </div>`
                       : html`
                           <div class="wm-workspaces-pane">

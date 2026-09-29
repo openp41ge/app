@@ -5,8 +5,9 @@
  *
  * The old full-screen blocking overlay and the toast-click modal are gone.
  * Instead, captured errors are held in a reactive list that any UI (e.g. the
- * manager window's "Errors" grid tab) can subscribe to. Clicking an error
- * toast opens that grid via the "openp41ge:open-error-grid" document event.
+ * manager window's "Logs" tab badge + error-detail drawer) can subscribe to.
+ * Clicking an error toast switches the manager window to its Logs tab via the
+ * "openp41ge:open-logs-tab" document event.
  *
  * Renderer errors: window.onerror, unhandledrejection, console.error
  * Main process errors: forwarded via IPC channel "openp41ge:error"
@@ -15,8 +16,8 @@
  */
 
 const STORAGE_KEY = "openp41ge:captured-errors";
-/** Document event dispatched when an error toast is clicked (opens the Errors grid tab). */
-export const OPEN_ERROR_GRID_EVENT = "openp41ge:open-error-grid";
+/** Document event dispatched when an error toast is clicked (opens the manager's Logs tab). */
+export const OPEN_LOGS_TAB_EVENT = "openp41ge:open-logs-tab";
 
 import { createLogger } from "openp41ge-logger";
 import * as Sentry from "@sentry/electron/renderer";
@@ -96,10 +97,10 @@ function showErrorToast(err: CapturedError): void {
 
   const preview = full.length > 180 ? `${full.slice(0, 180)}…` : full;
   // Errors never auto-dismiss (duration 0) — the user must dismiss them, or
-  // click the toast to open the Errors grid tab (the manager window listens
-  // for OPEN_ERROR_GRID_EVENT).
+  // click the toast to switch the manager window to its Logs tab (where the
+  // row lives; the manager listens for OPEN_LOGS_TAB_EVENT).
   toastService.show(`Error: ${preview}`, "error", 0, () => {
-    document.dispatchEvent(new CustomEvent(OPEN_ERROR_GRID_EVENT));
+    document.dispatchEvent(new CustomEvent(OPEN_LOGS_TAB_EVENT));
   });
 }
 
@@ -121,15 +122,8 @@ export function subscribeErrors(listener: ErrorListener): () => void {
   };
 }
 
-/** Remove a single error by its index in the captured list. */
-export function removeCapturedError(index: number): void {
-  if (index < 0 || index >= errors.length) return;
-  errors = errors.filter((_, i) => i !== index);
-  persist();
-  emitChanges();
-}
-
-/** Clear all captured errors. */
+/** Clear all captured errors (e.g. when a workspace loads, so stale errors from
+ *  a previous session / hot reload don't linger). */
 export function clearCapturedErrors(): void {
   errors = [];
   try {
@@ -278,7 +272,7 @@ export function installErrorCapture(): void {
   };
 
   // Restore any errors stored from a previous page load — surface a single
-  // summary toast (never a blocking screen). Clicking it opens the grid.
+  // summary toast (never a blocking screen). Clicking it opens the Logs tab.
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -289,7 +283,7 @@ export function installErrorCapture(): void {
           "error",
           0,
           () => {
-            document.dispatchEvent(new CustomEvent(OPEN_ERROR_GRID_EVENT));
+            document.dispatchEvent(new CustomEvent(OPEN_LOGS_TAB_EVENT));
           },
         );
         emitChanges();

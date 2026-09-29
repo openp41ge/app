@@ -16,8 +16,7 @@ import {
   clearCapturedErrors,
   subscribeErrors,
   getCapturedErrors,
-  removeCapturedError,
-  OPEN_ERROR_GRID_EVENT,
+  OPEN_LOGS_TAB_EVENT,
   type CapturedError,
 } from "@openp41ge/renderer/services/error-capture-service";
 import { subscribeLogs, setMinLevel, LogLevel, type LogEntry } from "openp41ge-logger";
@@ -127,18 +126,18 @@ describe("error-capture-service logging", () => {
     expect(item!.textContent!.length).toBeLessThan(200);
   });
 
-  it("dispatches the open-error-grid event when the error toast is clicked", () => {
+  it("dispatches the open-logs-tab event when the error toast is clicked", () => {
     let fired = false;
     const listener = (): void => {
       fired = true;
     };
-    document.addEventListener(OPEN_ERROR_GRID_EVENT, listener);
+    document.addEventListener(OPEN_LOGS_TAB_EVENT, listener);
     try {
       fireError("grid boom");
       (document.querySelector("openp41ge-toast .openp41ge-toast-error") as HTMLElement).click();
       expect(fired).toBe(true);
     } finally {
-      document.removeEventListener(OPEN_ERROR_GRID_EVENT, listener);
+      document.removeEventListener(OPEN_LOGS_TAB_EVENT, listener);
     }
   });
 
@@ -195,20 +194,6 @@ describe("error-capture-service error store", () => {
     expect(latest[1].message).toBe("first");
     expect(getCapturedErrors().length).toBe(2);
     unsubscribe();
-  });
-
-  it("removeCapturedError removes a single error by index", () => {
-    fireError("first");
-    fireError("second");
-    expect(getCapturedErrors().length).toBe(2);
-
-    removeCapturedError(0); // newest ("second")
-    const list = getCapturedErrors();
-    expect(list.length).toBe(1);
-    expect(list[0].message).toBe("first");
-
-    removeCapturedError(99); // out of range — no-op
-    expect(getCapturedErrors().length).toBe(1);
   });
 
   it("clearCapturedErrors empties the store and removes the persisted copy", () => {

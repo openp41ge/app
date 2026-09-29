@@ -22,7 +22,7 @@ import "./components/openp41ge-windowview";
 import "./components/openp41ge-window-manager";
 import "./components/openp41ge-manager-settings";
 import "./components/openp41ge-releases-pane";
-import "./components/openp41ge-error-grid";
+import "./components/openp41ge-logs-pane";
 import "./components/openp41ge-titlebar";
 import "./components/openp41ge-topbar";
 import "./components/openp41ge-contextmenu";
