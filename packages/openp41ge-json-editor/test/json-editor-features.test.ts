@@ -139,6 +139,18 @@ describe("json-editor structure features", () => {
     expect(danger.length).toBeGreaterThan(1);
   });
 
+  test("hovering delete draws a red accent border around the block", async () => {
+    const del = el.shadowRoot.querySelector('.je-row[data-line="2"] .je-del');
+    del.dispatchEvent(new Event("mouseenter"));
+    await new Promise((r) => setTimeout(r, 20));
+    const border = el.shadowRoot.querySelector(".je-hl-border");
+    expect(border).toBeTruthy();
+    expect(border.style.getPropertyValue("--je-hl")).toBe("#f48771");
+    // The border spans the highlighted rows and carries corner overdraw lines.
+    expect(parseFloat(border.style.height)).toBeGreaterThan(20);
+    expect(border.querySelectorAll(".je-hl-ac").length).toBe(8);
+  });
+
   test("delete on a NESTED member removes only that member at its real depth", async () => {
     // `model` lives at providers.vllm.model (line 5, 0-based) — not at the root.
     const target = el.shadowRoot.querySelector('.je-row[data-line="5"] .je-del');
@@ -1426,5 +1438,86 @@ describe("Alt+Arrow line movement (VS Code)", () => {
     ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", altKey: true, bubbles: true }));
     await new Promise((r) => setTimeout(r, 20));
     expect(input(editor).value).toBe(text);
+  });
+});
+
+describe("json-editor enum value suggestions", () => {
+  const SETTINGS = { updateChannel: "latest", appTheme: "dark" };
+  const SETTINGS_SCHEMA = {
+    type: "object",
+    properties: {
+      updateChannel: {
+        type: "string",
+        enum: ["latest", "alpha", "beta", "rc"],
+        description: "The update channel.",
+      },
+      appTheme: { type: "string", enum: ["dark", "light"], description: "The theme." },
+    },
+  };
+
+  async function mountSettings() {
+    const editor = await mount(SETTINGS);
+    editor.schema = SETTINGS_SCHEMA;
+    await new Promise((r) => setTimeout(r, 20));
+    return editor;
+  }
+
+  // Click-to-select the `updateChannel` value token: place a collapsed caret
+  // on the token and fire a click, which the editor turns into a full-token
+  // selection and then surfaces the enum suggestions.
+  function clickValueToken(editor, token) {
+    const ta = input(editor);
+    const caret = ta.value.indexOf(token) + 1;
+    ta.setSelectionRange(caret, caret);
+    ta.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+  }
+
+  test("clicking an enum value selects it and shows the allowed values", async () => {
+    const editor = await mountSettings();
+    clickValueToken(editor, '"latest"');
+    await new Promise((r) => setTimeout(r, 20));
+
+    const list = editor.shadowRoot.querySelector(".je-suggest");
+    expect(list).toBeTruthy();
+    const keys = [...list.querySelectorAll(".je-suggest-item")].map((n) => n.dataset.key);
+    expect(keys).toEqual(["latest", "alpha", "beta", "rc"]);
+    // The value token is fully selected by the click.
+    const ta = input(editor);
+    expect(ta.selectionStart).not.toBe(ta.selectionEnd);
+  });
+
+  test("Up/Down moves the highlight and Enter replaces the value", async () => {
+    const editor = await mountSettings();
+    clickValueToken(editor, '"latest"');
+    await new Promise((r) => setTimeout(r, 20));
+
+    const items = () => [...editor.shadowRoot.querySelectorAll(".je-suggest-item")];
+    expect(items()[0].classList.contains("je-suggest-item--sel")).toBe(true);
+
+    const ta = input(editor);
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(items()[1].classList.contains("je-suggest-item--sel")).toBe(true);
+
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ta.value).toContain('"updateChannel": "alpha"');
+    expect(editor.shadowRoot.querySelector(".je-suggest")).toBeNull();
+  });
+
+  test("typing a prefix filters the enum values", async () => {
+    const editor = await mountSettings();
+    const ta = input(editor);
+    // Replace the current value with a partial "be" so the caret filters.
+    ta.value = ta.value.replace('"latest"', '"be"');
+    const caret = ta.value.indexOf('"be"') + 3;
+    ta.setSelectionRange(caret, caret);
+    ta.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    const keys = [...editor.shadowRoot.querySelectorAll(".je-suggest-item")].map(
+      (n) => n.dataset.key,
+    );
+    expect(keys).toEqual(["beta"]);
   });
 });

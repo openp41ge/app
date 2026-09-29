@@ -291,3 +291,105 @@ export function defaultLiteralForType(type?: string): { value: string; inside: b
       return { value: '""', inside: true };
   }
 }
+
+/** A value-position string whose schema property declares an `enum`, so the
+ *  editor can offer the allowed values. */
+export interface ValueSuggestionContext {
+  /** Full path to the value string (object key path, e.g. `["updateChannel"]`).
+   *  `""` is never used: the caret is always inside a member's value. */
+  path: JsonPath;
+  /** Offsets (in the full text) of the value string including the quotes. */
+  open: number;
+  close: number;
+  /** The string's current contents, excluding the quotes. */
+  content: string;
+  /** The allowed string values (`enum`), in schema order. */
+  values: string[];
+  /** Schema `description` of the property, if any (for the side tooltip). */
+  description: string | null;
+}
+
+/** The object key whose value is the string starting at `stringOpen`, or null
+ *  when the string is an array element / not preceded by a `:` on its line.
+ *  Only same-line `"key": "value"` member formatting is recognized (which is
+ *  exactly what the editor's JSON.stringify formatting produces). */
+function memberValueKey(text: string, stringOpen: number): string | null {
+  let i = stringOpen - 1;
+  while (i >= 0 && (text[i] === " " || text[i] === "\t")) i--;
+  if (i < 0 || text[i] !== ":") return null;
+  let j = i - 1;
+  while (j >= 0 && (text[j] === " " || text[j] === "\t")) j--;
+  if (j < 0 || text[j] !== '"') return null;
+  let k = j - 1;
+  let esc = false;
+  while (k >= 0) {
+    const c = text[k];
+    if (esc) {
+      esc = false;
+      k--;
+      continue;
+    }
+    if (c === "\\") {
+      esc = true;
+      k--;
+      continue;
+    }
+    if (c === '"') break;
+    k--;
+  }
+  if (k < 0) return null;
+  return text.slice(k + 1, j).replace(/\\(["\\/bfnrt])/g, "$1");
+}
+
+/** Detect whether the caret sits inside a value-position string belonging to a
+ *  schema property that declares string `enum` values. `selected` should be
+ *  true when the whole token is selected (e.g. after a click-to-select), in
+ *  which case all values are offered (the token is about to be replaced)
+ *  rather than filtered. Returns null when the caret is not in such a value. */
+export function valueSuggestContextAt(
+  schema: unknown,
+  text: string,
+  pos: number,
+  selected: boolean,
+): ValueSuggestionContext | null {
+  if (pos < 0) return null;
+  const s = stringAt(text, pos);
+  if (!s) return null;
+  const key = memberValueKey(text, s.open);
+  if (key === null) return null;
+  const lineStart = text.lastIndexOf("\n", s.open - 1) + 1;
+  const ownerPath = ownerPathAt(text, lineStart);
+  if (!ownerPath) return null;
+  const path = [...ownerPath, key];
+  const prop = schemaAtPath(schema, path);
+  if (!prop || typeof prop !== "object") return null;
+  const p = prop as Record<string, unknown>;
+  const values = Array.isArray(p.enum)
+    ? (p.enum as unknown[]).filter((v): v is string => typeof v === "string")
+    : [];
+  if (values.length === 0) return null;
+  if (selected) {
+    // The whole value is selected (click-to-select) — offer every allowed
+    // value regardless of the current contents.
+    return {
+      path,
+      open: s.open,
+      close: s.close,
+      content: text.slice(s.open + 1, s.close),
+      values,
+      description: typeof p.description === "string" ? p.description : null,
+    };
+  }
+  // Typing case: filter the offered values by what's been typed so far.
+  const prefix = text.slice(s.open + 1, pos).toLowerCase();
+  const filtered = values.filter((v) => prefix === "" || v.toLowerCase().startsWith(prefix));
+  if (filtered.length === 0) return null;
+  return {
+    path,
+    open: s.open,
+    close: s.close,
+    content: text.slice(s.open + 1, s.close),
+    values: filtered,
+    description: typeof p.description === "string" ? p.description : null,
+  };
+}

@@ -43,6 +43,7 @@ import {
   ownerPathAt,
   suggestContextAt,
   stringAt,
+  valueSuggestContextAt,
   type KeySuggestion,
 } from "./json-suggest";
 import { computeFoldRanges, findEntryAtLine, type FoldRange } from "./json-analyze";
@@ -102,6 +103,21 @@ export const SUGGEST_ITEM_H = 24;
 export const GUTTER_FOLD_PX = 24;
 /** How long the cursor must rest on a key before the schema tooltip shows. */
 export const TOOLTIP_DELAY_MS = 350;
+
+/** 1px fade-out overdraw lines continuing a highlighted block's accent border
+ *  past its four corners (solid at the border, fading outward). Paired with
+ *  the corner position, each entry's inline `left`/`top`/etc. offsets the line
+ *  by the 1px border width because it anchors to the padded box edge. */
+const HL_ACCENT_LINES: Array<["up" | "down" | "left" | "right", Record<string, string>]> = [
+  ["up", { left: "-1px", bottom: "100%" }],
+  ["left", { top: "-1px", right: "100%" }],
+  ["up", { right: "-1px", bottom: "100%" }],
+  ["right", { top: "-1px", left: "100%" }],
+  ["down", { left: "-1px", top: "100%" }],
+  ["left", { bottom: "-1px", right: "100%" }],
+  ["down", { right: "-1px", top: "100%" }],
+  ["right", { bottom: "-1px", left: "100%" }],
+];
 
 export function gutterWidthFor(rowCount: number, digitPx: number): number {
   const digits = String(Math.max(1, rowCount)).length;
@@ -300,6 +316,8 @@ export class JsonEditorElement extends LitElement {
     tipTop: number;
     items: KeySuggestion[];
     selected: number;
+    /** `key` = completing an object key; `value` = choosing an enum value. */
+    kind: "key" | "value";
   } | null = null;
   /** Visible caret offset at which the list was dismissed (see `_dismissSuggest`).
    *  Suppresses the list from instantly re-appearing until the caret moves or
@@ -644,6 +662,43 @@ export class JsonEditorElement extends LitElement {
     }
     .je-row--overwrite {
       background: rgba(88, 166, 255, 0.22);
+    }
+    /* 1px accent border around a highlighted member block (delete/overwrite
+       hover), with short fade-out overdraw lines continuing past each corner. */
+    .je-hl-border {
+      position: absolute;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      box-sizing: border-box;
+      border: 1px solid var(--je-hl, #f48771);
+      pointer-events: none;
+    }
+    .je-hl-ac {
+      position: absolute;
+      pointer-events: none;
+      --je-len: 7px;
+      --je-hold: 40%;
+    }
+    .je-hl-ac.jev-up {
+      width: 1px;
+      height: var(--je-len);
+      background: linear-gradient(to top, var(--je-hl) var(--je-hold), transparent 100%);
+    }
+    .je-hl-ac.jev-down {
+      width: 1px;
+      height: var(--je-len);
+      background: linear-gradient(to bottom, var(--je-hl) var(--je-hold), transparent 100%);
+    }
+    .je-hl-ac.jev-left {
+      width: var(--je-len);
+      height: 1px;
+      background: linear-gradient(to left, var(--je-hl) var(--je-hold), transparent 100%);
+    }
+    .je-hl-ac.jev-right {
+      width: var(--je-len);
+      height: 1px;
+      background: linear-gradient(to right, var(--je-hl) var(--je-hold), transparent 100%);
     }
     .je-row--faded .je-line {
       opacity: 0.38;
@@ -1052,7 +1107,7 @@ export class JsonEditorElement extends LitElement {
             <div class="je-gutter-mount"></div>
             <div class="je-content">
               <div class="je-selection"></div>
-              <div class="je-lines">${this._visibleLines.map((v) => this._renderRow(v))}</div>
+              <div class="je-lines">${this._hlBorder()}${this._visibleLines.map((v) => this._renderRow(v))}</div>
               <div class="je-tooltip" role="tooltip"></div>
               ${this._renderSuggest()}
               <textarea
@@ -1756,35 +1811,56 @@ export class JsonEditorElement extends LitElement {
       this._suggest = null;
       return;
     }
-    const pos = ta.selectionStart;
+    const selStart = ta.selectionStart;
+    const selEnd = ta.selectionEnd;
+    const selectedToken = selStart !== selEnd;
     // If the list was just dismissed at this exact caret (e.g. via Escape),
     // don't re-open it until the caret moves or the text changes.
-    if (this._suggestSuppress !== null && pos === this._suggestSuppress) return;
+    if (this._suggestSuppress !== null && selStart === this._suggestSuppress) return;
     this._suggestSuppress = null;
-    const fullPos = this._visToFull[pos];
+    const fullPos = this._visToFull[selStart];
     if (fullPos === undefined || fullPos === null) {
       this._suggest = null;
       return;
     }
-    const ctx = suggestContextAt(this._text, fullPos);
-    if (!ctx || !this.schema) {
-      this._suggest = null;
-      return;
+    // Value-position enum suggestions first (e.g. `updateChannel`'s allowed
+    // channels), then key auto-complete for key-position strings. The two are
+    // mutually exclusive: a quoted string is either a key or a value.
+    let items: KeySuggestion[] | null = null;
+    let kind: "key" | "value" = "key";
+    const valCtx = valueSuggestContextAt(this.schema, this._text, fullPos, selectedToken);
+    if (valCtx) {
+      items = valCtx.values.map((val) => ({
+        key: val,
+        description: valCtx.description,
+        type: "string",
+      }));
+      kind = "value";
+    } else if (this.schema) {
+      const ctx = suggestContextAt(this._text, fullPos);
+      if (ctx) {
+        items = collectKeySuggestions(
+          this.schema,
+          ctx.ownerPath,
+          this._parsedValue,
+          ctx.prefix,
+        );
+        kind = "key";
+      }
     }
-    const items = collectKeySuggestions(this.schema, ctx.ownerPath, this._parsedValue, ctx.prefix);
-    if (items.length === 0) {
+    if (!items || items.length === 0) {
       this._suggest = null;
       return;
     }
     const rowIdx = this._visibleLines.findIndex(
-      (v) => pos >= v.start && pos <= v.start + v.text.length,
+      (v) => selStart >= v.start && selStart <= v.start + v.text.length,
     );
     if (rowIdx < 0) {
       this._suggest = null;
       return;
     }
     const v = this._visibleLines[rowIdx];
-    const col = Math.min(pos - v.start, v.text.length);
+    const col = Math.min(selStart - v.start, v.text.length);
     const rowH = Math.max(1, Number(this.rowHeight) || 20);
     const cw = this._measureCharW() > 0 ? this._measureCharW() : 8;
     const x = 10 + col * cw;
@@ -1794,6 +1870,7 @@ export class JsonEditorElement extends LitElement {
     const prev = this._suggest;
     const sameItems =
       prev !== null &&
+      prev.kind === kind &&
       prev.items.length === items.length &&
       prev.items.every((p, i) => p.key === items[i].key);
     const selected = sameItems ? Math.min(prev!.selected, items.length - 1) : 0;
@@ -1803,6 +1880,7 @@ export class JsonEditorElement extends LitElement {
       tipTop: y + selected * SUGGEST_ITEM_H,
       items,
       selected,
+      kind,
     };
   }
 
@@ -1831,6 +1909,31 @@ export class JsonEditorElement extends LitElement {
     if (!item) return;
     const ta = this._inputEl();
     if (!ta) return;
+
+    // Enum value: replace the whole value string with the chosen literal and
+    // park the caret just after its closing quote.
+    if (s.kind === "value") {
+      const selIn = ta.selectionStart;
+      const fullPos = this._visToFull[selIn];
+      if (fullPos === undefined || fullPos === null) return;
+      const str = stringAt(this._text, fullPos);
+      if (!str) return;
+      const line = this._fullLineOf(fullPos);
+      const lineFullStart = this._fullLineStarts[line];
+      const v = this._visibleLines.find((x) => x.line === line);
+      if (!v) return;
+      const visOpen = v.start + (str.open - lineFullStart);
+      const visEnd = visOpen + (str.close - str.open + 1);
+      const ins = JSON.stringify(item.key);
+      this._replaceRange(ta, visOpen, visEnd, ins);
+      const caretOffset = visOpen + ins.length;
+      ta.setSelectionRange(caretOffset, caretOffset);
+      this._suggest = null;
+      this._suggestSuppress = caretOffset;
+      this._afterEdit(ta);
+      return;
+    }
+
     const pos = ta.selectionStart;
     const fullPos = this._visToFull[pos];
     if (fullPos === undefined || fullPos === null) return;
@@ -2069,6 +2172,52 @@ export class JsonEditorElement extends LitElement {
     this._highlightKind = kind;
     this.requestUpdate();
   }
+
+  /** The visible block of highlighted lines and the accent color for the
+   *  delete / overwrite border. Returns null when nothing is highlighted. */
+  private _hlBlock(): { top: number; height: number; color: string } | null {
+    if (this._dangerLines.size === 0) return null;
+    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    let first = -1;
+    let last = -1;
+    for (let i = 0; i < this._visibleLines.length; i++) {
+      if (this._dangerLines.has(this._visibleLines[i].line)) {
+        if (first < 0) first = i;
+        last = i;
+      }
+    }
+    if (first < 0) return null;
+    return {
+      top: first * rowH,
+      height: (last - first + 1) * rowH,
+      color: this._highlightKind === "overwrite" ? "#58a6ff" : "#f48771",
+    };
+  }
+
+  /** The 1px accent border + corner overdraw lines shown while a member is
+   *  highlighted for delete (red) or overwrite (blue). */
+  private _hlBorder(): TemplateResult | typeof nothing {
+    const b = this._hlBlock();
+    if (!b) return nothing;
+    return html`
+      <div
+        class="je-hl-border"
+        style="top:${b.top}px; height:${b.height}px; --je-hl:${b.color}"
+      >
+        ${HL_ACCENT_LINES.map(
+          ([dir, pos]) =>
+            html`<span
+              class="je-hl-ac jev-${dir}"
+              aria-hidden="true"
+              style=${Object.entries(pos)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join("; ")}
+            ></span>`,
+        )}
+      </div>
+    `;
+  }
+
 
   private _clearDanger(): void {
     if (this._dangerLines.size === 0) return;
@@ -2380,6 +2529,9 @@ export class JsonEditorElement extends LitElement {
     const r = this._selectableAt(pos);
     if (r) {
       ta.setSelectionRange(r.start, r.end);
+      // Clicking a value token selects it — surface its enum suggestions so
+      // Up/Down can cycle the allowed values (e.g. the update channel).
+      this._updateSuggest();
     }
     this._updateBraceMatch(ta);
     this._syncActiveLine();

@@ -10,6 +10,7 @@ import {
   suggestContextAt,
   collectKeySuggestions,
   defaultLiteralForType,
+  valueSuggestContextAt,
 } from "../src/json-suggest";
 import { parseJson } from "../src/json-parse";
 
@@ -300,5 +301,81 @@ describe("defaultLiteralForType", () => {
   it("pre-populates braces/brackets and parks the caret inside", () => {
     expect(defaultLiteralForType("object")).toEqual({ value: "{}", inside: true });
     expect(defaultLiteralForType("array")).toEqual({ value: "[]", inside: true });
+  });
+});
+
+describe("valueSuggestContextAt", () => {
+  const SCHEMA = {
+    type: "object",
+    properties: {
+      updateChannel: {
+        type: "string",
+        enum: ["latest", "alpha", "beta", "rc"],
+        description: "The update channel.",
+      },
+      appTheme: { type: "string", enum: ["dark", "light"] },
+      name: { type: "string" },
+      nested: {
+        type: "object",
+        properties: { channel: { type: "string", enum: ["a", "b"] } },
+      },
+    },
+  };
+
+  const TEXT = [
+    "{",
+    '  "updateChannel": "latest",',
+    '  "appTheme": "dark",',
+    '  "name": "abc",',
+    '  "nested": {',
+    '    "channel": "a"',
+    "  }",
+    "}",
+  ].join("\n");
+
+  it("returns null for the caret in a non-enum string value", () => {
+    const open = TEXT.indexOf('"abc"');
+    expect(valueSuggestContextAt(SCHEMA, TEXT, open + 1, false)).toBeNull();
+  });
+
+  it("returns the enum values for a caret inside an enum value string", () => {
+    const open = TEXT.indexOf('"latest"');
+    const ctx = valueSuggestContextAt(SCHEMA, TEXT, open + 1, false);
+    expect(ctx).not.toBeNull();
+    expect(ctx!.path).toEqual(["updateChannel"]);
+    expect(ctx!.values).toEqual(["latest", "alpha", "beta", "rc"]);
+    expect(ctx!.content).toBe("latest");
+  });
+
+  it("filters the offered values by the typed prefix", () => {
+    const open = TEXT.indexOf('"latest"');
+    // Caret inside the value after typing "la".
+    const ctx = valueSuggestContextAt(SCHEMA, TEXT, open + 3, false);
+    expect(ctx!.values).toEqual(["latest"]);
+  });
+
+  it("offers every value when the whole token is selected (click-to-select)", () => {
+    const open = TEXT.indexOf('"latest"');
+    const ctx = valueSuggestContextAt(SCHEMA, TEXT, open + 1, true);
+    expect(ctx!.values).toEqual(["latest", "alpha", "beta", "rc"]);
+  });
+
+  it("resolves a nested enum value path", () => {
+    const open = TEXT.indexOf('"a"');
+    const ctx = valueSuggestContextAt(SCHEMA, TEXT, open + 1, false);
+    expect(ctx!.path).toEqual(["nested", "channel"]);
+    expect(ctx!.values).toEqual(["a", "b"]);
+  });
+
+  it("returns null when the caret is in a key string", () => {
+    const open = TEXT.indexOf('"updateChannel"');
+    expect(valueSuggestContextAt(SCHEMA, TEXT, open + 1, false)).toBeNull();
+  });
+
+  it("returns null for an array element value (no key)", () => {
+    const text = '{ "items": ["x", "y"] }';
+    const schema = { type: "object", properties: { items: { type: "array", items: { type: "string", enum: ["x", "y"] } } } };
+    const open = text.indexOf('"x"');
+    expect(valueSuggestContextAt(schema, text, open + 1, false)).toBeNull();
   });
 });

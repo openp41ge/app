@@ -578,6 +578,23 @@ describe("json-editor overwrite / pinned-default rows", () => {
     expect(el.shadowRoot.querySelectorAll(".je-row--danger, .je-row--overwrite").length).toBe(0);
   });
 
+  test("hovering the overwrite button draws a blue accent border with corner overdraws", async () => {
+    const el = await setup({ lineHeight: 24, fontSize: 14 }, { lineHeight: 20, fontSize: 14 });
+    const ow = el.shadowRoot.querySelector('.je-row--faded[data-line="2"] .je-ow');
+    ow.dispatchEvent(new Event("mouseenter"));
+    await new Promise((r) => setTimeout(r, 20));
+    const border = el.shadowRoot.querySelector(".je-hl-border");
+    expect(border).toBeTruthy();
+    expect(border.style.getPropertyValue("--je-hl")).toBe("#58a6ff");
+    expect(border.querySelectorAll(".je-hl-ac").length).toBe(8);
+    // The block is a single line, so the border is exactly one row tall.
+    expect(parseFloat(border.style.height)).toBeCloseTo(20, 0);
+    // Clearing the highlight removes the accent border.
+    ow.dispatchEvent(new Event("mouseleave"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el.shadowRoot.querySelector(".je-hl-border")).toBeNull();
+  });
+
   test("explicitPaths keeps a pinned default from fading", async () => {
     const el = await setup({ lineHeight: 20, fontSize: 14 }, { lineHeight: 20, fontSize: 14 });
     // Pin fontSize (still at its default) — it must NOT be faded.
