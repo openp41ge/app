@@ -6,6 +6,11 @@
  */
 
 import { Openp41geApplication } from "./openp41ge-application.js";
+import { initSentry } from "./sentry.js";
+
+// Initialize Sentry before the app starts (and thus before Electron is
+// ready): the SDK must register its `sentry-ipc` scheme & IPC handlers early.
+initSentry();
 
 const app = new Openp41geApplication();
 // Expose for the test framework to query lifecycle readiness via
