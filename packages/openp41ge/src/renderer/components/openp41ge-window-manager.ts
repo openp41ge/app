@@ -3223,7 +3223,9 @@ export class Openp41geWindowManager extends LitElement {
                     </div>
                   `
                 : this._activeTab === "releases"
-                  ? html`<div class="wm-tab-pane"><p class="wm-tab-placeholder">Releases</p></div>`
+                  ? html`<div class="wm-tab-pane">
+                      <openp41ge-releases-pane></openp41ge-releases-pane>
+                    </div>`
                   : this._activeTab === "settings"
                     ? html`<div class="wm-settings-pane">
                         <openp41ge-manager-settings></openp41ge-manager-settings>
