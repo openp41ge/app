@@ -327,6 +327,24 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     return wm.requestUpdate();
   }
 
+  it("renders the bottom bar inside the Workspaces tab pane, not the window", async () => {
+    await (wm as Wm).updateComplete;
+    // The list footer is part of the tab content (inside the pane scoped to the
+    // Workspaces tab), NOT a window-level bar that changes with tab activation.
+    expect(wm.shadowRoot?.querySelector(".wm-workspaces-pane .ws-list-footer")).not.toBeNull();
+    expect(wm.shadowRoot?.querySelector(".wm-root > .ws-list-footer")).toBeNull();
+  });
+
+  it("tracks the bottom bar into the Settings pane when the tab switches", async () => {
+    (wm as Wm)._activeTab = "settings";
+    await (wm as Wm).updateComplete;
+    // Each tab owns its own footer, rendered inside that tab's pane — it does not
+    // stay as a window-level bar that just changes content when the tab switches.
+    expect(wm.shadowRoot?.querySelector(".wm-settings-pane .smd-footer")).not.toBeNull();
+    expect(wm.shadowRoot?.querySelector(".wm-workspaces-pane .ws-list-footer")).toBeNull();
+    expect(wm.shadowRoot?.querySelector(".wm-root > .ws-list-footer")).toBeNull();
+  });
+
   it("trades a thumbnail for a +N more label once the row overflows", async () => {
     setWorkspace(4);
     await (wm as Wm).updateComplete;
