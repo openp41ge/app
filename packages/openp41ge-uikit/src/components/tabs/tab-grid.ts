@@ -85,6 +85,9 @@ export class TabGrid extends LitElement {
   > = {};
   @property({ type: Object }) activeTabIds: Record<string, string> = {};
   @property({ type: Function }) ghostFactory: GhostFactory | undefined = undefined;
+  /** Forwarded to each <tab-bar> as its `showAdd` flag (renders a trailing
+   *  “＋” button that bubbles `tab-bar-add`). */
+  @property({ type: Boolean }) barShowAdd: boolean = false;
 
   set gridState(state: GridState | null) {
     if (!state) return;
@@ -1181,6 +1184,7 @@ export class TabGrid extends LitElement {
           .winId=${this.winId}
           .col=${colIndex}
           .focused=${colIndex === this._focusedCol}
+          .showAdd=${this.barShowAdd}
         ></tab-bar>
         <tab-content
           .tabIds=${tabIds}

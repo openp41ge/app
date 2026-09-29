@@ -24,6 +24,7 @@ import {
 } from "./log-page-reader";
 import { LogListLayout } from "./log-list-layout";
 import { findMatchRanges, type TextRange } from "./log-search";
+import { OverlayScrollbar } from "openp41ge-scrollbar";
 
 /**
  * One entry in the virtual list. Either the day-boundary confirmation row
@@ -105,6 +106,8 @@ export class Openp41geLogViewer extends LitElement {
   private _unsubscribeLive: (() => void) | null = null;
   private _isScrolledUp = false;
   private _scrollToBottomPending = false;
+  /** Custom overlay scrollbar (both axes) drawn over the log list. */
+  private _scrollbar: OverlayScrollbar | null = null;
 
   // Virtual list. Only the visible window of items is rendered; measured per-item
   // heights are cached by a stable key so they survive prepend/append/filter.
@@ -189,6 +192,9 @@ export class Openp41geLogViewer extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    // If reconnecting after a disconnect (keep-alive), re-attach the overlay
+    // scrollbar — firstUpdated only fires once per element lifetime.
+    if (!this._scrollbar && this._listEl) this._attachScrollbar();
     // Cmd/Ctrl+F is listened on the host so it works whether focus is on the
     // host element or anywhere inside the viewer. Because the component renders
     // into light DOM, keydown events from .log-list bubble up through
@@ -209,7 +215,41 @@ export class Openp41geLogViewer extends LitElement {
     super.disconnectedCallback();
     this.removeEventListener("keydown", this._onListKeyDown);
     this.removeEventListener("pointerdown", this._onPointerDown);
+    this._scrollbar?.destroy();
+    this._scrollbar = null;
     this._teardown();
+  }
+
+  /** Attach the shared floating OverlayScrollbar (same component the file
+   *  editor uses) over the log list, on both axes — the list scrolls
+   *  vertically and (when wrap is off) horizontally. The native bar is hidden
+   *  only on the list; the track/thumb are placed in `.viewer-root` (made
+   *  position:relative), stopping at the bottom bar so the thumb overlays the
+   *  list, not the filter toolbar. Pass the enclosing shadow root as
+   *  styleTarget so the scoped scrollbar styles reach the list in a shadow
+   *  tree (e.g. the standalone Logs window). */
+  private _attachScrollbar(): void {
+    if (this._scrollbar) return;
+    // jsdom/test env has no ResizeObserver; skip attaching gracefully.
+    if (typeof ResizeObserver === "undefined") return;
+    const list = this._listEl;
+    const container = this.querySelector<HTMLElement>(".viewer-root");
+    if (!list || !container) return;
+    const root = this.getRootNode();
+    const styleTarget = root instanceof ShadowRoot ? root : undefined;
+    this._scrollbar = OverlayScrollbar.attach(list, {
+      axis: "both",
+      container,
+      inset: { bottom: "34px" },
+      styleTarget,
+      size: 9,
+      hoverSize: 12,
+      autoHide: true,
+    });
+  }
+
+  protected firstUpdated(): void {
+    this._attachScrollbar();
   }
 
   private _onPointerDown = (e: PointerEvent): void => {
@@ -961,6 +1001,9 @@ export class Openp41geLogViewer extends LitElement {
           font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", monospace;
           font-size: 12px;
           overflow: hidden;
+          /* Serves as the positioned container for the floating overlay
+             scrollbar (its track/thumb are absolutely placed inside). */
+          position: relative;
         }
         .log-list {
           flex: 1;

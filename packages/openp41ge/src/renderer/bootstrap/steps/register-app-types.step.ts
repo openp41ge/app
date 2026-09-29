@@ -23,7 +23,7 @@ import { commitFileDiffAppRegistration } from "../../apps/commit-file-diff/index
 import { agentsAppRegistration } from "../../apps/agents/index";
 import { toolResultAppRegistration } from "../../apps/tool-result/index";
 import { searchResultsAppRegistration } from "../../apps/search-results/index";
-import { allSystemTabRegistrations } from "../../apps/system-tabs/index";
+import { availableSystemTabRegistrations } from "../../apps/system-tabs/index";
 import { explorerPlugin } from "../../apps/system-tabs/explorer-plugin";
 import { gitPlugin } from "../../apps/system-tabs/git-plugin";
 import { workspaceData } from "../../services/workspace-data";
@@ -47,7 +47,7 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(searchResultsAppRegistration);
 
     // Register system tab types for sidebars
-    for (const reg of allSystemTabRegistrations) {
+    for (const reg of availableSystemTabRegistrations()) {
       registerSystemTabType(reg);
     }
 

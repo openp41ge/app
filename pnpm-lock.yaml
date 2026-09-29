@@ -431,6 +431,9 @@ importers:
       lit:
         specifier: ^3.3.3
         version: 3.3.3
+      openp41ge-scrollbar:
+        specifier: workspace:*
+        version: link:../openp41ge-scrollbar
     devDependencies:
       typescript:
         specifier: ^7.0.2

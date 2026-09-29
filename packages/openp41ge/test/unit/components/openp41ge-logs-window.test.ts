@@ -45,6 +45,13 @@ function dispatch(el: Lw, name: string, detail: Record<string, unknown>): void {
   grid(el).dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
 }
 
+/** The “＋” button rendered at the right end of a column's tab bar. Both
+ *  <tab-grid> and <tab-bar> render in light DOM, so the button is a plain
+ *  descendant of the grid host. */
+function tabBarAddButton(el: Lw): HTMLElement | null {
+  return grid(el).querySelector<HTMLElement>(".tab-bar-add");
+}
+
 beforeEach(() => {
   _resetLogStreams();
 });
@@ -210,6 +217,80 @@ describe("openp41ge-logs-window", () => {
     await el.updateComplete;
     expect(placements(el)).toHaveLength(1);
     expect(placements(el)[0].tabIds).toEqual([tab]);
+    el.remove();
+  });
+
+  it("has a clean top bar (no title, no add buttons)", async () => {
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    const root = el.shadowRoot as unknown as ShadowRoot;
+    expect(root.querySelector(".lw-title")).toBeNull();
+    expect(root.querySelector('[data-testid="lw-add-stream"]')).toBeNull();
+    expect(root.querySelector('[data-testid="lw-add-column"]')).toBeNull();
+    el.remove();
+  });
+
+  it("renders a + button at the end of the tab bar that opens the picker", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    // The <tab-bar> is a nested custom element; let it finish its first render.
+    const g = grid(el);
+    await (g as unknown as { updateComplete: Promise<void> }).updateComplete;
+    const bar = g.querySelector("tab-bar") as unknown as {
+      updateComplete: Promise<void>;
+    } | null;
+    await bar?.updateComplete;
+
+    const addBtn = tabBarAddButton(el);
+    expect(addBtn).toBeTruthy();
+    addBtn!.click();
+    await el.updateComplete;
+
+    const picker = (el.shadowRoot as unknown as ShadowRoot).querySelector(
+      '[data-testid="lw-picker"]',
+    );
+    expect(picker).toBeTruthy();
+    el.remove();
+  });
+
+  it("toggles the sidebar on Cmd+B and opens a stream from it", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    // Sidebar is closed (and not rendered) by default.
+    expect(
+      (el.shadowRoot as unknown as ShadowRoot).querySelector('[data-testid="lw-sidebar"]'),
+    ).toBeNull();
+
+    // A stream registered after the default tabs were applied has no default
+    // tab; opening it from the sidebar adds a new tab.
+    registerLogStream("sys-b", "name-b");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "b", metaKey: true, bubbles: true }));
+    await el.updateComplete;
+
+    const sidebar = (el.shadowRoot as unknown as ShadowRoot).querySelector<HTMLElement>(
+      '[data-testid="lw-sidebar"]',
+    );
+    expect(sidebar).toBeTruthy();
+    expect(sidebar!.getAttribute("data-side")).toBe("right");
+
+    // Click the sys-b row (registrations are listed in registration order).
+    const rows = sidebar!.querySelectorAll<HTMLElement>('[data-testid="lw-sidebar-row"]');
+    const targetRow = Array.from(rows).find((r) => r.getAttribute("data-system") === "sys-b");
+    expect(targetRow).toBeTruthy();
+    targetRow!.click();
+    await el.updateComplete;
+    const systems = (el as unknown as { _tabs: Array<{ system: string }> })._tabs.map(
+      (t) => t.system,
+    );
+    expect(systems).toContain("sys-b");
     el.remove();
   });
 });

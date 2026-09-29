@@ -9,7 +9,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { emitEvent } from "../app";
 import type { SystemTabRegistration } from "../controllers/types";
-import { allSystemTabRegistrations } from "../apps/system-tabs";
+import { availableSystemTabRegistrations } from "../apps/system-tabs";
 import { getSystemTabRegistration } from "../apps/app-registry";
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
@@ -140,7 +140,7 @@ class Openp41geSidebar extends LitElement {
     // and stays inside the viewport (never negative x).
     menu.x = Math.max(8, (r?.right ?? 160) - 160);
     menu.y = (r?.bottom ?? 0) + 2;
-    menu.items = allSystemTabRegistrations.map((reg: SystemTabRegistration) => ({
+    menu.items = availableSystemTabRegistrations().map((reg: SystemTabRegistration) => ({
       label: reg.label,
       badge: this._openSidesFor(reg.id),
       // The ＋ opens the tab on the sidebar that hosts the ＋ (`this.side`), not

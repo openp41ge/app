@@ -26,6 +26,9 @@ export const gitSystemTabRegistration: SystemTabRegistration = {
   defaultSide: "right",
   createController: (tabId, config) => new CommitSearchSystemTabController(tabId, config),
   settings: gitSettings,
+  // Not production-ready yet: the History panel is only available in dev
+  // builds until it is stabilised.
+  devOnly: true,
 };
 
 export const agentsSystemTabRegistration: SystemTabRegistration = {
@@ -44,3 +47,23 @@ export const allSystemTabRegistrations: SystemTabRegistration[] = [
   gitSystemTabRegistration,
   agentsSystemTabRegistration,
 ];
+
+/**
+ * System tab registrations available in the current runtime, with `devOnly`
+ * tabs dropped from packaged (production) builds. Evaluated lazily at call
+ * time so the dev decision is made when the list is actually consumed.
+ *
+ * When `isDev` is unavailable (e.g. tests / ambiguous environments) the tab is
+ * kept, so gating only hides a `devOnly` tab on a definitively packaged build.
+ */
+export function availableSystemTabRegistrations(): SystemTabRegistration[] {
+  let dev = true;
+  try {
+    if (typeof window !== "undefined" && typeof window.openp41ge?.isDev === "function") {
+      dev = !!window.openp41ge.isDev();
+    }
+  } catch {
+    dev = true;
+  }
+  return allSystemTabRegistrations.filter((reg) => !reg.devOnly || dev);
+}

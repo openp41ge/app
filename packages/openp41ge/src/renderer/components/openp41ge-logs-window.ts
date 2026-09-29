@@ -37,6 +37,7 @@ import { Openp41geLogViewer } from "openp41ge-logger/viewer";
 import {
   DragOrchestrator,
   TabDragSource,
+  OverlayScrollbar,
   type TabGrid,
   type TargetResolver,
   type IDropTarget,
@@ -91,12 +92,22 @@ export class Openp41geLogsWindow extends LitElement {
   private _orchestrator: DragOrchestrator | null = null;
   /** Column new streams are opened in (last active/focused column). */
   private _lastActiveCol = 0;
+  /** Which column's "＋" opened the stream picker (streams open in that column). */
+  private _pickerCol = 0;
+
+  /** Single sidebar panel — open/closed and which side it sits on. The side is
+   *  config-driven; the config isn't built yet, so it defaults to the right. */
+  @state() private _sidebarOpen = false;
+  @state() private _sidebarSide: "left" | "right" = "right";
+  private _sidebarScrollbar: OverlayScrollbar | null = null;
 
   // ── Lifecycle ────────────────────────────────────────────────────────
 
   connectedCallback(): void {
     super.connectedCallback();
     this._setupDrag();
+    // Cmd/Ctrl+B toggles the single sidebar panel (one shortcut, one sidebar).
+    window.addEventListener("keydown", this._onKeyDown);
     // Build the default tab set from the systems that have logged so far. If
     // none have logged yet, subscribe and populate as soon as the first stream
     // registers (so a freshly booted app still gets its default tabs).
@@ -114,6 +125,9 @@ export class Openp41geLogsWindow extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    window.removeEventListener("keydown", this._onKeyDown);
+    this._sidebarScrollbar?.destroy();
+    this._sidebarScrollbar = null;
     this._teardownDrag();
     this._offStreams?.();
     this._offStreams = null;
@@ -134,6 +148,34 @@ export class Openp41geLogsWindow extends LitElement {
     if (changed.has("_placements") || changed.has("_tabs")) {
       void this._mountViewers();
     }
+    this._attachSidebarScrollbar();
+  }
+
+  /** Toggle the sidebar on Cmd/Ctrl+B (either modifier alone, no shift/alt). */
+  private _onKeyDown = (e: KeyboardEvent): void => {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.shiftKey || e.altKey) return;
+    if (e.key.toLowerCase() !== "b") return;
+    e.preventDefault();
+    this._sidebarOpen = !this._sidebarOpen;
+  };
+
+  /** Attach the floating OverlayScrollbar to the sidebar's stream list once the
+   *  list is rendered. Idempotent. */
+  private _attachSidebarScrollbar(): void {
+    if (this._sidebarScrollbar || !this._sidebarOpen) return;
+    if (typeof ResizeObserver === "undefined") return;
+    const list = this.renderRoot?.querySelector<HTMLElement>(".lw-sidebar-list");
+    const container = this.renderRoot?.querySelector<HTMLElement>(".lw-sidebar-body");
+    if (!list || !container) return;
+    this._sidebarScrollbar = OverlayScrollbar.attach(list, {
+      axis: "vertical",
+      container,
+      styleTarget: this.shadowRoot ?? undefined,
+      size: 9,
+      hoverSize: 12,
+      autoHide: true,
+    });
   }
 
   // ── Drag setup (logs-specific, NOT the workspace drag system) ─────────
@@ -447,6 +489,15 @@ export class Openp41geLogsWindow extends LitElement {
     this._pickerQuery = "";
   }
 
+  /** The trailing “＋” on a column's tab bar bubbles `tab-bar-add`; open the
+   *  picker and remember which column the stream should land in. */
+  private _onTabBarAdd = (e: Event): void => {
+    const detail = (e as CustomEvent).detail ?? {};
+    const col = typeof detail.col === "number" ? detail.col : this._lastActiveCol;
+    this._pickerCol = col;
+    this._openPicker();
+  };
+
   private _closePicker(): void {
     this._pickerOpen = false;
   }
@@ -580,12 +631,6 @@ export class Openp41geLogsWindow extends LitElement {
           -webkit-app-region: drag;
           user-select: none;
         }
-        .lw-title {
-          font-weight: 600;
-          color: var(--text-secondary, #999);
-          letter-spacing: 0.03em;
-          font-size: 13px;
-        }
         .lw-titlebar .lw-spacer {
           flex: 1;
         }
@@ -630,6 +675,7 @@ export class Openp41geLogsWindow extends LitElement {
         }
         .lw-grid {
           flex: 1;
+          min-width: 0;
           min-height: 0;
           position: relative;
           display: flex;
@@ -640,6 +686,89 @@ export class Openp41geLogsWindow extends LitElement {
           min-width: 0;
           min-height: 0;
           display: block;
+        }
+        /* Sidebar: a single, toggleable panel that sits on the configured side
+           (right by default). Styled with the same language as the workspace
+           sidebar (gutter background + a divider on its grid-facing edge). */
+        .lw-body {
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: row;
+          overflow: hidden;
+        }
+        .lw-sidebar {
+          width: 260px;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          box-sizing: border-box;
+          background: var(--bg-gutter, #161616);
+        }
+        .lw-sidebar.left {
+          border-right: 1px solid var(--border-divider, #2d2d2d);
+        }
+        .lw-sidebar.right {
+          border-left: 1px solid var(--border-divider, #2d2d2d);
+        }
+        .lw-sidebar-head {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          height: 35px;
+          padding: 0 12px;
+          border-bottom: 1px solid var(--border-divider, #2d2d2d);
+          font-family: var(--font-ui, sans-serif);
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.03em;
+          color: var(--text-secondary, #999);
+        }
+        .lw-sidebar-body {
+          flex: 1;
+          min-height: 0;
+          position: relative;
+          overflow: hidden;
+        }
+        .lw-sidebar-list {
+          height: 100%;
+          overflow-y: auto;
+          padding: 6px 0;
+        }
+        .lw-sidebar-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          cursor: pointer;
+          font-family: var(--font-ui, sans-serif);
+          font-size: 12px;
+          color: var(--text-primary, #ccc);
+        }
+        .lw-sidebar-row:hover {
+          background: var(--bg-hover, #262626);
+        }
+        .lw-sidebar-sys {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .lw-sidebar-count {
+          flex-shrink: 0;
+          color: var(--text-muted, #888);
+          font-size: 11px;
+          background: var(--bg-primary, #161616);
+          border-radius: 8px;
+          padding: 1px 7px;
+        }
+        .lw-sidebar-empty {
+          padding: 12px;
+          color: var(--text-muted, #888);
+          font-size: 12px;
+          font-style: italic;
+          font-family: var(--font-ui, sans-serif);
         }
         .lw-empty {
           position: absolute;
@@ -780,23 +909,6 @@ export class Openp41geLogsWindow extends LitElement {
 
       <div class="lw-root">
         <div class="lw-titlebar" style="padding-left: ${isMac ? "82px" : "10px"}">
-          <span class="lw-title">Logs</span>
-          <button
-            type="button"
-            class="lw-btn"
-            data-testid="lw-add-stream"
-            @click=${this._openPicker}
-          >
-            ＋ Stream
-          </button>
-          <button
-            type="button"
-            class="lw-btn"
-            data-testid="lw-add-column"
-            @click=${this._addColumn}
-          >
-            ＋ Column
-          </button>
           <span class="lw-spacer"></span>
           ${
             isMac
@@ -811,35 +923,43 @@ export class Openp41geLogsWindow extends LitElement {
           }
         </div>
 
-        <div class="lw-grid">
-          <tab-grid
-            .winId=${WIN_ID}
-            .cols=${this._cols}
-            .placements=${this._placements}
-            .tabData=${this._tabData()}
-            .activeTabIds=${this._activeTabIds}
-            @grid-activate=${this._onGridActivate}
-            @grid-focus-col=${this._onGridFocusCol}
-            @grid-move=${this._onGridMove}
-            @grid-split=${this._onGridSplit}
-            @tab-bar-reorder=${this._onReorder}
-            @tab-bar-move-cell=${this._onMoveCell}
-          ></tab-grid>
-          ${
-            this._tabs.length === 0
-              ? html`<div class="lw-empty" data-testid="lw-empty">
-                  <span>No log streams open.</span>
-                  <button
-                    type="button"
-                    class="lw-btn"
-                    style="pointer-events:auto"
-                    @click=${this._openPicker}
-                  >
-                    ＋ Open a stream
-                  </button>
-                </div>`
-              : nothing
-          }
+        <div class="lw-body">
+          ${this._sidebarOpen && this._sidebarSide === "left" ? this._sidebarTemplate() : nothing}
+          <div class="lw-grid">
+            <tab-grid
+              .winId=${WIN_ID}
+              .cols=${this._cols}
+              .placements=${this._placements}
+              .tabData=${this._tabData()}
+              .activeTabIds=${this._activeTabIds}
+              .barShowAdd=${true}
+              .edgeLeft=${!(this._sidebarSide === "left" && this._sidebarOpen)}
+              .edgeRight=${!(this._sidebarSide === "right" && this._sidebarOpen)}
+              @grid-activate=${this._onGridActivate}
+              @grid-focus-col=${this._onGridFocusCol}
+              @grid-move=${this._onGridMove}
+              @grid-split=${this._onGridSplit}
+              @tab-bar-reorder=${this._onReorder}
+              @tab-bar-move-cell=${this._onMoveCell}
+              @tab-bar-add=${this._onTabBarAdd}
+            ></tab-grid>
+            ${
+              this._tabs.length === 0
+                ? html`<div class="lw-empty" data-testid="lw-empty">
+                    <span>No log streams open.</span>
+                    <button
+                      type="button"
+                      class="lw-btn"
+                      style="pointer-events:auto"
+                      @click=${this._openPicker}
+                    >
+                      ＋ Open a stream
+                    </button>
+                  </div>`
+                : nothing
+            }
+          </div>
+          ${this._sidebarOpen && this._sidebarSide === "right" ? this._sidebarTemplate() : nothing}
         </div>
       </div>
 
@@ -920,11 +1040,50 @@ export class Openp41geLogsWindow extends LitElement {
     `;
   }
 
+  /** Sidebar panel markup. Single panel on this._sidebarSide; lists the
+   *  registered log streams (click a row to open it as a tab). */
+  private _sidebarTemplate(): TemplateResult {
+    const streams = listLogStreams();
+    return html`
+      <aside
+        class="lw-sidebar ${this._sidebarSide === "left" ? "left" : "right"}"
+        data-testid="lw-sidebar"
+        data-side=${this._sidebarSide}
+      >
+        <div class="lw-sidebar-head"><span>Log streams</span></div>
+        <div class="lw-sidebar-body">
+          <div class="lw-sidebar-list" data-testid="lw-sidebar-list">
+            ${
+              streams.length === 0
+                ? html`<div class="lw-sidebar-empty">No streams registered.</div>`
+                : streams.map((s) => this._sidebarRow(s))
+            }
+          </div>
+        </div>
+      </aside>
+    `;
+  }
+
+  private _sidebarRow(s: LogStreamInfo): TemplateResult {
+    const label = s.name && s.name !== s.system ? `${s.system} (${s.name})` : s.system;
+    return html`
+      <div
+        class="lw-sidebar-row"
+        data-testid="lw-sidebar-row"
+        data-system=${s.system}
+        @click=${() => this._openStream(s.system)}
+      >
+        <span class="lw-sidebar-sys">${this._escape(label)}</span>
+        <span class="lw-sidebar-count">${s.entryCount}</span>
+      </div>
+    `;
+  }
+
   /** Renders a stream picker row. */
   private _pickerRow(s: LogStreamInfo): TemplateResult {
     const open = (): void => {
       this._closePicker();
-      this._openStream(s.system);
+      this._openStream(s.system, this._pickerCol);
     };
     return html`
       <div class="lw-picker-row" data-testid="lw-picker-row" @click=${open}>

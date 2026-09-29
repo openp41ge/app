@@ -37,6 +37,10 @@ export class TabBar extends LitElement {
   @property({ type: String }) winId: string = "";
   @property({ type: Number }) col: number = 0;
   @property({ type: Boolean }) focused: boolean = false;
+  /** When true, render a trailing “＋” button (right end of the bar) that
+   *  bubbles a `tab-bar-add` event so the host can open a new tab. Opt-in:
+   *  the workspace grid does not set it, so it stays out of the way there. */
+  @property({ type: Boolean }) showAdd: boolean = false;
 
   /** Local override for ephemeral pin state — set optimistically on click,
    *  cleared when the workspace state confirms via updated `tabs` property. */
@@ -401,6 +405,31 @@ export class TabBar extends LitElement {
               right: 0;
               background: linear-gradient(to left, var(--tab-bar-bg, #161616), transparent);
             }
+            .tab-bar-add {
+              position: absolute;
+              top: 0;
+              right: 0;
+              bottom: 0;
+              z-index: 4;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 34px;
+              flex-shrink: 0;
+              color: var(--text-secondary, #999);
+              font-size: 15px;
+              cursor: pointer;
+              user-select: none;
+              background: var(--bg-surface, #161616);
+              border-left: 1px solid var(--border-divider, #2d2d2d);
+              transition:
+                color 0.15s,
+                background 0.15s;
+            }
+            .tab-bar-add:hover {
+              color: var(--text-primary, #ccc);
+              background: var(--bg-hover-strong, #444);
+            }
           </style>
           ${this.tabIds.map((id) => {
             const tab = this.tabs[id];
@@ -520,6 +549,28 @@ export class TabBar extends LitElement {
         </div>
         <div class="tab-bar-fade-left"></div>
         <div class="tab-bar-fade-right"></div>
+        ${
+          this.showAdd
+            ? html`
+                <div
+                  class="tab-bar-add"
+                  title="Add a log stream tab"
+                  @click=${(e: MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.dispatchEvent(
+                      new CustomEvent("tab-bar-add", {
+                        bubbles: true,
+                        detail: { winId: this.winId, col: this.col },
+                      }),
+                    );
+                  }}
+                >
+                  ＋
+                </div>
+              `
+            : nothing
+        }
       </div>
     `;
   }

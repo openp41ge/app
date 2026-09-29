@@ -11,7 +11,7 @@
 import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { createLogger } from "openp41ge-logger";
-import { allSystemTabRegistrations } from "../../apps/system-tabs";
+import { availableSystemTabRegistrations } from "../../apps/system-tabs";
 const log = createLogger("openp41ge", "register-event-listeners");
 
 export class RegisterEventListenersStep implements IStartupStep {
@@ -58,7 +58,7 @@ export class RegisterEventListenersStep implements IStartupStep {
 
     // Settings open events — one listener per sidebar tab's *unique* settings
     // event, so each tab opens exactly its own settings grid tab.
-    for (const reg of allSystemTabRegistrations) {
+    for (const reg of availableSystemTabRegistrations()) {
       const settings = reg.settings;
       if (!settings) continue;
       document.addEventListener(settings.openEvent, ((e: CustomEvent) => {

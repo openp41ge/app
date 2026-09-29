@@ -128,4 +128,10 @@ export interface SystemTabRegistration {
   createController: (tabId: string, config?: Record<string, unknown>) => SystemTabController;
   /** This tab's own, unique settings surface (grid tab). Optional. */
   settings?: SystemTabSettings;
+  /**
+   * When true, the tab is only registered (and only offered) in non-packaged
+   * dev builds. Used for panels that are not ready for production — a
+   * `devOnly` tab is dropped from packaged builds at registration time.
+   */
+  devOnly?: boolean;
 }
