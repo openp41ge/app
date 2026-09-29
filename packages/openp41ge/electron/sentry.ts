@@ -61,13 +61,29 @@ export function initSentry(): void {
     return;
   }
 
-  const environment = app.isPackaged ? "production" : "development";
+  // Prefer the build-time injected version/channel (set by the release
+  // pipeline via esbuild --define); fall back to app metadata in dev or when
+  // not injected. This makes the reported release exactly match the version
+  // source maps are uploaded under, and the environment reflect the channel.
+  const bakedVersion =
+    typeof __OPENP41GE_VERSION__ !== "undefined" ? __OPENP41GE_VERSION__ : undefined;
+  const bakedChannel =
+    typeof __OPENP41GE_CHANNEL__ !== "undefined" ? __OPENP41GE_CHANNEL__ : undefined;
+  const version =
+    bakedVersion && bakedVersion !== "0.0.0-dev" ? bakedVersion : app.getVersion();
+  const environment =
+    bakedChannel && bakedChannel !== "development"
+      ? bakedChannel
+      : app.isPackaged
+        ? "production"
+        : "development";
+
   Sentry.init({
     dsn: dsnValue,
-    release: app.getVersion(),
+    release: version,
     environment,
     // Error monitoring for now; adjust once tracing is wanted.
     tracesSampleRate: 0,
   });
-  log.debug(`Sentry initialized (environment=${environment}, release=${app.getVersion()}).`);
+  log.debug(`Sentry initialized (environment=${environment}, release=${version}).`);
 }

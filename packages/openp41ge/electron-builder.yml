@@ -22,6 +22,9 @@ files:
   - dist-electron/electron/main.js
   - dist-electron/electron/preload.cjs
   - package.json
+  # Source maps are uploaded to Sentry, not shipped inside the asar.
+  - "!dist/**/*.map"
+  - "!dist-electron/**/*.map"
 
 asar: true
 

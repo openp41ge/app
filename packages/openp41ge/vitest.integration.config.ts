@@ -29,6 +29,10 @@ export default defineConfig({
       "openp41ge-logger": path.resolve(__dirname, "../openp41ge-logger/src"),
       "@openp41ge-terminal": path.resolve(__dirname, "../openp41ge-terminal/src"),
       "@openp41ge-agents": path.resolve(__dirname, "../openp41ge-agents/src"),
+      // Main-process services import the Sentry capture helpers, which use
+      // @sentry/electron/main (needs Electron to load). Replace it with a
+      // no-op stub so service tests run without Electron.
+      "@sentry/electron/main": path.resolve(__dirname, "./test/unit/stubs/sentry-main.ts"),
       "openp41ge-agents": path.resolve(__dirname, "../openp41ge-agents/src"),
       "openp41ge-uikit/tooltip": path.resolve(
         __dirname,

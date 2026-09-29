@@ -5,6 +5,7 @@ packages:
 allowBuilds:
   "@google/genai": true
   "@scarf/scarf": true
+  '@sentry/cli': true
   electron: true
   electron-winstaller: false
   esbuild: true

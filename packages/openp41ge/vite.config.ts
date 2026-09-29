@@ -7,6 +7,10 @@ export default defineConfig({
   build: {
     outDir: "../../dist",
     emptyOutDir: true,
+    // Emit .js.map files for Sentry source-map upload, but without a
+    // sourceMappingURL comment ("hidden") so the shipped bundle doesn't
+    // reference them / they aren't picked up against packaged files.
+    sourcemap: "hidden",
   },
   resolve: {
     alias: [
@@ -99,9 +103,13 @@ export default defineConfig({
 
   // Replace the OPENP41GE_DEBUG env var with a build-time constant so the
   // renderer can check it (agents: OPENP41GE_DEBUG=1 seeds a debug session).
+  // APP_VERSION / APP_CHANNEL are injected by the release pipeline so the
+  // renderer reports the same release/environment the main process uses.
   define: {
     __OPENP41GE_DEBUG__: JSON.stringify(
       process.env.OPENP41GE_DEBUG === "1" || process.env.OPENP41GE_DEBUG === "true",
     ),
+    __OPENP41GE_VERSION__: JSON.stringify(process.env.APP_VERSION ?? "0.0.0-dev"),
+    __OPENP41GE_CHANNEL__: JSON.stringify(process.env.APP_CHANNEL ?? "development"),
   },
 });

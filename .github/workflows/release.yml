@@ -144,6 +144,19 @@ jobs:
 
       - name: Build renderer + main process
         run: pnpm nx build openp41ge
+        env:
+          # Baked into the bundle via esbuild --define / Vite define so the
+          # app's Sentry release & environment match the version/channel the
+          # source maps are uploaded under.
+          APP_VERSION: ${{ needs.meta.outputs.version }}
+          APP_CHANNEL: ${{ needs.meta.outputs.channel }}
+
+      - name: Upload source maps to Sentry
+        working-directory: packages/openp41ge
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: bash scripts/upload-sourcemaps.sh
 
       - name: Package, sign, and notarize
         working-directory: packages/openp41ge
