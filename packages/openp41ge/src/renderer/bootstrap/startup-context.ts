@@ -47,7 +47,7 @@ import { initRendererLogTransport } from "../services/renderer-log-transport";
 import type { Workspace } from "../../layout/types";
 
 /** Kinds of window the renderer can boot as. Mirrors `Openp41geWindowType`. */
-export type RendererWindowType = "workspace" | "window-manager";
+export type RendererWindowType = "workspace" | "window-manager" | "logs";
 
 export class StartupContext {
   // ── Injected services ──────────────────────────────────────────────

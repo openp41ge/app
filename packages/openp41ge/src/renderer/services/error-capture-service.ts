@@ -16,8 +16,6 @@
  */
 
 const STORAGE_KEY = "openp41ge:captured-errors";
-/** Document event dispatched when an error toast is clicked (opens the manager's Logs tab). */
-export const OPEN_LOGS_TAB_EVENT = "openp41ge:open-logs-tab";
 
 import { createLogger } from "openp41ge-logger";
 import * as Sentry from "@sentry/electron/renderer";
@@ -97,10 +95,9 @@ function showErrorToast(err: CapturedError): void {
 
   const preview = full.length > 180 ? `${full.slice(0, 180)}…` : full;
   // Errors never auto-dismiss (duration 0) — the user must dismiss them, or
-  // click the toast to switch the manager window to its Logs tab (where the
-  // row lives; the manager listens for OPEN_LOGS_TAB_EVENT).
+  // click the toast to open the dedicated Logs window (where the row lives).
   toastService.show(`Error: ${preview}`, "error", 0, () => {
-    document.dispatchEvent(new CustomEvent(OPEN_LOGS_TAB_EVENT));
+    window.openp41ge?.windowManager.openLogsWindow();
   });
 }
 
@@ -272,7 +269,7 @@ export function installErrorCapture(): void {
   };
 
   // Restore any errors stored from a previous page load — surface a single
-  // summary toast (never a blocking screen). Clicking it opens the Logs tab.
+  // summary toast (never a blocking screen). Clicking it opens the Logs window.
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -283,7 +280,7 @@ export function installErrorCapture(): void {
           "error",
           0,
           () => {
-            document.dispatchEvent(new CustomEvent(OPEN_LOGS_TAB_EVENT));
+            window.openp41ge?.windowManager.openLogsWindow();
           },
         );
         emitChanges();

@@ -48,7 +48,8 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
 
     // A window-manager window never receives a workspace state update (it is not
     // bound to a layout Window), so render its picker view directly.
-    if (context.windowType === "window-manager") {
+    // A logs window likewise owns its stream tabs locally.
+    if (context.windowType === "window-manager" || context.windowType === "logs") {
       void this._render(context);
     }
   }
@@ -65,6 +66,16 @@ export class SubscribeStateUpdatesStep implements IStartupStep {
       root.querySelector("openp41ge-windowview")?.remove();
       if (!root.querySelector("openp41ge-window-manager")) {
         const el = document.createElement("openp41ge-window-manager");
+        root.appendChild(el);
+      }
+      return;
+    }
+
+    // A logs window hosts the standalone log grid, not a workspace layout.
+    if (context.windowType === "logs") {
+      root.querySelector("openp41ge-windowview")?.remove();
+      if (!root.querySelector("openp41ge-logs-window")) {
+        const el = document.createElement("openp41ge-logs-window");
         root.appendChild(el);
       }
       return;

@@ -37,8 +37,10 @@ export class FetchInitialStateStep implements IStartupStep {
 
     // A window-manager window is not bound to a layout Window — it hosts the
     // workspace picker and does not render a grid, so it has no layout state.
-    if (context.windowType === "window-manager") {
-      log.info("window-manager window: skipping workspace state fetch");
+    // A logs window is likewise standalone: it owns its stream tabs locally and
+    // has no layout state to fetch.
+    if (context.windowType === "window-manager" || context.windowType === "logs") {
+      log.info(`${context.windowType} window: skipping workspace state fetch`);
       return;
     }
 

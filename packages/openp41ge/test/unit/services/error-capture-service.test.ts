@@ -16,7 +16,6 @@ import {
   clearCapturedErrors,
   subscribeErrors,
   getCapturedErrors,
-  OPEN_LOGS_TAB_EVENT,
   type CapturedError,
 } from "@openp41ge/renderer/services/error-capture-service";
 import { subscribeLogs, setMinLevel, LogLevel, type LogEntry } from "openp41ge-logger";
@@ -126,19 +125,14 @@ describe("error-capture-service logging", () => {
     expect(item!.textContent!.length).toBeLessThan(200);
   });
 
-  it("dispatches the open-logs-tab event when the error toast is clicked", () => {
-    let fired = false;
-    const listener = (): void => {
-      fired = true;
+  it("opens the Logs window when the error toast is clicked", () => {
+    const openLogsWindow = vi.fn();
+    (window as unknown as { openp41ge: unknown }).openp41ge = {
+      windowManager: { openLogsWindow },
     };
-    document.addEventListener(OPEN_LOGS_TAB_EVENT, listener);
-    try {
-      fireError("grid boom");
-      (document.querySelector("openp41ge-toast .openp41ge-toast-error") as HTMLElement).click();
-      expect(fired).toBe(true);
-    } finally {
-      document.removeEventListener(OPEN_LOGS_TAB_EVENT, listener);
-    }
+    fireError("grid boom");
+    (document.querySelector("openp41ge-toast .openp41ge-toast-error") as HTMLElement).click();
+    expect(openLogsWindow).toHaveBeenCalledTimes(1);
   });
 
   it("does not count an error twice through the console replay", () => {

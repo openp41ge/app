@@ -44,7 +44,8 @@ declare global {
       };
       windowManager: {
         open: () => void;
-        openWindowSummaries: () => Promise<Array<{ windowId: string; windowType: "workspace" | "window-manager"; workspacePath: string | null }>>;
+        openLogsWindow: () => void;
+        openWindowSummaries: () => Promise<Array<{ windowId: string; windowType: "workspace" | "window-manager" | "logs"; workspacePath: string | null }>>;
         openWorkspaceWindow: (workspacePath: string) => void;
         focusWorkspaceWindow: (workspacePath: string) => Promise<boolean>;
         onOpenWindowsChanged: (callback: () => void) => () => void;
@@ -71,7 +72,7 @@ declare global {
         dispatch: (fn: string, ...args: unknown[]) => void;
         onStateUpdate: (callback: (stateJson: string) => void) => () => void;
         getWindowId: () => string | null;
-        getWindowType: () => "workspace" | "window-manager";
+        getWindowType: () => "workspace" | "window-manager" | "logs";
         getWorkspacePath: () => string | null;
         getLaunchTab: () => WindowManagerTabId | null;
         waitForInit: () => Promise<void>;

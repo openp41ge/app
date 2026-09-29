@@ -188,6 +188,10 @@ contextBridge.exposeInMainWorld("openp41ge", {
     open: () => {
       ipcRenderer.send("window-manager:open");
     },
+    /** Open (or focus) a dedicated Logs window. */
+    openLogsWindow: () => {
+      ipcRenderer.send("logs-window:open");
+    },
     /** List currently open windows (id, kind, workspace binding). */
     openWindowSummaries: () => {
       return ipcRenderer.invoke("window-manager:open-window-summaries");

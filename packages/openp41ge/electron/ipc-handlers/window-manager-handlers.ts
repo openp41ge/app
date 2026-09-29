@@ -6,6 +6,7 @@
 import { ipcMain, BrowserWindow } from "electron";
 import {
   openWindowManager,
+  openLogsWindow,
   getOpenWindowSummaries,
   openWorkspaceWindow,
   focusWorkspaceWindow,
@@ -32,6 +33,10 @@ function _isLiveManagerWindow(id: string): BrowserWindow | null {
 export function registerWindowManagerHandlers(): void {
   ipcMain.on("window-manager:open", (event) => {
     openWindowManager(BrowserWindow.fromWebContents(event.sender) ?? undefined);
+  });
+
+  ipcMain.on("logs-window:open", (event) => {
+    openLogsWindow(BrowserWindow.fromWebContents(event.sender) ?? undefined);
   });
 
   ipcMain.handle("window-manager:open-window-summaries", () => {

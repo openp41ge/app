@@ -39,7 +39,7 @@ export function setAppQuitting(value: boolean): void {
  * `.openp41ge-workspace` file; `window-manager` windows list/open workspaces.
  * Not exhaustive — future window types register via a factory (see plan).
  */
-export type Openp41geWindowType = "workspace" | "window-manager";
+export type Openp41geWindowType = "workspace" | "window-manager" | "logs";
 
 /** Metadata describing a created window (its kind + workspace binding). */
 export interface Openp41geWindowMeta {
@@ -342,6 +342,34 @@ export function openWindowManager(sourceWindow?: BrowserWindow, tab?: WindowMana
     return;
   }
   createWindowManagerWindow(sourceWindow, tab);
+}
+
+/**
+ * Create a new resizable logs window (not bound to any workspace layout
+ * Window). Returns the window id.
+ */
+export function createLogsWindow(sourceWindow?: BrowserWindow): string {
+  const winId = `logs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  createOpenp41geWindow(winId, false, sourceWindow, undefined, undefined, {
+    windowType: "logs",
+    workspacePath: null,
+  });
+  return winId;
+}
+
+/**
+ * Open (or focus) a logs window. Reuses an existing one if present so a second
+ * "Logs" action brings the existing window to the front instead of stacking.
+ */
+export function openLogsWindow(sourceWindow?: BrowserWindow): void {
+  for (const [id, bw] of openp41geWindows) {
+    if (openp41geWindowMeta.get(id)?.windowType !== "logs") continue;
+    if (bw.isDestroyed()) continue;
+    if (bw.isMinimized()) bw.restore();
+    bw.focus();
+    return;
+  }
+  createLogsWindow(sourceWindow);
 }
 
 /** Summaries of every open window (id, kind, workspace binding). */

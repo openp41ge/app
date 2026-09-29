@@ -27,8 +27,6 @@ import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import { MANAGER_SETTINGS_STATE_EVENT } from "./openp41ge-manager-settings";
 import type { Openp41geManagerSettings } from "./openp41ge-manager-settings";
-import { OPEN_LOGS_TAB_EVENT, subscribeErrors } from "../services/error-capture-service";
-import type { CapturedError } from "../services/error-capture-service";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import { registerManagerTabBar } from "../services/init-drag-system";
 import { MANAGER_TAB_REORDER_EVENT } from "../services/drop-targets/manager-tab-bar-drop-target";
@@ -92,7 +90,7 @@ function attachEdgeOverdraw(
 
 interface OpenWindowSummary {
   windowId: string;
-  windowType: "workspace" | "window-manager";
+  windowType: "workspace" | "window-manager" | "logs";
   workspacePath: string | null;
 }
 
@@ -112,7 +110,7 @@ interface ClosingDrawer extends DrawerState {
 }
 
 /** Tabs available in the manager window's tab bar. */
-type ManagerTabId = "workspaces" | "settings" | "welcome" | "releases" | "logs";
+type ManagerTabId = "workspaces" | "settings" | "welcome" | "releases";
 
 /** Labels for each manager tab, keyed by id. */
 const MANAGER_TAB_LABELS: Record<ManagerTabId, string> = {
@@ -120,7 +118,6 @@ const MANAGER_TAB_LABELS: Record<ManagerTabId, string> = {
   workspaces: "Workspaces",
   settings: "Settings",
   releases: "Releases",
-  logs: "Logs",
 };
 
 export class Openp41geWindowManager extends LitElement {
@@ -132,7 +129,6 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _openTabs: ManagerTabId[] = ["workspaces"];
   @state() private _activeTab: ManagerTabId = "workspaces";
   /** Number of captured errors — drives the Errors tab badge. */
-  @state() private _errorCount = 0;
   @state() private _welcomeDismissed = false;
   /** Slide-transition phase for the welcome page (out-* / in-* / "" = idle). */
   /** Prevents overlapping navigations while a slide is playing. */
@@ -189,8 +185,6 @@ export class Openp41geWindowManager extends LitElement {
   private _offRemoveTab: (() => void) | null = null;
   /** Unregister the tab bar from the drag system (called on disconnect). */
   private _unregisterManagerBar: (() => void) | null = null;
-  /** Cancel captured-error subscription (called on disconnect). */
-  private _offErrors: (() => void) | null = null;
   /** Suppress the following row click after a drag/swipe, so the drawer doesn't pop open. */
   private _suppressClick = false;
   private _tooltipTargets: Element[] = [];
@@ -218,10 +212,8 @@ export class Openp41geWindowManager extends LitElement {
     // the in-flight drag state.
     // Keep the Logs tab badge in sync with captured errors, and switch to the
     // Logs tab when an error toast is clicked (event from error-capture).
-    this._offErrors = subscribeErrors((errs: CapturedError[]) => {
-      this._errorCount = errs.length;
-    });
-    document.addEventListener(OPEN_LOGS_TAB_EVENT, this._onOpenLogsTab);
+    // Keep the Logs tab badge in sync with captured errors, and switch to the
+    // Logs tab when an error toast is clicked (event from error-capture).
     this._offEndSession = window.openp41ge.drag.onEndSession(() => this._teardownDrag());
     // Refresh the open-windows column immediately when any window opens/closes,
     // rather than waiting for this window to regain focus.
@@ -231,13 +223,7 @@ export class Openp41geWindowManager extends LitElement {
     // A menu item may request a specific tab when the manager window is already
     // open; activate it and bring the window to front (done in main).
     this._offActivateTab = window.openp41ge.windowManager.onActivateTab((tab) => {
-      if (
-        tab === "workspaces" ||
-        tab === "settings" ||
-        tab === "welcome" ||
-        tab === "releases" ||
-        tab === "logs"
-      ) {
+      if (tab === "workspaces" || tab === "settings" || tab === "welcome" || tab === "releases") {
         this._activateTab(tab);
       }
     });
@@ -295,9 +281,6 @@ export class Openp41geWindowManager extends LitElement {
     this.shadowRoot?.removeEventListener("click", this._onShadowClick);
     this.removeEventListener(MANAGER_SETTINGS_STATE_EVENT, this._onSettingsState);
     document.removeEventListener("pointerdown", this._onPointerDown);
-    this._offErrors?.();
-    this._offErrors = null;
-    document.removeEventListener(OPEN_LOGS_TAB_EVENT, this._onOpenLogsTab);
     this._offEndSession?.();
     this._offOpenWindowsChanged?.();
     this._offOpenWindowsChanged = null;
@@ -420,13 +403,7 @@ export class Openp41geWindowManager extends LitElement {
     const btn = target?.closest?.("button.wm-md-button[data-tab]") as HTMLElement | null;
     if (!btn) return;
     const tab = btn.dataset.tab ?? "";
-    if (
-      tab === "workspaces" ||
-      tab === "settings" ||
-      tab === "welcome" ||
-      tab === "releases" ||
-      tab === "logs"
-    ) {
+    if (tab === "workspaces" || tab === "settings" || tab === "welcome" || tab === "releases") {
       this._activateTab(tab);
     }
   };
@@ -1307,11 +1284,6 @@ export class Openp41geWindowManager extends LitElement {
 
   /** Open the inline + menu listing the available tabs, with an "O" badge on
    *  the right marking each tab already open in the bar. */
-  /** An error toast was clicked — switch to the Logs tab (where the row lives). */
-  private _onOpenLogsTab = (): void => {
-    this._activateTab("logs");
-  };
-
   private _onTabAddClick(e: Event): void {
     const btn = e.currentTarget as HTMLElement | null;
     const r = btn?.getBoundingClientRect();
@@ -1956,6 +1928,23 @@ export class Openp41geWindowManager extends LitElement {
           user-select: none;
           background: var(--bg-secondary, #161616);
           border-bottom: 1px solid var(--divider, #333);
+        }
+        .wm-open-logs {
+          -webkit-app-region: no-drag;
+          flex-shrink: 0;
+          height: 22px;
+          padding: 0 10px;
+          border: 1px solid var(--divider, #333);
+          border-radius: 5px;
+          background: var(--bg-tertiary, #1f1f1f);
+          color: var(--text-secondary, #aaa);
+          font-size: 12px;
+          font-family: var(--font-ui, sans-serif);
+          cursor: pointer;
+        }
+        .wm-open-logs:hover {
+          background: var(--bg-hover, #2a2a2a);
+          color: var(--text-primary, #d4d4d4);
         }
         .wm-winbtns {
           display: flex;
@@ -2625,18 +2614,6 @@ export class Openp41geWindowManager extends LitElement {
         .wm-settings-pane > .ws-list-footer {
           flex-shrink: 0;
         }
-        /* Logs tab: a single full-height logs pane (fills the body edge-to-edge). */
-        .wm-logs-pane {
-          height: 100%;
-          padding: 0;
-          display: flex;
-          flex-direction: column;
-          box-sizing: border-box;
-        }
-        .wm-logs-pane > openp41ge-logs-pane {
-          flex: 1;
-          min-height: 0;
-        }
         /* Workspaces tab: a full-height flex column whose bottom group (search
            bar + footer) sticks to the bottom of the pane as the list scrolls. */
         .wm-workspaces-pane {
@@ -3265,6 +3242,13 @@ export class Openp41geWindowManager extends LitElement {
       </style>
       <div class="wm-root">
         <div class="wm-titlebar">
+          <button
+            class="wm-open-logs"
+            aria-label="Open Logs window"
+            @click=${() => window.openp41ge?.windowManager.openLogsWindow()}
+          >
+            Logs
+          </button>
           <div class="wm-winbtns">
             <button
               class="wm-winbtn wm-winbtn--close"
@@ -3292,11 +3276,6 @@ export class Openp41geWindowManager extends LitElement {
                   @click=${() => this._activateTab(id)}
                 >
                   <span class="wm-tab-title">${MANAGER_TAB_LABELS[id]}</span>
-                  ${
-                    id === "logs" && this._errorCount > 0
-                      ? html`<span class="wm-tab-badge">${this._errorCount}</span>`
-                      : nothing
-                  }
                   <span
                     class="wm-tab-close"
                     aria-label="Close tab"
@@ -3352,259 +3331,249 @@ export class Openp41geWindowManager extends LitElement {
                         <openp41ge-manager-settings></openp41ge-manager-settings>
                         ${this._settingsListFooter()}
                       </div>`
-                    : this._activeTab === "logs"
-                      ? html`<div class="wm-tab-pane wm-logs-pane">
-                          <openp41ge-logs-pane></openp41ge-logs-pane>
-                        </div>`
-                      : html`
-                          <div class="wm-workspaces-pane">
-                            ${
-                              this._loaded &&
-                              this._workspaces.length === 0 &&
-                              !this._addingWorkspace
-                                ? html`<p class="empty">No workspaces yet.</p>`
-                                : this._searchOpen &&
-                                    this._workspaces.length > 0 &&
-                                    filtered.length === 0
-                                  ? html`<p class="empty">
-                                      No workspaces match “${this._searchQuery}”.
-                                    </p>`
-                                  : html`
-                                      <ul>
-                                        ${
-                                          this._addingWorkspace
-                                            ? html`
-                                                <li class="ws-row ws-row--new">
-                                                  <div class="ws-info">
-                                                    <input
-                                                      class="wm-new-ws-input"
-                                                      placeholder="Enter workspace name"
-                                                      spellcheck="false"
-                                                      @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
-                                                      @blur=${() => {
-                                                        if (this._addingWorkspace)
-                                                          void this._createWorkspaceFromInput();
-                                                      }}
-                                                    />
-                                                    <div class="ws-meta">
-                                                      <span
-                                                        class="ws-skeleton ws-skeleton--num"
-                                                      ></span>
-                                                    </div>
-                                                    <div class="ws-pills">
-                                                      <span
-                                                        class="ws-skeleton ws-skeleton--pill"
-                                                      ></span>
-                                                    </div>
-                                                  </div>
-                                                  <div class="ws-new-actions">
-                                                    <button
-                                                      class="ws-action ws-action--confirm"
-                                                      aria-label="Create workspace"
-                                                      title="Create workspace"
-                                                      @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                                                      @click=${(e: Event) => {
-                                                        e.stopPropagation();
+                    : html`
+                        <div class="wm-workspaces-pane">
+                          ${
+                            this._loaded && this._workspaces.length === 0 && !this._addingWorkspace
+                              ? html`<p class="empty">No workspaces yet.</p>`
+                              : this._searchOpen &&
+                                  this._workspaces.length > 0 &&
+                                  filtered.length === 0
+                                ? html`<p class="empty">
+                                    No workspaces match “${this._searchQuery}”.
+                                  </p>`
+                                : html`
+                                    <ul>
+                                      ${
+                                        this._addingWorkspace
+                                          ? html`
+                                              <li class="ws-row ws-row--new">
+                                                <div class="ws-info">
+                                                  <input
+                                                    class="wm-new-ws-input"
+                                                    placeholder="Enter workspace name"
+                                                    spellcheck="false"
+                                                    @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
+                                                    @blur=${() => {
+                                                      if (this._addingWorkspace)
                                                         void this._createWorkspaceFromInput();
-                                                      }}
-                                                    >
-                                                      <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        height="24px"
-                                                        viewBox="0 -960 960 960"
-                                                        width="24px"
-                                                        fill="#e3e3e3"
-                                                      >
-                                                        <path
-                                                          d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"
-                                                        />
-                                                      </svg>
-                                                    </button>
-                                                    <button
-                                                      class="ws-action ws-action--cancel"
-                                                      aria-label="Cancel"
-                                                      title="Cancel"
-                                                      @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                                                      @click=${(e: Event) => {
-                                                        e.stopPropagation();
-                                                        this._addingWorkspace = false;
-                                                      }}
-                                                    >
-                                                      <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        height="24px"
-                                                        viewBox="0 -960 960 960"
-                                                        width="24px"
-                                                        fill="#e3e3e3"
-                                                      >
-                                                        <path
-                                                          d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
-                                                        />
-                                                      </svg>
-                                                    </button>
+                                                    }}
+                                                  />
+                                                  <div class="ws-meta">
+                                                    <span
+                                                      class="ws-skeleton ws-skeleton--num"
+                                                    ></span>
                                                   </div>
-                                                </li>
-                                              `
-                                            : nothing
-                                        }
-                                        ${filtered.map((w, i) => {
-                                          const name = w.data.name?.trim() || "Unnamed";
-                                          const repos = w.data.repos?.length ?? 0;
-                                          const worktrees = (w.data.repos ?? []).reduce(
-                                            (n, r) => n + (r.worktrees?.length ?? 0),
-                                            0,
-                                          );
-                                          const isOpen = openPaths.has(w.filePath);
-                                          const windows = w.data.windows ?? [];
-                                          const shared = w.data.sharedSidebars;
-                                          const leftOpen = !!shared?.leftSidebarOpen;
-                                          const rightOpen = !!shared?.rightSidebarOpen;
-                                          const wins = windows.length > 0 ? windows : [undefined];
-                                          // Up to 3 thumbnails; once the row overflows, trade one
-                                          // thumbnail for a "+ N more" counter (4 windows shows
-                                          // 2 thumbs + "+ 2 more", never "+ 1 more").
-                                          const showMore = wins.length > MAX_VISIBLE_THUMBS;
-                                          const visibleWins = wins.slice(
-                                            0,
-                                            showMore ? MAX_VISIBLE_THUMBS - 1 : MAX_VISIBLE_THUMBS,
-                                          );
-                                          const moreCount = showMore
-                                            ? wins.length - (MAX_VISIBLE_THUMBS - 1)
-                                            : 0;
-                                          const isLast = i === filtered.length - 1;
-                                          const sideRows = html`<span
-                                              class="ws-thumb-side-row"
-                                            ></span
-                                            ><span class="ws-thumb-side-row"></span
-                                            ><span class="ws-thumb-side-row"></span>`;
-                                          const renderThumb = (
-                                            win:
-                                              | { grid?: { placements?: unknown[]; cols?: number } }
-                                              | undefined,
-                                          ) => html`
-                                            <div
-                                              class="ws-thumb"
-                                              @pointerenter=${(e: PointerEvent) => this._onThumbPointerEnter(e, w.filePath, isOpen)}
-                                              @pointerdown=${(e: PointerEvent) => this._onThumbPointerDown(e, w.filePath, isOpen)}
-                                              @pointermove=${this._onThumbPointerMove}
-                                              @pointerup=${this._onThumbPointerUp}
-                                              @pointercancel=${this._onThumbPointerCancel}
-                                            >
-                                              <div class="ws-thumb-chrome">
-                                                <span class="ws-thumb-dot"></span
-                                                ><span class="ws-thumb-dot"></span
-                                                ><span class="ws-thumb-dot"></span>
-                                              </div>
-                                              <div class="ws-win-body">
-                                                ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
-                                                <div class="ws-win-grid">
-                                                  ${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}
+                                                  <div class="ws-pills">
+                                                    <span
+                                                      class="ws-skeleton ws-skeleton--pill"
+                                                    ></span>
+                                                  </div>
                                                 </div>
-                                                ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
-                                              </div>
+                                                <div class="ws-new-actions">
+                                                  <button
+                                                    class="ws-action ws-action--confirm"
+                                                    aria-label="Create workspace"
+                                                    title="Create workspace"
+                                                    @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                                                    @click=${(e: Event) => {
+                                                      e.stopPropagation();
+                                                      void this._createWorkspaceFromInput();
+                                                    }}
+                                                  >
+                                                    <svg
+                                                      xmlns="http://www.w3.org/2000/svg"
+                                                      height="24px"
+                                                      viewBox="0 -960 960 960"
+                                                      width="24px"
+                                                      fill="#e3e3e3"
+                                                    >
+                                                      <path
+                                                        d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"
+                                                      />
+                                                    </svg>
+                                                  </button>
+                                                  <button
+                                                    class="ws-action ws-action--cancel"
+                                                    aria-label="Cancel"
+                                                    title="Cancel"
+                                                    @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                                                    @click=${(e: Event) => {
+                                                      e.stopPropagation();
+                                                      this._addingWorkspace = false;
+                                                    }}
+                                                  >
+                                                    <svg
+                                                      xmlns="http://www.w3.org/2000/svg"
+                                                      height="24px"
+                                                      viewBox="0 -960 960 960"
+                                                      width="24px"
+                                                      fill="#e3e3e3"
+                                                    >
+                                                      <path
+                                                        d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+                                                      />
+                                                    </svg>
+                                                  </button>
+                                                </div>
+                                              </li>
+                                            `
+                                          : nothing
+                                      }
+                                      ${filtered.map((w, i) => {
+                                        const name = w.data.name?.trim() || "Unnamed";
+                                        const repos = w.data.repos?.length ?? 0;
+                                        const worktrees = (w.data.repos ?? []).reduce(
+                                          (n, r) => n + (r.worktrees?.length ?? 0),
+                                          0,
+                                        );
+                                        const isOpen = openPaths.has(w.filePath);
+                                        const windows = w.data.windows ?? [];
+                                        const shared = w.data.sharedSidebars;
+                                        const leftOpen = !!shared?.leftSidebarOpen;
+                                        const rightOpen = !!shared?.rightSidebarOpen;
+                                        const wins = windows.length > 0 ? windows : [undefined];
+                                        // Up to 3 thumbnails; once the row overflows, trade one
+                                        // thumbnail for a "+ N more" counter (4 windows shows
+                                        // 2 thumbs + "+ 2 more", never "+ 1 more").
+                                        const showMore = wins.length > MAX_VISIBLE_THUMBS;
+                                        const visibleWins = wins.slice(
+                                          0,
+                                          showMore ? MAX_VISIBLE_THUMBS - 1 : MAX_VISIBLE_THUMBS,
+                                        );
+                                        const moreCount = showMore
+                                          ? wins.length - (MAX_VISIBLE_THUMBS - 1)
+                                          : 0;
+                                        const isLast = i === filtered.length - 1;
+                                        const sideRows = html`<span class="ws-thumb-side-row"></span
+                                          ><span class="ws-thumb-side-row"></span
+                                          ><span class="ws-thumb-side-row"></span>`;
+                                        const renderThumb = (
+                                          win:
+                                            | { grid?: { placements?: unknown[]; cols?: number } }
+                                            | undefined,
+                                        ) => html`
+                                          <div
+                                            class="ws-thumb"
+                                            @pointerenter=${(e: PointerEvent) => this._onThumbPointerEnter(e, w.filePath, isOpen)}
+                                            @pointerdown=${(e: PointerEvent) => this._onThumbPointerDown(e, w.filePath, isOpen)}
+                                            @pointermove=${this._onThumbPointerMove}
+                                            @pointerup=${this._onThumbPointerUp}
+                                            @pointercancel=${this._onThumbPointerCancel}
+                                          >
+                                            <div class="ws-thumb-chrome">
+                                              <span class="ws-thumb-dot"></span
+                                              ><span class="ws-thumb-dot"></span
+                                              ><span class="ws-thumb-dot"></span>
                                             </div>
-                                          `;
-                                          return html`
-                                            <li
-                                              class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
-                                              @click=${(e: Event) => {
-                                                e.stopPropagation();
-                                                if (this._suppressClick) {
-                                                  this._suppressClick = false;
-                                                  return;
-                                                }
-                                                if (this._workspaceDeleteMode)
-                                                  this._toggleWorkspaceSelection(w.filePath);
-                                              }}
-                                              @dblclick=${(e: Event) => {
-                                                e.stopPropagation();
-                                                if (this._workspaceDeleteMode) return;
-                                                this._openWorkspaceWindow(w.filePath);
-                                              }}
-                                            >
-                                              <div class="ws-info">
-                                                <div class="ws-name">${name}</div>
-                                                <div class="ws-meta">
-                                                  ${this._countLabel(repos, "repo")} ·
-                                                  ${this._countLabel(worktrees, "worktree")}
-                                                </div>
-                                                ${
-                                                  this._workspaceDeleteMode
-                                                    ? nothing
-                                                    : html`
-                                                        <div class="ws-pills">
-                                                          ${
-                                                            isOpen
-                                                              ? html`<span
-                                                                  class="ws-pill ws-pill--open"
-                                                                  role="button"
-                                                                  tabindex="0"
-                                                                  @click=${(e: Event) => this._onRowPillOpen(e, w.filePath)}
-                                                                  >Open</span
-                                                                >`
-                                                              : nothing
-                                                          }
-                                                          <span class="ws-pill"
-                                                            >${this._countLabel(w.data.windows?.length ?? 0, "window")}</span
-                                                          >
-                                                        </div>
-                                                      `
-                                                }
+                                            <div class="ws-win-body">
+                                              ${leftOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                              <div class="ws-win-grid">
+                                                ${Array.from({ length: this._skeletonCells(win) }, () => html`<div class="ws-thumb-cell"></div>`)}
                                               </div>
-                                              <div class="ws-thumbs">
-                                                ${visibleWins.map(renderThumb)}
-                                                ${
-                                                  moreCount > 0
-                                                    ? html`<span class="ws-more"
-                                                        ><span class="ws-more-count"
-                                                          >+ ${moreCount}</span
-                                                        ><span class="ws-more-word"
-                                                          >more</span
-                                                        ></span
-                                                      >`
-                                                    : nothing
-                                                }
+                                              ${rightOpen ? html`<div class="ws-win-side">${sideRows}</div>` : nothing}
+                                            </div>
+                                          </div>
+                                        `;
+                                        return html`
+                                          <li
+                                            class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
+                                            @click=${(e: Event) => {
+                                              e.stopPropagation();
+                                              if (this._suppressClick) {
+                                                this._suppressClick = false;
+                                                return;
+                                              }
+                                              if (this._workspaceDeleteMode)
+                                                this._toggleWorkspaceSelection(w.filePath);
+                                            }}
+                                            @dblclick=${(e: Event) => {
+                                              e.stopPropagation();
+                                              if (this._workspaceDeleteMode) return;
+                                              this._openWorkspaceWindow(w.filePath);
+                                            }}
+                                          >
+                                            <div class="ws-info">
+                                              <div class="ws-name">${name}</div>
+                                              <div class="ws-meta">
+                                                ${this._countLabel(repos, "repo")} ·
+                                                ${this._countLabel(worktrees, "worktree")}
                                               </div>
                                               ${
                                                 this._workspaceDeleteMode
-                                                  ? html`<span
-                                                      class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"
-                                                    ></span>`
+                                                  ? nothing
                                                   : html`
-                                                      <button
-                                                        class="ws-edit"
-                                                        aria-label="Edit ${name}"
-                                                        @click=${(e: Event) => {
-                                                          e.stopPropagation();
-                                                          this._openWorkspace(w);
-                                                        }}
-                                                      >
-                                                        <svg
-                                                          xmlns="http://www.w3.org/2000/svg"
-                                                          width="16"
-                                                          height="16"
-                                                          viewBox="0 -960 960 960"
-                                                          fill="currentColor"
+                                                      <div class="ws-pills">
+                                                        ${
+                                                          isOpen
+                                                            ? html`<span
+                                                                class="ws-pill ws-pill--open"
+                                                                role="button"
+                                                                tabindex="0"
+                                                                @click=${(e: Event) => this._onRowPillOpen(e, w.filePath)}
+                                                                >Open</span
+                                                              >`
+                                                            : nothing
+                                                        }
+                                                        <span class="ws-pill"
+                                                          >${this._countLabel(w.data.windows?.length ?? 0, "window")}</span
                                                         >
-                                                          <path
-                                                            d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"
-                                                          />
-                                                        </svg>
-                                                      </button>
+                                                      </div>
                                                     `
                                               }
-                                            </li>
-                                          `;
-                                        })}
-                                      </ul>
-                                    `
-                            }
-                            <div class="wm-workspaces-bottom">
-                              ${this._searchOpen ? this._workspaceSearchBar() : nothing}
-                              ${this._workspaceListFooter()}
-                            </div>
+                                            </div>
+                                            <div class="ws-thumbs">
+                                              ${visibleWins.map(renderThumb)}
+                                              ${
+                                                moreCount > 0
+                                                  ? html`<span class="ws-more"
+                                                      ><span class="ws-more-count"
+                                                        >+ ${moreCount}</span
+                                                      ><span class="ws-more-word">more</span></span
+                                                    >`
+                                                  : nothing
+                                              }
+                                            </div>
+                                            ${
+                                              this._workspaceDeleteMode
+                                                ? html`<span
+                                                    class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"
+                                                  ></span>`
+                                                : html`
+                                                    <button
+                                                      class="ws-edit"
+                                                      aria-label="Edit ${name}"
+                                                      @click=${(e: Event) => {
+                                                        e.stopPropagation();
+                                                        this._openWorkspace(w);
+                                                      }}
+                                                    >
+                                                      <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        width="16"
+                                                        height="16"
+                                                        viewBox="0 -960 960 960"
+                                                        fill="currentColor"
+                                                      >
+                                                        <path
+                                                          d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"
+                                                        />
+                                                      </svg>
+                                                    </button>
+                                                  `
+                                            }
+                                          </li>
+                                        `;
+                                      })}
+                                    </ul>
+                                  `
+                          }
+                          <div class="wm-workspaces-bottom">
+                            ${this._searchOpen ? this._workspaceSearchBar() : nothing}
+                            ${this._workspaceListFooter()}
                           </div>
-                        `
+                        </div>
+                      `
             }
           </div>
           ${

@@ -51,6 +51,8 @@ export class ResolveWindowKindStep implements IStartupStep {
     const rawType = bridge.workspace.getWindowType?.();
     if (rawType === "window-manager") {
       context.windowType = "window-manager";
+    } else if (rawType === "logs") {
+      context.windowType = "logs";
     } else if (rawType === "workspace") {
       context.windowType = "workspace";
     } else {

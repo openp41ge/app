@@ -15,7 +15,6 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Openp41geWindowManager } from "../../../src/renderer/components/openp41ge-window-manager";
-import { OPEN_LOGS_TAB_EVENT } from "../../../src/renderer/services/error-capture-service";
 
 const HOLD_MS = 350;
 
@@ -336,11 +335,20 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     expect(wm.shadowRoot?.querySelector(".wm-root > .ws-list-footer")).toBeNull();
   });
 
-  it("opens the Logs tab when the open-logs-tab event is dispatched", async () => {
-    document.dispatchEvent(new CustomEvent(OPEN_LOGS_TAB_EVENT));
+  it("renders the Logs button in the title bar that opens the Logs window", async () => {
+    const openLogsWindow = vi.fn();
+    (window as unknown as { openp41ge: unknown }).openp41ge = {
+      ...(window as unknown as { openp41ge: Record<string, unknown> }).openp41ge,
+      windowManager: {
+        ...(window as unknown as { openp41ge: { windowManager: object } }).openp41ge.windowManager,
+        openLogsWindow,
+      },
+    };
     await (wm as Wm).updateComplete;
-    expect((wm as unknown as { _activeTab: string })._activeTab).toBe("logs");
-    expect((wm as unknown as { _openTabs: string[] })._openTabs).toContain("logs");
+    const btn = wm.shadowRoot?.querySelector<HTMLButtonElement>(".wm-open-logs");
+    expect(btn).not.toBeNull();
+    btn!.click();
+    expect(openLogsWindow).toHaveBeenCalledTimes(1);
   });
 
   it("tracks the bottom bar into the Settings pane when the tab switches", async () => {
