@@ -22,7 +22,7 @@
     "packages/openp41ge": {
       "entry": ["src/main/index.ts", "electron/main.ts", "electron/preload.cjs"],
       "project": ["src/**/*.ts", "electron/**/*.{ts,cjs}"],
-      "ignoreDependencies": ["ts-node", "@xterm/xterm", "@xterm/addon-fit"],
+      "ignoreDependencies": ["ts-node", "@xterm/xterm", "@xterm/addon-fit", "@sentry/cli"],
       "ignore": [
         // Welcome-page demo components — referenced by tag name from
         // render-markdown.ts; kept for the animated intro demos.

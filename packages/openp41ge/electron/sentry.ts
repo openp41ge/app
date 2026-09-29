@@ -69,8 +69,7 @@ export function initSentry(): void {
     typeof __OPENP41GE_VERSION__ !== "undefined" ? __OPENP41GE_VERSION__ : undefined;
   const bakedChannel =
     typeof __OPENP41GE_CHANNEL__ !== "undefined" ? __OPENP41GE_CHANNEL__ : undefined;
-  const version =
-    bakedVersion && bakedVersion !== "0.0.0-dev" ? bakedVersion : app.getVersion();
+  const version = bakedVersion && bakedVersion !== "0.0.0-dev" ? bakedVersion : app.getVersion();
   const environment =
     bakedChannel && bakedChannel !== "development"
       ? bakedChannel

@@ -42,17 +42,11 @@ export default defineConfig({
       },
       {
         find: "openp41ge-uikit/overdraw-line",
-        replacement: path.resolve(
-          __dirname,
-          "../openp41ge-uikit/src/components/overdraw-line",
-        ),
+        replacement: path.resolve(__dirname, "../openp41ge-uikit/src/components/overdraw-line"),
       },
       {
         find: "openp41ge-uikit/drop-indicator",
-        replacement: path.resolve(
-          __dirname,
-          "../openp41ge-uikit/src/components/drop-indicator",
-        ),
+        replacement: path.resolve(__dirname, "../openp41ge-uikit/src/components/drop-indicator"),
       },
       { find: "openp41ge-uikit", replacement: path.resolve(__dirname, "../openp41ge-uikit/src") },
       {
@@ -64,7 +58,10 @@ export default defineConfig({
         replacement: path.resolve(__dirname, "../openp41ge-syntax-highlighting/src"),
       },
       { find: "openp41ge-tabs", replacement: path.resolve(__dirname, "../openp41ge-tabs/src") },
-      { find: "openp41ge-json-editor", replacement: path.resolve(__dirname, "../openp41ge-json-editor/src") },
+      {
+        find: "openp41ge-json-editor",
+        replacement: path.resolve(__dirname, "../openp41ge-json-editor/src"),
+      },
       {
         find: "openp41ge-json-editor/json-editor",
         replacement: path.resolve(__dirname, "../openp41ge-json-editor/src/json-editor.ts"),
