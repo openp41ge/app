@@ -947,6 +947,7 @@ export class Openp41geLogViewer extends LitElement {
            is matched by tag selector to fill its pane container. */
         openp41ge-log-viewer {
           display: block;
+          width: 100%;
           height: 100%;
           overflow: hidden;
           box-sizing: border-box;
