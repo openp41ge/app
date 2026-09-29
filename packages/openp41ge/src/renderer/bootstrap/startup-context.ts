@@ -147,13 +147,21 @@ export class StartupContext {
     this.settingsOpenHandler.init(this.commandBus, this.workspaceState);
     this.fileDropHandler.init(this.commandBus);
 
-    // Initialize Openp41geTabsEventHandler to handle tab-grid custom events
-    this.openp41geTabsEventHandler.init(this.commandBus, this.tabMountManager, {
-      getWorkspace: () => this.workspaceState.getWorkspace(),
-    });
+    // The workshops tab system (event handler + drag orchestrator) is bound to
+    // the workspace state. The Logs window owns its grid locally in
+    // <openp41ge-logs-window>, so both are skipped there — otherwise the
+    // workspace handler would intercept the logs grid's events and dispatch
+    // workspace commands, and initDragSystem would register a competing drag
+    // pipeline for the same tab buttons.
+    if (this.windowType !== "logs") {
+      // Initialize Openp41geTabsEventHandler to handle tab-grid custom events
+      this.openp41geTabsEventHandler.init(this.commandBus, this.tabMountManager, {
+        getWorkspace: () => this.workspaceState.getWorkspace(),
+      });
 
-    // Initialize tab drag-and-drop system
-    initDragSystem();
+      // Initialize tab drag-and-drop system
+      initDragSystem();
+    }
 
     // Forward renderer log bus to the main process (<dataDir>/logs).
     initRendererLogTransport();

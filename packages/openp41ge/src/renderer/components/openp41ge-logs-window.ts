@@ -3,13 +3,26 @@
  *
  * Booted when the main process creates a window with windowType `"logs"`. It is
  * a resizable window (hiddenInset titlebar, like workspace windows) with a top
- * bar and a tab bar, no sidebars, that shows log streams in a grid so several
- * streams can be watched side by side.
+ * bar and a single shared <tab-grid> (no sidebars) so several log streams can
+ * be watched side by side.
+ *
+ * The component reuses the uikit tab system rather than a hand-rolled grid:
+ *   - <tab-grid> owns the columns, per-column <tab-bar>/<tab-content>, the
+ *     drop targets, ghost previews and drag-split detection.
+ *   - This component owns the LOCAL grid model (placements / active tabs / tab
+ *     metadata) and mounts one <openp41ge-log-viewer> per tab via
+ *     grid.mountController().
+ *   - Drag/reorder/split/move are driven by the events the grid and its tab
+ *     bars bubble up (grid-activate, grid-move, grid-split, tab-bar-reorder,
+ *     tab-bar-move-cell, grid-focus-col). A thin logs-specific DragOrchestrator
+ *     starts tab drags; it is intentionally NOT the workspace's drag system
+ *     (which is coupled to the workspace model and is skipped for logs windows
+ *     in StartupContext.wireServices).
  *
  * Each tab is a single log stream (one system). By default the grid opens one
- * tab per system that has logged, plus one for the platform. The "+" button in
- * a column's tab bar opens the stream picker drawer to open specific streams.
- * Clicking an ERROR row opens a detail drawer for that entry.
+ * tab per system that has logged, plus the platform. The top-bar "＋ Stream"
+ * button opens the stream picker drawer; "＋ Column" opens a fresh empty
+ * column. Clicking an ERROR row opens a detail drawer for that entry.
  */
 
 import { LitElement, html, type TemplateResult, nothing } from "lit";
@@ -21,6 +34,13 @@ import {
   type LogStreamInfo,
 } from "openp41ge-logger";
 import { Openp41geLogViewer } from "openp41ge-logger/viewer";
+import {
+  DragOrchestrator,
+  TabDragSource,
+  type TabGrid,
+  type TargetResolver,
+  type IDropTarget,
+} from "openp41ge-uikit";
 import { LogFilePageReader } from "../services/log-file-page-reader";
 import { getCapturedErrors, type CapturedError } from "../services/error-capture-service";
 
@@ -31,10 +51,9 @@ interface LogTab {
   title: string;
 }
 
-interface Cell {
-  id: string;
+interface Placement {
+  position: { row: number; col: number };
   tabIds: string[];
-  activeId: string;
 }
 
 interface DetailState {
@@ -46,30 +65,38 @@ interface DetailState {
 
 const TAB_PREFIX = "logtab-";
 let _tabSeq = 0;
-let _cellSeq = 0;
+
+/** Stable grid window id — the logs grid is local to this window, so a single
+ *  shared id is enough (the drop events carry it but this host ignores it). */
+const WIN_ID = "logs-window";
 
 @customElement("openp41ge-logs-window")
 export class Openp41geLogsWindow extends LitElement {
   /** Fully store the grid state in `state` so Lit re-renders on change. */
   @state() private _tabs: LogTab[] = [];
-  @state() private _cells: Cell[] = [];
-  /** Cell id the picker was opened from, or null when the drawer is closed. */
-  @state() private _pickerFor: string | null = null;
+  /** Column-ordered placements: `_placements[i].position.col === i`. */
+  @state() private _placements: Placement[] = [];
+  /** col (as string key) → active tab id in that column. */
+  @state() private _activeTabIds: Record<string, string> = {};
+  @state() private _pickerOpen = false;
   @state() private _pickerQuery = "";
   @state() private _detail: DetailState | null = null;
-  @state() private _columnRatios: number[] = [];
   /** When the first streams register, populate the default tabs once. */
-  private _defaultsApplied = false;
+  @state() private _defaultsApplied = false;
 
   private _viewers = new Map<string, Openp41geLogViewer>();
   private _offStreams: (() => void) | null = null;
   private _offLogs: (() => void) | null = null;
   private _detailUnsub: (() => void) | null = null;
+  private _orchestrator: DragOrchestrator | null = null;
+  /** Column new streams are opened in (last active/focused column). */
+  private _lastActiveCol = 0;
 
   // ── Lifecycle ────────────────────────────────────────────────────────
 
   connectedCallback(): void {
     super.connectedCallback();
+    this._setupDrag();
     // Build the default tab set from the systems that have logged so far. If
     // none have logged yet, subscribe and populate as soon as the first stream
     // registers (so a freshly booted app still gets its default tabs).
@@ -87,6 +114,7 @@ export class Openp41geLogsWindow extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._teardownDrag();
     this._offStreams?.();
     this._offStreams = null;
     this._offLogs?.();
@@ -98,10 +126,87 @@ export class Openp41geLogsWindow extends LitElement {
     this._viewers.clear();
   }
 
+  protected firstUpdated(): void {
+    this._attachDetailListeners();
+  }
+
+  protected updated(changed: Map<string, unknown>): void {
+    if (changed.has("_placements") || changed.has("_tabs")) {
+      void this._mountViewers();
+    }
+  }
+
+  // ── Drag setup (logs-specific, NOT the workspace drag system) ─────────
+
+  private _resolveTarget: TargetResolver = (
+    clientX: number,
+    clientY: number,
+  ): IDropTarget | null => {
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el) return null;
+    // <tab-bar> and <tab-grid> are light-DOM components that expose their own
+    // dropTarget; match them directly (the workspace resolver's legacy class
+    // selectors do not apply to the uikit components).
+    const tabBarEl = (el as Element).closest?.("tab-bar");
+    if (tabBarEl instanceof HTMLElement) {
+      const dt = (tabBarEl as unknown as { dropTarget?: IDropTarget }).dropTarget;
+      if (dt) return dt;
+    }
+    const gridEl = (el as Element).closest?.("tab-grid");
+    if (gridEl instanceof HTMLElement) {
+      const dt = (gridEl as unknown as { dropTarget?: IDropTarget }).dropTarget;
+      if (dt) return dt;
+    }
+    return null;
+  };
+
+  private _setupDrag(): void {
+    if (this._orchestrator) return;
+    this._orchestrator = new DragOrchestrator(this._resolveTarget);
+    this.shadowRoot?.addEventListener("mousedown", this._onMouseDown);
+    this.shadowRoot?.addEventListener("click", this._onTabCloseClick);
+  }
+
+  private _teardownDrag(): void {
+    this._orchestrator?.dispose();
+    this._orchestrator = null;
+    this.shadowRoot?.removeEventListener("mousedown", this._onMouseDown);
+    this.shadowRoot?.removeEventListener("click", this._onTabCloseClick);
+  }
+
+  private _onMouseDown = (e: Event): void => {
+    const me = e as MouseEvent;
+    // Only the primary button initiates tab drags; right/middle clicks must
+    // never start one. Close buttons are handled by the click handler below.
+    if (me.button !== 0) return;
+    const target = me.target as Element | null;
+    if (target?.closest?.(".tab-close")) return;
+    const tabBtn = target?.closest?.("[data-tab-id]");
+    if (!(tabBtn instanceof HTMLElement)) return;
+
+    e.preventDefault();
+    const tabId = tabBtn.getAttribute("data-tab-id") || "";
+    const barEl = tabBtn.closest("tab-bar");
+    if (!barEl) return;
+    const bar = barEl as HTMLElement & { winId?: string };
+    const winId = bar.winId || WIN_ID;
+    const label = this._tabById(tabId)?.title ?? tabBtn.textContent?.trim() ?? "Tab";
+    const source = new TabDragSource(tabBtn, tabId, winId, winId, label);
+    this._orchestrator?.startDrag(source, me.clientX, me.clientY);
+  };
+
+  private _onTabCloseClick = (e: Event): void => {
+    const el = (e.target as Element | null)?.closest?.(".tab-close[data-close-tab-id]");
+    if (!(el instanceof HTMLElement)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const tabId = el.getAttribute("data-close-tab-id");
+    if (tabId) this._closeTab(tabId);
+  };
+
   // ── Default tabs ─────────────────────────────────────────────────────
 
-  /** Open one tab per system that has logged (grouping its streams), plus the
-   *  platform if it has logged. All placed in a single column. */
+  /** Open one tab per system that has logged, placed in a single column. */
   private _applyDefaults(): void {
     if (this._defaultsApplied) return;
     const systems = new Set(listLogStreams().map((s) => s.system));
@@ -112,117 +217,238 @@ export class Openp41geLogsWindow extends LitElement {
       .map((system) => this._makeTab(system));
     const tabIds = tabs.map((t) => t.id);
     this._tabs = tabs;
-    this._cells = [
-      {
-        id: `cell-${_cellSeq++}`,
-        tabIds,
-        activeId: tabIds[0] ?? "",
-      },
-    ];
-    this._columnRatios = [1];
+    this._setPlacements([{ position: { row: 0, col: 0 }, tabIds }]);
+    this._reconcileActives();
+    this._lastActiveCol = 0;
   }
 
   private _makeTab(system: string): LogTab {
     return { id: `${TAB_PREFIX}${_tabSeq++}`, system, title: system };
   }
 
-  // ── Tab / cell operations ────────────────────────────────────────────
-
-  private _cell(cellId: string): Cell | undefined {
-    return this._cells.find((c) => c.id === cellId);
-  }
-
-  private _tab(tabId: string): LogTab | undefined {
+  private _tabById(tabId: string): LogTab | undefined {
     return this._tabs.find((t) => t.id === tabId);
   }
 
-  private _openStream(system: string, cellId: string | null): void {
-    // Reuse an existing tab for the same system (activate it in its cell).
-    const existing = this._tabs.find((t) => t.system === system);
-    // Determine the target cell: the picker's cell, else the first cell.
-    const target = this._cell(cellId ?? "") ??
-      this._cells[0] ?? { id: `cell-${_cellSeq++}`, tabIds: [], activeId: "" };
+  // ── Grid state helpers ───────────────────────────────────────────────
 
-    if (!this._cells.some((c) => c.id === target.id)) {
-      this._cells = [...this._cells, target];
+  private get _cols(): number {
+    return Math.max(this._placements.length, 1);
+  }
+
+  private _colPlacement(col: number): Placement | undefined {
+    return this._placements.find((p) => p.position.col === col);
+  }
+
+  /** Sort placements by column and renumber so `[i].position.col === i` — the
+   *  invariant <tab-grid>'s `_getNextTabForCell` and GridDropTarget rely on. */
+  private _setPlacements(placements: Placement[]): void {
+    const sorted = [...placements].sort((a, b) => a.position.col - b.position.col);
+    this._placements = sorted.map((p, i) => ({
+      position: { row: 0, col: i },
+      tabIds: p.tabIds,
+    }));
+  }
+
+  /** Ensure every column that has tabs has a valid active id (first tab if the
+   *  tracked one was closed/moved), and drop stale column entries. */
+  private _reconcileActives(): void {
+    const next: Record<string, string> = {};
+    for (const p of this._placements) {
+      const colStr = String(p.position.col);
+      const cur = this._activeTabIds[colStr];
+      next[colStr] = cur && p.tabIds.includes(cur) ? cur : (p.tabIds[0] ?? "");
     }
-    if (existing) {
-      const cell = this._cell(target.id);
-      if (cell && !cell.tabIds.includes(existing.id)) {
-        this._updateCell(target.id, { tabIds: [...cell.tabIds, existing.id] });
+    this._activeTabIds = next;
+  }
+
+  private _activeTabIdFor(col: number): string {
+    return this._activeTabIds[String(col)] ?? this._colPlacement(col)?.tabIds[0] ?? "";
+  }
+
+  /**
+   * Move a tab into `targetCol` at `insertAt` (append when -1 / out of range).
+   * Removes the source column if it empties (never below one column).
+   */
+  private _moveTab(tabId: string, targetCol: number, insertAt: number, activate = true): void {
+    const boxes = this._placements.map((p) => ({ tabIds: [...p.tabIds] }));
+    const srcIdx = boxes.findIndex((b) => b.tabIds.includes(tabId));
+    if (srcIdx < 0) return;
+    boxes[srcIdx].tabIds = boxes[srcIdx].tabIds.filter((id) => id !== tabId);
+
+    let tIdx = targetCol;
+    if (tIdx < 0 || tIdx > boxes.length) tIdx = boxes.length;
+    if (tIdx >= boxes.length) boxes.push({ tabIds: [] });
+    const at =
+      insertAt < 0 ? boxes[tIdx].tabIds.length : Math.min(insertAt, boxes[tIdx].tabIds.length);
+    boxes[tIdx].tabIds.splice(at, 0, tabId);
+
+    if (boxes[srcIdx].tabIds.length === 0 && boxes.length > 1) {
+      boxes.splice(srcIdx, 1);
+    }
+
+    this._setPlacements(boxes.map((b, i) => ({ position: { row: 0, col: i }, tabIds: b.tabIds })));
+    this._reconcileActives();
+    if (activate) {
+      const landed = boxes.findIndex((b) => b.tabIds.includes(tabId));
+      if (landed >= 0) {
+        this._activeTabIds = { ...this._activeTabIds, [String(landed)]: tabId };
+        this._lastActiveCol = landed;
       }
-      this._updateCell(target.id, { activeId: existing.id });
+    }
+  }
+
+  /** Reorder a tab within a single column. */
+  private _reorder(col: number, fromIndex: number, toIndex: number): void {
+    const boxes = this._placements.map((p) => ({ tabIds: [...p.tabIds] }));
+    const box = boxes[col];
+    if (!box || fromIndex < 0 || fromIndex >= box.tabIds.length) return;
+    if (toIndex < 0 || toIndex > box.tabIds.length) return;
+    const [moved] = box.tabIds.splice(fromIndex, 1);
+    box.tabIds.splice(toIndex, 0, moved);
+    this._setPlacements(boxes.map((b, i) => ({ position: { row: 0, col: i }, tabIds: b.tabIds })));
+    this._reconcileActives();
+  }
+
+  /** Split a tab into a fresh column placed at the given boundary. */
+  private _splitTab(tabId: string, splitCol: number, splitLeft: boolean): void {
+    const boxes = this._placements.map((p) => ({ tabIds: [...p.tabIds] }));
+    const srcIdx = boxes.findIndex((b) => b.tabIds.includes(tabId));
+    if (srcIdx < 0) return;
+    boxes[srcIdx].tabIds = boxes[srcIdx].tabIds.filter((id) => id !== tabId);
+
+    const at = Math.max(0, Math.min(splitLeft ? splitCol : splitCol + 1, boxes.length));
+    boxes.splice(at, 0, { tabIds: [tabId] });
+
+    // Remove the (now empty) source column if it has no tabs left.
+    if (boxes.length > 1) {
+      const emptyIdx = boxes.findIndex((b) => b.tabIds.length === 0);
+      if (emptyIdx >= 0 && !boxes[emptyIdx].tabIds.includes(tabId)) {
+        boxes.splice(emptyIdx, 1);
+      }
+    }
+
+    this._setPlacements(boxes.map((b, i) => ({ position: { row: 0, col: i }, tabIds: b.tabIds })));
+    this._reconcileActives();
+    const landed = boxes.findIndex((b) => b.tabIds.includes(tabId));
+    if (landed >= 0) {
+      this._activeTabIds = { ...this._activeTabIds, [String(landed)]: tabId };
+      this._lastActiveCol = landed;
+    }
+  }
+
+  /** Open a fresh empty column at the end and focus it. */
+  private _addColumn(): void {
+    const boxes = this._placements.map((p) => ({ tabIds: [...p.tabIds] }));
+    boxes.push({ tabIds: [] });
+    this._setPlacements(boxes.map((b, i) => ({ position: { row: 0, col: i }, tabIds: b.tabIds })));
+    this._reconcileActives();
+    this._lastActiveCol = boxes.length - 1;
+  }
+
+  private _closeTab(tabId: string): void {
+    const boxes = this._placements.map((p) => ({ tabIds: [...p.tabIds] }));
+    const srcIdx = boxes.findIndex((b) => b.tabIds.includes(tabId));
+    if (srcIdx < 0) return;
+    boxes[srcIdx].tabIds = boxes[srcIdx].tabIds.filter((id) => id !== tabId);
+    if (boxes.length > 1 && boxes[srcIdx].tabIds.length === 0) {
+      boxes.splice(srcIdx, 1);
+    }
+    this._setPlacements(boxes.map((b, i) => ({ position: { row: 0, col: i }, tabIds: b.tabIds })));
+    this._tabs = this._tabs.filter((t) => t.id !== tabId);
+    this._releaseViewer(tabId);
+    this._reconcileActives();
+    if (this._lastActiveCol >= this._placements.length) this._lastActiveCol = 0;
+  }
+
+  // ── Tab / cell operations (public accessors used by tests) ───────────
+
+  private _activate(col: number, tabId: string): void {
+    const p = this._colPlacement(col);
+    if (!p || !p.tabIds.includes(tabId)) return;
+    this._lastActiveCol = col;
+    this._activeTabIds = { ...this._activeTabIds, [String(col)]: tabId };
+  }
+
+  /** Open (or reuse) a tab for `system` in the given column. */
+  private _openStream(system: string, col?: number): void {
+    let targetCol = col ?? this._lastActiveCol;
+    if (!this._colPlacement(targetCol)) {
+      targetCol = this._placements.length ? this._placements[0].position.col : 0;
+    }
+
+    let tab = this._tabById(this._tabs.find((t) => t.system === system)?.id ?? "");
+    if (!tab) {
+      tab = this._makeTab(system);
+      this._tabs = [...this._tabs, tab];
+      this._moveTab(tab.id, targetCol, -1, true);
       return;
     }
 
-    const tab = this._makeTab(system);
-    this._tabs = [...this._tabs, tab];
-    this._updateCell(target.id, { tabIds: [...target.tabIds, tab.id], activeId: tab.id });
-  }
-
-  private _updateCell(cellId: string, patch: Partial<Cell>): void {
-    this._cells = this._cells.map((c) => (c.id === cellId ? { ...c, ...patch } : c));
-  }
-
-  private _activateTab(cellId: string, tabId: string): void {
-    this._updateCell(cellId, { activeId: tabId });
-  }
-
-  private _closeTab(cellId: string, tabId: string): void {
-    const cell = this._cell(cellId);
-    if (!cell || !cell.tabIds.includes(tabId)) return;
-    const tabIds = cell.tabIds.filter((id) => id !== tabId);
-    const activeId = tabIds.length === 0 ? "" : cell.activeId === tabId ? tabIds[0] : cell.activeId;
-    this._updateCell(cellId, { tabIds, activeId });
-    this._tabs = this._tabs.filter((t) => t.id !== tabId);
-    this._releaseViewer(tabId);
-    if (tabIds.length === 0) this._removeEmptyCell(cellId);
-  }
-
-  private _removeEmptyCell(cellId: string): void {
-    // Never leave zero columns: keep a single empty cell so the "+" is usable.
-    const remaining = this._cells.filter((c) => c.id !== cellId);
-    this._cells = remaining.length > 0 ? remaining : [];
-    this._columnRatios = this._normalizeRatios(this._columnRatios.slice(1));
-    if (this._cells.length === 0) {
-      const fresh = { id: `cell-${_cellSeq++}`, tabIds: [], activeId: "" };
-      this._cells = [fresh];
-      this._columnRatios = [1];
+    const currentCol = this._placements.findIndex((p) => p.tabIds.includes(tab.id));
+    if (currentCol === targetCol && this._colPlacement(targetCol)) {
+      this._activate(targetCol, tab.id);
+    } else {
+      this._moveTab(tab.id, targetCol, -1, true);
     }
   }
 
-  /** Split a cell into two columns (moves it to a fresh right-hand column). */
-  private _splitCell(cellId: string): void {
-    const cell = this._cell(cellId);
-    if (!cell) return;
-    // A fresh column that hosts no tabs yet is opened next to the current cell.
-    const fresh = { id: `cell-${_cellSeq++}`, tabIds: [], activeId: "" };
-    const idx = this._cells.findIndex((c) => c.id === cellId);
-    const cells = [...this._cells.slice(0, idx + 1), fresh, ...this._cells.slice(idx + 1)];
-    this._cells = cells;
-    const ratios = [
-      ...this._columnRatios.slice(0, idx + 1),
-      1,
-      ...this._columnRatios.slice(idx + 1),
-    ];
-    this._columnRatios = this._normalizeRatios(ratios);
-  }
+  // ── Grid event handlers (bubbled from <tab-grid> / <tab-bar>) ─────────
 
-  private _normalizeRatios(ratios: number[]): number[] {
-    if (ratios.length === 0) return [1];
-    const sum = ratios.reduce((a, b) => a + b, 0) || 1;
-    return ratios.map((r) => r / sum);
-  }
+  private _onGridActivate = (e: Event): void => {
+    const detail = (e as CustomEvent).detail ?? {};
+    const tabId = detail.tabId as string | undefined;
+    const col = detail.col as number | undefined;
+    if (!tabId) return;
+    const colNum =
+      typeof col === "number" ? col : this._placements.findIndex((p) => p.tabIds.includes(tabId));
+    this._activate(colNum, tabId);
+  };
+
+  private _onGridFocusCol = (e: Event): void => {
+    const col = (e as CustomEvent).detail?.col as number | undefined;
+    if (typeof col === "number") this._lastActiveCol = col;
+  };
+
+  private _onGridMove = (e: Event): void => {
+    const detail = (e as CustomEvent).detail ?? {};
+    const tabId = detail.tabId as string | undefined;
+    if (!tabId) return;
+    this._moveTab(
+      tabId,
+      Number(detail.targetCol) || 0,
+      Number.isFinite(detail.insertAt) ? detail.insertAt : -1,
+    );
+  };
+
+  private _onGridSplit = (e: Event): void => {
+    const detail = (e as CustomEvent).detail ?? {};
+    const tabId = detail.tabId as string | undefined;
+    if (!tabId) return;
+    this._splitTab(tabId, Number(detail.splitCol) || 0, Boolean(detail.splitLeft));
+  };
+
+  private _onReorder = (e: Event): void => {
+    const detail = (e as CustomEvent).detail ?? {};
+    this._reorder(Number(detail.col) || 0, Number(detail.fromIndex), Number(detail.toIndex));
+  };
+
+  private _onMoveCell = (e: Event): void => {
+    const detail = (e as CustomEvent).detail ?? {};
+    const tabId = detail.tabId as string | undefined;
+    if (!tabId) return;
+    this._moveTab(tabId, Number(detail.targetCol) || 0, Number(detail.dropIndex), true);
+  };
 
   // ── Stream picker ────────────────────────────────────────────────────
 
-  private _openPicker(cellId: string): void {
-    this._pickerFor = cellId;
+  private _openPicker(): void {
+    this._pickerOpen = true;
     this._pickerQuery = "";
   }
 
   private _closePicker(): void {
-    this._pickerFor = null;
+    this._pickerOpen = false;
   }
 
   private _availableStreams(): LogStreamInfo[] {
@@ -263,15 +489,44 @@ export class Openp41geLogsWindow extends LitElement {
     this._detailUnsub = null;
   }
 
-  // ── Viewer mounting ──────────────────────────────────────────────────
+  // ── Viewer mounting into <tab-grid> ──────────────────────────────────
 
-  private _ensureViewer(tab: LogTab, host: HTMLElement): Openp41geLogViewer {
+  private _grid(): TabGrid | null {
+    const grid = this.renderRoot?.querySelector("tab-grid");
+    return grid ? (grid as unknown as TabGrid) : null;
+  }
+
+  /** Mount each tab's log viewer into its <tab-content> controller slot.
+   *  Waits for the grid (and its tab-content children) to finish rendering so
+   *  the controller divs exist before mounting. Idempotent — re-mounts after
+   *  a re-render so viewers follow their tabs when they move columns. */
+  private async _mountViewers(): Promise<void> {
+    const grid = this._grid();
+    if (!grid) return;
+    try {
+      await (grid as unknown as { updateComplete: Promise<void> }).updateComplete;
+      const contents = grid.querySelectorAll("tab-content");
+      await Promise.all(
+        Array.from(contents).map(
+          (tc) => (tc as unknown as { updateComplete: Promise<void> }).updateComplete,
+        ),
+      );
+    } catch {
+      // Defensive: if the grid is mid-teardown, skip this pass.
+    }
+    for (const tab of this._tabs) {
+      if (!this._placements.some((p) => p.tabIds.includes(tab.id))) continue;
+      const viewer = this._ensureViewer(tab);
+      grid.mountController(tab.id, viewer);
+    }
+  }
+
+  private _ensureViewer(tab: LogTab): Openp41geLogViewer {
     let viewer = this._viewers.get(tab.id);
     if (!viewer) {
       viewer = document.createElement(Openp41geLogViewer.tagName) as Openp41geLogViewer;
       viewer.pageReader = new LogFilePageReader();
       viewer.system = tab.system;
-      host.appendChild(viewer);
       this._viewers.set(tab.id, viewer);
     }
     return viewer;
@@ -285,41 +540,16 @@ export class Openp41geLogsWindow extends LitElement {
 
   // ── Render ───────────────────────────────────────────────────────────
 
-  protected firstUpdated(): void {
-    this._attachDetailListeners();
-  }
-
-  protected updated(): void {
-    // Keep each cell's active-tab viewer mounted (and only it visible). The
-    // viewer element is created lazily and reused across re-renders; Lit's
-    // re-render never touches it because it lives inside the stable
-    // .lw-content container rather than being part of the template.
-    for (const cell of this._cells) {
-      const content = this.renderRoot?.querySelector<HTMLElement>(
-        `.lw-content[data-cell="${cell.id}"]`,
-      );
-      if (!content) continue;
-      const tab = this._tab(cell.activeId);
-      if (!tab) continue;
-      const viewer = this._ensureViewer(tab, content);
-      content.querySelectorAll<HTMLElement>("openp41ge-log-viewer").forEach((v) => {
-        v.style.display = v === viewer ? "flex" : "none";
-        if (v === viewer) {
-          v.style.flex = "1";
-          v.style.minHeight = "0";
-        }
-      });
-    }
+  private _tabData(): Record<string, { title: string; content: string; pinned: boolean }> {
+    const data: Record<string, { title: string; content: string; pinned: boolean }> = {};
+    for (const t of this._tabs) data[t.id] = { title: t.title, content: "", pinned: true };
+    return data;
   }
 
   render(): TemplateResult {
     const isMac =
       typeof window !== "undefined" &&
       (window.openp41ge?.platform === "darwin" || navigator.platform.startsWith("Mac"));
-    const ratios =
-      this._columnRatios.length === this._cells.length
-        ? this._columnRatios
-        : this._normalizeRatios(this._columnRatios.concat([1]));
 
     return html`
       <style>
@@ -401,106 +631,29 @@ export class Openp41geLogsWindow extends LitElement {
         .lw-grid {
           flex: 1;
           min-height: 0;
+          position: relative;
           display: flex;
           overflow: hidden;
         }
-        .lw-cell {
-          display: flex;
-          flex-direction: column;
+        .lw-grid tab-grid {
+          flex: 1;
           min-width: 0;
           min-height: 0;
-          overflow: hidden;
-          border-right: 1px solid var(--border-divider, #232323);
-        }
-        .lw-cell:last-child {
-          border-right: none;
-        }
-        .lw-tabbar {
-          flex-shrink: 0;
-          height: 36px;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          padding: 0 6px;
-          border-bottom: 1px solid var(--border-divider, #2d2d2d);
-          background: var(--bg-secondary, #161616);
-          overflow-x: auto;
-          box-sizing: border-box;
-        }
-        .lw-tabbar::-webkit-scrollbar {
-          height: 0;
-        }
-        .lw-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          height: 26px;
-          padding: 0 8px;
-          border: 1px solid transparent;
-          border-radius: 5px;
-          color: var(--text-secondary, #999);
-          font-size: 12px;
-          font-family: var(--font-ui, sans-serif);
-          cursor: pointer;
-          white-space: nowrap;
-          flex-shrink: 0;
-          user-select: none;
-        }
-        .lw-chip:hover {
-          background: var(--bg-hover, #262626);
-        }
-        .lw-chip.lw-active {
-          background: var(--bg-hover, #262626);
-          color: var(--text-primary, #e0e0e0);
-          border-color: var(--border-divider, #333);
-        }
-        .lw-chip .lw-close {
-          display: inline-flex;
-          width: 14px;
-          height: 14px;
-          align-items: center;
-          justify-content: center;
-          border-radius: 3px;
-          color: var(--text-muted, #888);
-          font-size: 10px;
-          line-height: 1;
-        }
-        .lw-chip .lw-close:hover {
-          background: var(--danger, #e81123);
-          color: #fff;
-        }
-        .lw-add {
-          flex-shrink: 0;
-          width: 26px;
-          height: 26px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid var(--border-divider, #333);
-          border-radius: 5px;
-          color: var(--text-secondary, #aaa);
-          font-size: 14px;
-          font-family: var(--font-ui, sans-serif);
-          cursor: pointer;
-        }
-        .lw-add:hover {
-          background: var(--bg-hover, #262626);
-        }
-        .lw-content {
-          flex: 1;
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
+          display: block;
         }
         .lw-empty {
-          flex: 1;
+          position: absolute;
+          inset: 0;
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
+          gap: 10px;
           color: var(--text-muted, #888);
           font-size: 12px;
           font-style: italic;
+          pointer-events: none;
+          background: var(--bg-primary, #1e1e1e);
         }
         .lw-drawer-mask {
           position: absolute;
@@ -626,13 +779,21 @@ export class Openp41geLogsWindow extends LitElement {
       </style>
 
       <div class="lw-root">
-        <div class="lw-titlebar">
-          ${isMac ? nothing : html``}
+        <div class="lw-titlebar" style="padding-left: ${isMac ? "82px" : "10px"}">
           <span class="lw-title">Logs</span>
           <button
             type="button"
             class="lw-btn"
-            @click=${() => this._splitCell(this._cells[0]?.id ?? "")}
+            data-testid="lw-add-stream"
+            @click=${this._openPicker}
+          >
+            ＋ Stream
+          </button>
+          <button
+            type="button"
+            class="lw-btn"
+            data-testid="lw-add-column"
+            @click=${this._addColumn}
           >
             ＋ Column
           </button>
@@ -651,20 +812,42 @@ export class Openp41geLogsWindow extends LitElement {
         </div>
 
         <div class="lw-grid">
-          ${this._cells.map((cell, i) => this._renderCell(cell, i, ratios[i] ?? 1))}
+          <tab-grid
+            .winId=${WIN_ID}
+            .cols=${this._cols}
+            .placements=${this._placements}
+            .tabData=${this._tabData()}
+            .activeTabIds=${this._activeTabIds}
+            @grid-activate=${this._onGridActivate}
+            @grid-focus-col=${this._onGridFocusCol}
+            @grid-move=${this._onGridMove}
+            @grid-split=${this._onGridSplit}
+            @tab-bar-reorder=${this._onReorder}
+            @tab-bar-move-cell=${this._onMoveCell}
+          ></tab-grid>
           ${
-            this._cells.length === 0
-              ? html`<div class="lw-empty">No log columns — use ＋ Column to add one.</div>`
+            this._tabs.length === 0
+              ? html`<div class="lw-empty" data-testid="lw-empty">
+                  <span>No log streams open.</span>
+                  <button
+                    type="button"
+                    class="lw-btn"
+                    style="pointer-events:auto"
+                    @click=${this._openPicker}
+                  >
+                    ＋ Open a stream
+                  </button>
+                </div>`
               : nothing
           }
         </div>
       </div>
 
       ${
-        this._pickerFor
+        this._pickerOpen
           ? html`
               <div class="lw-drawer-mask" @click=${this._closePicker}></div>
-              <aside class="lw-drawer">
+              <aside class="lw-drawer" data-testid="lw-picker">
                 <div class="lw-drawer-head">
                   <span>Open a log stream</span>
                   <button
@@ -687,7 +870,7 @@ export class Openp41geLogsWindow extends LitElement {
                 <div class="lw-picker-list" data-testid="lw-picker-list">
                   ${
                     this._availableStreams().length === 0
-                      ? html`<div class="lw-empty">No streams match.</div>`
+                      ? html`<div class="lw-empty" style="position:static">No streams match.</div>`
                       : this._availableStreams().map((s) => this._pickerRow(s))
                   }
                 </div>
@@ -737,74 +920,11 @@ export class Openp41geLogsWindow extends LitElement {
     `;
   }
 
-  private _renderCell(cell: Cell, index: number, ratio: number): TemplateResult {
-    const active = this._tab(cell.activeId);
-    return html`
-      <div class="lw-cell" style="flex: ${ratio}" data-testid="lw-cell">
-        <div class="lw-tabbar">
-          ${cell.tabIds.map((tid) => this._tabChip(cell, tid))}
-          <button
-            type="button"
-            class="lw-add"
-            data-testid="lw-add"
-            title="Open a log stream"
-            @click=${() => this._openPicker(cell.id)}
-          >
-            ＋
-          </button>
-          <button
-            type="button"
-            class="lw-add"
-            title="Split into a new column"
-            data-testid="lw-split"
-            @click=${() => this._splitCell(cell.id)}
-          >
-            ▥
-          </button>
-        </div>
-        <div class="lw-content" data-cell=${cell.id}>
-          ${
-            active
-              ? nothing
-              : html`<div class="lw-empty">No tab open — press ＋ to open a stream.</div>`
-          }
-        </div>
-      </div>
-    `;
-  }
-
-  private _tabChip(cell: Cell, tabId: string): TemplateResult | typeof nothing {
-    const tab = this._tab(tabId);
-    if (!tab) return nothing;
-    return html`
-      <div
-        class="lw-chip${tabId === cell.activeId ? " lw-active" : ""}"
-        data-testid="lw-chip"
-        @click=${() => this._activateTab(cell.id, tabId)}
-      >
-        <span class="lw-chip-label">${this._escape(tab.title)}</span>
-        <span
-          class="lw-close"
-          role="button"
-          aria-label="Close tab"
-          @click=${(e: Event) => {
-            e.stopPropagation();
-            this._closeTab(cell.id, tabId);
-          }}
-        >
-          ×
-        </span>
-      </div>
-    `;
-  }
-
-  /** Renders a (re-)mountable host element so Lit doesn't clobber the live
-   *  viewer DOM between re-renders. The viewer is created lazily and reused. */
+  /** Renders a stream picker row. */
   private _pickerRow(s: LogStreamInfo): TemplateResult {
     const open = (): void => {
-      const forCell = this._pickerFor;
       this._closePicker();
-      this._openStream(s.system, forCell);
+      this._openStream(s.system);
     };
     return html`
       <div class="lw-picker-row" data-testid="lw-picker-row" @click=${open}>
