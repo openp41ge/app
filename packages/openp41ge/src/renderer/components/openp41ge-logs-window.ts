@@ -160,6 +160,11 @@ export class Openp41geLogsWindow extends LitElement {
     this._sidebarOpen = !this._sidebarOpen;
   };
 
+  /** Titlebar sidebar toggle button — same action as Cmd/Ctrl+B. */
+  private _toggleSidebar = (): void => {
+    this._sidebarOpen = !this._sidebarOpen;
+  };
+
   /** Attach the floating OverlayScrollbar to the sidebar's stream list once the
    *  list is rendered. Idempotent. */
   private _attachSidebarScrollbar(): void {
@@ -621,13 +626,13 @@ export class Openp41geLogsWindow extends LitElement {
         }
         .lw-titlebar {
           flex-shrink: 0;
-          height: 40px;
+          height: 35px;
           display: flex;
           align-items: center;
           gap: 8px;
           padding: 0 10px;
           border-bottom: 1px solid var(--border-divider, #2d2d2d);
-          background: var(--bg-primary, #1e1e1e);
+          background: var(--bg-gutter, #161616);
           -webkit-app-region: drag;
           user-select: none;
         }
@@ -635,8 +640,29 @@ export class Openp41geLogsWindow extends LitElement {
           flex: 1;
         }
         .lw-titlebar button,
-        .lw-winbtn {
+        .lw-winbtn,
+        .lw-sidebar-btn {
           -webkit-app-region: no-drag;
+        }
+        /* Right-sidebar toggle (mirrors the workspace titlebar's tb-btn). */
+        .lw-sidebar-btn {
+          width: 28px;
+          height: 28px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
+          cursor: pointer;
+          color: var(--text-secondary, #999);
+          transition:
+            color 0.12s ease,
+            background 0.12s ease;
+          margin-right: 4px;
+        }
+        .lw-sidebar-btn:hover {
+          background: var(--hover-bg, rgba(128, 128, 128, 0.15));
+          color: var(--text-primary, #ccc);
         }
         .lw-btn {
           display: inline-flex;
@@ -910,6 +936,23 @@ export class Openp41geLogsWindow extends LitElement {
       <div class="lw-root">
         <div class="lw-titlebar" style="padding-left: ${isMac ? "82px" : "10px"}">
           <span class="lw-spacer"></span>
+          <!-- Right sidebar toggle (same button as the workspace titlebar) -->
+          <div
+            class="lw-sidebar-btn"
+            title=${this._sidebarOpen ? "Close sidebar" : "Open sidebar"}
+            data-testid="lw-sidebar-toggle"
+            @click=${this._toggleSidebar}
+          >
+            <svg width="18" height="18" viewBox="0 -960 960 960" fill="currentColor">
+              <path
+                d="${
+                  this._sidebarOpen
+                    ? "M300-640v320l160-160-160-160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm440-80h120v-560H640v560Zm-80 0v-560H200v560h360Zm80 0h120-120Z"
+                    : "M460-320v-320L300-480l160 160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm440-80h120v-560H640v560Zm-80 0v-560H200v560h360Zm80 0h120-120Z"
+                }"
+              ></path>
+            </svg>
+          </div>
           ${
             isMac
               ? nothing

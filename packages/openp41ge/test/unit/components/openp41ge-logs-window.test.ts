@@ -293,4 +293,32 @@ describe("openp41ge-logs-window", () => {
     expect(systems).toContain("sys-b");
     el.remove();
   });
+
+  it("toggles the sidebar from the titlebar button", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    const btn = (el.shadowRoot as unknown as ShadowRoot).querySelector<HTMLElement>(
+      '[data-testid="lw-sidebar-toggle"]',
+    );
+    expect(btn).toBeTruthy();
+    expect(
+      (el.shadowRoot as unknown as ShadowRoot).querySelector('[data-testid="lw-sidebar"]'),
+    ).toBeNull();
+
+    btn!.click();
+    await el.updateComplete;
+    expect(
+      (el.shadowRoot as unknown as ShadowRoot).querySelector('[data-testid="lw-sidebar"]'),
+    ).toBeTruthy();
+
+    btn!.click();
+    await el.updateComplete;
+    expect(
+      (el.shadowRoot as unknown as ShadowRoot).querySelector('[data-testid="lw-sidebar"]'),
+    ).toBeNull();
+    el.remove();
+  });
 });
