@@ -32,7 +32,6 @@ import { ConfigService } from "../services/config-service";
 import { FileOpenHandler } from "../services/file-open-handler";
 import { CommitOpenHandler } from "../services/commit-open-handler";
 import { AgentsOpenHandler } from "../services/agents-open-handler";
-import { LogOpenHandler } from "../services/log-open-handler";
 import { SettingsOpenHandler } from "../services/settings-open-handler";
 import { SettingsDrawerOpenHandler } from "../services/settings-drawer-open-handler";
 import { ContextMenuBuilder } from "../services/context-menu-builder";
@@ -59,7 +58,6 @@ export class StartupContext {
   readonly fileOpenHandler: IFileOpenHandler;
   readonly commitOpenHandler: CommitOpenHandler;
   readonly agentsOpenHandler: AgentsOpenHandler;
-  readonly logOpenHandler: LogOpenHandler;
   readonly settingsOpenHandler: SettingsOpenHandler;
   readonly settingsDrawerOpenHandler: SettingsDrawerOpenHandler;
   readonly contextMenuBuilder: IContextMenuBuilder;
@@ -120,7 +118,6 @@ export class StartupContext {
     this.fileOpenHandler = new FileOpenHandler();
     this.commitOpenHandler = new CommitOpenHandler();
     this.agentsOpenHandler = new AgentsOpenHandler();
-    this.logOpenHandler = new LogOpenHandler();
     this.settingsOpenHandler = new SettingsOpenHandler();
     this.settingsDrawerOpenHandler = new SettingsDrawerOpenHandler();
     this.contextMenuBuilder = new ContextMenuBuilder();
@@ -143,7 +140,6 @@ export class StartupContext {
     this.fileOpenHandler.init(this.commandBus, this.workspaceState, this.tabMountManager);
     this.commitOpenHandler.init(this.commandBus, this.workspaceState);
     this.agentsOpenHandler.init(this.commandBus, this.workspaceState);
-    this.logOpenHandler.init(this.commandBus, this.workspaceState);
     this.settingsOpenHandler.init(this.commandBus, this.workspaceState);
     this.fileDropHandler.init(this.commandBus);
 

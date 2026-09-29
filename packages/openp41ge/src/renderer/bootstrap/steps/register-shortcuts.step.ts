@@ -280,22 +280,6 @@ export class RegisterShortcutsStep implements IStartupStep {
       category: "File",
     });
 
-    // ── App logs (Cmd+Shift+D) ───────────────────────────────────────
-    // Opens the Logs sidebar (the overlay's Logs tab was replaced by the
-    // sidebar + grid log tabs).
-    km.register({
-      modifiers: 12, // Meta + Shift
-      key: "d",
-      code: "KeyD",
-      handler: () => {
-        const winId = window.openp41ge?.workspace?.getWindowId?.();
-        if (!winId) return;
-        window.openp41ge.workspace.dispatch("openSystemTab", winId, "right", "logs", "Logs");
-      },
-      description: "Open Logs sidebar",
-      category: "Debug",
-    });
-
     // ── Global keydown listener ─────────────────────────────────────
     document.addEventListener("keydown", (e) => {
       km.handleKeyDown(e);

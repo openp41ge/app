@@ -224,15 +224,12 @@ export const renderer = {
     log.info("starting renderer");
 
     // Seed a debug session when OPENP41GE_DEBUG=1 (build) or
-    // localStorage["openp41ge-debug"]="1": capture DEBUG, open the Logs tab.
+    // localStorage["openp41ge-debug"]="1": capture DEBUG, open the Logs window.
     if (isDebugSeed()) {
       log.info("debug session seeded by environment flag");
       setMinLevel(LogLevel.DEBUG);
       window.openp41ge?.logs?.setDebug?.(true);
-      const winId = window.openp41ge?.workspace?.getWindowId?.();
-      if (winId) {
-        window.openp41ge.workspace.dispatch("openSystemTab", winId, "right", "logs", "Logs");
-      }
+      window.openp41ge?.windowManager?.openLogsWindow?.();
     }
 
     // Inject global Tailwind utility classes before any UI renders

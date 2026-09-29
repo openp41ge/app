@@ -92,17 +92,6 @@ export class SettingsDrawerOpenHandler {
         );
         break;
       }
-      case "logs-settings": {
-        host.openSurface(
-          singleSettingsSurface(
-            detail.title ?? "Logs",
-            document.createElement("openp41ge-logs-settings"),
-            appType,
-          ),
-          side,
-        );
-        break;
-      }
       case "git-settings": {
         host.openSurface(
           singleSettingsSurface(

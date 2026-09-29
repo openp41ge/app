@@ -11,7 +11,6 @@
 import { FileEditorSettingsTabController } from "./file-editor-settings-tab";
 import { AgentSettingsTabController } from "./agent-settings-tab";
 import { HistorySettingsTabController } from "./git-settings-tab";
-import { LogsSettingsTabController } from "./logs-settings-tab";
 import type { SystemTabSettings } from "../../controllers/types";
 
 /** Explorer tab's settings → the built-in file editor settings. */
@@ -42,14 +41,4 @@ export const gitSettings: SystemTabSettings = {
   description: "Configure the History panel",
   openEvent: "openp41ge:open-git-settings",
   createController: (tabId) => new HistorySettingsTabController(tabId),
-};
-
-/** Logs tab's settings. */
-export const logsSettings: SystemTabSettings = {
-  appType: "logs-settings",
-  label: "Logs",
-  icon: "⚙",
-  description: "Configure the Logs panel",
-  openEvent: "openp41ge:open-logs-settings",
-  createController: (tabId) => new LogsSettingsTabController(tabId),
 };

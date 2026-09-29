@@ -532,7 +532,7 @@ function onLogStreamMouseDown(e: MouseEvent): void {
   // never start a drag or interrupt an existing one.
   if (e.button !== 0) return;
 
-  // Logs sidebar rows are built in the light DOM by LogsSystemTabController.
+  // Log-stream sidebar rows (retired Logs system tab) were built in the light DOM.
   const row = e
     .composedPath()
     .find(

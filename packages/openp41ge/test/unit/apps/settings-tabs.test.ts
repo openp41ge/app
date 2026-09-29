@@ -8,7 +8,6 @@
 import { describe, it, expect } from "vitest";
 import { FileEditorSettingsTabController } from "@openp41ge/renderer/apps/settings/file-editor-settings-tab";
 import { AgentSettingsTabController } from "@openp41ge/renderer/apps/settings/agent-settings-tab";
-import { LogsSettingsTabController } from "@openp41ge/renderer/apps/settings/logs-settings-tab";
 
 describe("settings tab controllers", () => {
   it("mounts the file-editor settings element", () => {
@@ -25,14 +24,6 @@ describe("settings tab controllers", () => {
     const container = document.createElement("div");
     ctrl.mount(container);
     expect(container.querySelector("openp41ge-agent-settings")).not.toBeNull();
-    ctrl.unmount();
-  });
-
-  it("mounts the logs settings element", () => {
-    const ctrl = new LogsSettingsTabController("t4");
-    const container = document.createElement("div");
-    ctrl.mount(container);
-    expect(container.querySelector("openp41ge-logs-settings")).not.toBeNull();
     ctrl.unmount();
   });
 

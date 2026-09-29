@@ -56,11 +56,6 @@ export class RegisterEventListenersStep implements IStartupStep {
       context.agentsOpenHandler.handleOpenSearchResultFile(e);
     }) as EventListener);
 
-    // Log-system open events (Logs sidebar rows)
-    document.addEventListener("openp41ge:open-log-system", ((e: CustomEvent) => {
-      context.logOpenHandler.handleOpenLogSystem(e);
-    }) as EventListener);
-
     // Settings open events — one listener per sidebar tab's *unique* settings
     // event, so each tab opens exactly its own settings grid tab.
     for (const reg of allSystemTabRegistrations) {
@@ -79,9 +74,6 @@ export class RegisterEventListenersStep implements IStartupStep {
       context.settingsDrawerOpenHandler.handleOpenDrawer(e);
     }) as EventListener);
     document.addEventListener("openp41ge:open-explorer-settings-drawer", ((e: CustomEvent) => {
-      context.settingsDrawerOpenHandler.handleOpenDrawer(e);
-    }) as EventListener);
-    document.addEventListener("openp41ge:open-logs-settings-drawer", ((e: CustomEvent) => {
       context.settingsDrawerOpenHandler.handleOpenDrawer(e);
     }) as EventListener);
     document.addEventListener("openp41ge:open-git-settings-drawer", ((e: CustomEvent) => {

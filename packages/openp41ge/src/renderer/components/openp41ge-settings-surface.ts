@@ -2,8 +2,8 @@
  * <openp41ge-settings-surface> — generic single-pane settings surface for the
  * "negative drawer" host.
  *
- * Hosts an existing settings component (e.g. <openp41ge-file-editor-settings>,
- * <openp41ge-logs-settings>) as the base drawer layer. The same content a
+ * Hosts an existing settings component (e.g. <openp41ge-file-editor-settings>)
+ * as the base drawer layer. The same content a
  * grid-tab settings shell would render is shown over the grid instead. There
  * are no sub-drawers; the host still provides the head (+ close button) and the
  * shared resize handle.

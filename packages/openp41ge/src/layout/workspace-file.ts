@@ -59,7 +59,7 @@ export function emptyWorkspaceSession(): WorkspaceSession {
 }
 
 /** System-tab appTypes that have been removed from the product. */
-const OBSOLETE_SYSTEM_TAB_APPTYPES = new Set(["search"]);
+const OBSOLETE_SYSTEM_TAB_APPTYPES = new Set(["search", "logs"]);
 
 /**
  * Strip system tabs whose appType is no longer a registered sidebar panel
