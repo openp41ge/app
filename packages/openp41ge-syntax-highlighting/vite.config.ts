@@ -8,10 +8,13 @@ export default defineConfig({
         "textmate-init": new URL("./src/textmate-init.ts", import.meta.url).pathname,
         "token-registry": new URL("./src/token-registry.ts", import.meta.url).pathname,
         "line-tokens": new URL("./src/line-tokens.ts", import.meta.url).pathname,
-        "lazy-tokenization-manager": new URL("./src/lazy-tokenization-manager.ts", import.meta.url).pathname,
-        "tokenizer": new URL("./src/tokenizer.ts", import.meta.url).pathname,
-        "contiguous-tokens-store": new URL("./src/contiguous-tokens-store.ts", import.meta.url).pathname,
-        "encoded-token-attributes": new URL("./src/encoded-token-attributes.ts", import.meta.url).pathname,
+        "lazy-tokenization-manager": new URL("./src/lazy-tokenization-manager.ts", import.meta.url)
+          .pathname,
+        tokenizer: new URL("./src/tokenizer.ts", import.meta.url).pathname,
+        "contiguous-tokens-store": new URL("./src/contiguous-tokens-store.ts", import.meta.url)
+          .pathname,
+        "encoded-token-attributes": new URL("./src/encoded-token-attributes.ts", import.meta.url)
+          .pathname,
       },
       formats: ["es"],
       fileName: (_format, entryName) => `${entryName}.js`,

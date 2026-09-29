@@ -44,16 +44,39 @@ describe("buildInlineDiffFile", () => {
     // Post-commit file: line 1 → L1, line 9 → L9.
     const content = "L1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nL9\nl10\n";
     const file = buildInlineDiffFile(content, [
-      { header: "@@ -1,2 +1,2 @@", lines: [{ type: "-", text: "l1" }, { type: "+", text: "L1" }, { type: " ", text: "l2" }] },
-      { header: "@@ -9,2 +9,2 @@", lines: [{ type: "-", text: "l9" }, { type: "+", text: "L9" }, { type: " ", text: "l10" }] },
+      {
+        header: "@@ -1,2 +1,2 @@",
+        lines: [
+          { type: "-", text: "l1" },
+          { type: "+", text: "L1" },
+          { type: " ", text: "l2" },
+        ],
+      },
+      {
+        header: "@@ -9,2 +9,2 @@",
+        lines: [
+          { type: "-", text: "l9" },
+          { type: "+", text: "L9" },
+          { type: " ", text: "l10" },
+        ],
+      },
     ]);
     expect(file.rows).toHaveLength(12);
     expect(file.text).toBe("l1\nL1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nL9\nl10");
 
     expect(file.rows.map((r) => r.kind)).toEqual([
-      "removed", "added", "context",
-      "context", "context", "context", "context", "context", "context",
-      "removed", "added", "context",
+      "removed",
+      "added",
+      "context",
+      "context",
+      "context",
+      "context",
+      "context",
+      "context",
+      "context",
+      "removed",
+      "added",
+      "context",
     ]);
     // Context rows keep honest old|new (both equal on unchanged lines), and the
     // gap lines l3..l8 are all present with their real numbers.
@@ -67,7 +90,10 @@ describe("buildInlineDiffFile", () => {
     const file = buildInlineDiffFile(content, [
       {
         header: "@@ -2,2 +2,0 @@",
-        lines: [{ type: "-", text: "remove me" }, { type: "-", text: "remove me two" }],
+        lines: [
+          { type: "-", text: "remove me" },
+          { type: "-", text: "remove me two" },
+        ],
       },
     ]);
     expect(file.text).toBe("keep\nremove me\nremove me two\nstill here");
@@ -83,7 +109,13 @@ describe("buildInlineDiffFile", () => {
 
   it("wholly-new file rows have a new number but no old line", () => {
     const file = buildInlineDiffFile("fresh one\nfresh two\n", [
-      { header: "@@ -0,0 +1,2 @@", lines: [{ type: "+", text: "fresh one" }, { type: "+", text: "fresh two" }] },
+      {
+        header: "@@ -0,0 +1,2 @@",
+        lines: [
+          { type: "+", text: "fresh one" },
+          { type: "+", text: "fresh two" },
+        ],
+      },
     ]);
     expect(file.rows).toEqual([
       { kind: "added", oldLine: null, newLine: 1 },
@@ -104,7 +136,13 @@ describe("buildInlineDiffFile", () => {
 
   it("a deleted file keeps only its removed rows (no new side)", () => {
     const file = buildInlineDiffFile("", [
-      { header: "@@ -1,2 +0,0 @@", lines: [{ type: "-", text: "gone" }, { type: "-", text: "gone two" }] },
+      {
+        header: "@@ -1,2 +0,0 @@",
+        lines: [
+          { type: "-", text: "gone" },
+          { type: "-", text: "gone two" },
+        ],
+      },
     ]);
     expect(file.rows.map((r) => r.kind)).toEqual(["removed", "removed"]);
     // new side is empty → no new number.

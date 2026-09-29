@@ -93,7 +93,7 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     const footer = el.querySelector(".exs-footer");
     expect(footer).toBeTruthy();
     expect(footer.querySelector(".exs-toggle")).toBeTruthy();
-    const sortBtn = footer.querySelector(".exs-footer-btn[aria-label=\"Sort keys\"]");
+    const sortBtn = footer.querySelector('.exs-footer-btn[aria-label="Sort keys"]');
     expect(sortBtn).toBeTruthy();
     expect(sortBtn.getAttribute("aria-label")).toBe("Sort keys");
     expect(sortBtn.disabled).toBe(false);
@@ -223,10 +223,7 @@ describe("openp41ge-explorer-settings — Explorer settings JSON editor", () => 
     await tick();
     head(el).querySelector(".sdw-save").click();
     await tick();
-    expect(fake.sets.map((s) => s.key)).toEqual([
-      "explorer.indentSize",
-      "explorer.prefetchDepth",
-    ]);
+    expect(fake.sets.map((s) => s.key)).toEqual(["explorer.indentSize", "explorer.prefetchDepth"]);
     // The staged document is reflected back in sorted order.
     expect(Object.keys(el._overrides)).toEqual(["indentSize", "prefetchDepth"]);
   });

@@ -31,9 +31,7 @@ function setup() {
 }
 
 function leftLabels(): HTMLElement[] {
-  return [
-    ...document.querySelectorAll("#content .fe-inline-left .fe-inline-left-label"),
-  ];
+  return [...document.querySelectorAll("#content .fe-inline-left .fe-inline-left-label")];
 }
 
 function leftTops(): string[] {
@@ -150,7 +148,7 @@ describe("InlineDiffGutterColumns", () => {
 
     // Fake wrap mapping: line 1 -> view 1 (1 segment), line 2 -> view 2
     // spanning THREE segments, line 3 -> view 5 (1 segment).
-    const viewStart = (m: number) => ({ 1: 1, 2: 2, 3: 5 }[m] ?? m);
+    const viewStart = (m: number) => ({ 1: 1, 2: 2, 3: 5 })[m] ?? m;
     const viewCount = (m: number) => (m === 2 ? 3 : 1);
     cols.setVisibleRange(1, 3, viewStart, viewCount);
 
@@ -205,13 +203,23 @@ describe("InlineDiffGutterColumns", () => {
   test("re-painting the same band range is a no-op (no style/text/class writes)", async () => {
     const { cols } = setup();
     cols.setSizes(LH, 50);
-    cols.setRows({ infoFor: (line) => ({ leftLabel: String(line), cls: line % 2 === 0 ? "fe-inline-removed-cell" : "" }) });
+    cols.setRows({
+      infoFor: (line) => ({
+        leftLabel: String(line),
+        cls: line % 2 === 0 ? "fe-inline-removed-cell" : "",
+      }),
+    });
     cols.setVisibleRange(3, 7);
 
     const container = document.querySelector(".fe-inline-left")!;
     const records: MutationRecord[] = [];
     const mo = new MutationObserver((rs) => records.push(...rs));
-    mo.observe(container, { subtree: true, childList: true, attributes: true, characterData: true });
+    mo.observe(container, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
 
     cols.setVisibleRange(3, 7);
     await new Promise((r) => setTimeout(r, 0));
@@ -230,7 +238,12 @@ describe("InlineDiffGutterColumns", () => {
 
     const records: MutationRecord[] = [];
     const mo = new MutationObserver((rs) => records.push(...rs));
-    mo.observe(container, { subtree: true, childList: true, attributes: true, characterData: true });
+    mo.observe(container, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
 
     cols.setVisibleRange(4, 7);
     await new Promise((r) => setTimeout(r, 0));
@@ -241,9 +254,14 @@ describe("InlineDiffGutterColumns", () => {
     );
     // Count CELL-level additions/removals (textContent of the fresh cell also
     // produces a childList record on that same new element — allowed).
-    const isCell = (n: Node) => n instanceof Element && n.classList.contains("fe-inline-left-label");
-    const cellAdds = records.filter((r) => r.type === "childList" && [...r.addedNodes].some(isCell));
-    const cellRemoves = records.filter((r) => r.type === "childList" && [...r.removedNodes].some(isCell));
+    const isCell = (n: Node) =>
+      n instanceof Element && n.classList.contains("fe-inline-left-label");
+    const cellAdds = records.filter(
+      (r) => r.type === "childList" && [...r.addedNodes].some(isCell),
+    );
+    const cellRemoves = records.filter(
+      (r) => r.type === "childList" && [...r.removedNodes].some(isCell),
+    );
     expect(attrMutations).toEqual([]); // existing cells untouched
     expect(cellAdds.length).toBe(1); // line 7 entered
     expect(cellRemoves.length).toBe(1); // line 3 left
@@ -263,7 +281,12 @@ describe("InlineDiffGutterColumns", () => {
     const container = document.querySelector(".fe-inline-left")!;
     const records: MutationRecord[] = [];
     const mo = new MutationObserver((rs) => records.push(...rs));
-    mo.observe(container, { subtree: true, childList: true, attributes: true, characterData: true });
+    mo.observe(container, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
 
     cols.setVisibleRange(1, 4);
     await new Promise((r) => setTimeout(r, 0));

@@ -66,7 +66,11 @@ import {
 } from "openp41ge-editor-engine/themes";
 import type { SyntaxTheme } from "openp41ge-editor-engine/themes";
 import { InlineDiffHighlightsRenderer, type InlineDiffRow } from "./inline-diff-highlights";
-import { makeFeNumberColumn, makeFeDiffBeforeColumn, type FeGutterRowData } from "./fe-gutter-columns";
+import {
+  makeFeNumberColumn,
+  makeFeDiffBeforeColumn,
+  type FeGutterRowData,
+} from "./fe-gutter-columns";
 import { computeFoldRegions, type FoldRegion } from "./fe-fold";
 import { ClipboardHandler } from "openp41ge-editor-engine/input/clipboard-handler";
 import { CompositionHandler } from "openp41ge-editor-engine/input/composition-handler";
@@ -433,8 +437,7 @@ export class FileEditorElement extends LitElement {
     if (this._inlineRows && row) {
       // AFTER (middle) — the new file number. Full on context + added rows; a
       // GAP where the line has no new side (a deletion).
-      afterLabel =
-        row.kind !== "removed" && row.newLine != null ? String(row.newLine) : "";
+      afterLabel = row.kind !== "removed" && row.newLine != null ? String(row.newLine) : "";
     }
     const afterParts: string[] = [];
     if (row?.kind === "added") afterParts.push("fe-inline-added-cell");
@@ -552,7 +555,8 @@ export class FileEditorElement extends LitElement {
     this._collapsedHeaders.clear();
     this._hiddenLines.clear();
     if (this._foldRecomputeFrame !== null) {
-      if (typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(this._foldRecomputeFrame);
+      if (typeof cancelAnimationFrame !== "undefined")
+        cancelAnimationFrame(this._foldRecomputeFrame);
       this._foldRecomputeFrame = null;
     }
     this._viewLines?.setHiddenLines(null);
@@ -578,8 +582,7 @@ export class FileEditorElement extends LitElement {
   /** Push the current hidden-line set into the view layer and refresh. */
   private _applyFolds(): void {
     if (!this._viewLines || !this._viewModel) return;
-    const hidden =
-      this._foldEnabled && this._hiddenLines.size > 0 ? this._hiddenLines : null;
+    const hidden = this._foldEnabled && this._hiddenLines.size > 0 ? this._hiddenLines : null;
     this._viewLines.setHiddenLines(hidden);
     this._clampCursorToVisible();
     const start = this._viewLines.startLineNumber || 1;
@@ -1882,7 +1885,6 @@ export class FileEditorElement extends LitElement {
     const initialLineCount = Math.min(model.lineCount, 100);
     this._syncGutterBand(1, initialLineCount);
 
-
     // Listen for model content changes (edits, undo, redo)
     model.onDidChangeContent((event: TextContentChangeEvent) => {
       // An undo/redo back to the pristine document fires with versionId 0;
@@ -2558,10 +2560,7 @@ export class FileEditorElement extends LitElement {
     // are already handled by _onCursorChange for local edits. Calling it here
     // would place an unwanted cursor in inactive tabs sharing this model.
     if (this._viewLines.startLineNumber && this._viewLines.endLineNumber) {
-      this._syncGutterBand(
-        this._viewLines.startLineNumber,
-        this._viewLines.endLineNumber,
-      );
+      this._syncGutterBand(this._viewLines.startLineNumber, this._viewLines.endLineNumber);
     }
   }
 

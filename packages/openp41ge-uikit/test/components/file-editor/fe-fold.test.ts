@@ -30,16 +30,12 @@ describe("computeFoldRegions", () => {
   });
 
   test("a single nested block yields one region", () => {
-    const regions = computeFoldRegions(
-      providerOf(["const x = {", "  a: 1,", "  b: 2", "};"]),
-    );
+    const regions = computeFoldRegions(providerOf(["const x = {", "  a: 1,", "  b: 2", "};"]));
     expect(regions).toEqual([{ startLine: 1, endLine: 3 }]);
   });
 
   test("nested blocks produce nested (smaller) regions after the header", () => {
-    const regions = computeFoldRegions(
-      providerOf(["a", "  b", "    c", "  d", "e"]),
-    );
+    const regions = computeFoldRegions(providerOf(["a", "  b", "    c", "  d", "e"]));
     // Outer block [1,4] and inner block [2,3].
     expect(regions).toEqual([
       { startLine: 1, endLine: 4 },
@@ -48,9 +44,7 @@ describe("computeFoldRegions", () => {
   });
 
   test("siblings under one parent are separate regions", () => {
-    const regions = computeFoldRegions(
-      providerOf(["a", "  b", "    c", "  d", "    e"]),
-    );
+    const regions = computeFoldRegions(providerOf(["a", "  b", "    c", "  d", "    e"]));
     // `a` folds its whole body [1,5]; `b`'s child block folds [2,3]; `d`'s
     // child block folds [4,5] — the two inner blocks are separate regions.
     expect(regions).toEqual([
@@ -61,9 +55,7 @@ describe("computeFoldRegions", () => {
   });
 
   test("blank lines are ignored for the header/child decision", () => {
-    const regions = computeFoldRegions(
-      providerOf(["a", "  b", "", "  c", "d"]),
-    );
+    const regions = computeFoldRegions(providerOf(["a", "  b", "", "  c", "d"]));
     expect(regions).toEqual([{ startLine: 1, endLine: 4 }]);
   });
 

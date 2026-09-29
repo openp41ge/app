@@ -37,8 +37,7 @@ export class SearchResultsController extends BaseController {
     this.container = container;
 
     const pending = (window as unknown as Record<string, unknown>).__pendingToolResult as
-      | SearchResultsContext
-      | undefined;
+      SearchResultsContext | undefined;
     if (pending && !this._toolName) {
       this._toolName = pending.toolName ?? "";
       this._argsString = pending.argsString ?? "";

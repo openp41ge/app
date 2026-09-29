@@ -5,10 +5,17 @@
  * so no host / DOM / timers are involved.
  */
 import { describe, test, expect, beforeEach, vi } from "vitest";
-import { TooltipController, type TooltipHostLike } from "../../src/components/tooltip/tooltip-controller";
+import {
+  TooltipController,
+  type TooltipHostLike,
+} from "../../src/components/tooltip/tooltip-controller";
 import type { TooltipContent } from "../../src/components/tooltip/content";
 
-function fakeHost(): { host: TooltipHostLike; show: ReturnType<typeof vi.fn>; hide: ReturnType<typeof vi.fn> } {
+function fakeHost(): {
+  host: TooltipHostLike;
+  show: ReturnType<typeof vi.fn>;
+  hide: ReturnType<typeof vi.fn>;
+} {
   const show = vi.fn();
   const hide = vi.fn();
   return { show, hide, host: { show, hide } };

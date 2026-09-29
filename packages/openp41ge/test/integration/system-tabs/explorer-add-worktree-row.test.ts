@@ -131,7 +131,11 @@ describe("Explorer per-repo add-worktree row", () => {
   });
 
   it("does not submit a duplicate branch name on Enter and keeps the repo open", async () => {
-    const item = await makeItem("org/repo", [{ name: "main", branch: "main", path: "/p/main", exists: true }], true);
+    const item = await makeItem(
+      "org/repo",
+      [{ name: "main", branch: "main", path: "/p/main", exists: true }],
+      true,
+    );
     const onAdd = vi.fn();
     item.addEventListener("repo-add-worktree", onAdd as EventListener);
 
@@ -154,7 +158,11 @@ describe("Explorer per-repo add-worktree row", () => {
   });
 
   it("disables the confirm button while the name is a duplicate", async () => {
-    const item = await makeItem("org/repo", [{ name: "main", branch: "main", path: "/p/main", exists: true }], true);
+    const item = await makeItem(
+      "org/repo",
+      [{ name: "main", branch: "main", path: "/p/main", exists: true }],
+      true,
+    );
     const input = await openInput(item);
 
     input.value = "main";

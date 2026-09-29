@@ -49,7 +49,7 @@ describe("drop-line", () => {
     expect(el.getAttribute("orientation")).toBe("horizontal");
     expect(el.getAttribute("overdraw")).toBe("");
     const css = styleOf(el);
-    expect(css).toContain("[overdraw][orientation=\"horizontal\"]");
+    expect(css).toContain('[overdraw][orientation="horizontal"]');
     expect(css).toContain("linear-gradient(to right");
   });
 
@@ -131,7 +131,7 @@ describe("drop-box", () => {
     await el.updateComplete;
     expect(el.getAttribute("fade")).toBe("right");
     const css = styleOf(el);
-    expect(css).toContain("[fade=\"right\"]");
+    expect(css).toContain('[fade="right"]');
     expect(css).toContain("linear-gradient(to right");
 
     el.wash = false;
@@ -304,7 +304,16 @@ describe("drop-box-overdraw", () => {
     expect(g("od-br-v").style.left).toBe("397px");
     expect(g("od-br-v").style.top).toBe("600px");
     // Accents are as thick as the border and become visible once placed.
-    for (const c of ["od-tl-h", "od-tl-v", "od-tr-h", "od-tr-v", "od-bl-h", "od-bl-v", "od-br-h", "od-br-v"])
+    for (const c of [
+      "od-tl-h",
+      "od-tl-v",
+      "od-tr-h",
+      "od-tr-v",
+      "od-bl-h",
+      "od-bl-v",
+      "od-br-h",
+      "od-br-v",
+    ])
       expect(g(c).style.opacity).toBe("1");
     expect(g("od-tl-h").style.getPropertyValue("--overdraw-thickness")).toBe("3px");
     expect(g("od-tl-h").style.getPropertyValue("--overdraw-hold")).toBe("30%");
@@ -315,12 +324,10 @@ describe("drop-box-overdraw", () => {
     // The overdraw tracks the box's rect each frame; drive the frame callback
     // manually so the test can change the box's rect on demand.
     let rafCallback: FrameRequestCallback | null = null;
-    const rafSpy = vi
-      .spyOn(globalThis, "requestAnimationFrame")
-      .mockImplementation((cb) => {
-        rafCallback = cb;
-        return 1;
-      });
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      rafCallback = cb;
+      return 1;
+    });
     const cafSpy = vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(() => {});
     try {
       const host = document.createElement("div");

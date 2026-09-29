@@ -96,9 +96,7 @@ describe("ExplorerSystemTab search", () => {
   beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
-    drawerHost = document.createElement(
-      "openp41ge-settings-drawer-host",
-    ) as unknown as DrawerHost;
+    drawerHost = document.createElement("openp41ge-settings-drawer-host") as unknown as DrawerHost;
     document.body.appendChild(drawerHost);
     workspaceFileService.openFilePath = "/w/test.openp41ge-workspace";
     model = new TestExplorerSearchModel();
@@ -176,9 +174,7 @@ describe("ExplorerSystemTab search", () => {
     // the filter starts inactive (empty terms match everything).
     expect(drawerHost.querySelector("[data-repo-filter-toggle]")).toBeNull();
     expect(tree._repoFilterActive).toBe(false);
-    const termInput = drawerHost.querySelector(
-      "[data-repo-filter-input]",
-    ) as HTMLInputElement;
+    const termInput = drawerHost.querySelector("[data-repo-filter-input]") as HTMLInputElement;
     expect(termInput).not.toBeNull();
 
     // Typing a term keeps only the matching repo in the tree.
@@ -208,9 +204,7 @@ describe("ExplorerSystemTab search", () => {
     expect(drawerHost.querySelectorAll("[data-repo-filter-input]").length).toBe(1);
 
     // Typing in the bottom row auto-appends a fresh empty row below it.
-    const first = drawerHost.querySelector(
-      "[data-repo-filter-input]",
-    ) as HTMLInputElement;
+    const first = drawerHost.querySelector("[data-repo-filter-input]") as HTMLInputElement;
     first.value = "test";
     first.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     await tree.updateComplete;
@@ -237,18 +231,14 @@ describe("ExplorerSystemTab search", () => {
 
   it("presses Return to jump focus to the trailing empty filter row", async () => {
     model.results = [];
-    tree._repos = [
-      { path: "/repo", name: "test-repo", url: "https://github.com/x/test-repo" },
-    ];
+    tree._repos = [{ path: "/repo", name: "test-repo", url: "https://github.com/x/test-repo" }];
     tree._worktreesByRepo = new Map([
       ["test-repo", [{ branch: "main", path: "/repo/main", exists: true }]],
     ]);
     await openSearch(tree);
 
     // Type a term → a fresh empty row appears below it.
-    const first = drawerHost.querySelector(
-      "[data-repo-filter-input]",
-    ) as HTMLInputElement;
+    const first = drawerHost.querySelector("[data-repo-filter-input]") as HTMLInputElement;
     first.value = "test";
     first.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     await tree.updateComplete;
@@ -294,9 +284,7 @@ describe("ExplorerSystemTab search", () => {
 
     // Enter a repo term in the always-visible filter — the search re-runs over
     // only the matching repo/worktree roots.
-    const termInput = drawerHost.querySelector(
-      "[data-repo-filter-input]",
-    ) as HTMLInputElement;
+    const termInput = drawerHost.querySelector("[data-repo-filter-input]") as HTMLInputElement;
     termInput.value = "test";
     termInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     await new Promise((r) => setTimeout(r, 300));
@@ -510,7 +498,9 @@ describe("ExplorerSystemTab search", () => {
     expect(item.filterCase).toBe(false);
 
     // Toggle the case option in the drawer and re-type — the item carries it.
-    const caseBtn = drawerHost.querySelector<HTMLElement>('button[title="Match case (case-sensitive)"]');
+    const caseBtn = drawerHost.querySelector<HTMLElement>(
+      'button[title="Match case (case-sensitive)"]',
+    );
     expect(caseBtn).not.toBeNull();
     caseBtn?.click();
     await new Promise((r) => setTimeout(r, 300)); // debounce re-runs the search

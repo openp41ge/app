@@ -9,16 +9,16 @@ Run all available tooling in sequence to verify the health of the codebase. Alwa
 
 ## Available Tooling
 
-| Tool                         | Command                     | Scope                                                               |
-| ---------------------------- | --------------------------- | ------------------------------------------------------------------- |
-| **Dead code detection**      | `nx knip`                   | All packages — finds unused files, exports, dependencies, and types |
-| **TypeScript type check**    | `nx run-many -t typecheck`  | All packages                                                        |
-| **Lint (oxlint)**           | `nx lint`                   | `packages/` + `demos/` — configured in `.oxlintrc.json` (replaced ESLint to unblock TS 7; oxlint has no `typescript` peer) |
-| **Prettier check**           | `nx format:check`           | All files — config in `.prettierrc`                                 |
-| **Unit + integration tests** | `nx run-many -t test`       | All packages via per-package vitest configs                         |
-| **E2E tests**                | `nx run-many -t e2e`        | Playwright E2E tests across packages                                |
-| **Build**                    | `nx run-many -t build`      | All 17 packages                                                     |
-| **Coverage**                 | `npx vitest run --coverage` | All packages                                                        |
+| Tool                         | Command                     | Scope                                                                                                                      |
+| ---------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Dead code detection**      | `nx knip`                   | All packages — finds unused files, exports, dependencies, and types                                                        |
+| **TypeScript type check**    | `nx run-many -t typecheck`  | All packages                                                                                                               |
+| **Lint (oxlint)**            | `nx lint`                   | `packages/` + `demos/` — configured in `.oxlintrc.json` (replaced ESLint to unblock TS 7; oxlint has no `typescript` peer) |
+| **Prettier check**           | `nx format:check`           | All files — config in `.prettierrc`                                                                                        |
+| **Unit + integration tests** | `nx run-many -t test`       | All packages via per-package vitest configs                                                                                |
+| **E2E tests**                | `nx run-many -t e2e`        | Playwright E2E tests across packages                                                                                       |
+| **Build**                    | `nx run-many -t build`      | All 17 packages                                                                                                            |
+| **Coverage**                 | `npx vitest run --coverage` | All packages                                                                                                               |
 
 ## ⚠️ Nx Cache and Root-Level Targets
 

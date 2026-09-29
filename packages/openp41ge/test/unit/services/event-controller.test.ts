@@ -211,10 +211,7 @@ describe("EventGraph", () => {
 
     it("rejects edges targeting unknown nodes", () => {
       graph.load(sampleGraph);
-      const errors = graph.extend(
-        [],
-        [{ id: "e-bad", from: "evt", to: ["does-not-exist"] }],
-      );
+      const errors = graph.extend([], [{ id: "e-bad", from: "evt", to: ["does-not-exist"] }]);
       expect(errors.length).toBeGreaterThan(0);
       expect(errors[0].type).toBe("node-not-found");
     });
@@ -298,7 +295,9 @@ describe("AppState", () => {
     });
 
     it("handles observer that throws without affecting others", () => {
-      const fn1 = vi.fn(() => { throw new Error("oops"); });
+      const fn1 = vi.fn(() => {
+        throw new Error("oops");
+      });
       const fn2 = vi.fn();
       state.observe(fn1);
       state.observe(fn2);
@@ -345,7 +344,15 @@ describe("AppState", () => {
 
 describe("EventLogBuffer", () => {
   let log: EventLogBuffer;
-  const sampleEntry = { eventType: "test-ev", payload: { x: 1 }, matchedEdge: null, handlerResults: [], totalDuration: 5, stateSnapshot: {}, sourceFile: "test.ts" };
+  const sampleEntry = {
+    eventType: "test-ev",
+    payload: { x: 1 },
+    matchedEdge: null,
+    handlerResults: [],
+    totalDuration: 5,
+    stateSnapshot: {},
+    sourceFile: "test.ts",
+  };
 
   beforeEach(() => {
     log = new EventLogBuffer(10);
@@ -461,13 +468,25 @@ describe("EventRouter", () => {
       state,
       logBuffer,
       handlers: {
-        "focus/set-focused": async () => { state.windowFocused = true; },
-        "focus/set-blurred": async () => { state.windowFocused = false; },
-        "focus/set-sidebar-right": async () => { state.focusedSide = "right"; },
-        "focus/clear-sidebar": async () => { state.focusedSide = null; },
+        "focus/set-focused": async () => {
+          state.windowFocused = true;
+        },
+        "focus/set-blurred": async () => {
+          state.windowFocused = false;
+        },
+        "focus/set-sidebar-right": async () => {
+          state.focusedSide = "right";
+        },
+        "focus/clear-sidebar": async () => {
+          state.focusedSide = null;
+        },
         "keyboard/suppress": async () => {},
-        "test/handler-a": async (payload) => { handlerA(payload); },
-        "test/handler-b": async (payload) => { handlerB(payload); },
+        "test/handler-a": async (payload) => {
+          handlerA(payload);
+        },
+        "test/handler-b": async (payload) => {
+          handlerB(payload);
+        },
       },
     });
   });
@@ -522,18 +541,40 @@ describe("EventRouter", () => {
   describe("emit — handler execution", () => {
     it("runs handlers in order", async () => {
       const order: string[] = [];
-      router.registerHandler("test/order-a", async () => { order.push("a"); });
-      router.registerHandler("test/order-b", async () => { order.push("b"); });
+      router.registerHandler("test/order-a", async () => {
+        order.push("a");
+      });
+      router.registerHandler("test/order-b", async () => {
+        order.push("b");
+      });
       // Extend graph with a node that dispatches to both
       const g = new EventGraph();
-      g.load({ version: 1, nodes: [{ id: "test/order-a" }, { id: "test/order-b" }], edges: [{ id: "e-ord", from: "order-ev", to: ["test/order-a", "test/order-b"] }] });
-      const r = new EventRouter({ graph: g, state, logBuffer, handlers: { "test/order-a": async () => { order.push("a"); }, "test/order-b": async () => { order.push("b"); } } });
+      g.load({
+        version: 1,
+        nodes: [{ id: "test/order-a" }, { id: "test/order-b" }],
+        edges: [{ id: "e-ord", from: "order-ev", to: ["test/order-a", "test/order-b"] }],
+      });
+      const r = new EventRouter({
+        graph: g,
+        state,
+        logBuffer,
+        handlers: {
+          "test/order-a": async () => {
+            order.push("a");
+          },
+          "test/order-b": async () => {
+            order.push("b");
+          },
+        },
+      });
       await r.emit("order-ev", {});
       expect(order).toEqual(["a", "b"]);
     });
 
     it("does not throw when handler throws — logs error instead", async () => {
-      router.registerHandler("test/handler-a", async () => { throw new Error("handler error"); });
+      router.registerHandler("test/handler-a", async () => {
+        throw new Error("handler error");
+      });
       await expect(router.emit("test-event", {})).resolves.toBeUndefined();
     });
   });

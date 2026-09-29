@@ -278,7 +278,11 @@ describe("NodeGitCommitService.searchCommits", () => {
     const all = await svc.searchCommits(repoName, { query: "readme", in: "all", content: true });
     expect(all.map((r) => r.shortHash)).toEqual([shortHash.c3]);
 
-    const files = await svc.searchCommits(repoName, { query: "readme", in: "files", content: true });
+    const files = await svc.searchCommits(repoName, {
+      query: "readme",
+      in: "files",
+      content: true,
+    });
     expect(files.map((r) => r.shortHash)).toEqual([shortHash.c3]);
   });
 
@@ -322,13 +326,16 @@ describe("NodeGitCommitService.searchCommits", () => {
     // Force only the content `-G` invocation to fail; message `--grep` calls
     // pass through to the real git. The content failure must be swallowed and
     // the message-only hit (zorple in c4's body) must still be returned.
-    const real = (svc as unknown as {
-      _execGit: (args: string[], repo?: string) => Promise<string>;
-    })._execGit.bind(svc);
+    const real = (
+      svc as unknown as {
+        _execGit: (args: string[], repo?: string) => Promise<string>;
+      }
+    )._execGit.bind(svc);
     (svc as unknown as { _execGit: (a: string[], r?: string) => Promise<string> })._execGit = (
       args: string[],
       repo?: string,
-    ) => (args.some((a) => a.startsWith("-G")) ? Promise.reject(new Error("boom")) : real(args, repo));
+    ) =>
+      args.some((a) => a.startsWith("-G")) ? Promise.reject(new Error("boom")) : real(args, repo);
     try {
       const good = await svc.searchCommits(repoName, {
         query: "zorple",
@@ -337,7 +344,8 @@ describe("NodeGitCommitService.searchCommits", () => {
       });
       expect(good.map((r) => r.shortHash)).toEqual([shortHash.c4]);
     } finally {
-      (svc as unknown as { _execGit: (a: string[], r?: string) => Promise<string> })._execGit = real;
+      (svc as unknown as { _execGit: (a: string[], r?: string) => Promise<string> })._execGit =
+        real;
     }
   });
 
@@ -415,9 +423,7 @@ describe("NodeGitCommitService.getCommitFileHunks", () => {
   });
 
   it("returns [] for an unknown hash or file", async () => {
-    await expect(
-      svc.getCommitFileHunks(repoName, c0, "nope.ts", "hello", {}),
-    ).resolves.toEqual([]);
+    await expect(svc.getCommitFileHunks(repoName, c0, "nope.ts", "hello", {})).resolves.toEqual([]);
     await expect(
       svc.getCommitFileHunks(repoName, "deadbeef", "app.txt", "hello", {}),
     ).resolves.toEqual([]);

@@ -364,13 +364,23 @@ ${nameHtml}</div>`;
     // @keyframes + cursor styles). Injecting via document.body.innerHTML avoids
     // a loadURL navigation that would tear down the placeholder before it paints
     // and leave the ghost blank until the PNG decodes.
-    const html = buildBitmapImgHtml(dataUrl, outerW, outerH, insetPx, this._liftOff, srcOffsetX, srcOffsetY);
+    const html = buildBitmapImgHtml(
+      dataUrl,
+      outerW,
+      outerH,
+      insetPx,
+      this._liftOff,
+      srcOffsetX,
+      srcOffsetY,
+    );
     const ghost = this._ghost;
     const apply = () => {
       if (ghost && !ghost.isDestroyed()) {
-        ghost.webContents.executeJavaScript(`document.body.innerHTML = ${JSON.stringify(html)};`).catch(() => {
-          /* page could be closing; keep whatever is painted */
-        });
+        ghost.webContents
+          .executeJavaScript(`document.body.innerHTML = ${JSON.stringify(html)};`)
+          .catch(() => {
+            /* page could be closing; keep whatever is painted */
+          });
       }
     };
     if (this._pageLoaded) {

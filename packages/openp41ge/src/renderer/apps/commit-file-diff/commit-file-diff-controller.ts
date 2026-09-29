@@ -57,8 +57,7 @@ export class CommitFileDiffController extends BaseController {
 
     // Fresh mount: the handler set the pending context for this window.
     const pending = (window as unknown as Record<string, unknown>).__pendingCommitFileDiff as
-      | CommitFileContext
-      | undefined;
+      CommitFileContext | undefined;
     if (pending?.repoName && pending.hash && pending.path && !this._repoName) {
       this._repoName = pending.repoName;
       this._hash = pending.hash;

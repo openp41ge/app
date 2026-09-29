@@ -5,12 +5,7 @@
  * covering all states (many branches, long messages, empty commits, etc.)
  */
 
-import type {
-  BranchEntry,
-  CommitEntry,
-  DiffStatEntry,
-  GitBrowserData,
-} from "openp41ge-uikit";
+import type { BranchEntry, CommitEntry, DiffStatEntry, GitBrowserData } from "openp41ge-uikit";
 
 // ---------------------------------------------------------------------------
 // Helpers

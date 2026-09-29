@@ -1671,8 +1671,8 @@ class Openp41geWorktreeTree extends LitElement {
    *  Only the lines above a button are drawn — a line pointing down from a
    *  bottom-bar button would run off the bottom of the window. */
   private _syncTopCornerOverdraws(): void {
-    this.querySelectorAll<HTMLElement>(".sb-bottom-bar .p41ge-icon-btn").forEach(
-      (btn) => attachTopCornerOverdraws(btn),
+    this.querySelectorAll<HTMLElement>(".sb-bottom-bar .p41ge-icon-btn").forEach((btn) =>
+      attachTopCornerOverdraws(btn),
     );
   }
 

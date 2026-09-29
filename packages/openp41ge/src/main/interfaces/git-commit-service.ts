@@ -5,11 +5,7 @@
  * Implementations run in the main (Node.js) process.
  */
 
-import type {
-  CommitSearchOptions,
-  SearchHunk,
-  SearchResultCommit,
-} from "openp41ge-git";
+import type { CommitSearchOptions, SearchHunk, SearchResultCommit } from "openp41ge-git";
 
 export interface CommitEntry {
   hash: string;

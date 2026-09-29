@@ -6,6 +6,7 @@ Date: 2026-09-29
 ## Goal
 
 Make packaged-app crashes readable in Sentry by:
+
 1. **Emitting source maps** for both the renderer (Vite) and main process (esbuild).
 2. **Uploading them to Sentry tagged with the release version** during the release pipeline.
 3. **Ensuring the version (and ideally channel) is embedded in the built app** so the app's reported `release`/`environment` exactly matches the upload, so Sentry maps stacks to source.
@@ -65,7 +66,7 @@ Make packaged-app crashes readable in Sentry by:
     paths out of the box (verify against a real event; the Sentry wizard picks
     this up automatically, we can mirror whatever it writes).
 - **Wire into `release.yml`** `build-macos` job, right after `pnpm nx build
-  openp41ge`:
+openp41ge`:
   ```yaml
   - name: Upload source maps to Sentry
     working-directory: packages/openp41ge
@@ -98,12 +99,16 @@ renderer is consistent too:
   release/environment are build-time authoritative, falling back to
   `app.getVersion()`:
   ```ts
-  const version = __OPENP41GE_VERSION__ && __OPENP41GE_VERSION__ !== "0.0.0-dev"
-    ? __OPENP41GE_VERSION__
-    : app.getVersion();
-  const environment = __OPENP41GE_CHANNEL__ && __OPENP41GE_CHANNEL__ !== "development"
-    ? __OPENP41GE_CHANNEL__
-    : (app.isPackaged ? "production" : "development");
+  const version =
+    __OPENP41GE_VERSION__ && __OPENP41GE_VERSION__ !== "0.0.0-dev"
+      ? __OPENP41GE_VERSION__
+      : app.getVersion();
+  const environment =
+    __OPENP41GE_CHANNEL__ && __OPENP41GE_CHANNEL__ !== "development"
+      ? __OPENP41GE_CHANNEL__
+      : app.isPackaged
+        ? "production"
+        : "development";
   ```
   (These constants need a `declare` in `electron/`'s ambient types — same pattern
   as the existing `__OPENP41GE_DEBUG__` renderer define.)
@@ -126,18 +131,18 @@ Sentry UI can filter `alpha` vs `beta` vs `stable`.
 
 ## File-touch summary
 
-| File | Change |
-|------|--------|
-| `packages/openp41ge/vite.config.ts` | `build.sourcemap: "hidden"` + `__OPENP41GE_VERSION__`/`__OPENP41GE_CHANNEL__` defines |
-| `packages/openp41ge/project.json` | add `--sourcemap=external` to esbuild build command |
-| `packages/openp41ge/electron-builder.yml` | exclude `*.map` from packaged files |
-| `packages/openp41ge/electron/sentry.ts` | use baked version/channel with fallback |
-| `packages/openp41ge/electron/ambient types` | `declare` the two defines |
-| `packages/openp41ge/src/renderer/main.ts` | pass `release` to renderer init |
-| `packages/openp41ge/package.json` | add `@sentry/cli` devDependency |
-| `packages/openp41ge/scripts/upload-sourcemaps.sh` | new — `sentry-cli sourcemaps upload` |
-| `.sentryclirc` | new — org/project defaults |
-| `.github/workflows/release.yml` | build-macos: set `APP_VERSION`/`APP_CHANNEL`, then upload maps |
+| File                                              | Change                                                                                |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `packages/openp41ge/vite.config.ts`               | `build.sourcemap: "hidden"` + `__OPENP41GE_VERSION__`/`__OPENP41GE_CHANNEL__` defines |
+| `packages/openp41ge/project.json`                 | add `--sourcemap=external` to esbuild build command                                   |
+| `packages/openp41ge/electron-builder.yml`         | exclude `*.map` from packaged files                                                   |
+| `packages/openp41ge/electron/sentry.ts`           | use baked version/channel with fallback                                               |
+| `packages/openp41ge/electron/ambient types`       | `declare` the two defines                                                             |
+| `packages/openp41ge/src/renderer/main.ts`         | pass `release` to renderer init                                                       |
+| `packages/openp41ge/package.json`                 | add `@sentry/cli` devDependency                                                       |
+| `packages/openp41ge/scripts/upload-sourcemaps.sh` | new — `sentry-cli sourcemaps upload`                                                  |
+| `.sentryclirc`                                    | new — org/project defaults                                                            |
+| `.github/workflows/release.yml`                   | build-macos: set `APP_VERSION`/`APP_CHANNEL`, then upload maps                        |
 
 ## Validation
 

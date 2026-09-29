@@ -18,7 +18,10 @@
  * content while scrolling.
  */
 import { describe, test, expect, beforeEach } from "vitest";
-import { LineNumbersOverlay, type LineNumbersOverlayConfig } from "../../../src/rendering/line-numbers-overlay";
+import {
+  LineNumbersOverlay,
+  type LineNumbersOverlayConfig,
+} from "../../../src/rendering/line-numbers-overlay";
 
 const LH = 20;
 
@@ -30,7 +33,9 @@ function setup(config: Partial<LineNumbersOverlayConfig> = {}) {
     lineHeight: LH,
     ...config,
   });
-  const container: HTMLElement = (overlay as unknown as { _scrollContainer: { element: HTMLElement } })._scrollContainer.element;
+  const container: HTMLElement = (
+    overlay as unknown as { _scrollContainer: { element: HTMLElement } }
+  )._scrollContainer.element;
   return { gutter, overlay, container };
 }
 
@@ -71,8 +76,12 @@ describe("LineNumbersOverlay setVisibleRange", () => {
     disconnect();
 
     const isCell = (n: Node) => n instanceof Element && n.classList.contains("line-number-wrapper");
-    const childAdds = records.filter((r) => r.type === "childList" && [...r.addedNodes].some(isCell));
-    const childRemoves = records.filter((r) => r.type === "childList" && [...r.removedNodes].some(isCell));
+    const childAdds = records.filter(
+      (r) => r.type === "childList" && [...r.addedNodes].some(isCell),
+    );
+    const childRemoves = records.filter(
+      (r) => r.type === "childList" && [...r.removedNodes].some(isCell),
+    );
     // No attribute/text writes may land on a REUSED (pre-existing) element —
     // only the newly-added label may be written after it is appended.
     const writesOnExisting = records.filter(
@@ -90,7 +99,9 @@ describe("LineNumbersOverlay setVisibleRange", () => {
     const after = Array.from(container.querySelectorAll(".line-number")).map((n) => n.textContent);
     expect(after).toEqual(["5", "6", "7", "8", "9"]);
     // Position of a reused label is unchanged.
-    const line6 = Array.from(container.querySelectorAll(".line-number")).find((n) => n.textContent === "6")!;
+    const line6 = Array.from(container.querySelectorAll(".line-number")).find(
+      (n) => n.textContent === "6",
+    )!;
     expect(line6.parentElement!.style.top).toBe("100px"); // (6-1)*20
   });
 
@@ -136,7 +147,9 @@ describe("LineNumbersOverlay setVisibleRange", () => {
     const attrMutations = records.filter((r) => r.type === "attributes");
     expect(attrMutations.length).toBeGreaterThan(0);
     const labels = Array.from(container.querySelectorAll(".line-number"));
-    expect(labels.filter((l) => l.textContent === "3")[0]!.classList.contains("fe-inline-added-cell")).toBe(true);
+    expect(
+      labels.filter((l) => l.textContent === "3")[0]!.classList.contains("fe-inline-added-cell"),
+    ).toBe(true);
   });
 });
 
@@ -155,7 +168,11 @@ describe("LineNumbersOverlay hover highlight", () => {
     const wrap2 = container.querySelector('.line-number-wrapper[data-line="2"]');
     expect(label2!.classList.contains("line-number-hover")).toBe(true);
     expect(wrap2!.classList.contains("line-number-hover")).toBe(true);
-    expect(container.querySelector('.line-number[data-line="1"]')!.classList.contains("line-number-hover")).toBe(false);
+    expect(
+      container
+        .querySelector('.line-number[data-line="1"]')!
+        .classList.contains("line-number-hover"),
+    ).toBe(false);
 
     overlay.setHoverLine(null);
     expect(label2!.classList.contains("line-number-hover")).toBe(false);
@@ -164,7 +181,11 @@ describe("LineNumbersOverlay hover highlight", () => {
     // A band repaint keeps the hover state coherent (no stale class).
     overlay.setHoverLine(2);
     overlay.setVisibleRange(1, 3);
-    expect(container.querySelector('.line-number[data-line="2"]')!.classList.contains("line-number-hover")).toBe(true);
+    expect(
+      container
+        .querySelector('.line-number[data-line="2"]')!
+        .classList.contains("line-number-hover"),
+    ).toBe(true);
     overlay.setHoverLine(null);
   });
 

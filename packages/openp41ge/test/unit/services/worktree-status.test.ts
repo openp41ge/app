@@ -7,7 +7,12 @@ import {
 
 describe("classifyWorktree", () => {
   it("returns ok when in sync and present", () => {
-    expect(classifyWorktree(0, 0, true)).toMatchObject({ state: "ok", ahead: 0, behind: 0, missing: false });
+    expect(classifyWorktree(0, 0, true)).toMatchObject({
+      state: "ok",
+      ahead: 0,
+      behind: 0,
+      missing: false,
+    });
   });
 
   it("flags needs-sync when ahead or behind", () => {
@@ -20,7 +25,12 @@ describe("classifyWorktree", () => {
   });
 
   it("flags missing before divergence when folder absent", () => {
-    expect(classifyWorktree(2, 4, false)).toMatchObject({ state: "missing", missing: true, ahead: 2, behind: 4 });
+    expect(classifyWorktree(2, 4, false)).toMatchObject({
+      state: "missing",
+      missing: true,
+      ahead: 2,
+      behind: 4,
+    });
   });
 
   it("treats unknown as unknown when known is false", () => {

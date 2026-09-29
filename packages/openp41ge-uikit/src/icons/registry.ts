@@ -153,7 +153,11 @@ export const iconRegistry: IconRegistry = {
     ),
 
   "file-deleted": (size) =>
-    icon("0 0 16 16", [`<circle cx="8" cy="8" r="6"/>`, `<line x1="5" y1="8" x2="11" y2="8"/>`], size),
+    icon(
+      "0 0 16 16",
+      [`<circle cx="8" cy="8" r="6"/>`, `<line x1="5" y1="8" x2="11" y2="8"/>`],
+      size,
+    ),
 
   "file-modified": (size) =>
     icon(
@@ -163,11 +167,7 @@ export const iconRegistry: IconRegistry = {
     ),
 
   "file-renamed": (size) =>
-    icon(
-      "0 0 16 16",
-      [`<circle cx="8" cy="8" r="6"/>`, `<path d="M7 5.5L10.5 8L7 10.5"/>`],
-      size,
-    ),
+    icon("0 0 16 16", [`<circle cx="8" cy="8" r="6"/>`, `<path d="M7 5.5L10.5 8L7 10.5"/>`], size),
 
   "git-commit": (size) =>
     icon(

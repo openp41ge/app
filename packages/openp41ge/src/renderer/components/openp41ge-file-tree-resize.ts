@@ -6,15 +6,11 @@
 
 /** Minimum width for the preview panel. */
 
-
 /** Minimum width for the drawer/explorer panel. */
-
 
 /** Minimum total wrapper width when no preview is open. */
 
-
 /** Fraction of window width used as the maximum combined (preview + drawer) width. */
-
 
 import { MIN_PREVIEW, MIN_DRAWER, MIN_WRAPPER, MAX_COMBINED_RATIO } from "openp41ge-constants";
 

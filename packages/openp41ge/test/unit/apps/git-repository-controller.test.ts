@@ -23,9 +23,7 @@ function makeWorkspace(col = 0, cols = 1): unknown {
         grid: {
           rows: 1,
           cols,
-          placements: [
-            { position: { row: 0, col }, tabIds: ["tab-git"] },
-          ],
+          placements: [{ position: { row: 0, col }, tabIds: ["tab-git"] }],
         },
       },
     ],
@@ -36,12 +34,9 @@ function makeWorkspace(col = 0, cols = 1): unknown {
  * capture the dispatched open-commit-file event. */
 function installBridge(state: unknown): FiredEvent[] {
   const fired: FiredEvent[] = [];
-  document.addEventListener(
-    "openp41ge:open-commit-file",
-    ((e: CustomEvent) => {
-      fired.push({ type: e.type, detail: (e.detail ?? {}) as Record<string, unknown> });
-    }) as EventListener,
-  );
+  document.addEventListener("openp41ge:open-commit-file", ((e: CustomEvent) => {
+    fired.push({ type: e.type, detail: (e.detail ?? {}) as Record<string, unknown> });
+  }) as EventListener);
   (window as unknown as Record<string, unknown>).openp41ge = {
     workspace: {
       getWindowId: () => "win-1",
@@ -135,12 +130,9 @@ describe("GitRepositoryController file-row click", () => {
 
   it("still opens in the next cell when the workspace state cannot be read", async () => {
     const fired: FiredEvent[] = [];
-    document.addEventListener(
-      "openp41ge:open-commit-file",
-      ((e: CustomEvent) => {
-        fired.push({ type: e.type, detail: (e.detail ?? {}) as Record<string, unknown> });
-      }) as EventListener,
-    );
+    document.addEventListener("openp41ge:open-commit-file", ((e: CustomEvent) => {
+      fired.push({ type: e.type, detail: (e.detail ?? {}) as Record<string, unknown> });
+    }) as EventListener);
     (window as unknown as Record<string, unknown>).openp41ge = {
       workspace: {
         getWindowId: () => "win-1",

@@ -79,8 +79,7 @@ export class AgentsController extends BaseController implements TabController {
     // In-chat find runs on the Node side: the component asks the store model
     // for the hit list + running total and only re-locates the active hit in
     // its own DOM, so huge transcripts never block the renderer.
-    el.chatSearch = (chatId, query, opts) =>
-      this._storeModel.searchTranscript(chatId, query, opts);
+    el.chatSearch = (chatId, query, opts) => this._storeModel.searchTranscript(chatId, query, opts);
 
     // Transcript content lives in the main process: the component loads only a
     // page window and pulls in older pages on scroll-up / on search navigation.
@@ -202,14 +201,16 @@ export class AgentsController extends BaseController implements TabController {
         // Small conversation: send the whole transcript (one page).
         const chat = await this._storeModel.get(this.chatId);
         if (!this._component) return;
-        this._component.setChat(chat ?? {
-          id: header.id,
-          title: header.title,
-          providerId: header.providerId,
-          createdAt: 0,
-          updatedAt: 0,
-          messages: [],
-        });
+        this._component.setChat(
+          chat ?? {
+            id: header.id,
+            title: header.title,
+            providerId: header.providerId,
+            createdAt: 0,
+            updatedAt: 0,
+            messages: [],
+          },
+        );
       } else {
         // Large: open in paged mode — load only the tail window from Node; the
         // component pulls older pages on scroll-up / on search navigation.

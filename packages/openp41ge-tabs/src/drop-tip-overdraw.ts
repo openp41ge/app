@@ -41,7 +41,8 @@ export function attachDropTipVerticalOverdraws(host: HTMLElement): void {
     `position:fixed;left:0;top:0;width:3px;height:${DROP_TIP_OVERDRAW_LENGTH}px;` +
     "pointer-events:none;z-index:999;opacity:0;";
   // Opaque at the end that touches the line, fading away from it.
-  up.style.cssText = base + "background:linear-gradient(to top, rgb(74, 158, 255) 40%, transparent);";
+  up.style.cssText =
+    base + "background:linear-gradient(to top, rgb(74, 158, 255) 40%, transparent);";
   down.style.cssText =
     base + "background:linear-gradient(to bottom, rgb(74, 158, 255) 40%, transparent);";
   host.appendChild(up);

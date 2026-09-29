@@ -146,10 +146,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("marks create rows as muted (tree-node--muted)", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
 
     const folderRow = rowByLabel(item, "add folder");
     const fileRow = rowByLabel(item, "add file");
@@ -158,10 +155,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("shows both rows when a worktree has no files or folders", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
 
     const labels = rowLabels(item);
     expect(labels).toEqual(["add folder", "add file"]);
@@ -185,10 +179,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("reveals an inline input when a + add file row is clicked", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
 
     const row = rowByLabel(item, "add file");
     expect(row).not.toBeNull();
@@ -200,10 +191,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("creates a file on confirm and opens it", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
     const onOpen = vi.fn();
     document.addEventListener("openp41ge:open-file", onOpen as EventListener);
 
@@ -232,10 +220,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("creates a folder on confirm (no file opened)", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
     const onOpen = vi.fn();
     document.addEventListener("openp41ge:open-file", onOpen as EventListener);
 
@@ -259,10 +244,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("escapes out of inline edit without creating anything", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
 
     const row = rowByLabel(item, "add file");
     row!.click();
@@ -280,7 +262,9 @@ describe("Explorer new-entry rows", () => {
     await (item as unknown as { updateComplete: Promise<unknown> }).updateComplete;
 
     expect(writeFile).not.toHaveBeenCalled();
-    expect(item.querySelector("openp41ge-tree")?.shadowRoot?.querySelector(".tree-new-entry-input")).toBeNull();
+    expect(
+      item.querySelector("openp41ge-tree")?.shadowRoot?.querySelector(".tree-new-entry-input"),
+    ).toBeNull();
   });
 
   it("dispatches create-row-edit when entering and escaping the inline input", async () => {
@@ -293,10 +277,7 @@ describe("Explorer new-entry rows", () => {
       events.push(d);
     };
     document.addEventListener("create-row-edit", onEdit as EventListener);
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
 
     // Entering edit mode dispatches editing=true.
     const row = rowByLabel(item, "add file");
@@ -320,10 +301,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("confirm button creates the file", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
 
     const row = rowByLabel(item, "add file");
     row!.click();
@@ -345,10 +323,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("cancel button discards the entry without creating anything", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
 
     const row = rowByLabel(item, "add file");
     row!.click();
@@ -371,10 +346,7 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("splits create rows into an action (+) cell and a description (file-type) icon cell", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
 
     const row = rowByLabel(item, "add file");
     row!.click();
@@ -385,7 +357,9 @@ describe("Explorer new-entry rows", () => {
 
     // Idle/unknown: the action cell holds the + glyph, the description cell
     // holds the default (unknown) file icon — never the same cell.
-    expect(tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="file"]')).not.toBeNull();
+    expect(
+      tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="file"]'),
+    ).not.toBeNull();
     const actionCell = tree?.shadowRoot?.querySelector(".tree-node .tree-chevron-cell svg");
     expect(actionCell).not.toBeNull();
 
@@ -394,23 +368,28 @@ describe("Explorer new-entry rows", () => {
     input!.value = "app.ts";
     input!.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     await (item as unknown as { updateComplete: Promise<unknown> }).updateComplete;
-    expect(tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="app.ts"]')).not.toBeNull();
-    expect(tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="file"]')).toBeNull();
+    expect(
+      tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="app.ts"]'),
+    ).not.toBeNull();
+    expect(
+      tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="file"]'),
+    ).toBeNull();
     expect(tree?.shadowRoot?.querySelector(".tree-node .tree-chevron-cell svg")).not.toBeNull();
 
     // A partial/unknown name falls back to the default file icon (no type icon).
     input!.value = "app";
     input!.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     await (item as unknown as { updateComplete: Promise<unknown> }).updateComplete;
-    expect(tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="app"]')).toBeNull();
-    expect(tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="file"]')).not.toBeNull();
+    expect(
+      tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="app"]'),
+    ).toBeNull();
+    expect(
+      tree?.shadowRoot?.querySelector<Element>('file-extension-svg[filename="file"]'),
+    ).not.toBeNull();
   });
 
   it("creates a file without an extension (no extension requirement)", async () => {
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], []);
     const row = rowByLabel(item, "add file");
     row!.click();
     await (item as unknown as { updateComplete: Promise<unknown> }).updateComplete;
@@ -430,14 +409,17 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("blocks creating a folder whose name already exists", async () => {
-    const doc = { name: "docs", path: "/repo/main/docs", isDirectory: true, size: 0, modifiedAt: 0 };
+    const doc = {
+      name: "docs",
+      path: "/repo/main/docs",
+      isDirectory: true,
+      size: 0,
+      modifiedAt: 0,
+    };
     // The worktree loader refreshes from readdir when cached data exists, so
     // make readdir return the same entry the duplicate check must see.
     readdir.mockResolvedValue([doc]);
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [doc],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], [doc]);
     const row = rowByLabel(item, "add folder");
     row!.click();
     await (item as unknown as { updateComplete: Promise<unknown> }).updateComplete;
@@ -460,7 +442,7 @@ describe("Explorer new-entry rows", () => {
     );
     const inputEl = tree?.shadowRoot?.querySelector(".tree-new-entry-input");
     expect(cross).not.toBeNull();
-    expect((cross?.getAttribute("style") ?? "")).toContain("#e81123");
+    expect(cross?.getAttribute("style") ?? "").toContain("#e81123");
     // Input text keeps its normal colour (no inline red override).
     expect((inputEl as HTMLElement | null)?.getAttribute("style") ?? "").not.toContain("#e81123");
 
@@ -473,12 +455,15 @@ describe("Explorer new-entry rows", () => {
   });
 
   it("blocks creating a file whose name already exists (case-insensitive)", async () => {
-    const exist = { name: "Notes.md", path: "/repo/main/Notes.md", isDirectory: false, size: 0, modifiedAt: 0 };
+    const exist = {
+      name: "Notes.md",
+      path: "/repo/main/Notes.md",
+      isDirectory: false,
+      size: 0,
+      modifiedAt: 0,
+    };
     readdir.mockResolvedValue([exist]);
-    const item = await makeItem(
-      [{ branch: "main", path: "/repo/main", exists: true }],
-      [exist],
-    );
+    const item = await makeItem([{ branch: "main", path: "/repo/main", exists: true }], [exist]);
     const row = rowByLabel(item, "add file");
     row!.click();
     await (item as unknown as { updateComplete: Promise<unknown> }).updateComplete;
@@ -497,7 +482,7 @@ describe("Explorer new-entry rows", () => {
       (s.getAttribute("style") ?? "").includes("rotate(45deg)"),
     );
     expect(cross).not.toBeNull();
-    expect((cross?.getAttribute("style") ?? "")).toContain("#e81123");
+    expect(cross?.getAttribute("style") ?? "").toContain("#e81123");
 
     input!.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true }),

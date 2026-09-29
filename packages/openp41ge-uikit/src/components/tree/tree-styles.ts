@@ -336,7 +336,9 @@ export const treeStyles = css`
     border-radius: 0;
     color: var(--tree-muted, var(--text-secondary, #999));
     cursor: pointer;
-    transition: color 80ms, background 80ms;
+    transition:
+      color 80ms,
+      background 80ms;
   }
   .tree-new-entry-btn + .tree-new-entry-btn {
     /* No separator between the confirm/cancel buttons. */

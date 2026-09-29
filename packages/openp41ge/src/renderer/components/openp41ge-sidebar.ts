@@ -424,7 +424,7 @@ class Openp41geSidebar extends LitElement {
                           : "color:var(--text-secondary, #999)"
                       }`;
                       return html` <div
-                        class="sidebar-tab ${isActive ? 'active' : ''} flex items-center gap-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
+                        class="sidebar-tab ${isActive ? "active" : ""} flex items-center gap-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
                         data-sidebar-tab-id=${tab.id}
                         data-sidebar-side=${this.side}
                         data-tab-title=${tab.title}

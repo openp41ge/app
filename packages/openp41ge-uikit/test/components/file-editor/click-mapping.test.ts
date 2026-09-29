@@ -42,7 +42,10 @@ function setupGeometry(el, gutterWidth) {
   Object.defineProperty(vp, "clientWidth", { value: 600, configurable: true });
   Object.defineProperty(vp, "scrollLeft", { value: 0, configurable: true });
   Object.defineProperty(vp, "scrollTop", { value: 0, configurable: true });
-  Object.defineProperty(el._gutterGroupEl, "offsetWidth", { value: gutterWidth, configurable: true });
+  Object.defineProperty(el._gutterGroupEl, "offsetWidth", {
+    value: gutterWidth,
+    configurable: true,
+  });
 }
 
 describe("file-editor click → column mapping (gutter offset)", () => {

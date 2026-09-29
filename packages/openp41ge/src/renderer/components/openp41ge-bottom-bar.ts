@@ -94,18 +94,13 @@ class Openp41geBottomBar extends LitElement {
       >
         ${
           this._emptyMessage !== null
-            ? html`<span class="text-muted text-xs"
-                >${this._emptyMessage}</span
-              >`
+            ? html`<span class="text-muted text-xs">${this._emptyMessage}</span>`
             : html`
                 <div class="flex items-center gap-2 flex-1 min-w-0">
-                  <span
-                    class="sbb-position text-secondary text-xs not-italic"
+                  <span class="sbb-position text-secondary text-xs not-italic"
                     >${this._positionText}</span
                   >
-                  <span
-                    class="sbb-mode text-xs not-italic"
-                    style="color:${this._modeColor};"
+                  <span class="sbb-mode text-xs not-italic" style="color:${this._modeColor};"
                     >${this._modeText}</span
                   >
                 </div>
@@ -166,8 +161,7 @@ class Openp41geBottomBar extends LitElement {
                       </div>
                     `,
                   )}
-                  <span
-                    class="sbb-size text-muted text-xs flex items-center h-full not-italic"
+                  <span class="sbb-size text-muted text-xs flex items-center h-full not-italic"
                     >${this._sizeText}</span
                   >
                 </div>

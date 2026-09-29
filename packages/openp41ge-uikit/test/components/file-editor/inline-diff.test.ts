@@ -55,7 +55,9 @@ function middleLabels(el): string[] {
   return [...el.querySelectorAll(".fe-gutter .line-number")].map((n) => n.textContent ?? "");
 }
 function leftLabels(el): string[] {
-  return [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")].map((n) => n.textContent ?? "");
+  return [...el.querySelectorAll(".fe-inline-left .fe-inline-left-label")].map(
+    (n) => n.textContent ?? "",
+  );
 }
 function cellCounts(el): { removed: number; added: number } {
   return {
@@ -256,7 +258,9 @@ describe("file-editor inline commit-diff mode", () => {
     const el = await mount();
     await loadInlineDiff(el);
 
-    const visible = [...el.querySelectorAll(".view-line")].map((v) => v.textContent ?? "").join("\n");
+    const visible = [...el.querySelectorAll(".view-line")]
+      .map((v) => v.textContent ?? "")
+      .join("\n");
     // The full buffer holds the spliced deletion AND its replacement; the
     // visible band (2 jsdom lines) shows the deleted line; no @@ anywhere.
     expect(el.textContentModel.getValue()).toContain("OLD_GONE");

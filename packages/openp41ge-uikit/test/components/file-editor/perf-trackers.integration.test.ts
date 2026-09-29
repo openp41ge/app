@@ -171,4 +171,3 @@ describe("file-editor Phase 1 trackers (integration)", () => {
     expect(stale).toHaveLength(0);
   });
 });
-

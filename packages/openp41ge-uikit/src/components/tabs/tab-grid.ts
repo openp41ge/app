@@ -525,7 +525,12 @@ export class TabGrid extends LitElement {
         this.dispatchEvent(
           new CustomEvent("grid-pin", {
             bubbles: true,
-            detail: { winId: sourceWinId, tabId, pinned: true, ephemeral: isEphemeral || undefined },
+            detail: {
+              winId: sourceWinId,
+              tabId,
+              pinned: true,
+              ephemeral: isEphemeral || undefined,
+            },
           }),
         );
       }
@@ -540,7 +545,12 @@ export class TabGrid extends LitElement {
         this.dispatchEvent(
           new CustomEvent("grid-pin", {
             bubbles: true,
-            detail: { winId: targetWinId, tabId, pinned: true, ephemeral: isEphemeral || undefined },
+            detail: {
+              winId: targetWinId,
+              tabId,
+              pinned: true,
+              ephemeral: isEphemeral || undefined,
+            },
           }),
         );
       }
@@ -620,9 +630,7 @@ export class TabGrid extends LitElement {
       const repoName = worktreePayload
         ? worktreePayload.split("\u0000")[0] || ""
         : e.dataTransfer.getData(REPO_DRAG_TYPE);
-      const branch = worktreePayload
-        ? worktreePayload.split("\u0000")[1] || undefined
-        : undefined;
+      const branch = worktreePayload ? worktreePayload.split("\u0000")[1] || undefined : undefined;
       if (repoName) {
         e.preventDefault();
         e.stopPropagation();
@@ -634,11 +642,7 @@ export class TabGrid extends LitElement {
 
         if (pos.isBoundary) {
           const splitCol =
-            pos.boundaryIndex === 0
-              ? 0
-              : pos.boundaryIndex >= this.cols
-                ? this.cols - 1
-                : pos.col;
+            pos.boundaryIndex === 0 ? 0 : pos.boundaryIndex >= this.cols ? this.cols - 1 : pos.col;
           const splitLeft =
             pos.boundaryIndex === 0
               ? true
@@ -706,12 +710,14 @@ export class TabGrid extends LitElement {
 
         // If drop is on a tab bar, add to that cell without splitting
         if (this._isOverTabBar(e)) {
-          const tabBarEl = document.elementFromPoint(e.clientX, e.clientY)
-            ?.closest?.("tab-bar") as unknown as { col?: number; getInsertionIndex?: (x: number) => number };
+          const tabBarEl = document
+            .elementFromPoint(e.clientX, e.clientY)
+            ?.closest?.("tab-bar") as unknown as {
+            col?: number;
+            getInsertionIndex?: (x: number) => number;
+          };
           const col = tabBarEl?.col ?? 0;
-          const insertAt = tabBarEl?.getInsertionIndex
-            ? tabBarEl.getInsertionIndex(e.clientX)
-            : -1;
+          const insertAt = tabBarEl?.getInsertionIndex ? tabBarEl.getInsertionIndex(e.clientX) : -1;
           for (const filePath of filePaths) {
             this.dispatchEvent(
               new CustomEvent("grid-open-tab", {
@@ -810,7 +816,8 @@ export class TabGrid extends LitElement {
     // Show tab bar indicator when cursor is over the tab bar
     if (this._isOverTabBar(e)) {
       this._ghostManager.hideGhost(this);
-      const tabBar = document.elementFromPoint(e.clientX, e.clientY)
+      const tabBar = document
+        .elementFromPoint(e.clientX, e.clientY)
         ?.closest?.("tab-bar") as unknown as { showDropIndicator?: (x: number) => void };
       if (tabBar?.showDropIndicator) {
         tabBar.showDropIndicator(e.clientX);
@@ -1043,9 +1050,11 @@ export class TabGrid extends LitElement {
           box-sizing: border-box;
         }
       </style>
-      <div class="grid-container" style=${gridStyle} >
-        ${Array.from({ length: this.cols }, (_, i) =>
-          html`${this._renderColumn(i)}${i < this.cols - 1 ? this._renderResizeHandle(i) : ""}`,
+      <div class="grid-container" style=${gridStyle}>
+        ${Array.from(
+          { length: this.cols },
+          (_, i) =>
+            html`${this._renderColumn(i)}${i < this.cols - 1 ? this._renderResizeHandle(i) : ""}`,
         )}
       </div>
     `;
@@ -1088,10 +1097,13 @@ export class TabGrid extends LitElement {
   private _onCellResizeStart(e: PointerEvent, colIndex: number): void {
     e.preventDefault();
     e.stopPropagation();
-    const cell = this.querySelector(`.grid-cell[data-cell-col="${colIndex}"]`) as HTMLElement | null;
+    const cell = this.querySelector(
+      `.grid-cell[data-cell-col="${colIndex}"]`,
+    ) as HTMLElement | null;
     this._resizeCol = colIndex;
     this._resizeStartX = e.clientX;
-    this._resizeStartWidth = cell?.getBoundingClientRect().width ?? this._cellWidths[colIndex] ?? 200;
+    this._resizeStartWidth =
+      cell?.getBoundingClientRect().width ?? this._cellWidths[colIndex] ?? 200;
     this._onCellResizeMove = (ev: PointerEvent) => {
       const dx = ev.clientX - this._resizeStartX;
       const min = 200;

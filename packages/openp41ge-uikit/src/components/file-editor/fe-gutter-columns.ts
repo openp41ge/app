@@ -53,8 +53,7 @@ interface FeCell extends HTMLElement {
   };
 }
 
-const FONT_STACK =
-  "'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace";
+const FONT_STACK = "'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace";
 
 /** Diff a class set against the last-applied tokens and apply the delta to the
  * cell (and its inner label, when present). `hoverCls` is added while the row
@@ -167,7 +166,8 @@ export function makeFeDiffBeforeColumn(opts: {
         `user-select:none;font-family:${FONT_STACK};`;
       const textSpan = document.createElement("div");
       textSpan.className = "fe-inline-left-text";
-      textSpan.style.cssText = "overflow:hidden;text-overflow:clip;white-space:nowrap;max-width:100%;";
+      textSpan.style.cssText =
+        "overflow:hidden;text-overflow:clip;white-space:nowrap;max-width:100%;";
       const dot = document.createElement("div");
       dot.className = "fe-inline-left-dot";
       dot.style.cssText =

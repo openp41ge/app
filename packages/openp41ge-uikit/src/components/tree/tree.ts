@@ -811,9 +811,7 @@ export class Openp41geTree extends LitElement {
     // Indentation: the indent unit per depth level is configurable via
     // --tree-indent (a fixed px value, changed in the explorer settings).
     const indentPerLevel = this._indentPerLevel();
-    const rowIndent = isSection
-      ? depth * indentPerLevel + SECTION_EXTRA
-      : depth * indentPerLevel;
+    const rowIndent = isSection ? depth * indentPerLevel + SECTION_EXTRA : depth * indentPerLevel;
     // A node may opt to be pulled back toward its parent (e.g. content-match
     // rows rendered as children of a file), reducing its effective indent.
     const appliedIndent = Math.max(0, rowIndent - (node.reduceIndent ?? 0));

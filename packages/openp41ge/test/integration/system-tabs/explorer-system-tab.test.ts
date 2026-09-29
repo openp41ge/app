@@ -224,7 +224,12 @@ describe("ExplorerSystemTabController", () => {
 
     // Header rows are navigable again alongside file rows and the
     // add-worktree/add-repository rows.
-    expect(tree._navigableRows().map((r) => r.className).sort()).toEqual([
+    expect(
+      tree
+        ._navigableRows()
+        .map((r) => r.className)
+        .sort(),
+    ).toEqual([
       "tree-node",
       "wt-add-row flex items-center h-[30px] pr-2 cursor-pointer select-none text-sm text-muted gap-[2px] transition-[color,background] duration-100",
       "wt-row-header",
@@ -247,9 +252,7 @@ describe("ExplorerSystemTabController", () => {
     // Repo header (stationary) carries the grey class value in CSS; focus is now
     // on the file row, which also owns the tree selection.
     expect(tree._focusedRowEl).toBe(node);
-    expect(
-      (fileTree as unknown as { selectedId: string | null }).selectedId,
-    ).toBe("/repo/a.ts");
+    expect((fileTree as unknown as { selectedId: string | null }).selectedId).toBe("/repo/a.ts");
 
     // The grey/blue split: the stationary header is wt-row-selected (grey), and a
     // focused header paints wt-row-focused (blue) — CSS colors, asserted on the
@@ -297,7 +300,9 @@ describe("ExplorerSystemTabController", () => {
     expect(tree._focusedRowEl).toBe(addWt);
 
     // Enter activates the row and begins the inline branch-name input.
-    tree.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    tree.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
     await item.updateComplete;
     expect(item._showingAddWorktree).toBe(true);
     expect(item.querySelector("#wt-addwt-input")).not.toBeNull();
@@ -335,7 +340,9 @@ describe("ExplorerSystemTabController", () => {
       const rows = tree._navigableRows();
       const isAddRepo = rowMarker === "add-repo-label";
       const addRow = isAddRepo
-        ? rows.find((r) => r.classList.contains("wt-add-row") && !r.classList.contains("add-worktree-row"))!
+        ? rows.find(
+            (r) => r.classList.contains("wt-add-row") && !r.classList.contains("add-worktree-row"),
+          )!
         : rows.find((r) => r.classList.contains("add-worktree-row"))!;
       expect(addRow).toBeDefined();
 

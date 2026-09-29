@@ -22,10 +22,7 @@
 
 import { LitElement, html } from "lit";
 import { property } from "lit/decorators.js";
-import {
-  gitBrowserRenderer,
-  type GitBrowserData,
-} from "openp41ge-git";
+import { gitBrowserRenderer, type GitBrowserData } from "openp41ge-git";
 
 // ─── Event names — exported for host app type safety ─────────────────────
 
@@ -176,15 +173,11 @@ export class GitRepositoryPanel extends LitElement {
   }
 
   private _dispatch<T>(type: string, detail: T): void {
-    this.dispatchEvent(
-      new CustomEvent<T>(type, { bubbles: true, composed: false, detail }),
-    );
+    this.dispatchEvent(new CustomEvent<T>(type, { bubbles: true, composed: false, detail }));
   }
 
   private _dispatchSimple(type: string): void {
-    this.dispatchEvent(
-      new CustomEvent(type, { bubbles: true, composed: false }),
-    );
+    this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: false }));
   }
 }
 

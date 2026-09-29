@@ -412,21 +412,23 @@ export class TabBar extends LitElement {
             const isEphemeralPinned =
               id in this._localEphemeralPinned
                 ? this._localEphemeralPinned[id]
-                : tab?.ephemeralPinned ?? false;
+                : (tab?.ephemeralPinned ?? false);
             const hasIcon = !!tab?.icon;
             const tabStyle = [
-              `display:inline-flex;align-items:center;flex-shrink:0;min-width:${hasIcon ? 'calc(var(--tab-min-width,120px) + 24px)' : 'var(--tab-min-width,120px)'};max-width:75%;height:34px;padding:0 0 0 8px;border-right:1px solid #333;cursor:pointer;font-size:12px;line-height:34px;user-select:none;white-space:nowrap;`,
-              `font-style:${!isEphemeral && !tab?.pinned ? 'italic' : 'normal'};`,
+              `display:inline-flex;align-items:center;flex-shrink:0;min-width:${hasIcon ? "calc(var(--tab-min-width,120px) + 24px)" : "var(--tab-min-width,120px)"};max-width:75%;height:34px;padding:0 0 0 8px;border-right:1px solid #333;cursor:pointer;font-size:12px;line-height:34px;user-select:none;white-space:nowrap;`,
+              `font-style:${!isEphemeral && !tab?.pinned ? "italic" : "normal"};`,
               isActive && this.focused && isEphemeral
                 ? isEphemeralPinned
-                  ? 'background:rgba(229,192,123,0.18);border-bottom:2px solid rgb(229,192,123);color:#e5c07b;'
-                  : 'background:rgba(229,192,123,0.12);border-bottom:2px dashed rgb(229,192,123);color:#e5c07b;'
-                : isActive ? aBg : iBg,
-            ].join('');
+                  ? "background:rgba(229,192,123,0.18);border-bottom:2px solid rgb(229,192,123);color:#e5c07b;"
+                  : "background:rgba(229,192,123,0.12);border-bottom:2px dashed rgb(229,192,123);color:#e5c07b;"
+                : isActive
+                  ? aBg
+                  : iBg,
+            ].join("");
             return html`
               <div
                 role="tab"
-                class="tab-btn ${isActive ? 'active' : ''}"
+                class="tab-btn ${isActive ? "active" : ""}"
                 data-tab-id=${id}
                 style=${tabStyle}
                 @mouseenter=${(e: MouseEvent) => this._startTextScroll(e.currentTarget as HTMLElement)}
@@ -436,50 +438,82 @@ export class TabBar extends LitElement {
                   class="tab-text-container"
                   style="flex:1;overflow:hidden;min-width:0;padding:0 0 0 8px;display:flex;align-items:center;"
                 >
-                  ${tab?.icon
-                    ? html`<span
-                        class="tab-icon"
-                        style="display:inline-flex;align-items:center;flex-shrink:0;margin-right:6px;line-height:1;color:inherit;"
-                        >${unsafeHTML(tab.icon)}</span
-                      >`
-                    : nothing}
+                  ${
+                    tab?.icon
+                      ? html`<span
+                          class="tab-icon"
+                          style="display:inline-flex;align-items:center;flex-shrink:0;margin-right:6px;line-height:1;color:inherit;"
+                          >${unsafeHTML(tab.icon)}</span
+                        >`
+                      : nothing
+                  }
                   <span
                     class="tab-text-inner"
                     style="white-space:nowrap;display:inline-block;overflow:hidden;text-overflow:ellipsis;"
                     >${tab ? tab.title : id}</span
                   >
                 </div>
-                ${isEphemeral
-                  ? html`<span class="flex items-center shrink-0" style="display:inline-flex;align-items:center;flex-shrink:0;">
-                      <span
-                        class="tab-pin ${isEphemeralPinned ? 'pinned' : ''}"
-                        id="pin-${id}"
-                        title=${isEphemeralPinned ? 'Unpin tab — closes on defocus' : 'Pin tab — stays open on defocus'}
-                        @click=${(e: MouseEvent) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const newPinned = !isEphemeralPinned;
-                          this._localEphemeralPinned[id] = newPinned;
-                          this.requestUpdate();
-                          this.dispatchEvent(
-                            new CustomEvent("grid-pin", {
-                              bubbles: true,
-                              detail: { winId: this.winId, tabId: id, pinned: newPinned, ephemeral: true },
-                            }),
-                          );
-                        }}
+                ${
+                  isEphemeral
+                    ? html`<span
+                        class="flex items-center shrink-0"
+                        style="display:inline-flex;align-items:center;flex-shrink:0;"
                       >
-                        ${isEphemeralPinned
-                          ? html`<svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
-                              <path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/>
-                            </svg>`
-                          : html`<svg width="14" height="14" viewBox="0 -960 960 960" fill="currentColor">
-                              <path d="M680-840v80h-40v327l-80-80v-247H400v87l-87-87-33-33v-47h400ZM480-40l-40-40v-240H240v-80l80-80v-46L56-792l56-56 736 736-58 56-264-264h-6v240l-40 40ZM354-400h92l-44-44-2-2-46 46Zm126-193Zm-78 149Z"/>
-                            </svg>`}
-                      </span>
-                      <span class="tab-close" data-close-tab-id=${id}><span class="tab-close-x">✕</span></span>
-                    </span>`
-                  : html`<span class="tab-close" data-close-tab-id=${id}><span class="tab-close-x">✕</span></span>`}
+                        <span
+                          class="tab-pin ${isEphemeralPinned ? "pinned" : ""}"
+                          id="pin-${id}"
+                          title=${isEphemeralPinned ? "Unpin tab — closes on defocus" : "Pin tab — stays open on defocus"}
+                          @click=${(e: MouseEvent) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const newPinned = !isEphemeralPinned;
+                            this._localEphemeralPinned[id] = newPinned;
+                            this.requestUpdate();
+                            this.dispatchEvent(
+                              new CustomEvent("grid-pin", {
+                                bubbles: true,
+                                detail: {
+                                  winId: this.winId,
+                                  tabId: id,
+                                  pinned: newPinned,
+                                  ephemeral: true,
+                                },
+                              }),
+                            );
+                          }}
+                        >
+                          ${
+                            isEphemeralPinned
+                              ? html`<svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 -960 960 960"
+                                  fill="currentColor"
+                                >
+                                  <path
+                                    d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"
+                                  />
+                                </svg>`
+                              : html`<svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 -960 960 960"
+                                  fill="currentColor"
+                                >
+                                  <path
+                                    d="M680-840v80h-40v327l-80-80v-247H400v87l-87-87-33-33v-47h400ZM480-40l-40-40v-240H240v-80l80-80v-46L56-792l56-56 736 736-58 56-264-264h-6v240l-40 40ZM354-400h92l-44-44-2-2-46 46Zm126-193Zm-78 149Z"
+                                  />
+                                </svg>`
+                          }
+                        </span>
+                        <span class="tab-close" data-close-tab-id=${id}
+                          ><span class="tab-close-x">✕</span></span
+                        >
+                      </span>`
+                    : html`<span class="tab-close" data-close-tab-id=${id}
+                        ><span class="tab-close-x">✕</span></span
+                      >`
+                }
               </div>
             `;
           })}

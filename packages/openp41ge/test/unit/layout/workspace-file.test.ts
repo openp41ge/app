@@ -114,7 +114,12 @@ describe("migrateWorkspaceFileData", () => {
           id: "win-x",
           bounds: { x: 0, y: 0, width: 100, height: 100 },
           grid: { rows: 1, cols: 1, placements: [] },
-          sidebar: { activeViewId: null, width: 280, activeLeftTab: "sys-search", activeRightTab: null },
+          sidebar: {
+            activeViewId: null,
+            width: 280,
+            activeLeftTab: "sys-search",
+            activeRightTab: null,
+          },
         },
       ],
     } as unknown as WorkspaceFileData);
@@ -125,7 +130,10 @@ describe("migrateWorkspaceFileData", () => {
     expect((file.systemTabs as Record<string, unknown>)?.["sys-explorer"]).toBeDefined();
     expect(file.sharedSidebars?.leftSidebarTabs).toEqual(["sys-explorer"]);
     expect(file.sharedSidebars?.rightSidebarTabs).toEqual(["sys-logs"]);
-    expect((file.windows?.[0] as unknown as { sidebar: { activeLeftTab: unknown } }).sidebar.activeLeftTab).toBeNull();
+    expect(
+      (file.windows?.[0] as unknown as { sidebar: { activeLeftTab: unknown } }).sidebar
+        .activeLeftTab,
+    ).toBeNull();
   });
 });
 

@@ -17,7 +17,10 @@ class FakeFeStatusBar extends HTMLElement {
 if (!customElements.get("fe-status-bar")) customElements.define("fe-status-bar", FakeFeStatusBar);
 
 const cleanup: HTMLElement[] = [];
-afterEach(() => { for (const c of cleanup) c.remove(); cleanup.length = 0; });
+afterEach(() => {
+  for (const c of cleanup) c.remove();
+  cleanup.length = 0;
+});
 
 function makeGrid(): HTMLElement {
   const grid = document.createElement("tab-grid") as HTMLElement & any;
@@ -29,8 +32,13 @@ function makeGrid(): HTMLElement {
     { position: { row: 0, col: 2 }, tabIds: ["a2"] },
     { position: { row: 0, col: 3 }, tabIds: ["a3"] },
   ];
-  grid.tabData = { a0:{title:"a0",content:""},a1:{title:"a1",content:""},a2:{title:"a2",content:""},a3:{title:"a3",content:""} };
-  grid.activeTabIds = { 0:"a0",1:"a1",2:"a2",3:"a3" };
+  grid.tabData = {
+    a0: { title: "a0", content: "" },
+    a1: { title: "a1", content: "" },
+    a2: { title: "a2", content: "" },
+    a3: { title: "a3", content: "" },
+  };
+  grid.activeTabIds = { 0: "a0", 1: "a1", 2: "a2", 3: "a3" };
   document.body.appendChild(grid);
   cleanup.push(grid);
   return grid;
@@ -106,7 +114,9 @@ describe("grid hover-reserve", () => {
     // Without overflow the reserve class is absent, so the button keeps its
     // natural height (no artificial min-height / bottom padding).
     expect(btn).toBeTruthy();
-    expect(grid.querySelector(".grid-container")!.classList.contains("grid-hover-reserve")).toBe(false);
+    expect(grid.querySelector(".grid-container")!.classList.contains("grid-hover-reserve")).toBe(
+      false,
+    );
     let cs = getComputedStyle(btn);
     expect(cs.minHeight).toBe("auto");
     expect(cs.paddingBottom).toBe("0");

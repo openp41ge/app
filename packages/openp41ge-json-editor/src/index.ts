@@ -5,7 +5,12 @@
  * tree/highlight helpers so consumers (and tests) can use them.
  */
 
-export { JsonEditorElement, JSON_EDITOR_CHANGE, JSON_EDITOR_OPEN, JSON_EDITOR_OVERWRITE } from "./json-editor";
+export {
+  JsonEditorElement,
+  JSON_EDITOR_CHANGE,
+  JSON_EDITOR_OPEN,
+  JSON_EDITOR_OVERWRITE,
+} from "./json-editor";
 
 export { gutterWidthFor, GUTTER_PAD_PX, GUTTER_FOLD_PX, DEFAULT_DIGIT_PX } from "./json-editor";
 

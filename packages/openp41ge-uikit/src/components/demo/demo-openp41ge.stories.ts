@@ -31,7 +31,13 @@ export const TwoColumns: Story = {
     cols: 2,
     placements: [
       { col: 0, tabs: [{ id: "f1", title: "file.js" }] },
-      { col: 1, tabs: [{ id: "t1", title: "terminal" }, { id: "e1", title: "editor" }] },
+      {
+        col: 1,
+        tabs: [
+          { id: "t1", title: "terminal" },
+          { id: "e1", title: "editor" },
+        ],
+      },
     ],
     "active-tab": "f1",
   },
@@ -43,7 +49,13 @@ export const ThreeColumns: Story = {
     placements: [
       { col: 0, tabs: [{ id: "a", title: "index" }] },
       { col: 1, tabs: [{ id: "b", title: "todo" }] },
-      { col: 2, tabs: [{ id: "c", title: "log" }, { id: "d", title: "cli" }] },
+      {
+        col: 2,
+        tabs: [
+          { id: "c", title: "log" },
+          { id: "d", title: "cli" },
+        ],
+      },
     ],
     "active-tab": "a",
   },
@@ -114,9 +126,7 @@ export const GhostBoundarySplit: Story = {
   render: () => html`
     <demo-openp41ge
       cols="1"
-      .placements=${[
-        { col: 0, tabs: [{ id: "a", title: "index" }] },
-      ]}
+      .placements=${[{ col: 0, tabs: [{ id: "a", title: "index" }] }]}
       active-tab="a"
       .ghostBoundaryIndex=${1}
       sidebar
@@ -131,7 +141,13 @@ export const FullFeatured: Story = {
       cols="3"
       .placements=${[
         { col: 0, tabs: [{ id: "a", title: "index.ts" }] },
-        { col: 1, tabs: [{ id: "b", title: "app.tsx" }, { id: "c", title: "styles.css" }] },
+        {
+          col: 1,
+          tabs: [
+            { id: "b", title: "app.tsx" },
+            { id: "c", title: "styles.css" },
+          ],
+        },
         { col: 2, tabs: [{ id: "d", title: "terminal" }] },
       ]}
       active-tab="b"

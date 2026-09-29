@@ -39,10 +39,7 @@ describe("settings schemas", () => {
     expect(keys.length).toBeGreaterThan(0);
     for (const key of keys) {
       const sub = schemaAtPath(AGENT_SETTINGS_SCHEMA, key);
-      expect(
-        schemaDescription(sub),
-        `expected a description for "${key.join(".")}"`,
-      ).toBeTruthy();
+      expect(schemaDescription(sub), `expected a description for "${key.join(".")}"`).toBeTruthy();
     }
   });
 
@@ -51,10 +48,7 @@ describe("settings schemas", () => {
     expect(keys.length).toBeGreaterThan(0);
     for (const key of keys) {
       const sub = schemaAtPath(GLOBAL_SETTINGS_SCHEMA, key);
-      expect(
-        schemaDescription(sub),
-        `expected a description for "${key.join(".")}"`,
-      ).toBeTruthy();
+      expect(schemaDescription(sub), `expected a description for "${key.join(".")}"`).toBeTruthy();
     }
   });
 

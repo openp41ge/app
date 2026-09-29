@@ -80,7 +80,9 @@ describe("GhostManager suppressFrame", () => {
     const box2 = grid.querySelector<HTMLElement>(":scope .openp41ge-ghost-overlay drop-box");
     expect(box2).toBe(box1); // same element — overlay/box reused, no flicker
     expect((box2 as unknown as { frame: boolean }).frame).toBe(false);
-    const over = grid.querySelector<HTMLElement>(":scope .openp41ge-ghost-overlay drop-box-overdraw");
+    const over = grid.querySelector<HTMLElement>(
+      ":scope .openp41ge-ghost-overlay drop-box-overdraw",
+    );
     expect(over!.style.display).toBe("none");
 
     // Toggle back to the bordered box (cursor over the cell).

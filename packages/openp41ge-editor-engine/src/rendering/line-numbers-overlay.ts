@@ -259,7 +259,8 @@ export class LineNumbersOverlay {
         }
       } else {
         const labelOverride = this._config.getLabelOverride?.(lineNum);
-        const text = labelOverride === undefined || labelOverride === null ? String(lineNum) : labelOverride;
+        const text =
+          labelOverride === undefined || labelOverride === null ? String(lineNum) : labelOverride;
         if (entry.lastText !== text) {
           entry.label.textContent = text;
           entry.lastText = text;

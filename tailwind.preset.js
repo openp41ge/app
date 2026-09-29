@@ -52,7 +52,7 @@ module.exports = {
         "2xs": ["10px", { lineHeight: "14px" }],
         xs: ["11px", { lineHeight: "16px" }],
         sm: ["12px", { lineHeight: "18px" }],
-        "13": ["13px", { lineHeight: "18px" }],
+        13: ["13px", { lineHeight: "18px" }],
       },
       spacing: {
         sidebar: "48px",

@@ -37,13 +37,9 @@ export function registerDispatchHandlers(dispatcher: OperationDispatcher): void 
           // actionOpenFileInNewWindow carries [filePath, fileName, sourceWinId,
           // dropScreenX, dropScreenY] — coords are the last two args (indices 3/4).
           const dropScreenX =
-            fn === "actionOpenFileInNewWindow" && args.length >= 5
-              ? Number(args[3])
-              : undefined;
+            fn === "actionOpenFileInNewWindow" && args.length >= 5 ? Number(args[3]) : undefined;
           const dropScreenY =
-            fn === "actionOpenFileInNewWindow" && args.length >= 5
-              ? Number(args[4])
-              : undefined;
+            fn === "actionOpenFileInNewWindow" && args.length >= 5 ? Number(args[4]) : undefined;
           createOpenp41geWindow(
             newWin.id,
             false,
@@ -57,8 +53,15 @@ export function registerDispatchHandlers(dispatcher: OperationDispatcher): void 
   });
 
   ipcMain.on("openp41ge:create-window", (event: IpcMainEvent, data: string) => {
-    const { type: _type, windowId, _paneId, tabId, bounds, dropScreenX, dropScreenY } =
-      JSON.parse(data);
+    const {
+      type: _type,
+      windowId,
+      _paneId,
+      tabId,
+      bounds,
+      dropScreenX,
+      dropScreenY,
+    } = JSON.parse(data);
     dispatcher.apply("detachTabToWindow", [windowId, tabId, bounds]);
     const ws = dispatcher.getWorkspace();
     const newWin = ws.windows[ws.windows.length - 1];

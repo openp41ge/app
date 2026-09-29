@@ -49,7 +49,10 @@ const CONTENT = ["new", "after", "final"].join("\n") + "\n";
 const HUNKS = [
   {
     header: "@@ -1,1 +1,1 @@",
-    lines: [{ type: "-", text: "old" }, { type: "+", text: "new" }],
+    lines: [
+      { type: "-", text: "old" },
+      { type: "+", text: "new" },
+    ],
   },
 ];
 

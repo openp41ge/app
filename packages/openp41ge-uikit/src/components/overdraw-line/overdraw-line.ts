@@ -49,7 +49,8 @@ export const OVERDRAW_LENGTHS = [4, 8, 5, 10, 6, 9, 7] as const;
  *  length, every time; consecutive ordinals always differ, so a run of lines
  *  looks uneven rather than uniform. Pure, so it is directly testable. */
 export function overdrawLengthForOrdinal(ordinal: number): number {
-  const n = ((ordinal % OVERDRAW_LENGTHS.length) + OVERDRAW_LENGTHS.length) % OVERDRAW_LENGTHS.length;
+  const n =
+    ((ordinal % OVERDRAW_LENGTHS.length) + OVERDRAW_LENGTHS.length) % OVERDRAW_LENGTHS.length;
   return OVERDRAW_LENGTHS[n];
 }
 

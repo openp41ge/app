@@ -152,7 +152,9 @@ describe("SidebarDropTarget no-op reorder suppression", () => {
     // with its <drop-box-overdraw> corner-bleed companion as a sibling.
     expect(document.querySelector(".sidebar-drop-zone-box")!.tagName).toBe("DROP-BOX");
     expect(overdrawVisible()).toBe(true);
-    expect(document.querySelector(".sidebar-drop-zone-overdraw")!.tagName).toBe("DROP-BOX-OVERDRAW");
+    expect(document.querySelector(".sidebar-drop-zone-overdraw")!.tagName).toBe(
+      "DROP-BOX-OVERDRAW",
+    );
     expect(feedback).not.toBeNull();
 
     target.onLeave();
@@ -460,7 +462,9 @@ describe("SidebarDropTarget tab-bar indicator geometry", () => {
     target.onHover(fakeSystemTabSource("t1", "right"), 80, 15);
     expect(document.querySelectorAll(".sidebar-drop-indicator")).toHaveLength(1);
     expect(
-      document.querySelector(".sidebar-drop-indicator")!.querySelectorAll(".drop-tip-vod-up, .drop-tip-vod-down"),
+      document
+        .querySelector(".sidebar-drop-indicator")!
+        .querySelectorAll(".drop-tip-vod-up, .drop-tip-vod-down"),
     ).toHaveLength(2);
   });
 });

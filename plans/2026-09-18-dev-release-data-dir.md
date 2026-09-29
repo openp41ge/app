@@ -53,8 +53,7 @@ export function appDataDirName(isPackaged: boolean): string {
 
 /** Absolute app-data root: env overrides first, then packaged-based default. */
 export function resolveAppDataDir(isPackaged: boolean): string {
-  const override =
-    process.env.OPENP41GE_E2E_DIR || process.env.OPENP41GE_DIR;
+  const override = process.env.OPENP41GE_E2E_DIR || process.env.OPENP41GE_DIR;
   if (override) return override;
   return path.join(os.homedir(), appDataDirName(isPackaged));
 }

@@ -30,10 +30,7 @@ fs.mkdirSync(path.dirname(outPath), { recursive: true });
 // Escape backticks, template literals, and backslashes in the CSS
 // Backslashes must be escaped first so CSS escapes like \\2c don't become
 // legacy octal escapes in the JS template literal.
-const escaped = css
-  .replace(/\\/g, "\\\\")
-  .replace(/`/g, "\\`")
-  .replace(/\$\{/g, "\\${");
+const escaped = css.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 
 fs.writeFileSync(
   outPath,

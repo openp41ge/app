@@ -136,7 +136,9 @@ describe("openp41ge-confirm-modal — showConfirmModal", () => {
       });
       const card = document.body.querySelector(".openp41ge-confirm-checkbox-card") as HTMLElement;
       card?.click();
-      const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+      const checkbox = document.body.querySelector(
+        ".openp41ge-confirm-checkbox input",
+      ) as HTMLInputElement;
       expect(checkbox!.checked).toBe(true);
       expect(document.body.querySelector("openp41ge-confirm-modal")).toBeTruthy();
       // Cleanup
@@ -162,7 +164,9 @@ describe("openp41ge-confirm-modal — showConfirmModal", () => {
         confirmLabel: "Delete",
         checkboxLabel: "Also delete data",
       });
-      const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+      const checkbox = document.body.querySelector(
+        ".openp41ge-confirm-checkbox input",
+      ) as HTMLInputElement;
       checkbox?.click();
       const okBtn = document.body.querySelector(".openp41ge-confirm-ok") as HTMLElement;
       okBtn?.click();
@@ -175,7 +179,9 @@ describe("openp41ge-confirm-modal — showConfirmModal", () => {
         message: "Delete workspace?",
         checkboxLabel: "Also delete data",
       });
-      const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+      const checkbox = document.body.querySelector(
+        ".openp41ge-confirm-checkbox input",
+      ) as HTMLInputElement;
       checkbox?.click();
       const cancelBtn = document.body.querySelector(".openp41ge-confirm-cancel") as HTMLElement;
       cancelBtn?.click();
@@ -190,7 +196,9 @@ describe("openp41ge-confirm-modal — showConfirmModal", () => {
       });
       return new Promise<void>((resolve) => {
         requestAnimationFrame(() => {
-          const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+          const checkbox = document.body.querySelector(
+            ".openp41ge-confirm-checkbox input",
+          ) as HTMLInputElement;
           const cancelBtn = document.body.querySelector(".openp41ge-confirm-cancel") as HTMLElement;
           const okBtn = document.body.querySelector(".openp41ge-confirm-ok") as HTMLElement;
 
@@ -217,7 +225,9 @@ describe("openp41ge-confirm-modal — showConfirmModal", () => {
         message: "Delete workspace?",
         checkboxLabel: "Also delete data",
       });
-      const checkbox = document.body.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement;
+      const checkbox = document.body.querySelector(
+        ".openp41ge-confirm-checkbox input",
+      ) as HTMLInputElement;
       checkbox?.focus();
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 

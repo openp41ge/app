@@ -665,13 +665,16 @@ function onManagerTabMouseDown(e: MouseEvent): void {
   const tabEl = e
     .composedPath()
     .find(
-      (el): el is HTMLElement =>
-        el instanceof HTMLElement && el.hasAttribute("data-manager-tab"),
+      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-manager-tab"),
     );
   if (!tabEl) return;
 
   // Don't initiate a drag from the tab's close button — it stays click-only.
-  if (e.composedPath().some((el) => el instanceof HTMLElement && el.classList.contains("wm-tab-close"))) {
+  if (
+    e
+      .composedPath()
+      .some((el) => el instanceof HTMLElement && el.classList.contains("wm-tab-close"))
+  ) {
     return;
   }
 
@@ -683,8 +686,7 @@ function onManagerTabMouseDown(e: MouseEvent): void {
   const tabId = tabEl.getAttribute("data-manager-tab") || "";
   if (!tabId) return;
   const title =
-    (tabEl.querySelector(".wm-tab-title")?.textContent ?? tabEl.textContent ?? "").trim() ||
-    tabId;
+    (tabEl.querySelector(".wm-tab-title")?.textContent ?? tabEl.textContent ?? "").trim() || tabId;
   const winId = _resolveMyWinId();
 
   // Calculate the cursor offset from the tab's top-left corner so the bitmap
@@ -1316,7 +1318,9 @@ export function initDragSystem(): () => void {
           // and the capture inset can't clip it (unlike the grid's edge line).
           setSidebarDropFeedbackSuppressed(true);
           document
-            .querySelectorAll(".sidebar-drop-zone-box, .sidebar-drop-zone-overdraw, .sidebar-drop-indicator")
+            .querySelectorAll(
+              ".sidebar-drop-zone-box, .sidebar-drop-zone-overdraw, .sidebar-drop-indicator",
+            )
             .forEach((el) => el.remove());
           document.querySelectorAll(".tab-drop-indicator").forEach((el) => {
             (el as HTMLElement).style.display = "none";
@@ -1613,21 +1617,11 @@ export function initDragSystem(): () => void {
         // manager window), the drop is a cancel — manager tabs can only land on
         // other management tab bars.
         if (!check) {
-          window.openp41ge.windowManager.openWithTab(
-            detail.winId,
-            detail.tabId,
-            screenX,
-            screenY,
-          );
+          window.openp41ge.windowManager.openWithTab(detail.winId, detail.tabId, screenX, screenY);
         }
       } catch {
         // On any error, conservatively treat the release as a drag-out.
-        window.openp41ge.windowManager.openWithTab(
-          detail.winId,
-          detail.tabId,
-          screenX,
-          screenY,
-        );
+        window.openp41ge.windowManager.openWithTab(detail.winId, detail.tabId, screenX, screenY);
       }
       return;
     }
@@ -1862,12 +1856,7 @@ async function _handleCrossWindowDrop(
       const tabId = (data as { tabId?: string }).tabId;
       if (tabId && _isOverManagerBar(clientX, clientY) && _managerBarEl && _managerBarDropTarget) {
         const dropIndex = managerDropIndex(_managerBarEl, clientX);
-        window.openp41ge.windowManager.moveTab(
-          sourceWinId,
-          _resolveMyWinId(),
-          tabId,
-          dropIndex,
-        );
+        window.openp41ge.windowManager.moveTab(sourceWinId, _resolveMyWinId(), tabId, dropIndex);
       }
       window.openp41ge.drag.endSession();
       return;
@@ -2365,7 +2354,8 @@ if (typeof window !== "undefined") {
     getManagerTabPendingStart: () => _pendingManagerTabDragStart,
     getManagerTabBarDropTarget: () => _managerBarDropTarget,
     isManagerTabDragActive: () => _managerTabDragActive,
-    registerManagerTabBarForTest: (barEl: HTMLElement) => registerManagerTabBar(barEl, _resolveMyWinId()),
+    registerManagerTabBarForTest: (barEl: HTMLElement) =>
+      registerManagerTabBar(barEl, _resolveMyWinId()),
     callUpdateManagerBarGhost: (cx: number, cy: number) => _updateManagerBarGhost(cx, cy),
   };
 }
@@ -2616,10 +2606,7 @@ function _clearSidebarDropTargetCache(): void {
  * cross-window drops can land on it. Called by <openp41ge-window-manager>
  * after its first render. Returns an unregister function.
  */
-export function registerManagerTabBar(
-  barEl: HTMLElement,
-  _winId: string,
-): () => void {
+export function registerManagerTabBar(barEl: HTMLElement, _winId: string): () => void {
   // A new registration replaces an old one (e.g. a re-render, or a second
   // window-manager window in the unlikely event of more than one per process).
   _managerBarDropTarget?.onLeave();
@@ -2638,12 +2625,7 @@ export function registerManagerTabBar(
 function _getManagerTabBarTarget(clientX: number, clientY: number): IDropTarget | null {
   if (!_managerBarDropTarget || !_managerBarEl) return null;
   const rect = _managerBarEl.getBoundingClientRect();
-  if (
-    clientX < rect.left ||
-    clientX > rect.right ||
-    clientY < rect.top ||
-    clientY > rect.bottom
-  ) {
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
     return null;
   }
   return _managerBarDropTarget;

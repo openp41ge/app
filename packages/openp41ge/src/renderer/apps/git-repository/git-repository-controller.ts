@@ -12,7 +12,12 @@
 
 import { BaseController } from "../../controllers/base-controller";
 import type { TabController } from "../../controllers/types";
-import type { GitRepositoryPanel, GitBrowserData, GitBranchContextMenuDetail, GitFileRowClickDetail } from "openp41ge-uikit";
+import type {
+  GitRepositoryPanel,
+  GitBrowserData,
+  GitBranchContextMenuDetail,
+  GitFileRowClickDetail,
+} from "openp41ge-uikit";
 import {
   GIT_SELECT_BRANCH,
   GIT_SELECT_COMMIT,
@@ -66,8 +71,8 @@ export class GitRepositoryController extends BaseController implements TabContro
 
     // Worktree-scoped drop: pick up the pending branch (set by the tab drop
     // handler alongside __pendingGitRepo).
-    const pendingWorktree = (window as unknown as Record<string, unknown>)
-      .__pendingGitWorktree as string | undefined;
+    const pendingWorktree = (window as unknown as Record<string, unknown>).__pendingGitWorktree as
+      string | undefined;
     if (pendingWorktree && !this.branch) {
       this.branch = pendingWorktree;
     }
@@ -323,8 +328,7 @@ export class GitRepositoryController extends BaseController implements TabContro
     }
     if (repoName !== this.repoName || !this._data) return;
 
-    const commitRef =
-      this._resolveBranchRef(this._data.selectedBranch) || this.branch || "";
+    const commitRef = this._resolveBranchRef(this._data.selectedBranch) || this.branch || "";
     try {
       const [branches, commitLog] = await Promise.all([
         isWorktreeMode
@@ -399,11 +403,9 @@ export class GitRepositoryController extends BaseController implements TabContro
 
     try {
       const repoName = this.repoName;
-      const commits = await window.openp41ge.workspaceController.getCommitLog(
-        repoName,
-        commitRef,
-        { maxCount: 50 },
-      );
+      const commits = await window.openp41ge.workspaceController.getCommitLog(repoName, commitRef, {
+        maxCount: 50,
+      });
       if (repoName !== this.repoName || !this._data) return;
 
       const diffStat = await window.openp41ge.workspaceController.getDiffStat(repoName);
@@ -518,10 +520,7 @@ export class GitRepositoryController extends BaseController implements TabContro
     if (this._data.visibleCommitCount < this._data.commits.length) {
       this._data = {
         ...this._data,
-        visibleCommitCount: Math.min(
-          this._data.visibleCommitCount + 10,
-          this._data.commits.length,
-        ),
+        visibleCommitCount: Math.min(this._data.visibleCommitCount + 10, this._data.commits.length),
       };
       this._pushData();
       return;
@@ -620,9 +619,7 @@ export class GitRepositoryController extends BaseController implements TabContro
           label: "Show commits",
           action: () => {
             if (this._data) {
-              this._onSelectBranch(
-                new CustomEvent(GIT_SELECT_BRANCH, { detail: { branchName } }),
-              );
+              this._onSelectBranch(new CustomEvent(GIT_SELECT_BRANCH, { detail: { branchName } }));
             }
           },
         },

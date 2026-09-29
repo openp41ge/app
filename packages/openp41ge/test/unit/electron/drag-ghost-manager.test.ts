@@ -7,7 +7,12 @@
  * file/tab) swaps stay 1:1 with no animation.
  */
 import { describe, it, expect } from "vitest";
-import { buildBitmapGhostHtml, buildBitmapImgHtml, buildWorkspaceGhostHtml, LIFT_MAX_SCALE } from "../../../src/main/services/drag-ghost-manager.js";
+import {
+  buildBitmapGhostHtml,
+  buildBitmapImgHtml,
+  buildWorkspaceGhostHtml,
+  LIFT_MAX_SCALE,
+} from "../../../src/main/services/drag-ghost-manager.js";
 
 const SPRING_EASE = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
@@ -56,7 +61,13 @@ describe("buildBitmapGhostHtml", () => {
     const maxH = Math.round(84 * LIFT_MAX_SCALE);
     expect(html).toContain(`width:${maxW}px;height:${maxH}px`);
     expect(html).toContain("Two");
-    expect(html).toContain("transform-origin:" + Math.round(40 * LIFT_MAX_SCALE) + "px " + Math.round(20 * LIFT_MAX_SCALE) + "px");
+    expect(html).toContain(
+      "transform-origin:" +
+        Math.round(40 * LIFT_MAX_SCALE) +
+        "px " +
+        Math.round(20 * LIFT_MAX_SCALE) +
+        "px",
+    );
     expect(html).toContain("op41ge-lift");
     expect(html).toContain(SPRING_EASE);
   });

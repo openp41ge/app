@@ -617,9 +617,7 @@ export class NodeGitCommitService implements IGitCommitService {
           const hashes = await pinNewestN();
           if (hashes.length > 0) {
             const revs =
-              hashes.length > maxCount
-                ? [hashes[0], `^${hashes[maxCount]}`]
-                : [hashes[0]];
+              hashes.length > maxCount ? [hashes[0], `^${hashes[maxCount]}`] : [hashes[0]];
             const contentRaw = await this._execGit(
               [
                 "log",
@@ -776,11 +774,7 @@ export class NodeGitCommitService implements IGitCommitService {
    * Full content of `path` at `hash` (git show <hash>:<path>), or null for an
    * unknown commit/file. Best-effort — errors resolve null, never throw.
    */
-  async getCommitFileContent(
-    repoName: string,
-    hash: string,
-    path: string,
-  ): Promise<string | null> {
+  async getCommitFileContent(repoName: string, hash: string, path: string): Promise<string | null> {
     if (!hash || !path) return null;
     try {
       return await this._execGit(["show", `${hash}:${path}`], repoName);

@@ -24,10 +24,7 @@ describe("Gutter", () => {
   beforeEach(() => {
     gutter = new Gutter({});
     document.body.appendChild(gutter.root);
-    columns = [
-      lineNumberColumn({ width: 30 }),
-      foldColumn({ width: 19, onToggle: vi.fn() }),
-    ];
+    columns = [lineNumberColumn({ width: 30 }), foldColumn({ width: 19, onToggle: vi.fn() })];
     gutter.setColumns(columns);
   });
 
@@ -128,7 +125,9 @@ describe("Gutter", () => {
     it("portals corner overdraw accents around the hover box and removes them on dispose", () => {
       const realRaf = (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame;
       const rafCbs: FrameRequestCallback[] = [];
-      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = (
+        cb: FrameRequestCallback,
+      ) => {
         rafCbs.push(cb);
         return rafCbs.length;
       };
@@ -136,18 +135,36 @@ describe("Gutter", () => {
         gutter.setRows(rows(1), () => ({}));
         gutter.setHoverRow(0);
 
-        const layer = document.body.querySelector<HTMLElement>("div[aria-hidden='true'][style*='position: fixed']");
+        const layer = document.body.querySelector<HTMLElement>(
+          "div[aria-hidden='true'][style*='position: fixed']",
+        );
         expect(layer).toBeTruthy();
         const strokes = Array.from(layer!.querySelectorAll("overdraw-line"));
         // 4 edges x 2 corners.
         expect(strokes).toHaveLength(8);
-        expect(strokes.every((s) => s.style.getPropertyValue("--overdraw-color") === "var(--eg-hover-ring, rgba(255,255,255,0.16))")).toBe(true);
+        expect(
+          strokes.every(
+            (s) =>
+              s.style.getPropertyValue("--overdraw-color") ===
+              "var(--eg-hover-ring, rgba(255,255,255,0.16))",
+          ),
+        ).toBe(true);
         expect(new Set(strokes.map((s) => s.getAttribute("corner"))).size).toBe(8);
 
         // Step one frame with a stubbed box rect to place the strokes.
         const box = gutter.root.querySelector<HTMLElement>(".eg-hoverbox")!;
         box.getBoundingClientRect = () =>
-          ({ left: 100, top: 40, right: 200, bottom: 74, width: 100, height: 34, x: 100, y: 40, toJSON() {} }) as DOMRect;
+          ({
+            left: 100,
+            top: 40,
+            right: 200,
+            bottom: 74,
+            width: 100,
+            height: 34,
+            x: 100,
+            y: 40,
+            toJSON() {},
+          }) as DOMRect;
         // Run the pending frame; place() schedules the next, so only splice once.
         for (const cb of rafCbs.splice(0)) cb(0);
         const brRight = strokes.find((s) => s.getAttribute("corner") === "br-right")!;
@@ -170,13 +187,17 @@ describe("Gutter", () => {
     it("portals corner accents around a hovered collapse icon and clears on leave", () => {
       const realRaf = (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame;
       const rafCbs: FrameRequestCallback[] = [];
-      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+      (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = (
+        cb: FrameRequestCallback,
+      ) => {
         rafCbs.push(cb);
         return rafCbs.length;
       };
       try {
         gutter.setRows(rows(2), (key) => ({ hasChevron: key === 0 }));
-        const chev = gutter.root.querySelector<HTMLElement>(".eg-col--fold button.eg-fold-chevron")!;
+        const chev = gutter.root.querySelector<HTMLElement>(
+          ".eg-col--fold button.eg-fold-chevron",
+        )!;
         chev.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
 
         // The hovered collapse icon portals a fixed layer of 8 corner accents
@@ -185,12 +206,28 @@ describe("Gutter", () => {
         expect(layer).toBeTruthy();
         const strokes = Array.from(layer!.querySelectorAll("overdraw-line"));
         expect(strokes).toHaveLength(8);
-        expect(strokes.every((s) => s.style.getPropertyValue("--overdraw-color") === "var(--eg-hover-ring, rgba(255,255,255,0.16))")).toBe(true);
+        expect(
+          strokes.every(
+            (s) =>
+              s.style.getPropertyValue("--overdraw-color") ===
+              "var(--eg-hover-ring, rgba(255,255,255,0.16))",
+          ),
+        ).toBe(true);
         expect(new Set(strokes.map((s) => s.getAttribute("corner"))).size).toBe(8);
 
         // Step one frame with a stubbed chevron rect to place the accents.
         chev.getBoundingClientRect = () =>
-          ({ left: 10, top: 5, right: 34, bottom: 29, width: 24, height: 24, x: 10, y: 5, toJSON() {} }) as DOMRect;
+          ({
+            left: 10,
+            top: 5,
+            right: 34,
+            bottom: 29,
+            width: 24,
+            height: 24,
+            x: 10,
+            y: 5,
+            toJSON() {},
+          }) as DOMRect;
         for (const cb of rafCbs.splice(0)) cb(0);
         const brRight = strokes.find((s) => s.getAttribute("corner") === "br-right")!;
         const brBottom = strokes.find((s) => s.getAttribute("corner") === "br-bottom")!;
@@ -200,7 +237,9 @@ describe("Gutter", () => {
         expect(parseFloat(brBottom.style.left)).toBe(34);
 
         // Leaving the chevron (pointer exits the button) removes the accents.
-        chev.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body }));
+        chev.dispatchEvent(
+          new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body }),
+        );
         expect(document.body.querySelector("div[style*='position: fixed']")).toBeNull();
       } finally {
         (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = realRaf;
@@ -213,15 +252,10 @@ describe("Gutter", () => {
       const onClick = vi.fn();
       const g = new Gutter({ events: { onRowClick: onClick } });
       document.body.appendChild(g.root);
-      g.setColumns([
-        lineNumberColumn({ width: 10 }),
-        foldColumn({ width: 10 }),
-      ]);
+      g.setColumns([lineNumberColumn({ width: 10 }), foldColumn({ width: 10 })]);
       g.setRows(rows(2), () => ({}));
       const numCell = g.root.querySelector(".eg-col--line-numbers .eg-cell")!;
-      numCell.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
-      );
+      numCell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
       expect(onClick).toHaveBeenCalledWith(expect.objectContaining({ key: 0 }));
       g.dispose();
     });
@@ -230,15 +264,10 @@ describe("Gutter", () => {
       const onClick = vi.fn();
       const g = new Gutter({ events: { onRowClick: onClick } });
       document.body.appendChild(g.root);
-      g.setColumns([
-        lineNumberColumn({ width: 10 }),
-        foldColumn({ width: 10 }),
-      ]);
+      g.setColumns([lineNumberColumn({ width: 10 }), foldColumn({ width: 10 })]);
       g.setRows(rows(1), (key) => ({ hasChevron: key === 0 }));
       const chevCell = g.root.querySelector(".eg-col--fold .eg-cell")!;
-      chevCell.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
-      );
+      chevCell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
       expect(onClick).not.toHaveBeenCalled();
       g.dispose();
     });
@@ -249,15 +278,10 @@ describe("Gutter", () => {
         events: { onRowSelectRange: onRange },
       });
       document.body.appendChild(g.root);
-      g.setColumns([
-        lineNumberColumn({ width: 10 }),
-        foldColumn({ width: 10 }),
-      ]);
+      g.setColumns([lineNumberColumn({ width: 10 }), foldColumn({ width: 10 })]);
       g.setRows(rows(4));
       const numCell = g.root.querySelector(".eg-col--line-numbers .eg-cell")!;
-      numCell.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true, button: 0, clientY: 2 }),
-      );
+      numCell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0, clientY: 2 }));
       // Move the pointer (with the button held) to a lower row.
       document.dispatchEvent(
         new MouseEvent("mousemove", { bubbles: true, buttons: 1, clientY: 42 }),

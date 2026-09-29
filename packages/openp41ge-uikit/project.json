@@ -23,10 +23,7 @@
         "command": "tailwindcss -i src/styles.css -o dist/styles.css && node scripts/inline-css.mjs",
         "cwd": "{projectRoot}"
       },
-      "outputs": [
-        "{projectRoot}/dist/styles.css",
-        "{projectRoot}/src/generated/tailwind.ts"
-      ],
+      "outputs": ["{projectRoot}/dist/styles.css", "{projectRoot}/src/generated/tailwind.ts"],
       "cache": true
     },
     "typecheck": {

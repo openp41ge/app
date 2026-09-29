@@ -56,7 +56,10 @@ const EventLogPanelWrapper: React.FC = () => {
   }, []);
 
   const toggleReverse = useCallback(() => setReverse((r) => !r), []);
-  const clearAll = useCallback(() => { setEvents([]); nextId = 1; }, []);
+  const clearAll = useCallback(() => {
+    setEvents([]);
+    nextId = 1;
+  }, []);
 
   const visible = reverse ? [...events].reverse() : events;
 
@@ -68,7 +71,11 @@ const EventLogPanelWrapper: React.FC = () => {
       "div",
       { style: eventsContainerStyle },
       visible.length === 0
-        ? React.createElement("div", { style: { color: "#888", padding: "8px" } as React.CSSProperties }, "Waiting for events…")
+        ? React.createElement(
+            "div",
+            { style: { color: "#888", padding: "8px" } as React.CSSProperties },
+            "Waiting for events…",
+          )
         : visible.map((entry) =>
             React.createElement(
               "div",
@@ -94,11 +101,7 @@ const EventLogPanelWrapper: React.FC = () => {
         { key: "reverse", onClick: toggleReverse, style: btnStyle },
         reverse ? "Oldest first ▼" : "Newest first ▲",
       ),
-      React.createElement(
-        "button",
-        { key: "clear", onClick: clearAll, style: btnStyle },
-        "Clear",
-      ),
+      React.createElement("button", { key: "clear", onClick: clearAll, style: btnStyle }, "Clear"),
     ),
   );
 };

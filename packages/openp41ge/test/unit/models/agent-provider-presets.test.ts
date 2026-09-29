@@ -63,11 +63,17 @@ describe("agent-provider-presets", () => {
   it("presetFor matches a config to its preset by endpoint, else Custom", () => {
     expect(presetFor({ baseUrl: "https://api.openai.com/v1", defaultModel: "" }).id).toBe("openai");
     // Trailing slash / case are normalised.
-    expect(presetFor({ baseUrl: "HTTPS://API.OPENAI.COM/V1/", defaultModel: "" }).id).toBe("openai");
+    expect(presetFor({ baseUrl: "HTTPS://API.OPENAI.COM/V1/", defaultModel: "" }).id).toBe(
+      "openai",
+    );
     // A local/self-hosted endpoint is no longer a named preset → Custom.
-    expect(presetFor({ baseUrl: "http://localhost:8000/v1", defaultModel: "" }).id).toBe(CUSTOM_PRESET_ID);
+    expect(presetFor({ baseUrl: "http://localhost:8000/v1", defaultModel: "" }).id).toBe(
+      CUSTOM_PRESET_ID,
+    );
     // Unrecognised endpoint → Custom.
-    expect(presetFor({ baseUrl: "https://example.com/x/v1", defaultModel: "" }).id).toBe(CUSTOM_PRESET_ID);
+    expect(presetFor({ baseUrl: "https://example.com/x/v1", defaultModel: "" }).id).toBe(
+      CUSTOM_PRESET_ID,
+    );
     // Blank endpoint → Custom.
     expect(presetFor({ baseUrl: "", defaultModel: "" }).id).toBe(CUSTOM_PRESET_ID);
   });
@@ -86,10 +92,15 @@ describe("agent-provider-presets", () => {
     ).toBe("OpenAI");
     // Custom preset with a host → hostname.
     expect(
-      providerDisplayName(customPreset(), { baseUrl: "https://my.example.com/v1", defaultModel: "" }),
+      providerDisplayName(customPreset(), {
+        baseUrl: "https://my.example.com/v1",
+        defaultModel: "",
+      }),
     ).toBe("my.example.com");
     // Custom preset with no endpoint → generic label.
-    expect(providerDisplayName(customPreset(), { baseUrl: "", defaultModel: "" })).toBe("Custom provider");
+    expect(providerDisplayName(customPreset(), { baseUrl: "", defaultModel: "" })).toBe(
+      "Custom provider",
+    );
   });
 
   it("endpointHost returns the host without the scheme/path", () => {
@@ -107,12 +118,16 @@ describe("agent-provider-presets", () => {
   });
 
   it("providerCompatible derives the wire protocol from the endpoint", () => {
-    expect(providerCompatible({ baseUrl: "https://api.openai.com/v1", defaultModel: "" })).toBe("openai");
+    expect(providerCompatible({ baseUrl: "https://api.openai.com/v1", defaultModel: "" })).toBe(
+      "openai",
+    );
     expect(providerCompatible({ baseUrl: "https://api.anthropic.com/v1", defaultModel: "" })).toBe(
       "anthropic",
     );
     // Unknown endpoint → OpenAI-compatible by default.
-    expect(providerCompatible({ baseUrl: "http://localhost:8000/v1", defaultModel: "" })).toBe("openai");
+    expect(providerCompatible({ baseUrl: "http://localhost:8000/v1", defaultModel: "" })).toBe(
+      "openai",
+    );
   });
 
   it("nextModelId de-dupes against existing model ids", () => {

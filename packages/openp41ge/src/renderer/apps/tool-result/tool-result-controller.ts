@@ -41,8 +41,7 @@ export class ToolResultController extends BaseController {
 
     // Fresh mount: the handler set the pending context for this window.
     const pending = (window as unknown as Record<string, unknown>).__pendingToolResult as
-      | ToolResultContext
-      | undefined;
+      ToolResultContext | undefined;
     if (pending && !this._toolName) {
       this._toolName = pending.toolName ?? "";
       this._argsString = pending.argsString ?? "";
@@ -121,9 +120,7 @@ export class ToolResultController extends BaseController {
     // tool ran, never re-read from disk — so the tab always shows the file
     // content as it was at read time, even if the file changed since.
     const src = this._sourcePath();
-    const uri = src
-      ? `toolresult://${src.replace(/^\/+/, "")}`
-      : `toolresult://${this._toolName}`;
+    const uri = src ? `toolresult://${src.replace(/^\/+/, "")}` : `toolresult://${this._toolName}`;
     const model = new PieceTreeTextContentModel(uri, this._result);
     editor.textContentModel = model;
 

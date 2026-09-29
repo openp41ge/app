@@ -1058,7 +1058,15 @@ describe("openTabInNextCell", () => {
     const t2 = types.createTab("t2", "file-viewer", "Second");
     ws = ops.addTabToCell(ws, winId, t2, 0, 1);
 
-    const result = ops.openTabInNextCell(ws, winId, "p1", "tool-result", "read_file · a.ts", '{}', false);
+    const result = ops.openTabInNextCell(
+      ws,
+      winId,
+      "p1",
+      "tool-result",
+      "read_file · a.ts",
+      "{}",
+      false,
+    );
     const win = result.windows.find((w) => w.id === winId)!;
     const grid = win.grid;
 
@@ -1079,7 +1087,15 @@ describe("openTabInNextCell", () => {
     let ws = makeWs();
     const winId = makeWsId();
 
-    const result = ops.openTabInNextCell(ws, winId, "p1", "tool-result", "read_file · a.ts", '{}', false);
+    const result = ops.openTabInNextCell(
+      ws,
+      winId,
+      "p1",
+      "tool-result",
+      "read_file · a.ts",
+      "{}",
+      false,
+    );
     const win = result.windows.find((w) => w.id === winId)!;
     const grid = win.grid;
 
@@ -1103,7 +1119,7 @@ describe("openTabInNextCell", () => {
   test("is a no-op when the source tab is missing", () => {
     const ws = makeWs();
     const winId = makeWsId();
-    const result = ops.openTabInNextCell(ws, winId, "nope", "tool-result", "t", '{}', false);
+    const result = ops.openTabInNextCell(ws, winId, "nope", "tool-result", "t", "{}", false);
     expect(result).toBe(ws);
   });
 });

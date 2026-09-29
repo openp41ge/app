@@ -42,7 +42,9 @@ export class PluginRegistry {
     if (this._plugins.has(plugin.id)) {
       return {
         success: false,
-        errors: [{ type: "duplicate-node" as const, message: `Plugin "${plugin.id}" already registered.` }],
+        errors: [
+          { type: "duplicate-node" as const, message: `Plugin "${plugin.id}" already registered.` },
+        ],
       };
     }
 

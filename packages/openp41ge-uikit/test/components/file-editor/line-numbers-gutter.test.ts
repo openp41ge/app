@@ -164,7 +164,13 @@ describe("gutter drag-to-select", () => {
     const cell5 = after.querySelector('[data-key="5"]');
     expect(cell5).not.toBeNull();
     cell5.dispatchEvent(
-      new MouseEvent("mousedown", { button: 0, clientX: 0, clientY: 4 * 20, bubbles: true, cancelable: true }),
+      new MouseEvent("mousedown", {
+        button: 0,
+        clientX: 0,
+        clientY: 4 * 20,
+        bubbles: true,
+        cancelable: true,
+      }),
     );
     expect(el._cursorController.selection.selectionStartLineNumber).toBe(5);
     expect(el._cursorController.selection.positionLineNumber).toBe(5);
@@ -178,9 +184,13 @@ describe("gutter drag-to-select", () => {
     // Every line between the anchor and the drag point is selected, so all
     // of their number cells get the active highlight.
     for (let l = 5; l <= 12; l++) {
-      expect(after.querySelector(`[data-key="${l}"]`)?.classList.contains("active-line-number")).toBe(true);
+      expect(
+        after.querySelector(`[data-key="${l}"]`)?.classList.contains("active-line-number"),
+      ).toBe(true);
     }
-    expect(after.querySelector('[data-key="20"]')?.classList.contains("active-line-number")).toBe(false);
+    expect(after.querySelector('[data-key="20"]')?.classList.contains("active-line-number")).toBe(
+      false,
+    );
 
     document.dispatchEvent(new MouseEvent("mouseup", { buttons: 0, bubbles: true }));
   });
@@ -195,7 +205,13 @@ describe("gutter drag-to-select", () => {
 
     const after = afterCol(el);
     after.querySelector('[data-key="10"]').dispatchEvent(
-      new MouseEvent("mousedown", { button: 0, clientX: 0, clientY: 9 * 20, bubbles: true, cancelable: true }),
+      new MouseEvent("mousedown", {
+        button: 0,
+        clientX: 0,
+        clientY: 9 * 20,
+        bubbles: true,
+        cancelable: true,
+      }),
     );
     // Drag UP to line 3.
     document.dispatchEvent(

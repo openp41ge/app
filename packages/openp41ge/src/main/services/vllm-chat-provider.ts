@@ -135,7 +135,7 @@ export class VllmChatProvider implements ChatProvider {
       (n, m) =>
         n +
         (typeof (m as { content?: unknown }).content === "string"
-          ? ((m as { content: string }).content.length)
+          ? (m as { content: string }).content.length
           : JSON.stringify((m as { content?: unknown }).content ?? "").length),
       0,
     );

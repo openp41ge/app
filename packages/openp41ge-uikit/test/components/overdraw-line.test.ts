@@ -3,9 +3,20 @@
  * derived from its index among siblings and frozen once drawn.
  */
 import { describe, test, expect, beforeEach, vi, afterEach } from "vitest";
-import { OverdrawLine, OVERDRAW_LENGTHS, overdrawLengthForOrdinal } from "../../src/components/overdraw-line/overdraw-line";
-import { attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws } from "../../src/components/overdraw-line/corner-accent";
-import { attachTabEdgeOverdraws, detachTabEdgeOverdraws } from "../../src/components/overdraw-line/tab-overdraw";
+import {
+  OverdrawLine,
+  OVERDRAW_LENGTHS,
+  overdrawLengthForOrdinal,
+} from "../../src/components/overdraw-line/overdraw-line";
+import {
+  attachTopCornerOverdraws,
+  attachTopOverdraw,
+  attachTopHorizontalOverdraws,
+} from "../../src/components/overdraw-line/corner-accent";
+import {
+  attachTabEdgeOverdraws,
+  detachTabEdgeOverdraws,
+} from "../../src/components/overdraw-line/tab-overdraw";
 
 function styleOf(el: HTMLElement): string {
   const style = el.shadowRoot?.querySelector("style");
@@ -99,9 +110,7 @@ describe("OverdrawLine", () => {
     });
     await Promise.all(els.map((el) => el.updateComplete));
 
-    const lengths = els.map((el) =>
-      parseInt(el.style.getPropertyValue("--overdraw-length"), 10),
-    );
+    const lengths = els.map((el) => parseInt(el.style.getPropertyValue("--overdraw-length"), 10));
     expect(new Set(lengths).size).toBe(7);
     lengths.forEach((l) => expect(OVERDRAW_LENGTHS).toContain(l));
   });
@@ -116,9 +125,7 @@ describe("OverdrawLine", () => {
     for (let i = 0; i < OVERDRAW_LENGTHS.length; i++) {
       expect(overdrawLengthForOrdinal(i)).not.toBe(overdrawLengthForOrdinal(i + 1));
     }
-    expect(overdrawLengthForOrdinal(OVERDRAW_LENGTHS.length)).toBe(
-      overdrawLengthForOrdinal(0),
-    );
+    expect(overdrawLengthForOrdinal(OVERDRAW_LENGTHS.length)).toBe(overdrawLengthForOrdinal(0));
 
     // All values stay in the intended narrow band.
     for (let i = 0; i < 100; i++) {
@@ -137,9 +144,12 @@ describe("OverdrawLine", () => {
 
     const lines = Array.from(btn.querySelectorAll("overdraw-line"));
     expect(lines).toHaveLength(4);
-    expect(
-      lines.map((l) => `${l.getAttribute("corner")}${l.getAttribute("dir")}`).sort(),
-    ).toEqual(["tlleft", "tlup", "trright", "trup"]);
+    expect(lines.map((l) => `${l.getAttribute("corner")}${l.getAttribute("dir")}`).sort()).toEqual([
+      "tlleft",
+      "tlup",
+      "trright",
+      "trup",
+    ]);
     // Only the top corners are drawn — a line pointing down from a bottom-bar
     // button would run off the window.
     expect(lines.every((l) => !l.getAttribute("dir")!.endsWith("down"))).toBe(true);
@@ -185,9 +195,10 @@ describe("OverdrawLine", () => {
     expect(layer).toBeTruthy();
     const lines = Array.from(layer!.querySelectorAll("overdraw-line"));
     expect(lines).toHaveLength(2);
-    expect(
-      lines.map((l) => `${l.getAttribute("corner")}${l.getAttribute("dir")}`).sort(),
-    ).toEqual(["tlleft", "trright"]);
+    expect(lines.map((l) => `${l.getAttribute("corner")}${l.getAttribute("dir")}`).sort()).toEqual([
+      "tlleft",
+      "trright",
+    ]);
     expect(lines.every((l) => l.getAttribute("dir") !== "up")).toBe(true);
     expect(layer!.style.position).toBe("fixed");
     // Below the settings-drawer host (z-index 1001) so its full-window dim mask
@@ -318,8 +329,7 @@ describe("OverdrawLine", () => {
     // Left line samples x=11 (covered: transparent chrome over the opaque
     // drawer), right line samples x=209 (not covered: the opaque host is the
     // topmost opaque element there).
-    const stackAt = (x: number) =>
-      x < 100 ? [notch, surface, drawerBody, drawer, box] : [box];
+    const stackAt = (x: number) => (x < 100 ? [notch, surface, drawerBody, drawer, box] : [box]);
     document.elementsFromPoint = ((x: number) =>
       stackAt(x)) as unknown as typeof document.elementsFromPoint;
 
@@ -345,7 +355,18 @@ describe("attachTabEdgeOverdraws", () => {
 
   function stubRect(el: HTMLElement, r: Partial<DOMRect>) {
     el.getBoundingClientRect = () =>
-      ({ top: 0, left: 0, width: 0, height: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON() {}, ...r }) as DOMRect;
+      ({
+        top: 0,
+        left: 0,
+        width: 0,
+        height: 0,
+        right: 0,
+        bottom: 0,
+        x: 0,
+        y: 0,
+        toJSON() {},
+        ...r,
+      }) as DOMRect;
   }
 
   test("portals two fade strokes per edge into a fixed top layer", () => {
@@ -361,9 +382,12 @@ describe("attachTabEdgeOverdraws", () => {
     const lines = Array.from(layer!.querySelectorAll("overdraw-line"));
     // right (up+down) and bottom (left+right) → 4 strokes.
     expect(lines).toHaveLength(4);
-    expect(
-      lines.map((l) => `${l.getAttribute("corner")}${l.getAttribute("dir")}`).sort(),
-    ).toEqual(["bl-bottomleft", "br-bottomright", "br-rightdown", "tr-rightup"]);
+    expect(lines.map((l) => `${l.getAttribute("corner")}${l.getAttribute("dir")}`).sort()).toEqual([
+      "bl-bottomleft",
+      "br-bottomright",
+      "br-rightdown",
+      "tr-rightup",
+    ]);
   });
 
   test("is idempotent per edge-set and reconciles a changed edge set", () => {
@@ -371,13 +395,23 @@ describe("attachTabEdgeOverdraws", () => {
     document.body.appendChild(tab);
     attachTabEdgeOverdraws(tab, { edges: ["right", "bottom"] });
     attachTabEdgeOverdraws(tab, { edges: ["right", "bottom"] });
-    expect(document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line")).toHaveLength(4);
+    expect(
+      document.body
+        .querySelector("div[style*='position: fixed']")!
+        .querySelectorAll("overdraw-line"),
+    ).toHaveLength(4);
 
     // Changing the edges drops the now-unneeded strokes and keeps the rest.
     attachTabEdgeOverdraws(tab, { edges: ["right"] });
-    const lines = Array.from(document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"));
+    const lines = Array.from(
+      document.body
+        .querySelector("div[style*='position: fixed']")!
+        .querySelectorAll("overdraw-line"),
+    );
     expect(lines).toHaveLength(2);
-    expect(lines.every((l) => l.getAttribute("dir") === "up" || l.getAttribute("dir") === "down")).toBe(true);
+    expect(
+      lines.every((l) => l.getAttribute("dir") === "up" || l.getAttribute("dir") === "down"),
+    ).toBe(true);
   });
 
   test("applies per-edge colors via edgeColors", () => {
@@ -387,11 +421,23 @@ describe("attachTabEdgeOverdraws", () => {
       edges: ["right", "bottom"],
       edgeColors: { right: "#333", bottom: "var(--border-divider, #2d2d2d)" },
     });
-    const lines = Array.from(document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"));
-    const right = lines.filter((l) => l.getAttribute("dir") === "up" || l.getAttribute("dir") === "down");
-    const bottom = lines.filter((l) => l.getAttribute("dir") === "left" || l.getAttribute("dir") === "right");
+    const lines = Array.from(
+      document.body
+        .querySelector("div[style*='position: fixed']")!
+        .querySelectorAll("overdraw-line"),
+    );
+    const right = lines.filter(
+      (l) => l.getAttribute("dir") === "up" || l.getAttribute("dir") === "down",
+    );
+    const bottom = lines.filter(
+      (l) => l.getAttribute("dir") === "left" || l.getAttribute("dir") === "right",
+    );
     expect(right.every((l) => l.style.getPropertyValue("--overdraw-color") === "#333")).toBe(true);
-    expect(bottom.every((l) => l.style.getPropertyValue("--overdraw-color") === "var(--border-divider, #2d2d2d)")).toBe(true);
+    expect(
+      bottom.every(
+        (l) => l.style.getPropertyValue("--overdraw-color") === "var(--border-divider, #2d2d2d)",
+      ),
+    ).toBe(true);
   });
 
   test("positions strokes on the host's box corners with a stubbed rect", () => {
@@ -406,7 +452,11 @@ describe("attachTabEdgeOverdraws", () => {
     } finally {
       (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = raf;
     }
-    const lines = Array.from(document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"));
+    const lines = Array.from(
+      document.body
+        .querySelector("div[style*='position: fixed']")!
+        .querySelectorAll("overdraw-line"),
+    );
 
     // bottom-right corner: the right border continues down, the bottom border
     // continues right — both anchored at the bottom-right corner. The tab has
@@ -433,7 +483,11 @@ describe("attachTabEdgeOverdraws", () => {
     } finally {
       (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = raf;
     }
-    const lines = Array.from(document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"));
+    const lines = Array.from(
+      document.body
+        .querySelector("div[style*='position: fixed']")!
+        .querySelectorAll("overdraw-line"),
+    );
     const brRight = lines.find((l) => l.getAttribute("corner") === "br-bottom")!;
     // The host carries its own bottom border (inside the box, [bottom-1,bottom]),
     // so the accent stays aligned with that border.
@@ -472,18 +526,21 @@ describe("attachTabEdgeOverdraws", () => {
     }
 
     const lines = Array.from(
-      document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"),
+      document.body
+        .querySelector("div[style*='position: fixed']")!
+        .querySelectorAll("overdraw-line"),
     );
     // Anchors: right-edge strokes sit on x=r.right=260 (outside the clip's
     // right=200) → hidden. bl-bottom sits on (x=r.left=100, y=r.bottom=74)
     // → inside → shown. br-bottom sits on x=260 → hidden.
     const visible = lines.filter((l) => l.style.display !== "none");
     expect(visible.map((l) => l.getAttribute("corner")).sort()).toEqual(["bl-bottom"]);
-    expect(lines.filter((l) => l.style.display === "none").map((l) => l.getAttribute("corner")).sort()).toEqual([
-      "br-bottom",
-      "br-right",
-      "tr-right",
-    ]);
+    expect(
+      lines
+        .filter((l) => l.style.display === "none")
+        .map((l) => l.getAttribute("corner"))
+        .sort(),
+    ).toEqual(["br-bottom", "br-right", "tr-right"]);
   });
 
   test("keeps all strokes when the clip container fully contains the host", () => {
@@ -503,7 +560,9 @@ describe("attachTabEdgeOverdraws", () => {
     }
 
     const lines = Array.from(
-      document.body.querySelector("div[style*='position: fixed']")!.querySelectorAll("overdraw-line"),
+      document.body
+        .querySelector("div[style*='position: fixed']")!
+        .querySelectorAll("overdraw-line"),
     );
     expect(lines.filter((l) => l.style.display !== "none")).toHaveLength(4);
   });

@@ -68,20 +68,13 @@ export interface SearchDrawerProvider {
    * should be invoked whenever an option that affects the query changes, so the
    * surface re-runs the active search.
    */
-  buildOptions?(
-    boxes: SearchDrawerBuildContext,
-    onOptionsChanged: () => void,
-  ): (() => void) | void;
+  buildOptions?(boxes: SearchDrawerBuildContext, onOptionsChanged: () => void): (() => void) | void;
 
   /**
    * Run a search for `query` ("" clears) and render into the `results` element.
    * `opts` carries the shared regex / match-case state. May be async.
    */
-  search(
-    query: string,
-    opts: SearchDrawerOptions,
-    results: HTMLElement,
-  ): Promise<void> | void;
+  search(query: string, opts: SearchDrawerOptions, results: HTMLElement): Promise<void> | void;
 
   /** Called once when the drawer opens (defaults to focusing the input). */
   open?(input: HTMLInputElement): void;
@@ -270,12 +263,9 @@ function buildSearchSurface(provider: SearchDrawerProvider): Openp41geSearchSurf
     padding: "0",
     flexShrink: "0",
   });
-  const cleanup = provider.buildOptions?.(
-    { options: optionsRow, footer: footerRow },
-    () => {
-      if (input.value.trim()) schedule();
-    },
-  );
+  const cleanup = provider.buildOptions?.({ options: optionsRow, footer: footerRow }, () => {
+    if (input.value.trim()) schedule();
+  });
   if (typeof cleanup === "function") optionsCleanup = cleanup;
   if (optionsRow.childElementCount > 0) cardZone.appendChild(optionsRow);
   surface.appendChild(cardZone);
@@ -313,15 +303,18 @@ function buildSearchSurface(provider: SearchDrawerProvider): Openp41geSearchSurf
   function run(): void {
     const query = input.value.trim();
     const t = ++token;
-    void Promise.resolve(
-      provider.search(query, { regex, caseSensitive }, results),
-    ).catch((err: unknown) => {
-      if (t !== token) return;
-      results.replaceChildren();
-      results.appendChild(
-        message(`Search failed: ${err instanceof Error ? err.message : String(err)}`, "var(--error,#e53e3e)"),
-      );
-    });
+    void Promise.resolve(provider.search(query, { regex, caseSensitive }, results)).catch(
+      (err: unknown) => {
+        if (t !== token) return;
+        results.replaceChildren();
+        results.appendChild(
+          message(
+            `Search failed: ${err instanceof Error ? err.message : String(err)}`,
+            "var(--error,#e53e3e)",
+          ),
+        );
+      },
+    );
   }
   function schedule(): void {
     if (timer) clearTimeout(timer);

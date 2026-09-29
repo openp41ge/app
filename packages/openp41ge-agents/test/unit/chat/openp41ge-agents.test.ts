@@ -314,8 +314,7 @@ describe("Openp41geAgents (custom element)", () => {
     // lines are NOT children of the composer: they're portalled into a fixed
     // top-layer div on the body so they escape the panel's own overflow and
     // paint above neighbouring grid tabs/sidebars.
-    const layers = () =>
-      Array.from(document.body.querySelectorAll(".p41ge-overdraw-layer"));
+    const layers = () => Array.from(document.body.querySelectorAll(".p41ge-overdraw-layer"));
     expect(layers()).toHaveLength(1);
     const composerLines = Array.from(layers()[0].querySelectorAll("overdraw-line"));
     expect(composerLines).toHaveLength(2);
@@ -683,11 +682,11 @@ describe("Openp41geAgents (custom element)", () => {
 
     const reasoning = el.renderRoot.querySelector(".msg-reasoning");
     expect(reasoning).not.toBeNull();
-    // No template-literal whitespace leaks into the pre-wrap body: content
-    // starts flush at the top with no leading blank line or indent.
-    expect(reasoning!.querySelector(".msg-reasoning-body")!.textContent).toBe(
-      "Let me think about this",
-    );
+    // No template-literal whitespace leaks into the pre-wrap body: the
+    // pre-wrapped `.msg-content` starts flush at the top with no leading blank
+    // line or indent. (Assert on `.msg-content`, the pre-wrapped element — the
+    // `white-space: normal` body container also holds decorative overdraw-lines.)
+    expect(reasoning!.querySelector(".msg-content")!.textContent).toBe("Let me think about this");
     expect(reasoning!.querySelector(".msg-reasoning-size")!.textContent).toBe("~5 words");
   });
 
@@ -715,9 +714,7 @@ describe("Openp41geAgents (custom element)", () => {
     expect(content).not.toBeNull();
     expect(content!.querySelector("strong")!.textContent).toBe("think hard");
     expect(content!.querySelectorAll("ul li").length).toBe(2);
-    expect(content!.querySelector(".code-block-wrap pre code")!.textContent).toBe(
-      "const x = 1;",
-    );
+    expect(content!.querySelector(".code-block-wrap pre code")!.textContent).toBe("const x = 1;");
     el.remove();
   });
 
@@ -828,7 +825,9 @@ describe("Openp41geAgents (custom element)", () => {
     // No action buttons / status pill; the card is a collapsible details box
     // with corners. The header row carries chevron + Tool label + right-aligned name.
     expect(el.shadowRoot!.querySelector(".tool-call-actions")).toBeNull();
-    expect(el.shadowRoot!.querySelectorAll('.tool-call-group overdraw-line[corner]')).toHaveLength(8);
+    expect(el.shadowRoot!.querySelectorAll(".tool-call-group overdraw-line[corner]")).toHaveLength(
+      8,
+    );
     expect(el.shadowRoot!.querySelector(".tool-call-result")).toBeNull();
     expect(el.shadowRoot!.querySelector(".tool-call-status")).toBeNull();
     const summary = el.shadowRoot!.querySelector(".tool-call-row")!;
@@ -893,7 +892,7 @@ describe("Openp41geAgents (custom element)", () => {
     const shadow = el.shadowRoot!;
     expect(shadow.querySelectorAll(".tool-call-group")).toHaveLength(1);
     expect(shadow.querySelectorAll(".tool-call-details")).toHaveLength(3);
-    expect(shadow.querySelectorAll('.tool-call-group overdraw-line[corner]')).toHaveLength(8);
+    expect(shadow.querySelectorAll(".tool-call-group overdraw-line[corner]")).toHaveLength(8);
     // Two shared dividers between the three calls (and their fade extensions).
     expect(shadow.querySelectorAll(".tool-call-details + .tool-call-details")).toHaveLength(2);
     // No grouped `.tool-calls` container any more.
@@ -952,29 +951,43 @@ describe("Openp41geAgents (custom element)", () => {
 
     // All closed: a single grouped box.
     expect(shadow.querySelectorAll(".tool-call-group")).toHaveLength(1);
-    expect(shadow.querySelector(".tool-call-group")!.querySelectorAll(".tool-call-details")).toHaveLength(4);
+    expect(
+      shadow.querySelector(".tool-call-group")!.querySelectorAll(".tool-call-details"),
+    ).toHaveLength(4);
 
     // Open the 2nd call (b): it detaches into its own boxed card, while the
     // remaining closed calls re-group so the first and last two still touch.
-    const second = shadow.querySelector<HTMLDetailsElement>('.tool-call-details[data-tool-call-id="b"]')!;
+    const second = shadow.querySelector<HTMLDetailsElement>(
+      '.tool-call-details[data-tool-call-id="b"]',
+    )!;
     second.open = true;
     second.dispatchEvent(new Event("toggle", { bubbles: false }));
     await el.updateComplete;
 
     const groups = [...shadow.querySelectorAll(".tool-call-group")];
     expect(groups).toHaveLength(3);
-    expect([...groups[0].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId)).toEqual(["a"]);
-    expect([...groups[1].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId)).toEqual(["b"]);
+    expect(
+      [...groups[0].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId),
+    ).toEqual(["a"]);
+    expect(
+      [...groups[1].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId),
+    ).toEqual(["b"]);
     expect(groups[1].querySelector(".tool-call-details")!.hasAttribute("open")).toBe(true);
-    expect([...groups[2].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId)).toEqual(["c", "d"]);
+    expect(
+      [...groups[2].querySelectorAll(".tool-call-details")].map((d) => d.dataset.toolCallId),
+    ).toEqual(["c", "d"]);
 
     // Closing it returns all four calls to one grouped box.
-    const re = shadow.querySelector<HTMLDetailsElement>('.tool-call-details[data-tool-call-id="b"]')!;
+    const re = shadow.querySelector<HTMLDetailsElement>(
+      '.tool-call-details[data-tool-call-id="b"]',
+    )!;
     re.open = false;
     re.dispatchEvent(new Event("toggle", { bubbles: false }));
     await el.updateComplete;
     expect(shadow.querySelectorAll(".tool-call-group")).toHaveLength(1);
-    expect(shadow.querySelector(".tool-call-group")!.querySelectorAll(".tool-call-details")).toHaveLength(4);
+    expect(
+      shadow.querySelector(".tool-call-group")!.querySelectorAll(".tool-call-details"),
+    ).toHaveLength(4);
 
     el.remove();
   });

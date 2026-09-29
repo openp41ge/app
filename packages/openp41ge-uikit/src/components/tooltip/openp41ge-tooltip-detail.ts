@@ -21,12 +21,14 @@ export class Openp41geTooltipDetail extends BaseTooltip {
       >
         <div
           style="font-size:12px;font-weight:600;color:var(--text-primary,#ddd);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-          >${this.title}</div
         >
+          ${this.title}
+        </div>
         <div
           style="font-size:11px;color:var(--text-secondary,#aaa);line-height:1.35;white-space:normal;word-break:break-word;"
-          >${this.subtitle}</div
         >
+          ${this.subtitle}
+        </div>
       </div>
     `;
   }

@@ -60,10 +60,7 @@ function parseAttrs(s: string): Record<string, string> {
  *  Nested fences are tracked by depth, so a container directive can embed
  *  other directives (e.g. `workspace-window` wrapping `skeleton` + `card`).
  *  Returns the body and the index (into `lines`) of the closing delimiter. */
-function collectFenceBody(
-  lines: string[],
-  start: number,
-): { body: string[]; closeIndex: number } {
+function collectFenceBody(lines: string[], start: number): { body: string[]; closeIndex: number } {
   const body: string[] = [];
   let depth = 1;
   let i = start;
@@ -155,7 +152,7 @@ export function renderMarkdown(md: string): string {
             `<div class="wm-shortcuts">` +
               `<div class="wm-shortcut"><span class="kbd">&#8984;B</span><span>Toggle the right sidebar</span></div>` +
               `<div class="wm-shortcut"><span class="kbd">&#8984;&#8997;B</span><span>Toggle the left sidebar</span></div>` +
-            `</div>`,
+              `</div>`,
           );
         }
         // Unknown directive names are ignored.
@@ -174,7 +171,9 @@ export function renderMarkdown(md: string): string {
         quote.push(lines[i].trim().replace(/^>\s?/, ""));
         i++;
       }
-      out.push(`<blockquote class="wm-md-quote">${inline(escapeHtml(quote.join(" ")))}</blockquote>`);
+      out.push(
+        `<blockquote class="wm-md-quote">${inline(escapeHtml(quote.join(" ")))}</blockquote>`,
+      );
       continue;
     }
 

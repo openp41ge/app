@@ -178,15 +178,18 @@ function tryRenderTable(lines: string[], start: number): { html: string; next: n
     .map((row) => `<tr>${header.map((_, idx) => cell(row, idx, "td")).join("")}</tr>`)
     .join("");
   html += "</tbody></table>";
-  html += '<overdraw-line class="tbl-mid" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-mid" dir="right" aria-hidden="true"></overdraw-line>';
+  html +=
+    '<overdraw-line class="tbl-mid" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-mid" dir="right" aria-hidden="true"></overdraw-line>';
   for (let k = 0; k < body.length - 1; k++) {
-    html += '<overdraw-line class="tbl-mid" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-mid" dir="right" aria-hidden="true"></overdraw-line>';
+    html +=
+      '<overdraw-line class="tbl-mid" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-mid" dir="right" aria-hidden="true"></overdraw-line>';
   }
   // Vertical column-separator fades: one top + bottom pair per internal column
   // rule (between columns; the outer edges are the box frame). The host sets
   // their `left` on the separator line after layout.
   for (let k = 0; k < header.length - 1; k++) {
-    html += '<overdraw-line class="tbl-vfade" dir="up" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-vfade" dir="down" aria-hidden="true"></overdraw-line>';
+    html +=
+      '<overdraw-line class="tbl-vfade" dir="up" aria-hidden="true"></overdraw-line><overdraw-line class="tbl-vfade" dir="down" aria-hidden="true"></overdraw-line>';
   }
   html += "</div>";
 

@@ -32,7 +32,9 @@ export interface SentryCaptureOptions {
 /** True when the Sentry client is active (an init succeeded). */
 function sentryReady(): boolean {
   try {
-    return typeof Sentry.isInitialized === "function" ? Sentry.isInitialized() : !!Sentry.getClient();
+    return typeof Sentry.isInitialized === "function"
+      ? Sentry.isInitialized()
+      : !!Sentry.getClient();
   } catch {
     return false;
   }

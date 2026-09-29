@@ -1236,11 +1236,7 @@ class Openp41geWindowView extends LitElement {
 
   /** Place one separator accent at `top` over the separator line's y, fading
    *  from the sidebar's grid-side edge into the grid. */
-  private _placeSepOverdraw(
-    line: HTMLElement,
-    side: "left" | "right",
-    sbRect: DOMRect,
-  ): void {
+  private _placeSepOverdraw(line: HTMLElement, side: "left" | "right", sbRect: DOMRect): void {
     if (side === "left") {
       line.setAttribute("dir", "right");
       line.style.left = `${sbRect.right}px`;

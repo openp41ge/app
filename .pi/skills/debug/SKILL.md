@@ -51,7 +51,7 @@ cd packages/openp41ge && bash scripts/dev-renderer.sh
 > Vite's `5173` or other agents' usual ports) so stray dev servers never end
 > up rendered in the Electron window. If it ever needs changing, update ALL
 > of these together: `packages/openp41ge/vite.config.ts` (`server.port`),
-> `packages/openp41ge/scripts/wait-for-vite.mjs`, 
+> `packages/openp41ge/scripts/wait-for-vite.mjs`,
 > `packages/openp41ge/electron/window-manager.ts` (`win.loadURL`), and this
 > skill.
 

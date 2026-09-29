@@ -84,10 +84,14 @@ export function pinnedPaths(overrides: unknown, defaults: unknown): Set<string> 
       if (jsonEqual(v, d)) {
         out.add(p);
       } else {
-        for (let i = 0; i < v.length; i++) walk(v[i], (d as unknown[] | undefined)?.[i], `${p}[${i}]`);
+        for (let i = 0; i < v.length; i++)
+          walk(v[i], (d as unknown[] | undefined)?.[i], `${p}[${i}]`);
       }
     } else if (typeof v === "object") {
-      const def = (d && typeof d === "object" && !Array.isArray(d) ? d : {}) as Record<string, unknown>;
+      const def = (d && typeof d === "object" && !Array.isArray(d) ? d : {}) as Record<
+        string,
+        unknown
+      >;
       for (const [k, child] of Object.entries(v as Record<string, unknown>)) {
         walk(child, def[k], p ? `${p}.${k}` : k);
       }
@@ -136,9 +140,7 @@ export function stripDefaults<T>(
     if (path !== "" && explicitPaths?.has(path)) return value;
     const src = value as Record<string, unknown>;
     const def = (
-      defaults && typeof defaults === "object" && !Array.isArray(defaults)
-        ? defaults
-        : {}
+      defaults && typeof defaults === "object" && !Array.isArray(defaults) ? defaults : {}
     ) as Record<string, unknown>;
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(src)) {

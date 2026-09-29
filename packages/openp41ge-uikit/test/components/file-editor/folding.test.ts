@@ -165,15 +165,13 @@ describe("file-editor folding", () => {
 
     const hover = (ln: number) => {
       const cell = el._gutter.root.querySelector(
-        `.eg-col--fe-number .eg-cell[data-key="${ln}"]`
+        `.eg-col--fe-number .eg-cell[data-key="${ln}"]`,
       ) as HTMLElement;
       cell.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true }));
     };
     const box = () => el._gutter.root.querySelector(".eg-hoverbox") as HTMLElement | null;
-    const numW = () =>
-      parseFloat(el._gutter.root.querySelector(".eg-col--fe-number")!.style.width);
-    const foldW = () =>
-      parseFloat(el._gutter.root.querySelector(".eg-col--fold")!.style.width);
+    const numW = () => parseFloat(el._gutter.root.querySelector(".eg-col--fe-number")!.style.width);
+    const foldW = () => parseFloat(el._gutter.root.querySelector(".eg-col--fold")!.style.width);
 
     // Non-foldable row (line 7, no indent header) → box spans BOTH columns.
     hover(7);
@@ -203,12 +201,8 @@ describe("file-editor folding", () => {
     ]);
     await new Promise((r) => setTimeout(r, 20));
 
-    const num = el._gutter.root.querySelector(
-      `.eg-col--fe-number .eg-cell[data-key="7"]`,
-    );
-    const fold = el._gutter.root.querySelector(
-      `.eg-col--fold .eg-cell[data-key="7"]`,
-    );
+    const num = el._gutter.root.querySelector(`.eg-col--fe-number .eg-cell[data-key="7"]`);
+    const fold = el._gutter.root.querySelector(`.eg-col--fold .eg-cell[data-key="7"]`);
     // The number cell keeps its grey via active-line-number; the shared fold
     // column cell gets the host's eg-cell--active so BOTH columns highlight.
     expect(num?.classList.contains("active-line-number")).toBe(true);
@@ -219,8 +213,7 @@ describe("file-editor folding", () => {
     const el = await mount();
     el._enableFolds();
     await new Promise((r) => setTimeout(r, 20));
-    const foldW = () =>
-      parseFloat(el._gutter.root.querySelector(".eg-col--fold")!.style.width);
+    const foldW = () => parseFloat(el._gutter.root.querySelector(".eg-col--fold")!.style.width);
     expect(foldW()).toBeCloseTo(el._lineHeight, 0);
     // A different line height reflows the fold width to stay square.
     el.setEditorLineHeight(30);

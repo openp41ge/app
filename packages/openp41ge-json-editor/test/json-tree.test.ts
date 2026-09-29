@@ -215,7 +215,10 @@ describe("explicit / pinned paths", () => {
 
   it("pinnedPaths finds leaves equal to their default", () => {
     const overrides = { appTheme: "dark", lineHeight: 25, editor: { maxFileSize: 100 } };
-    expect([...pinnedPaths(overrides, DEFAULTS)].sort()).toEqual(["appTheme", "editor.maxFileSize"]);
+    expect([...pinnedPaths(overrides, DEFAULTS)].sort()).toEqual([
+      "appTheme",
+      "editor.maxFileSize",
+    ]);
   });
 
   it("stripDefaults keeps a pinned path even when it equals the default", () => {
@@ -227,7 +230,10 @@ describe("explicit / pinned paths", () => {
   it("stripDefaults keeps a pinned whole subtree verbatim", () => {
     const effective = { ...DEFAULTS, lineHeight: 30 };
     const pins = new Set(["editor"]);
-    expect(stripDefaults(effective, DEFAULTS, pins)).toEqual({ editor: DEFAULTS.editor, lineHeight: 30 });
+    expect(stripDefaults(effective, DEFAULTS, pins)).toEqual({
+      editor: DEFAULTS.editor,
+      lineHeight: 30,
+    });
   });
 
   it("stripDefaults drops unpinned default leaves and a pinned one stays after re-merge", () => {

@@ -54,7 +54,9 @@ export class TabContent extends LitElement {
               color:var(--text-muted, #666);
               font-family:var(--font-ui);
             "
-          >No tabs</p>
+          >
+            No tabs
+          </p>
         </div>
       `;
     }

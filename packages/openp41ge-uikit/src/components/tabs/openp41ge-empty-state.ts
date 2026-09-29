@@ -69,7 +69,9 @@ export class Openp41geEmptyState extends LitElement {
       font-size: 13px;
       font-family: inherit;
       cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
+      transition:
+        background 0.15s,
+        border-color 0.15s;
       margin: 4px;
     }
 
@@ -154,7 +156,10 @@ export class Openp41geEmptyState extends LitElement {
       font-size: 14px;
       cursor: pointer;
       opacity: 0;
-      transition: opacity 0.1s, color 0.1s, background 0.1s;
+      transition:
+        opacity 0.1s,
+        color 0.1s,
+        background 0.1s;
       line-height: 1;
       padding: 0;
     }
@@ -241,35 +246,47 @@ export class Openp41geEmptyState extends LitElement {
 
         <button class="action-btn" @click=${this._openProject}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/>
+            <path
+              d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"
+            />
           </svg>
           Open Project
         </button>
 
         <button class="action-btn" @click=${this._cloneRepo}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M4 1c.55 0 1 .45 1 1v1h7.5c.827 0 1.5.673 1.5 1.5v8c0 .827-.673 1.5-1.5 1.5h-11c-.827 0-1.5-.673-1.5-1.5V3c0-.55.45-1 1-1h3zm0 1.5H2v10h11v-8H5v1.25c0 .345.28.625.625.625h3.75c.345 0 .625-.28.625-.625V2.5H4zm.5 1v.625c0 .069.056.125.125.125h3.75a.125.125 0 0 0 .125-.125V2.5h-4v1zM2 12.5v1h11v-1H2z"/>
+            <path
+              d="M4 1c.55 0 1 .45 1 1v1h7.5c.827 0 1.5.673 1.5 1.5v8c0 .827-.673 1.5-1.5 1.5h-11c-.827 0-1.5-.673-1.5-1.5V3c0-.55.45-1 1-1h3zm0 1.5H2v10h11v-8H5v1.25c0 .345.28.625.625.625h3.75c.345 0 .625-.28.625-.625V2.5H4zm.5 1v.625c0 .069.056.125.125.125h3.75a.125.125 0 0 0 .125-.125V2.5h-4v1zM2 12.5v1h11v-1H2z"
+            />
           </svg>
           Clone Repository
         </button>
 
         <div class="divider"></div>
-          <p class="recents-title">Recent projects</p>
-          ${showRecents ? html`
-          <ul class="recents-list">
-            ${this.recents.map((r) => html`
-              <li class="recent-item" @click=${() => this._openRecent(r.name)}>
-                <span class="name">${r.name}</span>
-                <span class="date">${this._formatDate(r.openedAt)}</span>
-                <button
-                  class="remove-btn"
-                  title="Remove from recent projects"
-                  @click=${(e: MouseEvent) => this._removeRecent(r.name, e)}
-                >×</button>
-              </li>
-            `)}
-          </ul>
-          ` : html`<p class="no-recents">No recent projects</p>`}
+        <p class="recents-title">Recent projects</p>
+        ${
+          showRecents
+            ? html`
+                <ul class="recents-list">
+                  ${this.recents.map(
+                    (r) => html`
+                      <li class="recent-item" @click=${() => this._openRecent(r.name)}>
+                        <span class="name">${r.name}</span>
+                        <span class="date">${this._formatDate(r.openedAt)}</span>
+                        <button
+                          class="remove-btn"
+                          title="Remove from recent projects"
+                          @click=${(e: MouseEvent) => this._removeRecent(r.name, e)}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    `,
+                  )}
+                </ul>
+              `
+            : html`<p class="no-recents">No recent projects</p>`
+        }
       </div>
     `;
   }

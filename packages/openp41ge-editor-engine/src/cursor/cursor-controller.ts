@@ -646,9 +646,7 @@ export class CursorController {
    * controller with their caret state before delegating a movement/selection
    * command, and by hosts restoring cursor state after the model changes.
    */
-  setCursorStates(
-    states: Array<{ position: TextPosition; selectionAnchor: TextPosition }>,
-  ): void {
+  setCursorStates(states: Array<{ position: TextPosition; selectionAnchor: TextPosition }>): void {
     if (states.length === 0) return;
     const first = states[0];
     this._cursor = {

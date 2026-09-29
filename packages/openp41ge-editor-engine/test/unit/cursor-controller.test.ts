@@ -13,7 +13,7 @@ const p = (lineNumber: number, column: number): TextPosition => ({ lineNumber, c
 
 describe("CursorController.setCursorStates", () => {
   test("seeds a single collapsed caret", () => {
-    const m = new PieceTreeTextContentModel("json", "{\n  \"a\": 1\n}");
+    const m = new PieceTreeTextContentModel("json", '{\n  "a": 1\n}');
     const cc = new CursorController(m);
     cc.setCursorStates([{ position: p(2, 3), selectionAnchor: p(2, 3) }]);
     expect(cc.cursorCount).toBe(1);
@@ -23,7 +23,7 @@ describe("CursorController.setCursorStates", () => {
   });
 
   test("seeds a primary selection plus a secondary caret", () => {
-    const m = new PieceTreeTextContentModel("json", "{\n  \"a\": 1\n}");
+    const m = new PieceTreeTextContentModel("json", '{\n  "a": 1\n}');
     const cc = new CursorController(m);
     cc.setCursorStates([
       { position: p(2, 7), selectionAnchor: p(2, 3) },
@@ -38,7 +38,7 @@ describe("CursorController.setCursorStates", () => {
   });
 
   test("preserves sibling cursors that share the same position (no dedup)", () => {
-    const m = new PieceTreeTextContentModel("json", "{\n  \"a\": 1\n}");
+    const m = new PieceTreeTextContentModel("json", '{\n  "a": 1\n}');
     const cc = new CursorController(m);
     cc.setCursorStates([
       { position: p(1, 1), selectionAnchor: p(1, 1) },
@@ -49,7 +49,7 @@ describe("CursorController.setCursorStates", () => {
   });
 
   test("moveToFileStart applies a converge-to-top command to all seeded cursors, keeping each selection anchor", () => {
-    const m = new PieceTreeTextContentModel("json", "{\n  \"a\": 1\n}");
+    const m = new PieceTreeTextContentModel("json", '{\n  "a": 1\n}');
     const cc = new CursorController(m);
     cc.setCursorStates([
       { position: p(2, 7), selectionAnchor: p(2, 3) },

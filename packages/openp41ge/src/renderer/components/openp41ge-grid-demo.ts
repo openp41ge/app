@@ -111,7 +111,8 @@ export class Openp41geGridDemo extends LitElement {
         .cell--new {
           flex: 0 1 0;
           background: rgba(86, 156, 214, 0.28);
-          animation: grow 5.6s ease-in-out infinite,
+          animation:
+            grow 5.6s ease-in-out infinite,
             settle 5.6s ease-in-out infinite;
         }
         /* The dragged chip: flies from the sidebar into the grid, then lands. */

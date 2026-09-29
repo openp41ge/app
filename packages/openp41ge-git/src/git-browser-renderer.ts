@@ -76,7 +76,8 @@ class GitBrowserRenderer {
     GitBrowserRenderer._spinKeyframesInjected = true;
     try {
       const s = document.createElement("style");
-      s.textContent = "@keyframes git-render-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}";
+      s.textContent =
+        "@keyframes git-render-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}";
       document.head.appendChild(s);
     } catch {
       /* non-DOM environment — nothing to inject */
@@ -322,7 +323,8 @@ class GitBrowserRenderer {
         // Branch name (no dot — it's implicit that the branch name is the local entry)
         const nameEl = document.createElement("span");
         nameEl.textContent = branchName;
-        nameEl.style.cssText = "margin-left:4px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+        nameEl.style.cssText =
+          "margin-left:4px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
         row.appendChild(nameEl);
 
         // Ahead/behind badges
@@ -532,7 +534,9 @@ class GitBrowserRenderer {
 
     for (const file of data.filesChanged) {
       const row = this.renderFileRow(file);
-      row.addEventListener("click", () => callbacks.onFileRowClick(file.filePath || file.file || ''));
+      row.addEventListener("click", () =>
+        callbacks.onFileRowClick(file.filePath || file.file || ""),
+      );
       wrapper.appendChild(row);
     }
 
@@ -655,8 +659,7 @@ class GitBrowserRenderer {
 
   private _addBranchBadges(container: HTMLElement, branch: BranchEntry): void {
     const badges = document.createElement("span");
-    badges.style.cssText =
-      "display:flex;align-items:center;gap:3px;font-size:10px;flex-shrink:0;";
+    badges.style.cssText = "display:flex;align-items:center;gap:3px;font-size:10px;flex-shrink:0;";
 
     if (!branch.isLocal) {
       const remote = document.createElement("span");
@@ -712,7 +715,7 @@ class GitBrowserRenderer {
     metaLine.style.cssText = "display:flex;align-items:center;margin-top:1px;";
 
     const author = document.createElement("span");
-    author.textContent = commit.authorName || commit.author || '';
+    author.textContent = commit.authorName || commit.author || "";
     author.style.cssText = "color:#666;font-size:10px;";
     metaLine.appendChild(author);
 
@@ -746,7 +749,7 @@ class GitBrowserRenderer {
     const statusIcon = document.createElement("span");
     statusIcon.style.cssText =
       "width:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
-    switch (file.status || 'modified') {
+    switch (file.status || "modified") {
       case "added":
         statusIcon.innerHTML = fileAddedSvg(12);
         break;
@@ -763,7 +766,7 @@ class GitBrowserRenderer {
 
     // Filename
     const name = document.createElement("span");
-    name.textContent = file.filePath || file.file || '';
+    name.textContent = file.filePath || file.file || "";
     name.style.cssText =
       "margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;";
     row.appendChild(name);

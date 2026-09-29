@@ -12,7 +12,12 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { DragOrchestrator } from "openp41ge-tabs/orchestrator";
-import type { IDragSource, IDropTarget, DragResult, TargetFeedback } from "openp41ge-tabs/interfaces";
+import type {
+  IDragSource,
+  IDropTarget,
+  DragResult,
+  TargetFeedback,
+} from "openp41ge-tabs/interfaces";
 
 const cleanup: HTMLElement[] = [];
 afterEach(() => {
@@ -104,7 +109,10 @@ describe("DragOrchestrator onTargetChange", () => {
 
   it("does not fire a redundant null when no target was ever active", () => {
     const seen: Array<IDropTarget | null> = [];
-    const orchestrator = new DragOrchestrator(() => null, (t) => seen.push(t));
+    const orchestrator = new DragOrchestrator(
+      () => null,
+      (t) => seen.push(t),
+    );
 
     orchestrator.startDrag(makeSource(), 0, 0);
     dragTo(orchestrator, 5, 5);

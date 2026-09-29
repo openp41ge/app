@@ -16,9 +16,7 @@ export const gitPlugin: PluginRegistration = {
   ],
   handlers: {
     "git/refresh": async () => {
-      document.dispatchEvent(
-        new CustomEvent("git:refresh", { bubbles: true }),
-      );
+      document.dispatchEvent(new CustomEvent("git:refresh", { bubbles: true }));
     },
   },
 };

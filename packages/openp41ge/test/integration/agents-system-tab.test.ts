@@ -124,7 +124,9 @@ describe("AgentsSystemTabController", () => {
     expect(plus.getAttribute("aria-hidden")).toBe("true");
 
     // The footer holds the search tool (new) + this tab's own settings gear.
-    const settingsBtn = host.querySelector('button[aria-label="Agent settings"]') as HTMLButtonElement;
+    const settingsBtn = host.querySelector(
+      'button[aria-label="Agent settings"]',
+    ) as HTMLButtonElement;
     expect(settingsBtn).toBeTruthy();
     const searchBtn = host.querySelector('button[aria-label="Search chats"]') as HTMLButtonElement;
     expect(searchBtn).toBeTruthy();
@@ -223,7 +225,9 @@ describe("AgentsSystemTabController", () => {
     const drawerHost2 = openAgentSearchDrawer(host, drawerHost);
     await flush();
 
-    const input = drawerHost2.querySelector('input[placeholder="Search chats…"]') as HTMLInputElement;
+    const input = drawerHost2.querySelector(
+      'input[placeholder="Search chats…"]',
+    ) as HTMLInputElement;
     input.value = "tests";
     input.dispatchEvent(new Event("input"));
     await flush(300); // debounce is 200ms
@@ -255,7 +259,9 @@ describe("AgentsSystemTabController", () => {
     const drawerHost2 = openAgentSearchDrawer(host, drawerHost);
     await flush();
 
-    const input = drawerHost2.querySelector('input[placeholder="Search chats…"]') as HTMLInputElement;
+    const input = drawerHost2.querySelector(
+      'input[placeholder="Search chats…"]',
+    ) as HTMLInputElement;
     input.value = "tests";
     input.dispatchEvent(new Event("input"));
     await flush(300); // debounce is 200ms

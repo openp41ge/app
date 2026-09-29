@@ -91,9 +91,7 @@ export class RegisterTabActivationRecorderStep implements IStartupStep {
    */
   private _activeTabFor(win: Workspace["windows"][number], winId: string): string | null {
     const focusedCol = Openp41geTabsEventHandler.getLastFocusedCol(winId);
-    const placements = [...win.grid.placements].sort(
-      (a, b) => a.position.col - b.position.col,
-    );
+    const placements = [...win.grid.placements].sort((a, b) => a.position.col - b.position.col);
     const placement =
       placements.find((pl) => pl.position.col === focusedCol) ??
       placements.find((pl) => pl.position.col === 0) ??

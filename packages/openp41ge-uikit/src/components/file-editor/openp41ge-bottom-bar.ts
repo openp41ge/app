@@ -287,7 +287,9 @@ class FeStatusBar extends LitElement {
             this._emptyMessage !== null
               ? html`<span style="color:#666;font-size:11px;">${this._emptyMessage}</span>`
               : html`
-                  <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:100%;">
+                  <div
+                    style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:100%;"
+                  >
                     <span
                       class="sbb-size"
                       style="color:${this._isDirty ? "#e2b714" : "#777"};font-size:11px;display:flex;align-items:center;font-style:normal;"

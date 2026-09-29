@@ -25,7 +25,7 @@ multi-window, shadow-DOM, grid layout is fragile and hard to predict.
 - **`Cmd+P`** pane picker is **orphaned** — `register-shortcuts.step.ts:79`
   dispatches `openp41ge:show-pane-picker` but no listener exists, and
   `<openp41ge-pane-picker>` is never instantiated. Its styling/panel pattern is
-  reusable. *(Optional follow-up, see Scope.)*
+  reusable. _(Optional follow-up, see Scope.)_
 - **No Explorer file/folder creation exists today** — the worktree/repo tree has
   no "new file"/"new folder" command and no `file:create` IPC. The only path to a
   new file is `saveAs()` in the file editor (Save dialog). Quick-create needs a
@@ -69,14 +69,14 @@ registry-ish so new ones are additive:
   IPC and opens it in the grid. Target directory resolution:
   - If an Explorer tree folder is currently selected, use that directory;
   - Else fall back to the first workspace root;
-  - (Alternative) prompt for a full path. *(Open Question 2.)*
+  - (Alternative) prompt for a full path. _(Open Question 2.)_
 - **Create new folder** — new `file:createFolder` IPC (mkdir) under the same
   resolved directory.
 - **New agent chat** — calls the existing create-chat path and dispatches
   `openp41ge:open-chat` (reuse `_newChat()` wiring) → opens pinned in the grid.
 - **Open pane** (optional) — fold in the orphaned pane-picker actions
   (terminal/file-explorer/markdown/table/video) via `addColumnTab`, so the modal
-  becomes a single quick-open/quick-create entry point. *(Open Question 3.)*
+  becomes a single quick-open/quick-create entry point. _(Open Question 3.)_
 
 ### 4. New main-process IPC for file/folder creation
 
@@ -150,7 +150,7 @@ registry-ish so new ones are additive:
   pane-opening into the modal — flagging because it's dead, but this plan only
   touches it if requested.
 - **Out**: contextual/focus-dependent Cmd+N behaviour (Plan A) — explicitly
-  rejected for predictability; a future nicety is contextual *preselection*
+  rejected for predictability; a future nicety is contextual _preselection_
   inside the modal, but Cmd+N always opens the modal.
 
 ## Open Questions

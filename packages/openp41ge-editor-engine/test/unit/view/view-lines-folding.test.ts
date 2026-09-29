@@ -81,7 +81,10 @@ describe("ViewLines folding", () => {
     vl.setHiddenLines(null);
     vl.rebuildAll();
     expect(vl.getVisibleLineCount()).toBe(6);
-    const nums = vl.getRenderedLines().map((l) => l.lineNumber).sort((a, b) => a - b);
+    const nums = vl
+      .getRenderedLines()
+      .map((l) => l.lineNumber)
+      .sort((a, b) => a - b);
     expect(nums).toEqual([1, 2, 3, 4, 5, 6]);
   });
 

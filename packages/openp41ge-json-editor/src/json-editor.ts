@@ -53,7 +53,7 @@ import {
   type JsonToken,
   type SelectableRange,
 } from "./json-tokenize";
-import { cloneDeep, getAt, pathKey, summarize, type JsonPath } from "./json-tree"
+import { cloneDeep, getAt, pathKey, summarize, type JsonPath } from "./json-tree";
 import { renderMarkdown, isMarkdownFileRef } from "./md-render";
 import {
   Gutter,
@@ -180,11 +180,7 @@ function markDefaultLines(
   // The document's top-level object (`{}`) always exists and is never an
   // optional value — only its default-valued *subtrees* fade, so the container
   // braces always render solid behind the faded contents.
-  if (
-    path.length > 0 &&
-    !hasOverrideUnder(overrides, key) &&
-    getAt(defaults, path) !== undefined
-  ) {
+  if (path.length > 0 && !hasOverrideUnder(overrides, key) && getAt(defaults, path) !== undefined) {
     for (let l = node.line; l <= node.endLine; l++) faded.add(l);
     return;
   }
@@ -198,7 +194,6 @@ function markDefaultLines(
     }
   }
 }
-
 
 interface VisibleLine {
   /** Full-text line index (0-based). */
@@ -1107,7 +1102,9 @@ export class JsonEditorElement extends LitElement {
             <div class="je-gutter-mount"></div>
             <div class="je-content">
               <div class="je-selection"></div>
-              <div class="je-lines">${this._hlBorder()}${this._visibleLines.map((v) => this._renderRow(v))}</div>
+              <div class="je-lines">
+                ${this._hlBorder()}${this._visibleLines.map((v) => this._renderRow(v))}
+              </div>
               <div class="je-tooltip" role="tooltip"></div>
               ${this._renderSuggest()}
               <textarea
@@ -1489,45 +1486,49 @@ export class JsonEditorElement extends LitElement {
     // deleted; instead they offer an "overwrite" affordance that pins the
     // value into the user config (after which it becomes a normal, deletable
     // override). Buttons stay in the DOM and are revealed on hover (opacity).
-    const actions = closeRow || isRootLine
-      ? ""
-      : faded
-        ? html`<button
-            class="je-ow ${showOverwrite ? "je-ow--show" : ""}"
-            title="Overwrite this default value"
-            @click=${() => this._overwriteAtLine(v.line)}
-            @mouseenter=${() => {
-              this._hoverLine = v.line;
-              this._setRowHighlight(v.line, "overwrite");
-            }}
-            @mouseleave=${() => this._clearDanger()}
-          >
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+    const actions =
+      closeRow || isRootLine
+        ? ""
+        : faded
+          ? html`<button
+              class="je-ow ${showOverwrite ? "je-ow--show" : ""}"
+              title="Overwrite this default value"
+              @click=${() => this._overwriteAtLine(v.line)}
+              @mouseenter=${() => {
+                this._hoverLine = v.line;
+                this._setRowHighlight(v.line, "overwrite");
+              }}
+              @mouseleave=${() => this._clearDanger()}
             >
-              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-            </svg>
-          </button>`
-        : html`<button
-            class="je-del ${showDel ? "je-del--show" : ""}"
-            title="Delete"
-            @click=${() => this._deleteAtLine(v.line)}
-            @mouseenter=${() => {
-              this._hoverLine = v.line;
-              this._setRowHighlight(v.line, "delete");
-            }}
-            @mouseleave=${() => this._clearDanger()}
-          >
-            ×
-          </button>`;
-    return html`<div class="je-row ${hlClass}${faded ? " je-row--faded" : ""}" data-line="${v.line}">
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              </svg>
+            </button>`
+          : html`<button
+              class="je-del ${showDel ? "je-del--show" : ""}"
+              title="Delete"
+              @click=${() => this._deleteAtLine(v.line)}
+              @mouseenter=${() => {
+                this._hoverLine = v.line;
+                this._setRowHighlight(v.line, "delete");
+              }}
+              @mouseleave=${() => this._clearDanger()}
+            >
+              ×
+            </button>`;
+    return html`<div
+      class="je-row ${hlClass}${faded ? " je-row--faded" : ""}"
+      data-line="${v.line}"
+    >
       <div class="je-line">${content}${meta}</div>
       <div class="je-actions">${actions}</div>
     </div>`;
@@ -1839,12 +1840,7 @@ export class JsonEditorElement extends LitElement {
     } else if (this.schema) {
       const ctx = suggestContextAt(this._text, fullPos);
       if (ctx) {
-        items = collectKeySuggestions(
-          this.schema,
-          ctx.ownerPath,
-          this._parsedValue,
-          ctx.prefix,
-        );
+        items = collectKeySuggestions(this.schema, ctx.ownerPath, this._parsedValue, ctx.prefix);
         kind = "key";
       }
     }
@@ -2200,10 +2196,7 @@ export class JsonEditorElement extends LitElement {
     const b = this._hlBlock();
     if (!b) return nothing;
     return html`
-      <div
-        class="je-hl-border"
-        style="top:${b.top}px; height:${b.height}px; --je-hl:${b.color}"
-      >
+      <div class="je-hl-border" style="top:${b.top}px; height:${b.height}px; --je-hl:${b.color}">
         ${HL_ACCENT_LINES.map(
           ([dir, pos]) =>
             html`<span
@@ -2217,7 +2210,6 @@ export class JsonEditorElement extends LitElement {
       </div>
     `;
   }
-
 
   private _clearDanger(): void {
     if (this._dangerLines.size === 0) return;
@@ -3107,7 +3099,10 @@ export class JsonEditorElement extends LitElement {
     const movedLen = units[target].endsWith("\n")
       ? Math.max(0, units[target].length - 1)
       : units[target].length;
-    ta.setSelectionRange(movedStart + Math.min(col, movedLen), movedStart + Math.min(col, movedLen));
+    ta.setSelectionRange(
+      movedStart + Math.min(col, movedLen),
+      movedStart + Math.min(col, movedLen),
+    );
 
     this._afterEdit(ta);
   }

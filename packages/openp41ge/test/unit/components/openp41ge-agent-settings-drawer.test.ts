@@ -54,9 +54,7 @@ const baseEditor = (surface) => surface.shadowRoot.querySelector("json-editor");
 
 /** Fire the editor's change/open events on an element bound to the host. */
 function fire(el, name, detail) {
-  el.dispatchEvent(
-    new CustomEvent(name, { detail, bubbles: true, composed: true }),
-  );
+  el.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
 }
 
 describe("openp41ge-agent-settings-drawer", () => {
@@ -117,10 +115,7 @@ describe("openp41ge-agent-settings-drawer", () => {
       "models",
       "name",
     ]);
-    expect(Object.keys(surface._config.providers.vllm.models[0])).toEqual([
-      "contextWindow",
-      "id",
-    ]);
+    expect(Object.keys(surface._config.providers.vllm.models[0])).toEqual(["contextWindow", "id"]);
     // Sort is staging-only — nothing persisted.
     expect(surface.configService.sets.length).toBe(0);
   });
@@ -180,7 +175,9 @@ describe("openp41ge-agent-settings-drawer", () => {
     fire(layerJe, "json-editor-change", { value: { ...VLLM, defaultModel: "new-model" } });
     await tick();
     // Staged into the draft only.
-    expect(surface.configService.vals.agent.providers.vllm.defaultModel).toBe("Qwen2.5-Coder-7B-Instruct");
+    expect(surface.configService.vals.agent.providers.vllm.defaultModel).toBe(
+      "Qwen2.5-Coder-7B-Instruct",
+    );
     expect(surface.configService.sets.length).toBe(0);
     // Save persists the staged drafts.
     host.querySelector(".sdw-save").click();

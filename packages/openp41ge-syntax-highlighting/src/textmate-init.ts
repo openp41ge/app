@@ -42,7 +42,6 @@ function loadGrammarText(raw: string): IRawGrammar {
   return JSON.parse(raw) as IRawGrammar;
 }
 
-
 /**
  * The IOnigLib implementation that vscode-textmate needs.
  */

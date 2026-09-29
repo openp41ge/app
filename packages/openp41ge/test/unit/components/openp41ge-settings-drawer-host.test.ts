@@ -197,10 +197,22 @@ describe("openp41ge-settings-drawer-host edge snap", () => {
     // grid edge (320 min + 445 = 765, inside 800 - 75 = 725). The drawer must
     // NOT snap mid-drag — it tracks the pointer, and the indicator appears.
     bar.dispatchEvent(
-      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 0, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 0,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     document.dispatchEvent(
-      new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        cancelable: true,
+        clientX: -445,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     await host.updateComplete;
     expect(host.drawerWidthFor("right")).toBe(765);
@@ -209,7 +221,13 @@ describe("openp41ge-settings-drawer-host edge snap", () => {
     expect(indicator?.getAttribute("fade")).toBe("right");
     // Release inside the snap zone -> the drawer anchors to the full grid width.
     document.dispatchEvent(
-      new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        cancelable: true,
+        clientX: -445,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     await host.updateComplete;
     expect(host.drawerWidthFor("right")).toBe(800);
@@ -227,16 +245,34 @@ describe("openp41ge-settings-drawer-host edge snap", () => {
     // Proposed width 320 (min) + 380 = 700 (< 725), so it must NOT snap and no
     // indicator should show.
     bar.dispatchEvent(
-      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 0, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 0,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     document.dispatchEvent(
-      new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: -380, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        cancelable: true,
+        clientX: -380,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     await host.updateComplete;
     expect(host.drawerWidthFor("right")).toBe(700);
     expect(host.querySelector(".sdw-edge-snap")).toBeNull();
     document.dispatchEvent(
-      new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: -380, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        cancelable: true,
+        clientX: -380,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     await host.updateComplete;
     expect(host.drawerWidthFor("right")).toBe(700);
@@ -252,10 +288,22 @@ describe("openp41ge-settings-drawer-host edge snap", () => {
     await host.updateComplete;
     const bar = host.querySelector(".sdw-resize")!;
     bar.dispatchEvent(
-      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 0, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 0,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     document.dispatchEvent(
-      new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        cancelable: true,
+        clientX: -445,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     await host.updateComplete;
     // A right drawer snaps to the grid's LEFT edge, so the overdraw companion
@@ -264,7 +312,13 @@ describe("openp41ge-settings-drawer-host edge snap", () => {
     expect(box.getAttribute("fade")).toBe("right");
     expect(host.querySelector("drop-box-overdraw")).not.toBeNull();
     document.dispatchEvent(
-      new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: -445, clientY: 10, pointerId: 1 }),
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        cancelable: true,
+        clientX: -445,
+        clientY: 10,
+        pointerId: 1,
+      }),
     );
     await host.updateComplete;
     expect(host.querySelector("drop-box-overdraw")).toBeNull();

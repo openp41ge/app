@@ -35,10 +35,7 @@ export default defineConfig({
         __dirname,
         "../openp41ge-uikit/src/components/tooltip",
       ),
-      "openp41ge-uikit/file-editor": path.resolve(
-        __dirname,
-        "../openp41ge-uikit/src/file-editor",
-      ),
+      "openp41ge-uikit/file-editor": path.resolve(__dirname, "../openp41ge-uikit/src/file-editor"),
       "openp41ge-uikit/drop-indicator": path.resolve(
         __dirname,
         "../openp41ge-uikit/src/components/drop-indicator",

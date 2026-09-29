@@ -26,7 +26,14 @@ function deepMerge(base, override) {
   const apply = (target, src) => {
     if (!src || typeof src !== "object" || Array.isArray(src)) return;
     for (const [k, v] of Object.entries(src)) {
-      if (v && typeof v === "object" && !Array.isArray(v) && target[k] && typeof target[k] === "object" && !Array.isArray(target[k])) {
+      if (
+        v &&
+        typeof v === "object" &&
+        !Array.isArray(v) &&
+        target[k] &&
+        typeof target[k] === "object" &&
+        !Array.isArray(target[k])
+      ) {
         apply(target[k], v);
       } else {
         target[k] = v;

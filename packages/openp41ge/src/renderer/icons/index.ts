@@ -112,18 +112,17 @@ export function plusIconThick(size?: number): string {
 
 /** Check / confirm icon */
 export function checkIcon(size?: number): string {
-  return icon(
-    "0 0 16 16",
-    [`<path d="M3 8.5L6.5 12L13 4.5"/>`],
-    size,
-  );
+  return icon("0 0 16 16", [`<path d="M3 8.5L6.5 12L13 4.5"/>`], size);
 }
 
 /** Close / cancel (cross) icon */
 export function closeIcon(size?: number): string {
   return icon(
     "0 0 16 16",
-    [`<line x1="3.5" y1="3.5" x2="12.5" y2="12.5"/>`, `<line x1="12.5" y1="3.5" x2="3.5" y2="12.5"/>`],
+    [
+      `<line x1="3.5" y1="3.5" x2="12.5" y2="12.5"/>`,
+      `<line x1="12.5" y1="3.5" x2="3.5" y2="12.5"/>`,
+    ],
     size,
   );
 }

@@ -113,9 +113,7 @@ function toOverrides(
   if (value !== null && typeof value === "object") {
     const src = value as Record<string, unknown>;
     const def = (
-      defaults && typeof defaults === "object" && !Array.isArray(defaults)
-        ? defaults
-        : {}
+      defaults && typeof defaults === "object" && !Array.isArray(defaults) ? defaults : {}
     ) as Record<string, unknown>;
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(src)) {
@@ -128,7 +126,10 @@ function toOverrides(
       } else if (dv !== null && typeof dv === "object") {
         const pruned = toOverrides(dv, def[key], explicitKeys, cur);
         if (pruned !== undefined && Object.keys(pruned as object).length > 0) out[key] = pruned;
-      } else if (JSON.stringify(dv) !== JSON.stringify(def[key]) || (explicitKeys?.has(cur) ?? false)) {
+      } else if (
+        JSON.stringify(dv) !== JSON.stringify(def[key]) ||
+        (explicitKeys?.has(cur) ?? false)
+      ) {
         out[key] = dv;
       }
     }
@@ -174,10 +175,7 @@ function sortKeys<T>(value: T): T {
 
 /** The overrides-only config with its keys sorted alphabetically — used both
  *  for the persisted file and for the renderer's settings-editor seed. */
-function sortedOverrides(
-  config: UserConfig,
-  explicitKeys: Set<string>,
-): Record<string, unknown> {
+function sortedOverrides(config: UserConfig, explicitKeys: Set<string>): Record<string, unknown> {
   return sortKeys(toOverrides(config, DEFAULT_CONFIG, explicitKeys)) as Record<string, unknown>;
 }
 

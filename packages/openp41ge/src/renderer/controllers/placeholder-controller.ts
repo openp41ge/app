@@ -33,8 +33,7 @@ export class PlaceholderController extends BaseController {
       </div>
       <div class="flex-1 flex items-center justify-center text-muted text-sm italic bg-bg-secondary">${icon}</div>
     `;
-    container.className =
-      "w-full h-full flex flex-col bg-gutter overflow-hidden cursor-grab";
+    container.className = "w-full h-full flex flex-col bg-gutter overflow-hidden cursor-grab";
 
     // Append close button via the shared component
     const headerEl = container.querySelector("div");

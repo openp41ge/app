@@ -72,7 +72,9 @@ describe("openp41ge-sidebar ＋ button hover-only separators", () => {
   });
 
   it("keeps the left separator + overdraw always on a sidebar that hosts tabs", async () => {
-    const el = await makeSidebar([{ id: "sys-e", title: "Explorer", appType: "explorer", pinned: true }]);
+    const el = await makeSidebar([
+      { id: "sys-e", title: "Explorer", appType: "explorer", pinned: true },
+    ]);
     const btn = addBtn(el);
     await el.updateComplete;
 
@@ -83,7 +85,9 @@ describe("openp41ge-sidebar ＋ button hover-only separators", () => {
     expect(btn.style.borderLeft).toContain("var(--border-divider");
     // Left-edge strokes (only the ＋ produces corner tl-left/bl-left) persist
     // without any hover.
-    const leftStrokes = strokes().filter((l) => l.getAttribute("corner") === "tl-left" || l.getAttribute("corner") === "bl-left");
+    const leftStrokes = strokes().filter(
+      (l) => l.getAttribute("corner") === "tl-left" || l.getAttribute("corner") === "bl-left",
+    );
     expect(leftStrokes.map((l) => l.getAttribute("dir")).sort()).toEqual(["down", "up"]);
   });
 });

@@ -76,7 +76,6 @@ export class DemoOpenp41ge extends LitElement {
             <circle cx="17" cy="7" r="3" fill="#555" />
             <circle cx="26" cy="7" r="3" fill="#555" />
           </svg>
-
         </div>
         <!-- Grid area -->
         <div style="display:flex;flex-direction:row;flex:1;overflow:hidden;position:relative;">
@@ -105,25 +104,27 @@ export class DemoOpenp41ge extends LitElement {
         >
           ${tabs.map((tab) => this._renderTab(tab))}
           <!-- Ghost indicator in tab bar (matches real tab-bar-drop-target) -->
-          ${this.ghostTabBarCol === colIndex
-            ? html`<div
-                style="position:absolute;left:${this.ghostTabBarOffset}px;top:4px;bottom:4px;width:2px;background:rgb(74,158,255);pointer-events:none;z-index:10;"
-              ></div>`
-            : ""}
+          ${
+            this.ghostTabBarCol === colIndex
+              ? html`<div
+                  style="position:absolute;left:${this.ghostTabBarOffset}px;top:4px;bottom:4px;width:2px;background:rgb(74,158,255);pointer-events:none;z-index:10;"
+                ></div>`
+              : ""
+          }
         </div>
 
         <!-- Tab bar bottom separator -->
         <div style="height:4px;flex-shrink:0;background:#2a2a2a;"></div>
         <!-- Content area -->
-        <div
-          style="flex:1;background:#1e1e1e;position:relative;overflow:hidden;"
-        >
+        <div style="flex:1;background:#1e1e1e;position:relative;overflow:hidden;">
           <!-- Ghost overlay on content (matches real ghost-manager column highlight) -->
-          ${this.ghostCol === colIndex
-            ? html`<div
-                style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(74,158,255,0.35);background:rgba(74,158,255,0.08);pointer-events:none;z-index:5;"
-              ></div>`
-            : ""}
+          ${
+            this.ghostCol === colIndex
+              ? html`<div
+                  style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(74,158,255,0.35);background:rgba(74,158,255,0.08);pointer-events:none;z-index:5;"
+                ></div>`
+              : ""
+          }
           <!-- Content lines -->
           <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
             <div style="width:60%;height:3px;border-radius:1px;background:#555;opacity:0.5;"></div>
@@ -151,7 +152,9 @@ export class DemoOpenp41ge extends LitElement {
       <div
         style="width:88px;flex-shrink:0;background:#252526;border-left:1px solid #333;display:flex;flex-direction:column;padding:0;"
       >
-        <div style="padding:6px 8px 4px;font-size:8px;color:#999;font-weight:600;font-family:var(--font-ui);border-bottom:1px solid #333;">
+        <div
+          style="padding:6px 8px 4px;font-size:8px;color:#999;font-weight:600;font-family:var(--font-ui);border-bottom:1px solid #333;"
+        >
           EXPLORER
         </div>
         <div style="padding:4px 8px;display:flex;flex-direction:column;gap:2px;">
@@ -165,7 +168,16 @@ export class DemoOpenp41ge extends LitElement {
           </div>
           <div style="padding-left:14px;display:flex;align-items:center;gap:3px;">
             <svg width="5" height="7" viewBox="0 0 5 7" style="flex-shrink:0;">
-              <rect x="0" y="0" width="5" height="7" rx="1" stroke="#888" stroke-width="0.7" fill="none" />
+              <rect
+                x="0"
+                y="0"
+                width="5"
+                height="7"
+                rx="1"
+                stroke="#888"
+                stroke-width="0.7"
+                fill="none"
+              />
               <line x1="1" y1="2" x2="3" y2="2" stroke="#888" stroke-width="0.6" />
               <line x1="1" y1="4" x2="2.5" y2="4" stroke="#888" stroke-width="0.4" />
             </svg>
@@ -173,7 +185,16 @@ export class DemoOpenp41ge extends LitElement {
           </div>
           <div style="padding-left:14px;display:flex;align-items:center;gap:3px;">
             <svg width="5" height="7" viewBox="0 0 5 7" style="flex-shrink:0;">
-              <rect x="0" y="0" width="5" height="7" rx="1" stroke="#888" stroke-width="0.7" fill="none" />
+              <rect
+                x="0"
+                y="0"
+                width="5"
+                height="7"
+                rx="1"
+                stroke="#888"
+                stroke-width="0.7"
+                fill="none"
+              />
               <line x1="1" y1="2" x2="3" y2="2" stroke="#888" stroke-width="0.6" />
               <line x1="1" y1="4" x2="2.5" y2="4" stroke="#888" stroke-width="0.4" />
             </svg>

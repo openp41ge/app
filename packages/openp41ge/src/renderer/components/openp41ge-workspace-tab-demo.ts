@@ -116,9 +116,7 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
 
   /** Place the cards in the carousel and sync the skeleton highlight. */
   private _apply(): void {
-    const cards = this.parentElement?.querySelectorAll<HTMLElement>(
-      ".wm-window-copy > ol > li",
-    );
+    const cards = this.parentElement?.querySelectorAll<HTMLElement>(".wm-window-copy > ol > li");
     if (cards) {
       const a = this._step;
       cards.forEach((card, i) => {
@@ -180,31 +178,32 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
     const shown = (n: number) => !animated || this._static || s >= n;
     const hl = (n: number) => animated && !this._static && s === n;
     return html`
-    <div class="row ${shown(1) ? "show" : ""}">
-      <div class="thumb ${hl(4) ? "open" : ""}">
-        <div class="thumb-chrome">
-          <span class="thumb-dot"></span><span class="thumb-dot"></span><span class="thumb-dot"></span>
-        </div>
-        <div class="thumb-body">
-          <div class="thumb-side"></div>
-          <div class="thumb-grid">
-            <span class="thumb-cell"></span><span class="thumb-cell"></span
-            ><span class="thumb-cell"></span>
+      <div class="row ${shown(1) ? "show" : ""}">
+        <div class="thumb ${hl(4) ? "open" : ""}">
+          <div class="thumb-chrome">
+            <span class="thumb-dot"></span><span class="thumb-dot"></span
+            ><span class="thumb-dot"></span>
+          </div>
+          <div class="thumb-body">
+            <div class="thumb-side"></div>
+            <div class="thumb-grid">
+              <span class="thumb-cell"></span><span class="thumb-cell"></span
+              ><span class="thumb-cell"></span>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="info">
-        <span class="title ${hl(1) ? "hl" : ""}"></span>
-        <div class="meta ${shown(2) ? "show" : ""} ${hl(2) ? "hl" : ""}">
-          <span class="repo"></span>
+        <div class="info">
+          <span class="title ${hl(1) ? "hl" : ""}"></span>
+          <div class="meta ${shown(2) ? "show" : ""} ${hl(2) ? "hl" : ""}">
+            <span class="repo"></span>
+          </div>
+          <div class="pills ${shown(3) ? "show" : ""} ${hl(3) ? "hl" : ""}">
+            <span class="wt"></span><span class="wt"></span>
+          </div>
         </div>
-        <div class="pills ${shown(3) ? "show" : ""} ${hl(3) ? "hl" : ""}">
-          <span class="wt"></span><span class="wt"></span>
-        </div>
+        <span class="chev ${hl(4) ? "hl" : ""}">›</span>
       </div>
-      <span class="chev ${hl(4) ? "hl" : ""}">›</span>
-    </div>
-  `;
+    `;
   }
 
   override render(): TemplateResult {
@@ -213,7 +212,9 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
     const hl = (n: number): boolean => !this._static && s === n;
     return html`
       <style>
-        :host { display: block; }
+        :host {
+          display: block;
+        }
         .demo {
           height: 540px;
           display: flex;
@@ -271,7 +272,9 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
           font-size: 12px;
           margin-left: auto;
           flex-shrink: 0;
-          transition: background-color 0.4s ease, color 0.4s ease;
+          transition:
+            background-color 0.4s ease,
+            color 0.4s ease;
         }
         /* "New workspace" button — lights blue in step 1. */
         .add.hl {
@@ -310,7 +313,9 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          transition: border-color 0.4s ease, box-shadow 0.4s ease;
+          transition:
+            border-color 0.4s ease,
+            box-shadow 0.4s ease;
         }
         .thumb-chrome {
           height: 12px;
@@ -360,8 +365,13 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
           animation: open-pulse 2.5s ease-in-out infinite;
         }
         @keyframes open-pulse {
-          0%, 100% { box-shadow: 0 0 0 2px rgba(86, 156, 214, 0); }
-          50% { box-shadow: 0 0 0 3px rgba(86, 156, 214, 0.45); }
+          0%,
+          100% {
+            box-shadow: 0 0 0 2px rgba(86, 156, 214, 0);
+          }
+          50% {
+            box-shadow: 0 0 0 3px rgba(86, 156, 214, 0.45);
+          }
         }
         .info {
           flex: 1;
@@ -388,7 +398,9 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
           opacity: 0;
           transition: opacity 0.45s ease;
         }
-        .meta.show { opacity: 1; }
+        .meta.show {
+          opacity: 1;
+        }
         .meta .repo {
           width: 64px;
           height: 8px;
@@ -408,7 +420,9 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
           opacity: 0;
           transition: opacity 0.45s ease;
         }
-        .pills.show { opacity: 1; }
+        .pills.show {
+          opacity: 1;
+        }
         .pills .wt {
           width: 26px;
           height: 10px;
@@ -416,7 +430,9 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
           background: var(--bg-active, #3a3a42);
           transition: background-color 0.4s ease;
         }
-        .pills .wt:nth-child(2) { width: 18px; }
+        .pills .wt:nth-child(2) {
+          width: 18px;
+        }
         .pills.hl .wt {
           background: var(--accent, #79c0ff);
         }
@@ -436,10 +452,7 @@ export class Openp41geWorkspaceTabDemo extends LitElement {
           <span class="search"></span>
         </div>
         <div class="list">
-          ${this._wsRow(false)}
-          ${this._wsRow(false)}
-          ${this._wsRow(false)}
-          ${this._wsRow(true)}
+          ${this._wsRow(false)} ${this._wsRow(false)} ${this._wsRow(false)} ${this._wsRow(true)}
         </div>
         <div class="bottom-bar">
           <span class="add ${hl(0) ? "hl" : ""}">＋</span>

@@ -2589,8 +2589,8 @@ class Openp41geAgents extends LitElement {
            a reasoning block, keep extra space between them. Each box's corner
            accents overdraw ~7–8px past its own edge, so at the normal 8px
            message gap the two sets of lines would meet and read as one box. */
-        .chat-message.assistant:has(> .tool-call-group:last-child) +
-        .chat-message.assistant:has(> .reasoning-wrap:first-child) {
+        .chat-message.assistant:has(> .tool-call-group:last-child)
+          + .chat-message.assistant:has(> .reasoning-wrap:first-child) {
           margin-top: 12px;
         }
         .msg-reasoning {
@@ -2663,35 +2663,51 @@ class Openp41geAgents extends LitElement {
            toolbar groups, tool-call groups) anchor their lines 1px outside the
            padding box (top/left: -1px) so the solid end sits on the border; the
            stroke extends outward past the corner and fades to its tip. */
-        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="tl"][dir="left"] {
+        .chat-message.assistant
+          :is(.code-block, .code-block-toolbar-group, .tool-call-group)
+          overdraw-line[corner="tl"][dir="left"] {
           top: -1px;
           right: 100%;
         }
-        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="tl"][dir="up"] {
+        .chat-message.assistant
+          :is(.code-block, .code-block-toolbar-group, .tool-call-group)
+          overdraw-line[corner="tl"][dir="up"] {
           left: -1px;
           bottom: 100%;
         }
-        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="tr"][dir="right"] {
+        .chat-message.assistant
+          :is(.code-block, .code-block-toolbar-group, .tool-call-group)
+          overdraw-line[corner="tr"][dir="right"] {
           top: -1px;
           left: 100%;
         }
-        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="tr"][dir="up"] {
+        .chat-message.assistant
+          :is(.code-block, .code-block-toolbar-group, .tool-call-group)
+          overdraw-line[corner="tr"][dir="up"] {
           left: 100%;
           bottom: 100%;
         }
-        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="bl"][dir="left"] {
+        .chat-message.assistant
+          :is(.code-block, .code-block-toolbar-group, .tool-call-group)
+          overdraw-line[corner="bl"][dir="left"] {
           top: 100%;
           right: 100%;
         }
-        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="bl"][dir="down"] {
+        .chat-message.assistant
+          :is(.code-block, .code-block-toolbar-group, .tool-call-group)
+          overdraw-line[corner="bl"][dir="down"] {
           left: -1px;
           top: 100%;
         }
-        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="br"][dir="right"] {
+        .chat-message.assistant
+          :is(.code-block, .code-block-toolbar-group, .tool-call-group)
+          overdraw-line[corner="br"][dir="right"] {
           top: 100%;
           left: 100%;
         }
-        .chat-message.assistant :is(.code-block, .code-block-toolbar-group, .tool-call-group) overdraw-line[corner="br"][dir="down"] {
+        .chat-message.assistant
+          :is(.code-block, .code-block-toolbar-group, .tool-call-group)
+          overdraw-line[corner="br"][dir="down"] {
           left: 100%;
           top: 100%;
         }
@@ -2699,35 +2715,51 @@ class Openp41geAgents extends LitElement {
            no border of their own - an inner element carries it), so the corner
            lines anchor at 0/calc(100% - 1px) to land on that inner border (its
            inner edge is 1px inside the container). */
-        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="tl"][dir="left"] {
+        .chat-message.assistant
+          :is(.reasoning-wrap, .msg-table-wrap)
+          overdraw-line[corner="tl"][dir="left"] {
           top: 0;
           right: calc(100% - 1px);
         }
-        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="tl"][dir="up"] {
+        .chat-message.assistant
+          :is(.reasoning-wrap, .msg-table-wrap)
+          overdraw-line[corner="tl"][dir="up"] {
           left: 0;
           bottom: calc(100% - 1px);
         }
-        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="tr"][dir="right"] {
+        .chat-message.assistant
+          :is(.reasoning-wrap, .msg-table-wrap)
+          overdraw-line[corner="tr"][dir="right"] {
           top: 0;
           left: calc(100% - 1px);
         }
-        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="tr"][dir="up"] {
+        .chat-message.assistant
+          :is(.reasoning-wrap, .msg-table-wrap)
+          overdraw-line[corner="tr"][dir="up"] {
           left: calc(100% - 1px);
           bottom: calc(100% - 1px);
         }
-        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="bl"][dir="left"] {
+        .chat-message.assistant
+          :is(.reasoning-wrap, .msg-table-wrap)
+          overdraw-line[corner="bl"][dir="left"] {
           top: calc(100% - 1px);
           right: calc(100% - 1px);
         }
-        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="bl"][dir="down"] {
+        .chat-message.assistant
+          :is(.reasoning-wrap, .msg-table-wrap)
+          overdraw-line[corner="bl"][dir="down"] {
           left: 0;
           top: calc(100% - 1px);
         }
-        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="br"][dir="right"] {
+        .chat-message.assistant
+          :is(.reasoning-wrap, .msg-table-wrap)
+          overdraw-line[corner="br"][dir="right"] {
           top: calc(100% - 1px);
           left: calc(100% - 1px);
         }
-        .chat-message.assistant :is(.reasoning-wrap, .msg-table-wrap) overdraw-line[corner="br"][dir="down"] {
+        .chat-message.assistant
+          :is(.reasoning-wrap, .msg-table-wrap)
+          overdraw-line[corner="br"][dir="down"] {
           left: calc(100% - 1px);
           top: calc(100% - 1px);
         }
@@ -3040,7 +3072,7 @@ class Openp41geAgents extends LitElement {
         .chat-message.assistant .msg-table-wrap overdraw-line.tbl-vfade[dir="down"] {
           top: 100%;
         }
-/* A single "thinking…" tail shown at the bottom of the transcript while
+        /* A single "thinking…" tail shown at the bottom of the transcript while
            streaming — replaces the old flashing caret that was appended to every
            assistant response block. The label stays put while the three dots
            pulse in sequence, so it never pushes existing content around. */
@@ -3891,9 +3923,8 @@ class Openp41geAgents extends LitElement {
     const text = reasoning.trim();
     const words = text ? text.split(/\s+/).length : 0;
     const sizeLabel = words > 0 ? `~${this._fmtTok(words)} words` : "";
-    const segments = text
-      ? renderMarkdownSegments(text, { codeLanguages, msgId })
-      : [];
+    const segments = text ? renderMarkdownSegments(text, { codeLanguages, msgId }) : [];
+    const segs = segments.map((s) => this._renderSegment(s));
     return html`<div class="reasoning-wrap">
       <details class="msg-reasoning" ?open=${live}>
         <summary>
@@ -3901,12 +3932,20 @@ class Openp41geAgents extends LitElement {
           <span class="msg-reasoning-label">Reasoning</span>
           ${sizeLabel ? html`<span class="msg-reasoning-size">${sizeLabel}</span>` : html``}
         </summary>
-        <div class="msg-reasoning-body"><overdraw-line class="reasoning-ext" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="reasoning-ext" dir="right" aria-hidden="true"></overdraw-line><div class="msg-content" @click=${this._onMsgContentClick}>${segments.map((s) => this._renderSegment(s))}</div></div>
+        <div class="msg-reasoning-body">
+          <overdraw-line class="reasoning-ext" dir="left" aria-hidden="true"></overdraw-line
+          ><overdraw-line class="reasoning-ext" dir="right" aria-hidden="true"></overdraw-line>
+          <div class="msg-content" @click=${this._onMsgContentClick}>${segs}</div>
+        </div>
       </details>
-      <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
-      <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
-      <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
-      <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
+      <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line
+      ><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
+      <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line
+      ><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
+      <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line
+      ><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
+      <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line
+      ><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
     </div>`;
   }
 
@@ -3930,7 +3969,7 @@ class Openp41geAgents extends LitElement {
     // calls render inline at the position they occurred in the response.
     if (msg.segments && msg.segments.length > 0) {
       const out: unknown[] = [];
-      for (let i = 0; i < msg.segments.length; ) {
+      for (let i = 0; i < msg.segments.length;) {
         const seg = msg.segments[i];
         if (seg.type === "tool") {
           // Consecutive tool calls render as one grouped box; a text segment
@@ -3946,9 +3985,11 @@ class Openp41geAgents extends LitElement {
         const parts = seg.text
           ? renderMarkdownSegments(seg.text, { codeLanguages: overrides, msgId: msg.id })
           : [];
-        out.push(html`<div class="msg-content" @click=${this._onMsgContentClick}>
-          ${parts.map((s) => this._renderSegment(s))}
-        </div>`);
+        out.push(
+          html`<div class="msg-content" @click=${this._onMsgContentClick}>
+            ${parts.map((s) => this._renderSegment(s))}
+          </div>`,
+        );
         i++;
       }
       return html`
@@ -3968,11 +4009,7 @@ class Openp41geAgents extends LitElement {
         <div class="msg-content" @click=${this._onMsgContentClick}>
           ${segments.map((seg) => this._renderSegment(seg))}
         </div>
-        ${
-          toolCalls.length > 0
-            ? this._renderToolCalls(toolCalls)
-            : ""
-        }
+        ${toolCalls.length > 0 ? this._renderToolCalls(toolCalls) : ""}
       </div>
     `;
   }
@@ -3991,8 +4028,7 @@ class Openp41geAgents extends LitElement {
     const l = (corner: string, dir: string) =>
       html`<overdraw-line dir=${dir} corner=${corner} aria-hidden="true"></overdraw-line>`;
     return html`
-      ${l("tl", "left")}${l("tl", "up")}
-      ${l("tr", "right")}${l("tr", "up")}
+      ${l("tl", "left")}${l("tl", "up")} ${l("tr", "right")}${l("tr", "up")}
       ${l("bl", "left")}${l("bl", "down")}
       ${l("br", "right")}${opts?.skipBrVertical ? "" : l("br", "down")}
     `;
@@ -4154,30 +4190,50 @@ class Openp41geAgents extends LitElement {
     return html`
       <div class="tool-call-group">
         ${calls.map((tc, i) => this._renderToolCallItem(tc, i))}
-        <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
-        <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
-        <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
-        <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
+        <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line
+        ><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
+        <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line
+        ><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
+        <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line
+        ><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
+        <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line
+        ><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
       </div>
     `;
   }
 
   private _renderToolCallItem(tc: ToolCall, index = 0): TemplateResult {
     return html`
-      <details class="tool-call-details" data-tool-call-id=${tc.id}
+      <details
+        class="tool-call-details"
+        data-tool-call-id=${tc.id}
         ?open=${this._openToolCalls.has(tc.id)}
-        @toggle=${this._onToolCallToggle}>
+        @toggle=${this._onToolCallToggle}
+      >
         <summary class="tool-call-row">
-          ${index > 0
-            ? html`<overdraw-line class="tool-divider" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tool-divider" dir="right" aria-hidden="true"></overdraw-line>`
-            : html``}
+          ${
+            index > 0
+              ? html`<overdraw-line
+                    class="tool-divider"
+                    dir="left"
+                    aria-hidden="true"
+                  ></overdraw-line
+                  ><overdraw-line
+                    class="tool-divider"
+                    dir="right"
+                    aria-hidden="true"
+                  ></overdraw-line>`
+              : html``
+          }
           <span class="tool-call-chevron">${unsafeHTML(ICON_REASONING_CHEVRON)}</span>
           <span class="tool-call-label">Tool</span>
           <span class="tool-call-name">${tc.name}</span>
         </summary>
         <div class="tool-call-body">
-          <overdraw-line class="tool-call-ext" dir="left" aria-hidden="true"></overdraw-line><overdraw-line class="tool-call-ext" dir="right" aria-hidden="true"></overdraw-line>
-          <pre class="tool-call-json">${unsafeHTML(highlight(this._formatToolArgs(tc), "json"))}</pre>
+          <overdraw-line class="tool-call-ext" dir="left" aria-hidden="true"></overdraw-line
+          ><overdraw-line class="tool-call-ext" dir="right" aria-hidden="true"></overdraw-line>
+          <pre class="tool-call-json">
+${unsafeHTML(highlight(this._formatToolArgs(tc), "json"))}</pre>
         </div>
       </details>
     `;

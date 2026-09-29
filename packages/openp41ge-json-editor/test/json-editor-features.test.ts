@@ -240,7 +240,12 @@ describe("json-editor structure features", () => {
   test("delete buttons stay hidden until their row is hovered", async () => {
     expect(el.shadowRoot.querySelectorAll(".je-del--show").length).toBe(0);
     const ta = input(el);
-    const ev = new MouseEvent("mousemove", { bubbles: true, composed: true, clientX: 100, clientY: 100 });
+    const ev = new MouseEvent("mousemove", {
+      bubbles: true,
+      composed: true,
+      clientX: 100,
+      clientY: 100,
+    });
     Object.defineProperty(ev, "offsetY", { value: 30 });
     ta.dispatchEvent(ev);
     await new Promise((r) => setTimeout(r, 20));
@@ -249,7 +254,12 @@ describe("json-editor structure features", () => {
 
   test("the delete button stays visible while hovering it", async () => {
     const ta = input(el);
-    const ev = new MouseEvent("mousemove", { bubbles: true, composed: true, clientX: 100, clientY: 100 });
+    const ev = new MouseEvent("mousemove", {
+      bubbles: true,
+      composed: true,
+      clientX: 100,
+      clientY: 100,
+    });
     Object.defineProperty(ev, "offsetY", { value: 30 });
     ta.dispatchEvent(ev);
     await new Promise((r) => setTimeout(r, 20));
@@ -1409,7 +1419,9 @@ describe("Alt+Arrow line movement (VS Code)", () => {
     const editor = await mount();
     const ta = input(editor);
     ta.selectionStart = ta.selectionEnd = ta.value.indexOf('"providerId"');
-    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }));
+    ta.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }),
+    );
     await new Promise((r) => setTimeout(r, 20));
     const after = input(editor).value;
     // `providers` now precedes `providerId`.

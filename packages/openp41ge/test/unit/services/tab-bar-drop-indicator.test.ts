@@ -84,9 +84,7 @@ describe("TabBarDropTarget tab-bar indicator geometry", () => {
     expect(up.style.backgroundImage).toBe(
       "linear-gradient(to top, rgb(74, 158, 255) 40%, transparent)",
     );
-    expect(down.style.backgroundImage).toBe(
-      "linear-gradient(rgb(74, 158, 255) 40%, transparent)",
-    );
+    expect(down.style.backgroundImage).toBe("linear-gradient(rgb(74, 158, 255) 40%, transparent)");
   });
 
   it("does not re-append the strokes when the indicator is reused across hovers", () => {

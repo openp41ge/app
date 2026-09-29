@@ -109,11 +109,9 @@ async function ensureRemoteRefs(gitDir: string): Promise<void> {
 export function createWorktreeStore(reposRootDir: string): WorktreeStore {
   const getReposDir = (): string => reposRootDir;
 
-  const getRepoParent = (url: string): string =>
-    path.join(reposRootDir, deriveRepoDirName(url));
+  const getRepoParent = (url: string): string => path.join(reposRootDir, deriveRepoDirName(url));
 
-  const getRepoDir = (url: string): string =>
-    path.join(getRepoParent(url), ".git");
+  const getRepoDir = (url: string): string => path.join(getRepoParent(url), ".git");
 
   const getWorktreePath = (url: string, branch: string): string =>
     path.join(getRepoParent(url), branch.replace(/\//g, "--"));
@@ -255,7 +253,11 @@ export function createWorktreeStore(reposRootDir: string): WorktreeStore {
    * registered in the bare repo's metadata but the folder is gone (folder
    * deleted behind git's back), prune then retry once.
    */
-  async function addWorktree(wtDir: string, branch: string, gitDir: string): Promise<true | string> {
+  async function addWorktree(
+    wtDir: string,
+    branch: string,
+    gitDir: string,
+  ): Promise<true | string> {
     const attempt = (): Promise<void> =>
       runGit(["worktree", "add", "--checkout", wtDir, branch], gitDir).then(() => undefined);
     try {
@@ -295,7 +297,10 @@ export function createWorktreeStore(reposRootDir: string): WorktreeStore {
     const wtDir = getWorktreePath(url, branch);
 
     if (!fs.existsSync(parent) || !fs.existsSync(gitDir)) {
-      return { ok: false, error: "Repository not cloned yet. Clone before checking out worktrees." };
+      return {
+        ok: false,
+        error: "Repository not cloned yet. Clone before checking out worktrees.",
+      };
     }
 
     if (fs.existsSync(wtDir)) {
@@ -321,7 +326,10 @@ export function createWorktreeStore(reposRootDir: string): WorktreeStore {
       // Branch exists on remote — fetch it into a local branch, then worktree.
       let remoteExists = false;
       try {
-        const { stdout } = await runGit(["ls-remote", "--heads", url, "refs/heads/" + branch], gitDir);
+        const { stdout } = await runGit(
+          ["ls-remote", "--heads", url, "refs/heads/" + branch],
+          gitDir,
+        );
         remoteExists = !!stdout.trim();
       } catch {
         remoteExists = false;
@@ -382,7 +390,10 @@ export function createWorktreeStore(reposRootDir: string): WorktreeStore {
         await runGit(["reset", "--hard", "origin/" + branch], wtDir);
       } else {
         // No worktree — move the local branch ref to match remote.
-        await runGit(["update-ref", "refs/heads/" + branch, "refs/remotes/origin/" + branch], gitDir);
+        await runGit(
+          ["update-ref", "refs/heads/" + branch, "refs/remotes/origin/" + branch],
+          gitDir,
+        );
       }
       return { ok: true };
     } catch (e) {
@@ -405,7 +416,10 @@ export function createWorktreeStore(reposRootDir: string): WorktreeStore {
       fs.mkdirSync(repoParentDir, { recursive: true });
       await runGit(["clone", "--bare", url, gitDir]);
       // Ensure future fetches build remote-tracking refs for sync-status checks.
-      await runGit(["config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"], gitDir);
+      await runGit(
+        ["config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"],
+        gitDir,
+      );
       return { ok: true };
     } catch (e) {
       const msg = (e as Error).message;

@@ -73,8 +73,7 @@ const PIN_ICON =
   `<path d="m640-480 80 80v80H520v240l-40 40-40-40v-240H240v-80l80-80v-280h-40v-80h400v80h-40v280Zm-286 80h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></svg>`;
 
 /** Downward-arrow glyph for the scroll-to-bottom button. */
-const SCROLL_DOWN_ICON =
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 1.5v6.5M2.2 4.9 5 7.7l2.8-2.8"/></svg>`;
+const SCROLL_DOWN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 1.5v6.5M2.2 4.9 5 7.7l2.8-2.8"/></svg>`;
 
 // ─── Pure geometry (unit-testable) ─────────────────────────────────────
 
@@ -415,9 +414,7 @@ export class OverlayScrollbar {
         // up. `calc(0 + 4px)` is invalid (number + length), so default
         // `bottom` to a unit value.
         bottom:
-          ins.bottom === undefined || ins.bottom === "0"
-            ? "4px"
-            : `calc(${ins.bottom} + 4px)`,
+          ins.bottom === undefined || ins.bottom === "0" ? "4px" : `calc(${ins.bottom} + 4px)`,
         right: ins.right ?? "0",
         zIndex: String(this._zIndex + 1),
       });
@@ -437,9 +434,7 @@ export class OverlayScrollbar {
       const ins = this._inset;
       Object.assign(btn.style, {
         bottom:
-          ins.bottom === undefined || ins.bottom === "0"
-            ? "2px"
-            : `calc(${ins.bottom} + 2px)`,
+          ins.bottom === undefined || ins.bottom === "0" ? "2px" : `calc(${ins.bottom} + 2px)`,
         right: ins.right ?? "0",
         zIndex: String(this._zIndex + 1),
       });

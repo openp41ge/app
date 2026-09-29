@@ -168,8 +168,8 @@ export class InlineDiffGutterColumns {
     for (let line = start; line <= end; line++) {
       // Word-wrap: anchor at the model line's FIRST view segment and span the
       // full wrapped height; without wrap getters this is just (line-1)*lh.
-      const vStart = viewLineStart ? viewLineStart(line) ?? line : line;
-      const vCount = viewLineCount ? viewLineCount(line) ?? 1 : 1;
+      const vStart = viewLineStart ? (viewLineStart(line) ?? line) : line;
+      const vCount = viewLineCount ? (viewLineCount(line) ?? 1) : 1;
       const top = (vStart - 1) * this._lineHeight;
       const height = vCount * this._lineHeight;
 
@@ -203,7 +203,14 @@ export class InlineDiffGutterColumns {
             this._onLineClick?.(line);
           });
         }
-        st = { top: NaN, height: NaN, text: undefined, cls: undefined, active: undefined, hover: undefined };
+        st = {
+          top: NaN,
+          height: NaN,
+          text: undefined,
+          cls: undefined,
+          active: undefined,
+          hover: undefined,
+        };
         el.__st = st;
         // The separator dot sits on the shared border of this row. Only in
         // diff mode (no dots pile up while the column is hidden in normal

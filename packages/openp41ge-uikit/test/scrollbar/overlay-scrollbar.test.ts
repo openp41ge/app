@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  computeThumbLength,
-  computeThumbPosition,
-} from "openp41ge-scrollbar";
+import { computeThumbLength, computeThumbPosition } from "openp41ge-scrollbar";
 
 describe("OverlayScrollbar geometry", () => {
   describe("computeThumbLength", () => {

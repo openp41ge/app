@@ -32,13 +32,24 @@ export function paneHeaderButton(options: PaneHeaderButtonOptions): HTMLElement 
   btn.textContent = content;
   btn.className = className || "";
   btn.classList.add(
-    "shrink-0", "min-w-[28px]", "self-stretch",
-    "flex", "items-center", "justify-center",
-    "px-2", "bg-transparent", "text-muted",
-    "cursor-pointer", "text-sm", "leading-none",
-    "opacity-50", "border-none", "box-border",
-    "transition-[background,color,opacity]", "duration-100",
-    "select-none"
+    "shrink-0",
+    "min-w-[28px]",
+    "self-stretch",
+    "flex",
+    "items-center",
+    "justify-center",
+    "px-2",
+    "bg-transparent",
+    "text-muted",
+    "cursor-pointer",
+    "text-sm",
+    "leading-none",
+    "opacity-50",
+    "border-none",
+    "box-border",
+    "transition-[background,color,opacity]",
+    "duration-100",
+    "select-none",
   );
   if (title) btn.title = title;
 

@@ -44,10 +44,7 @@ function treeIcon(name: string, size: number) {
   // 3. Material icon theme for file names (app.ts → typescript icon)
   const material = getFileIcon(name);
   if (material) {
-    const sized = material.replace(
-      '<svg',
-      `<svg width="${size}" height="${size}"`,
-    );
+    const sized = material.replace("<svg", `<svg width="${size}" height="${size}"`);
     return html`${unsafeHTML(sized)}`;
   }
   return html``;
@@ -141,9 +138,7 @@ const repoNodes: TreeNode[] = [
         icon: "git-branch",
         expanded: false,
         actions: [{ id: "pull", icon: "refresh", label: "Pull" }],
-        children: [
-          { id: "wt-feat-readme", label: "README.md", icon: "README.md" },
-        ],
+        children: [{ id: "wt-feat-readme", label: "README.md", icon: "README.md" }],
       },
     ],
   },
@@ -187,10 +182,7 @@ export const Basic: Story = {
     <div
       style="width:280px;background:#1e1e1e;font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;"
     >
-      <openp41ge-tree
-        .nodes=${basicNodes}
-        .renderIcon=${treeIcon}
-      ></openp41ge-tree>
+      <openp41ge-tree .nodes=${basicNodes} .renderIcon=${treeIcon}></openp41ge-tree>
     </div>
   `,
 };
@@ -214,10 +206,7 @@ export const WithRepoStructure: Story = {
     <div
       style="width:280px;background:#1e1e1e;font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;"
     >
-      <openp41ge-tree
-        .nodes=${repoNodes}
-        .renderIcon=${treeIcon}
-      ></openp41ge-tree>
+      <openp41ge-tree .nodes=${repoNodes} .renderIcon=${treeIcon}></openp41ge-tree>
     </div>
   `,
 };
@@ -227,10 +216,7 @@ export const WithActions: Story = {
     <div
       style="width:280px;background:#1e1e1e;font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;"
     >
-      <openp41ge-tree
-        .nodes=${repoNodes}
-        .renderIcon=${treeIcon}
-      ></openp41ge-tree>
+      <openp41ge-tree .nodes=${repoNodes} .renderIcon=${treeIcon}></openp41ge-tree>
     </div>
   `,
 };
@@ -240,17 +226,16 @@ export const NestedDeep: Story = {
     <div
       style="width:280px;background:#1e1e1e;font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;"
     >
-      <openp41ge-tree
-        .nodes=${_buildDeepTree(5)}
-        .renderIcon=${treeIcon}
-      ></openp41ge-tree>
+      <openp41ge-tree .nodes=${_buildDeepTree(5)} .renderIcon=${treeIcon}></openp41ge-tree>
     </div>
   `,
 };
 
 export const Empty: Story = {
   render: () => html`
-    <div style="width:280px;background:#1e1e1e;font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;">
+    <div
+      style="width:280px;background:#1e1e1e;font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;"
+    >
       <openp41ge-tree .nodes=${[]}></openp41ge-tree>
     </div>
   `,
@@ -261,10 +246,7 @@ export const DraggableNodes: Story = {
     <div
       style="width:280px;background:#1e1e1e;font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;"
     >
-      <openp41ge-tree
-        .nodes=${basicNodes}
-        .renderIcon=${treeIcon}
-      ></openp41ge-tree>
+      <openp41ge-tree .nodes=${basicNodes} .renderIcon=${treeIcon}></openp41ge-tree>
     </div>
   `,
 };

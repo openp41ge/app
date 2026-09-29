@@ -17,12 +17,15 @@ import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
 import { REGEX_ICON, CASE_ON_ICON } from "../apps/git-commit-search/search-icons";
 import "openp41ge-uikit";
-import { tooltipController, OverlayScrollbar, attachTabEdgeOverdraws, attachTopCornerOverdraws } from "openp41ge-uikit";
+import {
+  tooltipController,
+  OverlayScrollbar,
+  attachTabEdgeOverdraws,
+  attachTopCornerOverdraws,
+} from "openp41ge-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
-import {
-  MANAGER_SETTINGS_STATE_EVENT,
-} from "./openp41ge-manager-settings";
+import { MANAGER_SETTINGS_STATE_EVENT } from "./openp41ge-manager-settings";
 import type { Openp41geManagerSettings } from "./openp41ge-manager-settings";
 import { workspaceFileService, deriveRepoName } from "../services/workspace-file-service";
 import { registerManagerTabBar } from "../services/init-drag-system";
@@ -1025,7 +1028,15 @@ export class Openp41geWindowManager extends LitElement {
           data-tip=${st.showDefaults ? "Hide defaults" : "Show defaults"}
           @click=${() => this._toggleShowDefaults()}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
@@ -3581,11 +3592,13 @@ export class Openp41geWindowManager extends LitElement {
               `
             : nothing
         }
-        ${this._activeTab !== "welcome"
-          ? this._activeTab === "settings"
-            ? this._settingsListFooter()
-            : this._workspaceListFooter()
-          : nothing}
+        ${
+          this._activeTab !== "welcome"
+            ? this._activeTab === "settings"
+              ? this._settingsListFooter()
+              : this._workspaceListFooter()
+            : nothing
+        }
       </div>
     `;
   }

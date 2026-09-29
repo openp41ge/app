@@ -168,7 +168,7 @@ export function attachTopHorizontalOverdraws(host: HTMLElement): void {
   // so also arm a macrotask fallback that runs `place()` if the frame didn't;
   // otherwise a drawer appearing while occluded would leave stale overdraws.
   const schedulePlace = () => {
-    if ((raf || placeTimer) || !host.isConnected) return;
+    if (raf || placeTimer || !host.isConnected) return;
     if (typeof requestAnimationFrame !== "function") {
       place();
       return;
@@ -214,8 +214,12 @@ export function attachTopHorizontalOverdraws(host: HTMLElement): void {
     // (which dims but does not hide the border) is deliberately ignored, which
     // is why a partial-width drawer hides only its spawn-side line, not the
     // far one; a full-width drawer covers both corners and hides both.
-    (tl as HTMLElement).style.display = cornerOccluded(host, rect.left + 1, rect.top + 1) ? "none" : "";
-    (tr as HTMLElement).style.display = cornerOccluded(host, rect.right - 1, rect.top + 1) ? "none" : "";
+    (tl as HTMLElement).style.display = cornerOccluded(host, rect.left + 1, rect.top + 1)
+      ? "none"
+      : "";
+    (tr as HTMLElement).style.display = cornerOccluded(host, rect.right - 1, rect.top + 1)
+      ? "none"
+      : "";
   }
 
   function teardown(): void {
@@ -357,5 +361,3 @@ function isWithin(ancestor: Element, child: Element): boolean {
   }
   return false;
 }
-
-

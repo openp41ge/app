@@ -7,12 +7,7 @@ import { Openp41geTooltipHost } from "../../src/components/tooltip/tooltip-host"
 import { Openp41geTooltip } from "../../src/components/tooltip/openp41ge-tooltip";
 import { Openp41geTooltipDetail } from "../../src/components/tooltip/openp41ge-tooltip-detail";
 
-const R = (
-  left: number,
-  top: number,
-  right: number,
-  bottom: number,
-): DOMRect =>
+const R = (left: number, top: number, right: number, bottom: number): DOMRect =>
   ({
     left,
     top,
@@ -123,7 +118,8 @@ describe("Openp41geTooltipHost", () => {
     const popup = document.createElement("div");
     document.body.appendChild(popup);
     stubOffset(popup, 120, 40);
-    const pos = (host as unknown as { _position: (p: HTMLElement, t: HTMLElement) => void })._position;
+    const pos = (host as unknown as { _position: (p: HTMLElement, t: HTMLElement) => void })
+      ._position;
 
     // Below, comfortably inside the viewport.
     target.getBoundingClientRect = () => R(200, 100, 260, 130);

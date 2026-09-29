@@ -139,11 +139,7 @@ export function openTabInNextCell(
  * `splitFileOpen` so the new cell gets a real midpoint divider even when there
  * are no existing column dividers.
  */
-function insertEmptyColumnAfter(
-  workspace: Workspace,
-  windowId: string,
-  col: number,
-): Workspace {
+function insertEmptyColumnAfter(workspace: Workspace, windowId: string, col: number): Workspace {
   const newCol = col + 1;
   return mapGridInWindow(workspace, windowId, (grid) => {
     const shifted = grid.placements.map((p) => {

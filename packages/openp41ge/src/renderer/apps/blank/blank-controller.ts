@@ -15,8 +15,7 @@ export class BlankController extends BaseController {
   mount(container: HTMLElement): void {
     this.container = container;
 
-    container.className =
-      "w-full h-full flex flex-col bg-gutter overflow-hidden cursor-grab";
+    container.className = "w-full h-full flex flex-col bg-gutter overflow-hidden cursor-grab";
     container.innerHTML = `
       <div class="flex items-center justify-between px-2 h-7 bg-bg-tertiary border-b border-divider shrink-0 select-none cursor-grab" style="justify-content:flex-end;"></div>
       <div class="flex-1 min-h-0"></div>

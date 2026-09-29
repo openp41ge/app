@@ -337,7 +337,8 @@ export function closeSystemTab(
   }
 
   // If no remaining window references the tab, delete it from the registry.
-  const stillReferenced = (result.sidebar.leftSidebarTabs as SystemTabId[]).includes(sid) ||
+  const stillReferenced =
+    (result.sidebar.leftSidebarTabs as SystemTabId[]).includes(sid) ||
     (result.sidebar.rightSidebarTabs as SystemTabId[]).includes(sid);
   if (!stillReferenced) {
     const { [sid]: _removed, ...remainingSysTabs } = result.systemTabs;
@@ -619,9 +620,7 @@ export function moveSystemTabToSidebar(
       sidebar: {
         ...w.sidebar!,
         [activeKey(targetSide)]: sid,
-        ...(movedWasActive
-          ? { [activeKey(sourceSide)]: nextActive }
-          : {}),
+        ...(movedWasActive ? { [activeKey(sourceSide)]: nextActive } : {}),
       },
     }));
   }

@@ -54,7 +54,12 @@ export function toggleWorktree(): void {
  * drop the positional args before reaching the operation, so we dispatch
  * directly instead.
  */
-export function emitOpenSystemTab(winId: string, appType: string, title: string, side?: "left" | "right"): void {
+export function emitOpenSystemTab(
+  winId: string,
+  appType: string,
+  title: string,
+  side?: "left" | "right",
+): void {
   const defaultSides: Record<string, "left" | "right"> = {
     explorer: "right",
     git: "right",
@@ -80,7 +85,12 @@ export function showCloneDialog(): void {
         const win = ws.windows.find((w) => w.id === myWindowId);
         if (win && !(ws.sidebar?.rightSidebarOpen ?? false)) {
           // Open the right sidebar with explorer tab
-          emitEvent("tab-open-system", { windowId: win.id, side: "right", appType: "explorer", title: "Explorer" });
+          emitEvent("tab-open-system", {
+            windowId: win.id,
+            side: "right",
+            appType: "explorer",
+            title: "Explorer",
+          });
         }
       }
     }

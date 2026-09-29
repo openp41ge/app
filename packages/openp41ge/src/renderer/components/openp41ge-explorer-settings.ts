@@ -212,8 +212,7 @@ export class Openp41geExplorerSettings extends LitElement {
     if (this._showDefaults) {
       // Reconcile the effective edit back to the override document (a value
       // the user left at its default is not an override unless pinned).
-      const next = (stripDefaults(value, this._defaults, this._pinned) ??
-        {}) as ExplorerSettings;
+      const next = (stripDefaults(value, this._defaults, this._pinned) ?? {}) as ExplorerSettings;
       this._sync(next);
     } else {
       this._sync(value);
@@ -248,10 +247,7 @@ export class Openp41geExplorerSettings extends LitElement {
       // values (a leaf equal to its default) are written as explicit keys.
       const doc = sortJsonKeys(this._overrides) as ExplorerSettings;
       for (const key of leafPaths(doc)) {
-        await this.configService.set(
-          `explorer.${key}`,
-          getAt(doc, pathFromKey(key)),
-        );
+        await this.configService.set(`explorer.${key}`, getAt(doc, pathFromKey(key)));
       }
       this._savedOverrides = cloneDeep(doc);
       this._sync(doc);

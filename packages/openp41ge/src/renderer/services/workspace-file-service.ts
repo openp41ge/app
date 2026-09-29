@@ -118,10 +118,7 @@ export class WorkspaceFileService {
    */
   async save(): Promise<boolean> {
     if (!this.openFilePath || !this.openData) return false;
-    const ok = await window.openp41ge.dialog.writeWorkspaceFile(
-      this.openFilePath,
-      this.openData,
-    );
+    const ok = await window.openp41ge.dialog.writeWorkspaceFile(this.openFilePath, this.openData);
     return ok;
   }
 

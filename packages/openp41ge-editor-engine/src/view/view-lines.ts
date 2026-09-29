@@ -184,7 +184,7 @@ export class ViewLines {
     const changed = this._hiddenLines !== next;
     this._hiddenLines = next;
     this._foldIndex = next
-      ? new FoldLineIndex({ isHidden: (m) => !!(this._hiddenLines?.has(m)) })
+      ? new FoldLineIndex({ isHidden: (m) => !!this._hiddenLines?.has(m) })
       : null;
     this._foldIndex?.setTotalModelLineCount(this._totalLineCount);
     if (changed) {

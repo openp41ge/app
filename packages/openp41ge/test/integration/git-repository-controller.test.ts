@@ -88,11 +88,9 @@ describe("GitRepositoryController — worktree mode", () => {
     // Never queries branches — there is no Branches section.
     expect(bridge().workspaceController.getBranches).not.toHaveBeenCalled();
     // Loads commits for the worktree's branch.
-    expect(bridge().workspaceController.getCommitLog).toHaveBeenCalledWith(
-      "acme",
-      "feature-x",
-      { maxCount: 50 },
-    );
+    expect(bridge().workspaceController.getCommitLog).toHaveBeenCalledWith("acme", "feature-x", {
+      maxCount: 50,
+    });
     // Never fetches the repo working-tree diff (no commit selected yet).
     expect(bridge().workspaceController.getDiffStat).not.toHaveBeenCalled();
 
@@ -122,20 +120,13 @@ describe("GitRepositoryController — worktree mode", () => {
     expect(panel).toBeTruthy();
 
     // Select a commit → diff for that commit only.
-    panel.dispatchEvent(
-      new CustomEvent("git-select-commit", { detail: { commitHash: "abc123" } }),
-    );
+    panel.dispatchEvent(new CustomEvent("git-select-commit", { detail: { commitHash: "abc123" } }));
     await flush();
-    expect(bridge().workspaceController.getDiffStat).toHaveBeenCalledWith(
-      "acme",
-      "abc123",
-    );
+    expect(bridge().workspaceController.getDiffStat).toHaveBeenCalledWith("acme", "abc123");
 
     // Deselect → back to the empty hint, never the working-tree diff.
     (bridge().workspaceController.getDiffStat as AsyncMock).mockClear();
-    panel.dispatchEvent(
-      new CustomEvent("git-select-commit", { detail: { commitHash: null } }),
-    );
+    panel.dispatchEvent(new CustomEvent("git-select-commit", { detail: { commitHash: null } }));
     await flush();
     expect(bridge().workspaceController.getDiffStat).not.toHaveBeenCalled();
     const data = (panel as { data?: { filesChanged?: unknown[]; selectedCommit?: string | null } })

@@ -6,8 +6,7 @@
  */
 
 export type TooltipContent =
-  | { type: "simple"; text: string }
-  | { type: "detail"; title: string; subtitle: string };
+  { type: "simple"; text: string } | { type: "detail"; title: string; subtitle: string };
 
 /** True when the content is the richer title+subtitle variant. */
 export function isDetailTooltip(content: TooltipContent): boolean {

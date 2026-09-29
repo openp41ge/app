@@ -182,7 +182,11 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       dragGhost.setBitmap(
         preparedBitmap,
         typeof tabWidth === "number" ? tabWidth : captureRect ? Math.round(captureRect.width) : 132,
-        typeof tabHeight === "number" ? tabHeight : captureRect ? Math.round(captureRect.height) : 84,
+        typeof tabHeight === "number"
+          ? tabHeight
+          : captureRect
+            ? Math.round(captureRect.height)
+            : 84,
         typeof inset === "number" ? inset : 0,
       );
     }

@@ -293,7 +293,11 @@ export class NodeGitService implements IGitService {
         await this._execGit(["worktree", "add", "--checkout", dirName, branch], repoName);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/already registered|missing but already registered|add -f|already used by worktree|already checked out/i.test(msg)) {
+        if (
+          /already registered|missing but already registered|add -f|already used by worktree|already checked out/i.test(
+            msg,
+          )
+        ) {
           try {
             await this._execGit(["worktree", "prune"], repoName);
             if (!fs.existsSync(worktreePath)) {
@@ -360,7 +364,10 @@ export class NodeGitService implements IGitService {
       // ("already used by worktree" / "already checked out"); if the dir now
       // exists, treat it as materialized instead of erroring.
       const msg = err instanceof Error ? err.message : String(err);
-      if (/already used by worktree|already checked out/i.test(msg) && fs.existsSync(worktreePath)) {
+      if (
+        /already used by worktree|already checked out/i.test(msg) &&
+        fs.existsSync(worktreePath)
+      ) {
         return { branch, path: worktreePath, exists: true };
       }
       throw err;

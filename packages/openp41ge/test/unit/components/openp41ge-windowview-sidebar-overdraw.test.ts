@@ -28,11 +28,12 @@ import {
 let rafCallbacks: FrameRequestCallback[] = [];
 beforeEach(() => {
   rafCallbacks = [];
-  (globalThis as unknown as { requestAnimationFrame: unknown }).requestAnimationFrame =
-    (cb: FrameRequestCallback): number => {
-      rafCallbacks.push(cb);
-      return rafCallbacks.length;
-    };
+  (globalThis as unknown as { requestAnimationFrame: unknown }).requestAnimationFrame = (
+    cb: FrameRequestCallback,
+  ): number => {
+    rafCallbacks.push(cb);
+    return rafCallbacks.length;
+  };
   (globalThis as unknown as { cancelAnimationFrame: unknown }).cancelAnimationFrame = () => {};
 });
 
@@ -43,7 +44,10 @@ afterEach(() => {
 function makeWin() {
   return {
     id: "win-a",
-    grid: { cols: 1, placements: [] as { position: { row: number; col: number }; tabIds: string[] }[] },
+    grid: {
+      cols: 1,
+      placements: [] as { position: { row: number; col: number }; tabIds: string[] }[],
+    },
     sidebar: { activeLeftTab: null, activeRightTab: null },
   };
 }
@@ -143,7 +147,15 @@ function stubGrid(wv: HTMLElement, container: HTMLElement | null) {
 const lines = () => [...document.body.querySelectorAll('overdraw-line[dir="up"]:not([corner])')];
 
 const sbRect = (left: number, right: number, top: number) => ({
-  left, top, right, bottom: top + 400, width: right - left, height: 400, x: left, y: top, toJSON() {},
+  left,
+  top,
+  right,
+  bottom: top + 400,
+  width: right - left,
+  height: 400,
+  x: left,
+  y: top,
+  toJSON() {},
 });
 
 describe("openp41ge-windowview sidebar divider overdraws", () => {
@@ -159,10 +171,24 @@ describe("openp41ge-windowview sidebar divider overdraws", () => {
     const left = wv.querySelector('openp41ge-sidebar[side="left"]');
     const right = wv.querySelector('openp41ge-sidebar[side="right"]');
     const rect = (left: number, right: number, top: number) => ({
-      left, top, right, bottom: top + 400, width: right - left, height: 400, x: left, y: top, toJSON() {},
+      left,
+      top,
+      right,
+      bottom: top + 400,
+      width: right - left,
+      height: 400,
+      x: left,
+      y: top,
+      toJSON() {},
     });
-    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => rect(0, 209, 36) });
-    Object.defineProperty(right, "getBoundingClientRect", { configurable: true, value: () => rect(490, 656, 36) });
+    Object.defineProperty(left, "getBoundingClientRect", {
+      configurable: true,
+      value: () => rect(0, 209, 36),
+    });
+    Object.defineProperty(right, "getBoundingClientRect", {
+      configurable: true,
+      value: () => rect(490, 656, 36),
+    });
 
     wv._positionSbDividerOverdraws();
 
@@ -267,8 +293,14 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     const { wv } = await mount();
     const left = wv.querySelector('openp41ge-sidebar[side="left"]');
     const right = wv.querySelector('openp41ge-sidebar[side="right"]');
-    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => sbRect(0, 209, 36) });
-    Object.defineProperty(right, "getBoundingClientRect", { configurable: true, value: () => sbRect(490, 656, 36) });
+    Object.defineProperty(left, "getBoundingClientRect", {
+      configurable: true,
+      value: () => sbRect(0, 209, 36),
+    });
+    Object.defineProperty(right, "getBoundingClientRect", {
+      configurable: true,
+      value: () => sbRect(490, 656, 36),
+    });
     addFooter(left, "left");
     addFooter(right, "right");
 
@@ -293,8 +325,14 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     const { wv } = await mount();
     const left = wv.querySelector('openp41ge-sidebar[side="left"]');
     const right = wv.querySelector('openp41ge-sidebar[side="right"]');
-    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => sbRect(0, 209, 36) });
-    Object.defineProperty(right, "getBoundingClientRect", { configurable: true, value: () => sbRect(490, 656, 36) });
+    Object.defineProperty(left, "getBoundingClientRect", {
+      configurable: true,
+      value: () => sbRect(0, 209, 36),
+    });
+    Object.defineProperty(right, "getBoundingClientRect", {
+      configurable: true,
+      value: () => sbRect(490, 656, 36),
+    });
     addFooter(left, "left");
 
     wv._placeSidebarFooterOverdraws();
@@ -306,7 +344,10 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
   it("follows the footer overdraw to a newly-accented sidebar tab", async () => {
     const { wv } = await mount();
     const left = wv.querySelector('openp41ge-sidebar[side="left"]');
-    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => sbRect(0, 209, 36) });
+    Object.defineProperty(left, "getBoundingClientRect", {
+      configurable: true,
+      value: () => sbRect(0, 209, 36),
+    });
 
     const hostA = document.createElement("div");
     hostA.className = "sidebar-tab-host visible";
@@ -321,7 +362,10 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     hostB.appendChild(footerB);
     left.appendChild(hostB);
     for (const el of [hostA, footerA, hostB, footerB]) {
-      Object.defineProperty(el, "getBoundingClientRect", { configurable: true, value: () => footRect("left") });
+      Object.defineProperty(el, "getBoundingClientRect", {
+        configurable: true,
+        value: () => footRect("left"),
+      });
     }
 
     wv._placeSidebarFooterOverdraws();
@@ -355,7 +399,11 @@ describe("openp41ge-windowview sidebar footer overdraws", () => {
     // but the vertical divider overdraws stay.
     expect(wv._sbFooterOverdraw.size).toBe(0);
     expect(wv._sbDividerOverdraw.size).toBe(2);
-    expect([...document.body.querySelectorAll('overdraw-line:not([corner])')].every((l) => l.getAttribute("dir") === "up")).toBe(true);
+    expect(
+      [...document.body.querySelectorAll("overdraw-line:not([corner])")].every(
+        (l) => l.getAttribute("dir") === "up",
+      ),
+    ).toBe(true);
   });
 
   it("cleans up the footer overdraws when disconnected", async () => {
@@ -392,11 +440,24 @@ describe("openp41ge-windowview grid cell-divider overdraws", () => {
     return { wv, win };
   }
   const rect = (left: number, right: number, top: number) => ({
-    left, top, right, bottom: top + 800, width: right - left, height: 800, x: left, y: top, toJSON() {},
+    left,
+    top,
+    right,
+    bottom: top + 800,
+    width: right - left,
+    height: 800,
+    x: left,
+    y: top,
+    toJSON() {},
   });
   function stubCell(wv: HTMLElement, col: number, left: number, right: number, top = 60) {
-    const cell = wv.querySelector<HTMLElement>(`.openp41ge-grid-area tab-grid .grid-cell[data-cell-col="${col}"]`)!;
-    Object.defineProperty(cell, "getBoundingClientRect", { configurable: true, value: () => rect(left, right, top) });
+    const cell = wv.querySelector<HTMLElement>(
+      `.openp41ge-grid-area tab-grid .grid-cell[data-cell-col="${col}"]`,
+    )!;
+    Object.defineProperty(cell, "getBoundingClientRect", {
+      configurable: true,
+      value: () => rect(left, right, top),
+    });
     return cell;
   }
 
@@ -448,13 +509,21 @@ describe("openp41ge-windowview grid cell-divider overdraws", () => {
     wv.remove();
     await wv.updateComplete.catch(() => {});
     expect(wv._cellOverdraw.size).toBe(0);
-    expect(document.body.querySelectorAll('overdraw-line:not([corner])').length).toBe(0);
+    expect(document.body.querySelectorAll("overdraw-line:not([corner])").length).toBe(0);
   });
 });
 
 describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
   const sepRect = (left: number, right: number, top: number, h = 30) => ({
-    left, top, right, bottom: top + h, width: right - left, height: h, x: left, y: top, toJSON() {},
+    left,
+    top,
+    right,
+    bottom: top + h,
+    width: right - left,
+    height: h,
+    x: left,
+    y: top,
+    toJSON() {},
   });
 
   // Build a visible host holding marked separator rows ([data-sb-sep]) like the
@@ -463,7 +532,15 @@ describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
   // separators (they must not collide with the position key).
   function addSepHost(
     sb: HTMLElement,
-    rows: Array<{ top?: boolean; bottom?: boolean; left: number; right: number; y: number; h?: number; noBottom?: boolean }>,
+    rows: Array<{
+      top?: boolean;
+      bottom?: boolean;
+      left: number;
+      right: number;
+      y: number;
+      h?: number;
+      noBottom?: boolean;
+    }>,
   ): HTMLElement {
     const host = document.createElement("div");
     host.className = "sidebar-tab-host visible";
@@ -495,13 +572,23 @@ describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
   function stubSidebars(wv: HTMLElement): [HTMLElement, HTMLElement] {
     const left = wv.querySelector('openp41ge-sidebar[side="left"]')!;
     const right = wv.querySelector('openp41ge-sidebar[side="right"]')!;
-    Object.defineProperty(left, "getBoundingClientRect", { configurable: true, value: () => sbRect(0, 209, 36) });
-    Object.defineProperty(right, "getBoundingClientRect", { configurable: true, value: () => sbRect(490, 656, 36) });
+    Object.defineProperty(left, "getBoundingClientRect", {
+      configurable: true,
+      value: () => sbRect(0, 209, 36),
+    });
+    Object.defineProperty(right, "getBoundingClientRect", {
+      configurable: true,
+      value: () => sbRect(490, 656, 36),
+    });
     return [left, right];
   }
 
-  const rightLines = () => [...document.body.querySelectorAll('overdraw-line[dir="right"]:not([corner])')];
-  const leftLines = () => [...document.body.querySelectorAll('overdraw-line[dir="left"]:not([corner])')];
+  const rightLines = () => [
+    ...document.body.querySelectorAll('overdraw-line[dir="right"]:not([corner])'),
+  ];
+  const leftLines = () => [
+    ...document.body.querySelectorAll('overdraw-line[dir="left"]:not([corner])'),
+  ];
 
   it("draws one horizontal overdraw per marked separator border", async () => {
     const { wv } = await mount();
@@ -550,7 +637,11 @@ describe("openp41ge-windowview sidebar chat-list separator overdraws", () => {
 
     expect(wv._sbSepOverdraw.size).toBe(1);
     expect(rightLines().length).toBe(0);
-    expect([...document.body.querySelectorAll('overdraw-line:not([corner])')].every((l) => l.getAttribute("dir") === "up")).toBe(true);
+    expect(
+      [...document.body.querySelectorAll("overdraw-line:not([corner])")].every(
+        (l) => l.getAttribute("dir") === "up",
+      ),
+    ).toBe(true);
   });
 
   it("drops accents when the separator rows leave the DOM", async () => {
@@ -645,7 +736,7 @@ describe("openp41ge-windowview grid tab-bar overdraws (into an empty sidebar)", 
     wv.remove();
     await wv.updateComplete.catch(() => {});
     expect(wv._sbGridTabBarOverdraw.size).toBe(0);
-    expect(document.body.querySelectorAll('overdraw-line:not([corner])').length).toBe(0);
+    expect(document.body.querySelectorAll("overdraw-line:not([corner])").length).toBe(0);
   });
 
   it("wants the lazy-creating overdraw loop when the grid hosts a tab and an open sidebar is empty", async () => {
@@ -832,6 +923,6 @@ describe("openp41ge-windowview grid content bottom-bar overdraws", () => {
     wv.remove();
     await wv.updateComplete.catch(() => {});
     expect(wv._sbGridContentOverdraw.size).toBe(0);
-    expect(document.body.querySelectorAll('overdraw-line:not([corner])').length).toBe(0);
+    expect(document.body.querySelectorAll("overdraw-line:not([corner])").length).toBe(0);
   });
 });

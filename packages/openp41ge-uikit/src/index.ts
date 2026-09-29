@@ -6,23 +6,35 @@ export { FileExtensionSvg } from "./components/file-extension-svg";
 export { iconRegistry } from "./icons";
 
 // ─── Overdraw line (fade-out accent) ─────────────────────────────────────
-export { OverdrawLine, attachTopCornerOverdraws, attachTopOverdraw, attachTopHorizontalOverdraws, attachTabEdgeOverdraws, detachTabEdgeOverdraws } from "./components/overdraw-line";
-export type { OverdrawDirection, TabEdge, TabEdgeOverdrawOptions } from "./components/overdraw-line";
+export {
+  OverdrawLine,
+  attachTopCornerOverdraws,
+  attachTopOverdraw,
+  attachTopHorizontalOverdraws,
+  attachTabEdgeOverdraws,
+  detachTabEdgeOverdraws,
+} from "./components/overdraw-line";
+export type {
+  OverdrawDirection,
+  TabEdge,
+  TabEdgeOverdrawOptions,
+} from "./components/overdraw-line";
 
 // ─── Drop indicators (shared blue drag/drop lines + box) ────────────────
-export { DropLine, DragLine, DragLineOverdraw, DropBox, DropBoxOverdraw, DROP_INDICATOR_COLOR, DROP_LINE_GLOW } from "./components/drop-indicator";
+export {
+  DropLine,
+  DragLine,
+  DragLineOverdraw,
+  DropBox,
+  DropBoxOverdraw,
+  DROP_INDICATOR_COLOR,
+  DROP_LINE_GLOW,
+} from "./components/drop-indicator";
 export type { DropFadeDirection } from "./components/drop-indicator";
 
 // ─── Scrollbar ──────────────────────────────────────────────────────────
-export {
-  OverlayScrollbar,
-  computeThumbLength,
-  computeThumbPosition,
-} from "openp41ge-scrollbar";
-export type {
-  ScrollbarAxis,
-  OverlayScrollbarOptions,
-} from "openp41ge-scrollbar";
+export { OverlayScrollbar, computeThumbLength, computeThumbPosition } from "openp41ge-scrollbar";
+export type { ScrollbarAxis, OverlayScrollbarOptions } from "openp41ge-scrollbar";
 export { installGlobalScrollbarStyles } from "./components/scrollbar/global-scrollbar-styles";
 
 // Re-export the inline tailwind CSS for component static styles
@@ -71,7 +83,10 @@ export {
   isSameFilePathInCell,
 } from "openp41ge-tabs/boundary";
 export type { GridPosition } from "openp41ge-tabs/boundary";
-export { DROP_TIP_OVERDRAW_LENGTH, attachDropTipVerticalOverdraws } from "openp41ge-tabs/drop-tip-overdraw";
+export {
+  DROP_TIP_OVERDRAW_LENGTH,
+  attachDropTipVerticalOverdraws,
+} from "openp41ge-tabs/drop-tip-overdraw";
 
 // ─── File Editor Component ────────────────────────────────────────────────
 export { FileEditorElement } from "./components/file-editor/file-editor";

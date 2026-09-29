@@ -18,9 +18,7 @@ export const explorerPlugin: PluginRegistration = {
     "explorer/refresh": async () => {
       // Refreshes the file tree — the sidebar component re-renders
       // when it detects workspace data changes.
-      document.dispatchEvent(
-        new CustomEvent("explorer:refresh", { bubbles: true }),
-      );
+      document.dispatchEvent(new CustomEvent("explorer:refresh", { bubbles: true }));
     },
   },
 };

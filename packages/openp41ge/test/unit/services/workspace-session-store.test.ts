@@ -68,7 +68,25 @@ describe("FileWorkspaceSessionStore", () => {
     const mock = makeMockFs();
     mock.files.set(
       "/w/acme.openp41ge-workspace",
-      JSON.stringify({ ...BASE_FILE, windows: [{ id: "win-restore-0", bounds: { x: 0, y: 0, width: 1000, height: 700 }, monitor: 0, grid: { id: "g", rows: 1, cols: 1, placements: [], dividers: { columns: [], rows: [] } }, overlays: [], sidebar: { activeViewId: null, width: 280, activeLeftTab: null, activeRightTab: null } }] }),
+      JSON.stringify({
+        ...BASE_FILE,
+        windows: [
+          {
+            id: "win-restore-0",
+            bounds: { x: 0, y: 0, width: 1000, height: 700 },
+            monitor: 0,
+            grid: {
+              id: "g",
+              rows: 1,
+              cols: 1,
+              placements: [],
+              dividers: { columns: [], rows: [] },
+            },
+            overlays: [],
+            sidebar: { activeViewId: null, width: 280, activeLeftTab: null, activeRightTab: null },
+          },
+        ],
+      }),
     );
     const store = new FileWorkspaceSessionStore(mock.readFile, mock.writeFile, mock.exists);
 

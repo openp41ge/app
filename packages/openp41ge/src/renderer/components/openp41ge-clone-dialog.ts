@@ -66,11 +66,7 @@ export class Openp41geCloneDialog extends LitElement {
 
   render() {
     return html`
-      <div
-        id="wt-addrepo-row"
-        class="flex flex-col gap-1 px-3 py-1.5"
-        @keydown=${this._onKeyDown}
-      >
+      <div id="wt-addrepo-row" class="flex flex-col gap-1 px-3 py-1.5" @keydown=${this._onKeyDown}>
         <div class="flex items-center gap-1.5">
           <input
             id="clone-url-input"

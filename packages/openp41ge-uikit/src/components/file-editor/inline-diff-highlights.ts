@@ -50,8 +50,7 @@ export class InlineDiffHighlightsRenderer {
 
     const start = Math.max(1, visibleStartLine);
     const end = Math.max(start, visibleEndLine);
-    const width =
-      contentWidth && contentWidth > 0 ? `${Math.round(contentWidth)}px` : "100%";
+    const width = contentWidth && contentWidth > 0 ? `${Math.round(contentWidth)}px` : "100%";
     for (let i = start; i <= end; i++) {
       const row = rows?.[i - 1];
       if (!row) continue;
@@ -61,8 +60,8 @@ export class InlineDiffHighlightsRenderer {
       // anchor the band at its FIRST view line and cover the full wrapped
       // height — exactly like the number columns, so the tint lines up with the
       // text on every segment. Identity when wrapping is off.
-      const vStart = viewLineStart ? viewLineStart(i) ?? i : i;
-      const vCount = viewLineCount ? viewLineCount(i) ?? 1 : 1;
+      const vStart = viewLineStart ? (viewLineStart(i) ?? i) : i;
+      const vCount = viewLineCount ? (viewLineCount(i) ?? 1) : 1;
 
       const el = document.createElement("div");
       el.style.position = "absolute";

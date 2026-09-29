@@ -4,18 +4,36 @@
     <meta charset="utf-8" />
     <title>openp41ge-agents scrollbar demo</title>
     <style>
-      html, body { margin: 0; height: 100%; }
-      body { background: #111; color: #d4d4d4; font-family: system-ui, sans-serif; display: flex; flex-direction: column; }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        background: #111;
+        color: #d4d4d4;
+        font-family: system-ui, sans-serif;
+        display: flex;
+        flex-direction: column;
+      }
       openp41ge-agents {
         --bg-tertiary: #222;
         --bg-active: #37373d;
         --text-primary: #d4d4d4;
         --text-secondary: #aaa;
         --border-color: #2a2a2a;
-        flex: 1; display: flex; flex-direction: column; min-height: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
       }
-      #ctl { padding: 8px 12px; background: #1a1a1a; }
-      button { margin-right: 6px; }
+      #ctl {
+        padding: 8px 12px;
+        background: #1a1a1a;
+      }
+      button {
+        margin-right: 6px;
+      }
     </style>
   </head>
   <body>
@@ -28,14 +46,28 @@
       const now = Date.now();
       const msgs = [];
       for (let i = 0; i < 40; i++) {
-        msgs.push({ id: "f" + i, role: "assistant", content: `Filler paragraph number ${i}. `.repeat(4), timestamp: now - (40 - i) * 1000 });
+        msgs.push({
+          id: "f" + i,
+          role: "assistant",
+          content: `Filler paragraph number ${i}. `.repeat(4),
+          timestamp: now - (40 - i) * 1000,
+        });
       }
-      el.setChat({ id: "demo", title: "Scroll", providerId: "openai", createdAt: now - 60000, updatedAt: now, messages: msgs });
+      el.setChat({
+        id: "demo",
+        title: "Scroll",
+        providerId: "openai",
+        createdAt: now - 60000,
+        updatedAt: now,
+        messages: msgs,
+      });
       let n = 0;
       document.getElementById("add").addEventListener("click", () => {
         n++;
         const m = el.messages ? null : null;
-        el.appendDelta(`\n\nA newly appended delta message ${n} to test scrollbar survival across re-renders.`);
+        el.appendDelta(
+          `\n\nA newly appended delta message ${n} to test scrollbar survival across re-renders.`,
+        );
       });
       // expose for CDP
       window.__el = el;

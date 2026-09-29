@@ -22,7 +22,13 @@ export type GraphPatch =
   | { op: "removeNode"; nodeId: string };
 
 export interface ValidationError {
-  type: "node-not-found" | "duplicate-node" | "duplicate-edge" | "missing-from" | "missing-to" | "invalid-when";
+  type:
+    | "node-not-found"
+    | "duplicate-node"
+    | "duplicate-edge"
+    | "missing-from"
+    | "missing-to"
+    | "invalid-when";
   message: string;
 }
 
@@ -65,7 +71,10 @@ export class EventGraph {
       // Validate target nodes exist
       for (const targetId of edge.to) {
         if (!this._graph.nodes.some((n) => n.id === targetId)) {
-          errors.push({ type: "node-not-found", message: `Edge "${edge.id}" targets unknown node "${targetId}".` });
+          errors.push({
+            type: "node-not-found",
+            message: `Edge "${edge.id}" targets unknown node "${targetId}".`,
+          });
         }
       }
       // edge.from is an event type, not a node ID — no validation needed
@@ -107,7 +116,7 @@ export class EventGraph {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const chr = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + chr;
+      hash = (hash << 5) - hash + chr;
       hash |= 0; // Convert to 32bit integer
     }
     return `graph:${Math.abs(hash).toString(16)}`;
@@ -148,7 +157,10 @@ export class EventGraph {
       // not a node ID. Only edge.to targets need to be registered nodes.
       for (const targetId of edge.to) {
         if (!nodeIds.has(targetId)) {
-          errors.push({ type: "node-not-found", message: `Edge "${edge.id}" targets unknown node "${targetId}".` });
+          errors.push({
+            type: "node-not-found",
+            message: `Edge "${edge.id}" targets unknown node "${targetId}".`,
+          });
         }
       }
     }

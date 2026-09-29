@@ -90,7 +90,9 @@ class GridState {
         if (p.tabIds.length === 0 && this.placements.length > 1) {
           this.placements.splice(ci, 1);
           this.cols = this.placements.length;
-          this.placements.forEach((pp, i) => { pp.position.col = i; });
+          this.placements.forEach((pp, i) => {
+            pp.position.col = i;
+          });
           const newActive: Record<string, string> = {};
           for (const [k, v] of Object.entries(this.activeTabIds)) {
             const ki = parseInt(k, 10);
@@ -132,15 +134,15 @@ class GridState {
     } else {
       this.placements.splice(splitIdx + 1, 0, newPlacement);
     }
-    this.placements.forEach((p, i) => { p.position.col = i; });
+    this.placements.forEach((p, i) => {
+      p.position.col = i;
+    });
     this.cols = this.placements.length;
     this.activeTabIds = {};
     this.placements.forEach((p, i) => {
       if (p.tabIds.length > 0) this.activeTabIds[String(i)] = p.tabIds[0];
     });
   }
-
-
 }
 
 // ─── File tree data ────────────────────────────────────────────────────
@@ -154,10 +156,25 @@ function buildFileTree(): TreeNode[] {
       children: [
         { id: "src/app.ts", label: "app.ts", icon: "typescript", draggable: true },
         { id: "src/utils.ts", label: "utils.ts", icon: "typescript", draggable: true },
-        { id: "src/components", label: "components", icon: "folder", children: [
-          { id: "src/components/header.ts", label: "header.ts", icon: "typescript", draggable: true },
-          { id: "src/components/footer.ts", label: "footer.ts", icon: "typescript", draggable: true },
-        ]},
+        {
+          id: "src/components",
+          label: "components",
+          icon: "folder",
+          children: [
+            {
+              id: "src/components/header.ts",
+              label: "header.ts",
+              icon: "typescript",
+              draggable: true,
+            },
+            {
+              id: "src/components/footer.ts",
+              label: "footer.ts",
+              icon: "typescript",
+              draggable: true,
+            },
+          ],
+        },
       ],
     },
     {
@@ -219,11 +236,20 @@ class TabsDemoApp extends LitElement {
   private _editorState = editorStateFromFiles("editor", 3);
 
   private _sideState = GridState.from("side-a", [
-    { id: createTabId(), title: "Terminal", content: '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>' },
+    {
+      id: createTabId(),
+      title: "Terminal",
+      content: '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>',
+    },
   ]);
 
   private _outputState = GridState.from("side-b", [
-    { id: createTabId(), title: "Output", content: '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>' },
+    {
+      id: createTabId(),
+      title: "Output",
+      content:
+        '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>',
+    },
   ]);
 
   // ── Drag state ───────────────────────────────────────────────────
@@ -278,8 +304,17 @@ class TabsDemoApp extends LitElement {
       const tabId = tabBtn.getAttribute("data-tab-id");
       if (!tabId) return;
       e.preventDefault();
-      this._currentDragSource = new TabDragSource(tabBtn as HTMLElement, tabId, tabBar.winId, "workset-1");
-      this._orchestrator.startDrag(this._currentDragSource, (e as MouseEvent).clientX, (e as MouseEvent).clientY);
+      this._currentDragSource = new TabDragSource(
+        tabBtn as HTMLElement,
+        tabId,
+        tabBar.winId,
+        "workset-1",
+      );
+      this._orchestrator.startDrag(
+        this._currentDragSource,
+        (e as MouseEvent).clientX,
+        (e as MouseEvent).clientY,
+      );
     });
 
     // ── Ghost overlay during drag ─────────────────────────────────
@@ -321,7 +356,11 @@ class TabsDemoApp extends LitElement {
       if (!source || !target) return;
       const removed = source.removeTab(tabId);
       if (!removed) return;
-      target.insertTabInSplit({ id: tabId, title: removed.title, content: removed.content }, splitCol, splitLeft);
+      target.insertTabInSplit(
+        { id: tabId, title: removed.title, content: removed.content },
+        splitCol,
+        splitLeft,
+      );
       this._renderAll();
     });
 
@@ -332,7 +371,11 @@ class TabsDemoApp extends LitElement {
       if (!source || !target) return;
       const removed = source.removeTab(tabId);
       if (!removed) return;
-      target.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, -1);
+      target.insertTab(
+        { id: tabId, title: removed.title, content: removed.content },
+        targetCol,
+        -1,
+      );
       this._renderAll();
     });
 
@@ -350,10 +393,20 @@ class TabsDemoApp extends LitElement {
       const state = this._state(winId);
       if (!state) return;
       if (isBoundary) {
-        const tab = { id: createTabId(), title: filePath, content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`, pinned: true };
+        const tab = {
+          id: createTabId(),
+          title: filePath,
+          content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`,
+          pinned: true,
+        };
         state.insertTabInSplit(tab, splitCol, splitLeft);
       } else {
-        const tab = { id: createTabId(), title: filePath, content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`, pinned: true };
+        const tab = {
+          id: createTabId(),
+          title: filePath,
+          content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`,
+          pinned: true,
+        };
         const idx = insertAt != null && insertAt >= 0 ? insertAt : -1;
         state.insertTab(tab, targetCol, idx);
       }
@@ -368,7 +421,11 @@ class TabsDemoApp extends LitElement {
       if (!source || !target) return;
       const removed = source.removeTab(tabId);
       if (!removed) return;
-      target.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, dropIndex);
+      target.insertTab(
+        { id: tabId, title: removed.title, content: removed.content },
+        targetCol,
+        dropIndex,
+      );
       this._renderAll();
     });
 
@@ -409,10 +466,19 @@ class TabsDemoApp extends LitElement {
     _tabCounter = 0;
     this._editorState = editorStateFromFiles("editor", 3);
     this._sideState = GridState.from("side-a", [
-      { id: createTabId(), title: "Terminal", content: '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>' },
+      {
+        id: createTabId(),
+        title: "Terminal",
+        content: '<div class="content-placeholder"><h3>Terminal</h3><p>$ git status</p></div>',
+      },
     ]);
     this._outputState = GridState.from("side-b", [
-      { id: createTabId(), title: "Output", content: '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>' },
+      {
+        id: createTabId(),
+        title: "Output",
+        content:
+          '<div class="content-placeholder"><h3>Output</h3><p style="color:#888;">Build output appears here.</p></div>',
+      },
     ]);
     this._renderAll();
   }
@@ -446,32 +512,78 @@ class TabsDemoApp extends LitElement {
   override render(): TemplateResult {
     return html`
       <style>
-        .tabs-demo { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #ccc; padding: 16px; height: 100vh; overflow-y: auto; box-sizing: border-box; }
-        .tabs-demo h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
-        .tabs-demo h1 span { color: rgb(74, 158, 255); }
-        .tabs-demo p { margin: 0 0 16px; font-size: 12px; color: #888; }
-        tab-grid { flex: 1; }
+        .tabs-demo {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          background: #1e1e1e;
+          color: #ccc;
+          padding: 16px;
+          height: 100vh;
+          overflow-y: auto;
+          box-sizing: border-box;
+        }
+        .tabs-demo h1 {
+          font-size: 18px;
+          margin: 0 0 4px;
+          color: #fff;
+        }
+        .tabs-demo h1 span {
+          color: rgb(74, 158, 255);
+        }
+        .tabs-demo p {
+          margin: 0 0 16px;
+          font-size: 12px;
+          color: #888;
+        }
+        tab-grid {
+          flex: 1;
+        }
       </style>
 
       <div class="tabs-demo" style="display:flex;flex-direction:column;height:100vh;">
         <h1>Openp41ge <span>Tabs</span></h1>
-        <p>VS Code-style editor groups. Drag tabs to column edges to split, across columns to rearrange, or between grids to move between groups.</p>
+        <p>
+          VS Code-style editor groups. Drag tabs to column edges to split, across columns to
+          rearrange, or between grids to move between groups.
+        </p>
 
-        <div class="multi-body" style="display:flex;flex-direction:column;flex:1;gap:12px;min-height:0;">
-          <div class="multi-row" style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;">
+        <div
+          class="multi-body"
+          style="display:flex;flex-direction:column;flex:1;gap:12px;min-height:0;"
+        >
+          <div
+            class="multi-row"
+            style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;"
+          >
             <tab-grid id="editor-grid" style="flex:1;"></tab-grid>
-            <div style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+            <div
+              style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"
+            >
+              <openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree>
+            </div>
           </div>
-          <div class="multi-row" style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;">
+          <div
+            class="multi-row"
+            style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;"
+          >
             <tab-grid id="side-grid-a" style="flex:1;"></tab-grid>
-            <div style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+            <div
+              style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"
+            >
+              <openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree>
+            </div>
           </div>
-          <div class="multi-row" style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;">
+          <div
+            class="multi-row"
+            style="display:flex;flex:1;min-height:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;overflow:hidden;"
+          >
             <tab-grid id="side-grid-b" style="flex:1;"></tab-grid>
-            <div style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"><openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree></div>
+            <div
+              style="width:220px;flex-shrink:0;border-left:1px solid #333;overflow-y:auto;background:#252526;"
+            >
+              <openp41ge-tree .nodes=${buildFileTree()}></openp41ge-tree>
+            </div>
           </div>
         </div>
-
       </div>
     `;
   }
@@ -533,8 +645,17 @@ class SingleGridApp extends LitElement {
       const tabId = tabBtn.getAttribute("data-tab-id");
       if (!tabId) return;
       e.preventDefault();
-      this._currentDragSource = new TabDragSource(tabBtn as HTMLElement, tabId, tabBar.winId, "workset-1");
-      this._orchestrator.startDrag(this._currentDragSource, (e as MouseEvent).clientX, (e as MouseEvent).clientY);
+      this._currentDragSource = new TabDragSource(
+        tabBtn as HTMLElement,
+        tabId,
+        tabBar.winId,
+        "workset-1",
+      );
+      this._orchestrator.startDrag(
+        this._currentDragSource,
+        (e as MouseEvent).clientX,
+        (e as MouseEvent).clientY,
+      );
     });
 
     // ── Ghost overlay ────────────────────────────────────────────
@@ -574,7 +695,11 @@ class SingleGridApp extends LitElement {
       if (sourceWinId !== "editor") return;
       const removed = this._state.removeTab(tabId);
       if (!removed) return;
-      this._state.insertTabInSplit({ id: tabId, title: removed.title, content: removed.content }, splitCol, splitLeft);
+      this._state.insertTabInSplit(
+        { id: tabId, title: removed.title, content: removed.content },
+        splitCol,
+        splitLeft,
+      );
       this._render();
     });
 
@@ -583,7 +708,11 @@ class SingleGridApp extends LitElement {
       if (sourceWinId !== "editor") return;
       const removed = this._state.removeTab(tabId);
       if (!removed) return;
-      this._state.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, -1);
+      this._state.insertTab(
+        { id: tabId, title: removed.title, content: removed.content },
+        targetCol,
+        -1,
+      );
       this._render();
     });
 
@@ -599,10 +728,20 @@ class SingleGridApp extends LitElement {
       if (winId !== "editor") return;
       const filePath = tabConfig.filePath || tabConfig.repoName || "untitled";
       if (isBoundary) {
-        const tab = { id: createTabId(), title: filePath, content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`, pinned: true };
+        const tab = {
+          id: createTabId(),
+          title: filePath,
+          content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`,
+          pinned: true,
+        };
         this._state.insertTabInSplit(tab, splitCol, splitLeft);
       } else {
-        const tab = { id: createTabId(), title: filePath, content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`, pinned: true };
+        const tab = {
+          id: createTabId(),
+          title: filePath,
+          content: `<div class="content-placeholder"><h3>${filePath}</h3><p>Opened file.</p></div>`,
+          pinned: true,
+        };
         const idx = insertAt != null && insertAt >= 0 ? insertAt : -1;
         this._state.insertTab(tab, targetCol, idx);
       }
@@ -614,7 +753,11 @@ class SingleGridApp extends LitElement {
       if (sourceWinId !== "editor" && targetCol === undefined) return;
       const removed = this._state.removeTab(tabId);
       if (!removed) return;
-      this._state.insertTab({ id: tabId, title: removed.title, content: removed.content }, targetCol, dropIndex);
+      this._state.insertTab(
+        { id: tabId, title: removed.title, content: removed.content },
+        targetCol,
+        dropIndex,
+      );
       this._render();
     });
 
@@ -729,7 +872,6 @@ class SingleGridApp extends LitElement {
           letter-spacing: 0.5px;
           border-bottom: 1px solid #333;
         }
-
       </style>
 
       <div class="single-demo">
@@ -748,8 +890,6 @@ class SingleGridApp extends LitElement {
 }
 
 // ─── Storybook stories ────────────────────────────────────────────────
-
-
 
 const meta: Meta = {
   title: "Components/TabGrid",

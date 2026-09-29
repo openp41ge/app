@@ -464,7 +464,11 @@ export class Gutter {
     ],
   };
 
-  private _hoverOverdraw: { layer: HTMLElement; lines: Array<{ edge: string; corner: string; dir: string; el: HTMLElement }>; raf: number } | null = null;
+  private _hoverOverdraw: {
+    layer: HTMLElement;
+    lines: Array<{ edge: string; corner: string; dir: string; el: HTMLElement }>;
+    raf: number;
+  } | null = null;
 
   /** Continue the hover box's inset ring border past each corner with short,
    * portalled <overdraw-line> fade accents (the same overdraw aesthetic used

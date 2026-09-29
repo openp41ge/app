@@ -50,29 +50,36 @@ export function registerDialogHandlers(openp41geDir: string): void {
 
   // ── Save workspace file ──────────────────────────────────────────────
 
-  ipcMain.handle("dialog:saveWorkspaceFile", async (_event, data: WorkspaceFileData, defaultPath?: string) => {
-    const result = await dialog.showSaveDialog({
-      defaultPath: defaultPath ?? path.join(openp41geDir, "workspaces"),
-      filters: [{ name: "Openp41ge Workspace", extensions: [WORKSPACE_EXT] }],
-    });
-    if (result.canceled || !result.filePath) return null;
-    const filePath = result.filePath;
-    // Ensure the extension is present
-    const finalPath = filePath.endsWith(`.${WORKSPACE_EXT}`) ? filePath : `${filePath}.${WORKSPACE_EXT}`;
-    try {
-      fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-      fs.writeFileSync(finalPath, serializeWorkspaceFile(data), "utf-8");
-      return finalPath;
-    } catch (err) {
-      console.error("Failed to write workspace file:", err);
-      return null;
-    }
-  });
+  ipcMain.handle(
+    "dialog:saveWorkspaceFile",
+    async (_event, data: WorkspaceFileData, defaultPath?: string) => {
+      const result = await dialog.showSaveDialog({
+        defaultPath: defaultPath ?? path.join(openp41geDir, "workspaces"),
+        filters: [{ name: "Openp41ge Workspace", extensions: [WORKSPACE_EXT] }],
+      });
+      if (result.canceled || !result.filePath) return null;
+      const filePath = result.filePath;
+      // Ensure the extension is present
+      const finalPath = filePath.endsWith(`.${WORKSPACE_EXT}`)
+        ? filePath
+        : `${filePath}.${WORKSPACE_EXT}`;
+      try {
+        fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+        fs.writeFileSync(finalPath, serializeWorkspaceFile(data), "utf-8");
+        return finalPath;
+      } catch (err) {
+        console.error("Failed to write workspace file:", err);
+        return null;
+      }
+    },
+  );
 
   // ── Pick folder (for data dir) ───────────────────────────────────────
 
   ipcMain.handle("dialog:pickFolder", async () => {
-    const result = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"],
+    });
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
   });
@@ -92,17 +99,20 @@ export function registerDialogHandlers(openp41geDir: string): void {
 
   // ── Direct write (no dialog — known path) ──────────────────────────────
 
-  ipcMain.handle("dialog:writeWorkspaceFile", async (_event, filePath: string, data: WorkspaceFileData) => {
-    try {
-      const resolved = resolveTilde(filePath);
-      fs.mkdirSync(path.dirname(resolved), { recursive: true });
-      fs.writeFileSync(resolved, serializeWorkspaceFile(data), "utf-8");
-      return true;
-    } catch (err) {
-      console.error("Failed to write workspace file:", err);
-      return false;
-    }
-  });
+  ipcMain.handle(
+    "dialog:writeWorkspaceFile",
+    async (_event, filePath: string, data: WorkspaceFileData) => {
+      try {
+        const resolved = resolveTilde(filePath);
+        fs.mkdirSync(path.dirname(resolved), { recursive: true });
+        fs.writeFileSync(resolved, serializeWorkspaceFile(data), "utf-8");
+        return true;
+      } catch (err) {
+        console.error("Failed to write workspace file:", err);
+        return false;
+      }
+    },
+  );
 
   // ── Create draft directory (create dataDir) ────────────────────────────
 
@@ -120,7 +130,9 @@ export function registerDialogHandlers(openp41geDir: string): void {
 
   ipcMain.handle("dialog:revealInFinder", async (_event, filePath: string) => {
     try {
-      const resolved = filePath.startsWith("~") ? path.join(os.homedir(), filePath.slice(1)) : filePath;
+      const resolved = filePath.startsWith("~")
+        ? path.join(os.homedir(), filePath.slice(1))
+        : filePath;
       shell.showItemInFolder(resolved);
       return true;
     } catch {
@@ -156,32 +168,35 @@ export function registerDialogHandlers(openp41geDir: string): void {
 
   // ── Delete workspace file (optionally incl. data dir) ─────────────
 
-  ipcMain.handle("dialog:deleteWorkspaceFile", async (_event, filePath: string, deleteData?: boolean) => {
-    try {
-      const resolved = resolveTilde(filePath);
-      // Only delete files (guard against misdirected directory paths)
-      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) return false;
+  ipcMain.handle(
+    "dialog:deleteWorkspaceFile",
+    async (_event, filePath: string, deleteData?: boolean) => {
+      try {
+        const resolved = resolveTilde(filePath);
+        // Only delete files (guard against misdirected directory paths)
+        if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) return false;
 
-      if (deleteData) {
-        // Remove the workspace's data directory, derived from the file contents.
-        try {
-          const data = readWorkspaceFile(resolved);
-          if (data.dataDir) {
-            const dataDirResolved = resolveTilde(data.dataDir);
-            if (fs.existsSync(dataDirResolved)) {
-              fs.rmSync(dataDirResolved, { recursive: true, force: true });
+        if (deleteData) {
+          // Remove the workspace's data directory, derived from the file contents.
+          try {
+            const data = readWorkspaceFile(resolved);
+            if (data.dataDir) {
+              const dataDirResolved = resolveTilde(data.dataDir);
+              if (fs.existsSync(dataDirResolved)) {
+                fs.rmSync(dataDirResolved, { recursive: true, force: true });
+              }
             }
+          } catch (err) {
+            console.error("Failed to remove workspace data dir:", err);
           }
-        } catch (err) {
-          console.error("Failed to remove workspace data dir:", err);
         }
-      }
 
-      fs.rmSync(resolved, { force: true });
-      return true;
-    } catch (err) {
-      console.error("Failed to delete workspace file:", err);
-      return false;
-    }
-  });
+        fs.rmSync(resolved, { force: true });
+        return true;
+      } catch (err) {
+        console.error("Failed to delete workspace file:", err);
+        return false;
+      }
+    },
+  );
 }

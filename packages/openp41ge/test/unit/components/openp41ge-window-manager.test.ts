@@ -319,7 +319,10 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
 
   function setWorkspace(windows: number): void {
     (wm as Wm)._workspaces = [
-      { filePath: "/w/a", data: { name: "Alpha", windows: Array.from({ length: windows }, () => ({})) } },
+      {
+        filePath: "/w/a",
+        data: { name: "Alpha", windows: Array.from({ length: windows }, () => ({})) },
+      },
     ] as never;
     return wm.requestUpdate();
   }
@@ -354,7 +357,13 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     const row = wm.shadowRoot?.querySelector(".ws-row");
     row?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
 
-    expect((window as unknown as { openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } } }).openp41ge.windowManager.openWorkspaceWindow).not.toHaveBeenCalled();
+    expect(
+      (
+        window as unknown as {
+          openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } };
+        }
+      ).openp41ge.windowManager.openWorkspaceWindow,
+    ).not.toHaveBeenCalled();
   });
 
   it("opens the workspace window on a row double-click", async () => {
@@ -364,7 +373,13 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     const row = wm.shadowRoot?.querySelector(".ws-row");
     row?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true }));
 
-    expect((window as unknown as { openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } } }).openp41ge.windowManager.openWorkspaceWindow).toHaveBeenCalledWith("/w/a");
+    expect(
+      (
+        window as unknown as {
+          openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } };
+        }
+      ).openp41ge.windowManager.openWorkspaceWindow,
+    ).toHaveBeenCalledWith("/w/a");
   });
 
   it("opens the drawer on an edit-button click, without opening the window", async () => {
@@ -374,7 +389,11 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     const edit = wm.shadowRoot?.querySelector<HTMLElement>(".ws-edit")!;
     edit.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
 
-    const om = (window as unknown as { openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } } }).openp41ge.windowManager.openWorkspaceWindow;
+    const om = (
+      window as unknown as {
+        openp41ge: { windowManager: { openWorkspaceWindow: ReturnType<typeof vi.fn> } };
+      }
+    ).openp41ge.windowManager.openWorkspaceWindow;
     expect(om).not.toHaveBeenCalled();
     expect((wm as Wm)._drawers).toHaveLength(1);
     expect(((wm as Wm)._drawers as Array<{ workspacePath: string }>)[0].workspacePath).toBe("/w/a");
@@ -386,12 +405,16 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     const lines = wm.shadowRoot?.querySelectorAll(".ws-list-footer overdraw-line");
     expect(lines?.length).toBe(3);
 
-    const search = wm.shadowRoot?.querySelector<HTMLElement>(".ws-list-footer .dw-search > overdraw-line");
+    const search = wm.shadowRoot?.querySelector<HTMLElement>(
+      ".ws-list-footer .dw-search > overdraw-line",
+    );
     expect(search?.getAttribute("dir")).toBe("up");
     expect(search?.style.right).toBe("-1px");
     expect(search?.style.left).toBe("");
 
-    for (const btn of wm.shadowRoot?.querySelectorAll<HTMLElement>(".ws-list-footer .dw-add, .ws-list-footer .dw-delete") ?? []) {
+    for (const btn of wm.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".ws-list-footer .dw-add, .ws-list-footer .dw-delete",
+    ) ?? []) {
       const line = btn.querySelector<HTMLElement>("overdraw-line");
       expect(line?.getAttribute("dir")).toBe("up");
       expect(line?.style.left).toBe("-1px");
@@ -409,7 +432,9 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     (wm as Wm).requestUpdate();
     await (wm as Wm).updateComplete;
 
-    const buttons = wm.shadowRoot?.querySelectorAll<HTMLElement>(".wm-search-bar .wm-search-toggle, .wm-search-bar .wm-search-clear");
+    const buttons = wm.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".wm-search-bar .wm-search-toggle, .wm-search-bar .wm-search-clear",
+    );
     expect(buttons?.length).toBe(3);
 
     for (const btn of buttons ?? []) {
@@ -432,18 +457,24 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     (wm as Wm).requestUpdate();
     await (wm as Wm).updateComplete;
 
-    (wm as Wm)._drawers = [{ id: "d1", workspacePath: "/w/a", kind: "workspace", title: "A", data: { repos: [] } }] as never;
+    (wm as Wm)._drawers = [
+      { id: "d1", workspacePath: "/w/a", kind: "workspace", title: "A", data: { repos: [] } },
+    ] as never;
     (wm as Wm).requestUpdate();
     await (wm as Wm).updateComplete;
 
-    for (const line of wm.shadowRoot?.querySelectorAll<HTMLElement>(".wm-search-bar overdraw-line") ?? []) {
+    for (const line of wm.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".wm-search-bar overdraw-line",
+    ) ?? []) {
       expect(line.style.display).toBe("none");
     }
 
     (wm as Wm)._drawers = [] as never;
     (wm as Wm).requestUpdate();
     await (wm as Wm).updateComplete;
-    for (const line of wm.shadowRoot?.querySelectorAll<HTMLElement>(".wm-search-bar overdraw-line") ?? []) {
+    for (const line of wm.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".wm-search-bar overdraw-line",
+    ) ?? []) {
       expect(line.style.display).toBe("");
     }
   });
@@ -501,7 +532,9 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
 
   it("attaches overdraw accents to the drawer footer and head buttons", async () => {
     (wm as Wm)._workspaces = [{ filePath: "/w/a", data: { name: "A", repos: [] } }] as never;
-    (wm as Wm)._drawers = [{ id: "d1", kind: "workspace", workspacePath: "/w/a", title: "A", data: { repos: [] } }] as never;
+    (wm as Wm)._drawers = [
+      { id: "d1", kind: "workspace", workspacePath: "/w/a", title: "A", data: { repos: [] } },
+    ] as never;
     (wm as Wm).requestUpdate();
     await (wm as Wm).updateComplete;
 
@@ -541,8 +574,14 @@ describe("Openp41geWindowManager workspace row thumbnails", () => {
     // Idempotent across another update.
     (wm as Wm).requestUpdate();
     await (wm as Wm).updateComplete;
-    expect(wm.shadowRoot?.querySelectorAll(".drawer-footer .dw-add > overdraw-line")?.length).toBe(1);
-    expect(wm.shadowRoot?.querySelectorAll(".drawer-actions .dw-close > overdraw-line")?.length).toBe(2);
-    expect(wm.shadowRoot?.querySelectorAll(".drawer-actions .dw-open > overdraw-line")?.length).toBe(2);
+    expect(wm.shadowRoot?.querySelectorAll(".drawer-footer .dw-add > overdraw-line")?.length).toBe(
+      1,
+    );
+    expect(
+      wm.shadowRoot?.querySelectorAll(".drawer-actions .dw-close > overdraw-line")?.length,
+    ).toBe(2);
+    expect(
+      wm.shadowRoot?.querySelectorAll(".drawer-actions .dw-open > overdraw-line")?.length,
+    ).toBe(2);
   });
 });

@@ -30,7 +30,9 @@ export const Default: Story = {
 
 export const AllIcons: Story = {
   render: () => html`
-    <div style="display:grid;grid-template-columns:repeat(4,auto);gap:16px;padding:16px;color:#ccc;font-family:monospace;">
+    <div
+      style="display:grid;grid-template-columns:repeat(4,auto);gap:16px;padding:16px;color:#ccc;font-family:monospace;"
+    >
       ${Object.keys(iconRegistry).map(
         (name) => html`
           <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">

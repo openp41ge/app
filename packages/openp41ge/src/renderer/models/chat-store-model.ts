@@ -13,7 +13,15 @@
 
 import { defaultChatTitle } from "openp41ge-constants";
 import { searchTranscript } from "openp41ge-agents";
-import type { Chat, ChatHeader, ChatSearchOptions, ChatSearchResult, ChatSummary, ChatTranscriptPage, ChatTranscriptSearch } from "openp41ge-agents";
+import type {
+  Chat,
+  ChatHeader,
+  ChatSearchOptions,
+  ChatSearchResult,
+  ChatSummary,
+  ChatTranscriptPage,
+  ChatTranscriptSearch,
+} from "openp41ge-agents";
 
 /** Narrow read/write contract for the chat store. */
 export interface ChatStoreModel {
@@ -240,7 +248,11 @@ export class TestChatStoreModel implements ChatStoreModel {
     return results;
   }
 
-  async searchTranscript(id: string, q: string, opts: ChatSearchOptions = {}): Promise<ChatTranscriptSearch> {
+  async searchTranscript(
+    id: string,
+    q: string,
+    opts: ChatSearchOptions = {},
+  ): Promise<ChatTranscriptSearch> {
     this.calls.push({ op: "searchTranscript", args: [id, q, opts] });
     return searchTranscript(this.chats.get(id), q, opts);
   }

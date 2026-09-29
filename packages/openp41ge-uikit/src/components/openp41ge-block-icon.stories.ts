@@ -44,7 +44,9 @@ export const Default: Story = {
 
 export const AllBlockIcons: Story = {
   render: () => html`
-    <div style="display:grid;grid-template-columns:repeat(4,auto);gap:20px;padding:16px;color:#ccc;font-family:monospace;">
+    <div
+      style="display:grid;grid-template-columns:repeat(4,auto);gap:20px;padding:16px;color:#ccc;font-family:monospace;"
+    >
       ${blockIcons
         .filter((n) => iconRegistry[n])
         .map(
@@ -61,12 +63,19 @@ export const AllBlockIcons: Story = {
 
 export const ToolbarRow: Story = {
   render: () => html`
-    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#252526;border-bottom:1px solid #333;border-radius:4px;">
+    <div
+      style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#252526;border-bottom:1px solid #333;border-radius:4px;"
+    >
       ${["projects", "refresh", "git", "terminal", "play"].map(
         (name) => html`
-          <div style="padding:4px;border-radius:4px;cursor:pointer;display:flex;align-items:center;"
-            @mouseenter=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
-            @mouseleave=${(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          <div
+            style="padding:4px;border-radius:4px;cursor:pointer;display:flex;align-items:center;"
+            @mouseenter=${(e: MouseEvent) => {
+              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)";
+            }}
+            @mouseleave=${(e: MouseEvent) => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+            }}
           >
             <openp41ge-icon name=${name} size="18" style="color:#999;"></openp41ge-icon>
           </div>

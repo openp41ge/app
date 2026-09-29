@@ -45,7 +45,9 @@ export class Openp41geStackDemo extends LitElement {
   override render(): TemplateResult {
     return html`
       <style>
-        :host { display: block; }
+        :host {
+          display: block;
+        }
         .demo {
           height: 300px;
           background: var(--bg, #1e1e1e);
@@ -89,7 +91,9 @@ export class Openp41geStackDemo extends LitElement {
         .cbtn--label.hl {
           background: var(--accent, #79c0ff);
         }
-        .spacer { flex: 1; }
+        .spacer {
+          flex: 1;
+        }
         .body {
           flex: 1;
           min-height: 0;
@@ -165,7 +169,9 @@ export class Openp41geStackDemo extends LitElement {
           flex: 1;
           max-width: 72px;
         }
-        .wt .bar { max-width: 54px; }
+        .wt .bar {
+          max-width: 54px;
+        }
         /* Small caption above the workspace-window skeleton. */
         .demo-caption {
           text-align: center;
@@ -312,7 +318,9 @@ export class Openp41geStackDemo extends LitElement {
   /** Place the cards in the carousel and sync the skeleton highlight. */
   private _apply(): void {
     const root = this.renderRoot;
-    root.querySelectorAll<HTMLElement>(".cbtn--label, .repo, .wt").forEach((el) => el.classList.remove("hl"));
+    root
+      .querySelectorAll<HTMLElement>(".cbtn--label, .repo, .wt")
+      .forEach((el) => el.classList.remove("hl"));
     const sel = [".cbtn--label", ".repo", ".wt"][this._active];
     if (sel) root.querySelectorAll(sel).forEach((el) => el.classList.add("hl"));
 

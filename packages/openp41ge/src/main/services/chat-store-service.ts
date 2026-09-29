@@ -271,7 +271,14 @@ export class ChatStoreService {
           if (m.segments) {
             m.segments = m.segments.map((s) =>
               s.type === "tool" && s.toolCall?.id === toolCallId
-                ? { ...s, toolCall: { ...s.toolCall, status: tc.status, ...(tc.error ? { error: tc.error } : {}) } }
+                ? {
+                    ...s,
+                    toolCall: {
+                      ...s.toolCall,
+                      status: tc.status,
+                      ...(tc.error ? { error: tc.error } : {}),
+                    },
+                  }
                 : s,
             );
           }

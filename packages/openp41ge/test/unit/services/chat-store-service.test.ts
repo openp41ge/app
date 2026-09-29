@@ -140,11 +140,7 @@ describe("searchTranscript", () => {
   });
 
   it("numbers ordinals per-message and not transcript-wide", () => {
-    const chat = makeChat("c1", [
-      user("foo bar foo"),
-      user("foo"),
-      user("bar foo"),
-    ]);
+    const chat = makeChat("c1", [user("foo bar foo"), user("foo"), user("bar foo")]);
     const r = searchTranscript(chat, "foo");
     expect(r.hits.map((h) => ({ m: h.messageId, o: h.order }))).toEqual([
       { m: "u-foo ", o: 0 },
@@ -285,9 +281,7 @@ describe("ChatStoreService", () => {
       id: "a1",
       role: "assistant",
       content: "",
-      toolCalls: [
-        { id: "tc1", name: "read_file", arguments: "", status: "running" },
-      ],
+      toolCalls: [{ id: "tc1", name: "read_file", arguments: "", status: "running" }],
       segments: [
         {
           type: "tool",

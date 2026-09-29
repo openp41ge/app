@@ -171,8 +171,6 @@ describe("AgentsController", () => {
     expect(el._liveTps).toBe(29.3);
   });
 
-
-
   it("populates the composer provider/model selector from the agent config", async () => {
     (window as unknown as Record<string, unknown>).openp41ge = {
       ...(window as unknown as Record<string, unknown>).openp41ge,

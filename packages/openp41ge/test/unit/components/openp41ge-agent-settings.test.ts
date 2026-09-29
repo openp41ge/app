@@ -95,10 +95,7 @@ describe("openp41ge-agent-settings — smart JSON view", () => {
       "models",
       "name",
     ]);
-    expect(Object.keys(el._config.providers.vllm.models[0])).toEqual([
-      "contextWindow",
-      "id",
-    ]);
+    expect(Object.keys(el._config.providers.vllm.models[0])).toEqual(["contextWindow", "id"]);
     // Staged in-memory only — sorting is not a save.
     expect(el.configService.sets.length).toBe(0);
   });
@@ -179,15 +176,13 @@ describe("openp41ge-agent-settings — smart JSON view", () => {
 
   test("editing within a json drawer stages but does not auto-save", async () => {
     const el = await mount(AGENT());
-    el.shadowRoot
-      .querySelector("json-editor")
-      .dispatchEvent(
-        new CustomEvent("json-editor-open", {
-          detail: { path: ["providers", "vllm"] },
-          bubbles: true,
-          composed: true,
-        }),
-      );
+    el.shadowRoot.querySelector("json-editor").dispatchEvent(
+      new CustomEvent("json-editor-open", {
+        detail: { path: ["providers", "vllm"] },
+        bubbles: true,
+        composed: true,
+      }),
+    );
     await tick();
     const drawerJe = el.shadowRoot.querySelector(".drawer json-editor");
     drawerJe.dispatchEvent(
@@ -199,7 +194,9 @@ describe("openp41ge-agent-settings — smart JSON view", () => {
     );
     await tick();
     // Staged in memory only — the persisted value is unchanged.
-    expect(el.configService.vals.agent.providers.vllm.defaultModel).toBe("Qwen2.5-Coder-7B-Instruct");
+    expect(el.configService.vals.agent.providers.vllm.defaultModel).toBe(
+      "Qwen2.5-Coder-7B-Instruct",
+    );
     expect(el.configService.sets.length).toBe(0);
     // Save persists the drafted config.
     el.shadowRoot.querySelector(".ags-footer-btn--primary").click();
@@ -218,15 +215,13 @@ describe("openp41ge-agent-settings — smart JSON view", () => {
       },
     };
     const el = await mount(agent);
-    el.shadowRoot
-      .querySelector("json-editor")
-      .dispatchEvent(
-        new CustomEvent("json-editor-open", {
-          detail: { path: ["providers", "vllm"] },
-          bubbles: true,
-          composed: true,
-        }),
-      );
+    el.shadowRoot.querySelector("json-editor").dispatchEvent(
+      new CustomEvent("json-editor-open", {
+        detail: { path: ["providers", "vllm"] },
+        bubbles: true,
+        composed: true,
+      }),
+    );
     await tick();
     const drawerJe = el.shadowRoot.querySelector(".drawer json-editor");
     expect(drawerJe).toBeTruthy();

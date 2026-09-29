@@ -478,10 +478,7 @@ export class AgentsSystemTabController implements SystemTabController {
       cursor: "pointer",
     });
 
-    const head = this._chatRowHead(
-      chat.title,
-      (chat.description ?? "").trim() || "No description",
-    );
+    const head = this._chatRowHead(chat.title, (chat.description ?? "").trim() || "No description");
     // Third row: the chat's last interaction time (falls back to creation).
     const titleBlock = head.firstElementChild as HTMLElement;
     const date = document.createElement("div");
@@ -520,7 +517,11 @@ export class AgentsSystemTabController implements SystemTabController {
   }
 
   /** Build a row header: a one-line title + muted description. */
-  private _chatRowHead(title: string, desc: string, titleColor = "var(--text-primary,#ccc)"): HTMLElement {
+  private _chatRowHead(
+    title: string,
+    desc: string,
+    titleColor = "var(--text-primary,#ccc)",
+  ): HTMLElement {
     const head = document.createElement("div");
     head.className = "chat-row-head";
     Object.assign(head.style, {

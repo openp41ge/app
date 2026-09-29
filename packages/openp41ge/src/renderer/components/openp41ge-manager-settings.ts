@@ -119,9 +119,10 @@ export class Openp41geManagerSettings extends LitElement {
       let overrides: Record<string, unknown>;
       try {
         if (typeof bridge.getOverrides === "function") {
-          overrides = sortJsonKeys(
-            this._pickGlobal((await bridge.getOverrides()) ?? {}),
-          ) as Record<string, unknown>;
+          overrides = sortJsonKeys(this._pickGlobal((await bridge.getOverrides()) ?? {})) as Record<
+            string,
+            unknown
+          >;
         } else {
           const raw = this._pickGlobal((await bridge.getAll()) ?? {});
           overrides = (stripDefaults(raw, baseDefaults) ?? {}) as Record<string, unknown>;
@@ -171,8 +172,10 @@ export class Openp41geManagerSettings extends LitElement {
   private _onJsonEditorChange(e: CustomEvent): void {
     const value = (e.detail as { value: Record<string, unknown> }).value;
     if (this._showDefaults) {
-      const next = (stripDefaults(value, this._defaults ?? {}, this._pinned) ??
-        {}) as Record<string, unknown>;
+      const next = (stripDefaults(value, this._defaults ?? {}, this._pinned) ?? {}) as Record<
+        string,
+        unknown
+      >;
       this._sync(next);
     } else {
       this._sync(value);

@@ -374,7 +374,10 @@ describe("valueSuggestContextAt", () => {
 
   it("returns null for an array element value (no key)", () => {
     const text = '{ "items": ["x", "y"] }';
-    const schema = { type: "object", properties: { items: { type: "array", items: { type: "string", enum: ["x", "y"] } } } };
+    const schema = {
+      type: "object",
+      properties: { items: { type: "array", items: { type: "string", enum: ["x", "y"] } } },
+    };
     const open = text.indexOf('"x"');
     expect(valueSuggestContextAt(schema, text, open + 1, false)).toBeNull();
   });

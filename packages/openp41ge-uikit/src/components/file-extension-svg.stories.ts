@@ -21,7 +21,9 @@ type Story = StoryObj;
 
 export const Default: Story = {
   render: (args) => html`
-    <div style="display:flex;align-items:center;gap:8px;padding:8px;font-family:monospace;font-size:13px;color:#d4d4d4;">
+    <div
+      style="display:flex;align-items:center;gap:8px;padding:8px;font-family:monospace;font-size:13px;color:#d4d4d4;"
+    >
       <file-extension-svg filename=${args.filename} size=${args.size}></file-extension-svg>
       <span>${args.filename}</span>
     </div>
@@ -30,17 +32,46 @@ export const Default: Story = {
 
 export const CommonFiles: Story = {
   render: () => html`
-    <div style="display:flex;flex-direction:column;gap:4px;padding:8px;font-family:monospace;font-size:13px;color:#d4d4d4;">
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="app.ts" size="16"></file-extension-svg><span>app.ts</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="styles.css" size="16"></file-extension-svg><span>styles.css</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="index.js" size="16"></file-extension-svg><span>index.js</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="package.json" size="16"></file-extension-svg><span>package.json</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="README.md" size="16"></file-extension-svg><span>README.md</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="Dockerfile" size="16"></file-extension-svg><span>Dockerfile</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename=".gitignore" size="16"></file-extension-svg><span>.gitignore</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="index.tsx" size="16"></file-extension-svg><span>index.tsx</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="logo.svg" size="16"></file-extension-svg><span>logo.svg</span></div>
-      <div style="display:flex;align-items:center;gap:8px;"><file-extension-svg filename="image.png" size="16"></file-extension-svg><span>image.png</span></div>
+    <div
+      style="display:flex;flex-direction:column;gap:4px;padding:8px;font-family:monospace;font-size:13px;color:#d4d4d4;"
+    >
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="app.ts" size="16"></file-extension-svg><span>app.ts</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="styles.css" size="16"></file-extension-svg
+        ><span>styles.css</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="index.js" size="16"></file-extension-svg><span>index.js</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="package.json" size="16"></file-extension-svg
+        ><span>package.json</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="README.md" size="16"></file-extension-svg
+        ><span>README.md</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="Dockerfile" size="16"></file-extension-svg
+        ><span>Dockerfile</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename=".gitignore" size="16"></file-extension-svg
+        ><span>.gitignore</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="index.tsx" size="16"></file-extension-svg
+        ><span>index.tsx</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="logo.svg" size="16"></file-extension-svg><span>logo.svg</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <file-extension-svg filename="image.png" size="16"></file-extension-svg
+        ><span>image.png</span>
+      </div>
     </div>
   `,
 };
@@ -58,7 +89,9 @@ export const AllIcons: Story = {
     const letters = Object.keys(groups).sort();
     return html`
       <div style="padding:12px;background:#1e1e1e;font-family:monospace;color:#d4d4d4;">
-        <div style="font-size:13px;margin-bottom:8px;color:#999;">All ${names.length} material icons</div>
+        <div style="font-size:13px;margin-bottom:8px;color:#999;">
+          All ${names.length} material icons
+        </div>
         ${letters.map(
           (letter) => html`
             <div style="margin-bottom:8px;">
@@ -71,7 +104,10 @@ export const AllIcons: Story = {
                       title=${name}
                     >
                       <file-extension-svg filename=${name} size="14"></file-extension-svg>
-                      <span style="font-size:7px;color:#888;overflow:hidden;text-overflow:ellipsis;max-width:48px;">${name}</span>
+                      <span
+                        style="font-size:7px;color:#888;overflow:hidden;text-overflow:ellipsis;max-width:48px;"
+                        >${name}</span
+                      >
                     </div>
                   `,
                 )}

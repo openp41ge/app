@@ -75,7 +75,8 @@ class Openp41geConfirmModal extends LitElement {
     if (v === "danger") {
       // Faded danger background + bright danger text (matches the
       // workspace-manager footer's Delete/Save button pattern).
-      this._confirmStyle = "openp41ge-confirm-danger rounded px-4 py-1.5 text-sm border-none cursor-pointer";
+      this._confirmStyle =
+        "openp41ge-confirm-danger rounded px-4 py-1.5 text-sm border-none cursor-pointer";
     } else if (v.includes(";") || v.includes(":")) {
       // Legacy inline style string — keep as-is for backward compat
       this._confirmStyle = v;
@@ -165,19 +166,11 @@ class Openp41geConfirmModal extends LitElement {
     this._renderDone = true;
 
     const titlePart = this._title
-      ? html`<div
-          class="text-13 font-semibold text-primary mb-2"
-        >
-          ${this._title}
-        </div>`
+      ? html`<div class="text-13 font-semibold text-primary mb-2">${this._title}</div>`
       : "";
 
     const detailPart = this._detail
-      ? html`<div
-          class="text-sm text-muted mb-4 leading-[1.4]"
-        >
-          ${this._detail}
-        </div>`
+      ? html`<div class="text-sm text-muted mb-4 leading-[1.4]">${this._detail}</div>`
       : "";
 
     const checkboxPart = this._checkboxLabel
@@ -192,10 +185,16 @@ class Openp41geConfirmModal extends LitElement {
             }}
           />
           <span class="flex-1 min-w-0">
-            <span class="block text-xs font-medium text-primary leading-snug">${this._esc(this._checkboxLabel)}</span>
-            ${this._checkboxDetail
-              ? html`<span class="block text-[11px] text-secondary leading-snug mt-0.5">${this._esc(this._checkboxDetail)}</span>`
-              : ""}
+            <span class="block text-xs font-medium text-primary leading-snug"
+              >${this._esc(this._checkboxLabel)}</span
+            >
+            ${
+              this._checkboxDetail
+                ? html`<span class="block text-[11px] text-secondary leading-snug mt-0.5"
+                    >${this._esc(this._checkboxDetail)}</span
+                  >`
+                : ""
+            }
           </span>
         </label>`
       : "";
@@ -211,13 +210,10 @@ class Openp41geConfirmModal extends LitElement {
           class="bg-bg-primary border border-border-color rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] px-6 py-5 min-w-[320px] max-w-[420px]"
         >
           ${titlePart}
-          <div
-            class="text-13 text-secondary whitespace-pre-line mb-${detailPart ? "1" : "4"}"
-          >
+          <div class="text-13 text-secondary whitespace-pre-line mb-${detailPart ? "1" : "4"}">
             ${this._message}
           </div>
-          ${detailPart}
-          ${checkboxPart}
+          ${detailPart} ${checkboxPart}
           <div class="flex gap-2 justify-start">
             <button
               class="openp41ge-confirm-cancel ${DEFAULT_CANCEL_STYLE}"
@@ -249,7 +245,9 @@ class Openp41geConfirmModal extends LitElement {
           e.preventDefault();
           // Activate whichever button/checkbox is currently focused
           const cancelBtn = this.querySelector(".openp41ge-confirm-cancel") as HTMLElement | null;
-          const checkbox = this.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement | null;
+          const checkbox = this.querySelector(
+            ".openp41ge-confirm-checkbox input",
+          ) as HTMLInputElement | null;
           if (document.activeElement === cancelBtn) {
             this._done(false);
           } else if (checkbox && document.activeElement === checkbox) {
@@ -264,7 +262,9 @@ class Openp41geConfirmModal extends LitElement {
           // Cycle focus through [checkbox?, cancel, confirm]
           const cancelBtn = this.querySelector(".openp41ge-confirm-cancel") as HTMLElement | null;
           const okBtn = this.querySelector(".openp41ge-confirm-ok") as HTMLElement | null;
-          const checkbox = this.querySelector(".openp41ge-confirm-checkbox input") as HTMLInputElement | null;
+          const checkbox = this.querySelector(
+            ".openp41ge-confirm-checkbox input",
+          ) as HTMLInputElement | null;
           const focusable: HTMLElement[] = [];
           if (checkbox) focusable.push(checkbox);
           if (cancelBtn) focusable.push(cancelBtn);
@@ -315,7 +315,9 @@ export function showConfirmModal(
 export function showConfirmModal(
   options: ShowConfirmOptions & { checkboxLabel: string },
 ): Promise<ShowConfirmResult>;
-export function showConfirmModal(options: ShowConfirmOptions): Promise<boolean | ShowConfirmResult> {
+export function showConfirmModal(
+  options: ShowConfirmOptions,
+): Promise<boolean | ShowConfirmResult> {
   const modal = document.createElement("openp41ge-confirm-modal") as Openp41geConfirmModal;
   modal.message = options.message;
   if (options.title) modal.title = options.title;
@@ -326,7 +328,5 @@ export function showConfirmModal(options: ShowConfirmOptions): Promise<boolean |
   if (options.checkboxLabel) modal.checkboxLabel = options.checkboxLabel;
   if (options.checkboxDetail) modal.checkboxDetail = options.checkboxDetail;
   document.body.appendChild(modal);
-  return options.checkboxLabel
-    ? modal.waitForConfirm()
-    : modal.waitForResult();
+  return options.checkboxLabel ? modal.waitForConfirm() : modal.waitForResult();
 }

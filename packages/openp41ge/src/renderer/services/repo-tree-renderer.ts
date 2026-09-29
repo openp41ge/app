@@ -219,10 +219,7 @@ class RepoTreeRenderer {
     return this._createFileRow(file, depth, selectedPath, callbacks);
   }
 
-  private _createVisToggle(
-    visible: boolean,
-    onToggle: () => void,
-  ): HTMLElement {
+  private _createVisToggle(visible: boolean, onToggle: () => void): HTMLElement {
     const visBtn = document.createElement("span");
     visBtn.innerHTML = visible ? eyeIcon(13) : eyeOffIcon(13);
     visBtn.className = `
@@ -286,8 +283,7 @@ class RepoTreeRenderer {
 
     const label = document.createElement("span");
     label.textContent = file.name;
-    label.className =
-      "ml-1 overflow-hidden text-ellipsis whitespace-nowrap text-secondary flex-1";
+    label.className = "ml-1 overflow-hidden text-ellipsis whitespace-nowrap text-secondary flex-1";
     row.appendChild(label);
 
     // Events

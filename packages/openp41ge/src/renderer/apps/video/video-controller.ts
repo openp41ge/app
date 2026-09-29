@@ -127,7 +127,8 @@ export class VideoController extends BaseController implements TabController {
 
     // ── Player container ──
     this.playerContainer = document.createElement("div");
-    this.playerContainer.className = "flex-1 min-h-0 relative bg-black flex items-center justify-center";
+    this.playerContainer.className =
+      "flex-1 min-h-0 relative bg-black flex items-center justify-center";
     container.appendChild(this.playerContainer);
 
     // If we have a saved URL, load it

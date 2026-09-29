@@ -64,9 +64,7 @@ export class Openp41geAddWorktreeDialog extends LitElement {
   render() {
     return html`
       <div id="wt-addwt-row" class="flex flex-col gap-1 px-3 py-1.5">
-        <div class="text-2xs text-secondary mb-0.5">
-          Add worktree to ${this.repoName}
-        </div>
+        <div class="text-2xs text-secondary mb-0.5">Add worktree to ${this.repoName}</div>
         ${this._loading ? html`<div class="text-secondary text-xs">Loading branches...</div>` : ""}
         ${this._error ? html`<div class="text-[#e06c75] text-xs">${this._error}</div>` : ""}
         ${

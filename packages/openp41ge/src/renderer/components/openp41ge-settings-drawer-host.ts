@@ -511,7 +511,10 @@ export class Openp41geSettingsDrawerHost extends LitElement {
   /** Width a drawer opens to: the preferred width (`maxDrawerWidth`, clamped
    *  to the grid area). This is the initial width, not an upper bound. */
   private _openWidthFor(side: DrawerSide, gridWidth: number): number {
-    return Math.max(this._minWidth, Math.min(this.maxDrawerWidth, this._sideMaxWidth(side, gridWidth)));
+    return Math.max(
+      this._minWidth,
+      Math.min(this.maxDrawerWidth, this._sideMaxWidth(side, gridWidth)),
+    );
   }
 
   /**
@@ -1069,17 +1072,19 @@ export class Openp41geSettingsDrawerHost extends LitElement {
 
       ${this.isOpen ? html`<div class="sdw-mask"></div>` : nothing} ${this._renderStack("left")}
       ${this._renderStack("right")}
-      ${this._edgeSnapSide
-        ? html`<drop-box
-              class="sdw-edge-snap"
-              fade="${this._edgeSnapSide === "left" ? "left" : "right"}"
-              style="
+      ${
+        this._edgeSnapSide
+          ? html`<drop-box
+                class="sdw-edge-snap"
+                fade="${this._edgeSnapSide === "left" ? "left" : "right"}"
+                style="
                 top: 0; bottom: 0; width: 100px; z-index: 30;
                 ${this._edgeSnapSide === "left" ? "right: 0" : "left: 0"}
               "
-            ></drop-box>
-            <drop-box-overdraw></drop-box-overdraw>`
-        : nothing}
+              ></drop-box>
+              <drop-box-overdraw></drop-box-overdraw>`
+          : nothing
+      }
     `;
   }
 

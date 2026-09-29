@@ -69,11 +69,7 @@ export function createSettingsButton(
  * because the group is mirrored per side the DOM/visual order is reversed for
  * the left sidebar. The settings icon is always the innermost one.
  */
-export function layoutFooterIcons(
-  footer: HTMLElement,
-  side: Side,
-  buttons: HTMLElement[],
-): void {
+export function layoutFooterIcons(footer: HTMLElement, side: Side, buttons: HTMLElement[]): void {
   const spacer = document.createElement("div");
   Object.assign(spacer.style, { flex: "1 1 auto" });
   if (side === "left") {
