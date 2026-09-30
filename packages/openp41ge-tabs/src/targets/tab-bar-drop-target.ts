@@ -8,11 +8,14 @@
  * Events (bubbling):
  *   tab-bar-reorder    — { winId, col, fromIndex, toIndex }
  *   tab-bar-move-cell  — { sourceWinId, tabId, targetWinId, targetCol, dropIndex }
+ *   grid-open-tab      — { winId, tabType, tabConfig, targetCol } (open-tab/file
+ *                        drops, mirroring a drop on the grid surface)
  */
 
 import type { IDragSource, IDropTarget, DragResult, TargetFeedback } from "../interfaces";
 import { getDropIndexInBar, getTabButtonsInBar } from "../boundary";
 import { attachDropTipVerticalOverdraws } from "../drop-tip-overdraw";
+import { GRID_EVENTS } from "./grid-drop-target";
 
 /**
  * Event types dispatched by TabBarDropTarget.
@@ -54,6 +57,32 @@ export class TabBarDropTarget implements IDropTarget {
     this._hideIndicator();
 
     const data = source.getDragData();
+
+    // A stream (`open-tab`) or file dropped on the tab bar opens it in this
+    // cell — mirroring a drop on the grid surface. The host listens for the
+    // same `grid-open-tab` event the grid surface fires.
+    if (data.type === "open-tab") {
+      this._fire(GRID_EVENTS.OPEN_TAB, {
+        winId: this.winId,
+        tabType: data.appType,
+        tabConfig: data.tabConfig ?? {},
+        targetCol: this._col,
+        pinned: true,
+      });
+      return { success: true };
+    }
+
+    if (data.type === "file") {
+      this._fire(GRID_EVENTS.OPEN_TAB, {
+        winId: this.winId,
+        tabType: "file-viewer",
+        tabConfig: { filePath: data.filePath },
+        targetCol: this._col,
+        pinned: true,
+      });
+      return { success: true };
+    }
+
     if (data.type !== "tab") {
       return { success: false, reason: "only tabs can be dropped on tab bars" };
     }
