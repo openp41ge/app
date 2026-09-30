@@ -76,24 +76,77 @@ jobs:
     # Refuse to release a commit that never got a green prerequisites run
     # (quality / test / integration / build). Guards manual dispatch on an
     # arbitrary commit as well as tag-triggered releases.
+    #
+    # A tag push and its prerequisites push land at the same time, so the gate
+    # can observe the run still in progress. Treat that as "not yet decided":
+    # wait for the newest prerequisites run for this commit to finish and only
+    # then judge its conclusion. Pass immediately if a successful run already
+    # exists; fail only when no run appears, or the latest one is not success.
     needs: meta
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       actions: read
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Require successful prerequisites for this commit
+      - name: Require successful prerequisites for this commit (wait for in-progress)
         run: |
           set -euo pipefail
           SHA="${{ github.sha }}"
-          CONCLUSION="$(gh run list --repo "$GITHUB_REPOSITORY" \
-            --workflow prerequisites.yml --commit "$SHA" \
-            --status completed --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)"
-          echo "prerequisites for $SHA -> ${CONCLUSION:-no completed run}"
+          REPO="$GITHUB_REPOSITORY"
+          POLL=15
+          WAIT_MIN=25
+
+          # Fast path: a completed successful run already exists.
+          PASSED="$(gh run list --repo "$REPO" --workflow prerequisites.yml \
+            --commit "$SHA" --status completed --conclusion success \
+            --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+          if [ -n "$PASSED" ]; then
+            echo "prerequisites already green for $SHA (run $PASSED)."
+            exit 0
+          fi
+
+          # Otherwise find the newest run for this commit and wait for it. The
+          # run may not exist yet (tag + prerequisites push are concurrent), so
+          # poll briefly for one to appear before giving up.
+          echo "No completed successful prerequisites run for $SHA; waiting..."
+          RUN_ID=""
+          START="$(date +%s)"
+          while [ -z "$RUN_ID" ]; do
+            RUN_ID="$(gh run list --repo "$REPO" --workflow prerequisites.yml \
+              --commit "$SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+            if [ -n "$RUN_ID" ]; then break; fi
+            if [ "$(( $(date +%s) - START ))" -ge "$(( WAIT_MIN * 60 ))" ]; then
+              echo "::error::No prerequisites run appeared for $SHA within ${WAIT_MIN}min. Release only commits that have a prerequisites run."
+              exit 1
+            fi
+            sleep "$POLL"
+          done
+
+          echo "Found prerequisites run $RUN_ID for $SHA - waiting for it to finish..."
+          LAST_STATUS=""
+          while :; do
+            CONCLUSION="$(gh run view "$RUN_ID" --repo "$REPO" \
+              --json conclusion --jq '.conclusion // empty' 2>/dev/null || true)"
+            if [ -n "$CONCLUSION" ]; then break; fi
+            STATUS="$(gh run view "$RUN_ID" --repo "$REPO" \
+              --json status --jq '.status // "unknown"' 2>/dev/null || echo unknown)"
+            if [ "$STATUS" != "$LAST_STATUS" ]; then
+              echo "  prerequisites run $RUN_ID is $STATUS..."
+              LAST_STATUS="$STATUS"
+            fi
+            if [ "$(( $(date +%s) - START ))" -ge "$(( WAIT_MIN * 60 ))" ]; then
+              echo "::error::Timed out after ${WAIT_MIN}min waiting for prerequisites run $RUN_ID (last status: $STATUS)."
+              exit 1
+            fi
+            sleep "$POLL"
+          done
+
+          echo "prerequisites run $RUN_ID for $SHA -> $CONCLUSION"
           if [ "$CONCLUSION" != "success" ]; then
-            echo "::error::Commit $SHA has no successful prerequisites run (found: ${CONCLUSION:-none}). Release only commits that passed quality/test/integration/build."
+            echo "::error::Prerequisites run $RUN_ID for $SHA finished as ${CONCLUSION:-unknown}. Release only commits that passed quality/test/integration/build."
             exit 1
           fi
 
