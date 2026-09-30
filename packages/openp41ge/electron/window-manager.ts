@@ -437,9 +437,11 @@ export function closeOrphanedWindows(): void {
   const activeIds = new Set(ws.windows.map((w) => w.id as string));
   for (const [openp41geWinId, bw] of openp41geWindows) {
     if (bw.isDestroyed()) continue;
-    // Window-manager windows are not bound to a layout Window, so they are
-    // never "orphaned" by the workspace layout.
-    if (openp41geWindowMeta.get(openp41geWinId)?.windowType === "window-manager") continue;
+    // Only workspace-layout windows are bound to a layout window; any other
+    // window type (window-manager, logs) is never "orphaned" by the workspace
+    // layout and must NOT be closed by a layout dispatch (e.g. a workspace
+    // shortcut accidentally fired from the standalone Logs window).
+    if (openp41geWindowMeta.get(openp41geWinId)?.windowType !== "workspace") continue;
     if (!activeIds.has(openp41geWinId)) {
       bw.close();
     }

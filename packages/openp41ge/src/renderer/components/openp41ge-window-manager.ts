@@ -1920,7 +1920,7 @@ export class Openp41geWindowManager extends LitElement {
           display: flex;
           align-items: center;
           flex-shrink: 0;
-          height: 32px;
+          height: 35px; /* matches the workspace + logs titlebars (TITLEBAR_HEIGHT) */
           padding: 0 14px;
           gap: 12px;
           box-sizing: border-box;

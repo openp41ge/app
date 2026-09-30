@@ -39,6 +39,8 @@ import {
   openp41geWindows,
   openp41geWindowMeta,
   focusWorkspaceWindow,
+  closeOrphanedWindows,
+  setDispatcher,
 } from "../../electron/window-manager.js";
 import type { BrowserWindow } from "electron";
 
@@ -57,6 +59,9 @@ function makeWindow(): AnyWin {
     restore(): void {},
     focus(): void {
       win._focused = true;
+    },
+    close(): void {
+      win._destroyed = true;
     },
   };
   return win;
@@ -95,5 +100,42 @@ describe("focusWorkspaceWindow", () => {
     openp41geWindows.set("wm", w as BrowserWindow);
     openp41geWindowMeta.set("wm", { windowType: "window-manager", workspacePath: null });
     expect(focusWorkspaceWindow("/a")).toBe(false);
+  });
+});
+
+describe("closeOrphanedWindows", () => {
+  beforeEach(() => {
+    openp41geWindows.clear();
+    openp41geWindowMeta.clear();
+    setDispatcher({
+      getWorkspace: () => ({ windows: [{ id: "ws-active" }] }),
+    } as never);
+  });
+
+  it("only closes workspace windows that are absent from the layout", () => {
+    const logs = makeWindow();
+    const wm = makeWindow();
+    const wsActive = makeWindow();
+    const wsOrphan = makeWindow();
+
+    openp41geWindows.set("logs-1", logs as BrowserWindow);
+    openp41geWindowMeta.set("logs-1", { windowType: "logs", workspacePath: null });
+    openp41geWindows.set("wm", wm as BrowserWindow);
+    openp41geWindowMeta.set("wm", { windowType: "window-manager", workspacePath: null });
+    openp41geWindows.set("ws-active", wsActive as BrowserWindow);
+    openp41geWindowMeta.set("ws-active", { windowType: "workspace", workspacePath: "/a" });
+    openp41geWindows.set("ws-orphan", wsOrphan as BrowserWindow);
+    openp41geWindowMeta.set("ws-orphan", { windowType: "workspace", workspacePath: "/a" });
+
+    closeOrphanedWindows();
+
+    // Logs + window-manager + still-active workspace windows survive; the
+    // orphaned workspace window (absent from the layout) is closed. This guards
+    // the bug where a workspace shortcut fired from the Logs window dispatched
+    // a layout command, ran orphan cleanup, and closed the Logs window.
+    expect(logs.isDestroyed()).toBe(false);
+    expect(wm.isDestroyed()).toBe(false);
+    expect(wsActive.isDestroyed()).toBe(false);
+    expect(wsOrphan.isDestroyed()).toBe(true);
   });
 });

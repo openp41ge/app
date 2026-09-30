@@ -21,15 +21,25 @@ export class RegisterShortcutsStep implements IStartupStep {
   async run(context: StartupContext): Promise<void> {
     const km = context.keyboardManager;
 
+    // Workspace-layout shortcuts (new window, pane picker, sidebar toggles,
+    // explorer/history/clone) operate on a workspace grid that the standalone
+    // Logs window does not have. Gate them so they never fire there — the
+    // Logs window owns its own Cmd/Ctrl+B `<openp41ge-logs-window>` handler,
+    // and running these would dispatch workspace commands over IPC and could
+    // otherwise close the Logs window (orphan cleanup runs after dispatches).
+    const isWorkspaceWindow = context.windowType === "workspace";
+
     // ── Window ──────────────────────────────────────────────────────
-    km.register({
-      modifiers: 8, // Meta
-      key: "n",
-      code: "KeyN",
-      handler: () => window.openp41ge.workspace.cmdNewWindow(),
-      description: "New Window",
-      category: "Window",
-    });
+    if (isWorkspaceWindow) {
+      km.register({
+        modifiers: 8, // Meta
+        key: "n",
+        code: "KeyN",
+        handler: () => window.openp41ge.workspace.cmdNewWindow(),
+        description: "New Window",
+        category: "Window",
+      });
+    }
 
     // ── Tab ─────────────────────────────────────────────────────────
     // Cmd+T for new tab/workset is removed — will be replaced with something else.
@@ -78,126 +88,138 @@ export class RegisterShortcutsStep implements IStartupStep {
     });
 
     // ── Pane ────────────────────────────────────────────────────────
-    km.register({
-      modifiers: 8,
-      key: "p",
-      code: "KeyP",
-      handler: () => {
-        try {
-          // showPanePicker — opens the pane picker overlay
-          // Dispatches the pane-picker event for the grid to handle
-          const panePickerEvent = new CustomEvent("openp41ge:show-pane-picker", {
-            bubbles: true,
-            composed: true,
-          });
-          document.dispatchEvent(panePickerEvent);
-        } catch (err) {
-          log.warn("Pane picker handler error:", err);
-        }
-      },
-      description: "Show Pane Picker",
-      category: "Pane",
-    });
+    if (isWorkspaceWindow) {
+      km.register({
+        modifiers: 8,
+        key: "p",
+        code: "KeyP",
+        handler: () => {
+          try {
+            // showPanePicker — opens the pane picker overlay
+            // Dispatches the pane-picker event for the grid to handle
+            const panePickerEvent = new CustomEvent("openp41ge:show-pane-picker", {
+              bubbles: true,
+              composed: true,
+            });
+            document.dispatchEvent(panePickerEvent);
+          } catch (err) {
+            log.warn("Pane picker handler error:", err);
+          }
+        },
+        description: "Show Pane Picker",
+        category: "Pane",
+      });
+    }
 
     // ── View: Sidebar toggles ───────────────────────────────────────
     // Cmd+B toggles the primary (right) sidebar
-    km.register({
-      modifiers: 8,
-      key: "b",
-      code: "KeyB",
-      handler: () => {
-        try {
-          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
-          if (!myWindowId) return;
-          emitEvent("sidebar-toggle", { windowId: myWindowId, side: "right" });
-        } catch (_err) {
-          // ignore
-        }
-      },
-      description: "Toggle Right Sidebar",
-      category: "View",
-    });
+    if (isWorkspaceWindow) {
+      km.register({
+        modifiers: 8,
+        key: "b",
+        code: "KeyB",
+        handler: () => {
+          try {
+            const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+            if (!myWindowId) return;
+            emitEvent("sidebar-toggle", { windowId: myWindowId, side: "right" });
+          } catch (_err) {
+            // ignore
+          }
+        },
+        description: "Toggle Right Sidebar",
+        category: "View",
+      });
+    }
 
     // Cmd+Option+B toggles the secondary (left) sidebar
-    km.register({
-      modifiers: 10,
-      key: "b",
-      code: "KeyB",
-      handler: () => {
-        try {
-          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
-          if (!myWindowId) return;
-          emitEvent("sidebar-toggle", { windowId: myWindowId, side: "left" });
-        } catch (_err) {
-          // ignore
-        }
-      },
-      description: "Toggle Left Sidebar",
-      category: "View",
-    });
+    if (isWorkspaceWindow) {
+      km.register({
+        modifiers: 10,
+        key: "b",
+        code: "KeyB",
+        handler: () => {
+          try {
+            const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+            if (!myWindowId) return;
+            emitEvent("sidebar-toggle", { windowId: myWindowId, side: "left" });
+          } catch (_err) {
+            // ignore
+          }
+        },
+        description: "Toggle Left Sidebar",
+        category: "View",
+      });
+    }
 
     // Cmd+Shift+E opens Explorer in the right sidebar
-    km.register({
-      modifiers: 12,
-      key: "e",
-      code: "KeyE",
-      handler: () => {
-        try {
-          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
-          if (!myWindowId) return;
-          emitEvent("sidebar-open", { windowId: myWindowId, side: "right", appType: "" });
-          emitEvent("tab-open-system", {
-            windowId: myWindowId,
-            side: "right",
-            appType: "explorer",
-            title: "Explorer",
-          });
-        } catch (_err) {
-          // ignore
-        }
-      },
-      description: "Open Explorer",
-      category: "View",
-    });
+    if (isWorkspaceWindow) {
+      km.register({
+        modifiers: 12,
+        key: "e",
+        code: "KeyE",
+        handler: () => {
+          try {
+            const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+            if (!myWindowId) return;
+            emitEvent("sidebar-open", { windowId: myWindowId, side: "right", appType: "" });
+            emitEvent("tab-open-system", {
+              windowId: myWindowId,
+              side: "right",
+              appType: "explorer",
+              title: "Explorer",
+            });
+          } catch (_err) {
+            // ignore
+          }
+        },
+        description: "Open Explorer",
+        category: "View",
+      });
+    }
 
     // Cmd+Shift+H opens History in the right sidebar
-    km.register({
-      modifiers: 12,
-      key: "h",
-      code: "KeyH",
-      handler: () => {
-        try {
-          const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
-          if (!myWindowId) return;
-          emitEvent("sidebar-open", { windowId: myWindowId, side: "right", appType: "" });
-          emitEvent("tab-open-system", {
-            windowId: myWindowId,
-            side: "right",
-            appType: "git",
-            title: "History",
-          });
-        } catch (_err) {
-          // ignore
-        }
-      },
-      description: "Open History",
-      category: "View",
-    });
+    if (isWorkspaceWindow) {
+      km.register({
+        modifiers: 12,
+        key: "h",
+        code: "KeyH",
+        handler: () => {
+          try {
+            const myWindowId = window.openp41ge?.workspace?.getWindowId?.();
+            if (!myWindowId) return;
+            emitEvent("sidebar-open", { windowId: myWindowId, side: "right", appType: "" });
+            emitEvent("tab-open-system", {
+              windowId: myWindowId,
+              side: "right",
+              appType: "git",
+              title: "History",
+            });
+          } catch (_err) {
+            // ignore
+          }
+        },
+        description: "Open History",
+        category: "View",
+      });
+    }
 
-    km.register({
-      modifiers: 12, // Meta + Shift
-      key: "o",
-      code: "KeyO",
-      handler: () => {
-        try {
-          showCloneDialog();
-        } catch (err) {
-          log.warn("Clone dialog shortcut error:", err);
-        }
-      },
-      description: "Clone Repository",
-      category: "File",
-    });
+    if (isWorkspaceWindow) {
+      km.register({
+        modifiers: 12, // Meta + Shift
+        key: "o",
+        code: "KeyO",
+        handler: () => {
+          try {
+            showCloneDialog();
+          } catch (err) {
+            log.warn("Clone dialog shortcut error:", err);
+          }
+        },
+        description: "Clone Repository",
+        category: "File",
+      });
+    }
 
     // ── View: Zoom ──────────────────────────────────────────────────
     const zoomIn = () => context.zoomService.zoomIn();

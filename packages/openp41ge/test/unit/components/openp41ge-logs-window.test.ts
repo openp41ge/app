@@ -1,14 +1,14 @@
 /**
  * Unit tests for the standalone Logs window.
  *
- * Covers tab defaulting (one per logged system), opening a stream from the
- * picker drawer, tab activation/close, column add, and the drag/reorder/split
- * events the shared <tab-grid> bubbles up (grid-activate, grid-move,
- * grid-split, tab-bar-reorder, tab-bar-move-cell). The component re-uses the
- * in-memory log stream registry, so streams are registered here with
- * `registerLogStream`.
+ * Covers tab defaulting (only the platform log auto-opens), opening a stream
+ * from the picker drawer, tab activation/close, column add, and the
+ * drag/reorder/split events the shared <tab-grid> bubbles up (grid-activate,
+ * grid-move, grid-split, tab-bar-reorder, tab-bar-move-cell). The component
+ * re-uses the in-memory log stream registry, so streams are registered here
+ * with `registerLogStream`.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Openp41geLogsWindow } from "../../../src/renderer/components/openp41ge-logs-window";
 import { registerLogStream, _resetLogStreams } from "openp41ge-logger";
 
@@ -45,6 +45,12 @@ function dispatch(el: Lw, name: string, detail: Record<string, unknown>): void {
   grid(el).dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
 }
 
+function openStream(el: Lw, system: string): void {
+  (
+    el as unknown as { _openStream(system: string, col?: number, pinned?: boolean): void }
+  )._openStream(system);
+}
+
 /** The “＋” button rendered at the right end of a column's tab bar. Both
  *  <tab-grid> and <tab-bar> render in light DOM, so the button is a plain
  *  descendant of the grid host. */
@@ -61,8 +67,8 @@ afterEach(() => {
 });
 
 describe("openp41ge-logs-window", () => {
-  it("opens one tab per logged system in a single column by default", async () => {
-    registerLogStream("sys-a", "name-a");
+  it("opens only the platform log by default; other systems are not auto-opened", async () => {
+    registerLogStream("openp41ge", "name-a");
     registerLogStream("sys-b", "name-b");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
@@ -71,9 +77,9 @@ describe("openp41ge-logs-window", () => {
     const systems = (el as unknown as { _tabs: Array<{ system: string }> })._tabs.map(
       (t) => t.system,
     );
-    expect(systems.sort()).toEqual(["sys-a", "sys-b"]);
+    expect(systems).toEqual(["openp41ge"]);
     expect(placements(el)).toHaveLength(1);
-    expect(placements(el)[0].tabIds).toHaveLength(2);
+    expect(placements(el)[0].tabIds).toHaveLength(1);
     expect(activeTabIds(el)["0"]).toBe(placements(el)[0].tabIds[0]);
 
     el.remove();
@@ -89,21 +95,16 @@ describe("openp41ge-logs-window", () => {
     el.remove();
   });
 
-  it("opens a stream from the picker and reuses the existing tab", async () => {
-    registerLogStream("sys-a", "name-a");
+  it("opens a stream from the sidebar and reuses the existing tab", async () => {
+    registerLogStream("openp41ge", "name-a");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
     await el.updateComplete;
     expect(tabIds(el)).toHaveLength(1);
 
-    (el as unknown as { _openPicker(): void })._openPicker();
-    await el.updateComplete;
-    const picker = (el as unknown as ShadowRoot).shadowRoot?.querySelector(
-      '[data-testid="lw-picker"]',
-    );
-    expect(picker).toBeTruthy();
-
-    (el as unknown as { _openStream(system: string, col?: number): void })._openStream("sys-a");
+    (
+      el as unknown as { _openStream(system: string, col?: number, pinned?: boolean): void }
+    )._openStream("openp41ge");
     await el.updateComplete;
     // Same system → reuse the single existing tab.
     expect(tabIds(el)).toHaveLength(1);
@@ -111,11 +112,100 @@ describe("openp41ge-logs-window", () => {
     el.remove();
   });
 
-  it("closes a tab and keeps the column usable", async () => {
+  it("opens a stream as an unpinned preview, then promotes it to pinned", async () => {
+    registerLogStream("openp41ge", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    // sys-b is not open; a single click (pinned=false) opens an unpinned preview.
+    (
+      el as unknown as { _openStream(system: string, col?: number, pinned?: boolean): void }
+    )._openStream("sys-b", undefined, false);
+    await el.updateComplete;
+    const sysB = (
+      el as unknown as { _tabs: Array<{ system: string; pinned: boolean }> }
+    )._tabs.find((t) => t.system === "sys-b");
+    expect(sysB?.pinned).toBe(false);
+
+    // A drag/drop open (pinned=true) promotes the preview to pinned.
+    (
+      el as unknown as { _openStream(system: string, col?: number, pinned?: boolean): void }
+    )._openStream("sys-b", undefined, true);
+    await el.updateComplete;
+    const pinnedB = (
+      el as unknown as { _tabs: Array<{ system: string; pinned: boolean }> }
+    )._tabs.find((t) => t.system === "sys-b");
+    expect(pinnedB?.pinned).toBe(true);
+    expect(tabIds(el)).toHaveLength(2);
+
+    el.remove();
+  });
+
+  it("replaces the unpinned preview in a column when another stream is previewed", async () => {
     registerLogStream("sys-a", "name-a");
     registerLogStream("sys-b", "name-b");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    (
+      el as unknown as { _openStream(system: string, col?: number, pinned?: boolean): void }
+    )._openStream("sys-c", undefined, false);
+    await el.updateComplete;
+    const syses = (el as unknown as { _tabs: Array<{ system: string }> })._tabs.map(
+      (t) => t.system,
+    );
+    expect(syses).toContain("sys-c");
+    const sysC = (
+      el as unknown as { _tabs: Array<{ system: string; pinned: boolean }> }
+    )._tabs.find((t) => t.system === "sys-c");
+    expect(sysC?.pinned).toBe(false);
+
+    // Previewing sys-d replaces the sys-c preview in the same column.
+    (
+      el as unknown as { _openStream(system: string, col?: number, pinned?: boolean): void }
+    )._openStream("sys-d", undefined, false);
+    await el.updateComplete;
+    const after = (el as unknown as { _tabs: Array<{ system: string }> })._tabs.map(
+      (t) => t.system,
+    );
+    expect(after).not.toContain("sys-c");
+    expect(after).toContain("sys-d");
+
+    el.remove();
+  });
+
+  it("opens a dropped stream row as a pinned tab via grid-open-tab", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    dispatch(el, "grid-open-tab", {
+      tabType: "log-viewer",
+      tabConfig: { system: "sys-b" },
+      targetCol: 0,
+      pinned: true,
+    });
+    await el.updateComplete;
+    const sysB = (
+      el as unknown as { _tabs: Array<{ system: string; pinned: boolean }> }
+    )._tabs.find((t) => t.system === "sys-b");
+    expect(sysB).toBeTruthy();
+    expect(sysB?.pinned).toBe(true);
+    el.remove();
+  });
+
+  it("closes a tab and keeps the column usable", async () => {
+    registerLogStream("openp41ge", "name-a");
+    registerLogStream("sys-b", "name-b");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (
+      el as unknown as { _openStream(system: string, col?: number, pinned?: boolean): void }
+    )._openStream("sys-b");
     await el.updateComplete;
     const first = placements(el)[0].tabIds[0];
 
@@ -129,7 +219,7 @@ describe("openp41ge-logs-window", () => {
   });
 
   it("adds an empty column", async () => {
-    registerLogStream("sys-a", "name-a");
+    registerLogStream("openp41ge", "name-a");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
     await el.updateComplete;
@@ -141,10 +231,12 @@ describe("openp41ge-logs-window", () => {
   });
 
   it("activates a tab via grid-activate", async () => {
-    registerLogStream("sys-a", "name-a");
+    registerLogStream("openp41ge", "name-a");
     registerLogStream("sys-b", "name-b");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    openStream(el, "sys-b");
     await el.updateComplete;
     const p = placements(el)[0];
     dispatch(el, "grid-activate", { tabId: p.tabIds[1], col: 0 });
@@ -154,10 +246,12 @@ describe("openp41ge-logs-window", () => {
   });
 
   it("reorders tabs within a column via tab-bar-reorder", async () => {
-    registerLogStream("sys-a", "name-a");
+    registerLogStream("openp41ge", "name-a");
     registerLogStream("sys-b", "name-b");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    openStream(el, "sys-b");
     await el.updateComplete;
     const before = placements(el)[0].tabIds;
 
@@ -169,10 +263,12 @@ describe("openp41ge-logs-window", () => {
   });
 
   it("moves a tab across columns via tab-bar-move-cell", async () => {
-    registerLogStream("sys-a", "name-a");
+    registerLogStream("openp41ge", "name-a");
     registerLogStream("sys-b", "name-b");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    openStream(el, "sys-b");
     await el.updateComplete;
     const [first, second] = placements(el)[0].tabIds;
 
@@ -189,11 +285,14 @@ describe("openp41ge-logs-window", () => {
   });
 
   it("splits a tab into a new column via grid-split", async () => {
-    registerLogStream("sys-a", "name-a");
+    registerLogStream("openp41ge", "name-a");
     registerLogStream("sys-b", "name-b");
     registerLogStream("sys-c", "name-c");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    openStream(el, "sys-b");
+    openStream(el, "sys-c");
     await el.updateComplete;
     const tabs = placements(el)[0].tabIds;
 
@@ -207,7 +306,7 @@ describe("openp41ge-logs-window", () => {
   });
 
   it("moves an empty grid's first tab via grid-move", async () => {
-    registerLogStream("sys-a", "name-a");
+    registerLogStream("openp41ge", "name-a");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
     await el.updateComplete;
@@ -217,6 +316,165 @@ describe("openp41ge-logs-window", () => {
     await el.updateComplete;
     expect(placements(el)).toHaveLength(1);
     expect(placements(el)[0].tabIds).toEqual([tab]);
+    el.remove();
+  });
+
+  it("resolves the grid drop target from the shadow root (pierces shadow DOM)", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    const sr = el.shadowRoot as unknown as ShadowRoot;
+    const g = grid(el);
+    expect(g.dropTarget).toBeTruthy();
+
+    // Regression: `document.elementFromPoint` returns the shadow HOST for a
+    // point inside this window, so `.closest("tab-bar"/"tab-grid")` never
+    // matched and a drag could resolve no drop target (tabs couldn't be moved
+    // or split into cells). The resolver must resolve from the shadow root.
+    // jsdom's elementFromPoint is unimplemented, so stub it to return a real
+    // element inside the grid's tab bar, i.e. exactly what the fix does.
+    const probe = g.querySelector<HTMLElement>("tab-bar") ?? (g as HTMLElement);
+    (
+      sr as ShadowRoot & { elementFromPoint: (x: number, y: number) => Element | null }
+    ).elementFromPoint = () => probe;
+    const dt = (el as unknown as { _resolveTarget(x: number, y: number): unknown })._resolveTarget(
+      100,
+      100,
+    );
+    expect(dt).toBeTruthy();
+    el.remove();
+  });
+
+  it("paints the grid drop indicator (ghost overlay) during a drag and clears it on drop", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    const g = grid(el);
+
+    // Regression: the orchestrator resolves the grid drop target but never
+    // renders its ghost, so the logs window showed no split/cell indicator.
+    // The host must paint the overlay itself from the drop target's feedback.
+    const source = { getDragData: () => ({ type: "tab", tabId: "x", winId: "w" }) };
+    const target = {
+      element: g,
+      onHover: () => ({ showGhost: true, ghostConfig: { cols: 2, boundaryIndex: 1 } }),
+    };
+    (el as unknown as { _resolveTarget: () => unknown })._resolveTarget = () => target;
+    (el as unknown as { _beginDrag: (s: unknown) => void })._beginDrag(source);
+    (el as unknown as { _updateGridGhost: (x: number, y: number) => void })._updateGridGhost(
+      100,
+      100,
+    );
+
+    expect(g.querySelector(".openp41ge-ghost-overlay")).toBeTruthy();
+
+    (el as unknown as { _onDragEnd: () => void })._onDragEnd();
+    expect(g.querySelector(".openp41ge-ghost-overlay")).toBeNull();
+    el.remove();
+  });
+
+  it("drives the main-process bitmap drag ghost from drag events (tab & stream)", async () => {
+    registerLogStream("sys-a", "name-a");
+    const start = vi.fn();
+    const move = vi.fn();
+    const end = vi.fn();
+    (window as unknown as { openp41ge: unknown }).openp41ge = { drag: { start, move, end } };
+
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    // Tab drag: the deferred start is captured on mousedown and fired on the
+    // first POSITION event (after the drag threshold), so the main process can
+    // capturePage a bitmap of the tab button. The in-DOM grid ghost must not
+    // appear before the threshold.
+    const tabPending = {
+      label: "sys-a",
+      screenX: 100,
+      screenY: 200,
+      tabId: "t1",
+      winId: "logs-window",
+      worksetId: "logs-window",
+      width: 120,
+      height: 30,
+      offsetX: 4,
+      offsetY: 5,
+      captureRect: { x: 10, y: 20, width: 116, height: 26 },
+    };
+    (el as unknown as { _pendingTabDragStart: unknown })._pendingTabDragStart = tabPending;
+    (el as unknown as { _beginDrag: (s: unknown) => void })._beginDrag({
+      getDragData: () => ({ type: "tab", tabId: "t1" }),
+    });
+
+    document.dispatchEvent(
+      new CustomEvent("openp41ge-drag-position", {
+        detail: { screenX: 300, screenY: 400 },
+      }),
+    );
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(start.mock.calls[0][0]).toBe("sys-a");
+    expect(start.mock.calls[0][11]).toBe("tab"); // dragType
+    expect(start.mock.calls[0][13]).toEqual(tabPending.captureRect);
+    expect(start.mock.calls[0][14]).toBe(2); // capture inset
+    expect(start.mock.calls[0][3]).toBeUndefined(); // no emoji
+    expect(move).toHaveBeenCalledWith(300, 400);
+
+    (el as unknown as { _onDragEnd: () => void })._onDragEnd();
+    expect(end).toHaveBeenCalledTimes(1);
+    expect((el as unknown as { _pendingTabDragStart: unknown })._pendingTabDragStart).toBeNull();
+    el.remove();
+  });
+
+  it("fires a row-style open-tab ghost for a sidebar stream drag", async () => {
+    registerLogStream("sys-a", "name-a");
+    const start = vi.fn();
+    const move = vi.fn();
+    const end = vi.fn();
+    (window as unknown as { openp41ge: unknown }).openp41ge = { drag: { start, move, end } };
+
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    const streamPending = {
+      label: "sys-a",
+      screenX: 50,
+      screenY: 60,
+      system: "sys-a",
+      winId: "logs-window",
+      offsetX: 2,
+      offsetY: 3,
+      width: 200,
+      height: 24,
+      captureRect: { x: 1, y: 1, width: 196, height: 20 },
+    };
+    (el as unknown as { _pendingStreamDragStart: unknown })._pendingStreamDragStart = streamPending;
+    (el as unknown as { _beginDrag: (s: unknown) => void })._beginDrag({
+      getDragData: () => ({ type: "open-tab" }),
+    });
+
+    document.dispatchEvent(
+      new CustomEvent("openp41ge-drag-position", {
+        detail: { screenX: 90, screenY: 120 },
+      }),
+    );
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(start.mock.calls[0][11]).toBe("open-tab"); // row-style dragType
+    expect(start.mock.calls[0][13]).toEqual(streamPending.captureRect);
+    // The open-tab payload rides so a target (or this window) can open the
+    // stream-scoped pane from the drag data.
+    expect(start.mock.calls[0][15]).toEqual({
+      appType: "log-viewer",
+      tabConfig: { system: "sys-a" },
+    });
+
+    (el as unknown as { _onDragEnd: () => void })._onDragEnd();
+    expect(end).toHaveBeenCalledTimes(1);
+    expect(
+      (el as unknown as { _pendingStreamDragStart: unknown })._pendingStreamDragStart,
+    ).toBeNull();
     el.remove();
   });
 
@@ -231,7 +489,7 @@ describe("openp41ge-logs-window", () => {
     el.remove();
   });
 
-  it("renders a + button at the end of the tab bar that opens the picker", async () => {
+  it("has no + button at the end of the tab bar (streams open from the sidebar)", async () => {
     registerLogStream("sys-a", "name-a");
     const el = make();
     document.body.appendChild(el as unknown as HTMLElement);
@@ -245,15 +503,8 @@ describe("openp41ge-logs-window", () => {
     } | null;
     await bar?.updateComplete;
 
-    const addBtn = tabBarAddButton(el);
-    expect(addBtn).toBeTruthy();
-    addBtn!.click();
-    await el.updateComplete;
-
-    const picker = (el.shadowRoot as unknown as ShadowRoot).querySelector(
-      '[data-testid="lw-picker"]',
-    );
-    expect(picker).toBeTruthy();
+    // The logs window opts out of the trailing “＋” (barShowAdd=false).
+    expect(tabBarAddButton(el)).toBeNull();
     el.remove();
   });
 
@@ -319,6 +570,270 @@ describe("openp41ge-logs-window", () => {
     expect(
       (el.shadowRoot as unknown as ShadowRoot).querySelector('[data-testid="lw-sidebar"]'),
     ).toBeNull();
+    el.remove();
+  });
+
+  it("renders a workspace-style sidebar tab bar with a ＋ button on the right edge", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (el as unknown as { _sidebarOpen: boolean })._sidebarOpen = true;
+    await el.updateComplete;
+
+    const sr = el.shadowRoot as unknown as ShadowRoot;
+    // Streams opens by default; Search does not.
+    expect(sr.querySelector('[data-testid="lw-sbtab-streams"]')).toBeTruthy();
+    expect(sr.querySelector('[data-testid="lw-sbtab-search"]')).toBeNull();
+    expect(sr.querySelector('[data-testid="lw-sbtab-streams"]')?.classList.contains("active")).toBe(
+      true,
+    );
+    // The ＋ button is pinned to the right edge of the tab bar.
+    const add = sr.querySelector<HTMLElement>('[data-testid="lw-sb-add"]');
+    expect(add).toBeTruthy();
+    expect(add!.textContent?.trim()).toBe("＋");
+    // Workspace-style tab chrome (close affordance + tab label).
+    const tab = sr.querySelector<HTMLElement>('[data-testid="lw-sbtab-streams"]');
+    expect(tab!.querySelector(".lw-sb-tab-label")?.textContent?.trim()).toBe("Streams");
+    expect(tab!.querySelector(".lw-sb-tab-close")).toBeTruthy();
+    expect(tab!.querySelector(".lw-sb-add")).toBeNull();
+    el.remove();
+  });
+
+  it("opens Streams and Search from the ＋ menu", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (el as unknown as { _sidebarOpen: boolean })._sidebarOpen = true;
+    await el.updateComplete;
+
+    // Capture the context menu the ＋ creates (it isn't registered in jsdom).
+    let captured: {
+      items?: Array<{ label: string; action?: () => void; badge?: string }>;
+    } | null = null;
+    const orig = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(
+      (tag: string, opts?: ElementCreationOptions) => {
+        const node = orig(tag, opts);
+        if (String(tag).toLowerCase() === "openp41ge-contextmenu") captured = node as never;
+        return node;
+      },
+    );
+
+    const add = (el.shadowRoot as unknown as ShadowRoot).querySelector<HTMLElement>(
+      '[data-testid="lw-sb-add"]',
+    );
+    add!.click();
+    expect(captured).toBeTruthy();
+    expect(captured!.items?.map((i) => i.label)).toEqual(["Streams", "Search"]);
+    // Streams is already open, so it carries an "open" badge; Search is not.
+    expect(captured!.items?.[0]?.badge).toBe("open");
+    expect(captured!.items?.[1]?.badge).toBe("");
+
+    // Choose Search from the menu → opens + activates it.
+    captured!.items![1]?.action?.();
+    await el.updateComplete;
+    expect(
+      (el.shadowRoot as unknown as ShadowRoot).querySelector('[data-testid="lw-sbtab-search"]'),
+    ).toBeTruthy();
+    expect(
+      (el.shadowRoot as unknown as ShadowRoot)
+        .querySelector('[data-testid="lw-sbtab-search"]')
+        ?.classList.contains("active"),
+    ).toBe(true);
+    // The side content shows the search pane.
+    expect(
+      (el.shadowRoot as unknown as ShadowRoot).querySelector('[data-testid="lw-search"]'),
+    ).toBeTruthy();
+
+    vi.restoreAllMocks();
+    el.remove();
+  });
+
+  it("closes a sidebar tab and falls back to the remaining one", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (el as unknown as { _sidebarOpen: boolean })._sidebarOpen = true;
+    await el.updateComplete;
+    (el as unknown as { _openSidebarTab: (id: string) => void })._openSidebarTab("search");
+    await el.updateComplete;
+
+    const sr = el.shadowRoot as unknown as ShadowRoot;
+    expect(sr.querySelector('[data-testid="lw-sbtab-search"]')).toBeTruthy();
+    expect(sr.querySelector('[data-testid="lw-sbtab-streams"]')).toBeTruthy();
+
+    // Close Search (active) → Streams becomes active; Search tab goes away.
+    (sr.querySelector('[data-testid="lw-sbtab-close-search"]') as HTMLElement).click();
+    await el.updateComplete;
+    expect(sr.querySelector('[data-testid="lw-sbtab-search"]')).toBeNull();
+    expect(sr.querySelector('[data-testid="lw-sbtab-streams"]')?.classList.contains("active")).toBe(
+      true,
+    );
+    el.remove();
+  });
+
+  it("renders a resize notch (drag bar) with a hover drag-line on the grid-facing edge", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (el as unknown as { _sidebarOpen: boolean })._sidebarOpen = true;
+    await el.updateComplete;
+
+    const sr = el.shadowRoot as unknown as ShadowRoot;
+    const notch = sr.querySelector<HTMLElement>(".lw-notch-v.right-notch");
+    expect(notch).toBeTruthy();
+    // The notch hosts the shared blue drag-line + its overdraw companion.
+    const line = notch!.querySelector<HTMLElement>("drag-line");
+    expect(line).toBeTruthy();
+    expect(notch!.querySelector("drag-line-overdraw")).toBeTruthy();
+    // On the grid-facing edge: for the right sidebar it sits between the grid
+    // and the sidebar (grid → notch → sidebar).
+    const gridEl = sr.querySelector<HTMLElement>(".lw-grid");
+    const sidebar = sr.querySelector<HTMLElement>('[data-testid="lw-sidebar"]');
+    expect(gridEl!.compareDocumentPosition(notch!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      notch!.compareDocumentPosition(sidebar!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // Hovering the notch lights the drag-line; leaving it hides it again.
+    expect(line!.hasAttribute("show")).toBe(false);
+    notch!.dispatchEvent(new MouseEvent("mouseenter"));
+    expect(line!.hasAttribute("show")).toBe(true);
+    notch!.dispatchEvent(new MouseEvent("mouseleave"));
+    expect(line!.hasAttribute("show")).toBe(false);
+    el.remove();
+  });
+
+  it("drags the sidebar resize notch to resize it, clamped to min/max", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (el as unknown as { _sidebarOpen: boolean })._sidebarOpen = true;
+    await el.updateComplete;
+
+    const sr = el.shadowRoot as unknown as ShadowRoot;
+    const notch = sr.querySelector<HTMLElement>(".lw-notch-v.right-notch")!;
+    const sidebar = sr.querySelector<HTMLElement>('[data-testid="lw-sidebar"]')!;
+    expect(sidebar.style.width).toBe("260px");
+
+    // Right sidebar drag: dragging left (-dx) widens it — 100 → 40 = +60px.
+    notch.dispatchEvent(new MouseEvent("mousedown", { clientX: 100 }));
+    document.dispatchEvent(new MouseEvent("mousemove", { clientX: 40 }));
+    expect(sidebar.style.width).toBe("320px");
+    // The drag-line stays lit while dragging.
+    expect(notch.querySelector("drag-line")?.hasAttribute("show")).toBe(true);
+    // Mouseup ends the drag and hides the drag-line.
+    document.dispatchEvent(new MouseEvent("mouseup"));
+    expect(sidebar.style.width).toBe("320px");
+    expect(notch.querySelector("drag-line")?.hasAttribute("show")).toBe(false);
+    expect((el as unknown as { _sidebarWidth: number })._sidebarWidth).toBe(320);
+
+    // Clamp to the maximum sidebar width.
+    notch.dispatchEvent(new MouseEvent("mousedown", { clientX: 100 }));
+    document.dispatchEvent(new MouseEvent("mousemove", { clientX: -100000 }));
+    expect(parseInt(sidebar.style.width, 10)).toBe(600);
+    document.dispatchEvent(new MouseEvent("mouseup"));
+
+    // Clamp to the minimum sidebar width.
+    notch.dispatchEvent(new MouseEvent("mousedown", { clientX: 100 }));
+    document.dispatchEvent(new MouseEvent("mousemove", { clientX: 100000 }));
+    expect(parseInt(sidebar.style.width, 10)).toBe(160);
+    document.dispatchEvent(new MouseEvent("mouseup"));
+    el.remove();
+  });
+
+  it("shows edge shadows on the sidebar tab strip while it overflows", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (el as unknown as { _sidebarOpen: boolean })._sidebarOpen = true;
+    (el as unknown as { _openSidebarTab: (id: string) => void })._openSidebarTab("search");
+    await el.updateComplete;
+
+    const sr = el.shadowRoot as unknown as ShadowRoot;
+    const scroll = sr.querySelector<HTMLElement>(".lw-sb-tabs")!;
+    const left = sr.querySelector<HTMLElement>(".lw-sb-shadow.left")!;
+    const right = sr.querySelector<HTMLElement>(".lw-sb-shadow.right")!;
+    expect(left).toBeTruthy();
+    expect(right).toBeTruthy();
+
+    // Simulate a strip that overflows to the right (no scroll yet).
+    Object.defineProperty(scroll, "scrollWidth", { value: 400, configurable: true });
+    Object.defineProperty(scroll, "clientWidth", { value: 200, configurable: true });
+    Object.defineProperty(scroll, "scrollLeft", { value: 0, configurable: true, writable: true });
+    scroll.dispatchEvent(new Event("scroll"));
+    await el.updateComplete;
+    expect(right.style.opacity).toBe("1");
+    expect(left.style.opacity).toBe("0");
+
+    // Scrolled to the right end → left shadow shows, right hides.
+    scroll.scrollLeft = 200;
+    scroll.dispatchEvent(new Event("scroll"));
+    await el.updateComplete;
+    expect(left.style.opacity).toBe("1");
+    expect(right.style.opacity).toBe("0");
+
+    // Middle → both edges overflow.
+    scroll.scrollLeft = 100;
+    scroll.dispatchEvent(new Event("scroll"));
+    await el.updateComplete;
+    expect(left.style.opacity).toBe("1");
+    expect(right.style.opacity).toBe("1");
+    el.remove();
+  });
+
+  it("scrolls the sidebar tab strip to reveal a clicked tab that is clipped", async () => {
+    registerLogStream("sys-a", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (el as unknown as { _sidebarOpen: boolean })._sidebarOpen = true;
+    (el as unknown as { _openSidebarTab: (id: string) => void })._openSidebarTab("search");
+    await el.updateComplete;
+
+    const sr = el.shadowRoot as unknown as ShadowRoot;
+    const scroll = sr.querySelector<HTMLElement>(".lw-sb-tabs")!;
+    const searchTab = sr.querySelector<HTMLElement>('[data-testid="lw-sbtab-search"]')!;
+
+    // The strip is scrolled right and the Search tab sits off the right edge.
+    Object.defineProperty(scroll, "scrollLeft", { value: 100, configurable: true, writable: true });
+    const orig = searchTab.getBoundingClientRect.bind(searchTab);
+    vi.spyOn(searchTab, "getBoundingClientRect").mockReturnValue({
+      left: 400,
+      right: 520,
+      top: 0,
+      bottom: 0,
+      width: 120,
+      height: 34,
+      x: 400,
+      y: 0,
+    } as DOMRect);
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 200,
+      top: 0,
+      bottom: 0,
+      width: 200,
+      height: 34,
+      x: 0,
+      y: 0,
+    } as DOMRect);
+    void orig;
+
+    searchTab.click();
+    await el.updateComplete;
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+
+    // scrollLeft = max(0, 400 - 0 + 100 - 8) = 492
+    expect((el as unknown as { _sidebarTab: string })._sidebarTab).toBe("search");
+    expect(scroll.scrollLeft).toBe(492);
+    vi.restoreAllMocks();
     el.remove();
   });
 });
