@@ -313,6 +313,16 @@ export class Openp41geWindowManager extends LitElement {
         },
       });
     }
+    // The trailing "+" new-tab button gets its own left separator (added via
+    // CSS) continued past both corners with the same overdraw accents, so the
+    // divider reads as bleeding off the button (like each tab's right sep).
+    const addBtn = this.shadowRoot?.querySelector<HTMLElement>(".wm-tabbar-add");
+    if (addBtn) {
+      attachTabEdgeOverdraws(addBtn, {
+        edges: ["left"],
+        edgeColors: { left: "var(--divider, #333)" },
+      });
+    }
   }
 
   /** Attach the top-corner overdraw accents to the settings footer action
@@ -2067,6 +2077,11 @@ export class Openp41geWindowManager extends LitElement {
           color: var(--text-secondary, #999);
           cursor: pointer;
           border-radius: 0;
+          /* Left separator between the trailing "+" button and the tabs, so
+             the right-pinned button reads as part of the bar (its overdraw
+             accents continue this line past both corners). */
+          border-left: 1px solid var(--divider, #333);
+          box-sizing: border-box;
           user-select: none;
           transition:
             background 0.15s,
@@ -2580,6 +2595,21 @@ export class Openp41geWindowManager extends LitElement {
         /* Application-level tab panes (Welcome / Releases placeholders). */
         .wm-tab-pane {
           padding: 16px 14px;
+        }
+        /* Releases tab: fills the body edge-to-edge so the release cards
+           scroll while the bottom bar (refresh) stays pinned to the bottom.
+           The pane itself owns the scroll + footer, so the tab pane has no
+           padding and is a full-height flex column. */
+        .wm-releases-pane {
+          height: 100%;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          box-sizing: border-box;
+        }
+        .wm-releases-pane > openp41ge-releases-pane {
+          flex: 1;
+          min-height: 0;
         }
         /* Global Settings pane: fills the body so the JSON editor goes edge-to-edge.
            The settings footer is a flex-shrink-0 row at the bottom of this pane. */
@@ -3299,7 +3329,7 @@ export class Openp41geWindowManager extends LitElement {
                     </div>
                   `
                 : this._activeTab === "releases"
-                  ? html`<div class="wm-tab-pane">
+                  ? html`<div class="wm-tab-pane wm-releases-pane">
                       <openp41ge-releases-pane></openp41ge-releases-pane>
                     </div>`
                   : this._activeTab === "settings"

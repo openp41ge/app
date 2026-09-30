@@ -5,8 +5,10 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   fetchReleases,
-  filterReleases,
-  channelShowsPrereleases,
+  fetchReleasesPage,
+  selectLatestPerChannel,
+  channelsForUpdateChannel,
+  compareTags,
   channelFromTag,
   formatReleaseDate,
   RELEASES_API,
@@ -80,21 +82,86 @@ describe("releases-service — fetchReleases", () => {
   });
 });
 
-describe("releases-service — channel filtering", () => {
-  test("latest channel hides prerelease builds", () => {
-    expect(channelShowsPrereleases("latest")).toBe(false);
-    expect(filterReleases("latest", [STABLE, ALPHA])).toEqual([STABLE]);
+describe("releases-service — channelsForUpdateChannel", () => {
+  test("latest resolves to the stable-only window", () => {
+    expect(channelsForUpdateChannel("latest")).toEqual(["stable"]);
   });
 
-  test("prerelease tracks show both stable and prerelease builds", () => {
-    for (const ch of ["alpha", "beta", "rc"]) {
-      expect(channelShowsPrereleases(ch)).toBe(true);
-      expect(filterReleases(ch, [STABLE, ALPHA])).toEqual([STABLE, ALPHA]);
-    }
+  test("prerelease channels include themselves plus every more-stable channel", () => {
+    expect(channelsForUpdateChannel("alpha")).toEqual(["alpha", "beta", "rc", "stable"]);
+    expect(channelsForUpdateChannel("beta")).toEqual(["beta", "rc", "stable"]);
+    expect(channelsForUpdateChannel("rc")).toEqual(["rc", "stable"]);
   });
 
-  test("an unknown channel behaves like a prerelease track (shows everything)", () => {
-    expect(filterReleases("nightly", [STABLE, ALPHA])).toEqual([STABLE, ALPHA]);
+  test("an unknown channel falls back to stable", () => {
+    expect(channelsForUpdateChannel("nightly")).toEqual(["stable"]);
+  });
+});
+
+describe("releases-service — selectLatestPerChannel", () => {
+  const BETA = { ...ALPHA, tag_name: "v0.1.0-beta.2", name: "v0.1.0-beta.2", published_at: "2026-09-28T00:00:00Z" };
+  const RC = { ...ALPHA, tag_name: "v0.1.0-rc.1", name: "v0.1.0-rc.1", published_at: "2026-09-29T12:00:00Z" };
+  const ALPHA_OLD = { ...ALPHA, tag_name: "v0.1.0-alpha.1", name: "v0.1.0-alpha.1" };
+
+  test("latest channel keeps only the newest stable release", () => {
+    expect(selectLatestPerChannel("latest", [STABLE, ALPHA])).toEqual([STABLE]);
+  });
+
+  test("alpha shows the latest of every included channel, newest published first", () => {
+    const result = selectLatestPerChannel("alpha", [STABLE, ALPHA, BETA, RC, ALPHA_OLD]);
+    expect(result.map((r) => r.tag_name)).toEqual([
+      "v0.1.0",
+      "v0.1.0-rc.1",
+      "v0.1.0-alpha.4",
+      "v0.1.0-beta.2",
+    ]);
+  });
+
+  test("drops historical releases older than the per-channel latest", () => {
+    const result = selectLatestPerChannel("alpha", [STABLE, ALPHA, ALPHA_OLD]);
+    expect(result.map((r) => r.tag_name)).toEqual(["v0.1.0", "v0.1.0-alpha.4"]);
+    expect(result).not.toContain(ALPHA_OLD);
+  });
+
+  test("beta window excludes alpha releases", () => {
+    const result = selectLatestPerChannel("beta", [STABLE, ALPHA, BETA]);
+    expect(result.map((r) => r.tag_name)).toEqual(["v0.1.0", "v0.1.0-beta.2"]);
+  });
+
+  test("rc window shows rc and stable only", () => {
+    const result = selectLatestPerChannel("rc", [STABLE, ALPHA, BETA, RC]);
+    expect(result.map((r) => r.tag_name)).toEqual(["v0.1.0", "v0.1.0-rc.1"]);
+  });
+});
+
+describe("releases-service — compareTags", () => {
+  test("orders by core version then prerelease number", () => {
+    expect(compareTags("v0.1.0-alpha.2", "v0.1.0-alpha.1")).toBeGreaterThan(0);
+    expect(compareTags("v0.2.0", "v0.1.0")).toBeGreaterThan(0);
+    expect(compareTags("v0.1.0", "v0.1.0")).toBe(0);
+  });
+
+  test("a stable release ranks above its same-core prerelease", () => {
+    expect(compareTags("v0.1.0", "v0.1.0-rc.1")).toBeGreaterThan(0);
+  });
+});
+
+describe("releases-service — fetchReleasesPage", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => vi.unstubAllGlobals());
+
+  test("appends the page query to the endpoint URL", async () => {
+    const mock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [STABLE] });
+    vi.stubGlobal("fetch", mock);
+    await fetchReleasesPage(3);
+    expect(mock.mock.calls[0][0]).toContain("page=3");
+  });
+
+  test("throws on a non-2xx response and returns [] for non-array payloads", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }));
+    await expect(fetchReleasesPage(1)).rejects.toThrow(/500/);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) }));
+    await expect(fetchReleasesPage(1)).resolves.toEqual([]);
   });
 });
 

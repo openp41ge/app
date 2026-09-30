@@ -6,7 +6,7 @@
  * deterministic, testable, and SOLID-compliant.
  */
 
-import { app, BrowserWindow, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, Notification } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-logger";
@@ -85,6 +85,8 @@ export class Openp41geApplication {
   // ── Private service instances ─────────────────────────────────────────
   private configService!: ConfigService;
   private autoUpdater!: AutoUpdaterService;
+  /** Avoid re-notifying about the same version during a session. */
+  private _notifiedUpdateVersion: string | null = null;
   private dispatcher!: OperationDispatcher;
   private terminalManager!: TerminalManager;
   private dragGhost!: DragGhostManager;
@@ -244,7 +246,36 @@ export class Openp41geApplication {
           // window might be closing
         }
       }
+      // Proactively tell the user a newer version exists (the startup check
+      // resolves it). This only informs — it never stages or downloads; the
+      // user still opens the Releases tab and clicks Download. Notify at most
+      // once per version per session.
+      if (
+        status.state === "update-available" &&
+        status.version &&
+        status.version !== this._notifiedUpdateVersion
+      ) {
+        this._notifiedUpdateVersion = status.version;
+        this._notifyUpdateAvailable(status.version);
+      }
     });
+  }
+
+  /** Show an OS notification that a new version is available. No-op if the
+   *  platform doesn't support notifications, or in an unpackaged build. */
+  private _notifyUpdateAvailable(version: string): void {
+    try {
+      if (typeof Notification === "undefined" || !Notification.isSupported()) return;
+      const current = this.autoUpdater.getCurrentVersion();
+      const body =
+        `Version ${version} is available` +
+        (current ? ` (you have ${current}).` : ".") +
+        " Open the Releases tab to download and update.";
+      new Notification({ title: "Update available", body }).show();
+    } catch (err) {
+      const log = createLogger("openp41ge", "main-process");
+      log.warn("update notification failed:", err);
+    }
   }
 
   // ── Step 4: Services ──────────────────────────────────────────────────

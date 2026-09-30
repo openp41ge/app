@@ -687,8 +687,12 @@ contextBridge.exposeInMainWorld("openp41ge", {
   updater: {
     /** Query the current auto-update status. */
     getStatus: () => ipcRenderer.invoke("updater:get-status"),
+    /** The installed app version (e.g. "0.1.0"). */
+    getCurrentVersion: () => ipcRenderer.invoke("updater:get-current-version"),
     /** Trigger an update check now. Returns the status after the check. */
     check: () => ipcRenderer.invoke("updater:check"),
+    /** Stage (download) the update the last check resolved. Resolves when done. */
+    download: () => ipcRenderer.invoke("updater:download"),
     /** Install the staged update and restart (only valid when an update is downloaded). */
     quitAndInstall: () => ipcRenderer.invoke("updater:quit-and-install"),
     /** Subscribe to auto-update status changes. Returns unsubscribe. */

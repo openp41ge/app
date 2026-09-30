@@ -335,8 +335,12 @@ declare global {
       updater: {
         /** Current auto-update status snapshot. */
         getStatus: () => Promise<UpdaterStatus>;
+        /** The installed app version (e.g. "0.1.0"). */
+        getCurrentVersion: () => Promise<string>;
         /** Trigger an update check now. */
         check: () => Promise<UpdaterStatus>;
+        /** Stage (download) the update the last check resolved. Resolves when done. */
+        download: () => Promise<UpdaterStatus>;
         /** Download-and-install the staged update, then restart. */
         quitAndInstall: () => Promise<void>;
         /** Subscribe to auto-update status changes. Returns unsubscribe. */
@@ -452,6 +456,7 @@ declare global {
     | { state: "checking"; channel: string }
     | { state: "update-available"; version: string }
     | { state: "update-not-available"; version: string }
+    | { state: "downloading"; version: string; progress: number; bytesPerSecond: number; transferred: number; total: number }
     | { state: "update-downloaded"; version: string }
     | { state: "error"; message: string };
 
