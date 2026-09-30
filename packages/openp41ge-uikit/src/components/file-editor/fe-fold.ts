@@ -25,6 +25,17 @@ export interface FoldContentProvider {
   indentOf(line: number): number;
   /** Whether a line is blank/whitespace-only (ignored for fold computation). */
   isBlank(line: number): boolean;
+  /**
+   * Whether a line *closes* a block (e.g. a bare `}`, `]` or `)` at the
+   * header's indent). When the next line after a block's deepest child has
+   * this shape, it is included in the fold region so a collapsed block reads as
+   * a single line (the closing bracket is swallowed into the fold) instead of
+   * leaving the closing line visible on the next line.
+   *
+   * Optional for backward compatibility — when absent, regions never absorb a
+   * closing line (the historical indentation-only behaviour).
+   */
+  isClosing?(line: number): boolean;
 }
 
 /**
@@ -71,7 +82,13 @@ export function computeFoldRegions(provider: FoldContentProvider): FoldRegion[] 
       let end = line + 1;
       while (end <= count && (blank[end] || indent[end] > headerIndent)) end++;
       // `end` now points at the first line NOT in the block (or past EOF).
-      const blockEnd = end - 1;
+      let blockEnd = end - 1;
+      // Absorb the block's closing line (a bare `}`, `]` or `)` back at the
+      // header's indent level) into the region, so a collapsed block folds to a
+      // single line instead of leaving the closing bracket on the next line.
+      if (end <= count && !blank[end] && provider.isClosing?.(end)) {
+        blockEnd = end;
+      }
       if (blockEnd > line) {
         regions.push({ startLine: line, endLine: blockEnd });
       }

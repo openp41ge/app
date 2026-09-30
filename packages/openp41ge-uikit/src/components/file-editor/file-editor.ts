@@ -86,10 +86,12 @@ import type { IFormatterRegistry } from "openp41ge-editor-engine/interfaces/form
 
 export type FileEditorState = "loading" | "ready" | "error" | "empty" | "too-large";
 
-// Width of the floating vertical OverlayScrollbar track. The custom horizontal
-// .fe-hscroll bar stops this far short of the right edge so the two bars never
-// overlap in the bottom-right corner.
+// Width of the floating vertical OverlayScrollbar track (also its hover size).
 const VERTICAL_SCROLLBAR_WIDTH = 10;
+// Height of the custom horizontal .fe-hscroll bar. While the bar can appear the
+// content gets this much bottom padding, so the bottom-most line never sits
+// under the bar when the user scrolls to the end of the file.
+const HSCROLL_HEIGHT = 10;
 // Delay before the custom horizontal bar fades out after the cursor leaves.
 const HSCROLL_AUTO_HIDE_DELAY = 2500;
 
@@ -520,6 +522,10 @@ export class FileEditorElement extends LitElement {
       lineCount: model.lineCount,
       indentOf: (l) => this._indentOf(l),
       isBlank: (l) => /^\s*$/.test(model.getLineContent(l)),
+      // A line that is just a closing bracket (optionally followed by a
+      // comma/semicolon) closes the block, so it gets absorbed into the fold
+      // region — a collapsed block then reads as one line.
+      isClosing: (l) => /^[}\])]\s*[,;]?\s*$/.test(model.getLineContent(l).trim()),
     });
     // Drop collapsed headers whose fold vanished after a content change.
     const stillFoldable = new Set(this._foldRegions.map((r) => r.startLine));
@@ -691,6 +697,13 @@ export class FileEditorElement extends LitElement {
     const total = vp.scrollWidth;
     const view = vp.clientWidth;
     const overflowing = !this._wordWrapEnabled && total > view;
+    // While the horizontal bar can appear, reserve space below the last line so
+    // it is never covered when the user scrolls to the end of the file. This is
+    // cleared as soon as the content stops overflowing horizontally.
+    const pad = overflowing ? `${HSCROLL_HEIGHT}px` : "";
+    if (this._scrollContentEl.style.paddingBottom !== pad) {
+      this._scrollContentEl.style.paddingBottom = pad;
+    }
     if (!overflowing) {
       if (track.style.display !== "none") track.style.display = "none";
       return;
@@ -698,14 +711,11 @@ export class FileEditorElement extends LitElement {
     if (track.style.display !== "") track.style.display = "";
     // Activity (scroll / layout) keeps the bar visible then re-arms the fade.
     this._hScrollPoke();
-    const left = this._gutterGroupEl ? this._gutterGroupEl.offsetWidth : 0;
-    if (track.style.left !== `${left}px`) track.style.left = `${left}px`;
-    // Only stop short of the right edge when the vertical scrollbar is present.
-    // If the content fits vertically (no vertical bar), the horizontal bar can
-    // span the full content width instead of leaving a 10px dead zone.
-    const verticalVisible = vp.scrollHeight > vp.clientHeight;
-    const right = verticalVisible ? `${VERTICAL_SCROLLBAR_WIDTH}px` : "0";
-    if (track.style.right !== right) track.style.right = right;
+    // The track spans the full editor width: it runs under the pinned
+    // line-number gutter and the floating vertical bar (the horizontal bar is
+    // the topmost layer at the bottom-right corner).
+    if (track.style.left !== "0px") track.style.left = "0px";
+    if (track.style.right !== "0px") track.style.right = "0px";
     const trackW = track.clientWidth;
     if (trackW <= 0) return;
     const range = Math.max(1, total - view);
@@ -936,8 +946,8 @@ export class FileEditorElement extends LitElement {
       }
       /* The NATIVE horizontal scrollbar spans the whole row — starting UNDER
          the pinned line-number columns. It is hidden; a custom .fe-hscroll bar
-         confined to the content area (right of the columns) replaces it. The
-         vertical bar stays native. */
+         that spans the full editor width (under the columns and the floating
+         vertical bar) replaces it. The vertical bar stays native. */
       .fe-viewport::-webkit-scrollbar:horizontal {
         height: 0;
       }
@@ -961,6 +971,12 @@ export class FileEditorElement extends LitElement {
       }
       .fe-hscroll-thumb:hover {
         background: ${isLight ? "#b0b0b0" : "#555"};
+      }
+      /* Folded (collapsed) header suffix — the grey “{ … }” summary appended to
+         a collapsed block so its opening/closing brackets read as inline
+         metadata (rather than source text), matching the JSON editor. */
+      .fe-fold-ellipsis {
+        color: var(--fe-secondary-color, #888);
       }
       /* Status bar theme support */
       fe-status-bar {
@@ -1194,18 +1210,19 @@ export class FileEditorElement extends LitElement {
       "position:relative;flex:1 1 auto;min-width:0;overflow:hidden;";
     this._scrollContentEl.appendChild(this._textRegionEl);
 
-    // Custom horizontal scrollbar — confined to the CONTENT area so its track
-    // does NOT start underneath the pinned line-number columns. It is NOT a
-    // child of the scroll container (the viewport scrolls, so an absolutely-
-    // positioned child there would slide with the content). Instead it lives in
-    // the non-scrolling .fe-viewport-container (position:relative) and stays
-    // pinned to the viewport's bottom edge while the content scrolls. It maps
-    // 1:1 onto the native scrollLeft/scrollWidth/clientWidth held by the
-    // viewport, so trackpad / Shift+wheel still scroll (the native horizontal
-    // bar is hidden in CSS).
+    // Custom horizontal scrollbar — spans the FULL editor width (it runs under
+    // the pinned line-number columns and the floating vertical bar; the bar is
+    // the topmost layer at the bottom-right corner). It is NOT a child of the
+    // scroll container (the viewport scrolls, so an absolutely-positioned child
+    // there would slide with the content). Instead it lives in the
+    // non-scrolling .fe-viewport-container (position:relative) and stays pinned
+    // to the viewport's bottom edge while the content scrolls. It maps 1:1 onto
+    // the native scrollLeft/scrollWidth/clientWidth held by the viewport, so
+    // trackpad / Shift+wheel still scroll (the native horizontal bar is hidden
+    // in CSS).
     this._hScrollTrack = document.createElement("div");
     this._hScrollTrack.className = "fe-hscroll";
-    this._hScrollTrack.style.cssText = `position:absolute;left:0;right:${VERTICAL_SCROLLBAR_WIDTH}px;bottom:0;height:10px;z-index:8;display:none;user-select:none;`;
+    this._hScrollTrack.style.cssText = `position:absolute;left:0;right:0;bottom:0;height:${HSCROLL_HEIGHT}px;z-index:8;display:none;user-select:none;`;
     this._hScrollThumb = document.createElement("div");
     this._hScrollThumb.className = "fe-hscroll-thumb";
     // Square corners (match the native bar). No border-radius.
@@ -1975,7 +1992,148 @@ export class FileEditorElement extends LitElement {
     // draw as plain text and are highlighted by the async catch-up pass.
     const tokens = this._viewModel.getLineTokensIfCached(lineNumber);
     this._noteRenderedLineTokens(tokens);
-    viewLine.setContent(content, tokens, this._viewModel.tabSize, this._bracketDepths);
+    // For a collapsed bracket block, drop the block's opening bracket from the
+    // rendered content so the grey `{ … }` summary can present it together with
+    // the block metadata (matching the JSON editor's collapsed-row treatment).
+    const foldInfo = this._foldSummaryAt(lineNumber);
+    viewLine.setContent(
+      foldInfo ? foldInfo.prefix : content,
+      tokens,
+      this._viewModel.tabSize,
+      this._bracketDepths,
+    );
+    this._applyFoldSuffix(lineNumber, viewLine, foldInfo);
+  }
+
+  /**
+   * Render (or clear) the inline grey fold-summary suffix on a collapsed
+   * block's header line. The line DOM is recreated on every visible-range
+   * rebuild, so this both appends and removes the span defensively.
+   */
+  private _applyFoldSuffix(
+    lineNumber: number,
+    viewLine: any,
+    foldInfo: { prefix: string; meta: string } | null,
+  ): void {
+    void lineNumber;
+    const el = viewLine.domNode.element as HTMLElement;
+    let span = el.querySelector<HTMLSpanElement>(":scope > .fe-fold-ellipsis");
+    if (foldInfo) {
+      if (!span) {
+        span = document.createElement("span");
+        span.className = "fe-fold-ellipsis";
+        el.appendChild(span);
+      }
+      span.textContent = foldInfo.meta;
+    } else if (span) {
+      span.remove();
+    }
+  }
+
+  /**
+   * The inline fold summary for a collapsed header line, or null when the line
+   * is not a collapsed fold. Returns the content `prefix` to render (the block
+   * header without its opening bracket, so the grey suffix can re-present it)
+   * and the grey `meta` suffix (the collapsed object's size/type summary in
+   * place of the previous bare ellipsis).
+   */
+  private _foldSummaryAt(line: number): { prefix: string; meta: string } | null {
+    if (!this._foldEnabled || !this._collapsedHeaders.has(line) || !this._viewModel) return null;
+    const region = this._foldRegionAt(line);
+    if (!region) return null;
+    const content = this._viewModel.getLineContent(line);
+    const closing = this._viewModel.getLineContent(region.endLine).trim();
+    const isObject = closing.startsWith("}");
+    const isArray = closing.startsWith("]");
+    const hidden = region.endLine - region.startLine;
+    const fallbackMeta = ` \u2026 ${hidden} line${hidden === 1 ? "" : "s"}`;
+    // Bracket block (object or array): re-present the opening bracket, the
+    // size/type summary, and the closing bracket all in the grey suffix.
+    if (isObject || isArray) {
+      const openCh = isObject ? "{" : "[";
+      // The block-opening bracket is the last one on the header (e.g. `{` in
+      // `"build": {`), which is also the one the fold region closes.
+      const idx = content.lastIndexOf(openCh);
+      if (idx >= 0) {
+        const summary = this._summarizeBlock(region, isObject);
+        if (summary) {
+          return {
+            prefix: content.slice(0, idx),
+            meta: `${openCh} ${summary} ${closing[0]}${closing.slice(1)}`,
+          };
+        }
+      }
+    }
+    // Non-bracket (indent-only) fold, or a header we couldn't parse: show the
+    // hidden line span as the metadata.
+    return { prefix: content, meta: fallbackMeta };
+  }
+
+  /**
+   * A JSON-editor-style summary of a collapsed block: the number of direct
+   * properties/items plus a breakdown of their value types ("2 properties ·
+   * 1 object"). Returns null when the block has no direct children (falls back
+   * to a line count elsewhere).
+   */
+  private _summarizeBlock(region: FoldRegion, isObject: boolean): string | null {
+    if (!this._viewModel) return null;
+    const bodyStart = region.startLine + 1;
+    const bodyEnd = region.endLine - 1;
+    // Direct children sit at the block's child indent (the minimum indentation
+    // among the non-blank body lines), minus the dedent closers.
+    let childIndent = Infinity;
+    const entries: { text: string; indent: number }[] = [];
+    for (let l = bodyStart; l <= bodyEnd; l++) {
+      const text = this._viewModel.getLineContent(l);
+      if (/^\s*$/.test(text)) continue;
+      const ind = this._indentOf(l);
+      entries.push({ text, indent: ind });
+      if (ind < childIndent) childIndent = ind;
+    }
+    if (!Number.isFinite(childIndent)) return null;
+    const children = entries.filter(
+      (e) => e.indent === childIndent && !/^[}\])]/.test(e.text.trim()),
+    );
+    if (children.length === 0) return null;
+    const counts: Record<string, number> = {
+      string: 0,
+      number: 0,
+      boolean: 0,
+      object: 0,
+      array: 0,
+      null: 0,
+    };
+    for (const c of children) {
+      const t = this._classifyEntry(c.text, isObject);
+      if (t in counts) counts[t]++;
+    }
+    const parts: string[] = [];
+    if (isObject) {
+      parts.push(`${children.length} propert${children.length === 1 ? "y" : "ies"}`);
+    } else {
+      parts.push(`${children.length} item${children.length === 1 ? "" : "s"}`);
+    }
+    for (const k of ["string", "number", "boolean", "object", "array", "null"]) {
+      if (counts[k]) parts.push(`${counts[k]} ${k}${counts[k] === 1 ? "" : "s"}`);
+    }
+    return parts.join(" \u00b7 ");
+  }
+
+  /** Roughly classify a single entry's value type for the fold summary. */
+  private _classifyEntry(text: string, isObject: boolean): string {
+    let value = text.trim().replace(/[,;]$/, "");
+    if (isObject) {
+      const colon = value.indexOf(":");
+      if (colon < 0) return "other";
+      value = value.slice(colon + 1).trim();
+    }
+    if (value.startsWith('"') || value.startsWith("'")) return "string";
+    if (value.startsWith("{")) return "object";
+    if (value.startsWith("[")) return "array";
+    if (value === "true" || value === "false") return "boolean";
+    if (value === "null") return "null";
+    if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(value)) return "number";
+    return "other";
   }
 
   /**

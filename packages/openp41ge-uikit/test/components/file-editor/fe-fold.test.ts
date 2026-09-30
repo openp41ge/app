@@ -21,6 +21,9 @@ function providerOf(lines: string[]) {
     isBlank(line: number) {
       return /^\s*$/.test(lines[line - 1] ?? "");
     },
+    isClosing(line: number) {
+      return /^[}\])]\s*[,;]?\s*$/.test((lines[line - 1] ?? "").trim());
+    },
   };
 }
 
@@ -31,7 +34,8 @@ describe("computeFoldRegions", () => {
 
   test("a single nested block yields one region", () => {
     const regions = computeFoldRegions(providerOf(["const x = {", "  a: 1,", "  b: 2", "};"]));
-    expect(regions).toEqual([{ startLine: 1, endLine: 3 }]);
+    // The closing `};` is absorbed, so a collapsed block reads as one line.
+    expect(regions).toEqual([{ startLine: 1, endLine: 4 }]);
   });
 
   test("nested blocks produce nested (smaller) regions after the header", () => {
@@ -63,10 +67,33 @@ describe("computeFoldRegions", () => {
     const regions = computeFoldRegions(
       providerOf(["function f() {", "  if (x) {", "    return 1;", "  }", "  return 2;", "}"]),
     );
-    // function header folds [2,5] (the whole body); the inner if folds [3,3].
+    // function header folds [2,6] (the whole body incl. its closing brace);
+    // the inner if folds [3,4] (its own closing brace absorbed).
     expect(regions).toEqual([
-      { startLine: 1, endLine: 5 },
-      { startLine: 2, endLine: 3 },
+      { startLine: 1, endLine: 6 },
+      { startLine: 2, endLine: 4 },
+    ]);
+  });
+
+  test("a closing line is absorbed even when its indent equals the header's", () => {
+    const regions = computeFoldRegions(
+      providerOf(['"a": {', '    "b": 1', "  }", '"c": [', "    2", "  ]"]),
+    );
+    // Object [1,3] and array [4,6], each absorbing its closing bracket.
+    expect(regions).toEqual([
+      { startLine: 1, endLine: 3 },
+      { startLine: 4, endLine: 6 },
+    ]);
+  });
+
+  test("a non-closing dedent (a sibling) is NOT absorbed", () => {
+    // `def bar` is a sibling at the header's indent, not a closing bracket.
+    const regions = computeFoldRegions(
+      providerOf(["def foo():", "    print(1)", "def bar():", "    print(2)"]),
+    );
+    expect(regions).toEqual([
+      { startLine: 1, endLine: 2 },
+      { startLine: 3, endLine: 4 },
     ]);
   });
 

@@ -17,6 +17,7 @@ import { LitElement, html, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { tooltipContent } from "../tooltip";
+import { attachTopCornerOverdraws } from "../overdraw-line";
 
 // Compact inline glyphs for the find toggles — kept as text so they read
 // clearly at 11px (same intent as the Git sidebar's regex/match-case icons).
@@ -54,6 +55,25 @@ class FeStatusBar extends LitElement {
   protected update(changedProperties: Map<string | number | symbol, unknown>): void {
     if (!this.isConnected) return;
     super.update(changedProperties);
+  }
+
+  /** Attach the top-corner overdraw accents to the bottom-bar action buttons.
+   *  Runs after every render so a format button or a custom button added at
+   *  runtime lands with its overdraws too. Idempotent (guarded internally).
+   *
+   *  The editor's sticky gutter (the line-number / fold column) paints at
+   *  `z-index: 6` OVER the status bar, so the buttons' vertical overdraws
+   *  would be clipped/hidden where they rise into the gutter (e.g. the
+   *  separator line between the file size and the find button). Raise the
+   *  accents above the gutter so the separator overdraws stay visible. */
+  protected updated(changedProperties: Map<string | number | symbol, unknown>): void {
+    super.updated(changedProperties);
+    this.querySelectorAll<HTMLElement>(".p41ge-icon-btn").forEach((btn) => {
+      attachTopCornerOverdraws(btn);
+      btn
+        .querySelectorAll<HTMLElement>(":scope > overdraw-line")
+        .forEach((line) => (line.style.zIndex = "20"));
+    });
   }
 
   // Reactive internal state — updated by public API methods

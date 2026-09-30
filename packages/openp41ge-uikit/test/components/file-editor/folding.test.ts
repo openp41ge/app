@@ -31,6 +31,32 @@ async function mount() {
   return el;
 }
 
+async function mountJson() {
+  const el = document.createElement("file-editor");
+  el.filePath = "/repo/app.json";
+  el.fileName = "app.json";
+  document.body.appendChild(el);
+  await new Promise((r) => setTimeout(r, 30));
+  const text = [
+    "{", //                        1 root
+    '  "a": {', //                  2 object header
+    '    "x": 1,', //               3
+    '    "y": "hello"', //          4
+    "  },", //                      5
+    '  "deps": [', //               6 array header
+    '    "vue",', //                7
+    '    "react"', //               8
+    "  ],", //                      9
+    '  "c": "z"', //               10
+    "}", //                        11
+  ].join("\n");
+  const model = new PieceTreeTextContentModel("file:///app.json", text);
+  el.textContentModel = model;
+  await el.loadFile("file:///app.json", "app.json");
+  await new Promise((r) => setTimeout(r, 35));
+  return el;
+}
+
 describe("file-editor folding", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
@@ -42,10 +68,11 @@ describe("file-editor folding", () => {
     await new Promise((r) => setTimeout(r, 20));
 
     expect(el._foldEnabled).toBe(true);
-    // Header at line 1 wraps its child block lines 2..5.
+    // Header at line 1 wraps its whole body (incl. the closing brace) 2..6;
+    // the nested if folds its own body 3..4.
     expect(el._foldRegions).toEqual([
-      { startLine: 1, endLine: 5 },
-      { startLine: 2, endLine: 3 },
+      { startLine: 1, endLine: 6 },
+      { startLine: 2, endLine: 4 },
     ]);
     // Chevron data is present only on fold headers.
     expect(el._gutterDataFor(1).hasChevron).toBe(true);
@@ -60,15 +87,15 @@ describe("file-editor folding", () => {
     el._toggleFoldAt(1);
     await new Promise((r) => setTimeout(r, 20));
 
-    // Header stays visible; body lines 2..5 are hidden; siblings stay.
+    // Header stays visible; body lines 2..6 (incl. the closing `}`) are hidden;
+    // the sibling stays.
     expect(el.isLineFolded(1)).toBe(false);
-    for (const hidden of [2, 3, 4, 5]) expect(el.isLineFolded(hidden)).toBe(true);
-    expect(el.isLineFolded(6)).toBe(false);
+    for (const hidden of [2, 3, 4, 5, 6]) expect(el.isLineFolded(hidden)).toBe(true);
     expect(el.isLineFolded(7)).toBe(false);
 
     // The gutter band skips the hidden lines.
     const keys = el._gutterRows(1, 7).map((r) => r.key);
-    expect(keys).toEqual([1, 6, 7]);
+    expect(keys).toEqual([1, 7]);
 
     // The chevron flips to the collapsed state.
     expect(el._gutterDataFor(1).folded).toBe(true);
@@ -97,8 +124,74 @@ describe("file-editor folding", () => {
 
     expect(el.isLineFolded(2)).toBe(false);
     expect(el.isLineFolded(3)).toBe(true);
-    expect(el.isLineFolded(4)).toBe(false);
-    expect(el._gutterRows(1, 7).map((r) => r.key)).toEqual([1, 2, 4, 5, 6, 7]);
+    expect(el.isLineFolded(4)).toBe(true);
+    expect(el.isLineFolded(5)).toBe(false);
+    expect(el._gutterRows(1, 7).map((r) => r.key)).toEqual([1, 2, 5, 6, 7]);
+  });
+
+  test("collapsing an object header greys the bracket and injects a type summary", async () => {
+    const el = await mountJson();
+    el._enableFolds();
+    el._toggleFoldAt(2); // collapse the "a" object
+    await new Promise((r) => setTimeout(r, 20));
+
+    // The header renders the key prefix and ONE grey suffix (brackets + meta)
+    // — no doubled opening brace.
+    const info = el._foldSummaryAt(2);
+    expect(info).toEqual({
+      prefix: '  "a": ',
+      meta: "{ 2 properties \u00b7 1 string \u00b7 1 number },",
+    });
+    // The closing brace line is folded away (absorbed into the region).
+    expect(el.isLineFolded(5)).toBe(true);
+  });
+
+  test("collapsing an array header greys the bracket and shows an item summary", async () => {
+    const el = await mountJson();
+    el._enableFolds();
+    el._toggleFoldAt(6); // collapse the "deps" array
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(el._foldSummaryAt(6)).toEqual({
+      prefix: '  "deps": ',
+      meta: "[ 2 items \u00b7 2 strings ],",
+    });
+    expect(el.isLineFolded(9)).toBe(true);
+  });
+
+  test("collapsing a top-level object summary is shown on the rendered row", async () => {
+    const el = await mountJson();
+    el._enableFolds();
+    el._toggleFoldAt(2);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const header = [...el.querySelectorAll(".view-line")].find((l) =>
+      l.querySelector(":scope > .fe-fold-ellipsis"),
+    );
+    expect(header).toBeTruthy();
+    expect(header!.textContent).toContain("{ 2 properties \u00b7 1 string \u00b7 1 number }");
+    // Exactly one `{` in the rendered header: the grey suffix's, not a doubled
+    // opening bracket from the original content.
+    expect(header!.textContent.split("{").length - 1).toBe(1);
+  });
+
+  test("a non-bracket (indent-only) fold falls back to a line-count summary", async () => {
+    const el = document.createElement("file-editor");
+    el.filePath = "/repo/app.py";
+    el.fileName = "app.py";
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 30));
+    const py = ["def foo():", "    print(1)", "    print(2)"].join("\n");
+    const model = new PieceTreeTextContentModel("file:///app.py", py);
+    el.textContentModel = model;
+    await el.loadFile("file:///app.py", "app.py");
+    await new Promise((r) => setTimeout(r, 35));
+    el._enableFolds();
+    el._toggleFoldAt(1);
+    await new Promise((r) => setTimeout(r, 20));
+
+    // No braces → no bracket summary; report the hidden line span instead.
+    expect(el._foldSummaryAt(1)).toEqual({ prefix: "def foo():", meta: " \u2026 2 lines" });
   });
 
   test("content edits that remove a fold collapse prune the dead header", async () => {
