@@ -50,12 +50,11 @@ import {
   type TargetResolver,
   type IDropTarget,
   type IDragSource,
-  type DragSourceData,
-  type DragResult,
   type TargetFeedback,
   type GhostPreview,
 } from "openp41ge-uikit";
 import { LogFilePageReader } from "../services/log-file-page-reader";
+import { LogStreamDragSource } from "../services/drag-sources/log-stream-drag-source";
 import {
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
@@ -150,54 +149,6 @@ interface PendingStreamDragStart {
   width: number;
   height: number;
   captureRect: { x: number; y: number; width: number; height: number };
-}
-
-/**
- * Drag source for a sidebar stream row. Mirrors the workspace's
- * `LogStreamDragSource`: an `open-tab` payload so a drop (cell or column
- * boundary) on the <tab-grid> fires a `grid-open-tab` event, which this host
- * turns into a PINNED stream tab. The in-DOM ghost is invisible — the drop
- * highlight on the grid is the actual feedback.
- */
-class StreamDragSource implements IDragSource {
-  readonly type = "open-tab";
-
-  private _system: string;
-  private _title: string;
-  private _ghost: HTMLElement | null = null;
-
-  constructor(system: string, title?: string) {
-    this._system = system;
-    this._title = title || system;
-  }
-
-  getDragData(): DragSourceData {
-    return {
-      type: "open-tab",
-      appType: "log-viewer",
-      title: this._title,
-      tabConfig: { system: this._system },
-    };
-  }
-
-  createGhost(): HTMLElement {
-    const ghost = document.createElement("div");
-    ghost.style.cssText =
-      "position:fixed;pointer-events:none;opacity:0;width:1px;height:1px;z-index:-1;";
-    this._ghost = ghost;
-    return ghost;
-  }
-
-  onDragStart(): void {
-    // The row stays at full opacity — the grid's drop highlight is the feedback.
-  }
-
-  onDragEnd(_result: DragResult): void {
-    if (this._ghost && this._ghost.parentNode) {
-      this._ghost.parentNode.removeChild(this._ghost);
-    }
-    this._ghost = null;
-  }
 }
 
 @customElement("openp41ge-logs-window")
@@ -1190,7 +1141,7 @@ export class Openp41geLogsWindow extends LitElement {
     const system = row.getAttribute("data-system") || "";
     if (!system || !this._orchestrator) return;
     e.preventDefault();
-    const source = new StreamDragSource(system);
+    const source = new LogStreamDragSource(system);
 
     // Defer `drag:start` until the first POSITION event (threshold met) so the
     // main process captures a pixel-accurate bitmap of the sidebar row (like the
