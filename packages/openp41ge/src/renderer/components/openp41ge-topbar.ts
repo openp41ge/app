@@ -44,7 +44,7 @@ class Openp41geTopBar extends LitElement {
         <div
           class="flex-1 min-w-0 px-3 text-sm text-muted whitespace-nowrap overflow-hidden text-ellipsis"
         >
-          Openp41ge
+          openp41ge
         </div>
 
         ${

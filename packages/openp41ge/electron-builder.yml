@@ -1,4 +1,4 @@
-# electron-builder config for OpenP41ge (macOS).
+# electron-builder config for openp41ge (macOS).
 # Built + signed + notarized + stapled in CI (.github/workflows/release.yml).
 #
 # Signing identity is discovered from the keychain (imported by
@@ -6,8 +6,8 @@
 # the environment: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID.
 
 appId: com.openp41ge.app
-productName: OpenP41ge
-copyright: Copyright © OpenP41ge
+productName: openp41ge
+copyright: Copyright © openp41ge
 artifactName: ${productName}-${version}-${arch}.${ext}
 
 # Keep electron-builder output out of vite's `dist` (renderer) directory.

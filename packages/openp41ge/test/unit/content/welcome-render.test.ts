@@ -18,7 +18,7 @@ describe("welcome", () => {
   });
   it("welcomePages renders the intro page", () => {
     expect(welcomePages).toHaveLength(1);
-    expect(welcomePages[0]).toContain("<h1>Welcome to OpenP41ge</h1>");
+    expect(welcomePages[0]).toContain("<h1>Welcome to openp41ge</h1>");
   });
   it("merges wrapped source lines into one paragraph", () => {
     const html = renderMarkdown("A line that\ncontinues here\nand ends here.");
@@ -35,9 +35,9 @@ describe("welcome", () => {
     );
   });
   it("renders blockquote info notes", () => {
-    const html = renderMarkdown("> You can reach this any time.\n> From the **OpenP41ge** menu.");
+    const html = renderMarkdown("> You can reach this any time.\n> From the **openp41ge** menu.");
     expect(html).toContain(
-      '<blockquote class="wm-md-quote">You can reach this any time. From the <strong>OpenP41ge</strong> menu.</blockquote>',
+      '<blockquote class="wm-md-quote">You can reach this any time. From the <strong>openp41ge</strong> menu.</blockquote>',
     );
   });
   it("renders a workspace-window container with a demo and its explanation beside it", () => {

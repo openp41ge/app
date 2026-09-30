@@ -35,7 +35,7 @@ export function registerDialogHandlers(openp41geDir: string): void {
   ipcMain.handle("dialog:openWorkspaceFile", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openFile"],
-      filters: [{ name: "Openp41ge Workspace", extensions: [WORKSPACE_EXT] }],
+      filters: [{ name: "openp41ge Workspace", extensions: [WORKSPACE_EXT] }],
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     const filePath = result.filePaths[0];
@@ -55,7 +55,7 @@ export function registerDialogHandlers(openp41geDir: string): void {
     async (_event, data: WorkspaceFileData, defaultPath?: string) => {
       const result = await dialog.showSaveDialog({
         defaultPath: defaultPath ?? path.join(openp41geDir, "workspaces"),
-        filters: [{ name: "Openp41ge Workspace", extensions: [WORKSPACE_EXT] }],
+        filters: [{ name: "openp41ge Workspace", extensions: [WORKSPACE_EXT] }],
       });
       if (result.canceled || !result.filePath) return null;
       const filePath = result.filePath;

@@ -193,7 +193,7 @@ export function createOpenp41geWindow(
     // fullscreenable, so remove the native window chrome and render custom
     // close/minimize controls (no fullscreen/green button) in the renderer.
     ...(isWindowManager ? { maxWidth: 600, frame: false, fullscreenable: false } : {}),
-    title: "OpenP41ge",
+    title: "openp41ge",
     ...(!isWindowManager ? { titleBarStyle: "hiddenInset" } : {}),
     // Match the app's dark surface so the areas exposed while the window
     // grows (native maximize animation, resize) never flash white.
@@ -501,8 +501,8 @@ export async function promptQuit(parentWindow?: BrowserWindow): Promise<void> {
   }
   if (parentWindow) {
     const confirmed = await showConfirmViaIPC(parentWindow, {
-      title: "Quit OpenP41ge?",
-      message: "Are you sure you want to quit Openp41ge? All panes will be closed.",
+      title: "Quit openp41ge?",
+      message: "Are you sure you want to quit openp41ge? All panes will be closed.",
       confirmLabel: "Quit",
     });
     if (confirmed) app.quit();
@@ -512,7 +512,7 @@ export async function promptQuit(parentWindow?: BrowserWindow): Promise<void> {
       buttons: ["Quit", "Cancel"],
       defaultId: 0,
       cancelId: 1,
-      message: "Are you sure you want to quit Openp41ge?",
+      message: "Are you sure you want to quit openp41ge?",
     });
     if (result === 0) app.quit();
   }
