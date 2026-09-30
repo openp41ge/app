@@ -528,26 +528,15 @@ export class Openp41geApplication {
         submenu: [
           { role: "about" },
           { type: "separator" },
-          // The compact Window Manager doubles as an app-level Settings window,
-          // so Workspaces and Settings both open it with the matching tab.
+          // The compact Window Manager doubles as an app-level Management hub
+          // (workspaces, releases, global settings), so one item opens it.
           {
-            label: "Workspaces",
-            click: () =>
-              openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "workspaces"),
-          },
-          {
-            label: "Releases",
-            click: () =>
-              openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "releases"),
-          },
-          {
-            label: "Settings…",
+            label: "Management",
             accelerator: "CmdOrCtrl+,",
-            click: () =>
-              openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined, "settings"),
+            click: () => openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined),
           },
           {
-            label: "Logs…",
+            label: "Logs",
             accelerator: "CmdOrCtrl+Shift+L",
             click: () => openLogsWindow(BrowserWindow.getFocusedWindow() ?? undefined),
           },
