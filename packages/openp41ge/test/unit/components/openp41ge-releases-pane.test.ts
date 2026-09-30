@@ -78,7 +78,7 @@ function makeDeps(
     },
     quitAndInstall: opts.quitAndInstall ?? (() => {}),
     confirmRestart: opts.confirmRestart ?? (async () => true),
-    loadCache: opts.cache === undefined ? (() => null) : (() => opts.cache ?? null),
+    loadCache: opts.cache === undefined ? () => null : () => opts.cache ?? null,
     saveCache: () => {},
   };
   return {
@@ -184,7 +184,14 @@ describe("openp41ge-releases-pane", () => {
       releases: [STABLE, ALPHA],
       download: async () => {
         downloaded = true;
-        return { state: "downloading", version: "0.1.0-alpha.4", progress: 0, bytesPerSecond: 0, transferred: 0, total: 0 };
+        return {
+          state: "downloading",
+          version: "0.1.0-alpha.4",
+          progress: 0,
+          bytesPerSecond: 0,
+          transferred: 0,
+          total: 0,
+        };
       },
     });
     const el = await mount(deps);
@@ -196,7 +203,14 @@ describe("openp41ge-releases-pane", () => {
   test("shows download progress then a restart prompt on the downloaded row", async () => {
     const { deps, emitStatus } = makeDeps({ initialChannel: "alpha", releases: [STABLE, ALPHA] });
     const el = await mount(deps);
-    emitStatus({ state: "downloading", version: "0.1.0-alpha.4", progress: 42, bytesPerSecond: 1000, transferred: 1000, total: 2400 });
+    emitStatus({
+      state: "downloading",
+      version: "0.1.0-alpha.4",
+      progress: 42,
+      bytesPerSecond: 1000,
+      transferred: 1000,
+      total: 2400,
+    });
     await el.updateComplete;
     expect(el.shadowRoot!.textContent).toContain("42%");
     emitStatus({ state: "update-downloaded", version: "0.1.0-alpha.4" });
@@ -235,7 +249,9 @@ describe("openp41ge-releases-pane", () => {
     });
     const el = await mount(deps);
     // Open the drawer for the alpha channel specifically.
-    (el.shadowRoot!.querySelector('.rp-btn--history[data-channel="alpha"]') as HTMLButtonElement).click();
+    (
+      el.shadowRoot!.querySelector('.rp-btn--history[data-channel="alpha"]') as HTMLButtonElement
+    ).click();
     await el.updateComplete;
     expect(el.shadowRoot!.textContent).toContain("Alpha history");
     // The drawer starts with the channel releases already in the cached list.

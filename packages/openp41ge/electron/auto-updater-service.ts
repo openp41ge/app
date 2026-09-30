@@ -47,7 +47,14 @@ export type UpdaterStatus =
   | { state: "checking"; channel: string }
   | { state: "update-available"; version: string }
   | { state: "update-not-available"; version: string }
-  | { state: "downloading"; version: string; progress: number; bytesPerSecond: number; transferred: number; total: number }
+  | {
+      state: "downloading";
+      version: string;
+      progress: number;
+      bytesPerSecond: number;
+      transferred: number;
+      total: number;
+    }
   | { state: "update-downloaded"; version: string }
   | { state: "error"; message: string };
 
@@ -254,7 +261,12 @@ export class AutoUpdaterService {
     updater.on("download-progress", (info) => {
       const p =
         info && typeof info === "object"
-          ? (info as { percent?: number; bytesPerSecond?: number; transferred?: number; total?: number })
+          ? (info as {
+              percent?: number;
+              bytesPerSecond?: number;
+              transferred?: number;
+              total?: number;
+            })
           : {};
       this._setStatus({
         state: "downloading",

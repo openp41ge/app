@@ -33,10 +33,7 @@
  */
 import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import {
-  attachTabEdgeOverdraws,
-  attachTopCornerOverdraws,
-} from "openp41ge-uikit/overdraw-line";
+import { attachTabEdgeOverdraws, attachTopCornerOverdraws } from "openp41ge-uikit/overdraw-line";
 import { appServices } from "../app";
 import { showConfirmModal } from "./openp41ge-confirm-modal";
 import {
@@ -50,7 +47,6 @@ import {
   type ReleaseChannel,
 } from "../services/releases-service";
 // `UpdaterStatus` is a global ambient type from global.d.ts.
-
 
 /** Injectable seams used by the pane. Tests replace these via the static. */
 export interface ReleasesPaneDeps {
@@ -243,9 +239,9 @@ export class Openp41geReleasesPane extends LitElement {
       const seen = new Set(this._drawerReleases.map((r) => r.tag_name));
       this._drawerReleases = [
         ...this._drawerReleases,
-        ...sameChannel.filter((r) => !seen.has(r.tag_name)).sort((a, b) =>
-          (b.published_at ?? "").localeCompare(a.published_at ?? ""),
-        ),
+        ...sameChannel
+          .filter((r) => !seen.has(r.tag_name))
+          .sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? "")),
       ];
       this._drawerPage = nextPage;
       this._drawerDone = page.length === 0;
@@ -277,11 +273,14 @@ export class Openp41geReleasesPane extends LitElement {
           cb(typeof v === "string" && v !== "" ? v : "latest"),
         ),
       getInstalledVersion: async () =>
-        (window.openp41ge?.updater?.getCurrentVersion?.() ?? Promise.resolve("")) as Promise<string>,
+        (window.openp41ge?.updater?.getCurrentVersion?.() ??
+          Promise.resolve("")) as Promise<string>,
       download: async () =>
-        (window.openp41ge?.updater?.download?.() ?? Promise.resolve(IDLE_STATUS)) as Promise<UpdaterStatus>,
+        (window.openp41ge?.updater?.download?.() ??
+          Promise.resolve(IDLE_STATUS)) as Promise<UpdaterStatus>,
       getStatus: async () =>
-        (window.openp41ge?.updater?.getStatus?.() ?? Promise.resolve(IDLE_STATUS)) as Promise<UpdaterStatus>,
+        (window.openp41ge?.updater?.getStatus?.() ??
+          Promise.resolve(IDLE_STATUS)) as Promise<UpdaterStatus>,
       onUpdaterStatus: (cb) => window.openp41ge?.updater?.onStatus?.(cb) ?? (() => {}),
       quitAndInstall: () => window.openp41ge?.updater?.quitAndInstall?.(),
       confirmRestart: () =>
@@ -317,8 +316,9 @@ export class Openp41geReleasesPane extends LitElement {
       ? html`<span class="rp-stale">showing cached — refreshing…</span>`
       : nothing;
     const installed = this._installedVersion
-      ? html`<span class="rp-installed">Installed:
-          <b class="rp-installed-version">v${this._installedVersion}</b></span>`
+      ? html`<span class="rp-installed"
+          >Installed: <b class="rp-installed-version">v${this._installedVersion}</b></span
+        >`
       : "";
     return html`
       <div class="rp">
@@ -372,25 +372,25 @@ export class Openp41geReleasesPane extends LitElement {
         <div class="rp-card">
           <div class="rp-card-body">
             <div class="rp-item-head">
-            ${
-              r.html_url
-                ? html`<a class="rp-tag" href=${r.html_url} target="_blank" rel="noopener noreferrer"
-                    >${r.tag_name}</a
-                  >`
-                : html`<span class="rp-tag">${r.tag_name}</span>`
-            }
-            <span class="rp-badge rp-badge--${channel}">${badge}</span>
-            ${
-              isInstalled
-                ? html`<span class="rp-chip rp-chip--installed">Installed</span>`
-                : ""
-            }
-            ${
-              r.published_at
-                ? html`<span class="rp-date">${formatReleaseDate(r.published_at)}</span>`
-                : ""
-            }
-          </div>
+              ${
+                r.html_url
+                  ? html`<a
+                      class="rp-tag"
+                      href=${r.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >${r.tag_name}</a
+                    >`
+                  : html`<span class="rp-tag">${r.tag_name}</span>`
+              }
+              <span class="rp-badge rp-badge--${channel}">${badge}</span>
+              ${isInstalled ? html`<span class="rp-chip rp-chip--installed">Installed</span>` : ""}
+              ${
+                r.published_at
+                  ? html`<span class="rp-date">${formatReleaseDate(r.published_at)}</span>`
+                  : ""
+              }
+            </div>
             ${r.body ? html`<div class="rp-body">${r.body}</div>` : ""}
           </div>
         </div>
@@ -415,7 +415,9 @@ export class Openp41geReleasesPane extends LitElement {
                 ? html`<button
                     class="rp-foot-btn rp-foot-btn--update rp-btn--restart"
                     @click=${() => void this._onRestart()}
-                  >Update</button>`
+                  >
+                    Update
+                  </button>`
                 : ""
             }
             ${
@@ -424,14 +426,18 @@ export class Openp41geReleasesPane extends LitElement {
                     class="rp-foot-btn rp-foot-btn--download rp-btn--install"
                     data-version=${norm}
                     @click=${() => this._onInstall()}
-                  >Download</button>`
+                  >
+                    Download
+                  </button>`
                 : ""
             }
             <button
               class="rp-foot-btn rp-btn--history"
               data-channel=${channel}
               @click=${() => this._openDrawer(channel)}
-            >History</button>
+            >
+              History
+            </button>
           </div>
         </div>
       </li>
@@ -450,30 +456,42 @@ export class Openp41geReleasesPane extends LitElement {
           <button class="rp-btn rp-btn--history" @click=${() => this._closeDrawer()}>✕</button>
         </header>
         <ul class="rp-drawer-list">
-          ${this._drawerReleases.length === 0
-            ? html`<p class="rp-state">No ${label} releases yet.</p>`
-            : this._drawerReleases.map((r) => html`
-                <li class="rp-drawer-item">
-                  <div class="rp-drawer-item-head">
-                    <span class="rp-tag">${r.tag_name}</span>
-                    <span class="rp-date">${formatReleaseDate(r.published_at)}</span>
-                  </div>
-                  ${r.body ? html`<div class="rp-body">${r.body}</div>` : ""}
-                  ${
-                    r.html_url
-                      ? html`<a class="rp-drawer-link" href=${r.html_url} target="_blank" rel="noopener noreferrer"
-                          >View on GitHub</a
-                        >`
-                      : ""
-                  }
-                </li>
-              `)}
+          ${
+            this._drawerReleases.length === 0
+              ? html`<p class="rp-state">No ${label} releases yet.</p>`
+              : this._drawerReleases.map(
+                  (r) => html`
+                    <li class="rp-drawer-item">
+                      <div class="rp-drawer-item-head">
+                        <span class="rp-tag">${r.tag_name}</span>
+                        <span class="rp-date">${formatReleaseDate(r.published_at)}</span>
+                      </div>
+                      ${r.body ? html`<div class="rp-body">${r.body}</div>` : ""}
+                      ${
+                        r.html_url
+                          ? html`<a
+                              class="rp-drawer-link"
+                              href=${r.html_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              >View on GitHub</a
+                            >`
+                          : ""
+                      }
+                    </li>
+                  `,
+                )
+          }
         </ul>
         ${
           this._drawerDone
             ? html`<div class="rp-drawer-footer">All versions loaded</div>`
             : html`<div class="rp-drawer-footer">
-                <button class="rp-btn rp-btn--history" @click=${() => void this._loadMoreHistory()} ?disabled=${this._drawerLoading}>
+                <button
+                  class="rp-btn rp-btn--history"
+                  @click=${() => void this._loadMoreHistory()}
+                  ?disabled=${this._drawerLoading}
+                >
                   ${this._drawerLoading ? "Loading…" : "Load older versions"}
                 </button>
               </div>`

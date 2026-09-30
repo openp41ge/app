@@ -99,8 +99,18 @@ describe("releases-service — channelsForUpdateChannel", () => {
 });
 
 describe("releases-service — selectLatestPerChannel", () => {
-  const BETA = { ...ALPHA, tag_name: "v0.1.0-beta.2", name: "v0.1.0-beta.2", published_at: "2026-09-28T00:00:00Z" };
-  const RC = { ...ALPHA, tag_name: "v0.1.0-rc.1", name: "v0.1.0-rc.1", published_at: "2026-09-29T12:00:00Z" };
+  const BETA = {
+    ...ALPHA,
+    tag_name: "v0.1.0-beta.2",
+    name: "v0.1.0-beta.2",
+    published_at: "2026-09-28T00:00:00Z",
+  };
+  const RC = {
+    ...ALPHA,
+    tag_name: "v0.1.0-rc.1",
+    name: "v0.1.0-rc.1",
+    published_at: "2026-09-29T12:00:00Z",
+  };
   const ALPHA_OLD = { ...ALPHA, tag_name: "v0.1.0-alpha.1", name: "v0.1.0-alpha.1" };
 
   test("latest channel keeps only the newest stable release", () => {
@@ -158,9 +168,15 @@ describe("releases-service — fetchReleasesPage", () => {
   });
 
   test("throws on a non-2xx response and returns [] for non-array payloads", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
+    );
     await expect(fetchReleasesPage(1)).rejects.toThrow(/500/);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) }),
+    );
     await expect(fetchReleasesPage(1)).resolves.toEqual([]);
   });
 });
