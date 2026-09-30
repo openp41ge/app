@@ -86,7 +86,9 @@ export function createLogger(system: string, name: string): ILogger {
     // this, so it won't surface a stream with zero entries.
     const entry = pushLog(level, system, name, args, data);
     if (entry) {
-      registerLogStream(system, name);
+      // Register the SYSTEM's stream. A stream is a system, so any subsystem
+      // (namespace) that emits its first entry surfaces the system.
+      registerLogStream(system);
     }
   }
 

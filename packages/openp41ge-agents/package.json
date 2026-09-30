@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "lit": "^3.3.3",
+    "openp41ge-logger": "workspace:*",
     "openp41ge-scrollbar": "workspace:*",
     "openp41ge-uikit": "workspace:*"
   }

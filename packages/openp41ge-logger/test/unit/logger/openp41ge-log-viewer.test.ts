@@ -109,6 +109,40 @@ describe("Openp41geLogViewer lifecycle", () => {
 
 // ── Toolbar buttons ──
 
+describe("find bar via setFindQuery", () => {
+  it("opens the find bar with a query and computes matches", async () => {
+    clearLogBuffer();
+    pushLog(LogLevel.INFO, "test", "mod", ["needle one"]);
+    pushLog(LogLevel.INFO, "test", "mod", ["unrelated"]);
+    pushLog(LogLevel.WARN, "test", "other", ["another needle"]);
+    const el = await createViewer();
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+
+    (el as unknown as Openp41geLogViewer).setFindQuery("needle");
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+
+    expect((el as any)._searchOpen).toBe(true);
+    expect((el as any)._searchQuery).toBe("needle");
+    expect(el.querySelector('[data-testid="log-find-input"]')).toBeTruthy();
+    expect((el as any)._searchMatches.length).toBeGreaterThanOrEqual(2);
+    await destroyViewer(el);
+  });
+
+  it("does not throw for an empty query", async () => {
+    clearLogBuffer();
+    pushLog(LogLevel.INFO, "test", "mod", ["line"]);
+    const el = await createViewer();
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+    (el as unknown as Openp41geLogViewer).setFindQuery("");
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+    expect((el as any)._searchOpen).toBe(true);
+    expect((el as any)._searchMatches.length).toBe(0);
+    await destroyViewer(el);
+  });
+});
+
 describe("bottom bar", () => {
   it("renders four level filter buttons", async () => {
     const el = await createViewer();

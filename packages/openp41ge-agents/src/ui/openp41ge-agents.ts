@@ -18,6 +18,7 @@ import { LitElement, html, type TemplateResult, type PropertyValues } from "lit"
 import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-scrollbar";
+import { registerLogStream } from "openp41ge-logger";
 import { attachTopOverdraw, attachTopHorizontalOverdraws } from "openp41ge-uikit/overdraw-line";
 import { tooltipContent, tooltipController } from "openp41ge-uikit/tooltip";
 import type {
@@ -4320,6 +4321,8 @@ ${unsafeHTML(highlight(this._formatToolArgs(tc), "json"))}</pre>
 }
 
 export function registerOpenp41geAgents(): void {
+  // Self-register this package as a log-stream system (a stream = a system).
+  registerLogStream("openp41ge-agents");
   if (!customElements.get("openp41ge-agents")) {
     customElements.define("openp41ge-agents", Openp41geAgents);
   }

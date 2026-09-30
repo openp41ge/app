@@ -699,6 +699,24 @@ export class Openp41geLogViewer extends LitElement {
     });
   }
 
+  /**
+   * Programmatically open the find bar with `query`, highlight the matching
+   * lines, and jump to the first match. Used by the Logs window when a
+   * cross-stream search result is opened, so the viewer lands on that hit.
+   */
+  setFindQuery(query: string): void {
+    this._searchQuery = query;
+    this._searchOpen = true;
+    void this._refreshSearch().then(() => {
+      if (this._searchMatches.length > 0) {
+        // Start from index -1 so `_nextMatch(1)` lands on (and scrolls to) 0.
+        this._activeMatchIndex = -1;
+        void this._nextMatch(1);
+      }
+    });
+    this.requestUpdate();
+  }
+
   private _focusSearch(): void {
     const input = this.querySelector<HTMLInputElement>("[data-testid=log-find-input]");
     input?.focus();
