@@ -117,7 +117,9 @@ export class TabBar extends LitElement {
   /** Attach per-corner overdraw accents to each tab button, continuing its
    * right separator (#333) and the bar's bottom border past the corners. The
    * strokes are portalled (fixed) so the bar's `overflow: hidden` cannot clip
-   * them; they re-place each frame and are removed with the tab. */
+   * them; they re-place each frame and are removed with the tab. The `+` add
+   * button gets the same treatment for its left separator and own bottom
+   * border, so its lines bleed past its corners like the tabs. */
   private _attachTabOverdraws(): void {
     if (typeof document === "undefined") return;
     const btns =
@@ -126,6 +128,13 @@ export class TabBar extends LitElement {
       attachTabEdgeOverdraws(btn, {
         edges: ["right", "bottom"],
         edgeColors: { right: "#333", bottom: "var(--border-divider, #2d2d2d)" },
+      });
+    }
+    const addBtn = this.renderRoot?.querySelector<HTMLElement>(".tab-bar-add");
+    if (addBtn && addBtn.isConnected) {
+      attachTabEdgeOverdraws(addBtn, {
+        edges: ["left", "bottom"],
+        edgeColors: { left: "#333", bottom: "var(--border-divider, #2d2d2d)" },
       });
     }
   }
@@ -306,6 +315,11 @@ export class TabBar extends LitElement {
           justify-content: center;
           margin-left: 6px;
           font-size: 13px;
+          /* Always render the ✕ in the UI font so it is the same size in every
+             window, regardless of an inherited monospace font (e.g. the Logs
+             window sets monospace on its root, which would otherwise shrink
+             the ✕ glyph). */
+          font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
           /* The ✕ glyph must never inherit the tab's italic (unpinned tabs
              italicize their title). Always render it upright. */
           font-style: normal;
@@ -375,7 +389,7 @@ export class TabBar extends LitElement {
       <div class="tab-bar-wrapper" style="position:relative;flex:1;min-width:0;">
         <div
           class="tab-bar-container"
-          style="display:flex;align-items:center;height:35px;border-bottom:1px solid var(--border-divider, #2d2d2d);background:var(--bg-surface, #161616);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;"
+          style="display:flex;align-items:center;height:35px;box-sizing:border-box;border-bottom:1px solid var(--border-divider, #2d2d2d);background:var(--bg-surface, #161616);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;"
         >
           <style>
             .tab-bar-container::-webkit-scrollbar {
@@ -421,7 +435,8 @@ export class TabBar extends LitElement {
               cursor: pointer;
               user-select: none;
               background: var(--bg-surface, #161616);
-              border-left: 1px solid var(--border-divider, #2d2d2d);
+              border-left: 1px solid #333;
+              border-bottom: 1px solid var(--border-divider, #2d2d2d);
               transition:
                 color 0.15s,
                 background 0.15s;
