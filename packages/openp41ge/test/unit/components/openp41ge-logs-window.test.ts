@@ -919,6 +919,94 @@ describe("log detail drawer", () => {
     el.remove();
   });
 
+  it("renders Message/Stack in code blocks and decodes HTML entities", async () => {
+    registerLogStream("openp41ge", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    const ent = {
+      timestamp: 1234567890000,
+      level: 3,
+      levelLabel: "ERROR",
+      system: "openp41ge",
+      source: "mod",
+      message: 'parse error at "line" &amp; more\n    at fn &quot;quoted&quot; (a.js:1:2)',
+      process: "renderer",
+    };
+    const evt = new CustomEvent("log-row-click", {
+      detail: { entry: ent },
+      bubbles: true,
+    }) as CustomEvent & { composedPath(): EventTarget[] };
+    Object.defineProperty(evt, "composedPath", { value: () => [document] });
+    (el as unknown as ShadowRoot).shadowRoot!.dispatchEvent(evt);
+    await el.updateComplete;
+
+    const sr = (el as unknown as ShadowRoot).shadowRoot!;
+
+    // Both Message and Stack sit in square, bordered code-block wrappers with
+    // corner overdraw accents; the inner <pre> holds the selectable content.
+    const messageBlock = sr.querySelector<HTMLElement>('[data-testid="lw-codeblock-message"]')!;
+    const stackBlock = sr.querySelector<HTMLElement>('[data-testid="lw-codeblock-stack"]')!;
+    expect(messageBlock.classList.contains("lw-codeblock")).toBe(true);
+    expect(stackBlock.classList.contains("lw-codeblock")).toBe(true);
+    expect(messageBlock.querySelectorAll("overdraw-line").length).toBe(8);
+    expect(stackBlock.querySelectorAll("overdraw-line").length).toBe(8);
+
+    const message = messageBlock.querySelector<HTMLElement>("pre")!;
+    const stack = stackBlock.querySelector<HTMLElement>("pre")!;
+
+    // Entities are decoded; real quotes render as quotes, not &quot;/&amp;.
+    expect(message.textContent).toBe('parse error at "line" & more');
+    expect(stack.textContent).toBe('    at fn "quoted" (a.js:1:2)');
+    expect(sr.querySelector(".lw-detail-body")?.textContent).not.toContain("&quot;");
+    expect(sr.querySelector(".lw-detail-body")?.textContent).not.toContain("&amp;");
+
+    el.remove();
+  });
+
+  it("copies a code block's decoded text via its copy button", async () => {
+    registerLogStream("openp41ge", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    const ent = {
+      timestamp: 1234567890000,
+      level: 3,
+      levelLabel: "ERROR",
+      system: "openp41ge",
+      source: "mod",
+      message: "say &quot;hi&quot; &amp; bye",
+      process: "renderer",
+    };
+    const evt = new CustomEvent("log-row-click", {
+      detail: { entry: ent },
+      bubbles: true,
+    }) as CustomEvent & { composedPath(): EventTarget[] };
+    Object.defineProperty(evt, "composedPath", { value: () => [document] });
+    (el as unknown as ShadowRoot).shadowRoot!.dispatchEvent(evt);
+    await el.updateComplete;
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+
+    const btn = (el as unknown as ShadowRoot).shadowRoot!.querySelector<HTMLElement>(
+      '[data-testid="lw-copy-message"]',
+    )!;
+    expect(btn).toBeTruthy();
+    btn.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    // It copies the DECODED text (no literal &quot;/&amp;).
+    expect(writeText).toHaveBeenCalledWith('say "hi" & bye');
+
+    el.remove();
+  });
+
   it("closes a drawer via its top-bar close button", async () => {
     registerLogStream("openp41ge", "name-a");
     const el = make();

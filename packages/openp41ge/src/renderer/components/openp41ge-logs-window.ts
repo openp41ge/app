@@ -55,6 +55,9 @@ import {
   type TargetFeedback,
   type GhostPreview,
 } from "openp41ge-uikit";
+// Registers the shared <overdraw-line> element for the drawer's code-block
+// corner accents (side-effect import; the element is defined when loaded).
+import "openp41ge-uikit/overdraw-line";
 import { LogFilePageReader } from "../services/log-file-page-reader";
 import { LogStreamDragSource } from "../services/drag-sources/log-stream-drag-source";
 import {
@@ -166,6 +169,32 @@ interface PendingStreamDragStart {
   captureRect: { x: number; y: number; width: number; height: number };
 }
 
+/** Copy button icon for the drawer's code blocks (user-provided Material icon). */
+const COPY_ICON = html` <svg
+  xmlns="http://www.w3.org/2000/svg"
+  height="24px"
+  viewBox="0 -960 960 960"
+  width="24px"
+  fill="currentColor"
+  aria-hidden="true"
+>
+  <path
+    d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"
+  />
+</svg>`;
+
+/** Check mark shown briefly after a successful copy. */
+const CHECK_ICON = html` <svg
+  xmlns="http://www.w3.org/2000/svg"
+  height="24px"
+  viewBox="0 -960 960 960"
+  width="24px"
+  fill="currentColor"
+  aria-hidden="true"
+>
+  <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />
+</svg>`;
+
 @customElement("openp41ge-logs-window")
 export class Openp41geLogsWindow extends LitElement {
   /** Fully store the grid state in `state` so Lit re-renders on change. */
@@ -177,6 +206,9 @@ export class Openp41geLogsWindow extends LitElement {
   @state() private _drawers: DrawerState[] = [];
   /** Monotonic id for distinguishing open drawers across cells. */
   private _drawerId = 0;
+  /** Which code block currently shows the "copied" check (key or null). */
+  @state() private _copied: string | null = null;
+  private _copiedTimer: number | null = null;
   /** When the first streams register, populate the default tabs once. */
   @state() private _defaultsApplied = false;
 
@@ -252,6 +284,10 @@ export class Openp41geLogsWindow extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    if (this._copiedTimer !== null) {
+      window.clearTimeout(this._copiedTimer);
+      this._copiedTimer = null;
+    }
     window.removeEventListener("keydown", this._onKeyDown);
     window.removeEventListener("resize", this._onDetailResize);
     document.removeEventListener("mousemove", this._onSidebarResizeMove);
@@ -1239,6 +1275,83 @@ export class Openp41geLogsWindow extends LitElement {
     this._drawers = this._drawers.filter((d) => d.id !== id);
   }
 
+  /** Copy a code block's decoded text to the clipboard and flash a check. */
+  private async _copyToClipboard(key: string, text: string): Promise<void> {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        this._legacyCopy(text);
+      }
+    } catch {
+      this._legacyCopy(text);
+    }
+    this._copied = key;
+    if (this._copiedTimer !== null) window.clearTimeout(this._copiedTimer);
+    this._copiedTimer = window.setTimeout(() => {
+      this._copied = null;
+      this._copiedTimer = null;
+    }, 1200);
+  }
+
+  /** Clipboard fallback for environments without the async Clipboard API. */
+  private _legacyCopy(text: string): void {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    ta.style.pointerEvents = "none";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+    } catch {
+      /* Best effort. */
+    }
+    ta.remove();
+  }
+
+  /** A labelled code block (square frame + corner overdraw accents) with a
+   *  copy button. The <pre> carries the selectable content; the bordered
+   *  .lw-codeblock wrapper carries the corner accents that overdraw its edges. */
+  private _detailCodeblock(opts: {
+    key: string;
+    title: string;
+    text: string;
+    testid: string;
+    buttonTestid: string;
+    ariaLabel: string;
+  }): TemplateResult {
+    const copied = this._copied === opts.key;
+    return html`
+      <div>
+        <div class="lw-sec-head">
+          <span class="lw-sec-title">${opts.title}</span>
+          <button
+            type="button"
+            class="lw-copy-btn${copied ? " copied" : ""}"
+            aria-label=${opts.ariaLabel}
+            data-testid=${opts.buttonTestid}
+            @click=${() => this._copyToClipboard(opts.key, this._decodeEntities(opts.text))}
+          >
+            ${copied ? CHECK_ICON : COPY_ICON}
+          </button>
+        </div>
+        <div class="lw-codeblock" data-testid=${opts.testid}>
+          <pre>${this._decodeEntities(opts.text)}</pre>
+          <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line
+          ><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
+          <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line
+          ><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
+          <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line
+          ><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
+          <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line
+          ><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
+        </div>
+      </div>
+    `;
+  }
+
   private _detachDetailListeners(): void {
     this._detailUnsub?.();
     this._detailUnsub = null;
@@ -1733,6 +1846,8 @@ export class Openp41geLogsWindow extends LitElement {
           display: flex;
           flex-direction: column;
           gap: 12px;
+          /* Allow highlighting / selecting log content so it can be copied. */
+          user-select: text;
         }
         .lw-sec-title {
           color: var(--text-muted, #888);
@@ -1741,10 +1856,108 @@ export class Openp41geLogsWindow extends LitElement {
           letter-spacing: 0.05em;
           font-family: var(--font-ui, sans-serif);
         }
-        .lw-detail-message {
+        /* Label row above a code block: title on the left, copy button on the right. */
+        .lw-sec-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+        /* Copy button for a code block. */
+        .lw-copy-btn {
+          display: grid;
+          place-items: center;
+          width: 22px;
+          height: 22px;
+          padding: 0;
+          border: none;
+          border-radius: 3px;
+          background: transparent;
+          color: var(--text-secondary, #999);
+          cursor: pointer;
+          user-select: none;
+          flex-shrink: 0;
+        }
+        .lw-copy-btn svg {
+          width: 14px;
+          height: 14px;
+        }
+        .lw-copy-btn:hover,
+        .lw-copy-btn:focus-visible {
+          background: rgba(255, 255, 255, 0.07);
+          color: var(--text-primary, #fff);
+        }
+        .lw-copy-btn.copied {
+          color: #6ecb6e;
+        }
+        /* Square code block for the Message / Stack details: monospace content
+           on a surface background with a straight-edge border. Each corner
+           carries a short <overdraw-line> accent that extends the border
+           outward past the corner and fades to a tip, so the block reads as a
+           hand-drawn frame (no rounded corners). The <pre> inside scrolls; the
+           bordered wrapper hosts the accents and is NOT a scroll container (so
+           the outward lines are not clipped). */
+        .lw-codeblock {
+          position: relative;
+          box-sizing: border-box;
+          margin: 0;
+          border: 1px solid var(--border-divider, #2d2d2d);
+          border-radius: 0;
+          background: var(--bg-surface, #161616);
+          color: var(--text-primary, #d4d4d4);
+          font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", monospace;
+          font-size: 12px;
+          line-height: 1.5;
+          user-select: text;
+          cursor: text;
+          /* Corner accent lines match the block border. */
+          --overdraw-color: var(--border-divider, #2d2d2d);
+        }
+        .lw-codeblock pre {
+          margin: 0;
+          padding: 8px 10px;
           white-space: pre-wrap;
           word-break: break-word;
-          color: var(--text-primary, #d4d4d4);
+          overflow-x: auto;
+          font: inherit;
+          color: inherit;
+          user-select: text;
+        }
+        /* Corner overdraw accents: the solid end sits on the border and the
+           stroke extends outward past the corner (anchored 1px outside the
+           padding box so the solid end lands on the border), fading to its tip. */
+        .lw-codeblock overdraw-line[corner="tl"][dir="left"] {
+          top: -1px;
+          right: 100%;
+        }
+        .lw-codeblock overdraw-line[corner="tl"][dir="up"] {
+          left: -1px;
+          bottom: 100%;
+        }
+        .lw-codeblock overdraw-line[corner="tr"][dir="right"] {
+          top: -1px;
+          left: 100%;
+        }
+        .lw-codeblock overdraw-line[corner="tr"][dir="up"] {
+          left: 100%;
+          bottom: 100%;
+        }
+        .lw-codeblock overdraw-line[corner="bl"][dir="left"] {
+          top: 100%;
+          right: 100%;
+        }
+        .lw-codeblock overdraw-line[corner="bl"][dir="down"] {
+          left: -1px;
+          top: 100%;
+        }
+        .lw-codeblock overdraw-line[corner="br"][dir="right"] {
+          top: 100%;
+          left: 100%;
+        }
+        .lw-codeblock overdraw-line[corner="br"][dir="down"] {
+          left: 100%;
+          top: 100%;
         }
         .lw-detail-meta {
           display: flex;
@@ -1950,32 +2163,42 @@ export class Openp41geLogsWindow extends LitElement {
                       </button>
                     </div>
                     <div class="lw-detail-body">
-                      <div>
-                        <div class="lw-sec-title">Message</div>
-                        <div class="lw-detail-message">${this._escape(d.detail.message)}</div>
-                      </div>
+                      ${this._detailCodeblock({
+                        key: "message",
+                        title: "Message",
+                        text: d.detail.message,
+                        testid: "lw-codeblock-message",
+                        buttonTestid: "lw-copy-message",
+                        ariaLabel: "Copy message",
+                      })}
                       ${
                         d.detail.stack
-                          ? html`<div>
-                              <div class="lw-sec-title">Stack</div>
-                              <pre class="lw-detail-message">${this._escape(d.detail.stack)}</pre>
-                            </div>`
+                          ? this._detailCodeblock({
+                              key: "stack",
+                              title: "Stack",
+                              text: d.detail.stack,
+                              testid: "lw-codeblock-stack",
+                              buttonTestid: "lw-copy-stack",
+                              ariaLabel: "Copy stack",
+                            })
                           : nothing
                       }
                       <div class="lw-detail-meta">
                         <div>
-                          <span class="lw-sec-title">Source </span>${this._escape(d.detail.source)}
+                          <span class="lw-sec-title">Source </span
+                          >${this._decodeEntities(d.detail.source)}
                         </div>
                         <div>
-                          <span class="lw-sec-title">System </span>${this._escape(d.detail.system)}
+                          <span class="lw-sec-title">System </span
+                          >${this._decodeEntities(d.detail.system)}
                         </div>
                         <div>
                           <span class="lw-sec-title">Process </span
-                          >${this._escape(d.detail.process)}
+                          >${this._decodeEntities(d.detail.process)}
                         </div>
                         <div>
                           <span class="lw-sec-title">Level </span
-                          >${this._escape(d.detail.levelLabel)}
+                          >${this._decodeEntities(d.detail.levelLabel)}
                         </div>
                         <div>
                           <span class="lw-sec-title">Time </span
@@ -2164,6 +2387,38 @@ export class Openp41geLogsWindow extends LitElement {
     return text.replace(
       /[&<>"']/g,
       (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m] ?? m,
+    );
+  }
+
+  /**
+   * Decode the common HTML entities (named + numeric) that may appear in log
+   * text, so e.g. `&quot;` renders as `"` rather than the literal entity. The
+   * result is rendered through Lit's text interpolation (a text node, not
+   * parsed HTML), so decoding remains XSS-safe — it only unescapes entities.
+   */
+  private _decodeEntities(text: string): string {
+    return text.replace(
+      /&(?:quot|amp|lt|gt|apos|nbsp|#(\d+)|#x([0-9a-fA-F]+));/g,
+      (m, dec: string | undefined, hex: string | undefined) => {
+        if (dec !== undefined) return String.fromCodePoint(Number(dec));
+        if (hex !== undefined) return String.fromCodePoint(parseInt(hex, 16));
+        switch (m) {
+          case "&quot;":
+            return '"';
+          case "&amp;":
+            return "&";
+          case "&lt;":
+            return "<";
+          case "&gt;":
+            return ">";
+          case "&apos;":
+            return "'";
+          case "&nbsp;":
+            return "\u00a0";
+          default:
+            return m;
+        }
+      },
     );
   }
 }
