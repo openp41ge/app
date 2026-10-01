@@ -195,6 +195,22 @@ const CHECK_ICON = html` <svg
   <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />
 </svg>`;
 
+/** The 8 <overdraw-line> corner accents (2 per corner) shared by a square frame
+ *  and the code-block copy button. Each line's solid end sits on the frame's
+ *  border and its stroke overdraws outward past the corner before fading. */
+function cornerOverdraw(): TemplateResult {
+  return html`
+    <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line
+    ><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
+    <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line
+    ><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
+    <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line
+    ><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
+    <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line
+    ><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
+  `;
+}
+
 @customElement("openp41ge-logs-window")
 export class Openp41geLogsWindow extends LitElement {
   /** Fully store the grid state in `state` so Lit re-renders on change. */
@@ -1312,8 +1328,11 @@ export class Openp41geLogsWindow extends LitElement {
   }
 
   /** A labelled code block (square frame + corner overdraw accents) with a
-   *  copy button. The <pre> carries the selectable content; the bordered
-   *  .lw-codeblock wrapper carries the corner accents that overdraw its edges. */
+   *  copy button hanging beneath its bottom-right corner. The <pre> carries the
+   *  selectable content; the bordered .lw-codeblock wrapper carries the corner
+   *  accents that overdraw its edges. The copy button is a small square frame in
+   *  its own right (border + overdraw lines) whose top edge touches the block's
+   *  bottom edge. */
   private _detailCodeblock(opts: {
     key: string;
     title: string;
@@ -1324,30 +1343,21 @@ export class Openp41geLogsWindow extends LitElement {
   }): TemplateResult {
     const copied = this._copied === opts.key;
     return html`
-      <div>
-        <div class="lw-sec-head">
-          <span class="lw-sec-title">${opts.title}</span>
-          <button
-            type="button"
-            class="lw-copy-btn${copied ? " copied" : ""}"
-            aria-label=${opts.ariaLabel}
-            data-testid=${opts.buttonTestid}
-            @click=${() => this._copyToClipboard(opts.key, this._decodeEntities(opts.text))}
-          >
-            ${copied ? CHECK_ICON : COPY_ICON}
-          </button>
-        </div>
+      <div class="lw-codeblock-wrap">
+        <div class="lw-sec-title">${opts.title}</div>
         <div class="lw-codeblock" data-testid=${opts.testid}>
           <pre>${this._decodeEntities(opts.text)}</pre>
-          <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line
-          ><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
-          <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line
-          ><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
-          <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line
-          ><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
-          <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line
-          ><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
+          ${cornerOverdraw()}
         </div>
+        <button
+          type="button"
+          class="lw-copy-btn${copied ? " copied" : ""}"
+          aria-label=${opts.ariaLabel}
+          data-testid=${opts.buttonTestid}
+          @click=${() => this._copyToClipboard(opts.key, this._decodeEntities(opts.text))}
+        >
+          ${copied ? CHECK_ICON : COPY_ICON} ${cornerOverdraw()}
+        </button>
       </div>
     `;
   }
@@ -1855,38 +1865,46 @@ export class Openp41geLogsWindow extends LitElement {
           text-transform: uppercase;
           letter-spacing: 0.05em;
           font-family: var(--font-ui, sans-serif);
-        }
-        /* Label row above a code block: title on the left, copy button on the right. */
-        .lw-sec-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
           margin-bottom: 6px;
         }
-        /* Copy button for a code block. */
+        /* The block and its dangling copy button share a column, so the button's
+           top edge can sit flush against the block's bottom edge. */
+        .lw-codeblock-wrap {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+        }
+        /* Square copy button hanging off the block's bottom-right corner: a
+           bordered frame in its own right (with corner overdraw accents) whose
+           top edge touches the block's bottom edge. The -1px top margin merges
+           the button's top border with the block's bottom border into one
+           continuous line (a tab attached to the block). */
         .lw-copy-btn {
+          align-self: flex-end;
+          position: relative;
+          overflow: visible;
+          box-sizing: border-box;
           display: grid;
           place-items: center;
-          width: 22px;
-          height: 22px;
+          width: 26px;
+          height: 24px;
+          margin: -1px 0 0;
           padding: 0;
-          border: none;
-          border-radius: 3px;
-          background: transparent;
+          border: 1px solid var(--border-divider, #2d2d2d);
+          border-radius: 0;
+          background: var(--bg-surface, #161616);
           color: var(--text-secondary, #999);
           cursor: pointer;
-          user-select: none;
-          flex-shrink: 0;
+          --overdraw-color: var(--border-divider, #2d2d2d);
         }
         .lw-copy-btn svg {
-          width: 14px;
-          height: 14px;
+          width: 12px;
+          height: 12px;
         }
         .lw-copy-btn:hover,
         .lw-copy-btn:focus-visible {
-          background: rgba(255, 255, 255, 0.07);
           color: var(--text-primary, #fff);
+          background: var(--bg-hover-strong, #2a2a2a);
         }
         .lw-copy-btn.copied {
           color: #6ecb6e;
@@ -1924,38 +1942,47 @@ export class Openp41geLogsWindow extends LitElement {
           color: inherit;
           user-select: text;
         }
-        /* Corner overdraw accents: the solid end sits on the border and the
-           stroke extends outward past the corner (anchored 1px outside the
-           padding box so the solid end lands on the border), fading to its tip. */
-        .lw-codeblock overdraw-line[corner="tl"][dir="left"] {
+        /* Corner overdraw accents (shared by the block and its copy button):
+           the solid end sits on the border and the stroke extends outward past
+           the corner (anchored 1px outside the padding box so the solid end
+           lands on the border), fading to its tip. */
+        .lw-codeblock overdraw-line[corner="tl"][dir="left"],
+        .lw-copy-btn overdraw-line[corner="tl"][dir="left"] {
           top: -1px;
           right: 100%;
         }
-        .lw-codeblock overdraw-line[corner="tl"][dir="up"] {
+        .lw-codeblock overdraw-line[corner="tl"][dir="up"],
+        .lw-copy-btn overdraw-line[corner="tl"][dir="up"] {
           left: -1px;
           bottom: 100%;
         }
-        .lw-codeblock overdraw-line[corner="tr"][dir="right"] {
+        .lw-codeblock overdraw-line[corner="tr"][dir="right"],
+        .lw-copy-btn overdraw-line[corner="tr"][dir="right"] {
           top: -1px;
           left: 100%;
         }
-        .lw-codeblock overdraw-line[corner="tr"][dir="up"] {
+        .lw-codeblock overdraw-line[corner="tr"][dir="up"],
+        .lw-copy-btn overdraw-line[corner="tr"][dir="up"] {
           left: 100%;
           bottom: 100%;
         }
-        .lw-codeblock overdraw-line[corner="bl"][dir="left"] {
+        .lw-codeblock overdraw-line[corner="bl"][dir="left"],
+        .lw-copy-btn overdraw-line[corner="bl"][dir="left"] {
           top: 100%;
           right: 100%;
         }
-        .lw-codeblock overdraw-line[corner="bl"][dir="down"] {
+        .lw-codeblock overdraw-line[corner="bl"][dir="down"],
+        .lw-copy-btn overdraw-line[corner="bl"][dir="down"] {
           left: -1px;
           top: 100%;
         }
-        .lw-codeblock overdraw-line[corner="br"][dir="right"] {
+        .lw-codeblock overdraw-line[corner="br"][dir="right"],
+        .lw-copy-btn overdraw-line[corner="br"][dir="right"] {
           top: 100%;
           left: 100%;
         }
-        .lw-codeblock overdraw-line[corner="br"][dir="down"] {
+        .lw-codeblock overdraw-line[corner="br"][dir="down"],
+        .lw-copy-btn overdraw-line[corner="br"][dir="down"] {
           left: 100%;
           top: 100%;
         }
