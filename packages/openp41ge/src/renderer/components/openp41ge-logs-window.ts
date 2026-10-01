@@ -2190,26 +2190,6 @@ export class Openp41geLogsWindow extends LitElement {
                       </button>
                     </div>
                     <div class="lw-detail-body">
-                      ${this._detailCodeblock({
-                        key: "message",
-                        title: "Message",
-                        text: d.detail.message,
-                        testid: "lw-codeblock-message",
-                        buttonTestid: "lw-copy-message",
-                        ariaLabel: "Copy message",
-                      })}
-                      ${
-                        d.detail.stack
-                          ? this._detailCodeblock({
-                              key: "stack",
-                              title: "Stack",
-                              text: d.detail.stack,
-                              testid: "lw-codeblock-stack",
-                              buttonTestid: "lw-copy-stack",
-                              ariaLabel: "Copy stack",
-                            })
-                          : nothing
-                      }
                       <div class="lw-detail-meta">
                         <div>
                           <span class="lw-sec-title">Source </span
@@ -2232,6 +2212,26 @@ export class Openp41geLogsWindow extends LitElement {
                           >${new Date(d.detail.timestamp).toLocaleString()}
                         </div>
                       </div>
+                      ${this._detailCodeblock({
+                        key: "message",
+                        title: "Message",
+                        text: d.detail.message,
+                        testid: "lw-codeblock-message",
+                        buttonTestid: "lw-copy-message",
+                        ariaLabel: "Copy message",
+                      })}
+                      ${
+                        d.detail.stack
+                          ? this._detailCodeblock({
+                              key: "stack",
+                              title: "Stack",
+                              text: d.detail.stack,
+                              testid: "lw-codeblock-stack",
+                              buttonTestid: "lw-copy-stack",
+                              ariaLabel: "Copy stack",
+                            })
+                          : nothing
+                      }
                     </div>
                   </aside>
                 </div>
