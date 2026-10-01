@@ -1041,9 +1041,7 @@ describe("log detail drawer", () => {
     const drawer = (el as unknown as ShadowRoot).shadowRoot!.querySelector<HTMLElement>(
       '[data-testid="lw-detail-drawer"]',
     )!;
-    const drawerTopLine = drawer.querySelector<HTMLElement>(
-      'overdraw-line[corner="tl"][dir="up"]',
-    );
+    const drawerTopLine = drawer.querySelector<HTMLElement>('overdraw-line[corner="tl"][dir="up"]');
     expect(drawerTopLine).toBeTruthy();
     expect(drawerTopLine!.getAttribute("style")).toContain("--overdraw-length: 8px");
 

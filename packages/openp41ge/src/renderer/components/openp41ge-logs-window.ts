@@ -2294,10 +2294,7 @@ export class Openp41geLogsWindow extends LitElement {
                           : nothing
                       }
                     </div>
-                    <div
-                      class="lw-drawer-foot"
-                      data-testid="lw-drawer-foot"
-                    ></div>
+                    <div class="lw-drawer-foot" data-testid="lw-drawer-foot"></div>
                   </aside>
                 </div>
               `;
