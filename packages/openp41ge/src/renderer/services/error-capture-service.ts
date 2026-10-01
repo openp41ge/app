@@ -48,6 +48,60 @@ const _listeners = new Set<ErrorListener>();
  */
 let _suppressConsoleCapture = false;
 
+/** ── Runaway-error guard ─────────────────────────────────────────────
+ * A bug that throws in a tight loop (e.g. a Lit render that keeps
+ * re-scheduling) can fire tens of thousands of errors per second. Without a
+ * guard, each one is written to the log bus, persisted to disk, stored in
+ * sessionStorage, and re-emitted to every subscriber — which is exactly how
+ * an error loop ballooned a log to multiple GB in minutes and took the app
+ * down. Each distinct error signature is fully captured only a handful of
+ * times per window; identical repeats are aggregated and dropped. */
+const THROTTLE_WINDOW_MS = 5_000;
+const THROTTLE_FULL_CAPTURES = 5;
+const THROTTLE_SUMMARY_EVERY = 100;
+const _errThrottle = new Map<string, { count: number; windowStart: number; suppressed: number }>();
+
+function _errorSignature(err: CapturedError): string {
+  const frame = (err.stack || "").split("\n").find((l) => l.trim().length > 0) || "";
+  return `${err.type}\u0000${err.message.slice(0, 300)}\u0000${frame.slice(0, 200)}`;
+}
+
+function _pruneThrottle(now: number): void {
+  if (_errThrottle.size <= 400) return;
+  for (const [k, v] of _errThrottle) {
+    if (now - v.windowStart > THROTTLE_WINDOW_MS) _errThrottle.delete(k);
+  }
+}
+
+/** True only for occurrences that should be fully captured (logged + shown). */
+function _shouldCapture(err: CapturedError): boolean {
+  const sig = _errorSignature(err);
+  const now = Date.now();
+  const rec = _errThrottle.get(sig);
+  if (!rec || now - rec.windowStart > THROTTLE_WINDOW_MS) {
+    _errThrottle.set(sig, { count: 1, windowStart: now, suppressed: 0 });
+    _pruneThrottle(now);
+    return true;
+  }
+  rec.count++;
+  if (rec.count <= THROTTLE_FULL_CAPTURES) return true;
+  rec.suppressed++;
+  if (rec.suppressed === THROTTLE_SUMMARY_EVERY) {
+    // Surface one aggregate line so a flood is never silent. Suppress the
+    // console replay so this summary isn't re-captured as a "console" error.
+    _suppressConsoleCapture = true;
+    try {
+      log.error("error-burst", {
+        message: `Error repeated ${rec.count}\u00d7 in ${THROTTLE_WINDOW_MS / 1000}s; suppressing further identical occurrences`,
+        signature: sig,
+      });
+    } finally {
+      _suppressConsoleCapture = false;
+    }
+  }
+  return false;
+}
+
 /** Coalesce rapid duplicate error toasts so a burst never floods the screen. */
 let _lastToastMessage = "";
 let _lastToastAt = 0;
@@ -143,13 +197,14 @@ export function installErrorCapture(): void {
   try {
     if (window.openp41ge?.lifecycle?.onError) {
       window.openp41ge.lifecycle.onError((data) => {
-        addError({
+        const captured: CapturedError = {
           message: data.message || "(no message)",
           source: data.source || "main-process",
           stack: data.stack || "",
           timestamp: Date.now(),
           type: "main-process",
-        });
+        };
+        if (_shouldCapture(captured)) addError(captured);
       });
     }
   } catch {
@@ -174,23 +229,26 @@ export function installErrorCapture(): void {
       // ERROR to console.error, which our own interceptor would otherwise add
       // AGAIN (type "console") — suppress it during the emit so a single
       // uncaught error is only shown once.
-      _suppressConsoleCapture = true;
-      try {
-        log.error("uncaught-error", {
-          message: msg,
-          source: source || "",
-          stack: error?.stack || "",
-        });
-      } finally {
-        _suppressConsoleCapture = false;
-      }
-      addError({
+      const captured: CapturedError = {
         message: msg,
         source: source || "",
         stack: error?.stack || "",
         timestamp: Date.now(),
         type: "exception",
-      });
+      };
+      if (_shouldCapture(captured)) {
+        _suppressConsoleCapture = true;
+        try {
+          log.error("uncaught-error", {
+            message: captured.message,
+            source: captured.source || "",
+            stack: captured.stack,
+          });
+        } finally {
+          _suppressConsoleCapture = false;
+        }
+        addError(captured);
+      }
     }
     if (typeof origOnerror === "function") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -204,24 +262,27 @@ export function installErrorCapture(): void {
   const origOnrejection = window.onunhandledrejection;
   window.onunhandledrejection = ((event: PromiseRejectionEvent) => {
     const reason = event.reason;
-    // Land the rejection in the log bus + file (suppress the replay into the
-    // console interceptor so it isn't double-counted as a console error).
-    _suppressConsoleCapture = true;
-    try {
-      log.error("unhandled-rejection", {
-        message: reason?.message || String(reason),
-        stack: reason?.stack || "",
-      });
-    } finally {
-      _suppressConsoleCapture = false;
-    }
-    addError({
+    const captured: CapturedError = {
       message: reason?.message || String(reason),
       source: "",
       stack: reason?.stack || "",
       timestamp: Date.now(),
       type: "rejection",
-    });
+    };
+    if (_shouldCapture(captured)) {
+      // Land the rejection in the log bus + file (suppress the replay into the
+      // console interceptor so it isn't double-counted as a console error).
+      _suppressConsoleCapture = true;
+      try {
+        log.error("unhandled-rejection", {
+          message: captured.message,
+          stack: captured.stack,
+        });
+      } finally {
+        _suppressConsoleCapture = false;
+      }
+      addError(captured);
+    }
     if (typeof origOnrejection === "function") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (origOnrejection as any)(event);
@@ -249,22 +310,25 @@ export function installErrorCapture(): void {
     // Breadcrumb so a Sentry event (uncaught errors are auto-captured by the
     // browser SDK's global handler) carries the console context that preceded
     // it. Safe no-op when Sentry isn't initialized (e.g. no DSN).
-    try {
-      Sentry.addBreadcrumb({
-        category: "console",
-        level: "error",
-        message: msg.slice(0, 300),
-      });
-    } catch {
-      // never let telemetry throw
-    }
-    addError({
+    const captured: CapturedError = {
       message: msg,
       source: "",
       stack: new Error().stack || "",
       timestamp: Date.now(),
       type: "console",
-    });
+    };
+    if (_shouldCapture(captured)) {
+      try {
+        Sentry.addBreadcrumb({
+          category: "console",
+          level: "error",
+          message: msg.slice(0, 300),
+        });
+      } catch {
+        // never let telemetry throw
+      }
+      addError(captured);
+    }
     origConsoleError.apply(console, args);
   };
 

@@ -76,9 +76,7 @@ describe("error-capture-service logging", () => {
 
   it("does not log benign renderer diagnostics (ResizeObserver loop)", () => {
     const entries: LogEntry[] = [];
-    const unsub = subscribeLogs((e) => e && entries.push(e));
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsub = subscribeLogs((e) => e && entries.push(e)); // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window.onerror as any)(
       "ResizeObserver loop completed with undelivered notifications",
       undefined,
@@ -198,5 +196,28 @@ describe("error-capture-service error store", () => {
     clearCapturedErrors();
     expect(getCapturedErrors()).toHaveLength(0);
     expect(sessionStorage.getItem("openp41ge:captured-errors")).toBeNull();
+  });
+
+  it("throttles a runaway storm of identical errors to a bounded count", () => {
+    const entries: LogEntry[] = [];
+    const unsub = subscribeLogs((e) => e && entries.push(e));
+    const before = getCapturedErrors().length;
+
+    // 200 identical errors in the same throttling window.
+    for (let i = 0; i < 200; i++) fireError("runaway identical error");
+
+    unsub();
+
+    const stormLogs = errorEntries(entries).filter(
+      (e) => e.message.includes("uncaught-error") && e.data?.message === "runaway identical error",
+    );
+    // A storm must never become one log line (or log-bus entry) per error.
+    expect(stormLogs.length).toBeLessThanOrEqual(5);
+
+    // The in-memory error store stays bounded too.
+    expect(getCapturedErrors().length - before).toBeLessThanOrEqual(5);
+
+    // And the flood is surfaced as an aggregation notice rather than silence.
+    expect(errorEntries(entries).some((e) => e.message.includes("error-burst"))).toBe(true);
   });
 });

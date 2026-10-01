@@ -7,7 +7,7 @@
  * reader path: initial latest load, prepending older pages on scroll-up,
  * live appends, level/source/system filters, and auto-scroll-to-bottom.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Openp41geLogViewer } from "@openp41ge-logger/openp41ge-log-viewer";
 import { pushLog, clearLogBuffer, LogLevel } from "@openp41ge-logger/log-buffer";
 import { LOG_PAGE_DEFAULT_LIMIT } from "@openp41ge-logger/log-page-reader";
@@ -162,13 +162,61 @@ describe("bottom bar", () => {
     await destroyViewer(el);
   });
 
-  it("clicking a level button activates it", async () => {
+  it("highlights the selected level and everything above it (cumulative)", async () => {
     const el = await createViewer();
     const buttons = el.querySelectorAll<HTMLButtonElement>(".level-btn");
+    // Default DEBUG = everything shown, so all four buttons are lit.
+    expect([...buttons].some((b) => !b.classList.contains("active"))).toBe(false);
+
     buttons[2].click(); // WARN
     await (el as unknown as Openp41geLogViewer).updateComplete;
+    // WARN shows WARN + ERROR; DEBUG + INFO are dimmed.
+    expect(buttons[0].classList.contains("active")).toBe(false); // DEBUG
+    expect(buttons[1].classList.contains("active")).toBe(false); // INFO
+    expect(buttons[2].classList.contains("active")).toBe(true); // WARN
+    expect(buttons[3].classList.contains("active")).toBe(true); // ERROR
+
+    buttons[3].click(); // ERROR — only errors remain.
+    await (el as unknown as Openp41geLogViewer).updateComplete;
     expect(buttons[0].classList.contains("active")).toBe(false);
-    expect(buttons[2].classList.contains("active")).toBe(true);
+    expect(buttons[1].classList.contains("active")).toBe(false);
+    expect(buttons[2].classList.contains("active")).toBe(false);
+    expect(buttons[3].classList.contains("active")).toBe(true);
+
+    buttons[1].click(); // INFO — INFO + WARN + ERROR.
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+    expect(buttons[0].classList.contains("active")).toBe(false); // DEBUG
+    expect(buttons[1].classList.contains("active")).toBe(true); // INFO
+    expect(buttons[2].classList.contains("active")).toBe(true); // WARN
+    expect(buttons[3].classList.contains("active")).toBe(true); // ERROR
+    await destroyViewer(el);
+  });
+
+  it("keeps the overlay scrollbar above the filter/find bars when they are shown", async () => {
+    const el = await createViewer();
+    const root = el.querySelector<HTMLElement>(".viewer-root")!;
+    const list = el.querySelector<HTMLElement>(".log-list")!;
+    const rootRect = { left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 };
+    const listRect = { left: 0, top: 0, width: 800, height: 560, right: 800, bottom: 560 };
+    vi.spyOn(root, "getBoundingClientRect").mockReturnValue(rootRect as DOMRect);
+    vi.spyOn(list, "getBoundingClientRect").mockReturnValue(listRect as DOMRect);
+
+    // The inset tracks the gap below the list (filter/find bar + bottom bar).
+    (el as unknown as { _updateScrollbarInset(): void })._updateScrollbarInset();
+    expect(root.style.getPropertyValue("--lw-scrollbar-bottom")).toBe("40px");
+
+    // Shrink the list (as if the find bar opened): inset grows to match.
+    vi.spyOn(list, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 800,
+      height: 520,
+      right: 800,
+      bottom: 520,
+    } as DOMRect);
+    (el as unknown as { _updateScrollbarInset(): void })._updateScrollbarInset();
+    expect(root.style.getPropertyValue("--lw-scrollbar-bottom")).toBe("80px");
+
     await destroyViewer(el);
   });
 
@@ -1439,6 +1487,45 @@ describe("stream filter", () => {
     await update(el);
     const after = parseFloat(el.querySelector<HTMLElement>(".log-width-spacer")!.style.width);
     expect(after).toBeGreaterThan(before);
+    await destroyViewer(el);
+  });
+});
+
+// ── Detail-drawer row interaction ──
+
+describe("log row detail interaction", () => {
+  it("shows only the first line of a multi-line message in the row", async () => {
+    pushLog(LogLevel.ERROR, "test", "mod", ["boom\n    at fn (a.js:1:2)\n    at main (b.js:3:4)"]);
+    const el = await createViewer();
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+    const row = entries(el)[0];
+    expect(row.querySelector(".log-text")!.textContent).toBe("boom");
+    await destroyViewer(el);
+  });
+
+  it("emits a bubbling log-row-click event carrying the full entry on row click", async () => {
+    pushLog(LogLevel.ERROR, "test", "mod", ["boom\n    at fn (a.js:1:2)"]);
+    const el = await createViewer();
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+    const listener = vi.fn();
+    el.addEventListener("log-row-click", listener);
+    entries(el)[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(listener).toHaveBeenCalledTimes(1);
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.entry.message).toBe("boom\n    at fn (a.js:1:2)");
+    expect(detail.entry.source).toBe("mod");
+    await destroyViewer(el);
+  });
+
+  it("does not emit log-row-click when the stream name is clicked", async () => {
+    pushLog(LogLevel.ERROR, "test", "mod", ["boom"]);
+    const el = await createViewer();
+    await (el as unknown as Openp41geLogViewer).updateComplete;
+    const listener = vi.fn();
+    el.addEventListener("log-row-click", listener);
+    const name = entries(el)[0].querySelector(".log-name")!;
+    name.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(listener).not.toHaveBeenCalled();
     await destroyViewer(el);
   });
 });

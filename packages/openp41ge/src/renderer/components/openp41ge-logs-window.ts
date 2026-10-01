@@ -26,7 +26,8 @@
  * buffered logs). A dropped stream row lands as a pinned tab; a single click
  * lands as an unpinned preview that is replaced by the next preview open in
  * its column (and is promoted to pinned when the tab is clicked again).
- * Clicking an ERROR row opens a detail drawer for that entry.
+ * Clicking a log row opens a detail drawer (sliding in from the right,
+ * inside the tab grid) for that entry.
  */
 
 import { LitElement, html, type TemplateResult, nothing } from "lit";
@@ -38,6 +39,7 @@ import {
   queryLog,
   type LogStreamInfo,
   type LogEntry,
+  type LogViewEntry,
 } from "openp41ge-logger";
 import { Openp41geLogViewer } from "openp41ge-logger/viewer";
 import {
@@ -62,7 +64,6 @@ import {
   NOTCH_OVERFLOW,
 } from "openp41ge-constants";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
-import { getCapturedErrors, type CapturedError } from "../services/error-capture-service";
 
 interface LogTab {
   id: string;
@@ -80,10 +81,24 @@ interface Placement {
 }
 
 interface DetailState {
+  /** First line of the message (the headline shown in the log row). */
   message: string;
+  /** The lines after the first — typically an appended stack trace. */
+  stack: string;
   source: string;
   system: string;
+  process: string;
+  levelLabel: string;
   timestamp: number;
+}
+
+/** One open detail drawer, locked to (and animating from) its owning grid cell.
+ *  Multiple cells can each hold a drawer simultaneously. `cell` may be null
+ *  (fallback to a single grid-wide drawer when no cell is resolvable). */
+interface DrawerState {
+  id: number;
+  cell: Element | null;
+  detail: DetailState;
 }
 
 const TAB_PREFIX = "logtab-";
@@ -159,7 +174,9 @@ export class Openp41geLogsWindow extends LitElement {
   @state() private _placements: Placement[] = [];
   /** col (as string key) → active tab id in that column. */
   @state() private _activeTabIds: Record<string, string> = {};
-  @state() private _detail: DetailState | null = null;
+  @state() private _drawers: DrawerState[] = [];
+  /** Monotonic id for distinguishing open drawers across cells. */
+  private _drawerId = 0;
   /** When the first streams register, populate the default tabs once. */
   @state() private _defaultsApplied = false;
 
@@ -217,6 +234,7 @@ export class Openp41geLogsWindow extends LitElement {
     this._setupDrag();
     // Cmd/Ctrl+B toggles the single sidebar panel (one shortcut, one sidebar).
     window.addEventListener("keydown", this._onKeyDown);
+    window.addEventListener("resize", this._onDetailResize);
     // Build the default tab set from the systems that have logged so far. If
     // none have logged yet, subscribe and populate as soon as the first stream
     // registers (so a freshly booted app still gets its default tabs).
@@ -235,6 +253,7 @@ export class Openp41geLogsWindow extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener("keydown", this._onKeyDown);
+    window.removeEventListener("resize", this._onDetailResize);
     document.removeEventListener("mousemove", this._onSidebarResizeMove);
     document.removeEventListener("mouseup", this._onSidebarResizeEnd);
     if (this._resizeActive) {
@@ -1182,28 +1201,72 @@ export class Openp41geLogsWindow extends LitElement {
   private _attachDetailListeners(): void {
     if (this._detailUnsub) return;
     const handler = (e: Event): void => {
-      const el = (e.target as HTMLElement | null)?.closest?.(`.level-error`);
-      if (!el) return;
-      const row = el.closest(".log-entry") as HTMLElement | null;
-      if (!row) return;
-      const message = row.querySelector(".log-message")?.textContent?.trim() ?? "";
-      const source = row.querySelector(".log-source")?.textContent?.trim() ?? "";
-      const system = row.querySelector(".log-system")?.textContent?.trim() ?? "";
-      const tsEl = row.querySelector(".log-time")?.textContent?.trim() ?? "";
-      const timestamp = Date.parse(tsEl) || Date.now();
-      this._detail = { message, source, system, timestamp };
+      const entry = (e as CustomEvent<{ entry?: LogViewEntry }>).detail?.entry;
+      if (!entry) return;
+      // Lock the drawer to the grid cell that owns the clicked row, so it
+      // overlays (and animates from) that column only. The event is composed,
+      // so the composed path includes the tab-grid's grid-cell even across the
+      // viewer/grid shadow boundaries.
+      const cell =
+        e
+          .composedPath?.()
+          .find((p): p is Element => p instanceof Element && p.classList.contains("grid-cell")) ??
+        null;
+      const nl = entry.message.indexOf("\n");
+      const detail: DetailState = {
+        message: nl < 0 ? entry.message : entry.message.slice(0, nl),
+        stack: nl < 0 ? "" : entry.message.slice(nl + 1),
+        source: entry.source,
+        system: entry.system,
+        process: entry.process,
+        levelLabel: entry.levelLabel,
+        timestamp: entry.timestamp,
+      };
+      // One drawer per cell: refresh an existing drawer for this cell, or open
+      // a new one. Clicks with no resolvable cell share single grid-wide drawer.
+      const idx = this._drawers.findIndex((d) => d.cell === cell);
+      if (idx >= 0) {
+        this._drawers = this._drawers.map((d, i) => (i === idx ? { ...d, detail } : d));
+      } else {
+        this._drawers = [...this._drawers, { id: ++this._drawerId, cell, detail }];
+      }
     };
-    this.shadowRoot?.addEventListener("click", handler);
-    this._detailUnsub = () => this.shadowRoot?.removeEventListener("click", handler);
+    this.shadowRoot?.addEventListener("log-row-click", handler);
+    this._detailUnsub = () => this.shadowRoot?.removeEventListener("log-row-click", handler);
   }
 
-  private _closeDetail(): void {
-    this._detail = null;
+  private _closeDrawer(id: number): void {
+    this._drawers = this._drawers.filter((d) => d.id !== id);
   }
 
   private _detachDetailListeners(): void {
     this._detailUnsub?.();
     this._detailUnsub = null;
+  }
+
+  /** Recompute drawer geometry after a layout change while any are open. */
+  private _onDetailResize = (): void => {
+    if (this._drawers.length > 0) this.requestUpdate();
+  };
+
+  /** A cell's geometry (left/top/width/height) relative to [.lw-grid], or null
+   *  when the cell can't be resolved (fall back to covering the whole grid). */
+  private _cellRectFor(cell: Element | null): {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null {
+    const grid = this.renderRoot?.querySelector(".lw-grid") as HTMLElement | null;
+    if (!grid || !cell || !cell.isConnected) return null;
+    const gr = grid.getBoundingClientRect();
+    const cr = cell.getBoundingClientRect();
+    return {
+      left: cr.left - gr.left,
+      top: cr.top - gr.top,
+      width: cr.width,
+      height: cr.height,
+    };
   }
 
   // ── Viewer mounting into <tab-grid> ──────────────────────────────────
@@ -1690,6 +1753,95 @@ export class Openp41geLogsWindow extends LitElement {
           color: var(--text-secondary, #aaa);
           font-size: 12px;
         }
+        /* Detail drawer — one per grid cell. Each is wrapped in a cell-sized
+           overlay with overflow:hidden, so the drawer slides in from ITS OWN
+           cell's right edge (not the grid's) and is clipped to that cell, never
+           spilling into neighboring columns or the titlebar/sidebar. Spans 80%
+           of the cell's width. It overlays the cell's tab bar, so it carries a
+           top bar matching the tab bar's 35px height (title + close). */
+        .lw-drawer-wrap {
+          position: absolute;
+          overflow: hidden;
+          z-index: 100;
+        }
+        .lw-drawer-mask {
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          animation: lw-drawer-fade 0.18s ease-out;
+        }
+        @keyframes lw-drawer-fade {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        .lw-drawer {
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          width: 80%;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          background: var(--bg-primary, #1e1e1e);
+          color: var(--text-primary, #d4d4d4);
+          border-left: 1px solid var(--border-divider, #2d2d2d);
+          box-shadow: -2px 0 12px rgba(0, 0, 0, 0.45);
+          z-index: 101;
+          animation: lw-drawer-in 0.18s ease-out;
+        }
+        @keyframes lw-drawer-in {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+        .lw-drawer-head {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          /* Matches the cell tab bar's height (35px tabs + 1px border). */
+          height: 35px;
+          box-sizing: border-box;
+          padding: 0 8px 0 12px;
+          border-bottom: 1px solid var(--border-divider, #2d2d2d);
+          background: var(--bg-surface, #161616);
+          color: var(--text-primary, #d4d4d4);
+          font-size: 12px;
+        }
+        .lw-drawer-head-title {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-family: var(--font-ui, sans-serif);
+          font-weight: 600;
+        }
+        .lw-drawer-close {
+          flex-shrink: 0;
+          width: 24px;
+          height: 24px;
+          display: grid;
+          place-items: center;
+          background: transparent;
+          border: none;
+          border-radius: 4px;
+          color: var(--text-secondary, #999);
+          cursor: pointer;
+          padding: 0;
+        }
+        .lw-drawer-close:hover {
+          background: rgba(255, 255, 255, 0.07);
+          color: var(--text-primary, #fff);
+        }
       </style>
 
       <div class="lw-root">
@@ -1764,6 +1916,77 @@ export class Openp41geLogsWindow extends LitElement {
                   </div>`
                 : nothing
             }
+            ${this._drawers.map((d) => {
+              const r = this._cellRectFor(d.cell);
+              const wrapStyle = r
+                ? `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;`
+                : "left:0;top:0;width:100%;height:100%;";
+              return html`
+                <div class="lw-drawer-wrap" data-testid="lw-drawer-wrap" style=${wrapStyle}>
+                  <div class="lw-drawer-mask" @click=${() => this._closeDrawer(d.id)}></div>
+                  <aside class="lw-drawer" data-testid="lw-detail-drawer">
+                    <div class="lw-drawer-head">
+                      <span class="lw-drawer-head-title" data-testid="lw-drawer-title"
+                        >Log details</span
+                      >
+                      <button
+                        type="button"
+                        class="lw-drawer-close"
+                        aria-label="Close details"
+                        data-testid="lw-drawer-close"
+                        @click=${() => this._closeDrawer(d.id)}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                        >
+                          <path d="M3 3l10 10M13 3L3 13" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="lw-detail-body">
+                      <div>
+                        <div class="lw-sec-title">Message</div>
+                        <div class="lw-detail-message">${this._escape(d.detail.message)}</div>
+                      </div>
+                      ${
+                        d.detail.stack
+                          ? html`<div>
+                              <div class="lw-sec-title">Stack</div>
+                              <pre class="lw-detail-message">${this._escape(d.detail.stack)}</pre>
+                            </div>`
+                          : nothing
+                      }
+                      <div class="lw-detail-meta">
+                        <div>
+                          <span class="lw-sec-title">Source </span>${this._escape(d.detail.source)}
+                        </div>
+                        <div>
+                          <span class="lw-sec-title">System </span>${this._escape(d.detail.system)}
+                        </div>
+                        <div>
+                          <span class="lw-sec-title">Process </span
+                          >${this._escape(d.detail.process)}
+                        </div>
+                        <div>
+                          <span class="lw-sec-title">Level </span
+                          >${this._escape(d.detail.levelLabel)}
+                        </div>
+                        <div>
+                          <span class="lw-sec-title">Time </span
+                          >${new Date(d.detail.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              `;
+            })}
           </div>
           ${
             this._sidebarOpen && this._sidebarSide === "right"
@@ -1772,46 +1995,6 @@ export class Openp41geLogsWindow extends LitElement {
           }
         </div>
       </div>
-
-      ${
-        this._detail
-          ? html`
-              <div class="lw-drawer-mask" @click=${this._closeDetail}></div>
-              <aside class="lw-drawer" data-testid="lw-detail-drawer">
-                <div class="lw-drawer-head">
-                  <span>Error detail</span>
-                  <button
-                    type="button"
-                    class="lw-drawer-close"
-                    @click=${this._closeDetail}
-                    aria-label="Close"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div class="lw-detail-body">
-                  <div>
-                    <div class="lw-sec-title">Message</div>
-                    <div class="lw-detail-message">${this._escape(this._detail.message)}</div>
-                  </div>
-                  <div class="lw-detail-meta">
-                    <div>
-                      <span class="lw-sec-title">Source </span>${this._escape(this._detail.source)}
-                    </div>
-                    <div>
-                      <span class="lw-sec-title">System </span>${this._escape(this._detail.system)}
-                    </div>
-                    <div>
-                      <span class="lw-sec-title">Time </span
-                      >${new Date(this._detail.timestamp).toLocaleString()}
-                    </div>
-                  </div>
-                  ${this._detailStack(this._detail)}
-                </div>
-              </aside>
-            `
-          : nothing
-      }
     `;
   }
 
@@ -1975,20 +2158,6 @@ export class Openp41geLogsWindow extends LitElement {
     const viewer = this._ensureViewer(tab);
     const q = this._searchQuery.trim();
     viewer.setFindQuery(q);
-  }
-
-  private _detailStack(detail: DetailState): TemplateResult | typeof nothing {
-    // Best-effort: surface a captured error's stack when the message matches.
-    const captured: CapturedError | undefined = getCapturedErrors().find(
-      (e) => e.message === detail.message,
-    );
-    if (!captured?.stack) return nothing;
-    return html`
-      <div>
-        <div class="lw-sec-title">Stack</div>
-        <pre class="lw-detail-message">${this._escape(String(captured.stack))}</pre>
-      </div>
-    `;
   }
 
   private _escape(text: string): string {

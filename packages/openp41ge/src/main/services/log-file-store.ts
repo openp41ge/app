@@ -92,6 +92,14 @@ function foldMax(
 const LIVE_FILE = "openp41ge.log";
 const MS_PER_DAY = 86_400_000;
 
+/** Rotate the live file beyond this size so a runaway log can never grow
+ *  the on-disk log unboundedly (e.g. an error loop writing GBs in minutes). */
+const MAX_LIVE_FILE_BYTES = 64 * 1024 * 1024; // 64 MB
+/** Backward-read chunk size (bytes) — bounds memory regardless of file size. */
+const TAIL_CHUNK_BYTES = 256 * 1024;
+/** Line-count scan chunk size (bytes) — bounded memory full-file scan. */
+const COUNT_CHUNK_BYTES = 1024 * 1024;
+
 function _dayString(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -106,10 +114,15 @@ export class LogFileStore {
   private _inWrite = false;
   /** Monotonic longest rendered line (chars) across all entries written/served. */
   private _maxLineChars = 0;
+  /** Cached total line counts keyed by `name|size|mtime` (avoids rescanning). */
+  private _lineCountCache = new Map<string, number>();
+  /** Live-file size cap; beyond this the live file is rotated aside. */
+  private readonly _maxLiveBytes: number;
 
-  constructor(baseDir: string, retentionDays = 14) {
+  constructor(baseDir: string, retentionDays = 14, maxLiveBytes = MAX_LIVE_FILE_BYTES) {
     this._logsDir = path.join(baseDir, "logs");
     this._retentionDays = Math.max(1, retentionDays);
+    this._maxLiveBytes = Math.max(1, maxLiveBytes);
   }
 
   get logsDir(): string {
@@ -158,6 +171,27 @@ export class LogFileStore {
     this._pruneArchives();
   }
 
+  /** Move the live file aside (as a queryable archive) once it exceeds the size
+   *  cap, then continue writing to a fresh live file. Best-effort: never blocks
+   *  logging. Prevents a runaway writer from consuming unbounded disk. */
+  private _rotateIfTooLarge(): void {
+    try {
+      const st = fs.statSync(this._livePath);
+      if (st.size <= this._maxLiveBytes) return;
+      const day = this._liveDay || _dayString(new Date());
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const archivePath = path.join(this._logsDir, `openp41ge-${day}-${stamp}.log`);
+      if (fs.existsSync(archivePath)) {
+        // Cannot rename onto an existing archive — drop the runaway tail instead.
+        fs.rmSync(this._livePath, { force: true });
+      } else {
+        fs.renameSync(this._livePath, archivePath);
+      }
+    } catch {
+      // best-effort; keep logging
+    }
+  }
+
   private _serialize(entry: StoredLogEntry): string {
     const line: Record<string, unknown> = {
       timestamp: entry.timestamp,
@@ -182,6 +216,7 @@ export class LogFileStore {
     this._inWrite = true;
     try {
       this._rollOverIfNeeded();
+      this._rotateIfTooLarge();
       fs.appendFileSync(this._livePath, this._serialize(entry) + "\n", "utf-8");
       this._maxLineChars = foldMax(entry, this._maxLineChars);
     } catch (err) {
@@ -198,6 +233,7 @@ export class LogFileStore {
     this._inWrite = true;
     try {
       this._rollOverIfNeeded();
+      this._rotateIfTooLarge();
       const lines = entries.map((e) => this._serialize(e)).join("\n") + "\n";
       fs.appendFileSync(this._livePath, lines, "utf-8");
       for (const e of entries) this._maxLineChars = foldMax(e, this._maxLineChars);
@@ -272,13 +308,122 @@ export class LogFileStore {
     }
   }
 
-  private _readLines(fileName: string): string[] {
+  /**
+   * Total count of newline-delimited (non-blank) lines in a file, computed with
+   * a bounded-memory streaming scan and cached per `name|size|mtime`. Never
+   * reads the whole file into one string, so a huge log can't OOM the process.
+   */
+  private _countLines(fileName: string): number {
+    const full = path.join(this._logsDir, fileName);
+    let size = 0;
+    let mtime = 0;
     try {
-      const content = fs.readFileSync(path.join(this._logsDir, fileName), "utf-8");
-      return content.split("\n").filter((l) => l.trim().length > 0);
+      const st = fs.statSync(full);
+      size = st.size;
+      mtime = st.mtimeMs;
+    } catch {
+      return 0;
+    }
+    const key = `${fileName}|${size}|${mtime}`;
+    const cached = this._lineCountCache.get(key);
+    if (cached !== undefined) return cached;
+
+    let fd: number;
+    try {
+      fd = fs.openSync(full, "r");
+    } catch {
+      return 0;
+    }
+    let count = 0;
+    try {
+      const buf = Buffer.alloc(COUNT_CHUNK_BYTES);
+      let offset = 0;
+      for (;;) {
+        const n = fs.readSync(fd, buf, 0, COUNT_CHUNK_BYTES, offset);
+        if (n <= 0) break;
+        for (let i = 0; i < n; i++) if (buf[i] === 0x0a) count++;
+        offset += n;
+      }
+      // A final line with no trailing newline still counts as a line.
+      if (offset > 0) {
+        const last = Buffer.alloc(1);
+        fs.readSync(fd, last, 0, 1, offset - 1);
+        if (last[0] !== 0x0a) count++;
+      }
+    } catch {
+      count = 0;
+    } finally {
+      fs.closeSync(fd);
+    }
+    this._lineCountCache.set(key, count);
+    return count;
+  }
+
+  /**
+   * Return the last `count` non-blank lines of a file, oldest → newest, by
+   * reading **backward** in bounded chunks. Never loads the whole file into
+   * memory, so the main process can read even a runaway multi-GB log without
+   * crashing. `count` bounds how many lines are ever retained at once.
+   */
+  private _readTailLines(fileName: string, count: number): string[] {
+    const full = path.join(this._logsDir, fileName);
+    let size = 0;
+    try {
+      size = fs.statSync(full).size;
     } catch {
       return [];
     }
+    if (size <= 0 || count <= 0) return [];
+
+    let fd: number;
+    try {
+      fd = fs.openSync(full, "r");
+    } catch {
+      return [];
+    }
+    let text = "";
+    let newlines = 0;
+    let start = size;
+    try {
+      while (start > 0 && newlines < count) {
+        const chunkStart = Math.max(0, start - TAIL_CHUNK_BYTES);
+        const buf = Buffer.alloc(start - chunkStart);
+        const n = fs.readSync(fd, buf, 0, buf.length, chunkStart);
+        if (n <= 0) break;
+        for (let i = 0; i < n; i++) if (buf[i] === 0x0a) newlines++;
+        text = buf.subarray(0, n).toString("utf-8") + text;
+        start = chunkStart;
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+
+    // If we didn't reach the top of the file, `text` may begin mid-line; drop
+    // that leading partial fragment so line indexes stay exact.
+    if (start > 0) {
+      let prev: number;
+      try {
+        const probe = Buffer.alloc(1);
+        const pfd = fs.openSync(full, "r");
+        try {
+          fs.readSync(pfd, probe, 0, 1, start - 1);
+        } finally {
+          fs.closeSync(pfd);
+        }
+        prev = probe[0];
+      } catch {
+        prev = 0x0a; // if probe fails, assume a line boundary (over-read safest)
+      }
+      if (prev !== 0x0a) {
+        const idx = text.indexOf("\n");
+        text = idx >= 0 ? text.slice(idx + 1) : "";
+      }
+    }
+
+    return text
+      .split("\n")
+      .filter((l) => l.trim().length > 0)
+      .slice(-count);
   }
 
   /**
@@ -330,8 +475,8 @@ export class LogFileStore {
     const fileIndex = cursor ? Math.max(0, Math.min(cursor.fileIndex, files.length - 1)) : 0;
     const lineCount = cursor ? Math.max(0, cursor.lineCount) : 0;
 
-    const lines = this._readLines(files[fileIndex].name);
-    const total = lines.length;
+    const fileName = files[fileIndex].name;
+    const total = this._countLines(fileName);
 
     // Current file fully consumed → expose the older day as a confirmable
     // boundary, rather than silently crossing into it.
@@ -358,17 +503,22 @@ export class LogFileStore {
       };
     }
 
-    const end = total - lineCount; // raw lines already served
-    const start = Math.max(0, end - want);
+    // Read only the tail window we need (never the whole file), so a huge or
+    // runaway log cannot exhaust the main process's memory.
+    const tail = this._readTailLines(fileName, lineCount + want);
+    // `tail` is the last (lineCount + want) lines; the window is the first
+    // `want` of those, i.e. all but the final `lineCount` (already-served) ones.
+    const window = tail.slice(0, Math.max(0, tail.length - lineCount)).slice(-want);
     const entries: PersistedLogEntry[] = [];
-    for (let i = start; i < end; i++) {
-      const entry = this._parseLine(lines[i]);
+    for (const line of window) {
+      const entry = this._parseLine(line);
       if (entry) {
         entries.push(entry);
         this._maxLineChars = foldMax(entry, this._maxLineChars);
       }
     }
-    const newLineCount = lineCount + (end - start);
+
+    const newLineCount = lineCount + entries.length;
     const hasMoreInFile = newLineCount < total;
     const hasOlder = hasMoreInFile;
     const nextDay = hasOlder

@@ -343,4 +343,44 @@ describe("LogFileStore.readLogsBackward", () => {
     const p2 = store.readLogsBackward(p1.cursor, 2);
     expect(p2.maxLineChars).toBeGreaterThanOrEqual(base);
   });
+
+  test("reads the newest entries from a large file without loading it whole", () => {
+    // Enough lines to span several backward chunks (>256 KB) plus more than a
+    // page, so a whole-file `readFileSync` would be the old (OOM-prone) path.
+    seed(6000);
+    // Spy: a bounded reader must never slurp the entire file into memory.
+    const readFileSync = vi.spyOn(fs, "readFileSync");
+
+    const p1 = store.readLogsBackward(null, 4);
+    expect(p1.entries.map((e) => e.message)).toEqual(["m5996", "m5997", "m5998", "m5999"]);
+    expect(p1.hasOlder).toBe(true);
+
+    // Paging deep into the file stays correct and never calls readFileSync.
+    let page = p1;
+    for (let i = 0; i < 5; i++) {
+      expect(page.entries.length).toBeGreaterThan(0);
+      page = store.readLogsBackward(page.cursor, 4);
+    }
+    expect(page.cursor).not.toBeNull();
+    expect(readFileSync).not.toHaveBeenCalled();
+  });
+
+  test("rotates the live file aside once it exceeds the size cap", () => {
+    // Use a tiny cap so the rotation is cheap to exercise.
+    const capped = new LogFileStore(tmpDir, 14, 64); // 64 bytes
+    const live = path.join(logsDir(), "openp41ge.log");
+    // First append creates the live file (small).
+    capped.append(makeEntry({ source: "alpha", message: "short" }));
+    // A longer batch pushes it over the cap on the next append.
+    capped.append(makeEntry({ source: "beta", message: "x".repeat(500) }));
+
+    const names = fs.readdirSync(logsDir());
+    const archives = names.filter(
+      (n) => n.startsWith("openp41ge-") && n.endsWith(".log") && n !== "openp41ge.log",
+    );
+    expect(archives.length).toBeGreaterThan(0);
+    // The fresh live file exists and holds the newest entry.
+    const liveText = fs.readFileSync(live, "utf-8");
+    expect(liveText).toContain('"beta"');
+  });
 });

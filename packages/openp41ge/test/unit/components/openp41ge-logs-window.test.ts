@@ -837,3 +837,218 @@ describe("openp41ge-logs-window", () => {
     el.remove();
   });
 });
+
+describe("log detail drawer", () => {
+  const entry = {
+    timestamp: 1234567890000,
+    level: 3,
+    levelLabel: "ERROR",
+    system: "openp41ge",
+    source: "mod",
+    message: "boom\n    at fn (a.js:1:2)",
+    process: "renderer",
+  };
+
+  /** Dispatch a log-row-click whose composed path reports the given cell. */
+  function clickRow(el: Lw, cell: Element | null): void {
+    const evt = new CustomEvent("log-row-click", {
+      detail: { entry },
+      bubbles: true,
+    }) as CustomEvent & { composedPath(): EventTarget[] };
+    Object.defineProperty(evt, "composedPath", {
+      value: () => (cell ? [cell, document] : []),
+    });
+    (el as unknown as ShadowRoot).shadowRoot!.dispatchEvent(evt);
+  }
+
+  /** A connected grid-cell element with a mocked bounding box. */
+  function mockCell(left: number, width: number): HTMLElement {
+    const cell = document.createElement("div");
+    cell.className = "grid-cell";
+    document.body.appendChild(cell);
+    vi.spyOn(cell, "getBoundingClientRect").mockReturnValue({
+      left,
+      top: 50,
+      width,
+      height: 600,
+      right: left + width,
+      bottom: 650,
+    } as DOMRect);
+    return cell;
+  }
+
+  it("opens a detail drawer when the viewer emits a log-row-click", async () => {
+    registerLogStream("openp41ge", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    clickRow(el, null);
+    await el.updateComplete;
+
+    const drawers = (el as unknown as { _drawers: Array<Record<string, unknown>> })._drawers;
+    expect(drawers).toHaveLength(1);
+    expect(drawers[0].detail.message).toBe("boom");
+    expect(drawers[0].detail.stack).toContain("at fn (a.js:1:2)");
+    expect(drawers[0].detail.source).toBe("mod");
+    expect(drawers[0].detail.process).toBe("renderer");
+
+    const drawer = (el as unknown as ShadowRoot).shadowRoot!.querySelector(
+      '[data-testid="lw-detail-drawer"]',
+    );
+    expect(drawer).toBeTruthy();
+    expect(drawer?.textContent).toContain("boom");
+    expect(drawer?.textContent).toContain("at fn (a.js:1:2)");
+
+    // The drawer overlays the tab bar, so it carries a top bar with a title and
+    // a close button (matching the tab bar's height).
+    const head = drawer!.querySelector<HTMLElement>(".lw-drawer-head")!;
+    expect(head).toBeTruthy();
+    expect(drawer!.querySelector('[data-testid="lw-drawer-title"]')!.textContent?.trim()).toBe(
+      "Log details",
+    );
+
+    // Clicking the mask closes the drawer.
+    const mask = (el as unknown as ShadowRoot).shadowRoot!.querySelector<HTMLElement>(
+      ".lw-drawer-mask",
+    )!;
+    mask.click();
+    await el.updateComplete;
+    expect((el as unknown as { _drawers: unknown[] })._drawers).toHaveLength(0);
+
+    el.remove();
+  });
+
+  it("closes a drawer via its top-bar close button", async () => {
+    registerLogStream("openp41ge", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    clickRow(el, null);
+    await el.updateComplete;
+
+    const close = (el as unknown as ShadowRoot).shadowRoot!.querySelector<HTMLElement>(
+      '[data-testid="lw-drawer-close"]',
+    )!;
+    expect(close).toBeTruthy();
+    close.click();
+    await el.updateComplete;
+    expect((el as unknown as { _drawers: unknown[] })._drawers).toHaveLength(0);
+
+    el.remove();
+  });
+
+  it("ignores log-row-click events without an entry", async () => {
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    (el as unknown as ShadowRoot).shadowRoot!.dispatchEvent(
+      new CustomEvent("log-row-click", { detail: {}, bubbles: true }),
+    );
+    await el.updateComplete;
+    expect((el as unknown as { _drawers: unknown[] })._drawers).toHaveLength(0);
+    el.remove();
+  });
+
+  it("locks a drawer to its owning cell, clipped to the cell (not the grid)", async () => {
+    registerLogStream("openp41ge", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    const grid = (el as unknown as ShadowRoot).shadowRoot!.querySelector<HTMLElement>(".lw-grid")!;
+    vi.spyOn(grid, "getBoundingClientRect").mockReturnValue({
+      left: 100,
+      top: 50,
+      width: 800,
+      height: 600,
+      right: 900,
+      bottom: 650,
+    } as DOMRect);
+
+    // Cell occupies the left half of the grid (grid 800 wide; cell_l = 0, w=400).
+    const cell = mockCell(100, 400);
+    clickRow(el, cell);
+    await el.updateComplete;
+
+    const wrap = (el as unknown as ShadowRoot).shadowRoot!.querySelector<HTMLElement>(
+      '[data-testid="lw-drawer-wrap"]',
+    )!;
+    expect(wrap).toBeTruthy();
+    // Wrapper sits exactly over the cell (not the whole grid), clipping the
+    // drawer's slide so it animates in from the cell's own right edge.
+    expect(wrap.style.left).toBe("0px");
+    expect(wrap.style.top).toBe("0px");
+    expect(wrap.style.width).toBe("400px");
+    expect(wrap.style.height).toBe("600px");
+    expect(wrap.classList.contains("lw-drawer-wrap")).toBe(true);
+
+    // The drawer lives inside the cell-sized wrapper.
+    expect(wrap.querySelector('[data-testid="lw-detail-drawer"]')).toBeTruthy();
+
+    cell.remove();
+    el.remove();
+  });
+
+  it("keeps one drawer per cell, and closing one leaves the others open", async () => {
+    registerLogStream("openp41ge", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+
+    const grid = (el as unknown as ShadowRoot).shadowRoot!.querySelector<HTMLElement>(".lw-grid")!;
+    vi.spyOn(grid, "getBoundingClientRect").mockReturnValue({
+      left: 100,
+      top: 50,
+      width: 800,
+      height: 600,
+      right: 900,
+      bottom: 650,
+    } as DOMRect);
+
+    const cellA = mockCell(100, 400);
+    const cellB = mockCell(500, 400);
+    clickRow(el, cellA);
+    clickRow(el, cellB);
+    await el.updateComplete;
+
+    const wraps = (el as unknown as ShadowRoot).shadowRoot!.querySelectorAll<HTMLElement>(
+      '[data-testid="lw-drawer-wrap"]',
+    );
+    expect(wraps).toHaveLength(2);
+    // Cell A drawer only covers A; Cell B drawer only covers B.
+    expect(wraps[0].style.width).toBe("400px");
+    expect(wraps[0].style.left).toBe("0px");
+    expect(wraps[1].style.width).toBe("400px");
+    expect(wraps[1].style.left).toBe("400px");
+
+    // Closing A's drawer (its mask is inside A's wrapper) leaves B open.
+    wraps[0].querySelector<HTMLElement>(".lw-drawer-mask")!.click();
+    await el.updateComplete;
+    const drawerStore = (el as unknown as { _drawers: Array<{ cell: Element | null }> })._drawers;
+    expect(drawerStore).toHaveLength(1);
+    expect(drawerStore[0].cell).toBe(cellB);
+    expect(
+      (el as unknown as ShadowRoot).shadowRoot!.querySelectorAll('[data-testid="lw-drawer-wrap"]'),
+    ).toHaveLength(1);
+
+    cellA.remove();
+    cellB.remove();
+    el.remove();
+  });
+
+  it("replaces (not duplicates) a drawer when the same cell is clicked again", async () => {
+    registerLogStream("openp41ge", "name-a");
+    const el = make();
+    document.body.appendChild(el as unknown as HTMLElement);
+    await el.updateComplete;
+    const cell = mockCell(100, 400);
+    clickRow(el, cell);
+    clickRow(el, cell);
+    await el.updateComplete;
+    expect((el as unknown as { _drawers: unknown[] })._drawers).toHaveLength(1);
+    cell.remove();
+    el.remove();
+  });
+});

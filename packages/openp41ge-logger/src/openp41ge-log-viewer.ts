@@ -248,7 +248,12 @@ export class Openp41geLogViewer extends LitElement {
     this._scrollbar = OverlayScrollbar.attach(list, {
       axis: "both",
       container,
-      inset: { bottom: "34px" },
+      // The bottom inset uses a CSS variable the viewer updates whenever the
+      // filter/find bars open or close, so both the horizontal and vertical
+      // scrollbars stop ABOVE the bars (which sit between the list and the
+      // bottom bar) instead of extending down over them. Default 34px = the
+      // bottom bar's height (the previous fixed value when no bars are shown).
+      inset: { bottom: "var(--lw-scrollbar-bottom, 34px)" },
       styleTarget,
       size: 9,
       hoverSize: 12,
@@ -256,8 +261,21 @@ export class Openp41geLogViewer extends LitElement {
     });
   }
 
+  /** Height between the bottom of the log list and the bottom of the viewer,
+   *  i.e. the filter/find bar(s) + the bottom bar. Drives the overlay
+   *  scrollbar's bottom inset so the thumbs stop above the bars when they are
+   *  shown. */
+  private _updateScrollbarInset(): void {
+    const container = this.querySelector<HTMLElement>(".viewer-root");
+    const list = this._listEl;
+    if (!container || !list) return;
+    const below = container.getBoundingClientRect().bottom - list.getBoundingClientRect().bottom;
+    container.style.setProperty("--lw-scrollbar-bottom", `${Math.max(0, below)}px`);
+  }
+
   protected firstUpdated(): void {
     this._attachScrollbar();
+    this._updateScrollbarInset();
   }
 
   /** Advance width (px) of one glyph in the viewer's monospace font, measured
@@ -913,15 +931,24 @@ export class Openp41geLogViewer extends LitElement {
   }
 
   /** Render a searchable field with `<mark>` highlight(s) for the matching ranges. */
-  private _highlighted(entry: LogViewEntry, segment: SearchSegment): TemplateResult {
-    const text: string = {
-      level: LOG_LEVEL_LABELS[entry.level],
-      time: formatTime(entry.timestamp),
-      source: entry.source,
-      message: entry.message,
-    }[segment];
-    const ranges = this._searchRangeMap.get(this._entryKey(entry))?.[segment];
-    if (!this._searchOpen || !ranges || ranges.length === 0) {
+  private _highlighted(
+    entry: LogViewEntry,
+    segment: SearchSegment,
+    displayText?: string,
+  ): TemplateResult {
+    const text: string =
+      displayText ??
+      {
+        level: LOG_LEVEL_LABELS[entry.level],
+        time: formatTime(entry.timestamp),
+        source: entry.source,
+        message: entry.message,
+      }[segment];
+    const allRanges = this._searchRangeMap.get(this._entryKey(entry))?.[segment];
+    // The row may show a truncated message (first line only); clip the search
+    // highlight ranges to the displayed text so range indices stay valid.
+    const ranges = allRanges?.filter((r) => r.end <= text.length) ?? [];
+    if (!this._searchOpen || ranges.length === 0) {
       return html`${this._escapeHtml(text)}`;
     }
     const parts: TemplateResult[] = [];
@@ -963,6 +990,28 @@ export class Openp41geLogViewer extends LitElement {
     </button>`;
   }
 
+  /** The first line of a message — what the row shows. The rest of the
+   *  message (typically an appended stack trace) is shown in the detail drawer. */
+  private _messageFirstLine(message: string): string {
+    const nl = message.indexOf("\n");
+    return nl < 0 ? message : message.slice(0, nl);
+  }
+
+  /** A click on a log row (not its stream name) opens the detail drawer: emit
+   *  a bubbling custom event carrying the full entry so the Logs window host
+   *  can show its details. The stream-name click is left to `_openFilter`. */
+  private _onLogListClick = (e: MouseEvent): void => {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (target.closest(".log-name")) return;
+    const row = target.closest(".log-entry") as (HTMLElement & { entry?: LogViewEntry }) | null;
+    const entry = row?.entry;
+    if (!entry) return;
+    this.dispatchEvent(
+      new CustomEvent("log-row-click", { detail: { entry }, bubbles: true, composed: true }),
+    );
+  };
+
   private _onScroll(): void {
     const el = this._listEl;
     if (!el) return;
@@ -988,6 +1037,8 @@ export class Openp41geLogViewer extends LitElement {
     // the longest-line spacer (an attribute change, not a childList mutation
     // the scrollbar's observer watches) won't repaint it on its own. Refresh it
     // on every render so the thumb tracks the current content width/height.
+    // Also recompute the bottom inset when the filter/find bars open or close.
+    this._updateScrollbarInset();
     this._scrollbar?.update();
 
     // Measure the rendered window so offset math stays accurate (rows may wrap
@@ -1089,6 +1140,15 @@ export class Openp41geLogViewer extends LitElement {
              search drain nudges scrollTop down (appearing as "scrolling"). */
           overflow-anchor: none;
         }
+        /* The app injects a global [tabindex]:focus-visible { outline: 2px solid
+           #4a9eff }. The log list is focused on any click in the pane (to keep
+           ⌘F working), which would paint a distracting blue box around the whole
+           tab content view. Suppress it here (same treatment as the find/filter
+           inputs below). */
+        .log-list:focus,
+        .log-list:focus-visible {
+          outline: none;
+        }
         .bottom-bar {
           display: flex;
           align-items: center;
@@ -1102,6 +1162,8 @@ export class Openp41geLogViewer extends LitElement {
           flex-shrink: 0;
         }
         .level-btn {
+          position: relative;
+          overflow: visible;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1116,7 +1178,11 @@ export class Openp41geLogViewer extends LitElement {
           height: auto;
           box-sizing: border-box;
         }
-        .level-btn:hover {
+        /* Hovering a level button highlights it and every more-severe level —
+           the same cumulative set that becomes active when it is selected
+           (hover INFO lights INFO+WARN+ERROR, hover DEBUG lights all four). */
+        .level-btn:hover,
+        .level-btn:hover ~ .level-btn {
           background: rgba(255, 255, 255, 0.07);
           color: var(--text-primary, #fff);
         }
@@ -1465,8 +1531,8 @@ export class Openp41geLogViewer extends LitElement {
           align-self: stretch;
           display: grid;
           place-items: center;
-          width: calc(34px + var(--grid-edge-left-pad, 0px));
-          padding: 0 0 0 var(--grid-edge-left-pad, 0px);
+          width: 34px;
+          padding: 0;
           cursor: pointer;
           background: transparent;
           border: 1px solid transparent;
@@ -1491,7 +1557,12 @@ export class Openp41geLogViewer extends LitElement {
         }
       </style>
       <div class="viewer-root">
-        <div class="log-list${this._wrap ? "" : " nowrap"}" tabindex="0" @scroll=${this._onScroll}>
+        <div
+          class="log-list${this._wrap ? "" : " nowrap"}"
+          tabindex="0"
+          @scroll=${this._onScroll}
+          @click=${this._onLogListClick}
+        >
           ${offsetTop > 0 ? html`<div class="vspacer" style="height:${offsetTop}px"></div>` : ""}
           ${
             windowItems.length === 0
@@ -1513,6 +1584,7 @@ export class Openp41geLogViewer extends LitElement {
                         <div
                           class="log-entry level-${levelClass(item.entry.level)}"
                           data-item-key="${item.key}"
+                          .entry=${item.entry}
                         >
                           <span class="log-level-tag"
                             >${this._highlighted(item.entry, "level")}</span
@@ -1525,7 +1597,13 @@ export class Openp41geLogViewer extends LitElement {
                             @click=${() => this._openFilter(item.entry.source)}
                             >[${this._highlighted(item.entry, "source")}]</span
                           >
-                          <span class="log-text">${this._highlighted(item.entry, "message")}</span>
+                          <span class="log-text"
+                            >${this._highlighted(
+                              item.entry,
+                              "message",
+                              this._messageFirstLine(item.entry.message),
+                            )}</span
+                          >
                         </div>
                       `,
                 )
@@ -1665,7 +1743,7 @@ export class Openp41geLogViewer extends LitElement {
           ${LEVELS.map(
             (lvl) => html`
               <button
-                class="level-btn${lvl === this._minLevel ? " active" : ""}"
+                class="level-btn${lvl >= this._minLevel ? " active" : ""}"
                 @click=${() => this._setLevel(lvl)}
               >
                 ${LOG_LEVEL_LABELS[lvl]}
