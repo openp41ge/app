@@ -2056,6 +2056,14 @@ export class Openp41geLogsWindow extends LitElement {
           z-index: 101;
           animation: lw-drawer-in 0.18s ease-out;
         }
+        /* The drawer's top-left corner overdraws up into the window titlebar,
+           completing the hand-drawn line along the drawer's top edge. (The
+           top-right corner is carried by the close button's tr,up accent.) */
+        .lw-drawer overdraw-line[corner="tl"][dir="up"] {
+          left: -1px;
+          bottom: 100%;
+          --overdraw-color: var(--border-divider, #2d2d2d);
+        }
         @keyframes lw-drawer-in {
           from {
             transform: translateX(100%);
@@ -2086,6 +2094,15 @@ export class Openp41geLogsWindow extends LitElement {
           white-space: nowrap;
           font-family: var(--font-ui, sans-serif);
           font-weight: 600;
+        }
+        /* Empty bottom bar mirroring the top bar's 35px height and surface
+           background (with a divider on its body-facing edge). */
+        .lw-drawer-foot {
+          flex-shrink: 0;
+          height: 35px;
+          box-sizing: border-box;
+          border-top: 1px solid var(--border-divider, #2d2d2d);
+          background: var(--bg-surface, #161616);
         }
         /* Square close button filling the head's full height, flush against the
            drawer's right edge. A left border separates it from the title; its
@@ -2202,6 +2219,12 @@ export class Openp41geLogsWindow extends LitElement {
                 <div class="lw-drawer-wrap" data-testid="lw-drawer-wrap" style=${wrapStyle}>
                   <div class="lw-drawer-mask" @click=${() => this._closeDrawer(d.id)}></div>
                   <aside class="lw-drawer" data-testid="lw-detail-drawer">
+                    <overdraw-line
+                      corner="tl"
+                      dir="up"
+                      style="--overdraw-length: 8px"
+                      aria-hidden="true"
+                    ></overdraw-line>
                     <div class="lw-drawer-head">
                       <span class="lw-drawer-head-title" data-testid="lw-drawer-title"
                         >Log details</span
@@ -2271,6 +2294,10 @@ export class Openp41geLogsWindow extends LitElement {
                           : nothing
                       }
                     </div>
+                    <div
+                      class="lw-drawer-foot"
+                      data-testid="lw-drawer-foot"
+                    ></div>
                   </aside>
                 </div>
               `;

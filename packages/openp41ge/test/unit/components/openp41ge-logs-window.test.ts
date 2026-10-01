@@ -1035,6 +1035,24 @@ describe("log detail drawer", () => {
       expect(line.getAttribute("style")).toContain("--overdraw-length: 8px");
     }
 
+    // The drawer itself carries the matching up-pointing accent on its
+    // top-left corner, completing the hand-drawn line along the drawer's top
+    // edge (the top-right corner is the close button's tr,up accent).
+    const drawer = (el as unknown as ShadowRoot).shadowRoot!.querySelector<HTMLElement>(
+      '[data-testid="lw-detail-drawer"]',
+    )!;
+    const drawerTopLine = drawer.querySelector<HTMLElement>(
+      'overdraw-line[corner="tl"][dir="up"]',
+    );
+    expect(drawerTopLine).toBeTruthy();
+    expect(drawerTopLine!.getAttribute("style")).toContain("--overdraw-length: 8px");
+
+    // The drawer carries an empty bottom bar mirroring the top bar's 35px
+    // height and surface background.
+    const foot = drawer.querySelector<HTMLElement>('[data-testid="lw-drawer-foot"]');
+    expect(foot).toBeTruthy();
+    expect(foot!.textContent).toBe("");
+
     close.click();
     await el.updateComplete;
     expect((el as unknown as { _drawers: unknown[] })._drawers).toHaveLength(0);
