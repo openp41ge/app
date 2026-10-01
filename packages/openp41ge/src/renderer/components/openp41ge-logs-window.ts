@@ -1947,42 +1947,50 @@ export class Openp41geLogsWindow extends LitElement {
            the corner (anchored 1px outside the padding box so the solid end
            lands on the border), fading to its tip. */
         .lw-codeblock overdraw-line[corner="tl"][dir="left"],
-        .lw-copy-btn overdraw-line[corner="tl"][dir="left"] {
+        .lw-copy-btn overdraw-line[corner="tl"][dir="left"],
+        .lw-drawer-close overdraw-line[corner="tl"][dir="left"] {
           top: -1px;
           right: 100%;
         }
         .lw-codeblock overdraw-line[corner="tl"][dir="up"],
-        .lw-copy-btn overdraw-line[corner="tl"][dir="up"] {
+        .lw-copy-btn overdraw-line[corner="tl"][dir="up"],
+        .lw-drawer-close overdraw-line[corner="tl"][dir="up"] {
           left: -1px;
           bottom: 100%;
         }
         .lw-codeblock overdraw-line[corner="tr"][dir="right"],
-        .lw-copy-btn overdraw-line[corner="tr"][dir="right"] {
+        .lw-copy-btn overdraw-line[corner="tr"][dir="right"],
+        .lw-drawer-close overdraw-line[corner="tr"][dir="right"] {
           top: -1px;
           left: 100%;
         }
         .lw-codeblock overdraw-line[corner="tr"][dir="up"],
-        .lw-copy-btn overdraw-line[corner="tr"][dir="up"] {
+        .lw-copy-btn overdraw-line[corner="tr"][dir="up"],
+        .lw-drawer-close overdraw-line[corner="tr"][dir="up"] {
           left: 100%;
           bottom: 100%;
         }
         .lw-codeblock overdraw-line[corner="bl"][dir="left"],
-        .lw-copy-btn overdraw-line[corner="bl"][dir="left"] {
+        .lw-copy-btn overdraw-line[corner="bl"][dir="left"],
+        .lw-drawer-close overdraw-line[corner="bl"][dir="left"] {
           top: 100%;
           right: 100%;
         }
         .lw-codeblock overdraw-line[corner="bl"][dir="down"],
-        .lw-copy-btn overdraw-line[corner="bl"][dir="down"] {
+        .lw-copy-btn overdraw-line[corner="bl"][dir="down"],
+        .lw-drawer-close overdraw-line[corner="bl"][dir="down"] {
           left: -1px;
           top: 100%;
         }
         .lw-codeblock overdraw-line[corner="br"][dir="right"],
-        .lw-copy-btn overdraw-line[corner="br"][dir="right"] {
+        .lw-copy-btn overdraw-line[corner="br"][dir="right"],
+        .lw-drawer-close overdraw-line[corner="br"][dir="right"] {
           top: 100%;
           left: 100%;
         }
         .lw-codeblock overdraw-line[corner="br"][dir="down"],
-        .lw-copy-btn overdraw-line[corner="br"][dir="down"] {
+        .lw-copy-btn overdraw-line[corner="br"][dir="down"],
+        .lw-drawer-close overdraw-line[corner="br"][dir="down"] {
           left: 100%;
           top: 100%;
         }
@@ -2050,7 +2058,7 @@ export class Openp41geLogsWindow extends LitElement {
           /* Matches the cell tab bar's height (35px tabs + 1px border). */
           height: 35px;
           box-sizing: border-box;
-          padding: 0 8px 0 12px;
+          padding: 0 0 0 12px;
           border-bottom: 1px solid var(--border-divider, #2d2d2d);
           background: var(--bg-surface, #161616);
           color: var(--text-primary, #d4d4d4);
@@ -2065,18 +2073,31 @@ export class Openp41geLogsWindow extends LitElement {
           font-family: var(--font-ui, sans-serif);
           font-weight: 600;
         }
+        /* Square close button filling the head's full height, flush against the
+           drawer's right edge. A left border separates it from the title; its
+           corners carry the shared <overdraw-line> accents so it matches the
+           code-block frames. The -1px top/left on each accent lands the solid
+           end on the button border; lines pointing up are clipped by the
+           cell overlay (the button sits at the drawer's top edge) — the rest
+           still read as the hand-drawn overdraw. */
         .lw-drawer-close {
+          position: relative;
+          overflow: visible;
           flex-shrink: 0;
-          width: 24px;
-          height: 24px;
+          align-self: stretch;
+          box-sizing: border-box;
+          width: 35px;
+          height: 35px;
           display: grid;
           place-items: center;
           background: transparent;
           border: none;
-          border-radius: 4px;
+          border-left: 1px solid var(--border-divider, #2d2d2d);
+          border-radius: 0;
           color: var(--text-secondary, #999);
           cursor: pointer;
           padding: 0;
+          --overdraw-color: var(--border-divider, #2d2d2d);
         }
         .lw-drawer-close:hover {
           background: rgba(255, 255, 255, 0.07);
@@ -2187,6 +2208,7 @@ export class Openp41geLogsWindow extends LitElement {
                         >
                           <path d="M3 3l10 10M13 3L3 13" />
                         </svg>
+                        ${cornerOverdraw()}
                       </button>
                     </div>
                     <div class="lw-detail-body">
