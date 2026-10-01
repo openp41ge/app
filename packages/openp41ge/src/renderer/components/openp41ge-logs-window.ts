@@ -195,10 +195,21 @@ const CHECK_ICON = html` <svg
   <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />
 </svg>`;
 
-/** The 8 <overdraw-line> corner accents (2 per corner) shared by a square frame
+/** The <overdraw-line> corner accents (2 per corner) shared by a square frame
  *  and the code-block copy button. Each line's solid end sits on the frame's
- *  border and its stroke overdraws outward past the corner before fading. */
-function cornerOverdraw(): TemplateResult {
+ *  border and its stroke overdraws outward past the corner before fading.
+ *  Pass `verticalOnly` to emit just the up/down accents — used where a
+ *  horizontal border already runs along the top/bottom edge, so only the
+ *  vertical strokes need the hand-drawn overdraw. */
+function cornerOverdraw(verticalOnly = false): TemplateResult {
+  if (verticalOnly) {
+    return html`
+      <overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line
+      ><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line
+      ><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line
+      ><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
+    `;
+  }
   return html`
     <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line
     ><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
@@ -1947,8 +1958,7 @@ export class Openp41geLogsWindow extends LitElement {
            the corner (anchored 1px outside the padding box so the solid end
            lands on the border), fading to its tip. */
         .lw-codeblock overdraw-line[corner="tl"][dir="left"],
-        .lw-copy-btn overdraw-line[corner="tl"][dir="left"],
-        .lw-drawer-close overdraw-line[corner="tl"][dir="left"] {
+        .lw-copy-btn overdraw-line[corner="tl"][dir="left"] {
           top: -1px;
           right: 100%;
         }
@@ -1959,8 +1969,7 @@ export class Openp41geLogsWindow extends LitElement {
           bottom: 100%;
         }
         .lw-codeblock overdraw-line[corner="tr"][dir="right"],
-        .lw-copy-btn overdraw-line[corner="tr"][dir="right"],
-        .lw-drawer-close overdraw-line[corner="tr"][dir="right"] {
+        .lw-copy-btn overdraw-line[corner="tr"][dir="right"] {
           top: -1px;
           left: 100%;
         }
@@ -1971,8 +1980,7 @@ export class Openp41geLogsWindow extends LitElement {
           bottom: 100%;
         }
         .lw-codeblock overdraw-line[corner="bl"][dir="left"],
-        .lw-copy-btn overdraw-line[corner="bl"][dir="left"],
-        .lw-drawer-close overdraw-line[corner="bl"][dir="left"] {
+        .lw-copy-btn overdraw-line[corner="bl"][dir="left"] {
           top: 100%;
           right: 100%;
         }
@@ -1983,8 +1991,7 @@ export class Openp41geLogsWindow extends LitElement {
           top: 100%;
         }
         .lw-codeblock overdraw-line[corner="br"][dir="right"],
-        .lw-copy-btn overdraw-line[corner="br"][dir="right"],
-        .lw-drawer-close overdraw-line[corner="br"][dir="right"] {
+        .lw-copy-btn overdraw-line[corner="br"][dir="right"] {
           top: 100%;
           left: 100%;
         }
@@ -2002,14 +2009,20 @@ export class Openp41geLogsWindow extends LitElement {
           font-size: 12px;
         }
         /* Detail drawer — one per grid cell. Each is wrapped in a cell-sized
-           overlay with overflow:hidden, so the drawer slides in from ITS OWN
-           cell's right edge (not the grid's) and is clipped to that cell, never
-           spilling into neighboring columns or the titlebar/sidebar. Spans 80%
-           of the cell's width. It overlays the cell's tab bar, so it carries a
-           top bar matching the tab bar's 35px height (title + close). */
+           overlay, so the drawer slides in from ITS OWN cell's right edge (not
+           the grid's) and is clipped to that cell, never spilling into
+           neighboring columns. Spans 80% of the cell's width. It overlays the
+           cell's tab bar, so it carries a top bar matching the tab bar's 35px
+           height (title + close).
+           The clip is [clip-path] rather than [overflow: hidden]: the drawer's
+           top bar sits flush against the cell's top edge (just below the window
+           titlebar), so the close button's up-pointing overdraw accents need to
+           overshoot a few px into the titlebar to read as hand-drawn. The
+           negative *top* inset allows that while left/right/bottom insets of 0
+           keep the slide-in and the drawer clipped to the cell. */
         .lw-drawer-wrap {
           position: absolute;
-          overflow: hidden;
+          clip-path: inset(-12px 0 0 0);
           z-index: 100;
         }
         .lw-drawer-mask {
@@ -2075,11 +2088,13 @@ export class Openp41geLogsWindow extends LitElement {
         }
         /* Square close button filling the head's full height, flush against the
            drawer's right edge. A left border separates it from the title; its
-           corners carry the shared <overdraw-line> accents so it matches the
-           code-block frames. The -1px top/left on each accent lands the solid
-           end on the button border; lines pointing up are clipped by the
-           cell overlay (the button sits at the drawer's top edge) — the rest
-           still read as the hand-drawn overdraw. */
+           corners carry the vertical <overdraw-line> accents so it matches the
+           code-block frames. Horizontal accents are omitted — a horizontal
+           border already runs along the button's top (the drawer/tab-bar line)
+           and bottom (the head's border) — so only the up/down strokes overdraw.
+           The -1px offset on each accent lands the solid end on the button's
+           edge; the up strokes overshoot into the titlebar above (allowed by
+           the wrap's clip-path), pointing down strokes hang into the body. */
         .lw-drawer-close {
           position: relative;
           overflow: visible;
@@ -2208,7 +2223,7 @@ export class Openp41geLogsWindow extends LitElement {
                         >
                           <path d="M3 3l10 10M13 3L3 13" />
                         </svg>
-                        ${cornerOverdraw()}
+                        ${cornerOverdraw(true)}
                       </button>
                     </div>
                     <div class="lw-detail-body">

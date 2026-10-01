@@ -1020,6 +1020,18 @@ describe("log detail drawer", () => {
       '[data-testid="lw-drawer-close"]',
     )!;
     expect(close).toBeTruthy();
+
+    // The close button carries only the vertical overdraw accents: the up/down
+    // strokes overdraw the button's top/bottom edges, while the horizontal
+    // strokes are omitted because a border already runs along those edges
+    // (the drawer's top line and the head's border-bottom).
+    const lines = [...close.querySelectorAll("overdraw-line")];
+    expect(lines).toHaveLength(4);
+    for (const line of lines) {
+      const dir = line.getAttribute("dir");
+      expect(dir).toMatch(/^(up|down)$/);
+    }
+
     close.click();
     await el.updateComplete;
     expect((el as unknown as { _drawers: unknown[] })._drawers).toHaveLength(0);
