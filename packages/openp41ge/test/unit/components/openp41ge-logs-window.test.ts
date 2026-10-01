@@ -1030,6 +1030,9 @@ describe("log detail drawer", () => {
     for (const line of lines) {
       const dir = line.getAttribute("dir");
       expect(dir).toMatch(/^(up|down)$/);
+      // Fixed accent length so the up-strokes clearly overshoot into the
+      // window titlebar above the drawer.
+      expect(line.getAttribute("style")).toContain("--overdraw-length: 8px");
     }
 
     close.click();

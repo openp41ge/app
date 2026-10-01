@@ -200,26 +200,21 @@ const CHECK_ICON = html` <svg
  *  border and its stroke overdraws outward past the corner before fading.
  *  Pass `verticalOnly` to emit just the up/down accents — used where a
  *  horizontal border already runs along the top/bottom edge, so only the
- *  vertical strokes need the hand-drawn overdraw. */
-function cornerOverdraw(verticalOnly = false): TemplateResult {
+ *  vertical strokes need the hand-drawn overdraw. Pass a `length` to fix the
+ *  accent length in px (otherwise the ordinal-derived length is used). */
+function cornerOverdraw(verticalOnly = false, length?: number): TemplateResult {
+  const style = length ? `--overdraw-length: ${length}px` : nothing;
+  const line = (corner: string, dir: string) =>
+    html`<overdraw-line
+      corner=${corner}
+      dir=${dir}
+      style=${style}
+      aria-hidden="true"
+    ></overdraw-line>`;
   if (verticalOnly) {
-    return html`
-      <overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line
-      ><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line
-      ><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line
-      ><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
-    `;
+    return html`${line("tl", "up")}${line("tr", "up")}${line("bl", "down")}${line("br", "down")}`;
   }
-  return html`
-    <overdraw-line corner="tl" dir="left" aria-hidden="true"></overdraw-line
-    ><overdraw-line corner="tl" dir="up" aria-hidden="true"></overdraw-line>
-    <overdraw-line corner="tr" dir="right" aria-hidden="true"></overdraw-line
-    ><overdraw-line corner="tr" dir="up" aria-hidden="true"></overdraw-line>
-    <overdraw-line corner="bl" dir="left" aria-hidden="true"></overdraw-line
-    ><overdraw-line corner="bl" dir="down" aria-hidden="true"></overdraw-line>
-    <overdraw-line corner="br" dir="right" aria-hidden="true"></overdraw-line
-    ><overdraw-line corner="br" dir="down" aria-hidden="true"></overdraw-line>
-  `;
+  return html`${line("tl", "left")}${line("tl", "up")}${line("tr", "right")}${line("tr", "up")}${line("bl", "left")}${line("bl", "down")}${line("br", "right")}${line("br", "down")}`;
 }
 
 @customElement("openp41ge-logs-window")
@@ -1564,7 +1559,11 @@ export class Openp41geLogsWindow extends LitElement {
           min-height: 0;
           position: relative;
           display: flex;
-          overflow: hidden;
+          /* clip-path (not overflow:hidden) so the drawer's top bar, flush with
+             the grid's top edge, can let the close button's up-pointing overdraw
+             accent overshoot into the window titlebar above. Left/right/bottom
+             insets of 0 keep everything else clipped to the grid. */
+          clip-path: inset(-12px 0 0 0);
         }
         .lw-grid tab-grid {
           flex: 1;
@@ -1580,7 +1579,9 @@ export class Openp41geLogsWindow extends LitElement {
           min-height: 0;
           display: flex;
           flex-direction: row;
-          overflow: hidden;
+          /* clip-path (not overflow:hidden) so the drawer overdraw accent can
+             overshoot the body's top edge into the window titlebar. */
+          clip-path: inset(-12px 0 0 0);
         }
         .lw-sidebar {
           width: 260px;
@@ -2223,7 +2224,7 @@ export class Openp41geLogsWindow extends LitElement {
                         >
                           <path d="M3 3l10 10M13 3L3 13" />
                         </svg>
-                        ${cornerOverdraw(true)}
+                        ${cornerOverdraw(true, 8)}
                       </button>
                     </div>
                     <div class="lw-detail-body">
